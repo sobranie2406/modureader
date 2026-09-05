@@ -66,6 +66,9 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Release architecture validation tests
+        run: python3 -m unittest discover -s test -p 'release_package_test.py' -v
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

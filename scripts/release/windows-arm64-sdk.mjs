@@ -19,11 +19,12 @@ const root = process.env.FLUTTER_ROOT;
 if (!root || !process.env.CI) throw Error('Missing CI Flutter SDK');
 const source = path.join(root, 'packages/flutter_tools/lib/src/base/os.dart');
 const before = fs.readFileSync(source, 'utf8');
-const anchor = 'HostPlatform get hostPlatform {';
-if (before.split(anchor).length !== 2) throw Error('Flutter source changed; review compatibility patch');
 const marker = '// Modu: detect the native ARM64 Windows host under x64 Dart emulation.';
 if (!before.includes(marker)) {
-  fs.writeFileSync(source, before.replace(anchor, `${anchor}\n    ${marker}\n    if (_platform.isWindows && _platform.environment['MODU_NATIVE_WINDOWS_ARM64'] == '1') {\n      return HostPlatform.windows_arm64;\n    }`));
+  // There is also a macOS override. Match only the shared ABI-based getter.
+  const anchor = /HostPlatform get hostPlatform \{(?=\r?\n\s+return switch \(_currentAbi\))/g;
+  if ([...before.matchAll(anchor)].length !== 1) throw Error('Flutter source changed; review compatibility patch');
+  fs.writeFileSync(source, before.replace(anchor, match => `${match}\n    ${marker}\n    if (_platform.isWindows && _platform.environment['MODU_NATIVE_WINDOWS_ARM64'] == '1') {\n      return HostPlatform.windows_arm64;\n    }`));
   // Regenerable tool snapshot in this job's SDK, not user code or credentials.
   const snapshot = path.join(root, 'bin/cache/flutter_tools.snapshot');
   if (fs.existsSync(snapshot)) fs.unlinkSync(snapshot);

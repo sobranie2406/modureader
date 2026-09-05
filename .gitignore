@@ -35,6 +35,7 @@ migrate_working_dir/
 /android/build/
 /dist-release/
 /.release-secrets/
+__pycache__/
 **/target/
 *.p12
 *.pfx
