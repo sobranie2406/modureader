@@ -17,3 +17,14 @@ Linux CI 发现并修复了平台识别遗漏及相关目录/数据库分支。�
 - 单独增加的新安装系统朗读探针复现 `No voice selected for TtsService.system`：未选择声音时业务方法在调用原生 speak 前失败。此项不包含在前述 163 项既有通过测试中，仍待修复。
 - 源码和插件清单确认 Linux 系统 TTS 没有实现，但设置仍显示并默认选择它；尚未完成 Linux 实机验证，不由此推断在线 TTS 也不可用。
 - Windows、Linux、Android、iOS 的发布包尚未完成全功能 GUI 验收。macOS 的局部通过同样不代表付费 AI、真实模型推理、音频播放、WebDAV 服务端和破坏性备份恢复已全量验收。
+
+## 原生安装器复查（2026-09-05）
+
+[工作流 33953107529](https://github.com/sobranie2406/modureader/actions/runs/33953107529) 的六个桌面目标全部通过，打包单元测试增至 10 项。
+
+- macOS x64 / ARM64：生成 DMG、磁盘映像完整性检查、只读挂载、Applications 拖放链接、应用深层 ad-hoc 签名、原生架构和源码记录检查。
+- Windows x64 / ARM64：在对应架构临时 CI 系统中实际执行 EXE 静默安装，检查程序和 DLL 架构，执行卸载，并检查安装目录外的合成文件保留。修正了 ARM64 测试等待卸载器自身清理的竞态。
+- Linux x64 / ARM64：在 Debian 13 容器中用 APT 实际安装 DEB 及系统依赖，检查菜单入口、ELF 架构、主程序和包内共享库的动态链接，再实际卸载。
+- 上述 Linux 检查发现并修正了原压缩包漏装 ONNX Runtime 实体库以及插件依赖 CI 绝对路径的问题；新 DEB 补齐同版本官方库并使用相对 RPATH。旧 tar.gz 不再作为应用下载入口。
+
+这些是安装器与运行依赖验证，不等于 Windows / Linux 全功能 GUI 验收，也不意味着前述 TTS 业务问题已修复。此次没有重新编译应用业务代码；Android / iOS 安装包没有改动。

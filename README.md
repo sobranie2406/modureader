@@ -17,14 +17,15 @@ This is an independently modified derivative, not an official release of either 
 
 | 平台 | 已发布架构 | 分发形式与限制 |
 | --- | --- | --- |
-| Windows | x64、ARM64 | 便携 ZIP；未做商业代码签名，需要 WebView2 Runtime |
-| Linux | x64、ARM64 | tar.gz；Debian 13 (trixie) 构建，需 GTK/WPE WebKit 等系统库 |
+| Windows | x64、ARM64 | EXE 安装器；支持快捷方式和卸载，未做商业代码签名，需要 WebView2 Runtime |
+| Linux | x64、ARM64 | DEB；面向 Debian 13 (trixie)，使用 APT 安装并解析系统依赖 |
 | Android | x86_64、arm64-v8a | 项目专用密钥签名的 APK；首次安装请核验下载来源 |
-| macOS | x64、ARM64 | ZIP；未公证，非 App Store 版本 |
+| macOS | x64、ARM64 | DMG；打开后拖入 Applications，未公证，非 App Store 版本 |
 | iOS | ARM64 真机 | iOS 16+，**unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
 
 这里的 x64 指 x86-64，ARM64 也是 64 位。iPhone/iPad 没有 x64 真机包。
 首个公开测试版为 [v0.1.0-beta.1](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.1)，共 9 个程序包，均附 SHA-256 校验文件。架构、签名和哈希检查不等于所有功能均经设备测试。
+桌面端使用原生安装包，不再以 ZIP / tar.gz 作为应用安装入口。Android 的 `-notices.zip` 是许可证资料；GitHub 自动提供的 `Source code (zip)` 是源码，两者都不是程序安装包。
 不提供绕过操作系统安全机制的脚本。签名、依赖和安装说明见 [发布说明](docs/RELEASING.md)。
 
 ## 功能一览

@@ -124,6 +124,16 @@ jobs:
         run: ./scripts/release/setup-inno.ps1
       - name: Verify architecture and package
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
+      - name: Verify Windows installation and uninstallation
+        if: matrix.platform == 'windows'
+        run: python scripts/release/verify_windows_install.py dist-release/*-setup.exe ${{ matrix.arch }}
+      - name: Verify installed Debian package dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get install -y ./dist-release/*.deb
+          python scripts/release/verify_linux_install.py ${{ matrix.arch }}
+          sudo apt-get remove -y modureader
+          test ! -e /opt/modureader/modu
       - uses: actions/upload-artifact@v4
         with:
           name: modu-${{ matrix.platform }}-${{ matrix.arch }}
