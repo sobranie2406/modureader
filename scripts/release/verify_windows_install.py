@@ -26,11 +26,14 @@ def smoke(installer, arch):
             raise RuntimeError('No registered uninstaller was installed')
         subprocess.run([str(uninstall), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
                        check=True, timeout=120)
-        for _ in range(30):
-            if not (install / 'modu.exe').exists():
+        # Inno's uninstaller uses a child process to remove its own executable.
+        # Especially under ARM64 emulation, waiting only for modu.exe races with
+        # that child and makes TemporaryDirectory cleanup hit a locked EXE.
+        for _ in range(50):
+            if not (install / 'modu.exe').exists() and not uninstall.exists():
                 break
             time.sleep(1)
-        if (install / 'modu.exe').exists() or not sentinel.is_file():
+        if (install / 'modu.exe').exists() or uninstall.exists() or not sentinel.is_file():
             raise RuntimeError('Uninstall smoke check failed')
     print(f'Windows {arch}: silent installation, payload architecture and uninstall passed')
 
