@@ -17,8 +17,8 @@ This is an independently modified derivative, not an official release of either 
 | Windows | x64、ARM64 | 便携 ZIP；未做商业代码签名，需要 WebView2 Runtime |
 | Linux | x64、ARM64 | tar.gz；Debian 13 (trixie) 构建，需 GTK/WPE WebKit 等系统库 |
 | Android | x86_64、arm64-v8a | 项目专用密钥签名的 APK；首次安装请核验下载来源 |
-| macOS | x64、ARM64 | ZIP / DMG；未公证，非 App Store 版本 |
-| iOS | ARM64 真机 | **unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
+| macOS | x64、ARM64 | ZIP；未公证，非 App Store 版本 |
+| iOS | ARM64 真机 | iOS 16+，**unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
 
 这里的 x64 指 x86-64，ARM64 也是 64 位。iPhone/iPad 没有 x64 真机包。
 表格是构建目标，**只有 Release 中实际存在并通过校验的附件才是已生成产物**。

@@ -90,6 +90,9 @@ def package(platform, arch, version):
     elif platform == "linux":
         bundle = ROOT / f"build/linux/{arch}/release/bundle"
         verify(bundle / "modu", platform, arch)
+        dependencies = run("ldd", str(bundle / "modu"))
+        if "not found" in dependencies:
+            raise RuntimeError(f"Unresolved Linux runtime libraries:\n{dependencies}")
         for binary in bundle.rglob("*tokenizers*.so"):
             verify(binary, platform, arch)
         shutil.copytree(bundle, stage, dirs_exist_ok=True, symlinks=True)

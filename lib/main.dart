@@ -152,7 +152,7 @@ class _MyAppState extends ConsumerState<MyApp>
   }
 
   Future<void> _updateWindowInfo() async {
-    if (!AnxPlatform.isWindows && !AnxPlatform.isMacOS) {
+    if (!AnxPlatform.isDesktop) {
       return;
     }
     final windowOffset = await windowManager.getPosition();

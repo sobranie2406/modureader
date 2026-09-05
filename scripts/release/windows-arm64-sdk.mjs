@@ -5,7 +5,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-if (process.platform !== 'win32' || !/arm64/i.test(os.machine()) || process.env.RUNNER_ARCH !== 'ARM64') {
+import { execFileSync } from 'node:child_process';
+const nativeCpu = process.platform === 'win32' ? execFileSync('powershell.exe',
+  ['-NoProfile', '-Command', '(Get-CimInstance Win32_Processor | Select-Object -First 1).Architecture'],
+  { encoding: 'utf8' }).trim() : '';
+console.log(JSON.stringify({ process: process.arch, machine: os.machine(), nativeCpu }));
+// Win32_Processor.Architecture = 12 is ARM64. os.machine() can report AMD64
+// inside an emulated Node process and must not be used as the hardware test.
+if (process.platform !== 'win32' || nativeCpu !== '12') {
   throw Error('This compatibility patch is only for a real Windows ARM64 CI runner');
 }
 const root = process.env.FLUTTER_ROOT;

@@ -2,6 +2,11 @@ name: Modu Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      targets:
+        description: 'all or comma-separated targets (linux-x64,linux-arm64,windows-x64,windows-arm64,macos-x64,macos-arm64,android,ios)'
+        default: all
+        type: string
   push:
     tags: ['v*']
 
@@ -9,24 +14,34 @@ permissions:
   contents: read
 
 concurrency:
-  group: modu-packages-${{ github.ref }}
+  group: modu-packages-${{ github.ref }}-${{ github.sha }}-${{ inputs.targets || 'all' }}
   cancel-in-progress: false
 
 jobs:
+  targets:
+    runs-on: ubuntu-24.04
+    outputs:
+      desktop: ${{ steps.matrix.outputs.desktop }}
+      has_desktop: ${{ steps.matrix.outputs.has_desktop }}
+      android: ${{ steps.matrix.outputs.android }}
+      ios: ${{ steps.matrix.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: matrix
+        env:
+          MODU_BUILD_TARGETS: ${{ inputs.targets || 'all' }}
+        run: node scripts/release/matrix.mjs
+
   quality:
     uses: ./.github/workflows/pr-check.yml
 
   desktop:
+    needs: targets
+    if: needs.targets.outputs.has_desktop == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {os: ubuntu-24.04, platform: linux, arch: x64, container: 'debian:trixie'}
-          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64, container: 'debian:trixie'}
-          - {os: windows-2025, platform: windows, arch: x64, sdk_arch: x64}
-          - {os: windows-11-arm, platform: windows, arch: arm64, sdk_arch: x64}
-          - {os: macos-15-intel, platform: macos, arch: x64, xcode_arch: x86_64}
-          - {os: macos-15, platform: macos, arch: arm64, xcode_arch: arm64}
+        include: ${{ fromJSON(needs.targets.outputs.desktop) }}
     name: ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
@@ -115,6 +130,8 @@ jobs:
           retention-days: 14
 
   android:
+    needs: targets
+    if: needs.targets.outputs.android == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -162,6 +179,8 @@ jobs:
           retention-days: 14
 
   ios:
+    needs: targets
+    if: needs.targets.outputs.ios == 'true'
     name: ios-arm64-UNSIGNED
     runs-on: macos-15
     timeout-minutes: 90

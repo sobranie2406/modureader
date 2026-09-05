@@ -90,6 +90,12 @@ set_target_properties(${BINARY_NAME}
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+if(TARGET flutter_inappwebview_linux_plugin)
+  # The plugin references a newer optional API absent in Debian's WPE 2.48.
+  target_compile_options(flutter_inappwebview_linux_plugin PRIVATE
+    "-include" "${CMAKE_CURRENT_SOURCE_DIR}/wpe_compat.h")
+  target_link_libraries(flutter_inappwebview_linux_plugin PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 
 # === Installation ===
