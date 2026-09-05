@@ -229,6 +229,21 @@ Future<Uri> _mobileBuild(
         cc;
     env['CC_${triple.replaceAll('-', '_')}'] = cc;
     env['AR_${triple.replaceAll('-', '_')}'] = compiler.archiver.toFilePath();
+    // Rust may pass a 4 KB max-page-size even with a recent NDK. Apply to
+    // rustc's final cdylib link, not just the C dependencies or ZIP alignment.
+    final existingFlags =
+        env['CARGO_ENCODED_RUSTFLAGS'] ??
+        (env['RUSTFLAGS'] ?? '')
+            .split(RegExp(r'\s+'))
+            .where((v) => v.isNotEmpty)
+            .join('\x1f');
+    env['CARGO_ENCODED_RUSTFLAGS'] = [
+      if (existingFlags.isNotEmpty) existingFlags,
+      '-C',
+      'link-arg=-Wl,-z,max-page-size=16384',
+      '-C',
+      'link-arg=-Wl,-z,common-page-size=16384',
+    ].join('\x1f');
   } else {
     env['IPHONEOS_DEPLOYMENT_TARGET'] = input.config.code.iOS.targetVersion
         .toString();

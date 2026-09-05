@@ -35,8 +35,25 @@ jobs:
   quality:
     uses: ./.github/workflows/pr-check.yml
 
+  models:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: assets/models/embeddings
+          key: bundled-models-${{ hashFiles('assets/models/embeddings/manifest.json') }}
+      - name: Fetch and verify four pinned offline models
+        run: python3 scripts/release/bundle_models.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundled-embedding-models
+          path: assets/models/embeddings/
+          if-no-files-found: error
+          retention-days: 7
+
   desktop:
-    needs: targets
+    needs: [targets, models]
     if: needs.targets.outputs.has_desktop == 'true'
     strategy:
       fail-fast: false
@@ -56,6 +73,10 @@ jobs:
           apt-get update
           apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundled-embedding-models
+          path: assets/models/embeddings
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -104,6 +125,9 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           npm ci --prefix assets/foliate-js
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Verify bundled model native inference on macOS
+        if: matrix.platform == 'macos' && matrix.arch == 'arm64'
+        run: flutter test integration_test/bundled_embedding_test.dart -d macos --reporter expanded
       - name: Build desktop
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: '3'
@@ -112,7 +136,7 @@ jobs:
           FLUTTER_XCODE_CODE_SIGN_IDENTITY: '-'
         run: |
           if [[ "${{ matrix.platform }}" == "macos" ]]; then
-            flutter build macos --release
+            flutter build macos --release --build-name "$(python scripts/release/verify_mobile.py --apple-build-name)"
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             flutter build windows --release
           else
@@ -146,12 +170,16 @@ jobs:
           retention-days: 14
 
   android:
-    needs: targets
+    needs: [targets, models]
     if: needs.targets.outputs.android == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundled-embedding-models
+          path: assets/models/embeddings
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -195,13 +223,17 @@ jobs:
           retention-days: 14
 
   ios:
-    needs: targets
+    needs: [targets, models]
     if: needs.targets.outputs.ios == 'true'
     name: ios-arm64-UNSIGNED
     runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundled-embedding-models
+          path: assets/models/embeddings
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -219,7 +251,7 @@ jobs:
           npm ci --prefix assets/foliate-js
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
       - name: Build unsigned device application
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
       - name: Package unsigned IPA (requires user's own signing)
         run: python3 scripts/release/package.py ios arm64
       - uses: actions/upload-artifact@v4

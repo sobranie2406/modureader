@@ -5,8 +5,8 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:anx_reader/service/tts/system_tts_support.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
@@ -18,6 +18,19 @@ class SystemTts extends BaseTts {
   }
 
   SystemTts._internal();
+
+  @visibleForTesting
+  SystemTts.forTesting({required bool supported})
+      : _supportedOverride = supported;
+
+  bool? _supportedOverride;
+  bool get isSupported => _supportedOverride ?? supportsSystemTts();
+
+  void _requireSupport() {
+    if (!isSupported) {
+      throw UnsupportedError(systemTtsUnsupportedMessage(chinese: true));
+    }
+  }
 
   final FlutterTts flutterTts = FlutterTts();
 
@@ -84,6 +97,10 @@ class SystemTts extends BaseTts {
     getNextTextFunction = getNextText;
     getPrevTextFunction = getPrevText;
 
+    // Opening a book must not fail just because no supported voice service
+    // has been chosen. Report the actionable error only when playing.
+    if (!isSupported) return;
+
     await setAwaitOptions();
 
     if (isAndroid) {
@@ -119,6 +136,7 @@ class SystemTts extends BaseTts {
   }
 
   Future<void> setAwaitOptions() async {
+    _requireSupport();
     await flutterTts.awaitSpeakCompletion(true);
     if (isAndroid) {
       await flutterTts.awaitSynthCompletion(true);
@@ -166,6 +184,7 @@ class SystemTts extends BaseTts {
 
   /// For testing a specific voice in settings (matching OnlineTts API)
   Future<void> speakWithVoice(String content, String voiceShortName) async {
+    _requireSupport();
     await stop();
     await flutterTts.setVolume(volume);
     await flutterTts.setSpeechRate(rate);
@@ -197,7 +216,9 @@ class SystemTts extends BaseTts {
     await flutterTts.setPitch(pitch);
 
     // Apply the saved voice model
-    final selectedVoice = SystemTtsProvider().resolveVoice(null);
+    // Empty means use the native engine's default. Online providers still
+    // require an explicit/default provider voice through resolveVoice().
+    final selectedVoice = Prefs().getTtsVoiceModel('system');
     await _applyVoice(selectedVoice);
 
     await flutterTts.speak(_currentVoiceText!);
@@ -211,6 +232,10 @@ class SystemTts extends BaseTts {
   @override
   Future<dynamic> stop() async {
     updateTtsState(TtsStateEnum.stopped);
+    if (!isSupported) {
+      _currentVoiceText = null;
+      return 1;
+    }
     final result = await flutterTts.stop();
     _currentVoiceText = null;
     return result;
@@ -218,6 +243,7 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> pause() async {
+    if (!isSupported) return;
     final result = await flutterTts.stop();
     if (result == 1) {
       updateTtsState(TtsStateEnum.paused);
@@ -270,6 +296,7 @@ class SystemTts extends BaseTts {
 
   @override
   Future<List<TtsVoice>> getVoices() async {
+    if (!isSupported) return [];
     try {
       dynamic voices = await flutterTts.getVoices;
       if (voices is List) {
@@ -291,6 +318,7 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> dispose() async {
+    if (!isSupported) return;
     await flutterTts.stop();
   }
 }

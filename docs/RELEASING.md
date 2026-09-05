@@ -7,12 +7,20 @@
 固定 SDK：Flutter 3.47.2。先运行 flutter pub get、flutter gen-l10n 和 build_runner。CI 使用各平台原生 runner，Windows ARM64 使用 scripts/release/windows-arm64-sdk.mjs 对 CI SDK 的宿主识别做显式兼容补丁，再验证生成文件的 PE 架构。
 分词器使用 third_party/hf_tokenizers 中保留原始 Rust 实现的兼容版本；移动端通过 Rust target 和 Flutter 提供的 NDK / Apple SDK 交叉编译，不使用假分词器替代。
 
+当前源码修正：Android Rust 链接显式设置 16 KB 最大/通用页对齐，打包时检查每个原生库的 ELF LOAD 段及 APK ZIP 对齐。macOS/iOS 构建需追加 `--build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"`，把 `0.1.0-beta.1` 转为合法的 `0.1.0` 营销版本，构建号仍来自 pubspec 的 `+` 后数字；打包时再次校验。预发布标记保留在包文件名和 Release 中。
+
+Windows 封装从 Visual Studio 当前工具链的 Redist 目录复制对应架构的 app-local VC++ CRT DLL，并核验架构、记录版本和哈希到 `WINDOWS-RUNTIME.txt`。不从第三方 DLL 网站下载，不安装到系统目录，不要求管理员权限。构建机必须有该架构的 VC++ Redist 文件；缺失时打包失败。Microsoft 运行库受其自身分发条款约束，不属于应用 GPL 源码。
+
+以上修正随 build 6326 重新构建；原 build 6325 下载缓存不包含这些修复。
+
+构建前使用 Python 3.11+ 运行 `python3 scripts/release/bundle_models.py`。该脚本按 `assets/models/embeddings/manifest.json` 的固定上游提交下载四个量化 ONNX 模型及分词器，核对大小和 SHA-256。权重不进入 Git 历史，由 CI 构建阶段获取并嵌入所有安装包；用户运行本地模型无需网络。打包脚本再次检查实际 Flutter 资源，缺失即失败。首次使用将资产准备到本机缓存，需额外可用空间。许可证与来源见 UPSTREAM.md 和 LICENSES。
+
 Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBackend-FDO、libwpe、epoxy、GStreamer 及音频插件；不同发行版可能需要自行从源码构建。Windows 需要 Microsoft Edge WebView2 Runtime。
 
 ## 各平台安装方式
 
 - macOS：下载对应处理器的 `.dmg`，打开后将 `Modu.app` 拖到 `Applications`。ARM64 对应 Apple Silicon，x64 对应 Intel。
-- Windows：下载对应处理器的 `-setup.exe`，运行安装向导。默认仅为当前用户安装，可选桌面快捷方式；在系统“已安装的应用”中卸载。应用仍需要 Microsoft Edge WebView2 Runtime，安装器不自动下载运行库。
+- Windows：下载对应处理器的 `-setup.exe`，运行安装向导。默认仅为当前用户安装，可选桌面快捷方式；在系统“已安装的应用”中卸载。当前源码生成的安装器随应用附带 VC++ CRT，但仍需要系统 Microsoft Edge WebView2 Runtime，不自动下载 WebView2。旧 beta.1 包还需要单独安装 VC++ Redistributable。
 - Linux：下载 `.deb`，在 Debian 13 中执行 `sudo apt install ./Modu-版本-linux-架构.deb`，由 APT 安装所需系统依赖；从应用菜单或 `modureader` 命令启动。卸载使用 `sudo apt remove modureader`，不会主动清除个人书库。x64 对应 Debian amd64，ARM64 对应 arm64。不宣称兼容其他发行版。
 - Android：安装对应 ABI 的 `.apk`，更新时沿用同一专用签名。
 - iOS：`.ipa` 保留未签名标记，需自行合法签名后安装，详见下节。

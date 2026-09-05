@@ -963,7 +963,7 @@ class Prefs extends ChangeNotifier {
   }
 
   String get vectorLocalModelId =>
-      prefs.getString('vectorLocalModelId') ?? 'all-MiniLM-L6-v2';
+      prefs.getString('vectorLocalModelId') ?? 'bge-small-zh-v1.5';
 
   set vectorLocalModelId(String value) {
     prefs.setString('vectorLocalModelId', value);

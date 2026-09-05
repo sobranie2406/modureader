@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:anx_reader/service/knowledge/bundled_embedding_assets.dart';
 
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:http/http.dart' as http;
@@ -40,7 +41,7 @@ class LocalEmbeddingModel {
 class LocalEmbeddingModels {
   const LocalEmbeddingModels._();
 
-  static const String defaultModelId = 'all-MiniLM-L6-v2';
+  static const String defaultModelId = 'bge-small-zh-v1.5';
 
   /// The four local embedding models shipped by ReadAny's model catalogue.
   static const List<LocalEmbeddingModel> all = [
@@ -52,7 +53,6 @@ class LocalEmbeddingModels {
       dimensions: 384,
       languages: 'English',
       description: 'Small and fast English sentence embedding model.',
-      recommended: true,
     ),
     LocalEmbeddingModel(
       id: 'bge-small-en-v1.5',
@@ -71,6 +71,7 @@ class LocalEmbeddingModels {
       dimensions: 512,
       languages: '中文',
       description: '针对中文语义检索优化的轻量向量模型。',
+      recommended: true,
     ),
     LocalEmbeddingModel(
       id: 'multilingual-e5-small',
@@ -86,7 +87,7 @@ class LocalEmbeddingModels {
   static LocalEmbeddingModel byId(String? id) {
     return all.firstWhere(
       (model) => model.id == id,
-      orElse: () => all.first,
+      orElse: () => all.singleWhere((model) => model.id == defaultModelId),
     );
   }
 }
@@ -95,15 +96,29 @@ class LocalEmbeddingModelStore {
   LocalEmbeddingModelStore({
     Directory? rootDirectory,
     http.Client? client,
+    BundledEmbeddingAssets? bundledAssets,
+    this.useBundledAssets = true,
     this.minimumModelBytes = 1024 * 1024,
     this.minimumTokenizerBytes = 128,
   })  : _rootDirectory = rootDirectory,
-        _client = client ?? http.Client();
+        _client = client ?? http.Client(),
+        _bundledAssets = bundledAssets ?? BundledEmbeddingAssets();
 
   final Directory? _rootDirectory;
   final http.Client _client;
   final int minimumModelBytes;
   final int minimumTokenizerBytes;
+  final bool useBundledAssets;
+  final BundledEmbeddingAssets _bundledAssets;
+
+  Future<bool> isBundled(LocalEmbeddingModel model) async =>
+      useBundledAssets && await _bundledAssets.contains(model.id);
+
+  Future<void> ensureAvailable(LocalEmbeddingModel model) async {
+    if (await isBundled(model)) {
+      await _bundledAssets.materialize(model.id, await modelDirectory(model));
+    }
+  }
 
   Future<Directory> get rootDirectory async {
     if (_rootDirectory != null) return _rootDirectory;
@@ -134,6 +149,7 @@ class LocalEmbeddingModelStore {
   }
 
   Future<bool> isDownloaded(LocalEmbeddingModel model) async {
+    if (await isBundled(model)) return true;
     final onnx = await modelFile(model);
     final tokenizer = await tokenizerFile(model);
     if (!await onnx.exists() || !await tokenizer.exists()) return false;

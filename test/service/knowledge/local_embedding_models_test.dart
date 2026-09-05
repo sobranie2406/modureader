@@ -36,6 +36,7 @@ void main() {
     final requested = <Uri>[];
     final store = LocalEmbeddingModelStore(
       rootDirectory: root,
+      useBundledAssets: false,
       minimumModelBytes: 1,
       minimumTokenizerBytes: 1,
       client: MockClient((request) async {
@@ -72,6 +73,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('modu-model-store-');
     final store = LocalEmbeddingModelStore(
       rootDirectory: root,
+      useBundledAssets: false,
       minimumModelBytes: 1,
       minimumTokenizerBytes: 1,
     );

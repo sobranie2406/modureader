@@ -3,6 +3,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:anx_reader/service/tts/tts_service.dart' as tts_svc;
 import 'package:anx_reader/widgets/reading_page/widget_title.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
@@ -22,15 +23,19 @@ class TtsWidget extends StatefulWidget {
 }
 
 class _TtsWidgetState extends State<TtsWidget> {
-  double volume = TtsHandler().volume;
-  double pitch = TtsHandler().pitch;
-  double rate = TtsHandler().rate;
+  double volume = Prefs().ttsVolume;
+  double pitch = Prefs().ttsPitch;
+  double rate = Prefs().ttsRate;
   double stopSeconds = 0;
   Timer? stopTimer;
 
+  bool get _unsupportedSystem =>
+      Prefs().ttsService == 'system' && !supportsSystemTts();
+
   @override
   void initState() {
-    if (TtsHandler().ttsStateNotifier.value != TtsStateEnum.playing) {
+    if (!_unsupportedSystem &&
+        TtsHandler().ttsStateNotifier.value != TtsStateEnum.playing) {
       TtsHandler()
           .init(
         widget.epubPlayerKey.currentState!.initTts,
@@ -60,6 +65,14 @@ class _TtsWidgetState extends State<TtsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_unsupportedSystem) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(systemTtsUnsupportedMessage(
+          chinese: Localizations.localeOf(context).languageCode == 'zh',
+        )),
+      );
+    }
     return ValueListenableBuilder<TtsStateEnum>(
       valueListenable: TtsHandler().ttsStateNotifier,
       builder: (context, ttsState, child) {

@@ -51,6 +51,7 @@ jobs:
 
       - name: Get dependencies
         run: |
+          python3 scripts/release/bundle_models.py
           flutter --version
           flutter pub get
 

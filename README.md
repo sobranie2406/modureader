@@ -1,5 +1,7 @@
 # 默读 · Modu Reader
 
+[简体中文](README.md) | [English](README_EN.md)
+
 <p align="center"><img src="assets/icon/modu-app-icon.png" width="120" alt="默读应用图标"></p>
 
 **本项目来源于 [Anx Reader](https://github.com/anxcye/anx-reader) 和 [ReadAny（Reader Any）](https://github.com/codedogQBY/ReadAny)。感谢两个项目的原作者和贡献者。**
@@ -83,7 +85,7 @@ AI 工具可以按需开关，包括查书、查笔记、检索正文、读取�
 | BGE Small ZH v1.5 | 中文 | 512 |
 | Multilingual E5 Small | 多语言 | 384 |
 
-这些是**可下载模型**，不是已随安装包附带的权重。下载完成后可在本机推理，也可选择远程嵌入 API。切换向量模型后应对旧书重新向量化。聊天模型与向量模型是两套配置，填好 AI Key 并不等于已经配置好向量索引。
+修订版 Beta 1（build 6326）**内嵌以上四个模型及分词器**，无需另行下载或填写 API Key 即可本地推理。默认选择中文 BGE，自动向量化默认关闭；首次覆盖旧版也会应用这两项设置，保留远程配置及密钥，之后的手动选择不会被反复重置。模型资源合计约 208 MiB，首次使用会在本机准备文件。也可手动选择远程嵌入 API。切换模型后应对旧书重新向量化；聊天和向量模型是两套配置。
 
 本地嵌入只表示向量计算在本机完成：若使用远程聊天、远程嵌入、翻译或语音接口，相关文本仍会发送给所选服务，不应将整个 AI 工作流宣传为完全离线。
 
@@ -97,7 +99,7 @@ AI 工具可以按需开关，包括查书、查笔记、检索正文、读取�
 
 ## 界面预览
 
-以下为默读 `v0.1.0-beta.1` 的 macOS 实际界面，不是上游截图或设计稿。截图展示部分设置状态，不代表新安装默认值；模型权重需另行下载。
+以下为默读 `v0.1.0-beta.1` 的 macOS 实际界面，不是上游截图或设计稿。截图来自较早构建，展示部分设置状态，不代表修订版的默认值；build 6326 已内嵌模型权重。
 
 ### 书籍阅读：正文、字体与阅读主题
 
@@ -141,13 +143,13 @@ AI 工具可以按需开关，包括查书、查笔记、检索正文、读取�
 1. 从 [Releases](https://github.com/sobranie2406/modureader/releases) 下载对应系统和架构的包，先阅读该平台的安装限制。
 2. 在书架添加电子书，打开后即可阅读；不使用 AI 时无需填写任何 API Key。
 3. 需要 AI 时，在「设置 → AI 设置」配置模型，并先做连接测试。
-4. 需要语义检索时，另外配置「向量模型」，下载本地模型或测试远程嵌入接口，再从书籍菜单建立索引。
+4. 需要语义检索时，直接从书籍菜单手动建立索引，默认使用内嵌中文模型；其他模型及远程接口可在「向量模型」中选择。
 5. 按需选择翻译、朗读与同步服务。详细操作、参数含义和安全注意事项见[设置指南](docs/SETTINGS.md)。
 
 ## 已知限制与测试范围
 
-- `v0.1.0-beta.1` 新安装未选择系统声音时，系统朗读可能报 `No voice selected`。可先在朗读设置获取声音列表并选择一个声音；默认声音回退问题尚待修复。
-- Linux 当前没有系统 TTS 插件实现，界面仍显示系统语音，不应将它视作已支持功能。在线语音在 Linux 上的播放仍需设备验证。
+- 原 Beta 1（build 6325）存在 Windows VC++ 运行库缺失、Android tokenizer 16 KB 对齐不合格、Apple 版本字段格式及默认系统朗读问题。build 6326 加入修复和打包检查；请以 Release 发布说明和应用内部构建号区分新旧包，旧下载缓存不会自动更新。
+- 当前源码在未选系统声音时使用原生默认声音；Linux 不支持系统 TTS，设置会禁用该选项并给出说明。用户需要主动选择在线语音，不会自动切换或上传正文。在线语音在 Linux 上的播放仍需设备验证。
 - 密码 PDF 暂不支持，纯扫描 PDF 不做 OCR；DRM 加密书籍不作为支持承诺。不同文件的排版与目录质量会影响阅读、正文提取和索引。
 - 免费翻译、Edge TTS 需要可用网络，服务可能限流或变更；付费服务需要用户自己的有效配置，不保证所有预设模型名长期可用。
 - 目前真实界面检查以 macOS 为主；其他系统的安装包已构建并核验架构，但不能据此宣称全平台功能无误。测试范围见 [docs/TESTING.md](docs/TESTING.md)。
@@ -161,12 +163,13 @@ AI 工具可以按需开关，包括查书、查笔记、检索正文、读取�
 需要对应平台的 Flutter 原生工具链；本地 tokenizer 的源码编译还需要 Rust（移动端需相应 Rust target）。
 
 ```sh
+python3 scripts/release/bundle_models.py # Python 3.11+，下载并校验固定版本模型，仅构建时联网
 flutter pub get
 flutter gen-l10n
 dart run build_runner build --delete-conflicting-outputs
 flutter test --concurrency 1
 # 在对应宿主平台运行：
-flutter build macos --release
+flutter build macos --release --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
 # Android 的 release 签名先按 docs/RELEASING.md 配置
 flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
 ```

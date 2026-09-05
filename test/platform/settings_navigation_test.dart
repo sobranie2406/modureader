@@ -3,6 +3,18 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('unsupported system speech is disabled with an explicit privacy notice',
+      () {
+    final settings =
+        File('lib/page/settings_page/narrate.dart').readAsStringSync();
+    final reader =
+        File('lib/widgets/reading_page/tts_widget.dart').readAsStringSync();
+    expect(settings, contains('enabled: supportsSystemTts()'));
+    expect(settings, contains('if (!unsupportedSystem)'));
+    expect(settings, contains('systemTtsUnsupportedMessage('));
+    expect(reader, contains('if (!_unsupportedSystem &&'));
+    expect(reader, contains('if (_unsupportedSystem)'));
+  });
   test('home settings tab opens the complete settings interface directly', () {
     final source =
         File('lib/page/home_page/settings_page.dart').readAsStringSync();

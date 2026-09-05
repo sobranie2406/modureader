@@ -5,6 +5,63 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+import sys
+import plistlib
+import json
+import zipfile
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
+from verify_mobile import apple_version, verify_android_elf, verify_apple_bundle
+from windows_runtime import prepare_windows_runtime, verify_crt
+import bundle_models
+
+
+class BundledModelsTest(unittest.TestCase):
+    def test_manifest_pins_all_four_models_and_tokenizers(self):
+        models = bundle_models.manifest()['models']
+        self.assertEqual(len(models), 4)
+        self.assertEqual({m['id'] for m in models}, {
+            'all-MiniLM-L6-v2', 'bge-small-en-v1.5',
+            'bge-small-zh-v1.5', 'multilingual-e5-small'})
+        for model in models:
+            self.assertRegex(model['revision'], r'^[0-9a-f]{40}$')
+            self.assertEqual({f['name'] for f in model['files']},
+                             {'model_quantized.onnx', 'tokenizer.json'})
+            for item in model['files']:
+                self.assertGreater(item['size'], 0)
+                self.assertRegex(item['sha256'], r'^[0-9a-f]{64}$')
+
+    def test_missing_or_corrupt_assets_cannot_be_packaged(self):
+        payload = b'public test model'
+        manifest = {'models': [{'id': 'test', 'files': [{
+            'name': 'model_quantized.onnx', 'size': len(payload),
+            'sha256': hashlib.sha256(payload).hexdigest()}]}]}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(bundle_models, 'manifest', return_value=manifest):
+            root = Path(tmp)
+            base = root / 'assets/models/embeddings'
+            base.mkdir(parents=True)
+            (base / 'manifest.json').write_text(json.dumps(manifest))
+            with self.assertRaises(ValueError):
+                bundle_models.verify_directory(root)
+            (base / 'test').mkdir()
+            model = base / 'test/model_quantized.onnx'
+            model.write_bytes(payload)
+            bundle_models.verify_directory(root)
+            for content in (payload, b'x' * len(payload)):
+                model.write_bytes(content)
+                with zipfile.ZipFile(root / 'assets.zip', 'w') as archive:
+                    for asset in base.rglob('*'):
+                        if asset.is_file():
+                            archive.write(asset, 'flutter_assets/' + asset.relative_to(root).as_posix())
+                with zipfile.ZipFile(root / 'assets.zip') as archive:
+                    if content == payload:
+                        bundle_models.verify_archive(archive, 'flutter_assets/')
+                    else:
+                        with self.assertRaises(ValueError):
+                            bundle_models.verify_archive(archive, 'flutter_assets/')
+                        with self.assertRaises(ValueError):
+                            bundle_models.verify_directory(root)
 
 spec = importlib.util.spec_from_file_location(
     "release_package", Path(__file__).resolve().parents[1] / "scripts/release/package.py")
@@ -110,6 +167,75 @@ class ArchitectureTest(unittest.TestCase):
         digest = hashlib.sha256(self.binary.read_bytes()).hexdigest()
         self.assertEqual(checksum, f"{digest}  binary\n".encode("utf-8"))
         self.assertNotIn(b"\r", checksum)
+
+
+class CompatibilityTest(unittest.TestCase):
+    def test_apple_prerelease_does_not_become_four_components(self):
+        self.assertEqual(apple_version('0.1.0-beta.1+6325'), '0.1.0')
+        self.assertEqual(apple_version('1.2.3'), '1.2.3')
+        with self.assertRaises(ValueError):
+            apple_version('0.1.0.1')
+
+    def test_invalid_apple_bundle_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = Path(tmp)
+            for version in ('0.1.0.1', '0.1.0-beta.1', '1.0.0'):
+                (app / 'Info.plist').write_bytes(plistlib.dumps({
+                    'CFBundleShortVersionString': version, 'CFBundleVersion': '6325'}))
+                with self.assertRaises(ValueError):
+                    verify_apple_bundle(app, '0.1.0-beta.1')
+            (app / 'Info.plist').write_bytes(plistlib.dumps({
+                'CFBundleShortVersionString': '0.1.0', 'CFBundleVersion': '6325'}))
+            verify_apple_bundle(app, '0.1.0-beta.1')
+
+    def test_android_16kb_load_segments_required_for_both_architectures(self):
+        for machine in (62, 183):
+            data = bytearray(120)
+            data[:6] = b'\x7fELF\x02\x01'
+            struct.pack_into('<H', data, 18, machine)
+            struct.pack_into('<Q', data, 32, 64)
+            struct.pack_into('<HH', data, 54, 56, 1)
+            for alignment in (4096, 8192, 16384, 65536):
+                struct.pack_into('<IIQQQQQQ', data, 64, 1, 5, 0, 0, 0, 120, 120, alignment)
+                if alignment < 16384:
+                    with self.assertRaisesRegex(ValueError, '16 KB'):
+                        verify_android_elf(data, machine)
+                else:
+                    verify_android_elf(data, machine)
+            with self.assertRaisesRegex(ValueError, 'architecture'):
+                verify_android_elf(data, 183 if machine == 62 else 62)
+            struct.pack_into('<Q', data, 80, 4096)  # Misaligned file offset.
+            with self.assertRaisesRegex(ValueError, '16 KB'):
+                verify_android_elf(data, machine)
+
+    def test_android_malformed_or_empty_program_headers_are_rejected(self):
+        for data in (b'', b'not an ELF', b'\x7fELF\x02\x01' + bytes(58)):
+            with self.assertRaises(ValueError):
+                verify_android_elf(data, 62)
+
+    def test_windows_crt_is_app_local_and_architecture_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for arch, machine in [('x64', 0x8664), ('arm64', 0xaa64)]:
+                source = root / '14.44.35211' / arch / 'Microsoft.VC143.CRT'
+                source.mkdir(parents=True)
+                bundle = root / arch
+                bundle.mkdir()
+                data = bytearray(512)
+                data[:2] = b'MZ'
+                struct.pack_into('<I', data, 0x3c, 128)
+                data[128:132] = b'PE\0\0'
+                struct.pack_into('<H', data, 132, machine)
+                for name in ['msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']:
+                    (source / name).write_bytes(data)
+                prepare_windows_runtime(bundle, arch, root / '14.44.35211')
+                verify_crt(bundle, arch)
+                self.assertIn('SHA-256:', (bundle / 'WINDOWS-RUNTIME.txt').read_text())
+                with self.assertRaises(ValueError):
+                    verify_crt(bundle, 'arm64' if arch == 'x64' else 'x64')
+                (bundle / 'msvcp140.dll').unlink()
+                with self.assertRaisesRegex(ValueError, 'Missing'):
+                    verify_crt(bundle, arch)
 
 
 if __name__ == "__main__":

@@ -93,6 +93,7 @@ class LocalOnnxEmbeddingEngine {
       return;
     }
     await _closeActiveModel();
+    await store.ensureAvailable(model);
     final onnx = await store.modelFile(model);
     final tokenizer = await store.tokenizerFile(model);
     final loadedTokenizer = Tokenizer.fromFile(tokenizer.path);

@@ -31,6 +31,7 @@ jobs:
         run: |
           flutter --version
           flutter pub get
+          python3 scripts/release/bundle_models.py
 
       - name: Prepare for macOS
         shell: bash
@@ -44,7 +45,7 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           chmod +x ./scripts/macos_nosign.sh
           ./scripts/macos_nosign.sh
-          flutter build macos
+          flutter build macos --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
           cd build/macos/Build/Products/Release
           mkdir -p "Modu"
           cp -r "Modu.app" "Modu/Modu.app"

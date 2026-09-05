@@ -27,7 +27,30 @@ hybrid RAG, ONNX models and background indexing queue; translation and TTS servi
 encrypted opt-in credential sync and backups; local-file access restrictions;
 PDF import/navigation fixes; multi-platform release packaging. See git history.
 
-## Vendored dependencies
+## Bundled embedding models (build 6326)
+
+All four quantized ONNX models and tokenizer files are distributed in installers.
+Exact Xenova repository revisions, file sizes and SHA-256 hashes are pinned in
+`assets/models/embeddings/manifest.json`; `scripts/release/bundle_models.py` fetches
+them at build time. No weight modifications are made by Modu. Native inference
+uses locally prepared assets, with no runtime model download required.
+
+- MiniLM: https://huggingface.co/Xenova/all-MiniLM-L6-v2; original model
+  https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2, Apache-2.0.
+  License preserved in `LICENSES/MiniLM-Embedding-Apache-2.0.txt`, from
+  https://github.com/UKPLab/sentence-transformers/blob/master/LICENSE.
+- BGE English/Chinese: https://huggingface.co/Xenova/bge-small-en-v1.5 and
+  https://huggingface.co/Xenova/bge-small-zh-v1.5; original models by BAAI,
+  https://huggingface.co/BAAI/bge-small-en-v1.5 and
+  https://huggingface.co/BAAI/bge-small-zh-v1.5, MIT.
+  License preserved in `LICENSES/BGE-Embedding-MIT.txt`, from
+  https://github.com/FlagOpen/FlagEmbedding/blob/master/LICENSE.
+- E5: https://huggingface.co/Xenova/multilingual-e5-small; original model
+  https://huggingface.co/intfloat/multilingual-e5-small, MIT.
+  License preserved in `LICENSES/E5-Embedding-MIT.txt`, from
+  https://github.com/microsoft/unilm/blob/master/LICENSE.
+
+## Vendored libraries
 
 - `third_party/hf_tokenizers`: hf_tokenizers 1.2.1, MIT, Yusuf Ihsan Gorgel.
   Original Dart API and Rust tokenizers implementation retained; Modu adds explicit

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
 
 import 'package:anx_reader/config/app_identity.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
@@ -52,6 +53,7 @@ Future<void> main() async {
     }
   });
   await Prefs().initPrefs();
+  await applyBundledModelDefaults(Prefs().prefs);
   HttpOverrides.global = AnxHttpProxyOverrides();
 
   // Initialize desktop window with validated position

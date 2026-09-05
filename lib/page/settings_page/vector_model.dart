@@ -26,6 +26,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   late final TextEditingController _dimensionController;
   late final LocalEmbeddingModelStore _localModelStore;
   final Map<String, bool> _downloadedModels = {};
+  final Set<String> _bundledModels = {};
   final Map<String, double> _downloadProgress = {};
   final Set<String> _testingModels = {};
   bool _loadingLocalModels = true;
@@ -117,14 +118,19 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
 
   Future<void> _refreshLocalModels() async {
     final states = <String, bool>{};
+    final bundled = <String>{};
     for (final model in LocalEmbeddingModels.all) {
       states[model.id] = await _localModelStore.isDownloaded(model);
+      if (await _localModelStore.isBundled(model)) bundled.add(model.id);
     }
     if (!mounted) return;
     setState(() {
       _downloadedModels
         ..clear()
         ..addAll(states);
+      _bundledModels
+        ..clear()
+        ..addAll(bundled);
       _loadingLocalModels = false;
     });
   }
@@ -296,8 +302,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             alignment: AlignmentDirectional.centerStart,
             child: Text(
               _label(
-                '模型下载后完全在本机执行。切换模型后，请对已有书籍重新向量化。',
-                'Downloaded models run entirely on-device. Re-vectorize existing books after switching models.',
+                '四个模型已随安装包内嵌，无需下载和 API Key，首次使用会在本机准备文件。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
+                'All four models are bundled: no download or API key is needed. Files are prepared locally on first use. Automatic indexing is off by default; reindex books after switching models.',
               ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -354,7 +360,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             Text(_modelDescription(model)),
             const SizedBox(height: 8),
             Text(
-              '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${_label('维', 'dimensions')}',
+              '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${_label('维', 'dimensions')}'
+              '${_bundledModels.contains(model.id) ? ' · ${_label('已内嵌 · 无需下载', 'Bundled · No download')}' : ''}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (progress != null) ...[

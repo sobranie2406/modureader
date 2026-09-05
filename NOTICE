@@ -11,3 +11,8 @@ see LICENSES/Anx-Reader-MIT.txt. ReadAny portions retain copyright (c) 2024
 ReadAny Team; see LICENSES/ReadAny-GPL-3.0-or-later.txt.
 Source: https://github.com/sobranie2406/modureader
 Third-party notices remain in their original source and dependency distributions.
+
+Installers bundle unmodified Xenova quantized ONNX exports and tokenizers for
+Sentence Transformers MiniLM (Apache-2.0), BAAI BGE (MIT), and Microsoft E5 (MIT).
+See UPSTREAM.md, assets/models/embeddings/manifest.json and LICENSES for exact
+sources, pinned revisions, checksums and the original license texts.

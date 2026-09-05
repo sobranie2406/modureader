@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 0.1.0-beta.1+6325
+version: 0.1.0-beta.1+6326
 
 environment:
   sdk: '>=3.5.2 <4.0.0'
@@ -164,6 +164,8 @@ dependency_overrides:
 
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   path_provider_platform_interface: ^2.1.2
   flutter_test:
     sdk: flutter
@@ -200,6 +202,11 @@ flutter:
     - assets/images/bgimg/
     - assets/icon/
     - assets/CHANGELOG.md
+    - assets/models/embeddings/manifest.json
+    - assets/models/embeddings/all-MiniLM-L6-v2/
+    - assets/models/embeddings/bge-small-en-v1.5/
+    - assets/models/embeddings/bge-small-zh-v1.5/
+    - assets/models/embeddings/multilingual-e5-small/
 
   fonts:
     - family: SourceHanSerif

@@ -5,6 +5,7 @@ import 'package:anx_reader/providers/tts_providers.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
+import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/service/tts/tts_service.dart' as tts_svc;
@@ -331,6 +332,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   Widget build(BuildContext context) {
     final ttsServiceId = ref.watch(ttsServiceProvider);
     final currentProvider = tts_svc.getTtsService(ttsServiceId).provider;
+    final unsupportedSystem = ttsServiceId == 'system' && !supportsSystemTts();
 
     // Listen to config changes to hide voice list
     ref.listen(onlineTtsConfigProvider(ttsServiceId), (prev, next) {
@@ -364,62 +366,71 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
           title: Text(L10n.of(context).ttsType),
           tiles: [
             CustomSettingsTile(child: _buildServiceSelection(ttsServiceId)),
+            if (unsupportedSystem)
+              CustomSettingsTile(
+                  child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(systemTtsUnsupportedMessage(
+                  chinese: Localizations.localeOf(context).languageCode == 'zh',
+                )),
+              )),
             if (ttsServiceId != 'system')
               CustomSettingsTile(child: _buildConfigSection(ttsServiceId)),
           ],
         ),
 
         // Voice List Section - Inlined
-        SettingsSection(
-          title: Text(L10n.of(context).settingsNarrateTtsVoiceModels),
-          tiles: [
-            CustomSettingsTile(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: _showVoiceList
-                    ? Column(
-                        children: [..._buildVoiceListContent()],
-                      )
-                    : Center(
-                        child: AnxButton(
-                          onPressed: () async {
-                            setState(() {
-                              _showVoiceList = true;
-                            });
-                            final voices =
-                                await ref.refresh(ttsVoicesProvider.future);
-                            if (selectedVoiceModel == null &&
-                                voices.isNotEmpty) {
-                              final currentLocale =
-                                  Localizations.localeOf(context);
-                              final currentLangCode =
-                                  currentLocale.languageCode;
+        if (!unsupportedSystem)
+          SettingsSection(
+            title: Text(L10n.of(context).settingsNarrateTtsVoiceModels),
+            tiles: [
+              CustomSettingsTile(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: _showVoiceList
+                      ? Column(
+                          children: [..._buildVoiceListContent()],
+                        )
+                      : Center(
+                          child: AnxButton(
+                            onPressed: () async {
+                              setState(() {
+                                _showVoiceList = true;
+                              });
+                              final voices =
+                                  await ref.refresh(ttsVoicesProvider.future);
+                              if (!mounted || !context.mounted) return;
+                              if ((selectedVoiceModel?.isEmpty ?? true) &&
+                                  voices.isNotEmpty) {
+                                final currentLocale =
+                                    Localizations.localeOf(context);
+                                final currentLangCode =
+                                    currentLocale.languageCode;
 
-                              // Try to find a voice matching current language
-                              TtsVoice? match = voices.firstWhere(
-                                (v) => v.locale
-                                    .toLowerCase()
-                                    .startsWith(currentLangCode.toLowerCase()),
-                                orElse: () => voices.firstWhere(
-                                  // Fallback to English
-                                  (v) =>
-                                      v.locale.toLowerCase().startsWith('en'),
-                                  // Fallback to first available
-                                  orElse: () => voices.first,
-                                ),
-                              );
+                                // Try to find a voice matching current language
+                                TtsVoice? match = voices.firstWhere(
+                                  (v) => v.locale.toLowerCase().startsWith(
+                                      currentLangCode.toLowerCase()),
+                                  orElse: () => voices.firstWhere(
+                                    // Fallback to English
+                                    (v) =>
+                                        v.locale.toLowerCase().startsWith('en'),
+                                    // Fallback to first available
+                                    orElse: () => voices.first,
+                                  ),
+                                );
 
-                              _selectVoiceModel(match.shortName);
-                            }
-                          },
-                          child: Text(
-                              L10n.of(context).settingsNarrateGetVoiceList),
+                                _selectVoiceModel(match.shortName);
+                              }
+                            },
+                            child: Text(
+                                L10n.of(context).settingsNarrateGetVoiceList),
+                          ),
                         ),
-                      ),
-              ),
-            )
-          ],
-        )
+                ),
+              )
+            ],
+          )
       ],
     );
   }
@@ -438,7 +449,12 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
           const DropdownMenuItem(value: 'edge', child: Text('Edge TTS')),
           DropdownMenuItem(
               value: 'system',
-              child: Text(L10n.of(context).settingsNarrateSystemTts)),
+              enabled: supportsSystemTts(),
+              child: Text(supportsSystemTts()
+                  ? L10n.of(context).settingsNarrateSystemTts
+                  : (isChinese
+                      ? '系统语音（此平台不支持）'
+                      : 'System speech (unavailable)'))),
           const DropdownMenuItem(value: 'dashscope', child: Text('DashScope')),
           const DropdownMenuItem(value: 'xiaomi', child: Text('Xiaomi MiMo')),
           DropdownMenuItem(

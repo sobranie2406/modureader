@@ -11,6 +11,8 @@ import subprocess
 import tarfile
 import tempfile
 import urllib.request
+from windows_runtime import prepare_windows_runtime, verify_crt
+from verify_mobile import verify_apple_bundle
 
 
 def command(*args, **kwargs):
@@ -142,6 +144,13 @@ Filename: "{{app}}\\modu.exe"; Description: "Launch Modu (requires Microsoft Web
 
 
 def build_windows(bundle, arch, version, output, work):
+    # Work on a separate payload so the input and its provenance remain intact.
+    prepared = work / 'windows-payload'
+    shutil.copytree(bundle, prepared, symlinks=True)
+    prepare_windows_runtime(prepared, arch)
+    verify_payload(prepared, 'windows', arch)
+    verify_crt(prepared, arch)
+    bundle = prepared
     compiler = shutil.which('iscc')
     if not compiler:
         compiler = str(Path(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'))
@@ -253,6 +262,8 @@ def build(bundle, platform, arch, version, output):
     bundle, output = Path(bundle).resolve(), Path(output).resolve()
     validate_version(version)
     verify_payload(bundle, platform, arch)
+    if platform == 'macos':
+        verify_apple_bundle(bundle / 'Modu.app', version)
     output.mkdir(parents=True, exist_ok=True)
     names = {'macos': f'Modu-{version}-macos-{arch}-unnotarized.dmg',
              'windows': f'Modu-{version}-windows-{arch}-setup.exe',

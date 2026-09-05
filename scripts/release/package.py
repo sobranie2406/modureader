@@ -7,6 +7,8 @@ import shutil
 import struct
 import subprocess
 import zipfile
+from verify_mobile import verify_android_apk, verify_apple_bundle
+from bundle_models import verify_archive, verify_directory
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "dist-release"
@@ -86,12 +88,15 @@ def package(platform, arch, version):
     if platform == "android":
         abi = {"arm64": "arm64-v8a", "x64": "x86_64"}[arch]
         apk = ROOT / f"build/app/outputs/flutter-apk/app-{abi}-release.apk"
+        verify_android_apk(apk, arch)
         with zipfile.ZipFile(apk) as archive:
+            verify_archive(archive, 'assets/flutter_assets/')
             assert f"lib/{abi}/libapp.so" in archive.namelist()
             assert f"lib/{abi}/libflutter.so" in archive.namelist()
         # Gradle must have signed the APK; verify it, do not silently ship debug.
         sdk = Path(os.environ["ANDROID_HOME"])
         apksigner = sorted((sdk / "build-tools").glob("*/apksigner"))[-1]
+        run(str(apksigner.parent / 'zipalign'), '-c', '-P', '16', '4', str(apk))
         result = run(str(apksigner), "verify", "--verbose", "--print-certs", str(apk))
         expected = (ROOT / "docs/android-signing-certificate.sha256").read_text().strip()
         fingerprints = [line.rsplit(":", 1)[1].strip().lower() for line in result.splitlines()
@@ -106,6 +111,7 @@ def package(platform, arch, version):
         for binary in ("modu.exe", "flutter_windows.dll", "onnxruntime.dll", "tokenizers_ffi.dll"):
             verify(bundle / binary, platform, arch)
         shutil.copytree(bundle, stage, dirs_exist_ok=True)
+        verify_directory(stage / 'data/flutter_assets')
     elif platform == "linux":
         bundle = ROOT / f"build/linux/{arch}/release/bundle"
         verify(bundle / "modu", platform, arch)
@@ -115,8 +121,11 @@ def package(platform, arch, version):
         for binary in bundle.rglob("*tokenizers*.so"):
             verify(binary, platform, arch)
         shutil.copytree(bundle, stage, dirs_exist_ok=True, symlinks=True)
+        verify_directory(stage / 'data/flutter_assets')
     elif platform == "macos":
         app = one("build/macos/Build/Products/Release/*.app")
+        verify_apple_bundle(app, version)
+        verify_directory(app / 'Contents/Frameworks/App.framework/Resources/flutter_assets')
         executable = run("/usr/libexec/PlistBuddy", "-c", "Print CFBundleExecutable", str(app / "Contents/Info.plist"))
         verify(app / "Contents/MacOS" / executable, platform, arch)
         subprocess.run(["ditto", str(app), str(stage / app.name)], check=True)
@@ -128,6 +137,8 @@ def package(platform, arch, version):
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(stage / app.name)], check=True)
     elif platform == "ios":
         app = one("build/ios/iphoneos/*.app")
+        verify_apple_bundle(app, version)
+        verify_directory(app / 'Frameworks/App.framework/flutter_assets')
         executable = run("/usr/libexec/PlistBuddy", "-c", "Print CFBundleExecutable", str(app / "Info.plist"))
         verify(app / executable, platform, arch)
         (stage / "Payload").mkdir()

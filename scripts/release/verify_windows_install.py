@@ -7,6 +7,7 @@ import tempfile
 import time
 
 from native_installers import verify_payload
+from windows_runtime import verify_crt
 
 
 def smoke(installer, arch):
@@ -19,6 +20,9 @@ def smoke(installer, arch):
                         '/NORESTART', '/SP-', f'/DIR={install}', f'/LOG={root / "install.log"}'],
                        check=True, timeout=180)
         verify_payload(install, 'windows', arch, installed=True)
+        verify_crt(install, arch)
+        if not (install / 'WINDOWS-RUNTIME.txt').is_file():
+            raise RuntimeError('Missing VC++ redistributable provenance')
         sentinel = root / 'user-library-must-survive.txt'
         sentinel.write_text('Synthetic user data outside program files')
         uninstall = install / 'unins000.exe'
