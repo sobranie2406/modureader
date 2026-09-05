@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:anx_reader/service/book_player/reader_background_response.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/book_player/reader_file_access.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -169,21 +169,7 @@ class Server {
   }
 
   Future<shelf.Response> _handleBgimgRequest(shelf.Request request) async {
-    final bgimgPath = Uri.decodeComponent(request.url.path.substring(6));
-    ByteBuffer? file;
-    if (bgimgPath.startsWith('assets/')) {
-      file = (await rootBundle.load(bgimgPath.substring(7))).buffer;
-    } else if (bgimgPath.startsWith('local/')) {
-      final local =
-          ReaderFileAccess.within(getBgimgDir(), bgimgPath.substring(6));
-      if (local == null) return shelf.Response.notFound('Bgimg not found');
-      file = (await local.readAsBytes()).buffer;
-    } else {
-      return shelf.Response.notFound('Bgimg not found');
-    }
-    final headers = {
-      'Content-Type': 'image/png',
-    };
-    return shelf.Response.ok(file.asUint8List(), headers: headers);
+    return readerBackgroundResponse(request.requestedUri,
+        directory: getBgimgDir(), assets: rootBundle);
   }
 }

@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/providers/dashboard_tiles_provider.dart';
-import 'package:anx_reader/service/vibration_service.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/common/fitted_text.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_detail_view.dart';
@@ -258,9 +257,7 @@ class DashboardTileShell extends ConsumerWidget {
             tile.onTap(context, ref);
             return;
           }
-          VibrationService.medium();
-          Navigator.of(context)
-              .push(
+          Navigator.of(context).push(
             PageRouteBuilder(
               opaque: false,
               pageBuilder: (context, animation, secondaryAnimation) {
@@ -276,10 +273,7 @@ class DashboardTileShell extends ConsumerWidget {
                 );
               },
             ),
-          )
-              .then((_) {
-            VibrationService.rigid();
-          });
+          );
         },
         child: Stack(
           children: [

@@ -24,22 +24,25 @@ abstract class BgimgModel with _$BgimgModel {
 
   const BgimgModel._();
 
+  String _imageUrl(String imagePath, String source) => Uri(
+        scheme: 'http',
+        host: '127.0.0.1',
+        port: Server().port,
+        pathSegments: ['bgimg', source, ...imagePath.split('/')],
+      ).toString();
+
   String get url => switch (type) {
         BgimgType.none => 'none',
-        BgimgType.assets =>
-          'http://127.0.0.1:${Server().port}/bgimg/assets/$path',
-        BgimgType.localFile =>
-          'http://127.0.0.1:${Server().port}/bgimg/local/$path',
+        BgimgType.assets => _imageUrl(path, 'assets'),
+        BgimgType.localFile => _imageUrl(path, 'local'),
       };
 
   String? get nightUrl => switch (type) {
         BgimgType.none => null,
-        BgimgType.assets => nightPath != null
-            ? 'http://127.0.0.1:${Server().port}/bgimg/assets/$nightPath'
-            : null,
-        BgimgType.localFile => nightPath != null
-            ? 'http://127.0.0.1:${Server().port}/bgimg/local/$nightPath'
-            : null,
+        BgimgType.assets =>
+          nightPath != null ? _imageUrl(nightPath!, 'assets') : null,
+        BgimgType.localFile =>
+          nightPath != null ? _imageUrl(nightPath!, 'local') : null,
       };
 
   /// Get the effective URL based on user selection and auto-adjust settings

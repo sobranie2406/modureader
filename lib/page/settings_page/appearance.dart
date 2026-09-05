@@ -1,7 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/env_var.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:anx_reader/widgets/settings/simple_dialog.dart';
@@ -126,17 +125,6 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
                   setState(() {});
                 },
               ),
-              if (AnxPlatform.isAndroid || AnxPlatform.isIOS)
-                SettingsTile.switchTile(
-                  title: Text(L10n.of(context).reduceVibrationFeedback),
-                  leading: const Icon(Icons.vibration),
-                  initialValue: Prefs().reduceVibrationFeedback,
-                  onToggle: (bool value) {
-                    setState(() {
-                      Prefs().reduceVibrationFeedback = value;
-                    });
-                  },
-                ),
               SettingsTile.switchTile(
                 title: Text(L10n.of(context).readingPageShowActionLabels),
                 leading: const Icon(Icons.subtitles_outlined),

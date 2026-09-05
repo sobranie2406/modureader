@@ -59,8 +59,9 @@ uses locally prepared assets, with no runtime model download required.
   Icon brands remain the property of their respective owners.
 - `assets/foliate-js`: Foliate-js, MIT; PDF.js and other embedded components retain
   their license notices. Modified renderer code is included in the source release.
-- ONNX Runtime: Microsoft, MIT. Windows/Linux use 1.22.0; Android/Apple use
-  1.23.0 through the pinned Flutter plugin. Both versions' original LICENSE and
+- ONNX Runtime: Microsoft, MIT. Windows/Linux use 1.22.0; Apple uses 1.23.0.
+  Android pins 1.24.3 to address ARM CPU instruction detection crashes
+  (https://github.com/microsoft/onnxruntime/issues/27282). These versions' LICENSE and
   ThirdPartyNotices.txt are preserved in LICENSES and copied into packages.
 - Linux WPE/WebKit libraries: distribution-provided dynamic libraries. Packages
   retain the Debian copyright files and record exact corresponding source

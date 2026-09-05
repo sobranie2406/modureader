@@ -1,4 +1,18 @@
 allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'com.microsoft.onnxruntime' &&
+                details.requested.name == 'onnxruntime-android') {
+                // 1.23.x can select unsupported ARM SME instructions and
+                // terminate Android with SIGILL (upstream #27282 / #27884).
+                // 1.24.3 includes the SME1/SME2 detection fix (#25760).
+                // 1.24.4 has no Android Maven artifact and does not change
+                // CPU detection or MLAS relative to 1.24.3. Keep Apple unchanged.
+                details.useVersion '1.24.3'
+                details.because 'Android ARM CPU instruction detection fix (onnxruntime#27884)'
+            }
+        }
+    }
     repositories {
         google()
         mavenCentral()

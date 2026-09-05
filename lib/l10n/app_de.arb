@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years, plural, one{vor 1 Jahr} other{vor {years} Jahren}}",
   "tileLibraryTotalsTitle": "Bibliothek gesamt",
   "tileLibraryTotalsDescription": "Überblick über Bücher, Lesetage und Notizen.",
-  "reduceVibrationFeedback": "Vibrationsrückkopplung reduzieren",
   "notesExportMergeChapters": "Kapitel zusammenführen",
   "notesExportMergeChaptersDescription": "Wenn aktiviert, teilen sich Notizen desselben Kapitels eine einzelne Überschrift.",
   "settingsAiTools": "KI-Werkzeuge",

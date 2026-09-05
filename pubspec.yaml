@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 0.1.0-beta.1+6326
+version: 0.1.0-beta.2+6327
 
 environment:
   sdk: '>=3.5.2 <4.0.0'
@@ -127,12 +127,10 @@ dependencies:
       path: share_handler
       ref: eeaa04d22e7e70babb55b6825b9ca7016e89c89a
   heroine: ^0.5.0+2
-  vibration: ^3.1.4
   staggered_reorderable:
     git:
       url: https://github.com/jingluoguo/staggered_reorderable.git
       ref: 2ac799a6eeb5da74bf5080a2ba2057272fa52b78
-  haptic_feedback: ^0.6.4+2
   in_app_purchase_android: ^0.4.0+8
 
 dependency_overrides:

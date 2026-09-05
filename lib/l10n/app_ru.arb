@@ -726,7 +726,6 @@
   "relativeTimeYearsAgo": "{years, plural, one{{years} год назад} few{{years} года назад} many{{years} лет назад} other{{years} года назад}}",
   "tileLibraryTotalsTitle": "Итоги библиотеки",
   "tileLibraryTotalsDescription": "Сводка по книгам, дням чтения и заметкам.",
-  "reduceVibrationFeedback": "Отключить виброотклик",
   "notesExportMergeChapters": "Объединять главы",
   "notesExportMergeChaptersDescription": "Если включено, заметки из той же главы отображаются под одним заголовком.",
   "settingsAiTools": "Инструменты ИИ",

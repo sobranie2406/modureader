@@ -25,7 +25,9 @@ Modu is an open-source AI ebook reader built with Flutter. It brings books, note
 | iOS | ARM64 devices | iOS 16+; **unsigned.ipa** has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
 
 Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
-The first public beta, [v0.1.0-beta.1](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.1), contains nine application packages, each with a SHA-256 checksum file. Architecture, signature and checksum checks are not a substitute for functional testing on devices.
+Beta 2 (build 6327): [downloads and release notes](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.2). Nine application packages are targeted; check the release page for available assets and their SHA-256 files. Architecture, signature and checksum checks are not a substitute for functional testing on devices.
+
+Beta 2 corrects reader background image and color handling, adds Settings → Report a Bug, removes app vibration feedback, and updates Android ONNX Runtime to 1.24.3. The local-model crash reported on Xiaomi 15 Ultra still needs verification on that device; see the [verification record (Chinese)](docs/android-onnx-haptics-verification.md).
 
 Desktop apps use native installers, not ZIP or tar.gz downloads. Android `-notices.zip` files contain license information; GitHub's automatically generated `Source code (zip)` downloads contain source code. Neither is an application installer. We do not provide scripts to bypass operating-system security protections. See [Release and installation instructions (Chinese)](docs/RELEASING.md) for details.
 

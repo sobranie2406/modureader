@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years}年前",
   "tileLibraryTotalsTitle": "ライブラリ合計",
   "tileLibraryTotalsDescription": "本・読書日数・ノートの概要です。",
-  "reduceVibrationFeedback": "振動フィードバックを軽減する",
   "notesExportMergeChapters": "章を結合",
   "notesExportMergeChaptersDescription": "有効にすると、同じ章のノートは1つの見出しを共有します。",
   "settingsAiTools": "AIツール",

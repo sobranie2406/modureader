@@ -772,7 +772,6 @@
   "relativeTimeYearsAgo": "{years, plural, other{{years} 年前}}",
   "tileLibraryTotalsTitle": "图书馆总览",
   "tileLibraryTotalsDescription": "书籍、阅读天数与笔记概览。",
-  "reduceVibrationFeedback": "减少振动反馈",
   "notesExportMergeChapters": "合并章节",
   "notesExportMergeChaptersDescription": "开启后，同一章节的笔记只显示一个标题。",
   "settingsAiTools": "AI 工具",

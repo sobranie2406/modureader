@@ -1059,14 +1059,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
-  haptic_feedback:
-    dependency: "direct main"
-    description:
-      name: haptic_feedback
-      sha256: "3b960570ad094b20028f439a22996f88fadcb20addd49478dbd47db5984a8894"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.6.4+2"
   hashcodes:
     dependency: transitive
     description:
@@ -2282,22 +2274,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.0+1"
-  vibration:
-    dependency: "direct main"
-    description:
-      name: vibration
-      sha256: "1fd51cb0f91c6d512734ca0e282dd87fbc7f389b6da5f03c77709ba2cf8fa901"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.4"
-  vibration_platform_interface:
-    dependency: transitive
-    description:
-      name: vibration_platform_interface
-      sha256: "4134fbfcd427b59a7a91f8733292e4e9b29a7f1e8224ff0d80f5745fbf0743c6"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.1"
   vm_service:
     dependency: transitive
     description:

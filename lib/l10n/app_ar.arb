@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years, plural, zero{منذ 0 عام} one{منذ عام واحد} two{منذ عامين} few{منذ {years} أعوام} many{منذ {years} عامًا} other{منذ {years} عام}}",
   "tileLibraryTotalsTitle": "إجمالي المكتبة",
   "tileLibraryTotalsDescription": "نظرة عامة على الكتب وأيام القراءة والملاحظات.",
-  "reduceVibrationFeedback": "تقليل ردود الفعل الاهتزاز",
   "notesExportMergeChapters": "دمج الفصول",
   "notesExportMergeChaptersDescription": "عند التفعيل، ستشارك الملاحظات من نفس الفصل عنوانًا واحدًا.",
   "settingsAiTools": "أدوات الذكاء الاصطناعي",

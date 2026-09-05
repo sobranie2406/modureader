@@ -328,15 +328,6 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get reduceVibrationFeedback {
-    return prefs.getBool('reduceVibrationFeedback') ?? false;
-  }
-
-  set reduceVibrationFeedback(bool value) {
-    prefs.setBool('reduceVibrationFeedback', value);
-    notifyListeners();
-  }
-
   bool get developerOptionsEnabled {
     return prefs.getBool("developerOptionsEnabled") ?? false;
   }

@@ -1,6 +1,4 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/page/settings_page/developer/vibration_test_page.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class DeveloperOptionsPage extends StatelessWidget {
@@ -29,21 +27,6 @@ class DeveloperOptionsPage extends StatelessWidget {
                   if (!value && Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
                   }
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.vibration_outlined),
-                title: const Text('Vibration Test'),
-                subtitle:
-                    const Text('Inspect device support and trigger presets'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute(
-                      builder: (context) => const VibrationTestPage(),
-                    ),
-                  );
                 },
               ),
             ],

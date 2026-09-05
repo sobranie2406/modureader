@@ -726,7 +726,6 @@
   "relativeTimeYearsAgo": "{years, plural, one{1 year ago} other{{years} years ago}}",
   "tileLibraryTotalsTitle": "Library totals",
   "tileLibraryTotalsDescription": "Books, reading days, and notes overview.",
-  "reduceVibrationFeedback": "Reduce vibration feedback",
   "notesExportMergeChapters": "Merge chapters",
   "notesExportMergeChaptersDescription": "When enabled, notes from the same chapter share a single heading.",
   "settingsAiTools": "AI Tools",

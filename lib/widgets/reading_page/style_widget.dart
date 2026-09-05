@@ -7,6 +7,7 @@ import 'package:anx_reader/models/font_model.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/page/settings_page/subpage/fonts.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/service/font.dart';
 import 'package:anx_reader/utils/font_parser.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -14,7 +15,6 @@ import 'package:anx_reader/widgets/icon_and_text.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/more_settings.dart';
 import 'package:anx_reader/widgets/reading_page/widget_title.dart';
 import 'package:anx_reader/dao/theme.dart';
-import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
 import 'package:anx_reader/widgets/reading_page/widgets/bgimg_selector.dart';
@@ -372,19 +372,21 @@ class StyleWidgetState extends State<StyleWidget> {
                     int.parse('0x${widget.themes[index].backgroundColor}')),
                 borderRadius: BorderRadius.circular(50),
                 border: Border.all(
-                  color: index + 1 == currentThemeId
+                  color: widget.themes[index].id == currentThemeId
                       ? Theme.of(context).primaryColor
                       : Colors.black45,
-                  width: index + 1 == currentThemeId ? 3 : 1,
+                  width: widget.themes[index].id == currentThemeId ? 3 : 1,
                 ),
               ),
               height: size,
               width: size,
               child: InkWell(
                 onTap: () {
-                  Prefs().saveReadThemeToPrefs(widget.themes[index]);
-                  widget.epubPlayerKey.currentState!
-                      .changeTheme(widget.themes[index]);
+                  selectReadingColorTheme(widget.themes[index], prefs: Prefs(),
+                      apply: (theme) {
+                    widget.epubPlayerKey.currentState?.changeTheme(theme);
+                    widget.epubPlayerKey.currentState?.changeBgimgEffect();
+                  });
                   setState(() {
                     currentThemeId = widget.themes[index].id;
                   });
@@ -430,10 +432,14 @@ class ThemeChangeWidget extends StatefulWidget {
     super.key,
     required this.readTheme,
     required this.setCurrentPage,
+    this.saveTheme,
+    this.applyTheme,
   });
 
   final ReadTheme readTheme;
   final Function setCurrentPage;
+  final Future<void> Function(ReadTheme)? saveTheme;
+  final void Function(ReadTheme)? applyTheme;
 
   @override
   State<ThemeChangeWidget> createState() => _ThemeChangeWidgetState();
@@ -441,6 +447,48 @@ class ThemeChangeWidget extends StatefulWidget {
 
 class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
   late ReadTheme readTheme;
+  bool _saving = false;
+
+  Future<void> _editColor({required bool background}) async {
+    final color = await showColorPickerDialog(
+        background ? readTheme.backgroundColor : readTheme.textColor);
+    if (!mounted || color == null) return;
+    final updated = ReadTheme(
+      id: readTheme.id,
+      backgroundColor: background ? color : readTheme.backgroundColor,
+      textColor: background ? readTheme.textColor : color,
+      backgroundImagePath: readTheme.backgroundImagePath,
+    );
+    setState(() => _saving = true);
+    try {
+      await (widget.saveTheme?.call(updated) ?? themeDao.updateTheme(updated));
+      if (!mounted) return;
+      // Update the shared theme entry only after persistence succeeded.
+      setState(() {
+        readTheme.backgroundColor = updated.backgroundColor;
+        readTheme.textColor = updated.textColor;
+      });
+      selectReadingColorTheme(updated,
+          prefs: Prefs(), clearBackgroundImage: background, apply: (theme) {
+        if (widget.applyTheme != null) {
+          widget.applyTheme!(theme);
+        } else {
+          epubPlayerKey.currentState?.changeTheme(theme);
+          epubPlayerKey.currentState?.changeBgimgEffect();
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text(Localizations.localeOf(context).languageCode == 'zh'
+              ? '保存主题失败，请重试。'
+              : 'Could not save the theme. Please try again.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   void initState() {
@@ -452,31 +500,13 @@ class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
   Widget build(BuildContext context) {
     return Row(children: [
       IconButton(
-        onPressed: () async {
-          String? pickingColor =
-              await showColorPickerDialog(readTheme.backgroundColor);
-          if (pickingColor != '') {
-            setState(() {
-              readTheme.backgroundColor = pickingColor!;
-            });
-            themeDao.updateTheme(readTheme);
-          }
-        },
+        onPressed: _saving ? null : () => _editColor(background: true),
         icon: Icon(Icons.circle,
             size: 80,
             color: Color(int.parse('0x${readTheme.backgroundColor}'))),
       ),
       IconButton(
-          onPressed: () async {
-            String? pickingColor =
-                await showColorPickerDialog(readTheme.textColor);
-            if (pickingColor != '') {
-              setState(() {
-                readTheme.textColor = pickingColor!;
-              });
-              themeDao.updateTheme(readTheme);
-            }
-          },
+          onPressed: _saving ? null : () => _editColor(background: false),
           icon: Icon(Icons.text_fields,
               size: 60, color: Color(int.parse('0x${readTheme.textColor}')))),
       const Expanded(
@@ -499,8 +529,8 @@ class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
   Future<String?> showColorPickerDialog(String currColor) async {
     Color pickedColor = Color(int.parse('0x$currColor'));
 
-    await showDialog<void>(
-      context: navigatorKey.currentState!.overlay!.context,
+    return showDialog<String>(
+      context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           content: SingleChildScrollView(
@@ -523,14 +553,13 @@ class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                Navigator.of(context).pop(pickedColor.value.toRadixString(16));
+                Navigator.of(context).pop(
+                    pickedColor.toARGB32().toRadixString(16).padLeft(8, '0'));
               },
             ),
           ],
         );
       },
     );
-
-    return pickedColor.value.toRadixString(16);
   }
 }

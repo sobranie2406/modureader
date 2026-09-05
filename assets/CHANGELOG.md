@@ -1,5 +1,16 @@
 # Changelog
 
+## Modu 0.1.0-beta.2 (6327)
+
+- 修复阅读背景图片格式、路径与缓存处理，以及背景颜色保存和实时更新逻辑。
+- 新增设置内「提交 Bug」入口，预览后由用户自行提交，不自动附带日志、书籍或服务密钥。
+- 移除应用震动反馈、设置与插件依赖。
+- Android ONNX Runtime 更新至 1.24.3，针对 ARM 指令识别兼容性问题；小米 15 Ultra 闪退仍待真机复测。
+- Fix reader background image handling and immediate theme updates.
+- Add a user-reviewed bug report form in Settings without automatic private-data attachments.
+- Remove app vibration feedback and its plugin dependencies.
+- Update Android ONNX Runtime to 1.24.3 for ARM instruction-detection compatibility; Xiaomi 15 Ultra verification remains pending.
+
 ## 1.15.0
 - Feat(network): Add global HTTP proxy support in advanced settings (#838) Thanks @dddXzz
 - Feat(network): Add HTTP proxy connectivity test feature (#838) Thanks @dddXzz

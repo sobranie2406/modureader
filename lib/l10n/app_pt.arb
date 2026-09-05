@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years, plural, one{há 1 ano} other{há {years} anos}}",
   "tileLibraryTotalsTitle": "Totais da biblioteca",
   "tileLibraryTotalsDescription": "Visão geral de livros, dias de leitura e notas.",
-  "reduceVibrationFeedback": "Reduza o feedback de vibração",
   "notesExportMergeChapters": "Mesclar capítulos",
   "notesExportMergeChaptersDescription": "Quando ativado, as notas do mesmo capítulo compartilham um único título.",
   "settingsAiTools": "Ferramentas de IA",

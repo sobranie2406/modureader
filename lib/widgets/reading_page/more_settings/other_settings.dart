@@ -262,6 +262,7 @@ class _OtherSettingsState extends State<OtherSettings> {
           value: Prefs().autoAdjustReadingTheme,
           onChanged: (bool value) => setState(() {
             Prefs().autoAdjustReadingTheme = value;
+            epubPlayerKey.currentState?.refreshReadingTheme();
           }),
         ),
       );

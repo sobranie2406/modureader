@@ -4,6 +4,7 @@ import 'package:anx_reader/page/settings_page/ai.dart';
 import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
 import 'package:anx_reader/page/settings_page/advanced.dart';
 import 'package:anx_reader/page/settings_page/appearance.dart';
+import 'package:anx_reader/page/settings_page/bug_report.dart';
 import 'package:anx_reader/page/settings_page/developer/developer_options_page.dart';
 import 'package:anx_reader/page/settings_page/narrate.dart';
 import 'package:anx_reader/page/settings_page/reading.dart';
@@ -195,6 +196,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   L10n.of(context).duplicateFile,
                   L10n.of(context).settingsAdvancedJavascript,
                   L10n.of(context).settingsAdvancedNetwork,
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '提交 Bug'
+                    : 'Report a bug',
+                "icon": Icons.bug_report_outlined,
+                "sections": const BugReportSettings(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '问题反馈与处理进度'
+                      : 'Bug reports and issue status',
                 ],
               },
             ];

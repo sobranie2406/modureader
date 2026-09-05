@@ -184,8 +184,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   void changeTheme(ReadTheme readTheme) {
-    textColor = readTheme.textColor;
-    backgroundColor = readTheme.backgroundColor;
+    if (!mounted) return;
+    setState(() {
+      textColor = readTheme.textColor;
+      backgroundColor = readTheme.backgroundColor;
+    });
 
     String bc = convertDartColorToJs(readTheme.backgroundColor);
     String tc = convertDartColorToJs(readTheme.textColor);
@@ -200,13 +203,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   void changeStyle(BookStyle? bookStyle) {
     styleTimer?.cancel();
-    String bgimgUrl = Prefs().bgimg.getEffectiveUrl(
-          isDarkMode: isDarkMode,
-          autoAdjust: Prefs().autoAdjustReadingTheme,
-        );
-
     styleTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
+      final bgimgUrl = Prefs().bgimg.getEffectiveUrl(
+            isDarkMode: isDarkMode,
+            autoAdjust: Prefs().autoAdjustReadingTheme,
+          );
       BookStyle style = bookStyle ?? Prefs().bookStyle;
       webViewController.evaluateJavascript(source: '''
       changeStyle({
@@ -223,7 +225,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         columnThreshold: ${style.columnThreshold},
         writingMode: '${Prefs().writingMode.code}',
         textAlign: '${Prefs().textAlignment.code}',
-        backgroundImage: '$bgimgUrl',
+        backgroundImage: ${jsonEncode(bgimgUrl)},
         bgimgBlur: ${Prefs().bgimg.blur},
         bgimgOpacity: ${Prefs().bgimg.opacity},
         bgimgFit: '${Prefs().bgimgFit.code}',
@@ -246,7 +248,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     );
     webViewController.evaluateJavascript(source: '''
       changeStyle({
-        backgroundImage: '$bgimgUrl',
+        backgroundImage: ${jsonEncode(bgimgUrl)},
         bgimgBlur: ${bgimg.blur},
         bgimgOpacity: ${bgimg.opacity},
         bgimgFit: '${Prefs().bgimgFit.code}',
@@ -709,6 +711,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       backgroundColor = Prefs().readTheme.backgroundColor;
       textColor = Prefs().readTheme.textColor;
     }
+  }
+
+  void refreshReadingTheme() {
+    if (!mounted) return;
+    getThemeColor();
+    changeTheme(ReadTheme(
+      backgroundColor: backgroundColor!,
+      textColor: textColor!,
+      backgroundImagePath: '',
+    ));
+    changeBgimgEffect();
   }
 
   Future<void> setHandler(InAppWebViewController controller) async {

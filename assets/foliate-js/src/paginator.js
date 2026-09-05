@@ -134,7 +134,7 @@ const getBackground = (bgimgUrl) => {
   if (bgimgUrl === 'none') {
     bg = `none`
   } else {
-    bg = `url(${bgimgUrl})`
+    bg = `url(${JSON.stringify(bgimgUrl)})`
   }
   return bg
 }

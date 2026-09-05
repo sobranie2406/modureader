@@ -3,11 +3,19 @@ package com.modu.reader
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Flutter's built-in long-press/selection feedback uses DecorView.
+        // Removing VIBRATE permission alone does not disable this API.
+        window.decorView.isHapticFeedbackEnabled = false
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

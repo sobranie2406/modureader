@@ -8,6 +8,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/bgimg.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/providers/bgimg.dart';
+import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:flutter/material.dart';
@@ -52,8 +53,14 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
           ? current.opacity
           : bgimgModel.opacity,
     );
-    Prefs().bgimg = updatedBgimg;
-    epubPlayerKey.currentState?.changeStyle(null);
+    _selectBackground(updatedBgimg);
+  }
+
+  void _selectBackground(BgimgModel image) {
+    selectReadingBackground(image, prefs: Prefs(), apply: () {
+      epubPlayerKey.currentState?.changeTheme(Prefs().readTheme);
+      epubPlayerKey.currentState?.changeBgimgEffect();
+    });
   }
 
   Widget buildImportBgimgItem() {
@@ -90,8 +97,7 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
         ],
       ),
       onTap: () {
-        Prefs().bgimg = bgimgModel;
-        epubPlayerKey.currentState?.changeStyle(null);
+        _selectBackground(bgimgModel);
       },
     );
   }
@@ -442,6 +448,13 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
       child: Column(
         children: [
           _buildBgimgFitSelector(context),
+          if (Prefs().autoAdjustReadingTheme)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(Localizations.localeOf(context).languageCode == 'zh'
+                  ? '手动选择背景后将关闭跟随系统的阅读主题，可在更多设置中重新开启。'
+                  : 'Selecting a background turns off automatic reading themes. You can enable them again in More settings.'),
+            ),
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.5,
             child: ListView.builder(

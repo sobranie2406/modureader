@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years} 年前",
   "tileLibraryTotalsTitle": "圖書館總覽",
   "tileLibraryTotalsDescription": "書籍、閱讀天數與筆記的概況。",
-  "reduceVibrationFeedback": "減少振動反饋",
   "notesExportMergeChapters": "合併章節",
   "notesExportMergeChaptersDescription": "啟用後，同一章節的筆記只會顯示一個標題。",
   "settingsAiTools": "AI 工具",

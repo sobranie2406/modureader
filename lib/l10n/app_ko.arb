@@ -724,7 +724,6 @@
   "relativeTimeYearsAgo": "{years}년 전",
   "tileLibraryTotalsTitle": "라이브러리 합계",
   "tileLibraryTotalsDescription": "책, 독서 일수, 노트의 개요입니다.",
-  "reduceVibrationFeedback": "진동 피드백 감소",
   "notesExportMergeChapters": "챕터 합치기",
   "notesExportMergeChaptersDescription": "활성화하면 같은 챕터의 노트가 하나의 제목만 사용합니다.",
   "settingsAiTools": "AI 도구",

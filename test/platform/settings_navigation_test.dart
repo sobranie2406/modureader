@@ -3,6 +3,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('bug reporting is a settings category before the final About entry', () {
+    final source = File('lib/page/settings_page/more_settings_page.dart')
+        .readAsStringSync();
+    expect(source, contains('"sections": const BugReportSettings()'));
+    expect(source, contains('提交 Bug'));
+    expect(source.indexOf('const BugReportSettings()'),
+        lessThan(source.indexOf('const About(leadingColor: true)')));
+  });
   test('unsupported system speech is disabled with an explicit privacy notice',
       () {
     final settings =
