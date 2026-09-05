@@ -1,0 +1,74 @@
+name: Native desktop installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release containing verified legacy desktop archives'
+        default: v0.1.0-beta.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: macos, arch: arm64, os: macos-15}
+          - {platform: macos, arch: x64, os: macos-15-intel}
+          - {platform: windows, arch: x64, os: windows-2025}
+          - {platform: windows, arch: arm64, os: windows-11-arm}
+          - {platform: linux, arch: x64, os: ubuntu-24.04, container: 'debian:trixie'}
+          - {platform: linux, arch: arm64, os: ubuntu-24.04-arm, container: 'debian:trixie'}
+    name: installer-${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPACKAGE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Debian packaging tools
+        if: matrix.platform == 'linux'
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates git gh python3 desktop-file-utils
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        if: matrix.platform != 'linux'
+        with:
+          python-version: '3.12'
+      - name: Install pinned Inno Setup compiler
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/release/setup-inno.ps1
+      - name: Packaging unit tests
+        run: python3 -m unittest discover -s test -p release_package_test.py
+      - name: Package verified release payload
+        run: python3 scripts/release/repack.py ${{ matrix.platform }} ${{ matrix.arch }} --tag "$REPACKAGE_TAG" --output dist-native
+      - name: Windows install and uninstall smoke test
+        if: matrix.platform == 'windows'
+        run: python3 scripts/release/verify_windows_install.py dist-native/Modu-${REPACKAGE_TAG#v}-windows-${{ matrix.arch }}-setup.exe ${{ matrix.arch }}
+      - name: Debian dependency resolution and installation smoke test
+        if: matrix.platform == 'linux'
+        run: |
+          apt-get install -y ./dist-native/Modu-${REPACKAGE_TAG#v}-linux-${{ matrix.arch }}.deb
+          dpkg-query -W modureader
+          test -x /usr/bin/modureader
+          desktop-file-validate /usr/share/applications/modureader.desktop
+          python3 scripts/release/verify_linux_install.py ${{ matrix.arch }}
+          apt-get remove -y modureader
+          test ! -e /opt/modureader/modu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist-native/*
+          if-no-files-found: error
+          retention-days: 14

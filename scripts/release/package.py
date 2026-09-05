@@ -6,7 +6,6 @@ from pathlib import Path
 import shutil
 import struct
 import subprocess
-import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -136,14 +135,11 @@ def package(platform, arch, version):
     else:
         raise ValueError(platform)
     notices(stage, platform)
-    if platform == "linux":
-        with tarfile.open(OUT / f"{name}.tar.gz", "w:gz") as archive:
-            archive.add(stage, arcname=name)
-    elif platform in ("ios", "macos"):
-        extension = "ipa" if platform == "ios" else "zip"
-        subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", str(stage), str(OUT / f"{name}.{extension}")], check=True)
+    if platform == "ios":
+        subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", str(stage), str(OUT / f"{name}.ipa")], check=True)
     else:
-        shutil.make_archive(str(OUT / name), "zip", stage)
+        from native_installers import build
+        build(stage, platform, arch, version, OUT)
 
 
 if __name__ == "__main__":

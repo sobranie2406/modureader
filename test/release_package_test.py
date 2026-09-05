@@ -11,6 +11,60 @@ spec = importlib.util.spec_from_file_location(
 release_package = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_package)
 
+native_spec = importlib.util.spec_from_file_location(
+    'native_installers', Path(__file__).resolve().parents[1] / 'scripts/release/native_installers.py')
+native = importlib.util.module_from_spec(native_spec)
+native_spec.loader.exec_module(native)
+
+
+class NativeInstallerTest(unittest.TestCase):
+    def test_debian_prerelease_sorts_before_final(self):
+        self.assertEqual(native.deb_version('0.1.0-beta.1'), '0.1.0~beta.1')
+        self.assertEqual(native.deb_version('1.0.0'), '1.0.0')
+
+    def test_invalid_versions_cannot_inject_installer_configuration(self):
+        for version in ('../x', 'v1.0.0', '1.0.0\nAppId=Other', '1.0.0;evil'):
+            with self.assertRaises(ValueError):
+                native.validate_version(version)
+
+    def test_windows_native_os_restrictions_and_user_data_safety(self):
+        for arch, rule in [('x64', 'x64os'), ('arm64', 'arm64')]:
+            script = native.windows_script(Path('payload'), arch, '0.1.0-beta.1', Path('out'))
+            self.assertIn(f'ArchitecturesAllowed={rule}\n', script)
+            self.assertIn(f'ArchitecturesInstallIn64BitMode={rule}\n', script)
+            self.assertIn('PrivilegesRequired=lowest', script)
+            self.assertNotIn('[UninstallDelete]', script)
+            self.assertIn('skipifsilent', script)
+
+    def test_native_checksum_is_portable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'package.deb'
+            path.write_bytes(b'native package')
+            native.checksum(path)
+            self.assertEqual(path.with_suffix('.deb.sha256').read_bytes(),
+                             f'{hashlib.sha256(b"native package").hexdigest()}  package.deb\n'.encode())
+
+    def test_only_installed_uninstaller_engine_can_have_different_architecture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('LICENSE', 'NOTICE', 'SOURCE.txt'):
+                (root / name).write_text('notice')
+            data = bytearray(512)
+            data[:2] = b'MZ'
+            struct.pack_into('<I', data, 0x3c, 128)
+            data[128:132] = b'PE\0\0'
+            struct.pack_into('<H', data, 132, 0xaa64)
+            for name in ('modu.exe', 'flutter_windows.dll', 'onnxruntime.dll', 'tokenizers_ffi.dll'):
+                (root / name).write_bytes(data)
+            struct.pack_into('<H', data, 132, 0x14c)
+            (root / 'unins000.exe').write_bytes(data)
+            native.verify_payload(root, 'windows', 'arm64', installed=True)
+            with self.assertRaises(ValueError):
+                native.verify_payload(root, 'windows', 'arm64')
+            (root / 'wrong.dll').write_bytes(data)
+            with self.assertRaises(ValueError):
+                native.verify_payload(root, 'windows', 'arm64', installed=True)
+
 
 class ArchitectureTest(unittest.TestCase):
     def setUp(self):

@@ -54,7 +54,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           apt-get update
-          apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3
+          apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -118,14 +118,19 @@ jobs:
           else
             flutter build ${{ matrix.platform }} --release --target-platform ${{ matrix.platform }}-${{ matrix.arch }}
           fi
+      - name: Install pinned Inno Setup compiler
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/release/setup-inno.ps1
       - name: Verify architecture and package
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
           name: modu-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            dist-release/*.zip
-            dist-release/*.tar.gz
+            dist-release/*.dmg
+            dist-release/*.exe
+            dist-release/*.deb
             dist-release/*.sha256
           if-no-files-found: error
           retention-days: 14
