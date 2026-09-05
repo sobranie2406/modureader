@@ -91,6 +91,10 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev libwpe-1.0-dev libepoxy-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libasound2-dev libpulse-dev libsqlite3-dev
       - uses: NuGet/setup-nuget@v2
         if: matrix.platform == 'windows'
+      - name: Verify Windows redistributable toolchain before compilation
+        # Resolve packaging compatibility before spending time compiling Flutter.
+        if: matrix.platform == 'windows'
+        run: python scripts/release/windows_runtime.py ${{ matrix.arch }}
       - name: Rust toolchain
         run: |
           if ! command -v rustup >/dev/null; then

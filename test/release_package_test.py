@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
 from verify_mobile import apple_version, verify_android_elf, verify_apple_bundle
-from windows_runtime import prepare_windows_runtime, verify_crt
+from windows_runtime import prepare_windows_runtime, verify_crt, pe_imports
 import bundle_models
 
 
@@ -173,6 +173,43 @@ class ArchitectureTest(unittest.TestCase):
 
 
 class CompatibilityTest(unittest.TestCase):
+    def test_arm64_redist_excludes_only_unneeded_foreign_compatibility_dll(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / 'redist/arm64/Microsoft.VC143.CRT'
+            source.mkdir(parents=True)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            data = bytearray(1024)
+            data[:2] = b'MZ'
+            struct.pack_into('<I', data, 0x3c, 128)
+            data[128:132] = b'PE\0\0'
+            struct.pack_into('<HH', data, 132, 0xaa64, 1)
+            struct.pack_into('<H', data, 148, 240)
+            struct.pack_into('<H', data, 152, 0x20b)
+            struct.pack_into('<I', data, 260, 16)
+            struct.pack_into('<IIII', data, 400, 512, 0x1000, 512, 512)
+            for name in ('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll'):
+                (source / name).write_bytes(data)
+            struct.pack_into('<H', data, 132, 0x8664)
+            (source / 'vcruntime140_1.dll').write_bytes(data)
+            prepare_windows_runtime(bundle, 'arm64', root / 'redist')
+            self.assertFalse((bundle / 'vcruntime140_1.dll').exists())
+            verify_crt(bundle, 'arm64')
+            # Both ordinary and delay imports must prevent unsafe exclusion.
+            struct.pack_into('<H', data, 132, 0xaa64)
+            for directory, name_offset in [(1, 12), (13, 4)]:
+                image = bytearray(data)
+                struct.pack_into('<II', image, 264 + directory * 8, 0x1000, 64)
+                if directory == 13:
+                    struct.pack_into('<I', image, 512, 1)
+                struct.pack_into('<I', image, 512 + name_offset, 0x1080)
+                image[640:659] = b'vcruntime140_1.dll\0\0'
+                (bundle / 'modu.exe').write_bytes(image)
+                self.assertIn('vcruntime140_1.dll', pe_imports(bundle / 'modu.exe'))
+                with self.assertRaisesRegex(ValueError, 'Required CRT'):
+                    prepare_windows_runtime(bundle, 'arm64', root / 'redist')
+
     def test_apple_prerelease_does_not_become_four_components(self):
         self.assertEqual(apple_version('0.1.0-beta.1+6325'), '0.1.0')
         self.assertEqual(apple_version('1.2.3'), '1.2.3')
