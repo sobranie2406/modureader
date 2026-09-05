@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APP_PATH="build/macos/Build/Products/Release/Anx Reader.app"
+APP_PATH="build/macos/Build/Products/Release/Modu.app"
 
 OPT_APP_FORMAT=""
 OPT_DEPLOYMENT=""
@@ -51,6 +51,6 @@ fi
 
 if [[ $BUILD_RESULT == 0 && $OPT_DEPLOYMENT == "-d" ]]; then
     echo "deploy to /Applications/"
-    rm -rf /Applications/AnxReader.app
-    cp -rf "$APP_PATH" /Applications/AnxReader.app
+    rm -rf /Applications/Modu.app
+    cp -rf "$APP_PATH" /Applications/Modu.app
 fi

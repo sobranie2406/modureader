@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anx_reader/config/app_identity.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -22,6 +23,8 @@ import 'package:anx_reader/utils/window_position_validator.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:heroine/heroine.dart';
@@ -38,6 +41,16 @@ MigrationCheckResult? _migrationCheckResult;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    for (final entry in {
+      'Modu': 'LICENSE',
+      'Anx Reader': 'LICENSES/Anx-Reader-MIT.txt',
+      'ReadAny': 'LICENSES/ReadAny-GPL-3.0-or-later.txt',
+    }.entries) {
+      yield LicenseEntryWithLineBreaks(
+          [entry.key], await rootBundle.loadString(entry.value));
+    }
+  });
   await Prefs().initPrefs();
   HttpOverrides.global = AnxHttpProxyOverrides();
 
@@ -65,8 +78,8 @@ Future<void> main() async {
   audioHandler = await AudioService.init(
     builder: () => TtsHandler(),
     config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.anx.reader.tts.channel.audio',
-      androidNotificationChannelName: 'ANX Reader TTS',
+      androidNotificationChannelId: 'com.modu.reader.tts.channel.audio',
+      androidNotificationChannelName: 'Modu TTS',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
     ),
@@ -200,7 +213,7 @@ class _MyAppState extends ConsumerState<MyApp>
             localeListResolutionCallback: _resolveLocale,
             localizationsDelegates: L10n.localizationsDelegates,
             supportedLocales: L10n.supportedLocales,
-            title: 'Anx Reader',
+            title: AppIdentity.globalDisplayName,
             themeMode: prefsNotifier.themeMode,
             theme: colorSchema(prefsNotifier, context, Brightness.light),
             darkTheme: colorSchema(prefsNotifier, context, Brightness.dark),

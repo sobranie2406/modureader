@@ -174,6 +174,8 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
               title: Text(L10n.of(context).settingsAdvancedHttpProxyEnabled),
               leading: const Icon(Icons.wifi_tethering),
               initialValue: Prefs().httpProxyEnabled,
+              description: const Text(
+                  '应用网络请求使用 HTTP 代理，连接失败不会自动直连。阅读器 WebView 和外部浏览器请使用系统代理。'),
               onToggle: (value) {
                 Prefs().httpProxyEnabled = value;
                 setState(() {});

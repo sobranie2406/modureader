@@ -55,6 +55,13 @@ export class TOCProgress {
     }
 }
 
+// Paginator page numbers already include the leading sentinel page. Fixed
+// layout uses zero-based section indexes instead; only that fallback needs +1.
+export const getChapterLocation = (renderer, section) => ({
+    current: renderer.page ?? ((section?.current ?? 0) + 1),
+    total: renderer.pages ? renderer.pages - 2 : (section?.total ?? 0),
+})
+
 export class SectionProgress {
     constructor(sections, sizePerLoc, sizePerTimeUnit) {
         this.sizes = sections.map(s => s.linear != 'no' && s.size > 0 ? s.size : 0)

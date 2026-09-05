@@ -1,5 +1,7 @@
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/service/ai/index.dart';
+import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
@@ -19,6 +21,7 @@ class AiStream extends ConsumerStatefulWidget {
     required this.prompt,
     this.identifier,
     this.config,
+    this.providerOverride,
     this.canCopy = true,
     this.regenerate = false,
     this.useAgent = false,
@@ -27,6 +30,7 @@ class AiStream extends ConsumerStatefulWidget {
   final PromptTemplatePayload prompt;
   final String? identifier;
   final Map<String, String>? config;
+  final AiProvider? providerOverride;
   final bool canCopy;
   final bool regenerate;
   final bool useAgent;
@@ -37,6 +41,13 @@ class AiStream extends ConsumerStatefulWidget {
 
 class AiStreamState extends ConsumerState<AiStream> {
   late Stream<String> stream;
+  CancelableLangchainRunner? _requestRunner;
+
+  @override
+  void dispose() {
+    _requestRunner?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -45,14 +56,18 @@ class AiStreamState extends ConsumerState<AiStream> {
   }
 
   Stream<String> _createStream(bool regenerate) {
+    _requestRunner?.cancel();
+    final runner = _requestRunner = CancelableLangchainRunner();
     final messages = widget.prompt.buildMessages();
     return aiGenerateStream(
       messages,
       identifier: widget.identifier,
       config: widget.config,
+      providerOverride: widget.providerOverride,
       regenerate: regenerate,
       useAgent: widget.useAgent,
       ref: ref,
+      requestRunner: runner,
     );
   }
 

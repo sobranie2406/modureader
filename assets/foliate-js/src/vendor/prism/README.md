@@ -1,6 +1,6 @@
 # Prism.js Code Syntax Highlighting
 
-This directory contains the Prism.js library for code syntax highlighting in Anx Reader.
+This directory contains the Prism.js library used for code syntax highlighting in Modu.
 
 ## Directory Structure
 

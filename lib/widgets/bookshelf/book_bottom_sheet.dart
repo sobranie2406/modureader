@@ -14,10 +14,13 @@ import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/book.dart';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/utils/share_file.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:anx_reader/widgets/delete_confirm.dart';
 import 'package:anx_reader/widgets/icon_and_text.dart';
 import 'package:file_picker/file_picker.dart';
@@ -39,24 +42,7 @@ class BookBottomSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> handleDelete(BuildContext context) async {
       Navigator.pop(context);
-      await bookDao.updateBook(Book(
-        id: book.id,
-        title: book.title,
-        coverPath: book.coverPath,
-        filePath: book.filePath,
-        lastReadPosition: book.lastReadPosition,
-        readingPercentage: book.readingPercentage,
-        author: book.author,
-        isDeleted: true,
-        description: book.description,
-        rating: book.rating,
-        md5: book.md5,
-        createTime: book.createTime,
-        updateTime: DateTime.now(),
-      ));
-      ref.read(bookListProvider.notifier).refresh();
-      File(book.fileFullPath).delete();
-      File(book.coverFullPath).delete();
+      await deleteBooksFromBookshelf(ref, [book]);
     }
 
     void handleDetail(BuildContext context) {
@@ -227,12 +213,20 @@ class BookBottomSheet extends ConsumerWidget {
         // Calculate MD5
         String? newMd5 = await MD5Service.calculateFileMd5(newDestPath);
 
-        // Update DB
-        await bookDao.updateBook(book.copyWith(
+        // Drain the old file's worker before changing its identity.
+        await bookKnowledgeIndexQueue.cancelAndRemove(book.id);
+        final replacement = book.copyWith(
           filePath: newRelativePath,
           md5: newMd5,
           updateTime: DateTime.now(),
-        ));
+        );
+        await bookDao.updateBook(replacement);
+        await BookKnowledgeIndexService().deleteIndex(book);
+        enqueueImportedBookForAutomaticIndexing(
+          book: replacement,
+          vectorModelEnabled: Prefs().vectorModelEnabled,
+          autoVectorizeOnImport: Prefs().autoVectorizeOnImport,
+        );
 
         // Delete old file if path is different
         if (book.fileFullPath != newDestPath) {
@@ -286,12 +280,13 @@ class BookBottomSheet extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      height: 100,
+      // Leave room for DeleteConfirm's padding and larger accessibility text.
+      constraints: const BoxConstraints(minHeight: 112),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          BookCover(book: book, width: 40),
+          SizedBox(height: 60, child: BookCover(book: book, width: 40)),
           const SizedBox(width: 10),
           Expanded(
             child: SingleChildScrollView(

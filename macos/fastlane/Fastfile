@@ -87,7 +87,7 @@ platform :mac do
       skip_screenshots: true,
       skip_metadata: true,
       precheck_include_in_app_purchases: false,
-      pkg: "./Anx Reader.pkg"
+      pkg: "./Modu.pkg"
     )
   end
   

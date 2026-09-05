@@ -267,21 +267,7 @@
     "settingsAiProviderReasoningEffortAuto",
     "settingsAiProviderReasoningEffortLow",
     "settingsAiProviderReasoningEffortMedium",
-    "settingsAiProviderReasoningEffortHigh",
-    "settingsAdvancedNetwork",
-    "settingsAdvancedHttpProxyEnabled",
-    "settingsAdvancedHttpProxyConfig",
-    "settingsAdvancedHttpProxyHost",
-    "settingsAdvancedHttpProxyHostHint",
-    "settingsAdvancedHttpProxyPort",
-    "settingsAdvancedHttpProxyPortHint",
-    "settingsAdvancedHttpProxyNotConfigured",
-    "settingsAdvancedHttpProxyInvalidInput",
-    "settingsAdvancedHttpProxyTestUrl",
-    "settingsAdvancedHttpProxyTest",
-    "settingsAdvancedHttpProxyTesting",
-    "settingsAdvancedHttpProxyTestSuccess",
-    "settingsAdvancedHttpProxyTestFailed"
+    "settingsAiProviderReasoningEffortHigh"
   ],
 
   "zh_TW": [
@@ -290,20 +276,6 @@
     "settingsAiProviderReasoningEffortAuto",
     "settingsAiProviderReasoningEffortLow",
     "settingsAiProviderReasoningEffortMedium",
-    "settingsAiProviderReasoningEffortHigh",
-    "settingsAdvancedNetwork",
-    "settingsAdvancedHttpProxyEnabled",
-    "settingsAdvancedHttpProxyConfig",
-    "settingsAdvancedHttpProxyHost",
-    "settingsAdvancedHttpProxyHostHint",
-    "settingsAdvancedHttpProxyPort",
-    "settingsAdvancedHttpProxyPortHint",
-    "settingsAdvancedHttpProxyNotConfigured",
-    "settingsAdvancedHttpProxyInvalidInput",
-    "settingsAdvancedHttpProxyTestUrl",
-    "settingsAdvancedHttpProxyTest",
-    "settingsAdvancedHttpProxyTesting",
-    "settingsAdvancedHttpProxyTestSuccess",
-    "settingsAdvancedHttpProxyTestFailed"
+    "settingsAiProviderReasoningEffortHigh"
   ]
 }

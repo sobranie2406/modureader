@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:anx_reader/service/iap/base_iap_service.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/services.dart';
+import 'package:anx_reader/config/app_identity.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
@@ -13,7 +14,7 @@ class PlayStoreIAPService extends BaseIAPService {
         _trialStartDate = DateTime.fromMillisecondsSinceEpoch(0);
 
   static const MethodChannel _installInfoChannel =
-      MethodChannel('com.anxcye.anx_reader/install_info');
+      MethodChannel('${AppIdentity.bundleId}/install_info');
   final InAppPurchase _inAppPurchase;
   DateTime _trialStartDate;
   final String _productId = 'anx_reader_lifetime';

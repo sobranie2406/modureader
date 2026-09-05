@@ -1,5 +1,5 @@
 import * as CFI from './epubcfi.js'
-import { TOCProgress, SectionProgress } from './progress.js'
+import { TOCProgress, SectionProgress, getChapterLocation } from './progress.js'
 import { Overlayer } from './overlayer.js'
 import { textWalker } from './text-walker.js'
 import { Translator, TranslationMode } from './translator.js'
@@ -178,12 +178,7 @@ export class View extends HTMLElement {
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
     const cfi = this.getCFI(index, range)
-    const totalPages = this.renderer.pages ? this.renderer.pages - 2 : progress.section.total
-    const currentPage = this.renderer.page ?? progress.section.current
-    const chapterLocation = {
-      current: currentPage,
-      total: totalPages
-    }
+    const chapterLocation = getChapterLocation(this.renderer, progress.section)
 
     this.lastLocation = { ...progress, tocItem, pageItem, cfi, range, chapterLocation }
     if (reason === 'snap' || reason === 'page' || reason === 'scroll')

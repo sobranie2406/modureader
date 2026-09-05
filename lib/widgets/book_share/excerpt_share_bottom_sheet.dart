@@ -125,7 +125,7 @@ class _ExcerptShareBottomSheetState
     }
 
     final tempDir = (await getAnxTempDir()).path;
-    final file = File('$tempDir/anx_excerpt_share.png');
+    final file = File('$tempDir/modu_excerpt_share.png');
     await file.writeAsBytes(imageData);
 
     await shareFile(file: file);
@@ -137,7 +137,7 @@ class _ExcerptShareBottomSheetState
     SmartDialog.dismiss();
     if (imageData == null) return;
 
-    final fileName = 'AnxReader_${widget.bookTitle.replaceAll(' ', '_')}';
+    final fileName = 'Modu_${widget.bookTitle.replaceAll(' ', '_')}';
     await SaveImg.downloadImg(imageData, 'png', fileName);
   }
 

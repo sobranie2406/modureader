@@ -94,7 +94,6 @@ class MicrosoftApiTranslateProvider extends TranslateServiceProvider {
         label: L10n.of(context).translateTip,
         type: ConfigItemType.tip,
         defaultValue: L10n.of(context).translateAzureHelpText,
-        link: 'https://anx.anxcye.com/docs/translate/azure',
       ),
       ConfigItem(
         key: 'api_key',

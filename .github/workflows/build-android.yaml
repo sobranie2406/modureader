@@ -64,10 +64,10 @@ jobs:
       - name: Rename builds
         run: |
           cd build/app/outputs/flutter-apk
-          mv app-armeabi-v7a-release.apk Anx-Reader-android-${{ inputs.version }}-armeabi-v7a.apk
-          mv app-arm64-v8a-release.apk Anx-Reader-android-${{ inputs.version }}-arm64-v8a.apk
-          mv app-x86_64-release.apk Anx-Reader-android-${{ inputs.version }}-x86_64.apk
-          mv app-release.apk Anx-Reader-android-${{ inputs.version }}-universal.apk
+          mv app-armeabi-v7a-release.apk Modu-android-${{ inputs.version }}-armeabi-v7a.apk
+          mv app-arm64-v8a-release.apk Modu-android-${{ inputs.version }}-arm64-v8a.apk
+          mv app-x86_64-release.apk Modu-android-${{ inputs.version }}-x86_64.apk
+          mv app-release.apk Modu-android-${{ inputs.version }}-universal.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

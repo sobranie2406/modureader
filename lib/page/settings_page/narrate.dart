@@ -1,4 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/providers/tts_providers.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
@@ -345,19 +346,20 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 50.0), // Add padding for bottom
       children: [
-        SettingsSection(
-          title: Text(L10n.of(context).settingsNarrateTtsService),
-          tiles: [
-            SettingsTile.switchTile(
-                title: Text(L10n.of(context).allowMixing),
-                description: Text(L10n.of(context).enableMixTip),
-                initialValue: Prefs().allowMixWithOtherAudio,
-                onToggle: (value) {
-                  Prefs().allowMixWithOtherAudio = value;
-                  setState(() {});
-                }),
-          ],
-        ),
+        if (AnxPlatform.isIOS)
+          SettingsSection(
+            title: Text(L10n.of(context).settingsNarrateTtsService),
+            tiles: [
+              SettingsTile.switchTile(
+                  title: Text(L10n.of(context).allowMixing),
+                  description: Text(L10n.of(context).enableMixTip),
+                  initialValue: Prefs().allowMixWithOtherAudio,
+                  onToggle: (value) {
+                    Prefs().allowMixWithOtherAudio = value;
+                    setState(() {});
+                  }),
+            ],
+          ),
         SettingsSection(
           title: Text(L10n.of(context).ttsType),
           tiles: [
@@ -423,6 +425,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   }
 
   Widget _buildServiceSelection(String currentServiceId) {
+    final isChinese = Localizations.localeOf(context).languageCode == 'zh';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: DropdownButtonFormField<String>(
@@ -432,18 +435,15 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
           border: OutlineInputBorder(),
         ),
         items: [
+          const DropdownMenuItem(value: 'edge', child: Text('Edge TTS')),
           DropdownMenuItem(
               value: 'system',
               child: Text(L10n.of(context).settingsNarrateSystemTts)),
-          DropdownMenuItem(
-              value: 'aliyun',
-              child: Text(L10n.of(context).settingsNarrateAliyunTts)),
-          DropdownMenuItem(
-              value: 'azure',
-              child: Text(L10n.of(context).settingsNarrateAzureTts)),
+          const DropdownMenuItem(value: 'dashscope', child: Text('DashScope')),
+          const DropdownMenuItem(value: 'xiaomi', child: Text('Xiaomi MiMo')),
           DropdownMenuItem(
               value: 'openai',
-              child: Text(L10n.of(context).settingsNarrateOpenAiTts)),
+              child: Text(isChinese ? 'OpenAI 兼容' : 'OpenAI compatible')),
         ],
         onChanged: (value) async {
           if (value != null && value != currentServiceId) {

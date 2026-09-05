@@ -13,12 +13,6 @@ class HeatmapChart extends ConsumerWidget {
 
     return HeatMap(
       showColorTip: false,
-      blockBorder: Border.all(
-        color: Colors.black12,
-        style: BorderStyle.solid,
-        width: 0.25,
-        strokeAlign: BorderSide.strokeAlignOutside,
-      ),
       defaultColor: Theme.of(context).colorScheme.surface,
       datasets: statisticData.when(
           data: (data) => data, loading: () => {}, error: (error, stack) => {}),

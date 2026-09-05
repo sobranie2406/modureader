@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.anxcye" "\0"
-            VALUE "FileDescription", "anx_reader" "\0"
+            VALUE "CompanyName", "Modu contributors" "\0"
+            VALUE "FileDescription", "Modu" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "anx_reader" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.anxcye. All rights reserved." "\0"
-            VALUE "OriginalFilename", "anx_reader.exe" "\0"
-            VALUE "ProductName", "anx_reader" "\0"
+            VALUE "InternalName", "modu" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Modu contributors. All rights reserved." "\0"
+            VALUE "OriginalFilename", "modu.exe" "\0"
+            VALUE "ProductName", "Modu" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

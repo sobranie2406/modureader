@@ -106,12 +106,6 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
     //             decoration: TextDecoration.underline,
     //           ),
     //         ),
-    //         onTap: () {
-    //           launchUrl(
-    //             Uri.parse('https://github.com/Anxcye/anx-reader/issues/49'),
-    //             mode: LaunchMode.externalApplication,
-    //           );
-    //         },
     //       ),
     //       trailing: Switch(
     //         value: Prefs().readingRules.bionicReading,

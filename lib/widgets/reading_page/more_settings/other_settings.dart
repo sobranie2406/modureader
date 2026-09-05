@@ -58,8 +58,15 @@ class _OtherSettingsState extends State<OtherSettings> {
       return ListTile(
         contentPadding: EdgeInsets.zero,
         trailing: Switch(
-            value: Prefs().hideStatusBar,
+            value: AnxPlatform.isDesktop
+                ? Prefs().readerFullscreen
+                : Prefs().hideStatusBar,
             onChanged: (bool? value) => setState(() {
+                  if (AnxPlatform.isDesktop) {
+                    Prefs().saveReaderFullscreen(value!);
+                    readingPageKey.currentState?.setReaderFullscreen(value);
+                    return;
+                  }
                   Prefs().saveHideStatusBar(value!);
                   if (value) {
                     hideStatusBar();

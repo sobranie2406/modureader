@@ -1,6 +1,7 @@
 name: PR Check
 
 on:
+  workflow_call:
   pull_request: {}
   workflow_dispatch:
     inputs:
@@ -64,3 +65,12 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Reader JavaScript regression tests
+        run: |
+          npm install --prefix "$RUNNER_TEMP/modu-js-tests" jsdom@26.1.0
+          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_business.test.mjs

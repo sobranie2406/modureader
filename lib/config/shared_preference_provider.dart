@@ -50,11 +50,24 @@ const String _prefsBackupEntryValueKey = 'value';
 const Set<String> _prefsImportSkipKeys = {
   'iapPurchaseStatus',
   'iapLastCheckTime',
+  // Enabling sensitive sync requires an explicit risk confirmation on each
+  // device. Never restore this switch or its local-only password silently.
+  'syncAiSettingsToWebdav',
+  'syncAiSettingsEncryptionPassword',
+};
+
+const Set<String> _prefsExportSkipKeys = {
+  // The encryption password must remain local and must not be copied into an
+  // app backup or uploaded alongside the encrypted payload.
+  'syncAiSettingsEncryptionPassword',
 };
 
 class Prefs extends ChangeNotifier {
   late SharedPreferences prefs;
   static final Prefs _instance = Prefs._internal();
+
+  /// Notifies settings consumers after a validated external restore.
+  void notifyExternalChange() => notifyListeners();
 
   factory Prefs() {
     return _instance;
@@ -70,6 +83,9 @@ class Prefs extends ChangeNotifier {
   static const String _statisticsDashboardTilesKey = 'statisticsDashboardTiles';
   static const String _enabledAiToolsKey = 'enabledAiTools';
   static const String _userPromptsKey = 'userPrompts';
+  static const String _readAnySkillStatesKey = 'readAnySkillStates';
+  static const String _readAnySkillPromptsKey = 'readAnySkillPrompts';
+  static const String _vectorModelConfigKey = 'vectorModelConfig';
 
   Future<void> initPrefs() async {
     prefs = await SharedPreferences.getInstance();
@@ -121,6 +137,7 @@ class Prefs extends ChangeNotifier {
       prefsBackupVersionKey: prefsBackupSchemaVersion,
     };
     for (final String key in prefs.getKeys()) {
+      if (_prefsExportSkipKeys.contains(key)) continue;
       final Object? value = prefs.get(key);
       final Map<String, Object?>? encoded = encodePrefsBackupEntry(value);
       if (encoded != null) {
@@ -387,6 +404,12 @@ class Prefs extends ChangeNotifier {
     return prefs.getBool('hideStatusBar') ?? true;
   }
 
+  bool get readerFullscreen => prefs.getBool('readerFullscreen') ?? false;
+  Future<void> saveReaderFullscreen(bool value) async {
+    await prefs.setBool('readerFullscreen', value);
+    notifyListeners();
+  }
+
   set autoHideBottomBar(bool status) {
     prefs.setBool('autoHideBottomBar', status);
     notifyListeners();
@@ -491,7 +514,10 @@ class Prefs extends ChangeNotifier {
 
   String get ttsService {
     String? service = prefs.getString('ttsService');
-    if (service != null) return service;
+    if (service != null) {
+      // Removed legacy providers may still be stored by an older installation.
+      return const {'aliyun', 'azure'}.contains(service) ? 'system' : service;
+    }
 
     // Migration/Fallback
     bool isSystem = prefs.getBool('isSystemTts') ??
@@ -499,7 +525,9 @@ class Prefs extends ChangeNotifier {
     if (!isSystem) {
       // Check if there was an online service set
       String? online = prefs.getString('onlineTtsService');
-      if (online != null) return online;
+      if (online != null) {
+        return const {'aliyun', 'azure'}.contains(online) ? 'system' : online;
+      }
     }
     return 'system';
   }
@@ -571,7 +599,7 @@ class Prefs extends ChangeNotifier {
 
   TranslateService get translateService {
     return getTranslateService(
-        prefs.getString('translateService') ?? 'bingWeb');
+        prefs.getString('translateService') ?? 'microsoftFree');
   }
 
   set translateFrom(LangListEnum from) {
@@ -617,12 +645,53 @@ class Prefs extends ChangeNotifier {
 
   TranslateService get fullTextTranslateService {
     final serviceName =
-        prefs.getString('fullTextTranslateService') ?? 'microsoftApi';
+        prefs.getString('fullTextTranslateService') ?? 'microsoftFree';
     if (serviceName == 'microsoft') {
       prefs.setString('fullTextTranslateService', 'microsoftApi');
       return TranslateService.microsoftApi;
     }
     return getTranslateService(serviceName);
+  }
+
+  set translationAiService(String identifier) {
+    prefs.setString('translationAiService', identifier);
+    notifyListeners();
+  }
+
+  /// AI endpoint/model used only for translation, matching ReadAny's separate
+  /// translation-model selector. Falls back to the default AI endpoint.
+  String get translationAiService {
+    final configured = prefs.getString('translationAiService');
+    final providers = getAiProviders();
+    if (providers.isEmpty) return selectedAiService;
+
+    bool isUsable(dynamic item) {
+      if (item is! Map) return false;
+      final provider = Map<String, dynamic>.from(item);
+      if (provider['enabled'] == false ||
+          (provider['model']?.toString().trim().isEmpty ?? true)) {
+        return false;
+      }
+      final keys = provider['apiKeys'];
+      return keys is List &&
+          keys.any((item) =>
+              item is Map &&
+              item['enabled'] != false &&
+              (item['key']?.toString().trim().isNotEmpty ?? false));
+    }
+
+    final usable = providers.where(isUsable).toList(growable: false);
+    if (usable.isEmpty) return selectedAiService;
+    if (configured != null &&
+        configured.isNotEmpty &&
+        usable.any((item) => item is Map && item['id'] == configured)) {
+      return configured;
+    }
+    final selected = selectedAiService;
+    if (usable.any((item) => item is Map && item['id'] == selected)) {
+      return selected;
+    }
+    return (usable.first as Map)['id']?.toString() ?? selected;
   }
 
   set fullTextTranslateFrom(LangListEnum from) {
@@ -645,7 +714,7 @@ class Prefs extends ChangeNotifier {
   }
 
   set aiRpm(int rpm) {
-    prefs.setInt('aiRpm', rpm);
+    prefs.setInt('aiRpm', rpm < 0 ? 0 : rpm);
     notifyListeners();
   }
 
@@ -847,6 +916,75 @@ class Prefs extends ChangeNotifier {
     return prefs.getString('selectedAiService') ?? 'openai';
   }
 
+  double get aiTemperature => prefs.getDouble('aiTemperature') ?? 0.7;
+
+  set aiTemperature(double value) {
+    prefs.setDouble('aiTemperature', value.clamp(0.0, 1.0));
+    notifyListeners();
+  }
+
+  int get aiMaxTokens => prefs.getInt('aiMaxTokens') ?? 8192;
+
+  set aiMaxTokens(int value) {
+    prefs.setInt('aiMaxTokens', value.clamp(1024, 32768));
+    notifyListeners();
+  }
+
+  int get aiContextTurns => prefs.getInt('aiContextTurns') ?? 8;
+
+  set aiContextTurns(int value) {
+    prefs.setInt('aiContextTurns', value.clamp(2, 30));
+    notifyListeners();
+  }
+
+  bool get vectorModelEnabled => prefs.getBool('vectorModelEnabled') ?? true;
+
+  set vectorModelEnabled(bool value) {
+    prefs.setBool('vectorModelEnabled', value);
+    notifyListeners();
+  }
+
+  bool get autoVectorizeOnImport =>
+      prefs.getBool('autoVectorizeOnImport') ?? false;
+
+  set autoVectorizeOnImport(bool value) {
+    prefs.setBool('autoVectorizeOnImport', value);
+    notifyListeners();
+  }
+
+  String get vectorModelMode => prefs.getString('vectorModelMode') ?? 'builtin';
+
+  set vectorModelMode(String value) {
+    prefs.setString(
+      'vectorModelMode',
+      value == 'remote' ? 'remote' : 'builtin',
+    );
+    notifyListeners();
+  }
+
+  String get vectorLocalModelId =>
+      prefs.getString('vectorLocalModelId') ?? 'all-MiniLM-L6-v2';
+
+  set vectorLocalModelId(String value) {
+    prefs.setString('vectorLocalModelId', value);
+    notifyListeners();
+  }
+
+  Map<String, dynamic> get vectorModelConfig {
+    final raw = prefs.getString(_vectorModelConfigKey);
+    if (raw == null || raw.isEmpty) return const {};
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> saveVectorModelConfig(Map<String, dynamic> config) async {
+    await prefs.setString(_vectorModelConfigKey, jsonEncode(config));
+    notifyListeners();
+  }
+
   void deleteAiConfig(String identifier) {
     prefs.remove('aiConfig_$identifier');
     notifyListeners();
@@ -982,6 +1120,60 @@ class Prefs extends ChangeNotifier {
   set userPrompts(List<UserPrompt> prompts) {
     final jsonList = prompts.map((p) => p.toJson()).toList();
     prefs.setString(_userPromptsKey, jsonEncode(jsonList));
+    notifyListeners();
+  }
+
+  Map<String, bool> get readAnySkillStates {
+    final jsonString = prefs.getString(_readAnySkillStatesKey);
+    if (jsonString == null || jsonString.isEmpty) return const {};
+    try {
+      final values = jsonDecode(jsonString) as Map<String, dynamic>;
+      return values.map((key, value) => MapEntry(key, value == true));
+    } catch (error) {
+      AnxLog.warning('Error loading ReadAny skill states: $error');
+      return const {};
+    }
+  }
+
+  bool isReadAnySkillEnabled(String skillId) {
+    return readAnySkillStates[skillId] ?? true;
+  }
+
+  void setReadAnySkillEnabled(String skillId, bool enabled) {
+    final states = Map<String, bool>.from(readAnySkillStates);
+    states[skillId] = enabled;
+    prefs.setString(_readAnySkillStatesKey, jsonEncode(states));
+    notifyListeners();
+  }
+
+  Map<String, String> get readAnySkillPrompts {
+    final jsonString = prefs.getString(_readAnySkillPromptsKey);
+    if (jsonString == null || jsonString.isEmpty) return const {};
+    try {
+      final values = jsonDecode(jsonString) as Map<String, dynamic>;
+      return values.map((key, value) => MapEntry(key, value.toString()));
+    } catch (error) {
+      AnxLog.warning('Error loading AI reading skill prompts: $error');
+      return const {};
+    }
+  }
+
+  String getReadAnySkillPrompt(String skillId, String defaultPrompt) {
+    final saved = readAnySkillPrompts[skillId]?.trim();
+    return saved == null || saved.isEmpty ? defaultPrompt : saved;
+  }
+
+  void setReadAnySkillPrompt(String skillId, String prompt) {
+    final prompts = Map<String, String>.from(readAnySkillPrompts);
+    prompts[skillId] = prompt;
+    prefs.setString(_readAnySkillPromptsKey, jsonEncode(prompts));
+    notifyListeners();
+  }
+
+  void resetReadAnySkillPrompt(String skillId) {
+    final prompts = Map<String, String>.from(readAnySkillPrompts)
+      ..remove(skillId);
+    prefs.setString(_readAnySkillPromptsKey, jsonEncode(prompts));
     notifyListeners();
   }
 
@@ -1181,6 +1373,30 @@ class Prefs extends ChangeNotifier {
 
   bool get autoSync {
     return prefs.getBool('autoSync') ?? true;
+  }
+
+  bool get syncAiSettingsToWebdav {
+    return prefs.getBool('syncAiSettingsToWebdav') ?? false;
+  }
+
+  set syncAiSettingsToWebdav(bool value) {
+    prefs.setBool('syncAiSettingsToWebdav', value);
+    notifyListeners();
+  }
+
+  String? get syncAiSettingsEncryptionPassword {
+    final value = prefs.getString('syncAiSettingsEncryptionPassword');
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  Future<void> saveSyncAiSettingsEncryptionPassword(String password) async {
+    await prefs.setString('syncAiSettingsEncryptionPassword', password);
+    notifyListeners();
+  }
+
+  Future<void> clearSyncAiSettingsEncryptionPassword() async {
+    await prefs.remove('syncAiSettingsEncryptionPassword');
+    notifyListeners();
   }
 
   set readingInfo(ReadingInfoModel info) {

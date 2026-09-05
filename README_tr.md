@@ -1,3 +1,5 @@
+> Historical upstream translation, not the current Modu product description. For Modu downloads, licensing and build instructions, see [Modu README](README.md). Upstream store links below are not Modu releases.
+
 [English](README.md) | **Türkçe** | [简体中文](README_zh.md) | [Русский](README_RU.md)
 
 <br>

@@ -1,4 +1,4 @@
-Anx Reader, a thoughtfully crafted e-book reader for book lovers. Featuring powerful AI capabilities and supporting various e-book formats, it makes reading smarter and more focused. With its modern interface design, we're committed to delivering pure reading pleasure.
+Modu is a thoughtfully crafted ebook reader for focused reading. Its AI reading tools, hybrid search, notes, statistics, text-to-speech, and WebDAV support make reading more intelligent while keeping the interface calm and distraction-free.
 
 <p>📚 <strong>Rich Format Support</strong></p>
 <ul>

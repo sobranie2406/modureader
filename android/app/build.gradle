@@ -29,9 +29,9 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.anxcye.anx_reader"
+    namespace "com.modu.reader"
     // compileSdk flutter.compileSdkVersion
-    compileSdk 35
+    compileSdk 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -48,10 +48,10 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.anxcye.anx_reader"
+        applicationId "com.modu.reader"
+        minSdkVersion 26
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

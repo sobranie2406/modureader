@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/book_player/reader_file_access.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/services.dart';
@@ -27,9 +28,8 @@ class Server {
       await stop();
     }
 
-    var handler = const shelf.Pipeline()
-        .addMiddleware(shelf.logRequests())
-        .addHandler(_handleRequests);
+    // Do not log capability URLs or book filenames.
+    final handler = const shelf.Pipeline().addHandler(_handleRequests);
 
     int port = Prefs().lastServerPort;
 
@@ -64,28 +64,31 @@ class Server {
     return await rootBundle.loadString(path);
   }
 
-  File? _tempFile;
-  String? _tempFileName;
+  final _files = ReaderFileAccess();
 
   String setTempFile(File file) {
-    _tempFile = file;
-    _tempFileName =
-        '${DateTime.now().millisecondsSinceEpoch}.${file.path.split('.').last}';
-    return _tempFileName!;
+    return 'book/${_files.register(file, reuse: false)}';
   }
+
+  String bookUrl(File file) =>
+      'http://127.0.0.1:$port/book/${_files.register(file)}';
+
+  void releaseTempFile(String route) =>
+      _files.revoke(route.substring('book/'.length));
 
   Future<shelf.Response> _handleRequests(shelf.Request request) async {
     final uriPath = request.requestedUri.path;
-    AnxLog.info('Server: Request for $uriPath');
-
-    if (_tempFileName != null && uriPath == "/${_tempFileName!}") {
-      return shelf.Response.ok(
-        _tempFile?.openRead(),
-        headers: {
-          'Content-Type': 'application/epub+zip',
-          'Access-Control-Allow-Origin': '*',
-        },
-      );
+    final origin = request.headers['origin'];
+    if (request.requestedUri.host != '127.0.0.1' ||
+        (origin != null && origin != 'http://127.0.0.1:$port') ||
+        request.headers['sec-fetch-site'] == 'cross-site') {
+      return shelf.Response.forbidden('Origin not allowed');
+    }
+    if (request.method != 'GET' && request.method != 'HEAD') {
+      return shelf.Response(405);
+    }
+    if (uriPath.split('/').any((part) => part == '..' || part == '.')) {
+      return shelf.Response.notFound('Not found');
     }
 
     if (uriPath.startsWith('/book/')) {
@@ -98,16 +101,14 @@ class Server {
       );
     } else if (uriPath.startsWith('/fonts/')) {
       Directory fontDir = getFontDir();
-      final file = File(
-          '${fontDir.path}/${path.basename(Uri.decodeComponent(uriPath))}');
-      if (!file.existsSync()) {
+      final file = ReaderFileAccess.within(fontDir, path.basename(uriPath));
+      if (file == null) {
         return shelf.Response.notFound('Font not found');
       }
       return shelf.Response.ok(
         file.openRead(),
         headers: {
           'Content-Type': 'font/opentype',
-          'Access-Control-Allow-Origin': '*',
           'cache-control': 'public, max-age=31536000',
         },
       );
@@ -119,7 +120,6 @@ class Server {
           file.buffer.asUint8List(),
           headers: {
             'Content-Type': 'application/epub+zip',
-            'Access-Control-Allow-Origin': '*', // Add this line
           },
         );
       }
@@ -149,25 +149,21 @@ class Server {
     } else if (uriPath.startsWith('/bgimg/')) {
       return await _handleBgimgRequest(request);
     } else {
-      return shelf.Response.ok(
-        'Request for "${request.url}"',
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-      );
+      return shelf.Response.notFound('Not found');
     }
   }
 
   shelf.Response _handleBookRequest(shelf.Request request) {
-    final bookPath = Uri.decodeComponent(request.url.path.substring(5));
-    final file = File(bookPath);
-    AnxLog.info('Server: Request for book: $bookPath');
-    if (!file.existsSync()) {
+    final file = _files.resolve(request.url.path.substring(5));
+    if (file == null) {
       return shelf.Response.notFound('Book not found');
     }
     final headers = {
-      'Content-Type': 'application/epub+zip',
-      'Access-Control-Allow-Origin': '*',
+      'Content-Type': path.extension(file.path).toLowerCase() == '.pdf'
+          ? 'application/pdf'
+          : 'application/octet-stream',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
     };
     return shelf.Response.ok(file.openRead(), headers: headers);
   }
@@ -178,15 +174,15 @@ class Server {
     if (bgimgPath.startsWith('assets/')) {
       file = (await rootBundle.load(bgimgPath.substring(7))).buffer;
     } else if (bgimgPath.startsWith('local/')) {
-      final path =
-          getBgimgDir().path + Platform.pathSeparator + bgimgPath.substring(6);
-      file = (await File(path).readAsBytes()).buffer;
+      final local =
+          ReaderFileAccess.within(getBgimgDir(), bgimgPath.substring(6));
+      if (local == null) return shelf.Response.notFound('Bgimg not found');
+      file = (await local.readAsBytes()).buffer;
     } else {
       return shelf.Response.notFound('Bgimg not found');
     }
     final headers = {
       'Content-Type': 'image/png',
-      'Access-Control-Allow-Origin': '*',
     };
     return shelf.Response.ok(file.asUint8List(), headers: headers);
   }

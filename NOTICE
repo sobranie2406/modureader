@@ -1,0 +1,13 @@
+Modu
+Copyright (c) 2026 Modu contributors
+
+Derived from Anx Reader: https://github.com/anxcye/anx-reader
+AI knowledge-engine and TTS portions are derived from or based on ReadAny: https://github.com/codedogQBY/ReadAny
+
+This is an independently modified derivative, not an official release of either upstream project.
+Distributed under GNU General Public License version 3 or later. See LICENSE.
+Anx Reader portions retain their MIT license and copyright (c) 2025 Anxcye;
+see LICENSES/Anx-Reader-MIT.txt. ReadAny portions retain copyright (c) 2024
+ReadAny Team; see LICENSES/ReadAny-GPL-3.0-or-later.txt.
+Source: https://github.com/sobranie2406/modureader
+Third-party notices remain in their original source and dependency distributions.

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:convert';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'dart:ui';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -28,6 +30,10 @@ import 'package:anx_reader/providers/bookmark.dart';
 import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/battery_level.dart';
+import 'package:anx_reader/service/knowledge/knowledge_chapter_source.dart';
+import 'package:anx_reader/service/knowledge/embedding_provider.dart';
+import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
@@ -44,7 +50,6 @@ import 'package:anx_reader/widgets/context_menu/context_menu.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
-import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -114,31 +119,53 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       ModalRoute.of(context)?.isCurrent ?? false;
 
   void prevPage() {
-    webViewController.evaluateJavascript(source: 'prevPage()');
+    webViewController.evaluateJavascript(source: 'prevPage(); void 0;');
   }
 
   void nextPage() {
-    webViewController.evaluateJavascript(source: 'nextPage()');
+    webViewController.evaluateJavascript(source: 'nextPage(); void 0;');
   }
 
   void prevChapter() {
     webViewController.evaluateJavascript(source: '''
-      prevSection()
+      prevSection(); void 0;
       ''');
   }
 
   void nextChapter() {
     webViewController.evaluateJavascript(source: '''
-      nextSection()
+      nextSection(); void 0;
       ''');
   }
 
-  void setTranslationMode(TranslationModeEnum mode) {
-    webViewController.evaluateJavascript(source: '''
-      if (typeof reader.view !== 'undefined' && reader.view.setTranslationMode) {
-        reader.view.setTranslationMode('${mode.code}');
-      }
-      ''');
+  Future<void> setTranslationMode(TranslationModeEnum mode) async {
+    await translateCurrentChapter(mode);
+  }
+
+  Future<void> translateCurrentChapter(
+    TranslationModeEnum mode, {
+    bool force = false,
+  }) async {
+    final result = await webViewController.callAsyncJavaScript(
+      functionBody: '''
+        if (typeof reader === 'undefined' ||
+            typeof reader.view === 'undefined' ||
+            !reader.view.setTranslationMode) {
+          return false;
+        }
+        if (${force ? 'true' : 'false'}) {
+          await reader.view.setTranslationMode('off');
+          if (reader.view.clearTranslations) {
+            reader.view.clearTranslations();
+          }
+        }
+        await reader.view.setTranslationMode(${jsonEncode(mode.code)});
+        return true;
+      ''',
+    );
+    if (result?.value != true) {
+      throw StateError('Translation is not available for this book');
+    }
   }
 
   Future<void> goToPercentage(double value) async {
@@ -470,6 +497,67 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           _getCurrentChapterContent(maxCharacters: maxCharacters),
       fetchChapterByHref: (href, {int? maxCharacters}) =>
           _getChapterContentByHref(href, maxCharacters: maxCharacters),
+      fetchPreviousContent: ({int? maxCharacters}) async {
+        final requestedCharacters = maxCharacters ?? 48000;
+        final content = await previousContent(requestedCharacters);
+        return _normalizeChapterContent(content, maxCharacters);
+      },
+    );
+  }
+
+  /// Builds the current book's local knowledge index on demand.
+  ///
+  /// This is intentionally explicit rather than part of reader startup. The
+  /// reader remains usable while a caller decides when indexing is suitable.
+  Future<IndexBuildResult> buildKnowledgeIndex({
+    IndexProgressCallback? onProgress,
+    bool Function()? isCancelled,
+  }) async {
+    final store = await BookKnowledgeIndexService().storeFor(book);
+    final handlers = ref.read(chapterContentBridgeProvider);
+    if (handlers == null) {
+      throw StateError('Chapter content bridge is not ready.');
+    }
+
+    final refs = ref
+        .read(bookTocProvider)
+        .map(_toKnowledgeChapterRef)
+        .toList(growable: false);
+    final source = KnowledgeChapterSource(
+      refs,
+      (href, {maxCharacters}) => handlers.fetchChapterByHref(
+        href,
+        maxCharacters: maxCharacters,
+      ),
+    );
+    final chapters = await source.load();
+    final embedding = EmbeddingProviderFactory.fromPrefs();
+    return KnowledgeIndexer(
+      service: KnowledgeSearchService(),
+      store: store,
+    ).build(
+      bookId: book.id.toString(),
+      chapters: chapters,
+      vectorizeBatch: embedding == null
+          ? null
+          : (chunks) => embedding.embedBatch(
+                chunks.map((chunk) => chunk.text).toList(growable: false),
+              ),
+      embeddingMode: embedding?.mode,
+      embeddingModelId: embedding?.modelId,
+      embeddingDimensions: embedding?.configuredDimension,
+      onProgress: onProgress,
+      isCancelled: isCancelled,
+    );
+  }
+
+  KnowledgeChapterRef _toKnowledgeChapterRef(TocItem item) {
+    return KnowledgeChapterRef(
+      id: item.id,
+      title: item.label,
+      href: item.href,
+      children:
+          item.subitems.map(_toKnowledgeChapterRef).toList(growable: false),
     );
   }
 
@@ -626,7 +714,15 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   Future<void> setHandler(InAppWebViewController controller) async {
     controller.addJavaScriptHandler(
         handlerName: 'onLoadEnd',
-        callback: (args) {
+        callback: (args) async {
+          if (!mounted) return;
+          try {
+            await setTranslationMode(
+                Prefs().getBookTranslationMode(widget.book.id));
+          } catch (error) {
+            AnxLog.warning('Unable to restore book translation mode: $error');
+          }
+          if (!mounted) return;
           widget.onLoadEnd();
         });
 
@@ -887,10 +983,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     setHandler(controller);
     _registerChapterContentBridge();
 
-    // Initialize translation mode based on book-specific settings
-    Future.delayed(const Duration(milliseconds: 300), () {
-      setTranslationMode(Prefs().getBookTranslationMode(widget.book.id));
-    });
+    // Translation is restored by onLoadEnd after the reader view is ready.
   }
 
   void removeOverlay() {
@@ -1081,6 +1174,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
     final readingInfoColor = Color(int.parse('0x$textColor')).withAlpha(150);
     final iconColor = Color(int.parse('0x$textColor'));
+    Future<int?>? batteryLevelFuture;
+
+    Future<int?> loadBatteryLevel() {
+      return batteryLevelFuture ??= readBatteryLevelSafely();
+    }
 
     Widget getWidget(ReadingInfoEnum readingInfoEnum, TextStyle textStyle) {
       final batteryTextStyle = TextStyle(
@@ -1104,34 +1202,32 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
       final timeWidget = MinuteClock(textStyle: textStyle);
 
-      final batteryWidget = FutureBuilder(
-          future: Battery().batteryLevel,
+      Widget batteryWidget() => FutureBuilder<int?>(
+          future: loadBatteryLevel(),
           builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                        0, (textStyle.fontSize ?? 10) * 0.08, 2, 0),
-                    child: Text('${snapshot.data}', style: batteryTextStyle),
-                  ),
-                  Icon(
-                    HeroIcons.battery_0,
-                    size: batteryIconSize,
-                    color: iconColor,
-                  ),
-                ],
-              );
-            } else {
-              return const SizedBox();
-            }
+            final level = snapshot.data;
+            if (level == null) return const SizedBox.shrink();
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      0, (textStyle.fontSize ?? 10) * 0.08, 2, 0),
+                  child: Text('$level', style: batteryTextStyle),
+                ),
+                Icon(
+                  HeroIcons.battery_0,
+                  size: batteryIconSize,
+                  color: iconColor,
+                ),
+              ],
+            );
           });
 
       Widget batteryAndTimeWidget() => Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              batteryWidget,
+              batteryWidget(),
               const SizedBox(width: 5),
               timeWidget,
             ],
@@ -1145,7 +1241,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         case ReadingInfoEnum.bookProgress:
           return bookProgressWidget;
         case ReadingInfoEnum.battery:
-          return batteryWidget;
+          return batteryWidget();
         case ReadingInfoEnum.time:
           return timeWidget;
         case ReadingInfoEnum.batteryAndTime:
@@ -1251,8 +1347,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   @override
   Widget build(BuildContext context) {
-    String uri = Uri.encodeComponent(widget.book.fileFullPath);
-    String url = 'http://127.0.0.1:${Server().port}/book/$uri';
+    String url = Server().bookUrl(File(widget.book.fileFullPath));
     String initialCfi = widget.cfi ?? widget.book.lastReadPosition;
 
     return Listener(

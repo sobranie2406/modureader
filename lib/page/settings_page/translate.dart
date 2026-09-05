@@ -1,15 +1,12 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/models/ai_provider.dart';
+import 'package:anx_reader/service/translate/deepl.dart';
 import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/settings/service_config_form.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class TranslateSetting extends StatefulWidget {
   const TranslateSetting({super.key});
@@ -19,502 +16,385 @@ class TranslateSetting extends StatefulWidget {
 }
 
 class _TranslateSettingState extends State<TranslateSetting> {
-  Widget autoTranslateSelection() {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      trailing: Switch(
-        value: Prefs().autoTranslateSelection,
-        onChanged: (bool value) => setState(() {
-          Prefs().autoTranslateSelection = value;
-        }),
-      ),
-      title: Text(L10n.of(context).readingPageAutoTranslateSelection),
-    );
-  }
+  late final TextEditingController _deepLApiKeyController;
+  late final TextEditingController _deepLBaseUrlController;
+  bool _obscureDeepLKey = true;
 
-  @override
-  Widget build(BuildContext context) {
-    return settingsSections(
-      sections: [
-        SettingsSection(
-          title: Text(L10n.of(context).underlineTranslation),
-          tiles: [
-            CustomSettingsTile(
-              child: FilledContainer(
-                margin: const EdgeInsets.all(2.0),
-                color: Theme.of(context).cardColor,
-                radius: 28,
-                child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Column(
-                    children: [
-                      TranslationConfig(
-                        setState: () => setState(() {}),
-                      ),
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              L10n.of(context).underlineTranslationTip,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            CustomSettingsTile(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: autoTranslateSelection(),
-              ),
-            ),
-          ],
-        ),
-        SettingsSection(
-          title: Text(L10n.of(context).fullTextTranslation),
-          tiles: [
-            CustomSettingsTile(
-              child: FilledContainer(
-                margin: const EdgeInsets.all(2.0),
-                color: Theme.of(context).cardColor,
-                radius: 28,
-                child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Column(
-                    children: [
-                      FullTextTranslationConfig(
-                        setState: () => setState(() {}),
-                      ),
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              L10n.of(context).fullTextTranslationTip,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        SettingsSection(
-          title: Text(L10n.of(context).translationServiceConfiguration),
-          tiles: [
-            for (var service in TranslateService.activeValues)
-              CustomSettingsTile(
-                child: TranslateSettingItem(service: service),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
+  bool get _isChinese => Localizations.localeOf(context).languageCode == 'zh';
 
-class TranslationConfig extends StatelessWidget {
-  const TranslationConfig({super.key, required this.setState});
-
-  final VoidCallback setState;
-
-  static const currentServiceTextStyle = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.bold,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) => const TranslateServicePicker(),
-                ).then((value) {
-                  setState();
-                });
-              },
-              child: Text(
-                Prefs().translateService.getLabel(context),
-                style: currentServiceTextStyle,
-              ),
-            ),
-            Text(L10n.of(context).settingsTranslateCurrentService),
-          ],
-        ),
-        const Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: TextButton(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (context) => const TranslateLangPicker(
-                        isFrom: true, isWebView: false),
-                  ).then((value) {
-                    setState();
-                  });
-                },
-                child: Text(Prefs().translateFrom.getNative(context)),
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios),
-            Expanded(
-              child: TextButton(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (context) => const TranslateLangPicker(
-                        isFrom: false, isWebView: false),
-                  ).then((value) {
-                    setState();
-                  });
-                },
-                child: Text(
-                  Prefs().translateTo.getNative(context),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class FullTextTranslationConfig extends StatelessWidget {
-  const FullTextTranslationConfig({super.key, required this.setState});
-
-  final VoidCallback setState;
-
-  static const currentServiceTextStyle = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.bold,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) => const FullTextTranslateServicePicker(),
-                ).then((value) {
-                  setState();
-                });
-              },
-              child: Text(
-                Prefs().fullTextTranslateService.getLabel(context),
-                style: currentServiceTextStyle,
-              ),
-            ),
-            Text(L10n.of(context).settingsTranslateCurrentService),
-          ],
-        ),
-        const Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: TextButton(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (context) => const TranslateLangPicker(
-                        isFrom: true, isWebView: true),
-                  ).then((value) {
-                    setState();
-                  });
-                },
-                child: Text(Prefs().fullTextTranslateFrom.getNative(context)),
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios),
-            Expanded(
-              child: TextButton(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (context) => const TranslateLangPicker(
-                        isFrom: false, isWebView: true),
-                  ).then((value) {
-                    setState();
-                  });
-                },
-                child: Text(
-                  Prefs().fullTextTranslateTo.getNative(context),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class TranslateServicePicker extends StatelessWidget {
-  const TranslateServicePicker({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: TranslateService.activeValues.length,
-      itemBuilder: (context, index) {
-        final service = TranslateService.activeValues.elementAt(index);
-        return ListTile(
-          title: Text(service.getLabel(context)),
-          onTap: () {
-            Prefs().translateService = service;
-            Navigator.pop(context);
-          },
-        );
-      },
-    );
-  }
-}
-
-class FullTextTranslateServicePicker extends StatelessWidget {
-  const FullTextTranslateServicePicker({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final services =
-        TranslateService.activeValues.where((s) => !s.isWebView).toList();
-
-    return ListView.builder(
-      itemCount: services.length,
-      itemBuilder: (context, index) => ListTile(
-        title: Text(services[index].getLabel(context)),
-        onTap: () {
-          Prefs().fullTextTranslateService = services[index];
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-}
-
-class TranslateLangPicker extends StatelessWidget {
-  const TranslateLangPicker(
-      {super.key, required this.isFrom, this.isWebView = false});
-
-  final bool isFrom;
-  final bool isWebView;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: LangListEnum.values.length,
-      itemBuilder: (context, index) => ListTile(
-        title: Text(LangListEnum.values[index].getNative(context)),
-        subtitle: Text(LangListEnum.values[index].name[0].toUpperCase() +
-            LangListEnum.values[index].name.substring(1)),
-        onTap: () {
-          if (isWebView) {
-            if (isFrom) {
-              Prefs().fullTextTranslateFrom = LangListEnum.values[index];
-            } else {
-              Prefs().fullTextTranslateTo = LangListEnum.values[index];
-            }
-          } else {
-            if (isFrom) {
-              Prefs().translateFrom = LangListEnum.values[index];
-            } else {
-              Prefs().translateTo = LangListEnum.values[index];
-            }
-          }
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-}
-
-class TranslateSettingItem extends StatefulWidget {
-  const TranslateSettingItem({super.key, required this.service});
-
-  final TranslateService service;
-
-  @override
-  State<TranslateSettingItem> createState() => _TranslateSettingItemState();
-}
-
-class _TranslateSettingItemState extends State<TranslateSettingItem> {
-  bool isExpanded = false;
-  static const testText = "Hello, world!";
-  static const languageTextStyle = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.bold,
-  );
-
-  Map<String, dynamic> _currentConfig = {};
+  String _label(String zh, String en) => _isChinese ? zh : en;
 
   @override
   void initState() {
     super.initState();
-    _loadConfig();
-  }
-
-  void _loadConfig() {
-    _currentConfig = getTranslateServiceConfig(widget.service);
-    setState(() {});
-  }
-
-  Widget languageText(String text) {
-    return Expanded(
-      child: Text(
-        text,
-        style: languageTextStyle,
-        textAlign: TextAlign.center,
-      ),
+    final config = TranslateService.deepl.provider.getConfig();
+    _deepLApiKeyController = TextEditingController(
+      text: config['api_key']?.toString() ?? '',
+    );
+    _deepLBaseUrlController = TextEditingController(
+      text: config['api_url']?.toString() ?? 'https://api-free.deepl.com/v2',
     );
   }
 
-  void _saveConfig() {
-    try {
-      saveTranslateServiceConfig(widget.service, _currentConfig);
-      AnxToast.show(L10n.of(context).commonSaved);
-    } catch (e) {
-      AnxToast.show(L10n.of(context).commonFailed);
+  @override
+  void dispose() {
+    _deepLApiKeyController.dispose();
+    _deepLBaseUrlController.dispose();
+    super.dispose();
+  }
+
+  void _selectService(TranslateService service) {
+    Prefs().translateService = service;
+    Prefs().fullTextTranslateService = service;
+    setState(() {});
+  }
+
+  Future<void> _showServicePicker() async {
+    final selected = await showModalBottomSheet<TranslateService>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  _label('选择翻译引擎', 'Select translation engine'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            for (final service in TranslateService.readAnyValues)
+              RadioListTile<TranslateService>(
+                value: service,
+                groupValue: Prefs().fullTextTranslateService,
+                title: Text(service.getLabel(context)),
+                subtitle: Text(_serviceDescription(service)),
+                onChanged: (value) => Navigator.pop(context, value),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) _selectService(selected);
+  }
+
+  String _serviceDescription(TranslateService service) {
+    return switch (service) {
+      TranslateService.microsoftFree => _label(
+          '无需 API 密钥，开箱即用',
+          'Works without an API key',
+        ),
+      TranslateService.ai => _label(
+          '使用 AI 设置中已配置的服务商和模型',
+          'Uses a provider and model configured in AI settings',
+        ),
+      TranslateService.deepl => _label(
+          '支持 DeepL 官方接口和 DeepLX 自定义地址',
+          'Supports official DeepL and custom DeepLX endpoints',
+        ),
+      _ => _label('兼容旧版配置', 'Legacy-compatible provider'),
+    };
+  }
+
+  List<AiProvider> get _configuredAiModels {
+    final providers = <AiProvider>[];
+    for (final raw in Prefs().getAiProviders()) {
+      try {
+        final provider = AiProvider.fromJson(raw as Map<String, dynamic>);
+        if (provider.enabled &&
+            provider.hasValidKey &&
+            provider.model.trim().isNotEmpty) {
+          providers.add(provider);
+        }
+      } catch (_) {
+        // Ignore malformed legacy entries; AI settings can repair them.
+      }
     }
+    return providers;
+  }
+
+  AiProvider? _currentTranslationAiModel(List<AiProvider> providers) {
+    if (providers.isEmpty) return null;
+    final selected = Prefs().translationAiService;
+    for (final provider in providers) {
+      if (provider.id == selected) return provider;
+    }
+    return providers.first;
+  }
+
+  Future<void> _showAiModelPicker(List<AiProvider> providers) async {
+    if (providers.isEmpty) return;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  _label('选择翻译模型', 'Select translation model'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final provider in providers)
+                    RadioListTile<String>(
+                      value: provider.id,
+                      groupValue: Prefs().translationAiService,
+                      title: Text(provider.model),
+                      subtitle: Text(provider.title),
+                      onChanged: (value) => Navigator.pop(context, value),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      Prefs().translationAiService = selected;
+      setState(() {});
+    }
+  }
+
+  Future<void> _showLanguagePicker() async {
+    final languages = LangListEnum.values
+        .where((language) => language != LangListEnum.auto)
+        .toList(growable: false);
+    final selected = await showModalBottomSheet<LangListEnum>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.7,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    _label('选择目标语言', 'Select target language'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: languages.length,
+                  itemBuilder: (context, index) {
+                    final language = languages[index];
+                    return RadioListTile<LangListEnum>(
+                      value: language,
+                      groupValue: Prefs().fullTextTranslateTo,
+                      title: Text(language.nativeName),
+                      onChanged: (value) => Navigator.pop(context, value),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null) {
+      Prefs().translateFrom = LangListEnum.auto;
+      Prefs().fullTextTranslateFrom = LangListEnum.auto;
+      Prefs().translateTo = selected;
+      Prefs().fullTextTranslateTo = selected;
+      setState(() {});
+    }
+  }
+
+  void _saveDeepLConfig() {
+    TranslateService.deepl.provider.saveConfig({
+      'api_key': _deepLApiKeyController.text.trim(),
+      'api_url': normalizeDeepLBaseUrl(_deepLBaseUrlController.text),
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final configItems = getTranslateServiceConfigItems(context, widget.service);
+    final service = Prefs().fullTextTranslateService;
+    final aiModels = _configuredAiModels;
+    final aiModel = _currentTranslationAiModel(aiModels);
 
-    return Card(
-      margin: const EdgeInsets.all(10),
-      color: isExpanded
-          ? Theme.of(context).colorScheme.secondaryContainer
-          : Colors.transparent,
-      shadowColor: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.translate_outlined),
-            title: Text(widget.service.getLabel(context)),
-            onTap: () {
-              setState(() {
-                isExpanded = !isExpanded;
-              });
-            },
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.bounceInOut,
-            alignment: Alignment.topCenter,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ServiceConfigForm(
-                          configItems: configItems,
-                          initialConfig: _currentConfig,
-                          onConfigChanged: (newConfig) {
-                            _currentConfig = newConfig;
-                          },
-                        ),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                _saveConfig();
-                                SmartDialog.show(
-                                  useSystem: true,
-                                  animationType:
-                                      SmartAnimationType.centerFade_otherSlide,
-                                  builder: (context) => AlertDialog(
-                                    title: const Center(
-                                      child: Icon(Icons.check_circle),
-                                    ),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            languageText(
-                                              Prefs()
-                                                  .translateFrom
-                                                  .getNative(context),
-                                            ),
-                                            const Icon(Icons.arrow_forward_ios),
-                                            languageText(
-                                              Prefs()
-                                                  .translateTo
-                                                  .getNative(context),
-                                            ),
-                                          ],
-                                        ),
-                                        const Divider(),
-                                        const Text(testText),
-                                        const Icon(Icons.arrow_downward),
-                                        translateText(testText,
-                                            service: widget.service),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Text(L10n.of(context).commonTest),
+    return settingsSections(
+      sections: [
+        SettingsSection(
+          title: Text(_label('翻译设置', 'Translation settings')),
+          tiles: [
+            CustomSettingsTile(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    _label('配置翻译选项', 'Configure translation options'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ),
+            ),
+            SettingsTile.navigation(
+              leading: const Icon(Icons.translate_outlined),
+              title: Text(_label('翻译引擎', 'Translation engine')),
+              value: Text(service.getLabel(context)),
+              onPressed: (_) => _showServicePicker(),
+            ),
+            if (service == TranslateService.ai)
+              SettingsTile.navigation(
+                leading: const Icon(Icons.smart_toy_outlined),
+                title: Text(_label('翻译模型', 'Translation model')),
+                description: aiModel == null
+                    ? Text(_label(
+                        '请先在 AI 设置中配置服务商和模型',
+                        'Configure a provider and model in AI settings first',
+                      ))
+                    : Text(aiModel.title),
+                value: Text(aiModel?.model ?? _label('未配置', 'Not configured')),
+                enabled: aiModels.isNotEmpty,
+                onPressed: (_) => _showAiModelPicker(aiModels),
+              ),
+            if (service == TranslateService.deepl)
+              CustomSettingsTile(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _deepLApiKeyController,
+                        obscureText: _obscureDeepLKey,
+                        decoration: InputDecoration(
+                          labelText: 'DeepL API Key',
+                          hintText: _label(
+                            '输入 DeepL API Key',
+                            'Enter DeepL API key',
+                          ),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureDeepLKey
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
-                            TextButton(
-                              onPressed: () {
-                                _saveConfig();
-                                setState(() {
-                                  isExpanded = !isExpanded;
-                                });
-                              },
-                              child: Text(L10n.of(context).commonSave),
+                            onPressed: () => setState(
+                              () => _obscureDeepLKey = !_obscureDeepLKey,
                             ),
-                          ],
+                          ),
                         ),
-                      ],
+                        onChanged: (_) => _saveDeepLConfig(),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _deepLBaseUrlController,
+                        decoration: InputDecoration(
+                          labelText: _label(
+                            'DeepL 请求地址',
+                            'DeepL request URL',
+                          ),
+                          hintText: 'https://api-free.deepl.com/v2',
+                          helperText: _label(
+                            '支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址',
+                            'Supports official DeepL, a DeepLX base URL, or a full /translate URL',
+                          ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => _saveDeepLConfig(),
+                        onEditingComplete: () {
+                          final normalized = normalizeDeepLBaseUrl(
+                            _deepLBaseUrlController.text,
+                          );
+                          _deepLBaseUrlController.value = TextEditingValue(
+                            text: normalized,
+                            selection: TextSelection.collapsed(
+                              offset: normalized.length,
+                            ),
+                          );
+                          _saveDeepLConfig();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        SettingsSection(
+          title: Text(_label('阅读翻译', 'Reader translation')),
+          tiles: [
+            SettingsTile.navigation(
+              leading: const Icon(Icons.language_outlined),
+              title: Text(_label('目标语言', 'Target language')),
+              description: Text(_label(
+                '阅读器底栏也可以临时切换目标语言',
+                'The target can also be changed from the reader toolbar',
+              )),
+              value: Text(Prefs().fullTextTranslateTo.nativeName),
+              onPressed: (_) => _showLanguagePicker(),
+            ),
+            SettingsTile.switchTile(
+              leading: const Icon(Icons.auto_awesome_outlined),
+              initialValue: Prefs().autoTranslateSelection,
+              title: Text(_label(
+                '选中文本后自动翻译',
+                'Translate selected text automatically',
+              )),
+              description: Text(_label(
+                '选择正文后直接打开翻译结果',
+                'Open translation automatically after selecting text',
+              )),
+              onToggle: (value) {
+                Prefs().autoTranslateSelection = value;
+                setState(() {});
+              },
+            ),
+            CustomSettingsTile(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _label(
+                          '执行翻译时，当前文字会发送到所选翻译服务。',
+                          'When translating, the current text is sent to the selected translation service.',
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

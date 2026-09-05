@@ -1,0 +1,45 @@
+name: hf_tokenizers
+description: >-
+  HuggingFace tokenizers for Dart over FFI. Load any tokenizer.json and get
+  byte-exact BPE, WordPiece, and Unigram encoding, backed by the Rust crate.
+version: 1.2.1
+repository: https://github.com/Yusufihsangorgel/tokenizers
+topics:
+  - llm
+  - ai
+  - tokenizer
+  - ffi
+  - nlp
+
+# Kept on one double-quoted line each. A folded `>-` block turns an
+# over-indented continuation into a literal newline, which is how the previous
+# caption shipped a `\n` to pub.dev.
+screenshots:
+  - description: "A sentence measured on two rulers, then every token span read as bytes and as string indices: five of the six substring readings return the wrong text."
+    path: doc/offsets.png
+  - description: "One sentence tokenized twice: the ids hf_tokenizers returns, and the three words a lowercase-and-look-up shortcut loses to the unknown token."
+    path: doc/parity.png
+  - description: "The example running: a BERT vocabulary of 30522, a byte-exact encode and decode round trip, then a 38-token document cut into 12-token chunks."
+    path: doc/demo.gif
+
+platforms:
+  linux:
+  macos:
+  windows:
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  ffi: ^2.1.0
+  hooks: '>=2.0.2 <3.0.0'
+  code_assets: ^2.0.0
+
+dev_dependencies:
+  # example/rag_chunking.dart only. Pure Dart with no runtime dependencies,
+  # so it costs consumers nothing.
+  rag_kit: ^1.0.2
+  crypto: ^3.0.0
+  lints: ^6.0.0
+  test: ^1.25.0
+

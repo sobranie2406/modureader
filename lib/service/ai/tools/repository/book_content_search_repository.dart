@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
 import 'package:anx_reader/page/home_page.dart';
 import 'package:anx_reader/service/ai/tools/input/book_content_search_input.dart';
 import 'package:anx_reader/service/ai/tools/repository/books_repository.dart';
@@ -13,6 +14,12 @@ import 'package:anx_reader/utils/webView/webview_console_message.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+
+typedef BookChapterExtractionProgress = void Function(
+  String chapterId,
+  int completed,
+  int total,
+);
 
 class BookContentSearchRepository {
   BookContentSearchRepository({
@@ -28,6 +35,36 @@ class BookContentSearchRepository {
   final Duration _sessionIdleTimeout;
 
   final Map<int, _HeadlessSearchSession> _sessions = {};
+
+  /// Extracts all readable chapters through the same Foliate reader used by
+  /// normal reading, without navigating away from the bookshelf.
+  Future<Map<String, String>> extractChaptersForIndex(
+    Book book, {
+    BookChapterExtractionProgress? onProgress,
+    bool Function()? isCancelled,
+  }) async {
+    if (book.id <= 0 || book.isDeleted) {
+      throw StateError('Book is not available for indexing.');
+    }
+    if (!await File(book.fileFullPath).exists()) {
+      throw StateError('The local book file is not available.');
+    }
+
+    final session = await _getOrCreateSession(book);
+    try {
+      return await session.extractChapters(
+        onProgress: onProgress,
+        timeout: _searchTimeout,
+        isCancelled: isCancelled,
+      );
+    } finally {
+      if (session.isActive) {
+        session.scheduleDispose(_sessionIdleTimeout);
+      } else {
+        _sessions.remove(book.id);
+      }
+    }
+  }
 
   Future<Map<String, dynamic>> search(BookContentSearchInput input) async {
     final keyword = input.keyword.trim();
@@ -95,21 +132,34 @@ class BookContentSearchRepository {
   }
 
   Future<_HeadlessSearchSession> _getOrCreateSession(Book book) async {
+    final fingerprint = await bookSourceFingerprint(book);
     final existing = _sessions[book.id];
-    if (existing != null && existing.isActive) {
+    if (existing != null &&
+        existing.isActive &&
+        existing.sourceFingerprint == fingerprint) {
       existing.cancelDisposalTimer();
+      await existing.ensureInitialized();
       return existing;
     }
+    await existing?.dispose();
 
-    final session = _HeadlessSearchSession(
+    late final _HeadlessSearchSession session;
+    session = _HeadlessSearchSession(
       book: book,
+      sourceFingerprint: fingerprint,
       idleCallback: () {
-        _sessions.remove(book.id);
+        if (identical(_sessions[book.id], session)) _sessions.remove(book.id);
       },
     );
 
     _sessions[book.id] = session;
-    await session.ensureInitialized();
+    try {
+      await session.ensureInitialized();
+    } catch (_) {
+      await session.dispose();
+      if (identical(_sessions[book.id], session)) _sessions.remove(book.id);
+      rethrow;
+    }
     return session;
   }
 }
@@ -117,22 +167,28 @@ class BookContentSearchRepository {
 class _HeadlessSearchSession {
   _HeadlessSearchSession({
     required this.book,
+    required this.sourceFingerprint,
     required this.idleCallback,
   });
 
   final Book book;
+  final String sourceFingerprint;
   final VoidCallback idleCallback;
 
   AnxHeadlessWebView? _webView;
   InAppWebViewController? _controller;
   final _AsyncLock _lock = _AsyncLock();
   Completer<void>? _readyCompleter;
+  Completer<List<dynamic>>? _tocCompleter;
   _ActiveSearch? _activeSearch;
   Timer? _disposeTimer;
 
   bool get isActive => _webView != null;
 
-  Future<void> ensureInitialized() async {
+  Future<void>? _initialization;
+  Future<void> ensureInitialized() => _initialization ??= _initialize();
+
+  Future<void> _initialize() async {
     if (Platform.isWindows && webViewEnvironment == null) {
       throw StateError(
         'WebViewEnvironment is not initialized. '
@@ -152,6 +208,7 @@ class _HeadlessSearchSession {
 
     final loadCompleter = Completer<void>();
     _readyCompleter = Completer<void>();
+    _tocCompleter = Completer<List<dynamic>>();
 
     final headless = AnxHeadlessWebView(
       webViewEnvironment: webViewEnvironment,
@@ -174,6 +231,19 @@ class _HeadlessSearchSession {
               _handleSearchEvent(data);
             } else if (data is Map) {
               _handleSearchEvent(Map<String, dynamic>.from(data));
+            }
+            return null;
+          },
+        );
+        controller.addJavaScriptHandler(
+          handlerName: 'onSetToc',
+          callback: (args) {
+            final completer = _tocCompleter;
+            if (completer != null &&
+                !completer.isCompleted &&
+                args.isNotEmpty &&
+                args.first is List) {
+              completer.complete(List<dynamic>.from(args.first as List));
             }
             return null;
           },
@@ -300,6 +370,94 @@ class _HeadlessSearchSession {
     });
   }
 
+  Future<Map<String, String>> extractChapters({
+    BookChapterExtractionProgress? onProgress,
+    required Duration timeout,
+    bool Function()? isCancelled,
+  }) {
+    return _lock.synchronized(() async {
+      cancelDisposalTimer();
+      await ensureInitialized();
+      await _waitUntilReady();
+      final controller = _controller;
+      if (controller == null) {
+        throw StateError('WebView controller is not initialized');
+      }
+
+      var tocCompleter = _tocCompleter;
+      if (tocCompleter == null) {
+        tocCompleter = Completer<List<dynamic>>();
+        _tocCompleter = tocCompleter;
+      }
+      if (!tocCompleter.isCompleted) {
+        await controller.evaluateJavascript(source: 'refreshToc()');
+      }
+      final toc = await tocCompleter.future.timeout(
+        timeout,
+        onTimeout: () => throw TimeoutException(
+          'Timed out loading table of contents for book ${book.id}',
+        ),
+      );
+      final indexToc = await controller.callAsyncJavaScript(
+        functionBody: 'return getIndexToc();',
+      );
+      final chapters =
+          _flattenToc(indexToc?.value is List ? indexToc!.value as List : toc);
+      if (chapters.isEmpty) {
+        throw StateError('No readable chapters were found.');
+      }
+
+      final result = <String, String>{};
+      for (var index = 0; index < chapters.length; index++) {
+        if (isCancelled?.call() ?? false) break;
+        final chapter = chapters[index];
+        final hrefLiteral = jsonEncode(chapter.href);
+        final response = await controller.callAsyncJavaScript(
+          functionBody: 'return await getChapterContentByHref($hrefLiteral);',
+        );
+        final text = response?.value?.toString().trim() ?? '';
+        if (text.isNotEmpty) result[chapter.id] = text;
+        onProgress?.call(chapter.id, index + 1, chapters.length);
+        await Future<void>.delayed(Duration.zero);
+      }
+      if (isCancelled?.call() ?? false) return result;
+      if (result.isEmpty) {
+        throw StateError(book.fileFullPath.toLowerCase().endsWith('.pdf')
+            ? 'PDF 未检测到可提取的文字层。扫描 PDF 需要先进行 OCR。'
+            : 'No readable chapter text was found.');
+      }
+      return result;
+    });
+  }
+
+  List<_IndexChapterRef> _flattenToc(List<dynamic> toc) {
+    final result = <_IndexChapterRef>[];
+
+    void visit(dynamic raw, String fallbackId) {
+      if (raw is! Map) return;
+      final item = Map<String, dynamic>.from(raw);
+      final href = item['href']?.toString().trim() ?? '';
+      final id = item['id']?.toString().trim();
+      if (href.isNotEmpty) {
+        result.add(_IndexChapterRef(
+          id: (id == null || id.isEmpty) ? fallbackId : id,
+          href: href,
+        ));
+      }
+      final children = item['subitems'];
+      if (children is List) {
+        for (var index = 0; index < children.length; index++) {
+          visit(children[index], '$fallbackId.$index');
+        }
+      }
+    }
+
+    for (var index = 0; index < toc.length; index++) {
+      visit(toc[index], 'chapter-$index');
+    }
+    return result;
+  }
+
   void scheduleDispose(Duration duration) {
     cancelDisposalTimer();
     _disposeTimer = Timer(duration, () async {
@@ -319,6 +477,7 @@ class _HeadlessSearchSession {
     _webView = null;
     _controller = null;
     _readyCompleter = null;
+    _tocCompleter = null;
     if (webView != null) {
       try {
         await webView.dispose();
@@ -386,8 +545,7 @@ class _HeadlessSearchSession {
   }
 
   String _buildBookUrl() {
-    final encodedPath = Uri.encodeComponent(book.fileFullPath);
-    final url = 'http://127.0.0.1:${Server().port}/book/$encodedPath';
+    final url = Server().bookUrl(File(book.fileFullPath));
     final initialCfi = book.lastReadPosition;
     return generateUrl(
       url,
@@ -395,6 +553,13 @@ class _HeadlessSearchSession {
       importing: false,
     );
   }
+}
+
+class _IndexChapterRef {
+  const _IndexChapterRef({required this.id, required this.href});
+
+  final String id;
+  final String href;
 }
 
 class _ActiveSearch {

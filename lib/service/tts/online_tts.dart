@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:anx_reader/service/tts/tts_provider.dart';
 import 'package:anx_reader/service/tts/models/tts_segment.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
@@ -26,6 +28,7 @@ class OnlineTts extends BaseTts {
   static const int _batchSize = 5; // Max concurrent fetches
   static const int _fetchTimeoutSeconds = 10;
   static const int _maxRetries = 2;
+  static final TtsCache _audioCache = TtsCache(maxEntries: 256);
 
   // ============ Audio Player ============
   AudioPlayer? _player;
@@ -292,14 +295,28 @@ class OnlineTts extends BaseTts {
       if (segment.isReady) return;
 
       try {
-        final bytes = await backend
-            .speak(
-              segment.sentence.text,
-              null,
-              rate,
-              pitch,
+        final currentBackend = backend;
+        final voice = currentBackend.getSelectedVoice();
+        final audio = await _audioCache
+            .synthesize(
+              _ProviderAdapter(
+                provider: currentBackend,
+                rate: rate,
+                pitch: pitch,
+                voice: voice,
+              ),
+              TtsRequest(
+                text: segment.sentence.text,
+                voice: voice,
+                model: currentBackend.serviceId,
+                parameters: {
+                  'rate': rate.toStringAsFixed(4),
+                  'pitch': pitch.toStringAsFixed(4),
+                },
+              ),
             )
             .timeout(Duration(seconds: _fetchTimeoutSeconds));
+        final bytes = audio.bytes;
 
         // Check if version is still valid (settings haven't changed during fetch)
         if (segment.fetchVersion != targetVersion) {
@@ -311,7 +328,7 @@ class OnlineTts extends BaseTts {
         if (bytes.isEmpty) {
           segment.isSilent = true;
         } else {
-          segment.audio = bytes;
+          segment.audio = Uint8List.fromList(bytes);
         }
         return; // Success, exit retry loop
       } on TimeoutException {
@@ -494,5 +511,25 @@ class OnlineTts extends BaseTts {
   Future<void> dispose() async {
     await stop();
     isInit = false;
+  }
+}
+
+class _ProviderAdapter implements TtsProvider {
+  const _ProviderAdapter({
+    required this.provider,
+    required this.rate,
+    required this.pitch,
+    required this.voice,
+  });
+
+  final TtsServiceProvider provider;
+  final double rate;
+  final double pitch;
+  final String voice;
+
+  @override
+  Future<TtsAudioChunk> synthesize(TtsRequest request) async {
+    final bytes = await provider.speak(request.text, voice, rate, pitch);
+    return TtsAudioChunk(bytes: bytes, mimeType: 'audio/mpeg');
   }
 }

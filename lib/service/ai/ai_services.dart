@@ -44,7 +44,7 @@ List<AiServiceOption> buildDefaultAiServices() {
       logo: 'assets/images/claude.png',
       defaultUrl: 'https://api.anthropic.com/v1/messages',
       defaultApiKey: 'YOUR_API_KEY',
-      defaultModel: 'claude-3-5-sonnet-20240620',
+      defaultModel: 'claude-sonnet-4-6',
     ),
     AiServiceOption(
       identifier: 'gemini',
@@ -60,7 +60,15 @@ List<AiServiceOption> buildDefaultAiServices() {
       logo: 'assets/images/deepseek.png',
       defaultUrl: 'https://api.deepseek.com/v1/chat/completions',
       defaultApiKey: 'YOUR_API_KEY',
-      defaultModel: 'deepseek-chat',
+      defaultModel: 'deepseek-v4-flash',
+    ),
+    AiServiceOption(
+      identifier: 'glm',
+      title: '智谱 GLM',
+      logo: 'assets/images/commonAi.png',
+      defaultUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      defaultApiKey: 'YOUR_API_KEY',
+      defaultModel: 'glm-5.2',
     ),
     AiServiceOption(
       identifier: 'openrouter',
@@ -68,7 +76,7 @@ List<AiServiceOption> buildDefaultAiServices() {
       logo: 'assets/images/openrouter.png',
       defaultUrl: 'https://openrouter.ai/api/v1/chat/completions',
       defaultApiKey: 'YOUR_API_KEY',
-      defaultModel: 'gpt-4o-mini',
+      defaultModel: 'openai/gpt-4o-mini',
     ),
   ];
 }

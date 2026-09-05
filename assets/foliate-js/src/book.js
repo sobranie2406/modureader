@@ -599,7 +599,7 @@ const isFBZ = ({ name, type }) =>
   type === 'application/x-zip-compressed-fb2'
   || name.endsWith('.fb2.zip') || name.endsWith('.fbz')
 
-const getView = async file => {
+const loadBook = async file => {
   let book
   if (file.isDirectory) {
     const loader = await makeDirectoryLoader(file)
@@ -638,6 +638,11 @@ const getView = async file => {
     }
   }
   if (!book) throw new Error('File type not supported')
+  return book
+}
+
+const getView = async file => {
+  const book = await loadBook(file)
   const view = document.createElement('foliate-view')
   document.body.append(view)
   await view.open(book)
@@ -1094,9 +1099,9 @@ class Reader {
     this.view.addEventListener('doctouchend', this.#onTouchEnd.bind(this))
 
     setStyle()
-    if (!cfi)
-      this.view.renderer.next()
     this.setView(this.view)
+    // init owns initial navigation. A second, unawaited next() can skip the
+    // first spread (and race with the first iframe load) in fixed-layout books.
     await this.view.init({ lastLocation: cfi })
 
     // set html bg color to grey 
@@ -1393,7 +1398,7 @@ class Reader {
     if (!target) return ''
     if (!this.view?.book?.sections) return ''
 
-    const resolved = this.view.resolveNavigation?.(target)
+    const resolved = await this.view.resolveNavigation?.(target)
     if (!resolved || resolved.index == null) return ''
 
     const section = this.view.book.sections[resolved.index]
@@ -1614,8 +1619,8 @@ class Reader {
         href: item.href,
         id: item.id,
         level,
-        startPercentage: getFractionByHref(item.href),
-        startPage: Math.ceil(getFractionByHref(item.href) * totalPages),
+        startPercentage: item.startPercentage ?? getFractionByHref(item.href),
+        startPage: item.startPage ?? Math.ceil(getFractionByHref(item.href) * totalPages),
         subitems: buildItems(item.subitems, level + 1)
       })) || [];
     }
@@ -1625,6 +1630,11 @@ class Reader {
 
 
 const open = async (file, cfi) => {
+  // Metadata extraction must not wait for an offscreen reader to paginate.
+  if (importing) {
+    await getMetadata(await loadBook(file))
+    return
+  }
   const reader = new Reader()
   globalThis.reader = reader
   await reader.open(file, cfi)
@@ -1639,13 +1649,12 @@ const open = async (file, cfi) => {
     onSetToc()
     callFlutter('renderAnnotations')
   }
-  else { getMetadata() }
 }
 
 
 const callFlutter = (name, data) => {
   // console.log('callFlutter', name, data)
-  window.flutter_inappwebview.callHandler(name, data)
+  return window.flutter_inappwebview.callHandler(name, data)
 }
 
 const setStyle = (oldStyle) => {
@@ -1767,27 +1776,32 @@ const onExternalLink = (link) => callFlutter('onExternalLink', link)
 
 const onSetToc = () => callFlutter('onSetToc', reader.toc)
 
-const getMetadata = async () => {
-  const cover = await reader.view.book.getCover()
-  if (cover) {
-    // cover is a blob, so we need to convert it to base64
-    const fileReader = new FileReader()
-    fileReader.readAsDataURL(cover)
-    fileReader.onloadend = () => {
-      callFlutter('onMetadata', {
-        ...reader.view.book.metadata,
-        cover: fileReader.result
-      })
-    }
-  } else {
-    callFlutter('onMetadata', {
-      ...reader.view.book.metadata,
-      cover: null
-    })
-  }
+const getMetadata = async book => {
+  let cover = null
+  let timer
+  try {
+    cover = await Promise.race([
+      (async () => {
+        const blob = await book.getCover?.()
+        if (!blob) return null
+        return new Promise((resolve, reject) => {
+          const fileReader = new FileReader()
+          fileReader.onload = () => resolve(fileReader.result)
+          fileReader.onerror = () => reject(fileReader.error)
+          fileReader.readAsDataURL(blob)
+        })
+      })(),
+      new Promise(resolve => { timer = setTimeout(() => resolve(null), 8000) }),
+    ])
+  } catch (error) {
+    // Missing/broken cover does not make a readable book invalid.
+    console.warn('Cover unavailable', error)
+  } finally { clearTimeout(timer) }
+  await callFlutter('onMetadata', { ...book.metadata, cover })
 }
 
 window.refreshToc = () => onSetToc()
+window.getIndexToc = () => reader.view.book.indexToc ?? reader.toc
 
 window.changeStyle = (newStyle) => {
   const oldStyle = style
@@ -2357,6 +2371,12 @@ var style = JSON.parse(urlParams.get('style'))
 var readingRules = JSON.parse(urlParams.get('readingRules'))
 
 fetch(url)
-  .then(res => res.blob())
+  .then(res => {
+    if (!res.ok) throw new Error(`Book request failed: HTTP ${res.status}`)
+    return res.blob()
+  })
   .then(blob => open(new File([blob], new URL(url, window.location.origin).pathname), initialCfi))
-  .catch(e => console.error(e))
+  .catch(async e => {
+    if (importing) await callFlutter('onImportError', { name: e.name, message: e.message })
+    console.error(e)
+  })

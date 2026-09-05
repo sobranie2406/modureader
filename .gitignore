@@ -32,6 +32,27 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
+/dist-release/
+/.release-secrets/
+**/target/
+*.p12
+*.pfx
+*.mobileprovision
+*.keystore
+.env.*
+
+# Private local QA captures/reports are not source-release assets. Keep only
+# synthetic fixtures needed by the public regression suite.
+/docs/qa/*
+!/docs/qa/2026-09-05/
+/docs/qa/2026-09-05/*
+!/docs/qa/2026-09-05/full-audit/
+/docs/qa/2026-09-05/full-audit/*
+!/docs/qa/2026-09-05/full-audit/fixtures/
+/docs/qa/2026-09-05/full-audit/fixtures/*
+!/docs/qa/2026-09-05/full-audit/fixtures/*.pdf
+!/docs/qa/2026-09-05/full-audit/fixtures/*.epub
 
 # Symbolication related
 app.*.symbols

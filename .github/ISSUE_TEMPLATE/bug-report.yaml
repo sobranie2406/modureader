@@ -9,7 +9,7 @@ body:
     attributes:
       label: Prerequisites|前提条件
       options:
-        - label: I have checked the [troubleshooting](https://github.com/Anxcye/anx-reader/blob/develop/docs/troubleshooting.md)|我已经查看过[故障排除](https://github.com/Anxcye/anx-reader/blob/develop/docs/troubleshooting.md)
+        - label: I have checked the troubleshooting guide|我已经查看过故障排除指南
           required: true
         - label: I have searched for similar issues and did not find any|我已经搜索过没有相同的问题
           required: true
@@ -63,7 +63,7 @@ body:
           [e.g. Android]
         - OS: | 操作系统：
           [e.g. Android13(MIUI14)]
-        - AnxReader Version: | 安读版本：
+        - Modu Version: | 默读版本：
           [e.g. 1.2.0+2033]
         - Device: | 设备：
           [e.g. Xiaomi 13]

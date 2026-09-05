@@ -36,7 +36,7 @@ class LangchainAiConfig {
   ChatOpenAIOptions toOpenAIOptions() {
     return ChatOpenAIOptions(
       model: model.isEmpty ? null : model,
-      temperature: temperature,
+      temperature: normalizeAiTemperatureForModel(model, temperature),
       topP: topP,
       maxTokens: maxTokens,
       reasoningEffort: reasoningEffort.toOpenAiReasoningEffort(),
@@ -98,6 +98,8 @@ class LangchainAiConfig {
     required String apiKey,
     required String url,
     AiReasoningEffort reasoningEffort = AiReasoningEffort.auto,
+    double? temperature,
+    int? maxTokens,
   }) {
     return LangchainAiConfig(
       identifier: providerId,
@@ -105,6 +107,9 @@ class LangchainAiConfig {
       model: model,
       baseUrl: _deriveBaseUrl(url),
       reasoningEffort: reasoningEffort,
+      temperature: temperature,
+      maxTokens: maxTokens,
+      maxOutputTokens: maxTokens,
     );
   }
 
@@ -134,6 +139,17 @@ class LangchainAiConfig {
       additional: additional ?? this.additional,
     );
   }
+}
+
+/// Some hosted models reject arbitrary temperatures instead of clamping them.
+/// Keep this compatibility rule next to option construction so it applies to
+/// both imported providers and legacy configurations.
+double? normalizeAiTemperatureForModel(String model, double? temperature) {
+  final normalized = model.trim().toLowerCase();
+  if (normalized.startsWith('kimi-k2.') || normalized.startsWith('kimi-k3')) {
+    return 1.0;
+  }
+  return temperature;
 }
 
 Map<String, String> _parseHeaders(String? headersRaw) {

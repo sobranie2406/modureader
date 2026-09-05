@@ -47,12 +47,16 @@ Future<bool> performStorageMigration({
     }
 
     // Also copy the log file if it exists
-    onProgress?.call('anx_reader.log', 6, totalItems);
-    final sourceLogFile =
-        File('$sourcePath${Platform.pathSeparator}anx_reader.log');
+    onProgress?.call('modu.log', 6, totalItems);
+    var sourceLogFile = File('$sourcePath${Platform.pathSeparator}modu.log');
+    if (!sourceLogFile.existsSync()) {
+      // Keep importing the legacy filename when migrating an upstream install.
+      sourceLogFile =
+          File('$sourcePath${Platform.pathSeparator}anx_reader.log');
+    }
     if (sourceLogFile.existsSync()) {
       final destLogFile =
-          File('$destinationPath${Platform.pathSeparator}anx_reader.log');
+          File('$destinationPath${Platform.pathSeparator}modu.log');
       await sourceLogFile.copy(destLogFile.path);
       AnxLog.info('StorageMigration: Copied log file successfully');
     }

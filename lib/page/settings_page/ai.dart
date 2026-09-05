@@ -1,24 +1,19 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/ai_prompts.dart';
 import 'package:anx_reader/enums/ai_chat_display_mode.dart';
 import 'package:anx_reader/enums/ai_panel_position.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/ai_provider_list_page.dart';
-import 'package:anx_reader/providers/ai_cache_count.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
-import 'package:anx_reader/providers/user_prompts.dart';
 import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
-import 'package:anx_reader/widgets/common/anx_button.dart';
+import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
-import 'package:anx_reader/widgets/delete_confirm.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:anx_reader/utils/toast/common.dart';
 
 class AISettings extends ConsumerStatefulWidget {
   const AISettings({super.key});
@@ -28,151 +23,10 @@ class AISettings extends ConsumerStatefulWidget {
 }
 
 class _AISettingsState extends ConsumerState<AISettings> {
-  // User prompts state
-  String? _expandedUserPromptId;
-  final Map<String, TextEditingController> _userPromptNameControllers = {};
-  final Map<String, TextEditingController> _userPromptContentControllers = {};
-
-  @override
-  void dispose() {
-    // Clean up user prompt controllers
-    for (var controller in _userPromptNameControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _userPromptContentControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
-
-    List<Map<String, dynamic>> prompts = [
-      {
-        "identifier": AiPrompts.test,
-        "title": l10n.settingsAiPromptTest,
-        "variables": ["language_locale"],
-      },
-      {
-        "identifier": AiPrompts.summaryTheChapter,
-        "title": l10n.settingsAiPromptSummaryTheChapter,
-        "variables": [],
-      },
-      {
-        "identifier": AiPrompts.summaryTheBook,
-        "title": l10n.settingsAiPromptSummaryTheBook,
-        "variables": [],
-      },
-      {
-        "identifier": AiPrompts.summaryThePreviousContent,
-        "title": l10n.settingsAiPromptSummaryThePreviousContent,
-        "variables": ["previous_content"],
-      },
-      {
-        "identifier": AiPrompts.translate,
-        "title": l10n.settingsAiPromptTranslateAndDictionary,
-        "variables": ["text", "to_locale", "from_locale", "contextText"],
-      },
-      {
-        "identifier": AiPrompts.fullTextTranslate,
-        "title": l10n.settingsAiPromptFullTextTranslate,
-        "variables": ["text", "to_locale", "from_locale"],
-      },
-      {
-        "identifier": AiPrompts.mindmap,
-        "title": l10n.settingsAiPromptMindmap,
-        "variables": [],
-      }
-    ];
-
-    var promptTile = CustomSettingsTile(
-      child: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        itemCount: prompts.length,
-        itemBuilder: (context, index) {
-          return SettingsTile.navigation(
-            title: Text(prompts[index]["title"]),
-            onPressed: (context) {
-              SmartDialog.show(builder: (context) {
-                final controller = TextEditingController(
-                  text: Prefs().getAiPrompt(
-                    AiPrompts.values[index],
-                  ),
-                );
-
-                return AlertDialog(
-                  title: Text(L10n.of(context).commonEdit),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        maxLines: 10,
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      Wrap(
-                        children: [
-                          for (var variable in prompts[index]["variables"])
-                            TextButton(
-                              onPressed: () {
-                                // insert the variables at the cursor
-                                if (controller.selection.start == -1 ||
-                                    controller.selection.end == -1) {
-                                  return;
-                                }
-
-                                TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: controller.selection.start,
-                                  ),
-                                );
-
-                                controller.text = controller.text.replaceRange(
-                                  controller.selection.start,
-                                  controller.selection.end,
-                                  '{{$variable}}',
-                                );
-                              },
-                              child: Text(
-                                '{{$variable}}',
-                              ),
-                            ),
-                        ],
-                      )
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Prefs().deleteAiPrompt(AiPrompts.values[index]);
-                        controller.text = Prefs().getAiPrompt(
-                          AiPrompts.values[index],
-                        );
-                      },
-                      child: Text(L10n.of(context).commonReset),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Prefs().saveAiPrompt(
-                          AiPrompts.values[index],
-                          controller.text,
-                        );
-                      },
-                      child: Text(L10n.of(context).commonSave),
-                    ),
-                  ],
-                );
-              });
-            },
-          );
-        },
-      ),
-    );
+    ref.watch(aiProvidersProvider);
 
     final toolDefs = AiToolRegistry.definitions;
     final enabledToolIds = Prefs().enabledAiToolIds;
@@ -251,89 +105,69 @@ class _AISettingsState extends ConsumerState<AISettings> {
         ],
       ),
       SettingsSection(
-        title: Text(L10n.of(context).settingsAiPrompt),
-        tiles: [
-          promptTile,
-        ],
-      ),
-      SettingsSection(
-        title: Text(L10n.of(context).settingsAiUserPrompts),
-        tiles: [
-          userPromptsTile(),
-        ],
-      ),
-      SettingsSection(
         title: Text(l10n.settingsAiTools),
         tiles: [
           toolsTile,
         ],
       ),
       SettingsSection(
-        title: Text(L10n.of(context).settingsAiCache),
+        title: const Text('AI 对话历史'),
         tiles: [
           CustomSettingsTile(
-            child: ListTile(
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(L10n.of(context).settingsAiCacheSize),
-                  Text(
-                    L10n.of(context).settingsAiCacheCurrentSize(ref
-                        .watch(aiCacheCountProvider)
-                        .when(
-                            data: (value) => value,
-                            loading: () => 0,
-                            error: (error, stack) => 0)),
-                  ),
-                ],
-              ),
-              subtitle: Row(
-                children: [
-                  Text(Prefs().maxAiCacheCount.toString()),
-                  Expanded(
-                    child: Slider(
-                      value: Prefs().maxAiCacheCount.toDouble(),
-                      min: 0,
-                      max: 1000,
-                      divisions: 100,
-                      label: Prefs().maxAiCacheCount.toString(),
-                      onChanged: (value) {
-                        Prefs().maxAiCacheCount = value.toInt();
-                        setState(() {});
-                      },
-                    ),
-                  ),
-                ],
-              ),
+            child: const ListTile(
+              title: Text('保留对话历史'),
+              subtitle:
+                  Text('对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。'),
             ),
           ),
-          SettingsTile.navigation(
-              title: Text(L10n.of(context).settingsAiCacheClear),
-              onPressed: (context) {
-                SmartDialog.show(
-                  builder: (context) => AlertDialog(
-                    title: Text(L10n.of(context).commonConfirm),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          SmartDialog.dismiss();
-                        },
-                        child: Text(L10n.of(context).commonCancel),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          ref.read(aiCacheCountProvider.notifier).clearCache();
-                          SmartDialog.dismiss();
-                        },
-                        child: Text(L10n.of(context).commonConfirm),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+        ],
+      ),
+      SettingsSection(
+        tiles: [
+          ConfigTransferTile(
+            kind: 'ai',
+            label: _readAnyLabel('AI 配置', 'AI configuration'),
+            getData: _buildAiTransferData,
+            applyData: _applyAiTransferData,
+          ),
         ],
       ),
     ]);
+  }
+
+  Map<String, dynamic> _buildAiTransferData() {
+    final prefs = Prefs();
+    return AiConfigTransfer.createPayload(
+      providers: ref.read(aiProvidersProvider),
+      selectedProviderId: prefs.selectedAiService,
+      temperature: prefs.aiTemperature,
+      maxTokens: prefs.aiMaxTokens,
+      contextTurns: prefs.aiContextTurns,
+      rpm: prefs.aiRpm,
+      translationProviderId: prefs.translationAiService,
+    );
+  }
+
+  Future<void> _applyAiTransferData(Map<String, dynamic> data) async {
+    final imported = AiConfigTransfer.parse(data);
+    final prefs = Prefs();
+    prefs.saveAiProviders(imported.providers);
+    prefs.selectedAiService = imported.selectedProviderId;
+    prefs.aiTemperature = imported.temperature;
+    prefs.aiMaxTokens = imported.maxTokens;
+    prefs.aiContextTurns = imported.contextTurns;
+    if (imported.rpm != null) prefs.aiRpm = imported.rpm!;
+    final translationId = imported.translationProviderId;
+    if (translationId != null &&
+        imported.providers.any((provider) => provider.id == translationId)) {
+      prefs.translationAiService = translationId;
+    }
+    ref.read(aiProvidersProvider.notifier).refresh();
+    if (mounted) setState(() {});
+  }
+
+  String _readAnyLabel(String zh, String en) {
+    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 
   // Build description showing current selected provider
@@ -441,323 +275,6 @@ class _AISettingsState extends ConsumerState<AISettings> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // User prompts management methods
-  AbstractSettingsTile userPromptsTile() {
-    final userPrompts = ref.watch(userPromptsProvider);
-    ref.read(userPromptsProvider.notifier);
-
-    return CustomSettingsTile(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top button and hint
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AnxButton(
-                  onPressed: _showAddPromptDialog,
-                  child: Text(L10n.of(context).settingsAiUserPromptsAdd),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.info_outline,
-                        size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        L10n.of(context).settingsAiUserPromptsHint,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Prompts list
-          if (userPrompts.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: Text(
-                  L10n.of(context).settingsAiUserPromptsEmpty,
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: userPrompts.length,
-              itemBuilder: (context, index) {
-                final prompt = userPrompts[index];
-                final isExpanded = _expandedUserPromptId == prompt.id;
-
-                return _buildUserPromptItem(
-                  prompt,
-                  isExpanded,
-                  index,
-                  userPrompts.length,
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserPromptItem(
-    prompt,
-    bool isExpanded,
-    int index,
-    int totalCount,
-  ) {
-    final notifier = ref.read(userPromptsProvider.notifier);
-
-    // Initialize controllers
-    _userPromptNameControllers.putIfAbsent(
-      prompt.id,
-      () => TextEditingController(text: prompt.name),
-    );
-    _userPromptContentControllers.putIfAbsent(
-      prompt.id,
-      () => TextEditingController(text: prompt.content),
-    );
-
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      alignment: Alignment.topCenter,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.withAlpha(100)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title row: Switch + Name + Action buttons
-            Row(
-              children: [
-                Switch(
-                  value: prompt.enabled,
-                  onChanged: (_) {
-                    notifier.toggleEnabled(prompt.id);
-                  },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    prompt.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-
-                // Edit button
-                IconButton(
-                  icon: Icon(isExpanded ? Icons.expand_less : Icons.edit),
-                  onPressed: () {
-                    setState(() {
-                      _expandedUserPromptId = isExpanded ? null : prompt.id;
-                    });
-                  },
-                  tooltip: L10n.of(context).commonEdit,
-                ),
-
-                // Move up button
-                IconButton(
-                  icon: const Icon(Icons.arrow_upward, size: 20),
-                  onPressed: index > 0
-                      ? () => notifier.movePrompt(prompt.id, true)
-                      : null,
-                ),
-
-                // Move down button
-                IconButton(
-                  icon: const Icon(Icons.arrow_downward, size: 20),
-                  onPressed: index < totalCount - 1
-                      ? () => notifier.movePrompt(prompt.id, false)
-                      : null,
-                ),
-              ],
-            ),
-
-            // Expanded edit area
-            if (isExpanded) ...[
-              const Divider(height: 16),
-              _buildEditForm(prompt),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditForm(prompt) {
-    final notifier = ref.read(userPromptsProvider.notifier);
-    final nameController = _userPromptNameControllers[prompt.id]!;
-    final contentController = _userPromptContentControllers[prompt.id]!;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Name input
-        TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            labelText: L10n.of(context).settingsAiUserPromptsName,
-            border: const OutlineInputBorder(),
-          ),
-          maxLength: 50,
-        ),
-        const SizedBox(height: 12),
-
-        // Content input
-        TextField(
-          controller: contentController,
-          decoration: InputDecoration(
-            labelText: L10n.of(context).settingsAiUserPromptsContent,
-            border: const OutlineInputBorder(),
-            alignLabelWithHint: true,
-          ),
-          maxLines: 8,
-          minLines: 5,
-          maxLength: 2000,
-        ),
-        const SizedBox(height: 12),
-
-        // Action buttons
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Delete button (uses default L10n text)
-            DeleteConfirm(
-              delete: () {
-                notifier.deletePrompt(prompt.id);
-                _userPromptNameControllers.remove(prompt.id)?.dispose();
-                _userPromptContentControllers.remove(prompt.id)?.dispose();
-                setState(() {
-                  _expandedUserPromptId = null;
-                });
-              },
-              useTextButton: true,
-            ),
-
-            // Save button
-            TextButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                final content = contentController.text.trim();
-
-                if (name.isEmpty || content.isEmpty) {
-                  AnxToast.show(L10n.of(context).commonInputCannotBeEmpty);
-                  return;
-                }
-
-                final updatedPrompt = prompt.copyWith(
-                  name: name,
-                  content: content,
-                );
-                notifier.updatePrompt(updatedPrompt);
-
-                setState(() {
-                  _expandedUserPromptId = null;
-                });
-
-                AnxToast.show(L10n.of(context).commonSaveSuccess);
-              },
-              child: Text(L10n.of(context).commonSave),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _showAddPromptDialog() {
-    final notifier = ref.read(userPromptsProvider.notifier);
-    final nameController = TextEditingController();
-    final contentController = TextEditingController();
-
-    SmartDialog.show(
-      builder: (context) => AlertDialog(
-        title: Text(L10n.of(context).settingsAiUserPromptsAdd),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: L10n.of(context).settingsAiUserPromptsName,
-                  border: const OutlineInputBorder(),
-                ),
-                maxLength: 50,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: contentController,
-                decoration: InputDecoration(
-                  labelText: L10n.of(context).settingsAiUserPromptsContent,
-                  border: const OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-                maxLines: 8,
-                minLines: 5,
-                maxLength: 2000,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              SmartDialog.dismiss();
-              nameController.dispose();
-              contentController.dispose();
-            },
-            child: Text(L10n.of(context).commonCancel),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final content = contentController.text.trim();
-
-              if (name.isEmpty || content.isEmpty) {
-                AnxToast.show(L10n.of(context).commonInputCannotBeEmpty);
-                return;
-              }
-
-              notifier.addPrompt(name: name, content: content);
-
-              SmartDialog.dismiss();
-              nameController.dispose();
-              contentController.dispose();
-
-              AnxToast.show(L10n.of(context).commonAddSuccess);
-            },
-            child: Text(L10n.of(context).commonConfirm),
-          ),
-        ],
       ),
     );
   }

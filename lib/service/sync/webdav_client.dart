@@ -72,7 +72,7 @@ class WebdavClient extends SyncClientBase {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       localTestFile = io.File('${tempDir.path}/webdav_test_$timestamp.txt');
 
-      final testContent = 'Anx Reader WebDAV Test\n'
+      final testContent = 'Modu WebDAV Test\n'
           'Test Time: ${DateTime.now()}\n'
           'Platform: ${AnxPlatform.type.name}\n'
           'Timestamp: $timestamp\n';
@@ -185,7 +185,10 @@ class WebdavClient extends SyncClientBase {
   Future<RemoteFile?> readProps(String path) async {
     RemoteFile? file;
     try {
-      file = (await _client.readProps(path)).toRemoteFile();
+      final normalizedPath = path.endsWith('/') && path.length > 1
+          ? path.substring(0, path.length - 1)
+          : path;
+      file = (await _client.readProps(normalizedPath)).toRemoteFile();
     } catch (e) {
       return null;
     }

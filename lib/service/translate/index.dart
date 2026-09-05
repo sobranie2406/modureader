@@ -7,6 +7,7 @@ import 'package:anx_reader/service/config/config_item.dart';
 import 'package:anx_reader/service/translate/ai.dart';
 import 'package:anx_reader/service/translate/deepl.dart';
 import 'package:anx_reader/service/translate/google_api.dart';
+import 'package:anx_reader/service/translate/microsoft_free.dart';
 import 'package:anx_reader/service/translate/microsoft_api.dart';
 import 'package:anx_reader/service/translate/web_view.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -15,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 enum TranslateService {
+  microsoftFree,
   bingWeb,
   googleWeb,
   microsoftApi,
@@ -24,6 +26,8 @@ enum TranslateService {
 
   TranslateServiceProvider get provider {
     switch (this) {
+      case TranslateService.microsoftFree:
+        return MicrosoftFreeTranslateProvider();
       case TranslateService.bingWeb:
         return BingWebTranslateProvider();
       case TranslateService.googleWeb:
@@ -48,6 +52,13 @@ enum TranslateService {
   static List<TranslateService> get activeValues => values
       .where((e) => e != TranslateService.ai || EnvVar.enableAIFeature)
       .toList();
+
+  /// Providers displayed by ReadAny's translation settings.
+  static List<TranslateService> get readAnyValues => [
+        TranslateService.microsoftFree,
+        if (EnvVar.enableAIFeature) TranslateService.ai,
+        TranslateService.deepl,
+      ];
 }
 
 TranslateService getTranslateService(String name) {
@@ -58,7 +69,7 @@ TranslateService getTranslateService(String name) {
   try {
     return TranslateService.values.firstWhere((e) => e.name == name);
   } catch (e) {
-    return TranslateService.bingWeb;
+    return TranslateService.microsoftFree;
   }
 }
 

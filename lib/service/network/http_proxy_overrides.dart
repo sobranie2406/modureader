@@ -18,20 +18,21 @@ class AnxHttpProxyOverrides extends HttpOverrides {
 
       final proxyHost = Prefs().httpProxyHost.trim();
       final proxyPort = Prefs().httpProxyPort;
-      if (proxyHost.isEmpty || proxyPort <= 0) {
-        return 'DIRECT';
+      if (!_validProxy(proxyHost, proxyPort)) {
+        throw StateError('代理地址或端口无效，请检查代理设置');
       }
 
-      return 'PROXY $proxyHost:$proxyPort; DIRECT';
+      return 'PROXY $proxyHost:$proxyPort';
     };
     return client;
   }
 
   static Future<bool> testProxy(String host, int port, String testUrl) async {
+    if (!_validProxy(host, port)) return false;
+    final client = HttpClient();
     try {
       final uri = Uri.parse(testUrl);
-      final client = HttpClient();
-      client.findProxy = (_) => 'PROXY $host:$port; DIRECT';
+      client.findProxy = (_) => 'PROXY $host:$port';
       client.connectionTimeout = const Duration(seconds: 8);
 
       final request = await client.getUrl(uri).timeout(
@@ -40,11 +41,19 @@ class AnxHttpProxyOverrides extends HttpOverrides {
       final response = await request.close().timeout(
             const Duration(seconds: 8),
           );
-      await response.drain<void>();
+      await response.drain<void>().timeout(const Duration(seconds: 8));
       client.close();
       return response.statusCode >= 200 && response.statusCode < 400;
     } catch (_) {
       return false;
+    } finally {
+      client.close(force: true);
     }
   }
+
+  static bool _validProxy(String host, int port) =>
+      host.isNotEmpty &&
+      !host.contains(RegExp(r'[;\s/]')) &&
+      port > 0 &&
+      port <= 65535;
 }

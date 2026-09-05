@@ -1,9 +1,10 @@
+import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_reasoning_effort.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/ai_model_service.dart';
-import 'package:anx_reader/service/ai/index.dart';
+import 'package:anx_reader/service/ai/langchain_ai_config.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:anx_reader/widgets/common/anx_button.dart';
@@ -34,6 +35,9 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
 
   AiProtocol _selectedProtocol = AiProtocol.openai;
   AiReasoningEffort _reasoningEffort = AiReasoningEffort.auto;
+  late double _temperature;
+  late int _maxTokens;
+  late int _contextTurns;
   List<AiApiKey> _apiKeys = [];
   bool _isModified = false;
   bool _isFetchingModels = false;
@@ -54,6 +58,17 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
     _modelController = TextEditingController(text: provider?.model ?? '');
     _selectedProtocol = provider?.protocol ?? AiProtocol.openai;
     _reasoningEffort = provider?.reasoningEffort ?? AiReasoningEffort.auto;
+    final prefs = Prefs();
+    _temperature = normalizeAiTemperatureForModel(
+      provider?.model ?? '',
+      provider?.temperature ?? prefs.aiTemperature,
+    )!
+        .clamp(0.0, 1.0)
+        .toDouble();
+    _maxTokens =
+        (provider?.maxTokens ?? prefs.aiMaxTokens).clamp(1024, 32768).toInt();
+    _contextTurns =
+        (provider?.contextTurns ?? prefs.aiContextTurns).clamp(2, 30).toInt();
     _apiKeys = provider?.apiKeys.toList() ?? [];
 
     _nameController.addListener(() => setState(() => _isModified = true));
@@ -257,6 +272,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
     final accent = colorScheme.secondary;
     return FilledContainer(
       child: ExpansionTile(
+        initiallyExpanded: true,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         childrenPadding: const EdgeInsets.all(16),
         shape: const Border(),
@@ -284,9 +300,19 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.settingsAdvanced,
+                    _label('模型参数', 'Model parameters'),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _label(
+                      '温度 ${_temperature.toStringAsFixed(1)} · 最大 $_maxTokens Token · $_contextTurns 轮',
+                      'Temperature ${_temperature.toStringAsFixed(1)} · $_maxTokens tokens · $_contextTurns turns',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -295,6 +321,49 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
           ],
         ),
         children: [
+          _buildParameterSlider(
+            title: _label('温度', 'Temperature'),
+            value: _temperature.toStringAsFixed(1),
+            current: _temperature,
+            min: 0,
+            max: 1,
+            divisions: 10,
+            onChanged: (value) {
+              setState(() {
+                _temperature = value;
+                _isModified = true;
+              });
+            },
+          ),
+          _buildParameterSlider(
+            title: _label('最大 Token 数', 'Max tokens'),
+            value: _maxTokens.toString(),
+            current: _maxTokens.toDouble(),
+            min: 1024,
+            max: 32768,
+            divisions: 31,
+            onChanged: (value) {
+              setState(() {
+                _maxTokens = value.round();
+                _isModified = true;
+              });
+            },
+          ),
+          _buildParameterSlider(
+            title: _label('上下文轮数', 'Context turns'),
+            value: _label('$_contextTurns 轮', '$_contextTurns turns'),
+            current: _contextTurns.toDouble(),
+            min: 2,
+            max: 30,
+            divisions: 28,
+            onChanged: (value) {
+              setState(() {
+                _contextTurns = value.round();
+                _isModified = true;
+              });
+            },
+          ),
+          const Divider(height: 28),
           DropdownButtonFormField<AiReasoningEffort>(
             initialValue: _reasoningEffort,
             decoration: InputDecoration(
@@ -347,6 +416,34 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParameterSlider({
+    required String title,
+    required String value,
+    required double current,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$title：$value'),
+          Slider(
+            value: current.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: divisions,
+            label: value,
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -453,6 +550,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
             const SizedBox(height: 16),
             TextField(
               controller: keyController,
+              obscureText: true,
               decoration: const InputDecoration(
                 labelText: 'API Key',
                 border: OutlineInputBorder(),
@@ -467,11 +565,11 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
           ),
           TextButton(
             onPressed: () {
-              if (keyController.text.isNotEmpty) {
+              if (keyController.text.trim().isNotEmpty) {
                 setState(() {
                   _apiKeys.add(AiApiKey(
                     id: const Uuid().v4(),
-                    key: keyController.text,
+                    key: keyController.text.trim(),
                     enabled: true,
                     label: labelController.text.isNotEmpty
                         ? labelController.text
@@ -541,6 +639,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
       final models = await fetchAiModels(
         url: _urlController.text.trim(),
         apiKey: enabledKeys.first.key,
+        protocol: _selectedProtocol,
       );
 
       if (!mounted) return;
@@ -599,39 +698,8 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
   }
 
   void _saveProvider() {
-    final l10n = L10n.of(context);
-
-    if (_nameController.text.isEmpty || _urlController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.commonFailed)),
-      );
-      return;
-    }
-
-    final provider = AiProvider(
-      id: widget.providerId ?? const Uuid().v4(),
-      title: _nameController.text,
-      url: _urlController.text,
-      protocol: _selectedProtocol,
-      enabled: true,
-      isBuiltin: widget.providerId != null
-          ? ref
-              .read(aiProvidersProvider)
-              .firstWhere((p) => p.id == widget.providerId)
-              .isBuiltin
-          : false,
-      apiKeys: _apiKeys,
-      model: _modelController.text,
-      reasoningEffort: _reasoningEffort,
-      keyIndex: 0,
-      createdAt: widget.providerId != null
-          ? ref
-              .read(aiProvidersProvider)
-              .firstWhere((p) => p.id == widget.providerId)
-              .createdAt
-          : DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    if (!_validateProviderDraft()) return;
+    final provider = _buildProviderDraft();
 
     if (widget.providerId == null) {
       ref.read(aiProvidersProvider.notifier).addProvider(provider);
@@ -645,62 +713,82 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
 
   void _testConnection() {
     final l10n = L10n.of(context);
-
-    // Save any pending changes before testing so the provider has the latest config
-    if (_isModified) {
-      if (_nameController.text.isEmpty || _urlController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.commonFailed)),
-        );
-        return;
-      }
-      final provider = AiProvider(
-        id: widget.providerId ?? const Uuid().v4(),
-        title: _nameController.text,
-        url: _urlController.text,
-        protocol: _selectedProtocol,
-        enabled: true,
-        isBuiltin: widget.providerId != null
-            ? ref
-                .read(aiProvidersProvider)
-                .firstWhere((p) => p.id == widget.providerId)
-                .isBuiltin
-            : false,
-        apiKeys: _apiKeys,
-        model: _modelController.text,
-        reasoningEffort: _reasoningEffort,
-        keyIndex: 0,
-        createdAt: widget.providerId != null
-            ? ref
-                .read(aiProvidersProvider)
-                .firstWhere((p) => p.id == widget.providerId)
-                .createdAt
-            : DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      if (widget.providerId == null) {
-        ref.read(aiProvidersProvider.notifier).addProvider(provider);
-      } else {
-        ref.read(aiProvidersProvider.notifier).updateProvider(provider);
-      }
-      setState(() => _isModified = false);
-    }
+    if (!_validateProviderDraft(requireApiKey: true)) return;
+    final provider = _buildProviderDraft();
 
     SmartDialog.show(
-      onDismiss: () {
-        cancelActiveAiRequest();
-      },
       builder: (context) => AlertDialog(
         title: Text(l10n.commonTest),
         content: SizedBox(
           width: double.maxFinite,
           child: AiStream(
             prompt: generatePromptTest(),
-            identifier: widget.providerId,
+            providerOverride: provider,
             regenerate: true,
           ),
         ),
       ),
     );
+  }
+
+  AiProvider? _existingProvider() {
+    if (widget.providerId == null) return null;
+    for (final provider in ref.read(aiProvidersProvider)) {
+      if (provider.id == widget.providerId) return provider;
+    }
+    return null;
+  }
+
+  AiProvider _buildProviderDraft() {
+    final existing = _existingProvider();
+    return AiProvider(
+      id: existing?.id ?? const Uuid().v4(),
+      title: _nameController.text.trim(),
+      url: _urlController.text.trim(),
+      protocol: _selectedProtocol,
+      enabled: existing?.enabled ?? true,
+      isBuiltin: existing?.isBuiltin ?? false,
+      apiKeys: _apiKeys,
+      model: _modelController.text.trim(),
+      temperature: normalizeAiTemperatureForModel(
+        _modelController.text,
+        _temperature,
+      ),
+      maxTokens: _maxTokens,
+      contextTurns: _contextTurns,
+      reasoningEffort: _reasoningEffort,
+      keyIndex: existing?.keyIndex ?? 0,
+      createdAt: existing?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  bool _validateProviderDraft({bool requireApiKey = false}) {
+    final name = _nameController.text.trim();
+    final model = _modelController.text.trim();
+    final uri = Uri.tryParse(_urlController.text.trim());
+    String? message;
+    if (name.isEmpty) {
+      message = _label('请输入服务商名称', 'Enter a provider name');
+    } else if (uri == null ||
+        !uri.hasScheme ||
+        uri.host.isEmpty ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
+      message =
+          _label('请输入有效的 HTTP 或 HTTPS 地址', 'Enter a valid HTTP or HTTPS URL');
+    } else if (model.isEmpty) {
+      message = _label('请输入或选择模型', 'Enter or select a model');
+    } else if (requireApiKey &&
+        !_apiKeys.any((key) => key.enabled && key.key.trim().isNotEmpty)) {
+      message = _label('请先添加并启用 API Key', 'Add and enable an API key first');
+    }
+    if (message == null) return true;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+    return false;
+  }
+
+  String _label(String zh, String en) {
+    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 }

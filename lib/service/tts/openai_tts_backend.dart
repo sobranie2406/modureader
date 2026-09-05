@@ -37,7 +37,6 @@ class OpenAiTtsProvider extends TtsServiceProvider {
         label: L10n.of(context).translateTip,
         type: ConfigItemType.tip,
         defaultValue: L10n.of(context).settingsNarrateOpenAiHelpText,
-        link: 'https://anx.anxcye.com/docs/tts/openai',
       ),
       ConfigItem(
         key: 'url',

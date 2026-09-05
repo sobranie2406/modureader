@@ -281,8 +281,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             onTap: () {
               widget.onClose();
               launchUrl(
-                Uri.parse(
-                    'https://www.bing.com/search?q=${widget.annoContent}'),
+                Uri.https('www.bing.com', '/search', {'q': widget.annoContent}),
                 mode: LaunchMode.externalApplication,
               );
             },
@@ -349,8 +348,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
                     content: widget.annoContent,
                     sendImmediate: false,
                   );
-                  key.aiChatKey.currentState?.inputController.text =
-                      widget.annoContent;
+                  key.aiChatKey.currentState
+                      ?.setReaderSourceText(widget.annoContent);
                 }
               },
               icon: const Icon(EvaIcons.message_circle_outline),

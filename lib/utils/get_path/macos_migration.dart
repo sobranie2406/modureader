@@ -47,9 +47,11 @@ Future<MigrationCheckResult> checkMigrationNeeded() async {
       }
     }
 
-    // Also check for log file
-    final oldLogFile = File('$oldPath${Platform.pathSeparator}anx_reader.log');
-    if (oldLogFile.existsSync()) {
+    // Also check current and legacy log filenames.
+    final oldLogFile = File('$oldPath${Platform.pathSeparator}modu.log');
+    final legacyLogFile =
+        File('$oldPath${Platform.pathSeparator}anx_reader.log');
+    if (oldLogFile.existsSync() || legacyLogFile.existsSync()) {
       oldHasData = true;
     }
 
@@ -121,11 +123,14 @@ Future<bool> performMigration({
     }
 
     // Also copy the log file if it exists
-    onProgress?.call('anx_reader.log', 6, totalItems);
-    final oldLogFile = File('$oldPath${Platform.pathSeparator}anx_reader.log');
+    onProgress?.call('modu.log', 6, totalItems);
+    var oldLogFile = File('$oldPath${Platform.pathSeparator}modu.log');
+    if (!oldLogFile.existsSync()) {
+      // Keep importing the legacy filename when migrating an upstream install.
+      oldLogFile = File('$oldPath${Platform.pathSeparator}anx_reader.log');
+    }
     if (oldLogFile.existsSync()) {
-      final newLogFile =
-          File('$newPath${Platform.pathSeparator}anx_reader.log');
+      final newLogFile = File('$newPath${Platform.pathSeparator}modu.log');
       await oldLogFile.copy(newLogFile.path);
       AnxLog.info('Migration: Copied log file successfully');
     }

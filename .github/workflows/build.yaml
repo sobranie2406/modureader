@@ -1,100 +1,198 @@
-name: Build & Release
+name: Modu Packages
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - 'v[0-9]*.[0-9]*.[0-9]*'
-      - 'v[0-9]*.[0-9]*.[0-9]*-alpha.[0-9]*'
-      - 'v[0-9]*.[0-9]*.[0-9]*-beta.[0-9]*'
+    tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: modu-packages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  setup:
-    uses: ./.github/workflows/setup.yaml
-    secrets:
-      NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}
+  quality:
+    uses: ./.github/workflows/pr-check.yml
 
-  build-android:
-    needs: setup
-    uses: ./.github/workflows/build-android.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-    secrets:
-      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux, arch: x64}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
+          - {os: windows-2025, platform: windows, arch: x64}
+          - {os: windows-11-arm, platform: windows, arch: arm64}
+          - {os: macos-15-intel, platform: macos, arch: x64, xcode_arch: x86_64}
+          - {os: macos-15, platform: macos, arch: arm64, xcode_arch: arm64}
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux native dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libwpewebkit-1.1-dev libwpebackend-fdo-1.0-dev libwpe-1.0-dev libepoxy-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libasound2-dev libpulse-dev
+      - uses: NuGet/setup-nuget@v2
+        if: matrix.platform == 'windows'
+      - name: Rust toolchain
+        run: |
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup default stable
+          if [[ "${{ matrix.platform }}-${{ matrix.arch }}" == "windows-arm64" ]]; then
+            rustup target add aarch64-pc-windows-msvc
+          fi
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Prepare sources
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          npm ci --prefix assets/foliate-js
+          (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Build desktop
+        env:
+          FLUTTER_XCODE_ARCHS: ${{ matrix.xcode_arch }}
+          FLUTTER_XCODE_ONLY_ACTIVE_ARCH: 'YES'
+          FLUTTER_XCODE_CODE_SIGN_IDENTITY: '-'
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos" ]]; then
+            flutter build macos --release
+          else
+            flutter build ${{ matrix.platform }} --release --target-platform ${{ matrix.platform }}-${{ matrix.arch }}
+          fi
+      - name: Verify architecture and package
+        run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modu-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist-release/*.zip
+            dist-release/*.tar.gz
+            dist-release/*.sha256
+          if-no-files-found: error
+          retention-days: 14
 
-  build-ios:
-    needs: setup
-    uses: ./.github/workflows/build-ios.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-      xcode_version: ${{ needs.setup.outputs.xcode_version }}
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Prepare sources and Rust mobile targets
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          npm ci --prefix assets/foliate-js
+          (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Load dedicated release signing identity
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: node scripts/release/android-signing.mjs --from-env
+      - name: Build signed APKs
+        run: flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
+      - name: Verify signatures and package
+        run: |
+          python3 scripts/release/package.py android arm64
+          python3 scripts/release/package.py android x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modu-android
+          path: |
+            dist-release/*.apk
+            dist-release/*.zip
+            dist-release/*.sha256
+          if-no-files-found: error
+          retention-days: 14
 
-  build-windows:
-    needs: setup
-    uses: ./.github/workflows/build-windows.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-    secrets:
-      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-      NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}
-
-  build-macos:
-    needs: setup
-    uses: ./.github/workflows/build-macos.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-      xcode_version: ${{ needs.setup.outputs.xcode_version }}
-
-  build-appstore:
-    needs: setup
-    uses: ./.github/workflows/build-appstore.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-      xcode_version: ${{ needs.setup.outputs.xcode_version }}
-    secrets:
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-      APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
-
-  build-playstore:
-    needs: setup
-    uses: ./.github/workflows/build-playstore.yaml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      flutter_version: ${{ needs.setup.outputs.flutter_version }}
-      is_alpha: ${{ needs.setup.outputs.is_alpha }}
-      is_beta: ${{ needs.setup.outputs.is_beta }}
-    secrets:
-      PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
-      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+  ios:
+    name: ios-arm64-UNSIGNED
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Prepare sources and Rust iOS target
+        run: |
+          rustup target add aarch64-apple-ios
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          npm ci --prefix assets/foliate-js
+          (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Build unsigned device application
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA (requires user's own signing)
+        run: python3 scripts/release/package.py ios arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modu-ios-arm64-unsigned
+          path: |
+            dist-release/*.ipa
+            dist-release/*.sha256
+          if-no-files-found: error
+          retention-days: 14
 
   release:
-    # needs: [setup, build-android, build-ios, build-windows, build-macos, build-appstore, build-playstore]
-    needs: [setup, build-android, build-ios, build-windows, build-macos, build-appstore]
-    uses: ./.github/workflows/release.yaml
-    with:
-      tag: ${{ needs.setup.outputs.tag }}
-      version: ${{ needs.setup.outputs.version }}
-      is_alpha: ${{ needs.setup.outputs.is_alpha }}
-      is_beta: ${{ needs.setup.outputs.is_beta }}
-      release_notes: ${{ needs.setup.outputs.release_notes }}
-    secrets:
-      NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}
-      TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [quality, desktop, android, ios]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: modu-*
+          path: dist-release
+          merge-multiple: true
+      - name: Verify package checksums and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          (cd dist-release && sha256sum --check *.sha256)
+          gh release create "$RELEASE_TAG" dist-release/* --verify-tag --prerelease --title "默读 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md

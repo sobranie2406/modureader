@@ -34,7 +34,7 @@ jobs:
     if: inputs.is_alpha == 'true'
     runs-on: ubuntu-latest
     env:
-      BASE_NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}/Anx-Reader%20Action
+      BASE_NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}/Modu%20Action
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
     if: inputs.is_alpha != 'true'
     runs-on: ubuntu-latest
     env:
-      BASE_NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}/Anx-Reader%20Action
+      BASE_NOTIFICATION_URL: ${{ secrets.NOTIFICATION_URL }}/Modu%20Action
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v4
@@ -130,7 +130,7 @@ jobs:
             **What's New:**
             ${{ steps.format_changelog.outputs.formatted_notes }}
             
-            📥 **Download:** https://github.com/Anxcye/anx-reader/releases/tag/${{ inputs.tag }}
+            📥 **Download:** ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }}
 
       - name: Send release message
         if: ${{ inputs.is_beta != 'true' && inputs.is_alpha != 'true' }}
@@ -147,7 +147,7 @@ jobs:
             **What's New:**
             ${{ steps.format_changelog.outputs.formatted_notes }}
             
-            📥 **Download:** https://github.com/Anxcye/anx-reader/releases/tag/${{ inputs.tag }}
+            📥 **Download:** ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }}
 
       - name: Send build completion notification
         shell: bash

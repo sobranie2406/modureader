@@ -41,6 +41,11 @@ class AiHistoryNotifier
     state = const AsyncValue.data([]);
   }
 
+  Future<void> clearScope(String scope) async {
+    await AiHistoryStore.clearScope(scope);
+    await _load();
+  }
+
   AiChatHistoryEntry? findById(String id) {
     return state.maybeWhen(
       data: (entries) {

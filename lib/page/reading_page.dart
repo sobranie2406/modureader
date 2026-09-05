@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:anx_reader/service/reader_fullscreen.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/reading_time.dart';
@@ -15,9 +17,13 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/page/book_detail.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
+import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/service/ai/index.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
+import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
+import 'package:anx_reader/service/reader_focus.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/utils/ui/status_bar.dart';
@@ -28,6 +34,7 @@ import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
+import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
 import 'package:anx_reader/widgets/reading_page/toc_widget.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
@@ -82,6 +89,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   static const double _aiChatMinHeight = 200;
   late double _aiChatHeight;
   bool _isResizingAiChat = false;
+  bool _isBuildingKnowledgeIndex = false;
   bool bookmarkExists = false;
 
   late final FocusNode _readerFocusNode;
@@ -103,6 +111,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
     if (Prefs().hideStatusBar) {
       hideStatusBar();
+    }
+    if (AnxPlatform.isDesktop && Prefs().readerFullscreen) {
+      unawaited(setReaderFullscreen(true));
     }
 
     WidgetsBinding.instance.addObserver(this);
@@ -134,6 +145,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   void dispose() {
+    if (AnxPlatform.isDesktop) unawaited(_fullscreen.close());
     Sync().syncData(SyncDirection.upload, ref, trigger: SyncTrigger.auto);
     _readTimeWatch.stop();
     _awakeTimer?.cancel();
@@ -156,10 +168,27 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     super.dispose();
   }
 
+  final _fullscreen = ReaderFullscreenSession();
+  Future<void> setReaderFullscreen(bool value) => _fullscreen.set(value);
+
   void _requestReaderFocus() {
     if (bottomBarOffstage && !_readerFocusNode.hasFocus) {
       _readerFocusNode.requestFocus();
     }
+  }
+
+  void _restoreReaderFocusAfterPanel() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !bottomBarOffstage || _aiChat != null) return;
+      _readerFocusNode.requestFocus();
+      unawaited(restoreNativeReaderFocus());
+    });
+  }
+
+  void _closeAiChat() {
+    setState(() => _aiChat = null);
+    showOrHideAppBarAndBottomBar(false);
+    _restoreReaderFocusAfterPanel();
   }
 
   void _releaseReaderFocus() {
@@ -386,6 +415,15 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     });
   }
 
+  void translationHandler() {
+    setState(() {
+      _currentPage = TranslationWidget(
+        bookId: _book.id,
+        epubPlayerKey: epubPlayerKey,
+      );
+    });
+  }
+
   double _aiChatMaxWidth(BuildContext context) {
     final totalWidth = MediaQuery.of(context).size.width;
     final maxByPercentage = totalWidth * 0.65;
@@ -459,15 +497,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             prompt: prompt,
           ),
         ),
-        onDismiss: () {
-          cancelActiveAiRequest();
-        },
       );
     }
   }
 
   List<Widget> _buildAiChatTrailing(BuildContext context) {
     return [
+      _buildKnowledgeIndexButton(context),
       IconButton(
         onPressed: () {
           setState(() {
@@ -489,14 +525,60 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             : L10n.of(context).aiShowAtRight,
       ),
       IconButton(
-        onPressed: () {
-          setState(() {
-            _aiChat = null;
-          });
-        },
+        onPressed: _closeAiChat,
         icon: const Icon(Icons.close),
       ),
     ];
+  }
+
+  Widget _buildKnowledgeIndexButton(BuildContext context) {
+    return IconButton(
+      onPressed: _isBuildingKnowledgeIndex
+          ? null
+          : () => _buildKnowledgeIndex(context),
+      icon: _isBuildingKnowledgeIndex
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.library_add_check_outlined),
+      tooltip: '建立本书知识库',
+    );
+  }
+
+  Future<void> _buildKnowledgeIndex(BuildContext context) async {
+    setState(() => _isBuildingKnowledgeIndex = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在读取章节并建立知识库…')),
+    );
+    try {
+      final result = await epubPlayerKey.currentState?.buildKnowledgeIndex(
+        onProgress: (chapterId, completed, total) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('知识库进度：$completed/$total'),
+              duration: const Duration(milliseconds: 700),
+            ),
+          );
+        },
+      );
+      if (!mounted) return;
+      final message = result?.status == IndexBuildStatus.completed
+          ? '本书知识库已建立'
+          : '知识库建立已取消';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('知识库建立失败：$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBuildingKnowledgeIndex = false);
+    }
   }
 
   void _rebuildAiChat() {
@@ -511,6 +593,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         Expanded(
           child: AiChatStream(
             key: aiChatKey,
+            scope: AiChatScope.reader,
             initialMessage: null,
             sendImmediate: false,
             quickPromptChips: _getAiQuickPromptChips(),
@@ -523,21 +606,16 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   List<AiQuickPromptChip> _getAiQuickPromptChips() {
     return [
-      AiQuickPromptChip(
-        icon: EvaIcons.book,
-        label: L10n.of(context).settingsAiPromptSummaryTheChapter,
-        prompt: generatePromptSummaryTheChapter().buildString(),
-      ),
-      AiQuickPromptChip(
-        icon: Icons.menu_book_rounded,
-        label: L10n.of(context).settingsAiPromptSummaryTheBook,
-        prompt: generatePromptSummaryTheBook().buildString(),
-      ),
-      AiQuickPromptChip(
-        icon: Icons.account_tree_outlined,
-        label: L10n.of(context).settingsAiPromptMindmap,
-        prompt: generatePromptMindmap().buildString(),
-      ),
+      ...readAnySkills
+          .where((skill) => Prefs().isReadAnySkillEnabled(skill.id))
+          .map(
+            (skill) => AiQuickPromptChip(
+              icon: _readAnySkillIcon(skill.id),
+              label: skill.name,
+              prompt: ReadingSkillPromptStore.promptFor(skill),
+              skillId: skill.id,
+            ),
+          ),
       // User custom prompts (enabled only)
       ...Prefs()
           .userPrompts
@@ -548,6 +626,22 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                 prompt: userPrompt.content,
               )),
     ];
+  }
+
+  IconData _readAnySkillIcon(String skillId) {
+    return switch (skillId) {
+      'smart_summary' => Icons.summarize_outlined,
+      'book_summary' => Icons.menu_book_rounded,
+      'concept_explainer' => Icons.lightbulb_outline,
+      'argument_analyzer' => Icons.account_tree_outlined,
+      'character_tracker' => Icons.groups_outlined,
+      'quote_collector' => Icons.format_quote_outlined,
+      'reading_guide' => Icons.explore_outlined,
+      'smart_translator' => Icons.translate_outlined,
+      'vocabulary_helper' => Icons.spellcheck_outlined,
+      'mindmap' => Icons.account_tree_outlined,
+      _ => Icons.extension_outlined,
+    };
   }
 
   Future<void> showAiChat({
@@ -578,27 +672,36 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
 
     if (shouldShowAsPopup) {
-      showModalBottomSheet(
+      ModalRoute<dynamic>? sheetRoute;
+      await showModalBottomSheet(
           context: navigatorKey.currentContext!,
           isScrollControlled: true,
           showDragHandle: false,
           clipBehavior: Clip.hardEdge,
-          builder: (context) => PointerInterceptor(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.8,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: AiChatStream(
-                      key: aiChatKey,
-                      initialMessage: content,
-                      sendImmediate: sendImmediate,
-                      quickPromptChips: quickPrompts,
-                    ),
+          builder: (context) {
+            sheetRoute = ModalRoute.of(context);
+            return PointerInterceptor(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: AiChatStream(
+                    key: aiChatKey,
+                    scope: AiChatScope.reader,
+                    initialMessage: content,
+                    sendImmediate: sendImmediate,
+                    quickPromptChips: quickPrompts,
+                    trailing: [_buildKnowledgeIndexButton(context)],
                   ),
                 ),
-              ));
+              ),
+            );
+          });
+      // A pop result precedes the reverse animation and native view disposal.
+      await sheetRoute?.completed;
+      _restoreReaderFocusAfterPanel();
     } else {
       setState(() {
         final maxWidth = _aiChatMaxWidth(navigatorKey.currentContext!);
@@ -611,6 +714,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             Expanded(
               child: AiChatStream(
                 key: aiChatKey,
+                scope: AiChatScope.reader,
                 initialMessage: content,
                 sendImmediate: sendImmediate,
                 quickPromptChips: quickPrompts,
@@ -655,9 +759,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         }
 
         if (shouldShowAsSplit && _aiChat != null) {
-          setState(() {
-            _aiChat = null;
-          });
+          _closeAiChat();
           return;
         }
 
@@ -783,6 +885,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       onPressed: () {
                                         styleHandler(setState);
                                       },
+                                    ),
+                                    IconButton(
+                                      tooltip:
+                                          L10n.of(context).settingsTranslate,
+                                      icon:
+                                          const Icon(Icons.translate_outlined),
+                                      onPressed: translationHandler,
                                     ),
                                     IconButton(
                                       icon: const Icon(EvaIcons.headphones),

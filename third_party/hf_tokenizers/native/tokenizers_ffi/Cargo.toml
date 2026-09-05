@@ -1,0 +1,17 @@
+[package]
+name = "tokenizers_ffi"
+version = "0.1.0"
+edition = "2021"
+description = "Thin C ABI over the HuggingFace tokenizers crate for the Dart tokenizers package."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+

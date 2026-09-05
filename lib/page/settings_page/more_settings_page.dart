@@ -1,6 +1,7 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/ai.dart';
+import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
 import 'package:anx_reader/page/settings_page/advanced.dart';
 import 'package:anx_reader/page/settings_page/appearance.dart';
 import 'package:anx_reader/page/settings_page/developer/developer_options_page.dart';
@@ -10,6 +11,7 @@ import 'package:anx_reader/page/settings_page/settings_page.dart';
 import 'package:anx_reader/page/settings_page/storege.dart';
 import 'package:anx_reader/page/settings_page/sync.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
+import 'package:anx_reader/page/settings_page/vector_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/settings/about.dart';
 import 'package:flutter/cupertino.dart';
@@ -38,7 +40,14 @@ class MoreSettings extends StatelessWidget {
 }
 
 class SubMoreSettings extends StatefulWidget {
-  const SubMoreSettings({super.key});
+  const SubMoreSettings({
+    super.key,
+    this.embedded = false,
+  });
+
+  /// When embedded in the home navigation, Settings is already the top-level
+  /// destination and must not show a redundant back button.
+  final bool embedded;
 
   @override
   State<SubMoreSettings> createState() => _SubMoreSettingsState();
@@ -61,13 +70,20 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
         final showDeveloperEntry = Prefs().developerOptionsEnabled;
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                Navigator.pop(context);
-              },
+            automaticallyImplyLeading: !widget.embedded,
+            leading: widget.embedded
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+            title: Text(
+              widget.embedded
+                  ? L10n.of(context).navBarSettings
+                  : L10n.of(context).settingsMoreSettings,
             ),
-            title: Text(L10n.of(context).settingsMoreSettings),
           ),
           body: LayoutBuilder(builder: (context, constraints) {
             List<Map<String, dynamic>> settings = [
@@ -92,13 +108,44 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   L10n.of(context).readingPageOther,
                 ],
               },
+              if (EnvVar.enableAIFeature)
+                {
+                  "title": L10n.of(context).settingsAi,
+                  "icon": Icons.auto_awesome,
+                  "sections": const AISettings(),
+                  "subtitles": [
+                    L10n.of(context).settingsAiServices,
+                    Localizations.localeOf(context).languageCode == 'zh'
+                        ? '模型参数、显示与工具'
+                        : 'Models, display and tools',
+                  ],
+                },
+              if (EnvVar.enableAIFeature)
+                {
+                  "title": Localizations.localeOf(context).languageCode == 'zh'
+                      ? 'AI 阅读技能'
+                      : 'AI Reading Skills',
+                  "icon": Icons.extension_outlined,
+                  "sections": const AiReadingSkillsSettings(),
+                  "subtitles": [
+                    Localizations.localeOf(context).languageCode == 'zh'
+                        ? '内置技能、自定义技能与提示词'
+                        : 'Built-in, custom skills and prompts',
+                  ],
+                },
               {
-                "title": L10n.of(context).settingsSync,
-                "icon": Icons.sync_outlined,
-                "sections": const SyncSetting(),
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '向量模型'
+                    : 'Vector Model',
+                "icon": Icons.hub_outlined,
+                "sections": const VectorModelSettings(),
                 "subtitles": [
-                  L10n.of(context).settingsSyncWebdav,
-                  L10n.of(context).exportAndImport,
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '语义搜索与 RAG'
+                      : 'Semantic search and RAG',
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '本地或远程嵌入模型'
+                      : 'Local or remote embeddings',
                 ],
               },
               {
@@ -111,23 +158,24 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 ],
               },
               {
+                "title": L10n.of(context).settingsSync,
+                "icon": Icons.sync_outlined,
+                "sections": const SyncSetting(),
+                "subtitles": [
+                  L10n.of(context).settingsSyncWebdav,
+                  L10n.of(context).exportAndImport,
+                ],
+              },
+              {
                 "title": L10n.of(context).settingsTranslate,
                 "icon": Icons.translate_outlined,
                 "sections": const TranslateSetting(),
                 "subtitles": [
-                  L10n.of(context).settingsTranslate,
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '翻译引擎、目标语言'
+                      : 'Engine and target language',
                 ],
               },
-              if (EnvVar.enableAIFeature)
-                {
-                  "title": L10n.of(context).settingsAi,
-                  "icon": Icons.auto_awesome,
-                  "sections": const AISettings(),
-                  "subtitles": [
-                    L10n.of(context).settingsAiServices,
-                    L10n.of(context).settingsAiPrompt,
-                  ],
-                },
               {
                 "title": L10n.of(context).storage,
                 "icon": Icons.storage_outlined,
@@ -199,6 +247,7 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
               ];
 
               return ListView(
+                padding: EdgeInsets.only(bottom: widget.embedded ? 80 : 0),
                 children: children,
               );
             }

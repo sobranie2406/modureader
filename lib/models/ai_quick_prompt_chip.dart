@@ -9,5 +9,6 @@ abstract class AiQuickPromptChip with _$AiQuickPromptChip {
     required IconData icon,
     required String label,
     required String prompt,
+    String? skillId,
   }) = _AiQuickPromptChip;
 }

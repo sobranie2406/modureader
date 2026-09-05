@@ -16,9 +16,15 @@ class BookFolder extends ConsumerStatefulWidget {
   const BookFolder({
     super.key,
     required this.books,
+    this.selectionMode = false,
+    this.selectedBookIds = const <int>{},
+    this.onSelectionChanged,
   });
 
   final List<Book> books;
+  final bool selectionMode;
+  final Set<int> selectedBookIds;
+  final BookSelectionChanged? onSelectionChanged;
 
   @override
   ConsumerState<BookFolder> createState() => _BookFolderState();
@@ -92,7 +98,12 @@ class _BookFolderState extends ConsumerState<BookFolder> {
       onLeave: (data) => onLeaveBook(data),
       builder: (context, candidateData, rejectedData) {
         return scaleTransition(
-          BookItem(book: widget.books[0]),
+          BookItem(
+            book: widget.books[0],
+            selectionMode: widget.selectionMode,
+            selected: widget.selectedBookIds.contains(widget.books[0].id),
+            onSelectionChanged: widget.onSelectionChanged,
+          ),
         );
       },
     );
@@ -168,13 +179,66 @@ class _BookFolderState extends ConsumerState<BookFolder> {
             folderPreview = buildStackedPreview();
         }
 
+        final selectedCount = widget.books
+            .where((book) => widget.selectedBookIds.contains(book.id))
+            .length;
+        final allSelected = selectedCount == widget.books.length;
         return scaleTransition(
           Column(
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => openFolder(groupName),
-                  child: folderPreview,
+                  onTap: () {
+                    if (!widget.selectionMode) {
+                      openFolder(groupName);
+                      return;
+                    }
+                    for (final book in widget.books) {
+                      widget.onSelectionChanged?.call(book, !allSelected);
+                    }
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      folderPreview,
+                      if (widget.selectionMode)
+                        Positioned(
+                          right: 7,
+                          top: 7,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: allSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.black.withAlpha(110),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: allSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 17,
+                                    )
+                                  : selectedCount > 0
+                                      ? Center(
+                                          child: Text(
+                                            '$selectedCount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               SizedBox(

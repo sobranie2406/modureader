@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/enums/sort_field.dart';
 import 'package:anx_reader/enums/sort_order.dart';
@@ -13,6 +15,8 @@ import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/book_filters.dart';
 import 'package:anx_reader/providers/tags.dart';
 import 'package:anx_reader/service/book.dart';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/page/search/search_page.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:anx_reader/utils/color/hash_color.dart';
@@ -20,6 +24,7 @@ import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
+import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:anx_reader/widgets/bookshelf/sync_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/common/tag_chip.dart';
@@ -50,9 +55,42 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
   bool _dragging = false;
   final GlobalKey _tagButtonKey = GlobalKey();
   final TextEditingController _editTagController = TextEditingController();
+  final Set<int> _selectedBookIds = <int>{};
+  bool _selectionMode = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_recoverAutomaticVectorizationQueue());
+  }
+
+  Future<void> _recoverAutomaticVectorizationQueue() async {
+    final prefs = Prefs();
+    if (!prefs.vectorModelEnabled || !prefs.autoVectorizeOnImport) return;
+
+    try {
+      final books = await bookDao.selectNotDeleteBooks();
+      final indexService = BookKnowledgeIndexService();
+      final added = await enqueueMissingBooksForAutomaticIndexing(
+        books: books,
+        vectorModelEnabled: prefs.vectorModelEnabled,
+        autoVectorizeOnImport: prefs.autoVectorizeOnImport,
+        hasIndex: indexService.hasIndex,
+        isBookAvailable: (book) => File(book.fileFullPath).existsSync(),
+      );
+      if (added > 0) {
+        AnxLog.info('Recovered $added books into the vectorization queue');
+      }
+    } catch (error, stackTrace) {
+      AnxLog.warning(
+        'Failed to recover automatic vectorization queue: '
+        '$error\n$stackTrace',
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -106,6 +144,31 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     final statusFilter = ref.watch(readingStatusFilterNotifierProvider);
     final selectedTags = ref.watch(tagSelectionProvider);
     final tagsAsync = ref.watch(tagListProvider);
+    final booksAsync = ref.watch(bookListProvider);
+    final visibleBooks = booksAsync.valueOrNull
+            ?.expand((group) => group)
+            .toList(growable: false) ??
+        const <Book>[];
+    final selectedBooks = visibleBooks
+        .where((book) => _selectedBookIds.contains(book.id))
+        .toList(growable: false);
+
+    void setBookSelected(Book book, bool selected) {
+      setState(() {
+        if (selected) {
+          _selectedBookIds.add(book.id);
+        } else {
+          _selectedBookIds.remove(book.id);
+        }
+      });
+    }
+
+    void exitSelectionMode() {
+      setState(() {
+        _selectionMode = false;
+        _selectedBookIds.clear();
+      });
+    }
 
     Widget buildFilterBar() {
       final statusChips = [
@@ -375,102 +438,110 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
 
     List<int> lockedIndices = [];
 
-    Widget buildBookshelfBody = ref.watch(bookListProvider).when(
-          data: (books) {
-            for (int i = 0; i < books.length; i++) {
-              // folder can't be dragged
-              if (books[i].length != 1) {
-                lockedIndices.add(i);
-              }
-            }
-            return books.isEmpty
-                ? const Center(child: BookshelfTips())
-                : ReorderableBuilder(
-                    // lock all index of books
-                    lockedIndices: lockedIndices,
-                    enableDraggable: true,
-                    longPressDelay: const Duration(milliseconds: 300),
-                    onReorder: (ReorderedListFunction reorderedListFunction) {},
-                    scrollController: _scrollController,
-                    onDragStarted: (index) {
-                      if (books[index].length == 1) {
-                        handleBottomSheet(context, books[index].first);
-                        // add other books to lockedIndices
-                        for (int i = 0; i < books.length; i++) {
-                          if (i != index) {
-                            lockedIndices.add(i);
-                          }
-                        }
+    Widget buildBookshelfBody = booksAsync.when(
+      data: (books) {
+        for (int i = 0; i < books.length; i++) {
+          // folder can't be dragged
+          if (books[i].length != 1) {
+            lockedIndices.add(i);
+          }
+        }
+        return books.isEmpty
+            ? const Center(child: BookshelfTips())
+            : ReorderableBuilder(
+                // lock all index of books
+                lockedIndices: lockedIndices,
+                enableDraggable: !_selectionMode,
+                longPressDelay: const Duration(milliseconds: 300),
+                onReorder: (ReorderedListFunction reorderedListFunction) {},
+                scrollController: _scrollController,
+                onDragStarted: (index) {
+                  if (books[index].length == 1) {
+                    handleBottomSheet(context, books[index].first);
+                    // add other books to lockedIndices
+                    for (int i = 0; i < books.length; i++) {
+                      if (i != index) {
+                        lockedIndices.add(i);
                       }
-                    },
-                    onDragEnd: (index) {
-                      // remove all books from lockedIndices
-                      lockedIndices = [];
-                      for (int i = 0; i < books.length; i++) {
-                        if (books[i].length != 1) {
-                          lockedIndices.add(i);
-                        }
-                      }
-                      setState(() {});
-                    },
-                    children: [
-                      ...books.map(
-                        (book) {
-                          final topLevelKey = ValueKey<String>(
-                            book.first.id.toString(),
-                          );
-                          return book.length == 1
-                              ? CustomDraggable(
-                                  key: topLevelKey,
-                                  data: book.first,
-                                  child: BookFolder(books: book),
-                                )
-                              : BookFolder(
-                                  key: topLevelKey,
-                                  books: book,
-                                );
-                        },
-                      ),
-                    ],
-                    builder: (children) {
-                      return LayoutBuilder(builder: (context, constraints) {
-                        return Column(
-                          children: [
-                            HintBanner(
-                                icon: const Icon(Icons.copy),
-                                hintKey: HintKey.dragAndDropToCreateFolder,
-                                margin: EdgeInsets.fromLTRB(20, 0, 20, 5),
-                                child: Text(L10n.of(context)
-                                    .dragAndDropToCreateFolderHint)),
-                            Expanded(
-                              child: GridView(
-                                key: _gridViewKey,
-                                controller: _scrollController,
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 12, 20, 80),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: constraints.maxWidth ~/
-                                      Prefs().bookCoverWidth,
-                                  childAspectRatio: 1 / 2.1,
-                                  mainAxisSpacing: 30,
-                                  crossAxisSpacing: 20,
-                                ),
-                                children: children,
+                    }
+                  }
+                },
+                onDragEnd: (index) {
+                  // remove all books from lockedIndices
+                  lockedIndices = [];
+                  for (int i = 0; i < books.length; i++) {
+                    if (books[i].length != 1) {
+                      lockedIndices.add(i);
+                    }
+                  }
+                  setState(() {});
+                },
+                children: [
+                  ...books.map(
+                    (book) {
+                      final topLevelKey = ValueKey<String>(
+                        book.first.id.toString(),
+                      );
+                      return book.length == 1
+                          ? CustomDraggable(
+                              key: topLevelKey,
+                              data: book.first,
+                              child: BookFolder(
+                                books: book,
+                                selectionMode: _selectionMode,
+                                selectedBookIds: _selectedBookIds,
+                                onSelectionChanged: setBookSelected,
                               ),
+                            )
+                          : BookFolder(
+                              key: topLevelKey,
+                              books: book,
+                              selectionMode: _selectionMode,
+                              selectedBookIds: _selectedBookIds,
+                              onSelectionChanged: setBookSelected,
+                            );
+                    },
+                  ),
+                ],
+                builder: (children) {
+                  return LayoutBuilder(builder: (context, constraints) {
+                    return Column(
+                      children: [
+                        HintBanner(
+                            icon: const Icon(Icons.copy),
+                            hintKey: HintKey.dragAndDropToCreateFolder,
+                            margin: EdgeInsets.fromLTRB(20, 0, 20, 5),
+                            child: Text(L10n.of(context)
+                                .dragAndDropToCreateFolderHint)),
+                        Expanded(
+                          child: GridView(
+                            key: _gridViewKey,
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 80),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: constraints.maxWidth ~/
+                                  Prefs().bookCoverWidth,
+                              childAspectRatio: 1 / 2.1,
+                              mainAxisSpacing: 30,
+                              crossAxisSpacing: 20,
                             ),
-                          ],
-                        );
-                      });
-                    });
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(child: Text(error.toString())),
-        );
+                            children: children,
+                          ),
+                        ),
+                      ],
+                    );
+                  });
+                });
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text(error.toString())),
+    );
 
     Widget body = Column(
       children: [
-        buildFilterBar(),
+        if (!_selectionMode) buildFilterBar(),
+        const _KnowledgeQueueBanner(),
         Expanded(
           child: DropTarget(
             onDragDone: (detail) async {
@@ -529,100 +600,172 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
 
     PreferredSizeWidget appBar = AppBar(
       forceMaterialTransparency: true,
-      title: Container(
-          height: 34,
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SearchPage(),
+      title: _selectionMode
+          ? Text('已选 ${selectedBooks.length} 本')
+          : Container(
+              height: 34,
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SearchPage(),
+                    ),
+                  );
+                },
+                child: FilledContainer(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  color: Theme.of(context).colorScheme.surface.withAlpha(80),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          L10n.of(context).searchBooksOrNotes,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Theme.of(context).hintColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              );
-            },
-            child: FilledContainer(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              color: Theme.of(context).colorScheme.surface.withAlpha(80),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: Colors.grey),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(L10n.of(context).searchBooksOrNotes,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: Theme.of(context).hintColor),
-                        overflow: TextOverflow.ellipsis),
-                  )
-                ],
               ),
             ),
-          )),
-      actions: [
-        const SyncButton(),
-        IconButton(
-          icon: const Icon(Icons.add),
-          onPressed: _importBook,
-        ),
-        IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () {
-              showMenu(
-                context: context,
-                position: RelativeRect.fromLTRB(
-                  MediaQuery.of(context).size.width,
-                  MediaQuery.of(context).padding.top + kToolbarHeight,
-                  0.0,
-                  0.0,
+      actions: _selectionMode
+          ? [
+              TextButton(
+                onPressed: visibleBooks.isEmpty
+                    ? null
+                    : () {
+                        setState(() {
+                          if (selectedBooks.length == visibleBooks.length) {
+                            _selectedBookIds.clear();
+                          } else {
+                            _selectedBookIds
+                              ..clear()
+                              ..addAll(visibleBooks.map((book) => book.id));
+                          }
+                        });
+                      },
+                child: Text(
+                  selectedBooks.length == visibleBooks.length &&
+                          visibleBooks.isNotEmpty
+                      ? '取消全选'
+                      : '全选',
                 ),
-                items: [
-                  for (var sortField in SortFieldEnum.values)
-                    PopupMenuItem(
-                        child: Text(
-                          sortField.getL10n(context),
-                          style: TextStyle(
-                            color: sortField == Prefs().sortField
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                        onTap: () {
-                          Prefs().sortField = sortField;
-                          ref.read(bookListProvider.notifier).refresh();
-                        }),
-                  PopupMenuItem(
-                    enabled: false,
-                    child: StatefulBuilder(builder: (_, setState) {
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: AnxSegmentedButton<SortOrderEnum>(
-                              onSelectionChanged: (value) {
-                                Prefs().sortOrder = value.first;
+              ),
+              TextButton.icon(
+                onPressed: selectedBooks.isEmpty
+                    ? null
+                    : () {
+                        queueBooksForVectorization(selectedBooks);
+                        exitSelectionMode();
+                      },
+                icon: const Icon(Icons.hub_outlined),
+                label: const Text('向量化'),
+              ),
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: selectedBooks.isEmpty
+                    ? null
+                    : () async {
+                        final deleted =
+                            await confirmAndDeleteBooksFromBookshelf(
+                          context,
+                          ref,
+                          selectedBooks,
+                        );
+                        if (deleted && mounted) exitSelectionMode();
+                      },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('删除'),
+              ),
+              IconButton(
+                tooltip: '退出选择',
+                onPressed: exitSelectionMode,
+                icon: const Icon(Icons.close),
+              ),
+            ]
+          : [
+              if (visibleBooks.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectionMode = true;
+                      _selectedBookIds.clear();
+                    });
+                  },
+                  child: const Text('选择'),
+                ),
+              const SyncButton(),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _importBook,
+              ),
+              IconButton(
+                  icon: const Icon(Icons.sort),
+                  onPressed: () {
+                    showMenu(
+                      context: context,
+                      position: RelativeRect.fromLTRB(
+                        MediaQuery.of(context).size.width,
+                        MediaQuery.of(context).padding.top + kToolbarHeight,
+                        0.0,
+                        0.0,
+                      ),
+                      items: [
+                        for (var sortField in SortFieldEnum.values)
+                          PopupMenuItem(
+                              child: Text(
+                                sortField.getL10n(context),
+                                style: TextStyle(
+                                  color: sortField == Prefs().sortField
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              onTap: () {
+                                Prefs().sortField = sortField;
                                 ref.read(bookListProvider.notifier).refresh();
-                                setState(() {});
-                              },
-                              segments: SortOrderEnum.values
-                                  .map(
-                                    (e) => SegmentButtonItem(
-                                      value: e,
-                                      label: e.getL10n(
-                                          navigatorKey.currentContext!),
-                                    ),
-                                  )
-                                  .toList(),
-                              selected: {Prefs().sortOrder},
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  )
-                ],
-              );
-            }),
-      ],
+                              }),
+                        PopupMenuItem(
+                          enabled: false,
+                          child: StatefulBuilder(builder: (_, setState) {
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: AnxSegmentedButton<SortOrderEnum>(
+                                    onSelectionChanged: (value) {
+                                      Prefs().sortOrder = value.first;
+                                      ref
+                                          .read(bookListProvider.notifier)
+                                          .refresh();
+                                      setState(() {});
+                                    },
+                                    segments: SortOrderEnum.values
+                                        .map(
+                                          (e) => SegmentButtonItem(
+                                            value: e,
+                                            label: e.getL10n(
+                                                navigatorKey.currentContext!),
+                                          ),
+                                        )
+                                        .toList(),
+                                    selected: {Prefs().sortOrder},
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+                        )
+                      ],
+                    );
+                  }),
+            ],
     );
 
     return Container(
@@ -671,6 +814,64 @@ class _StatusChip extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
         checkmarkColor: Theme.of(context).colorScheme.primary,
       ),
+    );
+  }
+}
+
+class _KnowledgeQueueBanner extends StatelessWidget {
+  const _KnowledgeQueueBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: bookKnowledgeIndexQueue,
+      builder: (context, _) {
+        final active = bookKnowledgeIndexQueue.activeItems;
+        if (active.isEmpty) return const SizedBox.shrink();
+        final current = bookKnowledgeIndexQueue.current ?? active.first;
+        final queued = bookKnowledgeIndexQueue.queuedCount;
+        final statusLabel = switch (current.status) {
+          BookKnowledgeQueueStatus.queued => '等待开始',
+          BookKnowledgeQueueStatus.extracting => '读取章节',
+          BookKnowledgeQueueStatus.preparing => '整理章节',
+          BookKnowledgeQueueStatus.vectorizing =>
+            '生成向量 ${((current.progress ?? 0) * 100).round()}%',
+          BookKnowledgeQueueStatus.cancelling => '正在取消',
+          _ => '后台处理',
+        };
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.hub_outlined, size: 19),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '后台向量化：${current.book.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 5),
+                    LinearProgressIndicator(value: current.progress),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(queued > 0 ? '$statusLabel · 排队 $queued 本' : statusLabel),
+            ],
+          ),
+        );
+      },
     );
   }
 }

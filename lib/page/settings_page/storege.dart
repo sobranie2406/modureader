@@ -79,7 +79,7 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
     // Check write permission by creating a test file
     try {
       final testFile =
-          File('$result${Platform.pathSeparator}.anx_permission_test');
+          File('$result${Platform.pathSeparator}.modu_permission_test');
       await testFile.writeAsString('test');
       await testFile.delete();
     } catch (e) {
@@ -178,7 +178,27 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
       }
       return ElevatedButton(
         onPressed: () async {
-          await ref.read(storageInfoProvider.notifier).clearCache();
+          final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                    title: const Text('清理缓存'),
+                    content: const Text(
+                        '将清理可重新生成的临时数据。书籍、笔记、AI 对话历史、已下载模型和向量索引不会删除。请在导入、同步和下载完成后清理。'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('取消')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('清理'))
+                    ],
+                  ));
+          if (confirmed != true || !mounted) return;
+          final success =
+              await ref.read(storageInfoProvider.notifier).clearCache();
+          if (!success && context.mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('清理失败，已保留尚未迁移的数据。')));
           ref.invalidate(storageInfoProvider);
         },
         child: Text('${L10n.of(context).storageClearCache} $size'),
@@ -206,6 +226,18 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
                   title: Text(L10n.of(context).storageLogFile),
                   trailing: fileSizeTriling(storageInfoAsync.value?.logSizeStr),
                 ),
+                for (final item in [
+                  ('本地向量模型', storageInfoAsync.value?.modelSize),
+                  ('书籍向量索引', storageInfoAsync.value?.indexSize),
+                  ('AI 对话历史', storageInfoAsync.value?.aiHistorySize),
+                  ('阅读背景', storageInfoAsync.value?.backgroundSize),
+                ])
+                  ListTile(
+                    title: Text(item.$1),
+                    trailing: fileSizeTriling(item.$2 == null
+                        ? null
+                        : storageInfoAsync.value!.formatSize(item.$2!)),
+                  ),
                 ListTile(
                   title: Text(L10n.of(context).storageCacheFile),
                   trailing:

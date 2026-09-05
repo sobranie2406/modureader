@@ -5,6 +5,8 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_linux
   desktop_drop
+  flutter_inappwebview_linux
+  flutter_onnxruntime
   screen_retriever_linux
   sqlite3_flutter_libs
   url_launcher_linux

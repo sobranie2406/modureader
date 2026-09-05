@@ -1,6 +1,7 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/env_var.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:anx_reader/widgets/settings/simple_dialog.dart';
@@ -117,6 +118,7 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               ),
               SettingsTile.switchTile(
                 title: Text(L10n.of(context).settingsAdvancedAutoHideBottomBar),
+                description: const Text('仅用于窄窗口的底部导航栏，不影响桌面侧边栏。'),
                 leading: const Icon(Icons.vertical_align_bottom),
                 initialValue: Prefs().autoHideBottomBar,
                 onToggle: (value) {
@@ -124,16 +126,17 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
                   setState(() {});
                 },
               ),
-              SettingsTile.switchTile(
-                title: Text(L10n.of(context).reduceVibrationFeedback),
-                leading: const Icon(Icons.vibration),
-                initialValue: Prefs().reduceVibrationFeedback,
-                onToggle: (bool value) {
-                  setState(() {
-                    Prefs().reduceVibrationFeedback = value;
-                  });
-                },
-              ),
+              if (AnxPlatform.isAndroid || AnxPlatform.isIOS)
+                SettingsTile.switchTile(
+                  title: Text(L10n.of(context).reduceVibrationFeedback),
+                  leading: const Icon(Icons.vibration),
+                  initialValue: Prefs().reduceVibrationFeedback,
+                  onToggle: (bool value) {
+                    setState(() {
+                      Prefs().reduceVibrationFeedback = value;
+                    });
+                  },
+                ),
               SettingsTile.switchTile(
                 title: Text(L10n.of(context).readingPageShowActionLabels),
                 leading: const Icon(Icons.subtitles_outlined),

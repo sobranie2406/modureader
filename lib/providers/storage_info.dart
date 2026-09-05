@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:anx_reader/models/storege_info_model.dart';
+import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/providers/font_list.dart';
 import 'package:anx_reader/utils/get_path/databases_path.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -15,6 +16,9 @@ part 'storage_info.g.dart';
 class StorageInfo extends _$StorageInfo {
   @override
   Future<StorageInfoModel> build() async {
+    // An upgraded user can open Storage before ever opening AI history. Resolve
+    // the legacy copy first so existing conversations are not reported as 0 B.
+    await AiHistoryStore.migrateLegacyHistory();
     return StorageInfoModel(
       databaseSize: await calculatePathSize(await getAnxDataBasesDir()),
       booksSize: await calculatePathSize(getFileDir()),
@@ -25,17 +29,23 @@ class StorageInfo extends _$StorageInfo {
       ),
       logSize: await calsulateFileSize(await getLogFile()),
       coverSize: await calculatePathSize(getCoverDir()),
+      modelSize: await calculatePathSize(Directory(getBasePath('models'))),
+      indexSize: await calculatePathSize(Directory(getBasePath('knowledge'))),
+      aiHistorySize: await calculatePathSize(Directory(getBasePath('ai'))),
+      backgroundSize: await calculatePathSize(getBgimgDir()),
     );
   }
 
   Future<bool> clearCache() async {
     try {
+      // Abort cleanup if migration fails; conversations are not disposable cache.
+      await AiHistoryStore.migrateLegacyHistory();
       final cacheDir = await getAnxCacheDir();
       if (!cacheDir.existsSync()) {
         return true;
       }
 
-      final entities = await cacheDir.list(recursive: true).toList();
+      final entities = await cacheDir.list(followLinks: false).toList();
       for (var entity in entities) {
         if (entity.existsSync()) {
           if (entity is File) {
@@ -55,13 +65,14 @@ class StorageInfo extends _$StorageInfo {
     }
   }
 
-  Future<int> calculatePathSize(Directory dir, {bool recursive = false}) async {
+  Future<int> calculatePathSize(Directory dir, {bool recursive = true}) async {
     if (!dir.existsSync()) {
       return 0;
     }
 
     int totalSize = 0;
-    final entities = await dir.list(recursive: recursive).toList();
+    final entities =
+        await dir.list(recursive: recursive, followLinks: false).toList();
     for (var entity in entities) {
       if (entity is File) {
         totalSize += await entity.length();
@@ -72,7 +83,7 @@ class StorageInfo extends _$StorageInfo {
   }
 
   Future<int> calsulateFileSize(File file) async {
-    return await file.length();
+    return await file.exists() ? await file.length() : 0;
   }
 
   Future<List<File>> listBookFiles() async {

@@ -19,9 +19,34 @@ class AiProviders extends _$AiProviders {
 
     // Convert from JSON
     try {
-      return rawProviders
+      var providers = rawProviders
           .map((json) => AiProvider.fromJson(json as Map<String, dynamic>))
           .toList();
+      var parametersMigrated = false;
+      providers = providers.map((provider) {
+        final temperature = (provider.temperature ?? Prefs().aiTemperature)
+            .clamp(0.0, 1.0)
+            .toDouble();
+        final maxTokens = (provider.maxTokens ?? Prefs().aiMaxTokens)
+            .clamp(1024, 32768)
+            .toInt();
+        final contextTurns = (provider.contextTurns ?? Prefs().aiContextTurns)
+            .clamp(2, 30)
+            .toInt();
+        if (provider.temperature == temperature &&
+            provider.maxTokens == maxTokens &&
+            provider.contextTurns == contextTurns) {
+          return provider;
+        }
+        parametersMigrated = true;
+        return provider.copyWith(
+          temperature: temperature,
+          maxTokens: maxTokens,
+          contextTurns: contextTurns,
+        );
+      }).toList();
+      if (parametersMigrated) Prefs().saveAiProviders(providers);
+      return _reconcileBuiltinProviders(providers);
     } catch (e) {
       // If parsing fails, reinitialize
       return _initializeDefaultProviders();
@@ -31,64 +56,120 @@ class AiProviders extends _$AiProviders {
   /// Initialize default providers from old configuration
   List<AiProvider> _initializeDefaultProviders() {
     final defaultServices = buildDefaultAiServices();
-    final now = DateTime.now();
-
-    final providers = defaultServices.map((option) {
-      // Try to migrate from old config
-      final oldConfig = Prefs().getAiConfig(option.identifier);
-      final url = oldConfig['url'] ?? option.defaultUrl;
-      final model = oldConfig['model'] ?? option.defaultModel;
-      final apiKey = oldConfig['api_key'] ?? option.defaultApiKey;
-
-      // Determine protocol from identifier
-      AiProtocol protocol;
-      switch (option.identifier) {
-        case 'claude':
-          protocol = AiProtocol.claude;
-          break;
-        case 'gemini':
-          protocol = AiProtocol.gemini;
-          break;
-        default:
-          protocol = AiProtocol.openai;
-      }
-
-      return AiProvider(
-        id: option.identifier,
-        title: option.title,
-        logoAsset: option.logo,
-        url: url,
-        protocol: protocol,
-        enabled: true,
-        isBuiltin: true,
-        apiKeys: apiKey.isNotEmpty && apiKey != 'YOUR_API_KEY'
-            ? [
-                AiApiKey(
-                  id: const Uuid().v4(),
-                  key: apiKey,
-                  enabled: true,
-                  createdAt: now,
-                )
-              ]
-            : [],
-        model: model,
-        keyIndex: 0,
-        createdAt: now,
-        updatedAt: now,
-      );
-    }).toList();
+    final providers = defaultServices.map(_providerFromOption).toList();
 
     // Save to storage
     Prefs().saveAiProviders(providers);
+    _ensureValidSelection(providers);
 
     return providers;
+  }
+
+  List<AiProvider> _reconcileBuiltinProviders(List<AiProvider> stored) {
+    final providers = stored.toList(growable: true);
+    var changed = false;
+
+    for (final option in buildDefaultAiServices()) {
+      final index =
+          providers.indexWhere((provider) => provider.id == option.identifier);
+      if (index < 0) {
+        providers.add(_providerFromOption(option));
+        changed = true;
+        continue;
+      }
+
+      final provider = providers[index];
+      final migratedModel = _migrateBuiltinModel(provider.id, provider.model);
+      final updated = provider.copyWith(
+        title: provider.title.trim().isEmpty ? option.title : provider.title,
+        logoAsset: provider.logoAsset ?? option.logo,
+        url: provider.url.trim().isEmpty ? option.defaultUrl : provider.url,
+        protocol: _protocolForIdentifier(option.identifier),
+        isBuiltin: true,
+        model: migratedModel.isEmpty ? option.defaultModel : migratedModel,
+      );
+      if (updated != provider) {
+        providers[index] = updated;
+        changed = true;
+      }
+    }
+
+    if (changed) Prefs().saveAiProviders(providers);
+    _ensureValidSelection(providers);
+    return providers;
+  }
+
+  AiProvider _providerFromOption(AiServiceOption option) {
+    final oldConfig = Prefs().getAiConfig(option.identifier);
+    final url = oldConfig['url'] ?? option.defaultUrl;
+    final model = _migrateBuiltinModel(
+      option.identifier,
+      oldConfig['model'] ?? option.defaultModel,
+    );
+    final apiKey = oldConfig['api_key'] ?? option.defaultApiKey;
+    final now = DateTime.now();
+
+    return AiProvider(
+      id: option.identifier,
+      title: option.title,
+      logoAsset: option.logo,
+      url: url,
+      protocol: _protocolForIdentifier(option.identifier),
+      enabled: true,
+      isBuiltin: true,
+      apiKeys: apiKey.isNotEmpty && apiKey != 'YOUR_API_KEY'
+          ? [
+              AiApiKey(
+                id: const Uuid().v4(),
+                key: apiKey,
+                enabled: true,
+                createdAt: now,
+              )
+            ]
+          : [],
+      model: model,
+      temperature: Prefs().aiTemperature,
+      maxTokens: Prefs().aiMaxTokens,
+      contextTurns: Prefs().aiContextTurns,
+      keyIndex: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  AiProtocol _protocolForIdentifier(String identifier) {
+    return switch (identifier) {
+      'claude' => AiProtocol.claude,
+      'gemini' => AiProtocol.gemini,
+      _ => AiProtocol.openai,
+    };
+  }
+
+  String _migrateBuiltinModel(String identifier, String model) {
+    return switch ((identifier, model.trim())) {
+      ('claude', 'claude-3-5-sonnet-20240620') => 'claude-sonnet-4-6',
+      ('deepseek', 'deepseek-chat') => 'deepseek-v4-flash',
+      ('openrouter', 'gpt-4o-mini') => 'openai/gpt-4o-mini',
+      (_, final value) => value,
+    };
+  }
+
+  void _ensureValidSelection(List<AiProvider> providers) {
+    final selectedId = Prefs().selectedAiService;
+    final isValid = providers.any(
+      (provider) => provider.id == selectedId && provider.enabled,
+    );
+    if (isValid) return;
+    final enabled = providers.where((provider) => provider.enabled).toList();
+    final replacement = enabled.isEmpty ? '' : enabled.first.id;
+    if (replacement != selectedId) Prefs().selectedAiService = replacement;
   }
 
   /// Get the currently selected provider
   AiProvider? getSelectedProvider() {
     final selectedId = Prefs().selectedAiService;
     try {
-      return state.firstWhere((p) => p.id == selectedId);
+      return state.firstWhere((p) => p.id == selectedId && p.enabled);
     } catch (_) {
       // If not found, return first enabled provider
       final enabled = state.where((p) => p.enabled).toList();
@@ -107,6 +188,10 @@ class AiProviders extends _$AiProviders {
 
   /// Set the selected provider
   void setSelectedProvider(String providerId) {
+    if (!state
+        .any((provider) => provider.id == providerId && provider.enabled)) {
+      return;
+    }
     Prefs().selectedAiService = providerId;
     ref.notifyListeners();
   }
@@ -163,6 +248,7 @@ class AiProviders extends _$AiProviders {
         if (p.id == providerId) p.copyWith(enabled: enabled) else p
     ];
     Prefs().saveAiProviders(state);
+    _ensureValidSelection(state);
   }
 
   /// Advance the key index for round-robin (called after successful API call)
@@ -237,8 +323,14 @@ class AiProviders extends _$AiProviders {
   /// Refresh providers (reload from storage)
   void refresh() {
     final providers = Prefs().getAiProviders();
-    state = providers
-        .map((json) => AiProvider.fromJson(json as Map<String, dynamic>))
-        .toList();
+    if (providers.isEmpty) {
+      state = _initializeDefaultProviders();
+      return;
+    }
+    state = _reconcileBuiltinProviders(
+      providers
+          .map((json) => AiProvider.fromJson(json as Map<String, dynamic>))
+          .toList(),
+    );
   }
 }

@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          BASE_NOTIFICATION_URL="${{ secrets.NOTIFICATION_URL }}/Anx-Reader%20Action"
+          BASE_NOTIFICATION_URL="${{ secrets.NOTIFICATION_URL }}/Modu%20Action"
           curl -s "$BASE_NOTIFICATION_URL/Build%20Started?url=$RUN_URL&level=timeSensitive&icon=https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png" || echo "Notification failed, continuing..."
 
       - name: Checkout repository

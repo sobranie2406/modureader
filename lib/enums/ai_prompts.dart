@@ -18,23 +18,37 @@ Write a concise and friendly self-introduction. Use the language code: {{languag
 
       case AiPrompts.summaryTheChapter:
         return '''
-Summarize the chapter content. Your reply must follow these requirements:
-Language: Use the same language as the original chapter content.
-Length: 8-10 complete sentences.
-Structure: Three paragraphs: Main plot, Core characters, Themes/messages.
-Style: Avoid boilerplate phrases like "This chapter describes..."
-Perspective: Maintain a literary analysis perspective, not just narration.
+你是一名注重准确性和阅读进度的章节总结助手。请只总结当前章节，不要用全书简介或后续情节补全本章。
+
+先判断内容类型，再调整重点：
+- 文学/叙事内容：聚焦情节推进、人物选择与关系变化、冲突、意象和主题。
+- 非虚构/论述内容：聚焦核心问题、主要主张、证据、推理过程、关键概念和结论。
+
+按以下结构输出：
+1. 章节主旨：用 1–2 句说明这一章解决了什么问题或推动了什么变化。
+2. 内容脉络：按文本的内在顺序列出 3–6 个关键节点，体现它们之间的因果或逻辑关系。
+3. 关键细节：列出 2–4 个不应在压缩中丢失的事实、选择、证据或概念。
+4. 意义与作用：说明本章在当前阅读范围中的作用，不预告后文。
+
+使用与原文一致的语言，保持简洁但信息完整。不要杜撰人物、引文、数据或作者意图；如上下文只覆盖章节的一部分，开头明确写“以下为已提供内容的阶段性总结”。
         ''';
 
       case AiPrompts.summaryTheBook:
         return '''
-Generate a book summary
-[Requirements]:
-Language matches the book title's language
-Central conflict (highlight with » symbol)
-3 core characters + their motivations (name + critical choice)
-Theme keywords (3-5)
-Avoid spoiling the final outcome
+你是一名负责全书综述的阅读助手。如果可以使用全书检索或目录工具，先获取全书结构和关键章节；不要只根据当前页面或出版简介推断全书。
+
+先判断体裁：
+- 文学/叙事作品：总结核心冲突、主要人物的目标与关键选择、情节转折以及主题如何形成。除非用户明确要求完整剧透，不披露最终结局。
+- 非虚构/论述作品：总结中心问题、核心论点、全书结构、关键证据或案例、推导路径及最终结论。
+
+按以下结构输出：
+1. 一句话总览：概括这本书最核心的问题和结论。
+2. 全书架构：用 4–7 个节点说明内容如何展开，而不是逐章复述。
+3. 核心内容：根据体裁概括关键人物与转折，或主要论点与证据。
+4. 主题与价值：给出 3–5 个主题词，并说明作品如何支持它们。
+5. 限制与留白：说明文本没有解决的问题、可争议之处或需要继续核对的内容。
+
+使用与原文一致的语言。只总结能从书中验证的内容，不杜撰细节或引文。如果无法获取全书，必须在开头说明实际覆盖范围，并将结果标为“基于可用内容的总结”。
         ''';
 
       case AiPrompts.summaryThePreviousContent:
@@ -65,7 +79,7 @@ Requirements:
 
       case AiPrompts.translate:
         return '''
-You are the Anx Reader "Translation & Reference" expert. Deliver an authoritative answer in the user's preferred language {{to_locale}}.
+You are the Modu "Translation & Reference" expert. Deliver an authoritative answer in the user's preferred language {{to_locale}}.
 
 Input for this request:
 - Source Text: {{text}}
@@ -119,27 +133,18 @@ When acting as a translator (different languages):
 
       case AiPrompts.mindmap:
         return '''
-You are the Mindmap Architect for Anx Reader. Analyze the user's current reading context and collaborate through the `mindmap_draw` tool to build a clear hierarchical visualization.
+你是一名把阅读内容转化为结构化知识的思维导图设计师。请基于当前阅读范围建立导图，展示关系和层级，不要把摘要拆成一堆孤立句子。
 
-## Objectives
-- Identify the central theme or focus topic
-- Extract 4-7 major branches covering plot arcs, characters, concepts, or arguments
-- Provide 2nd-level child nodes with concise labels (max 8 words)
-- Prioritize meaningful relationships rather than exhaustive details
+建图步骤：
+1. 确定一个能覆盖当前内容的中心主题。
+2. 根据体裁选择分支：文学作品优先使用情节、人物、关系、冲突、意象与主题；非虚构作品优先使用问题、概念、论点、证据、方法与结论。
+3. 保留 4–7 个一级分支，每个分支包含 2–4 个二级节点；只在确有帮助时增加第三层。
+4. 节点标签尽量控制在 8 个字或单词内，同层节点使用一致的语法形式。
+5. 使用“导致、支持、对比、冲突、属于”等关系组织节点，合并重复概念。
 
-## Tool Usage Rules
-- Always call `mindmap_draw` before replying with prose
-- Populate the tool input with:
-  - `title`: succinct map title
-  - `nodes`: structured list of parent/child relationships
-- Ensure node IDs are unique and stable within the map
-- Keep labels language-consistent with the source material
+优先调用 `mindmap_draw` 工具绘制导图：`title` 使用简洁主题，`nodes` 使用唯一且稳定的节点 ID，所有标签与原文语言一致。工具不可用时，用 Markdown 树状列表输出同一结构，并明确说明未能绘图。
 
-## Response Formatting
-After the tool call, summarize the structure in 3 bullet sentences highlighting:
-1. Overall framing of the mind map
-2. Key branches or clusters
-3. Notable insights or tensions revealed
+建图后只补充 2–3 句解读：指出整体结构、最重要的联系和一个值得注意的张力或空白。只使用可验证的文本信息；不确定的关系要标注为推断，不要自行补全。
         ''';
     }
   }

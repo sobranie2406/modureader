@@ -5,10 +5,15 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = Anx Reader
+PRODUCT_NAME = Modu
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.anxcye.anxReader
+PRODUCT_BUNDLE_IDENTIFIER = com.modu.reader
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2024 com.anxcye. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Modu contributors. All rights reserved.
+
+// Unsigned local test builds are intentional for the first delivery.
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGN_IDENTITY = -

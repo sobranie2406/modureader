@@ -21,6 +21,7 @@ class LangchainAiRegistry {
   LangchainPipeline resolve(
     LangchainAiConfig config, {
     bool useAgent = false,
+    Set<String>? allowedToolIds,
   }) {
     switch (config.identifier) {
       case 'claude':
@@ -28,12 +29,14 @@ class LangchainAiRegistry {
           config,
           _buildAnthropic(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
       case 'gemini':
         return _buildPipeline(
           config,
           _buildGoogle(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
       case 'deepseek':
       case 'openrouter':
@@ -43,6 +46,7 @@ class LangchainAiRegistry {
           config,
           _buildOpenAi(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
     }
   }
@@ -52,6 +56,7 @@ class LangchainAiRegistry {
     AiProtocol protocol,
     LangchainAiConfig config, {
     bool useAgent = false,
+    Set<String>? allowedToolIds,
   }) {
     switch (protocol) {
       case AiProtocol.claude:
@@ -59,18 +64,21 @@ class LangchainAiRegistry {
           config,
           _buildAnthropic(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
       case AiProtocol.gemini:
         return _buildPipeline(
           config,
           _buildGoogle(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
       case AiProtocol.openai:
         return _buildPipeline(
           config,
           _buildOpenAi(config),
           useAgent: useAgent,
+          allowedToolIds: allowedToolIds,
         );
     }
   }
@@ -106,6 +114,7 @@ class LangchainAiRegistry {
     LangchainAiConfig config,
     BaseChatModel model, {
     required bool useAgent,
+    Set<String>? allowedToolIds,
   }) {
     if (useAgent) {
       assert(ref != null, 'ref must be provided when useAgent is true');
@@ -118,7 +127,12 @@ class LangchainAiRegistry {
     ChatMessage? systemMessage;
 
     if (useAgent) {
-      final enabledIds = Prefs().enabledAiToolIds;
+      final enabledIds = Prefs()
+          .enabledAiToolIds
+          .where(
+            (id) => allowedToolIds == null || allowedToolIds.contains(id),
+          )
+          .toList(growable: false);
       final toolContext = AiToolContext(ref: ref!);
       tools = AiToolRegistry.buildTools(toolContext, enabledIds);
       final enabledDefs = AiToolRegistry.definitions
@@ -171,7 +185,7 @@ class LangchainAiRegistry {
         : '📚 User is browsing the library - You are a wise librarian, helping organize books and plan reading strategies.';
 
     final guidance =
-        '''You are "Anx Reader AI", an intelligent reading assistant integrated into the Anx Reader app.
+        '''You are "Modu AI", an intelligent reading assistant integrated into the Modu app.
 
 ## Your Role
 A knowledgeable reading companion who helps users understand, organize, and enjoy their reading experience through intelligent tool usage and thoughtful insights.

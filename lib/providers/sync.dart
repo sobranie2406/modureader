@@ -8,10 +8,12 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/models/sync_state_model.dart';
 import 'package:anx_reader/providers/book_list.dart';
+import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/database_sync_manager.dart';
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/utils/get_path/databases_path.dart';
@@ -272,6 +274,24 @@ class Sync extends _$Sync {
 
     AnxLog.info('Sync ping success');
 
+    // Materialize the selected AI service settings into the database before
+    // comparing timestamps. This makes API-key changes participate in the
+    // existing WebDAV database conflict flow without storing plaintext keys.
+    try {
+      await AiSettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+    } on AiSyncPasswordMissingException catch (e) {
+      AnxToast.show(e.toString());
+      AnxLog.warning('AI settings sync skipped: encryption password missing');
+      return;
+    } catch (e) {
+      AnxToast.show('AI 设置加密失败，本次同步已取消');
+      AnxLog.severe('Failed to prepare encrypted AI settings for sync: $e');
+      return;
+    }
+
     // Determine sync direction
     SyncDirection? finalDirection = await determineSyncDirection(direction);
     if (finalDirection == null) {
@@ -450,6 +470,7 @@ class Sync extends _$Sync {
               // Don't throw exception, let sync continue with file sync
               return;
             }
+            await _restoreAiSettingsAfterDatabaseDownload();
           } else {
             await _showSyncAbortedDialog();
             return;
@@ -492,6 +513,7 @@ class Sync extends _$Sync {
               // Don't throw exception, let sync continue with file sync
               return;
             }
+            await _restoreAiSettingsAfterDatabaseDownload();
           }
           break;
       }
@@ -504,6 +526,17 @@ class Sync extends _$Sync {
     } catch (e) {
       AnxLog.severe('Failed to sync database\n$e');
       rethrow;
+    }
+  }
+
+  Future<void> _restoreAiSettingsAfterDatabaseDownload() async {
+    final restored =
+        await AiSettingsSyncService().restoreFromDownloadedDatabase(
+      enabled: Prefs().syncAiSettingsToWebdav,
+      password: Prefs().syncAiSettingsEncryptionPassword,
+    );
+    if (restored) {
+      ref.read(aiProvidersProvider.notifier).refresh();
     }
   }
 

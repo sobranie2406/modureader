@@ -46,18 +46,18 @@ jobs:
           ./scripts/macos_nosign.sh
           flutter build macos
           cd build/macos/Build/Products/Release
-          mkdir -p "Anx Reader"
-          cp -r "Anx Reader.app" "Anx Reader/AnxReader.app"
-          ln -s /Applications "Anx Reader/Applications"
-          hdiutil create -volname "Anx Reader" -srcfolder "Anx Reader" -ov -format UDZO Anx-Reader-${{ inputs.version }}.dmg
-          ditto -c -k --keepParent "Anx Reader.app" "Anx-Reader-${{ inputs.version }}.zip"
+          mkdir -p "Modu"
+          cp -r "Modu.app" "Modu/Modu.app"
+          ln -s /Applications "Modu/Applications"
+          hdiutil create -volname "Modu" -srcfolder "Modu" -ov -format UDZO Modu-${{ inputs.version }}.dmg
+          ditto -c -k --keepParent "Modu.app" "Modu-${{ inputs.version }}.zip"
 
       - name: Rename builds
         run: |
           cd build
           mkdir -p macos
-          mv macos/Build/Products/Release/Anx-Reader-${{ inputs.version }}.dmg macos/Anx-Reader-macos-${{ inputs.version }}.dmg
-          mv macos/Build/Products/Release/Anx-Reader-${{ inputs.version }}.zip macos/Anx-Reader-macos-${{ inputs.version }}.zip
+          mv macos/Build/Products/Release/Modu-${{ inputs.version }}.dmg macos/Modu-macos-${{ inputs.version }}.dmg
+          mv macos/Build/Products/Release/Modu-${{ inputs.version }}.zip macos/Modu-macos-${{ inputs.version }}.zip
         shell: bash
 
       - name: Upload artifacts

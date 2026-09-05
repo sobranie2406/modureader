@@ -6,6 +6,7 @@ on:
 
 jobs:
   handle-special-labels:
+    if: github.repository == 'anxcye/anx-reader'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -21,7 +22,7 @@ jobs:
             const issueBody = context.payload.issue.body || '';
             
             // Check if platform information is complete
-            const platformSection = issueBody.match(/- Platform:.*?\n.*?- OS:.*?\n.*?- AnxReader Version:.*?\n.*?- Device:.*?\n/s);
+            const platformSection = issueBody.match(/- Platform:.*?\n.*?- OS:.*?\n.*?- Modu Version:.*?\n.*?- Device:.*?\n/s);
             
             if (!platformSection) {
               console.log('Platform section not found');
@@ -38,7 +39,7 @@ jobs:
               /\[e\.g\.\s+Xiaomi\s+13\]/,
               /- Platform:\s*\|\s*平台：\s*$/m,
               /- OS:\s*\|\s*操作系统：\s*$/m,
-              /- AnxReader Version:\s*\|\s*安读版本：\s*$/m,
+              /- Modu Version:\s*\|\s*默读版本：\s*$/m,
               /- Device:\s*\|\s*设备：\s*$/m
             ];
             
@@ -58,7 +59,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: "👋 感谢您提交bug报告！\n\n我注意到您的平台信息可能不够完整。为了更好地帮助您解决问题，请提供以下完整信息：\n\n- **Platform | 平台**：(如: Android, iOS, Windows, macOS, Linux)\n- **OS | 操作系统**：(如: Android 13 (MIUI 14), iOS 17.1, Windows 11)  \n- **AnxReader Version | 安读版本**：(如: 1.6.3+2100，可在应用设置中查看)\n- **Device | 设备**：(如: Xiaomi 13, iPhone 15, ThinkPad X1)\n\n请编辑您的issue并填写完整的平台信息，这将帮助我们更快地定位和解决问题。\n\n---\n\nThank you for submitting this bug report!\n\nI noticed that your platform information might be incomplete. To better help you solve the issue, please provide complete information for:\n\n- **Platform**: (e.g., Android, iOS, Windows, macOS, Linux)\n- **OS**: (e.g., Android 13 (MIUI 14), iOS 17.1, Windows 11)\n- **AnxReader Version**: (e.g., 1.6.3+2100, check in app settings)\n- **Device**: (e.g., Xiaomi 13, iPhone 15, ThinkPad X1)\n\nPlease edit your issue and fill in the complete platform information to help us locate and resolve the issue faster."
+                body: "👋 感谢您提交bug报告！\n\n我注意到您的平台信息可能不够完整。为了更好地帮助您解决问题，请提供以下完整信息：\n\n- **Platform | 平台**：(如: Android, iOS, Windows, macOS, Linux)\n- **OS | 操作系统**：(如: Android 13 (MIUI 14), iOS 17.1, Windows 11)  \n- **Modu Version | 默读版本**：(如: 1.6.3+2100，可在应用设置中查看)\n- **Device | 设备**：(如: Xiaomi 13, iPhone 15, ThinkPad X1)\n\n请编辑您的issue并填写完整的平台信息，这将帮助我们更快地定位和解决问题。\n\n---\n\nThank you for submitting this bug report!\n\nI noticed that your platform information might be incomplete. To better help you solve the issue, please provide complete information for:\n\n- **Platform**: (e.g., Android, iOS, Windows, macOS, Linux)\n- **OS**: (e.g., Android 13 (MIUI 14), iOS 17.1, Windows 11)\n- **Modu Version**: (e.g., 1.6.3+2100, check in app settings)\n- **Device**: (e.g., Xiaomi 13, iPhone 15, ThinkPad X1)\n\nPlease edit your issue and fill in the complete platform information to help us locate and resolve the issue faster."
               });
             }
       - name: Handle need-test-file Label

@@ -66,11 +66,13 @@ class AiProviderListPage extends ConsumerWidget {
                   )
                 else
                   TextButton(
-                    onPressed: () {
-                      ref
-                          .read(aiProvidersProvider.notifier)
-                          .setSelectedProvider(provider.id);
-                    },
+                    onPressed: provider.enabled
+                        ? () {
+                            ref
+                                .read(aiProvidersProvider.notifier)
+                                .setSelectedProvider(provider.id);
+                          }
+                        : null,
                     child: Text(l10n.settingsAiProviderSetDefault),
                   ),
                 const SizedBox(width: 8),

@@ -42,11 +42,11 @@ jobs:
           cd build/ios/Release-iphoneos
           mkdir -p Payload
           cp -r Runner.app Payload/
-          zip -r Anx-Reader-ios-${{ inputs.version }}-unsigned.zip Payload
-          cp Anx-Reader-ios-${{ inputs.version }}-unsigned.zip Anx-Reader-ios-${{ inputs.version }}-unsigned.ipa
+          zip -r Modu-ios-${{ inputs.version }}-unsigned.zip Payload
+          cp Modu-ios-${{ inputs.version }}-unsigned.zip Modu-ios-${{ inputs.version }}-unsigned.ipa
           mkdir -p ../../ios
-          cp Anx-Reader-ios-${{ inputs.version }}-unsigned.ipa ../../ios/
-          cp Anx-Reader-ios-${{ inputs.version }}-unsigned.zip ../../ios/
+          cp Modu-ios-${{ inputs.version }}-unsigned.ipa ../../ios/
+          cp Modu-ios-${{ inputs.version }}-unsigned.zip ../../ios/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

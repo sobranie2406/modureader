@@ -36,6 +36,9 @@ abstract class AiProvider with _$AiProvider {
     bool isBuiltin, // Whether this is a built-in provider (cannot be deleted)
     @Default([]) List<AiApiKey> apiKeys, // List of API keys
     @Default('') String model, // Current selected model
+    double? temperature, // Per-provider temperature; null uses legacy fallback
+    int? maxTokens, // Per-provider output token limit
+    int? contextTurns, // Per-provider conversation history turns
     @Default(AiReasoningEffort.auto)
     AiReasoningEffort reasoningEffort, // OpenAI reasoning effort
     @Default(0) int keyIndex, // Current round-robin key index

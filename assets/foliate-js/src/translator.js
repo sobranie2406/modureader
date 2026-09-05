@@ -113,6 +113,8 @@ export class Translator {
   }
 
   clearTranslations() {
+    const previousElements = Array.from(this.observedElements)
+
     // Remove all translation elements and restore original content
     this.observedElements.forEach(element => {
       const translationElements = element.querySelectorAll('.translated-text')
@@ -129,6 +131,15 @@ export class Translator {
     
     // Reinitialize observer
     this.#initializeObserver()
+
+    // Keep observing the current chapter so a target-language or provider
+    // change can immediately retranslate without waiting for navigation.
+    previousElements.forEach(element => {
+      if (element?.isConnected) {
+        this.#observer.observe(element)
+        this.observedElements.add(element)
+      }
+    })
   }
 
   #walkTextNodes(root, rejectTags = ['pre', 'code', 'math', 'style', 'script']) {

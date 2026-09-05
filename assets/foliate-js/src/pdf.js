@@ -497,17 +497,19 @@ const renderPage = async (page, getImageBlob) => {
 
     const naturalPdfSize = page.getViewport({ scale: 1 })
     const naturalPdfRatio = naturalPdfSize.width / naturalPdfSize.height
-    const appRatio = innerWidth / innerHeight
+    const appRatio = (innerWidth || 800) / (innerHeight || 600)
     const pdfToAppResolutionRatio = appRatio / naturalPdfRatio
 
-    const scale = devicePixelRatio * pdfToAppResolutionRatio
+    const scale = getImageBlob ? 600 / naturalPdfSize.width
+        : Math.min(4, Math.max(0.25, (devicePixelRatio || 1) * pdfToAppResolutionRatio))
     const viewport = page.getViewport({ scale })
 
     const canvas = document.createElement('canvas')
     canvas.height = viewport.height
     canvas.width = viewport.width
     const canvasContext = canvas.getContext('2d')
-    await page.render({ canvasContext, viewport }).promise
+    // PDF.js display intent waits for rAF, which a hidden WKWebView may suspend.
+    await page.render({ canvasContext, viewport, intent: 'print' }).promise
     const blob = await new Promise(resolve => canvas.toBlob(resolve))
     if (getImageBlob) return blob
 
@@ -578,11 +580,34 @@ export const makePDF = async file => {
     }
 
     const outline = await pdf.getOutline()
-    book.toc = outline?.map(makeTOCItem)
+    book.indexToc = Array.from({ length: pdf.numPages }, (_, i) => ({
+        id: `page-${i + 1}`, label: `第 ${i + 1} 页`, href: `pdf-page:${i}`,
+    }))
+    book.toc = outline?.length ? outline.map(makeTOCItem) : book.indexToc
 
     const cache = new Map()
     book.sections = Array.from({ length: pdf.numPages }).map((_, i) => ({
         id: i,
+        createDocument: async () => {
+            const page = await pdf.getPage(i + 1)
+            const content = await page.getTextContent()
+            const doc = document.implementation.createHTMLDocument(`第 ${i + 1} 页`)
+            let line = ''
+            const append = () => {
+                if (!line.trim()) return
+                const p = doc.createElement('p')
+                p.textContent = line
+                doc.body.append(p)
+                line = ''
+            }
+            for (const item of content.items) {
+                if (typeof item.str !== 'string') continue
+                line += item.str + ' '
+                if (item.hasEOL) append()
+            }
+            append()
+            return doc
+        },
         load: async () => {
             const cached = cache.get(i)
             if (cached) return cached
@@ -593,24 +618,42 @@ export const makePDF = async file => {
         size: 1000,
     }))
     book.sections[0].pageSpread = 'right'
-    book.isExternal = uri => /^\w+:/i.test(uri)
+    book.isExternal = uri => !uri.startsWith('pdf-page:') && /^\w+:/i.test(uri)
     book.resolveHref = async href => {
+        if (/^pdf-page:\d+$/.test(href)) {
+            const index = Number(href.slice(9))
+            if (index >= pdf.numPages) throw new Error('PDF page out of bounds')
+            return { index }
+        }
         const parsed = JSON.parse(href)
         const dest = typeof parsed === 'string'
             ? await pdf.getDestination(parsed) : parsed
-        if (!dest || !dest[0]) return { index: 0 }
-        const index = await pdf.getPageIndex(dest[0])
+        if (!dest || dest[0] == null) return { index: 0 }
+        const index = typeof dest[0] === 'number' ? dest[0] : await pdf.getPageIndex(dest[0])
         return { index }
     }
     book.splitTOCHref = async href => {
-        const parsed = JSON.parse(href)
-        const dest = typeof parsed === 'string'
-            ? await pdf.getDestination(parsed) : parsed
-        if (!dest || !dest[0]) return [0, null]
-        const index = await pdf.getPageIndex(dest[0])
+        const { index } = await book.resolveHref(href)
         return [index, null]
     }
     book.getTOCFragment = doc => doc.documentElement
     book.getCover = async () => renderPage(await pdf.getPage(1), true)
+    // PDF outline destinations may be named or indirect references, not section
+    // hrefs. Resolve them once so the synchronous reader TOC has real positions.
+    const locateTOC = async items => {
+        for (const item of items ?? []) {
+            try {
+                const { index } = await book.resolveHref(item.href)
+                if (Number.isInteger(index) && index >= 0 && index < pdf.numPages) {
+                    item.startPercentage = index / pdf.numPages
+                    item.startPage = index + 1
+                }
+            } catch {
+                // A broken bookmark should not make the whole PDF unreadable.
+            }
+            await locateTOC(item.subitems)
+        }
+    }
+    await locateTOC(book.toc)
     return book
 }

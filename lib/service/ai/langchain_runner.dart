@@ -7,11 +7,14 @@ import 'package:langchain/langchain.dart';
 
 class CancelableLangchainRunner {
   static const String thinkTag = '<think/>';
-  StreamSubscription<ChatResult>? _subscription;
+  final _cancellations = <Future<void> Function()>{};
+  final _cancelled = Completer<void>();
+  bool get isCancelled => _cancelled.isCompleted;
+  Future<void> get whenCancelled => _cancelled.future;
 
-  void cancel() {
-    _subscription?.cancel();
-    _subscription = null;
+  Future<void> cancel() async {
+    if (!_cancelled.isCompleted) _cancelled.complete();
+    await Future.wait(_cancellations.toList().map((cancel) => cancel()));
   }
 
   Stream<String> stream({
@@ -22,12 +25,25 @@ class CancelableLangchainRunner {
     String answerBuffer = '';
     bool reasoningDetected = false;
     bool answerPhaseStarted = false;
+    StreamSubscription<ChatResult>? subscription;
+    Future<void>? cleanup;
 
     late StreamController<String> controller;
+    Future<void> stop() => cleanup ??= () async {
+          _cancellations.remove(stop);
+          await subscription?.cancel();
+          await _closeModel(model);
+          if (!controller.isClosed) unawaited(controller.close());
+        }();
     controller = StreamController<String>(
       onListen: () {
+        _cancellations.add(stop);
+        if (isCancelled) {
+          unawaited(stop());
+          return;
+        }
         final source = model.stream(prompt);
-        _subscription = source.listen(
+        subscription = source.listen(
           (event) {
             final rawChunk = event.output.content;
             final reasoningChunk = event.output.reasoningContent;
@@ -76,24 +92,11 @@ class CancelableLangchainRunner {
               controller.addError(error, stackTrace);
             }
           },
-          onDone: () async {
-            await _closeModel(model);
-            if (!controller.isClosed) {
-              await controller.close();
-            }
-            _subscription = null;
-          },
+          onDone: stop,
           cancelOnError: false,
         );
       },
-      onCancel: () async {
-        await _subscription?.cancel();
-        _subscription = null;
-        await _closeModel(model);
-        if (!controller.isClosed) {
-          await controller.close();
-        }
-      },
+      onCancel: stop,
     );
 
     return controller.stream;
@@ -107,9 +110,28 @@ class CancelableLangchainRunner {
     ChatMessage? systemMessage,
     int maxIterations = 120,
   }) {
-    final controller = StreamController<String>();
+    StreamSubscription<ChatResult>? subscription;
+    Completer<void>? pendingIteration;
+    var cancelled = false;
+    Future<void>? cleanup;
+    late StreamController<String> controller;
+    Future<void> stop() => cleanup ??= () async {
+          cancelled = true;
+          _cancellations.remove(stop);
+          if (pendingIteration?.isCompleted == false)
+            pendingIteration!.complete();
+          await subscription?.cancel();
+          await _closeModel(model);
+          if (!controller.isClosed) unawaited(controller.close());
+        }();
+    controller = StreamController<String>(onCancel: stop);
+    _cancellations.add(stop);
 
     Future<void>(() async {
+      if (isCancelled || cancelled) {
+        await stop();
+        return;
+      }
       final parser = const ToolsAgentOutputParser();
       final toolMap = <String, Tool>{
         for (final tool in tools) tool.name: tool,
@@ -122,7 +144,7 @@ class CancelableLangchainRunner {
       var iterations = 0;
 
       void emit() {
-        if (controller.isClosed) return;
+        if (cancelled || controller.isClosed) return;
         controller.add(
           _composeAgentPayload(
             timeline: timeline,
@@ -183,7 +205,8 @@ class CancelableLangchainRunner {
       var streamFailed = false;
 
       try {
-        while (iterations < maxIterations && !controller.isClosed) {
+        while (
+            iterations < maxIterations && !cancelled && !controller.isClosed) {
           final promptMessages = buildConversation();
           if (promptMessages.isEmpty) {
             throw StateError('Agent prompt messages cannot be empty');
@@ -194,7 +217,8 @@ class CancelableLangchainRunner {
 
           ChatResult? aggregated;
           final completer = Completer<void>();
-          _subscription = model.stream(prompt, options: options).listen(
+          pendingIteration = completer;
+          subscription = model.stream(prompt, options: options).listen(
             (chunk) {
               final normalizedChunk = _normalizeThinkChunk(chunk);
 
@@ -227,7 +251,7 @@ class CancelableLangchainRunner {
               }
             },
             onDone: () {
-              _subscription = null;
+              subscription = null;
               if (!completer.isCompleted) {
                 completer.complete();
               }
@@ -236,6 +260,7 @@ class CancelableLangchainRunner {
           );
 
           await completer.future;
+          if (cancelled) break;
 
           if (aggregated == null) {
             throw StateError('Model returned no output');
@@ -251,6 +276,7 @@ class CancelableLangchainRunner {
 
           var shouldStop = false;
           for (final action in actions) {
+            if (cancelled) break;
             if (action is AgentFinish) {
               shouldStop = true;
               break;
@@ -282,6 +308,7 @@ class CancelableLangchainRunner {
               final observation = message == null
                   ? await tool.invoke(toolInput)
                   : 'Error: $message';
+              if (cancelled) break;
               final observationText = observation.toString();
               toolStep.status = ToolStepStatus.success;
               toolStep.output = observationText;
@@ -322,16 +349,11 @@ class CancelableLangchainRunner {
           iterations += 1;
         }
       } catch (error, stack) {
-        if (!controller.isClosed && !streamFailed) {
+        if (!cancelled && !controller.isClosed && !streamFailed) {
           controller.addError(error, stack);
         }
       } finally {
-        await _subscription?.cancel();
-        _subscription = null;
-        await _closeModel(model);
-        if (!controller.isClosed) {
-          await controller.close();
-        }
+        await stop();
       }
     });
 

@@ -1,3 +1,4 @@
+import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/main.dart';
@@ -13,7 +14,10 @@ class AiTranslateProvider extends TranslateServiceProvider {
   TranslateService get service => TranslateService.ai;
 
   @override
-  String getLabel(BuildContext context) => L10n.of(context).navBarAI;
+  String getLabel(BuildContext context) =>
+      Localizations.localeOf(context).languageCode == 'zh'
+          ? 'AI 翻译'
+          : 'AI Translation';
 
   /// AI translation uses native language names (e.g., "简体中文", "English")
   /// instead of ISO codes for better prompt understanding.
@@ -43,6 +47,7 @@ class AiTranslateProvider extends TranslateServiceProvider {
 
     return AiStream(
       prompt: prompt,
+      identifier: Prefs().translationAiService,
       regenerate: true,
     );
   }
@@ -71,8 +76,11 @@ class AiTranslateProvider extends TranslateServiceProvider {
 
       final messages = payload.buildMessages();
 
-      await for (final result
-          in aiGenerateStream(messages, regenerate: false)) {
+      await for (final result in aiGenerateStream(
+        messages,
+        identifier: Prefs().translationAiService,
+        regenerate: false,
+      )) {
         yield result;
       }
     } catch (e) {

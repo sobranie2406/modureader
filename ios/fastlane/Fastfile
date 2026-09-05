@@ -34,8 +34,8 @@ platform :ios do
 
 
     # get_certificates
-    # get_provisioning_profile(app_identifier: "com.anxcye.anxReader")
-    # get_provisioning_profile(app_identifier: "com.anxcye.anxReader.shareExtension")
+    # get_provisioning_profile(app_identifier: "com.modu.reader")
+    # get_provisioning_profile(app_identifier: "com.modu.reader.shareExtension")
   
     if is_ci
       create_keychain(
@@ -86,8 +86,8 @@ platform :ios do
       export_options: {
         teamID: "28W956D5K8",
         provisioningProfiles: {
-          "com.anxcye.anxReader" => "match AppStore com.anxcye.anxReader",
-          "com.anxcye.anxReader.shareExtension" => "match AppStore com.anxcye.anxReader.shareExtension"
+          "com.modu.reader" => "match AppStore com.modu.reader",
+          "com.modu.reader.shareExtension" => "match AppStore com.modu.reader.shareExtension"
         }
       }
     )

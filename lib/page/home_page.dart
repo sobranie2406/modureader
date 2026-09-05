@@ -24,7 +24,6 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/settings/about.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
 import 'package:flutter/material.dart';
@@ -231,18 +230,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                     radius: 20,
                     child: SafeArea(
                       child: NavigationRail(
-                        leading: InkWell(
-                          onTap: () => openAboutDialog(),
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 2.0),
-                            child: Image.asset(
-                              width: 32,
-                              height: 32,
-                              'assets/icon/Anx-logo-tined.png',
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                          ),
-                        ),
                         groupAlignment: 1,
                         extended: false,
                         selectedIndex: currentIndex,

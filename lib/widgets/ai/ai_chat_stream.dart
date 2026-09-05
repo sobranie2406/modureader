@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/providers/ai_history.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/ai_services.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
-import 'package:anx_reader/service/ai/index.dart';
+import 'package:anx_reader/service/ai/home_ai_execution.dart';
+import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/utils/ai_reasoning_parser.dart';
@@ -31,6 +31,13 @@ import 'package:langchain_core/chat_models.dart';
 
 import 'package:anx_reader/models/ai_quick_prompt_chip.dart';
 
+class _HomeStarterPrompt {
+  const _HomeStarterPrompt(this.id, this.text);
+
+  final String id;
+  final String text;
+}
+
 class AiChatStream extends ConsumerStatefulWidget {
   const AiChatStream({
     super.key,
@@ -38,12 +45,14 @@ class AiChatStream extends ConsumerStatefulWidget {
     this.sendImmediate = false,
     this.quickPromptChips = const [],
     this.trailing,
+    this.scope = AiChatScope.library,
   });
 
   final String? initialMessage;
   final bool sendImmediate;
   final List<AiQuickPromptChip> quickPromptChips;
   final List<Widget>? trailing;
+  final AiChatScope scope;
 
   @override
   ConsumerState<AiChatStream> createState() => AiChatStreamState();
@@ -56,10 +65,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   StreamController<List<ChatMessage>>? _messageController;
   StreamSubscription<List<ChatMessage>>? _messageSubscription;
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _inputFocusNode = FocusNode();
   bool _isStreaming = false;
-  late List<String> _suggestedPrompts;
-  late List<String> _starterPrompts;
   double _fontSize = 14.0;
+  String? _readerSourceText;
+  String? _lastSubmittedSkillId;
+  String? _lastSubmittedSourceText;
+  String? _lastSubmittedHomePromptId;
+  CancelableLangchainRunner? _requestRunner;
 
   List<Map<String, String>> _getQuickPrompts(BuildContext context) {
     return [
@@ -86,26 +99,30 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     ];
   }
 
+  List<_HomeStarterPrompt> _getStarterPrompts(BuildContext context) {
+    final l10n = L10n.of(context);
+    return [
+      _HomeStarterPrompt(homePromptRecentBooks, l10n.quickPrompt1),
+      _HomeStarterPrompt(homePromptLatestSession, l10n.quickPrompt2),
+      _HomeStarterPrompt(homePromptHighestProgress, l10n.quickPrompt3),
+      _HomeStarterPrompt(homePromptYesterdayNotes, l10n.quickPrompt4),
+      _HomeStarterPrompt(homePromptUnreadBooks, l10n.quickPrompt5),
+      _HomeStarterPrompt(homePromptRecommendRecent, l10n.quickPrompt6),
+      _HomeStarterPrompt(homePromptTodayHighlights, l10n.quickPrompt7),
+      _HomeStarterPrompt(homePromptWeeklyReadingTime, l10n.quickPrompt8),
+      _HomeStarterPrompt(homePromptNoteQuote, l10n.quickPrompt9),
+      _HomeStarterPrompt(homePromptReadNext, l10n.quickPrompt10),
+      _HomeStarterPrompt(homePromptOrganizeByGenre, l10n.quickPrompt11),
+      _HomeStarterPrompt(homePromptOrganizeByProgress, l10n.quickPrompt12),
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
-    _starterPrompts = [
-      L10n.of(navigatorKey.currentContext!).quickPrompt1,
-      L10n.of(navigatorKey.currentContext!).quickPrompt2,
-      L10n.of(navigatorKey.currentContext!).quickPrompt3,
-      L10n.of(navigatorKey.currentContext!).quickPrompt4,
-      L10n.of(navigatorKey.currentContext!).quickPrompt5,
-      L10n.of(navigatorKey.currentContext!).quickPrompt6,
-      L10n.of(navigatorKey.currentContext!).quickPrompt7,
-      L10n.of(navigatorKey.currentContext!).quickPrompt8,
-      L10n.of(navigatorKey.currentContext!).quickPrompt9,
-      L10n.of(navigatorKey.currentContext!).quickPrompt10,
-      L10n.of(navigatorKey.currentContext!).quickPrompt11,
-      L10n.of(navigatorKey.currentContext!).quickPrompt12,
-    ];
     _fontSize = Prefs().aiChatFontSize;
     inputController.text = widget.initialMessage ?? '';
-    _suggestedPrompts = _pickSuggestedPrompts();
+    _readerSourceText = _normalizeSourceText(widget.initialMessage);
     if (widget.sendImmediate) {
       _sendMessage();
     }
@@ -113,11 +130,34 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   @override
+  void didUpdateWidget(covariant AiChatStream oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialMessage != widget.initialMessage) {
+      setReaderSourceText(widget.initialMessage);
+    }
+  }
+
+  String? _normalizeSourceText(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  void setReaderSourceText(String? value) {
+    final normalized = _normalizeSourceText(value);
+    _readerSourceText = normalized;
+    if (normalized != null) {
+      inputController.text = normalized;
+    }
+  }
+
+  @override
   void dispose() {
+    _requestRunner?.cancel();
     inputController.dispose();
     _messageSubscription?.cancel();
     _messageController?.close();
     _scrollController.dispose();
+    _inputFocusNode.dispose();
     super.dispose();
   }
 
@@ -153,11 +193,6 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     return null;
   }
 
-  List<String> _pickSuggestedPrompts() {
-    final prompts = List<String>.from(_starterPrompts)..shuffle();
-    return prompts.take(3).toList(growable: false);
-  }
-
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -185,17 +220,20 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           Expanded(
             child: historyState.when(
               data: (items) {
-                if (items.isEmpty) {
+                final scopedItems = items
+                    .where((entry) => entry.scope == widget.scope.storageKey)
+                    .toList(growable: false);
+                if (scopedItems.isEmpty) {
                   return Center(
                     child: Text(L10n.of(context).noConversationTip),
                   );
                 }
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: items.length,
+                  itemCount: scopedItems.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
                   itemBuilder: (context, index) {
-                    final entry = items[index];
+                    final entry = scopedItems[index];
                     return _buildHistoryTile(context, entry);
                   },
                 );
@@ -327,9 +365,13 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     }
     _messageController = null;
 
-    ref.read(aiChatProvider.notifier).loadHistoryEntry(entry);
+    ref.read(aiChatProvider(widget.scope).notifier).loadHistoryEntry(entry);
 
     setState(() {
+      _readerSourceText = null;
+      _lastSubmittedSkillId = null;
+      _lastSubmittedSourceText = null;
+      _lastSubmittedHomePromptId = entry.homePromptId;
       _messageStream = null;
       // reset state when switching service
     });
@@ -344,10 +386,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   ) async {
     await ref.read(aiHistoryProvider.notifier).remove(entry.id);
 
-    final currentSessionId = ref.read(aiChatProvider.notifier).currentSessionId;
+    final currentSessionId =
+        ref.read(aiChatProvider(widget.scope).notifier).currentSessionId;
     if (currentSessionId == entry.id) {
-      ref.read(aiChatProvider.notifier).clear();
+      ref.read(aiChatProvider(widget.scope).notifier).clear();
       setState(() {
+        _lastSubmittedSkillId = null;
+        _lastSubmittedSourceText = null;
+        _lastSubmittedHomePromptId = null;
         _messageStream = null;
         // reset state when conversation changes
       });
@@ -355,14 +401,24 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   Future<void> _confirmClearHistory(BuildContext context) async {
-    await ref.read(aiHistoryProvider.notifier).clear();
-    ref.read(aiChatProvider.notifier).clear();
+    await ref
+        .read(aiHistoryProvider.notifier)
+        .clearScope(widget.scope.storageKey);
+    ref.read(aiChatProvider(widget.scope).notifier).clear();
     setState(() {
+      _lastSubmittedSkillId = null;
+      _lastSubmittedSourceText = null;
+      _lastSubmittedHomePromptId = null;
       _messageStream = null;
     });
   }
 
-  void _sendMessage({bool isRegenerate = false}) {
+  void _sendMessage({
+    bool isRegenerate = false,
+    String? skillId,
+    String? sourceText,
+    String? homePromptId,
+  }) {
     if (_isStreaming) {
       return;
     }
@@ -370,16 +426,26 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     if (inputController.text.trim().isEmpty) return;
     final message = inputController.text.trim();
     inputController.clear();
+    _lastSubmittedSkillId = skillId;
+    _lastSubmittedSourceText = _normalizeSourceText(sourceText);
+    _lastSubmittedHomePromptId = homePromptId;
 
     _messageSubscription?.cancel();
     _messageController?.close();
 
+    _requestRunner?.cancel();
+    final requestRunner = _requestRunner = CancelableLangchainRunner();
     final controller = StreamController<List<ChatMessage>>();
-    final stream = ref.read(aiChatProvider.notifier).sendMessageStream(
-          message,
-          ref,
-          isRegenerate,
-        );
+    final stream =
+        ref.read(aiChatProvider(widget.scope).notifier).sendMessageStream(
+              message,
+              ref,
+              isRegenerate,
+              skillId: skillId,
+              sourceText: _lastSubmittedSourceText,
+              homePromptId: homePromptId,
+              requestRunner: requestRunner,
+            );
 
     setState(() {
       _messageController = controller;
@@ -389,10 +455,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
     _messageSubscription = stream.listen(
       (event) {
+        if (controller.isClosed || !identical(_requestRunner, requestRunner))
+          return;
         controller.add(event);
         _scrollToBottom();
       },
       onError: (error, stack) {
+        if (controller.isClosed || !identical(_requestRunner, requestRunner))
+          return;
         controller.addError(error, stack);
         if (!controller.isClosed) {
           controller.close();
@@ -400,6 +470,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         if (mounted) {
           setState(() {
             _isStreaming = false;
+            if (inputController.text.isEmpty) inputController.text = message;
           });
         }
       },
@@ -407,6 +478,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         if (!controller.isClosed) {
           controller.close();
         }
+        if (!identical(_requestRunner, requestRunner)) return;
         if (mounted) {
           setState(() {
             _isStreaming = false;
@@ -418,7 +490,15 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   void _useQuickPrompt(String prompt) {
-    inputController.text = '$prompt ${inputController.text}';
+    final subject = inputController.text.trim();
+    if (subject.isEmpty) {
+      inputController
+        ..text = '$prompt '
+        ..selection = TextSelection.collapsed(offset: prompt.length + 1);
+      _inputFocusNode.requestFocus();
+      return;
+    }
+    inputController.text = '$prompt $subject';
     _sendMessage();
   }
 
@@ -431,9 +511,12 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _messageController?.close();
     _messageController = null;
     setState(() {
-      ref.read(aiChatProvider.notifier).clear();
+      ref.read(aiChatProvider(widget.scope).notifier).clear();
+      _readerSourceText = null;
+      _lastSubmittedSkillId = null;
+      _lastSubmittedSourceText = null;
+      _lastSubmittedHomePromptId = null;
       _messageStream = null;
-      _suggestedPrompts = _pickSuggestedPrompts();
     });
   }
 
@@ -441,7 +524,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     if (_isStreaming) {
       return;
     }
-    final messages = ref.read(aiChatProvider).value;
+    final messages = ref.read(aiChatProvider(widget.scope)).value;
     if (messages == null || messages.isEmpty) {
       return;
     }
@@ -449,11 +532,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     for (int i = messages.length - 1; i >= 0; i--) {
       final message = messages[i];
       if (message is HumanChatMessage) {
-        final history = messages.take(i).toList(growable: false);
-        ref.read(aiChatProvider.notifier).restore(history);
         setState(() {
           inputController.text = message.contentAsString;
-          _sendMessage(isRegenerate: true);
+          _sendMessage(
+            isRegenerate: true,
+            skillId: _lastSubmittedSkillId,
+            sourceText: _lastSubmittedSourceText,
+            homePromptId: _lastSubmittedHomePromptId,
+          );
         });
         break;
       }
@@ -469,7 +555,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
   void _cancelStreaming() {
     if (!_isStreaming) return;
-    cancelActiveAiRequest();
+    _requestRunner?.cancel();
+    _requestRunner = null;
     _messageSubscription?.cancel();
     _messageSubscription = null;
     _messageController?.close();
@@ -540,7 +627,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   ChatMessage? _getLastAssistantMessage() {
-    final messages = ref.watch(aiChatProvider).asData?.value;
+    final messages = ref.watch(aiChatProvider(widget.scope)).asData?.value;
     if (messages == null || messages.isEmpty) {
       return null;
     }
@@ -620,31 +707,33 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       child: SafeArea(
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                SizedBox.shrink(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Row(
-                      spacing: 8,
-                      children: quickPrompts.map((prompt) {
-                        return ActionChip(
-                          // labelPadding: EdgeInsets.all(0),
-                          label: Text(prompt['label']!),
-                          onPressed: () => _useQuickPrompt(prompt['prompt']!),
-                        );
-                      }).toList(),
+            if (widget.quickPromptChips.isEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox.shrink(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: Row(
+                        spacing: 8,
+                        children: quickPrompts.map((prompt) {
+                          return ActionChip(
+                            label: Text(prompt['label']!),
+                            onPressed: () => _useQuickPrompt(prompt['prompt']!),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: 4),
+                ],
+              ),
+              const SizedBox(height: 4),
+            ],
             TextField(
               controller: inputController,
+              focusNode: _inputFocusNode,
               decoration: InputDecoration(
                 isDense: true,
                 hintText: L10n.of(context).aiHintInputPlaceholder,
@@ -718,7 +807,10 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                 label: Text(chip.label),
                 onPressed: () {
                   inputController.text = chip.prompt;
-                  _sendMessage();
+                  _sendMessage(
+                    skillId: chip.skillId,
+                    sourceText: _readerSourceText,
+                  );
                 },
               ),
             ),
@@ -745,31 +837,40 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         children: [
           if (widget.quickPromptChips.isEmpty)
             Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    L10n.of(context).tryAQuickPrompt,
-                    style: theme.textTheme.titleMedium,
+              child: SingleChildScrollView(
+                key: const ValueKey('home-quick-prompts'),
+                primary: false,
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        L10n.of(context).tryAQuickPrompt,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _getStarterPrompts(context)
+                            .map(
+                              (prompt) => ActionChip(
+                                key: ValueKey('home-prompt-${prompt.id}'),
+                                label: Text(prompt.text),
+                                onPressed: () {
+                                  inputController.text = prompt.text;
+                                  _sendMessage(homePromptId: prompt.id);
+                                },
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _suggestedPrompts
-                        .map(
-                          (prompt) => ActionChip(
-                            label: Text(prompt),
-                            onPressed: () {
-                              inputController.text = prompt;
-                              _sendMessage();
-                            },
-                          ),
-                        )
-                        .toList(growable: false),
-                  ),
-                ],
+                ),
               ),
             ),
           buildQuickChipColumn(),
@@ -814,7 +915,24 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                       ? StreamBuilder<List<ChatMessage>>(
                           stream: _messageStream,
                           builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                    snapshot.error
+                                        .toString()
+                                        .replaceFirst('Bad state: ', ''),
+                                    key: const ValueKey('ai-request-error'),
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error)),
+                              );
+                            }
                             if (!snapshot.hasData) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.done)
+                                return buildEmptyState();
                               return Skeletonizer.zone(child: Bone.multiText());
                             }
 
@@ -826,7 +944,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                             return _buildMessageList(messages);
                           },
                         )
-                      : ref.watch(aiChatProvider).when(
+                      : ref.watch(aiChatProvider(widget.scope)).when(
                             data: (messages) {
                               if (messages.isEmpty) {
                                 return buildEmptyState();

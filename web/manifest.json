@@ -1,11 +1,11 @@
 {
-    "name": "anx_reader",
-    "short_name": "anx_reader",
+    "name": "Modu",
+    "short_name": "Modu",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#hexcode",
-    "theme_color": "#hexcode",
-    "description": "A new Flutter project.",
+    "background_color": "#FBFBF3",
+    "theme_color": "#FBFBF3",
+    "description": "Modu — a quiet, AI-assisted ebook reader.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

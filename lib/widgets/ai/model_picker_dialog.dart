@@ -5,7 +5,7 @@ import 'package:anx_reader/widgets/common/anx_button.dart';
 import 'package:flutter/material.dart';
 
 /// A dialog that lets the user either type a model name manually or pick one
-/// from the auto-fetched list (OpenAI-compatible `/v1/models` endpoint only).
+/// from the provider's model catalog endpoint.
 ///
 /// Returns the selected/entered model string, or `null` if cancelled.
 Future<String?> showModelPickerDialog({
@@ -42,9 +42,7 @@ class _ModelPickerDialogState extends State<_ModelPickerDialog> {
   String? _fetchError;
 
   bool get _canFetch =>
-      widget.provider.protocol == AiProtocol.openai &&
-      widget.provider.hasValidKey &&
-      widget.provider.url.isNotEmpty;
+      widget.provider.hasValidKey && widget.provider.url.isNotEmpty;
 
   @override
   void initState() {
@@ -72,6 +70,7 @@ class _ModelPickerDialogState extends State<_ModelPickerDialog> {
       final models = await fetchAiModels(
         url: widget.provider.url,
         apiKey: apiKey,
+        protocol: widget.provider.protocol,
       );
       if (mounted) {
         setState(() {
