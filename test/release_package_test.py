@@ -1,5 +1,6 @@
 """Architecture checks must reject cross-labelled or malformed native binaries."""
 import importlib.util
+import hashlib
 from pathlib import Path
 import struct
 import tempfile
@@ -47,6 +48,14 @@ class ArchitectureTest(unittest.TestCase):
     def test_missing_binary_is_an_error(self):
         with self.assertRaises(FileNotFoundError):
             release_package.verify(self.binary, "linux", "x64")
+
+    def test_checksums_use_portable_lf_bytes(self):
+        self.binary.write_bytes(b"Modu release artifact")
+        release_package.write_checksum(self.binary)
+        checksum = self.binary.with_name(self.binary.name + ".sha256").read_bytes()
+        digest = hashlib.sha256(self.binary.read_bytes()).hexdigest()
+        self.assertEqual(checksum, f"{digest}  binary\n".encode("utf-8"))
+        self.assertNotIn(b"\r", checksum)
 
 
 if __name__ == "__main__":

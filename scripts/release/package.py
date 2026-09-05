@@ -17,6 +17,15 @@ def run(*args):
     return subprocess.check_output(args, text=True).strip()
 
 
+def write_checksum(path):
+    with path.open("rb") as artifact:
+        digest = hashlib.file_digest(artifact, "sha256").hexdigest()
+    # Binary output preserves LF on Windows as well: CRLF makes Unix checksum
+    # readers interpret the carriage return as part of the artifact filename.
+    path.with_name(path.name + ".sha256").write_bytes(
+        f"{digest}  {path.name}\n".encode("utf-8"))
+
+
 def one(pattern):
     files = list(ROOT.glob(pattern))
     if len(files) != 1:
@@ -148,5 +157,4 @@ if __name__ == "__main__":
     package(args.platform, args.arch, version)
     for path in OUT.iterdir():
         if path.is_file() and path.suffix != ".sha256":
-            digest = hashlib.file_digest(path.open("rb"), "sha256").hexdigest()
-            path.with_name(path.name + ".sha256").write_text(f"{digest}  {path.name}\n")
+            write_checksum(path)
