@@ -9,6 +9,7 @@ TextSelectionControls selectionControls() {
       return CupertinoTextSelectionControls();
     case AnxPlatformEnum.android:
     case AnxPlatformEnum.ohos:
+    case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
       return MaterialTextSelectionControls();
   }

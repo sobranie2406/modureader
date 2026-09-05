@@ -23,6 +23,7 @@ String getSharedPrefsFileName() {
     case AnxPlatformEnum.android:
       return 'FlutterSharedPreferences.xml';
     case AnxPlatformEnum.windows:
+    case AnxPlatformEnum.linux:
       return 'shared_preferences.json';
     case AnxPlatformEnum.macos:
     case AnxPlatformEnum.ios:
@@ -43,6 +44,9 @@ Future<File> getAnxShredPrefsFile() async {
     case AnxPlatformEnum.windows:
       return File(
           "${(await getApplicationSupportDirectory()).path}\\${getSharedPrefsFileName()}");
+    case AnxPlatformEnum.linux:
+      return File(
+          "${(await getApplicationSupportDirectory()).path}/${getSharedPrefsFileName()}");
     case AnxPlatformEnum.macos:
       final baseDir =
           '${(await getAnxDocumentsPath()).split('Documents')[0]}Library/Preferences';

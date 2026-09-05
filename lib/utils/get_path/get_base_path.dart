@@ -48,6 +48,7 @@ Future<String> getAnxDocumentsPath() async {
     case AnxPlatformEnum.android:
     case AnxPlatformEnum.ohos:
       return directory.path;
+    case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
       return (await getApplicationSupportDirectory()).path;
     case AnxPlatformEnum.macos:

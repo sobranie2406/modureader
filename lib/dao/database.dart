@@ -131,6 +131,7 @@ class DBHelper {
           onUpgrade: onUpgradeDatabase,
         );
       case AnxPlatformEnum.ios:
+      case AnxPlatformEnum.linux:
       case AnxPlatformEnum.windows:
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;

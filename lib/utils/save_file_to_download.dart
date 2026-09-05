@@ -27,6 +27,7 @@ Future<String?> saveFileToDownload(
       final filePath = await FlutterFileDialog.saveFile(params: params);
       return filePath;
     case AnxPlatformEnum.macos:
+    case AnxPlatformEnum.linux:
       String? outputFile = await FilePicker.platform.saveFile(
         fileName: fileName,
       );

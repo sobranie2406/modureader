@@ -73,7 +73,11 @@ def package(platform, arch, version):
         # Gradle must have signed the APK; verify it, do not silently ship debug.
         sdk = Path(os.environ["ANDROID_HOME"])
         apksigner = sorted((sdk / "build-tools").glob("*/apksigner"))[-1]
-        subprocess.run([str(apksigner), "verify", "--verbose", str(apk)], check=True)
+        result = run(str(apksigner), "verify", "--verbose", "--print-certs", str(apk))
+        expected = (ROOT / "docs/android-signing-certificate.sha256").read_text().strip()
+        fingerprints = [line.rsplit(":", 1)[1].strip().lower() for line in result.splitlines()
+                        if "certificate SHA-256 digest:" in line]
+        assert fingerprints == [expected], "APK is not signed by the Modu release identity"
         shutil.copy2(apk, OUT / f"{name}.apk")
         notices(stage)
         shutil.make_archive(str(OUT / f"{name}-notices"), "zip", stage)
@@ -94,6 +98,11 @@ def package(platform, arch, version):
         executable = run("/usr/libexec/PlistBuddy", "-c", "Print CFBundleExecutable", str(app / "Contents/Info.plist"))
         verify(app / "Contents/MacOS" / executable, platform, arch)
         subprocess.run(["ditto", str(app), str(stage / app.name)], check=True)
+        # Flutter's CI build can leave an invalid resource seal. Seal the final
+        # copied bundle with the agreed ad-hoc identity, preserving entitlements.
+        subprocess.run(["codesign", "--force", "--deep", "--sign", "-",
+                        "--entitlements", str(ROOT / "macos/Runner/Release.entitlements"),
+                        str(stage / app.name)], check=True)
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(stage / app.name)], check=True)
     elif platform == "ios":
         app = one("build/ios/iphoneos/*.app")

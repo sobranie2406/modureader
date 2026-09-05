@@ -55,7 +55,7 @@ Future<void> main() async {
   HttpOverrides.global = AnxHttpProxyOverrides();
 
   // Initialize desktop window with validated position
-  if (AnxPlatform.isWindows || AnxPlatform.isMacOS) {
+  if (AnxPlatform.isDesktop) {
     await initializeDesktopWindow();
   }
 

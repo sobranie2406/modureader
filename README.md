@@ -15,7 +15,7 @@ This is an independently modified derivative, not an official release of either 
 | 平台 | 目标架构 | 分发形式与限制 |
 | --- | --- | --- |
 | Windows | x64、ARM64 | 便携 ZIP；未做商业代码签名，需要 WebView2 Runtime |
-| Linux | x64、ARM64 | tar.gz；Ubuntu 24.04 构建，需 GTK/WPE WebKit 等系统库 |
+| Linux | x64、ARM64 | tar.gz；Debian 13 (trixie) 构建，需 GTK/WPE WebKit 等系统库 |
 | Android | x86_64、arm64-v8a | 项目专用密钥签名的 APK；首次安装请核验下载来源 |
 | macOS | x64、ARM64 | ZIP / DMG；未公证，非 App Store 版本 |
 | iOS | ARM64 真机 | **unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |

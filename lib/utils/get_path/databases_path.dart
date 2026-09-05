@@ -11,6 +11,7 @@ Future<String> getAnxDataBasesPath() async {
     case AnxPlatformEnum.ohos:
       final path = await getDatabasesPath();
       return path;
+    case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
     case AnxPlatformEnum.macos:
     case AnxPlatformEnum.ios:

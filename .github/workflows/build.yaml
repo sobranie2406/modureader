@@ -21,31 +21,38 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, platform: linux, arch: x64}
-          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64}
-          - {os: windows-2025, platform: windows, arch: x64}
-          - {os: windows-11-arm, platform: windows, arch: arm64}
+          - {os: ubuntu-24.04, platform: linux, arch: x64, container: 'debian:trixie'}
+          - {os: ubuntu-24.04-arm, platform: linux, arch: arm64, container: 'debian:trixie'}
+          - {os: windows-2025, platform: windows, arch: x64, sdk_arch: x64}
+          - {os: windows-11-arm, platform: windows, arch: arm64, sdk_arch: x64}
           - {os: macos-15-intel, platform: macos, arch: x64, xcode_arch: x86_64}
           - {os: macos-15, platform: macos, arch: arm64, xcode_arch: arm64}
     name: ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     timeout-minutes: 90
     defaults:
       run:
         shell: bash
     steps:
+      - name: Debian base tools
+        if: matrix.platform == 'linux'
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - uses: actions/setup-python@v5
+        if: matrix.platform != 'linux'
         with:
           python-version: '3.12'
       - name: Linux native dependencies
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libwpewebkit-1.1-dev libwpebackend-fdo-1.0-dev libwpe-1.0-dev libepoxy-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libasound2-dev libpulse-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev libwpe-1.0-dev libepoxy-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libasound2-dev libpulse-dev libsqlite3-dev
       - uses: NuGet/setup-nuget@v2
         if: matrix.platform == 'windows'
       - name: Rust toolchain
@@ -60,10 +67,21 @@ jobs:
             rustup target add aarch64-pc-windows-msvc
           fi
       - uses: subosito/flutter-action@v2
+        if: matrix.platform != 'linux'
         with:
           flutter-version: '3.47.2'
+          architecture: ${{ matrix.sdk_arch || runner.arch }}
           channel: stable
           cache: true
+      - name: Linux Flutter source SDK (native x64 or ARM64 Dart)
+        if: matrix.platform == 'linux'
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$RUNNER_TEMP/modu-flutter"
+          echo "$RUNNER_TEMP/modu-flutter/bin" >> "$GITHUB_PATH"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Windows ARM64 SDK host detection compatibility
+        if: matrix.platform == 'windows' && matrix.arch == 'arm64'
+        run: node scripts/release/windows-arm64-sdk.mjs
       - name: Prepare sources
         run: |
           flutter pub get
@@ -79,6 +97,8 @@ jobs:
         run: |
           if [[ "${{ matrix.platform }}" == "macos" ]]; then
             flutter build macos --release
+          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
+            flutter build windows --release
           else
             flutter build ${{ matrix.platform }} --release --target-platform ${{ matrix.platform }}-${{ matrix.arch }}
           fi

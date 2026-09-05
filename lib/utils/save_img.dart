@@ -163,6 +163,7 @@ class SaveImg {
     switch (AnxPlatform.type) {
       case AnxPlatformEnum.android:
         return await androidImgSaver(img, extension, picName);
+      case AnxPlatformEnum.linux:
       case AnxPlatformEnum.windows:
       case AnxPlatformEnum.macos:
         return await windowsImgSaver(img, extension, picName);

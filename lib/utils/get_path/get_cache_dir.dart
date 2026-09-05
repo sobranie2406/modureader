@@ -7,6 +7,7 @@ Future<Directory> getAnxCacheDir() async {
   switch (AnxPlatform.type) {
     case AnxPlatformEnum.android:
     case AnxPlatformEnum.ohos:
+    case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
     case AnxPlatformEnum.macos:
     case AnxPlatformEnum.ios:

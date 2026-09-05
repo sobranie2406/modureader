@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-enum AnxPlatformEnum { android, ios, macos, windows, ohos }
+enum AnxPlatformEnum { android, ios, macos, windows, ohos, linux }
 
 class AnxPlatform {
   static AnxPlatformEnum get type {
@@ -17,6 +17,9 @@ class AnxPlatform {
     }
     if (Platform.isWindows && !kIsWeb) {
       return AnxPlatformEnum.windows;
+    }
+    if (Platform.isLinux && !kIsWeb) {
+      return AnxPlatformEnum.linux;
     }
     try {
       if (Platform.operatingSystem == 'ohos') {
@@ -33,8 +36,9 @@ class AnxPlatform {
   static bool get isMacOS => type == AnxPlatformEnum.macos;
   static bool get isWindows => type == AnxPlatformEnum.windows;
   static bool get isOhos => type == AnxPlatformEnum.ohos;
+  static bool get isLinux => type == AnxPlatformEnum.linux;
 
   static bool get isMobile => isAndroid || isIOS || isOhos;
 
-  static bool get isDesktop => isWindows || isMacOS;
+  static bool get isDesktop => isWindows || isMacOS || isLinux;
 }
