@@ -32,6 +32,10 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
+# Pinned plugins still use WinRT's pre-C++20 coroutine support. MSVC 14.51
+# turns that deprecation into STL1011; retain the supported compatibility path
+# until those plugins migrate, without suppressing unrelated compiler errors.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 
 # Compilation settings that should be applied to most targets.
 #
