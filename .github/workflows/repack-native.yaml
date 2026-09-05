@@ -41,6 +41,9 @@ jobs:
           apt-get update
           apt-get install -y ca-certificates git gh python3 desktop-file-utils
       - uses: actions/checkout@v4
+      - name: Trust the checked-out CI workspace in the Debian container
+        if: matrix.platform == 'linux'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-python@v5
         if: matrix.platform != 'linux'
         with:
