@@ -54,7 +54,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           apt-get update
-          apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils
+          apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

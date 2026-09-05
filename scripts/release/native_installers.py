@@ -8,7 +8,9 @@ import re
 import shutil
 import struct
 import subprocess
+import tarfile
 import tempfile
+import urllib.request
 
 
 def command(*args, **kwargs):
@@ -161,10 +163,49 @@ DEB_DEPENDS = ('libc6 (>= 2.41), libstdc++6 (>= 14), libgcc-s1, libgtk-3-0t64, '
                'libasound2t64, libpulse0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good')
 
 
+def prepare_linux_runtime(app, arch, work):
+    # flutter_onnxruntime 1.8.4 bundles only a symlink, omitting its target.
+    # Supply the exact upstream version used to link the released plugin.
+    upstream_arch, digest = {
+        'x64': ('x64', '8344d55f93d5bc5021ce342db50f62079daf39aaafb5d311a451846228be49b3'),
+        'arm64': ('aarch64', 'bb76395092d150b52c7092dc6b8f2fe4d80f0f3bf0416d2f269193e347e24702'),
+    }[arch]
+    basename = f'onnxruntime-linux-{upstream_arch}-1.22.0'
+    url = f'https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/{basename}.tgz'
+    archive = work / 'onnxruntime.tgz'
+    with urllib.request.urlopen(url, timeout=120) as response, archive.open('wb') as target:
+        shutil.copyfileobj(response, target)
+    with archive.open('rb') as source:
+        if hashlib.file_digest(source, 'sha256').hexdigest() != digest:
+            raise ValueError('Official ONNX Runtime archive checksum mismatch')
+    library = app / 'lib/libonnxruntime.so.1.22.0'
+    with tarfile.open(archive) as source:
+        member = source.getmember(f'{basename}/lib/{library.name}')
+        if not member.isfile():
+            raise ValueError('Expected a real ONNX Runtime shared library')
+        with source.extractfile(member) as data, library.open('wb') as target:
+            shutil.copyfileobj(data, target)
+    soname = app / 'lib/libonnxruntime.so.1'
+    if not soname.exists():
+        soname.symlink_to(library.name)
+    # Plugin files carry absolute CI build paths. Relocate them to the package's
+    # own library directory; never add application libraries to global ldconfig.
+    for plugin in (app / 'lib').glob('*.so'):
+        if not plugin.is_symlink() and plugin.name != 'libapp.so':
+            command('patchelf', '--set-rpath', '$ORIGIN', plugin)
+    command('patchelf', '--set-rpath', '$ORIGIN/lib', app / 'modu')
+    (app / 'LINUX-RUNTIME.txt').write_text(
+        f'ONNX Runtime 1.22.0: {url}\nSHA-256: {digest}\n'
+        'MIT license and ThirdPartyNotices: LICENSES/ONNXRuntime-1.22.0-*.txt\n'
+        'Missing runtime payload restored; ELF RPATH metadata made relocatable.\n'
+        'Application business code was not recompiled.\n', encoding='utf-8')
+
+
 def build_deb(bundle, arch, version, output, work):
     root = work / 'deb'
     app = root / 'opt/modureader'
     shutil.copytree(bundle, app, symlinks=True)
+    prepare_linux_runtime(app, arch, work)
     (app / 'modu').chmod(0o755)
     control = root / 'DEBIAN'
     control.mkdir()

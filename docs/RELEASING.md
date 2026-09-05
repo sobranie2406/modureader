@@ -36,4 +36,6 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 
 历史压缩包迁移可手动运行 `Native desktop installers` 工作流：校验现有附件与标签源码身份后，仅重新封装安装器，不重新编译应用、不移动既有标签。`INSTALLER-SOURCE.txt` 单独记录安装脚本提交和原始附件校验和。此迁移流程依赖旧附件仍在 Release；迁移完成后的新版本直接使用常规构建流程。
 
+Linux 封装还会补齐原插件漏打包的 ONNX Runtime 1.22.0 实体共享库，并用 `patchelf` 将 ELF 库搜索路径改为相对安装目录，避免依赖 CI 构建机路径。微软官方运行库下载经过固定 SHA-256 校验；来源与修改记录见包内 `LINUX-RUNTIME.txt`，原始许可仍随包提供。这是运行库分发修正，不是业务代码重新编译。
+
 对应源码： https://github.com/sobranie2406/modureader 。依赖的固定版本、源地址、许可见锁文件及 UPSTREAM.md；发行包自带 Flutter 生成的第三方许可汇总。

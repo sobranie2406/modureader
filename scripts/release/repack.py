@@ -50,7 +50,8 @@ def repack(platform, arch, tag, output):
             f'Application source: {source_sha} ({tag})\n'
             f'Application payload SHA-256: {expected}\n'
             f'Installer scripts: https://github.com/{repo}/tree/{installer_sha}/scripts/release\n'
-            'Application binaries are unchanged; only the distribution format is new.\n', encoding='utf-8')
+            'Application business code is not recompiled.\n'
+            'Linux additionally restores ONNX Runtime and relocates ELF RPATH; see LINUX-RUNTIME.txt.\n', encoding='utf-8')
         return build(bundle, platform, arch, version, Path(output))
 
 
