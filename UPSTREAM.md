@@ -36,3 +36,9 @@ PDF import/navigation fixes; multi-platform release packaging. See git history.
   Icon brands remain the property of their respective owners.
 - `assets/foliate-js`: Foliate-js, MIT; PDF.js and other embedded components retain
   their license notices. Modified renderer code is included in the source release.
+- ONNX Runtime: Microsoft, MIT. Windows/Linux use 1.22.0; Android/Apple use
+  1.23.0 through the pinned Flutter plugin. Both versions' original LICENSE and
+  ThirdPartyNotices.txt are preserved in LICENSES and copied into packages.
+- Linux WPE/WebKit libraries: distribution-provided dynamic libraries. Packages
+  retain the Debian copyright files and record exact corresponding source
+  package versions in SOURCE.txt; the app remains dynamically linked.

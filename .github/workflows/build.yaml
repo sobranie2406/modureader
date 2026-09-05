@@ -106,6 +106,7 @@ jobs:
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
       - name: Build desktop
         env:
+          CMAKE_BUILD_PARALLEL_LEVEL: '3'
           FLUTTER_XCODE_ARCHS: ${{ matrix.xcode_arch }}
           FLUTTER_XCODE_ONLY_ACTIVE_ARCH: 'YES'
           FLUTTER_XCODE_CODE_SIGN_IDENTITY: '-'

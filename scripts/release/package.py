@@ -40,7 +40,7 @@ def verify(path, platform, arch):
         assert expected in run("lipo", "-archs", str(path)).split(), path
 
 
-def notices(folder):
+def notices(folder, platform):
     folder.mkdir(parents=True, exist_ok=True)
     for name in ("LICENSE", "NOTICE", "UPSTREAM.md", "PRIVACY.md"):
         shutil.copy2(ROOT / name, folder / name)
@@ -55,6 +55,17 @@ def notices(folder):
         "Dependency versions and source URLs: pubspec.lock, UPSTREAM.md.\n",
         encoding="utf-8",
     )
+    if platform == "linux":
+        source_packages = []
+        for package in ("libwpewebkit-2.0-1", "libwpe-1.0-1", "libwpebackend-fdo-1.0-1"):
+            copyright_file = Path("/usr/share/doc") / package / "copyright"
+            shutil.copy2(copyright_file, folder / "LICENSES" / f"{package}-copyright.txt")
+            source_packages.append(run("dpkg-query", "--show",
+                "--showformat=${source:Package} ${source:Version}", package))
+        with (folder / "SOURCE.txt").open("a", encoding="utf-8") as source:
+            source.write("\nBundled WPE libraries — Debian corresponding source packages:\n")
+            source.write("\n".join(source_packages))
+            source.write("\nRetrieve with apt-get source PACKAGE=VERSION after enabling matching deb-src repositories.\n")
 
 
 def package(platform, arch, version):
@@ -79,7 +90,7 @@ def package(platform, arch, version):
                         if "certificate SHA-256 digest:" in line]
         assert fingerprints == [expected], "APK is not signed by the Modu release identity"
         shutil.copy2(apk, OUT / f"{name}.apk")
-        notices(stage)
+        notices(stage, platform)
         shutil.make_archive(str(OUT / f"{name}-notices"), "zip", stage)
         return
     if platform == "windows":
@@ -115,7 +126,7 @@ def package(platform, arch, version):
         subprocess.run(["ditto", str(app), str(stage / "Payload" / app.name)], check=True)
     else:
         raise ValueError(platform)
-    notices(stage)
+    notices(stage, platform)
     if platform == "linux":
         with tarfile.open(OUT / f"{name}.tar.gz", "w:gz") as archive:
             archive.add(stage, arcname=name)
