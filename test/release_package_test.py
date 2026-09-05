@@ -78,6 +78,9 @@ class NativeInstallerTest(unittest.TestCase):
     def test_debian_prerelease_sorts_before_final(self):
         self.assertEqual(native.deb_version('0.1.0-beta.1'), '0.1.0~beta.1')
         self.assertEqual(native.deb_version('1.0.0'), '1.0.0')
+        self.assertEqual(native.deb_version('0.1.0-beta.1', 6326), '0.1.0~beta.1-6326')
+        with self.assertRaises(ValueError):
+            native.deb_version('0.1.0-beta.1', 'bad\nrevision')
 
     def test_invalid_versions_cannot_inject_installer_configuration(self):
         for version in ('../x', 'v1.0.0', '1.0.0\nAppId=Other', '1.0.0;evil'):

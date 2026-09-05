@@ -150,7 +150,9 @@ def package(platform, arch, version):
         subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", str(stage), str(OUT / f"{name}.ipa")], check=True)
     else:
         from native_installers import build
-        build(stage, platform, arch, version, OUT)
+        build_number = next(line.split('+', 1)[1].strip() for line in
+                            (ROOT / 'pubspec.yaml').read_text().splitlines() if line.startswith('version:'))
+        build(stage, platform, arch, version, OUT, build_number=build_number)
 
 
 if __name__ == "__main__":

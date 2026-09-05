@@ -31,8 +31,13 @@ def validate_version(version):
     return version
 
 
-def deb_version(version):
-    return validate_version(version).replace('-', '~', 1)
+def deb_version(version, build_number=None):
+    value = validate_version(version).replace('-', '~', 1)
+    if build_number is not None:
+        if not re.fullmatch(r'[1-9][0-9]*', str(build_number)):
+            raise ValueError('Invalid Debian build revision')
+        value += '-' + str(build_number)
+    return value
 
 
 def verify_payload(bundle, platform, arch, installed=False):
@@ -207,10 +212,10 @@ def prepare_linux_runtime(app, arch, work):
         f'ONNX Runtime 1.22.0: {url}\nSHA-256: {digest}\n'
         'MIT license and ThirdPartyNotices: LICENSES/ONNXRuntime-1.22.0-*.txt\n'
         'Missing runtime payload restored; ELF RPATH metadata made relocatable.\n'
-        'Application business code was not recompiled.\n', encoding='utf-8')
+        'This packaging step adjusts runtime libraries; application source is recorded in SOURCE.txt.\n', encoding='utf-8')
 
 
-def build_deb(bundle, arch, version, output, work):
+def build_deb(bundle, arch, version, output, work, build_number=None):
     root = work / 'deb'
     app = root / 'opt/modureader'
     shutil.copytree(bundle, app, symlinks=True)
@@ -221,7 +226,7 @@ def build_deb(bundle, arch, version, output, work):
     architecture = {'x64': 'amd64', 'arm64': 'arm64'}[arch]
     size = sum(p.stat().st_size for p in app.rglob('*') if p.is_file()) // 1024
     (control / 'control').write_text(
-        f'Package: modureader\nVersion: {deb_version(version)}\nArchitecture: {architecture}\n'
+        f'Package: modureader\nVersion: {deb_version(version, build_number)}\nArchitecture: {architecture}\n'
         'Maintainer: Modu contributors <162990443+sobranie2406@users.noreply.github.com>\n'
         'Section: text\nPriority: optional\n'
         f'Installed-Size: {size}\nDepends: {DEB_DEPENDS}\n'
@@ -250,7 +255,7 @@ def build_deb(bundle, arch, version, output, work):
     command('dpkg-deb', '--root-owner-group', '--build', root, result)
     if command('dpkg-deb', '-f', result, 'Architecture') != architecture:
         raise ValueError('Incorrect Debian architecture')
-    if command('dpkg-deb', '-f', result, 'Version') != deb_version(version):
+    if command('dpkg-deb', '-f', result, 'Version') != deb_version(version, build_number):
         raise ValueError('Incorrect Debian prerelease version')
     extracted = work / 'deb-verify'
     command('dpkg-deb', '-x', result, extracted)
@@ -258,7 +263,7 @@ def build_deb(bundle, arch, version, output, work):
     return result
 
 
-def build(bundle, platform, arch, version, output):
+def build(bundle, platform, arch, version, output, build_number=None):
     bundle, output = Path(bundle).resolve(), Path(output).resolve()
     validate_version(version)
     verify_payload(bundle, platform, arch)
@@ -273,7 +278,8 @@ def build(bundle, platform, arch, version, output):
     with tempfile.TemporaryDirectory(prefix='modu-installer-') as tmp:
         work = Path(tmp)
         builder = {'macos': build_dmg, 'windows': build_windows, 'linux': build_deb}[platform]
-        result = builder(bundle, arch, version, output, work)
+        options = {'build_number': build_number} if platform == 'linux' else {}
+        result = builder(bundle, arch, version, output, work, **options)
     checksum(result)
     print(f'Created and checked: {result}')
     return result

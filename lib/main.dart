@@ -47,6 +47,9 @@ Future<void> main() async {
       'Modu': 'LICENSE',
       'Anx Reader': 'LICENSES/Anx-Reader-MIT.txt',
       'ReadAny': 'LICENSES/ReadAny-GPL-3.0-or-later.txt',
+      'MiniLM embedding model': 'LICENSES/MiniLM-Embedding-Apache-2.0.txt',
+      'BGE embedding models': 'LICENSES/BGE-Embedding-MIT.txt',
+      'E5 embedding model': 'LICENSES/E5-Embedding-MIT.txt',
     }.entries) {
       yield LicenseEntryWithLineBreaks(
           [entry.key], await rootBundle.loadString(entry.value));
