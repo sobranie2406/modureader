@@ -38,6 +38,15 @@
 - CI 编译、单元测试和安装器检查不等于所有平台全部业务功能均已真机验收。macOS 未公证，iOS 未签名，无 App Store / TestFlight 发布。
 - 远程 AI、翻译和语音可能发送文本给所选服务。请勿在公开 Issue 或截图中附带 API Key、同步密码、配置代码或私人书籍。Android 签名材料保存在仓库 Secrets，不进入源码。
 
+## 补充适用范围
+
+- 系统语音未指定音色时使用设备默认声音。Linux 没有系统 TTS 后端，界面禁用该选项；需用户主动选择在线语音，不会自动上传正文。Linux 在线语音播放仍待设备验证。
+- 密码 PDF 暂不支持；扫描 PDF 不做 OCR；不承诺支持 DRM 加密书籍。文件排版和目录质量会影响阅读、正文提取与索引。
+- 免费翻译和 Edge TTS 依赖网络，可能限流或变更；付费服务需有效配置，预设模型名不保证长期可用。
+- 实际界面检查主要在 macOS 完成。其他平台的构建、架构和安装器检查不等于所有业务功能均已验收。详细测试范围见 [测试记录](https://github.com/sobranie2406/modureader/blob/v0.1.0-beta.3/docs/TESTING.md)。
+- 不提供上游商店发行版、签名服务、Notion/Obsidian 专用导出或全部上游格式支持承诺。
+- README 截图来自早期 macOS 构建，展示真实操作入口但未生成模型回答，不作为接口可用性的验证证据；界面选项与默认值以安装版本为准。
+
 ## English summary
 
 MiMo now uses the official chat-completions speech protocol with corrected defaults, built-in voices and voice design without text rewriting. WAV playback, the 60-second MiMo synthesis timeout and configuration-sensitive caching are fixed. Legacy settings retain keys and custom proxy hosts; unsupported AAC/PCM selections use MP3. The 21 new MiMo tests use mocked HTTP, not a live account.
@@ -51,3 +60,12 @@ All four local embedding models remain bundled. Local Chinese BGE is the default
 Distribution targets: Android ARM64/x86_64 APK, Windows x64/ARM64 EXE, Debian 13 x64/ARM64 DEB, macOS Intel/Apple Silicon DMG, and an **unsigned iOS ARM64 IPA**. macOS is unnotarized; iOS requires your own valid signing and cannot be installed directly. Each asset has a SHA-256 file.
 
 Derived from Anx Reader and ReadAny; this is not an official upstream release. Sources, notices and licenses are included or linked.
+
+### Compatibility and verification notes archived from the project homepage
+
+- System speech uses the device's default voice when none is selected. Linux has no system TTS backend; users must explicitly choose an online service. There is no automatic text upload or provider fallback. Online speech playback on Linux still needs device testing.
+- Password-protected PDFs are unsupported; scanned PDFs do not undergo OCR. DRM-protected books are not guaranteed to work. Layout and contents quality affect reading, text extraction and indexing.
+- Free translation and Edge TTS depend on network access and may be rate-limited or changed by their providers. Paid services require valid settings; preset model names may change.
+- Actual UI checks have primarily been performed on macOS. Compilation, architecture and installer checks on other platforms do not establish full functional acceptance.
+- This project does not provide upstream store editions, signing services, dedicated Notion/Obsidian exports or support for every upstream format.
+- README screenshots are from an earlier macOS build. They show real controls without generated model answers, not proof of endpoint availability. Options and defaults depend on the installed version.

@@ -36,6 +36,15 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 
 ## 发布流程
 
+### 文档分工
+
+- `README.md` 与 `README_EN.md` 只介绍当前版本的功能、使用入口、截图和安装入口；保留必要的安装与隐私安全提醒。
+- 各 Beta 的新增、修复、构建号、测试结果、已知问题和未验证事项写入对应 GitHub Release，不在首页逐版累积。
+- 功能发生变化时直接更新中英文 README 的功能描述，不添加“Beta X 新增/修复”段落。
+- `docs/RELEASE_NOTES.md` 用于准备当前发布的说明；发布后修改说明应同步到对应 Release。历史版本的说明保留在各自 Release 中，不覆盖为新版内容。
+
+### 发布步骤
+
 1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
 2. 只在本仓库创建版本标签；GitHub Actions 并行生成各平台/架构制品。
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。

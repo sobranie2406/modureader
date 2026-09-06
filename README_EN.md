@@ -8,7 +8,7 @@
 
 Modu is an open-source AI ebook reader built with Flutter. It brings books, notes, reading progress and AI conversations together: read first, then ask questions about the current chapter. For semantic search, index your books using local models or a remote embedding service.
 
-**Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. The project is in **Beta**. Implementing a feature, building a package and validating it on a device are different milestones—see [Known limitations](#known-limitations-and-test-coverage).
+**Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. See [Releases](https://github.com/sobranie2406/modureader/releases) for version updates and usage notes.
 
 [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
@@ -25,17 +25,13 @@ Modu is an open-source AI ebook reader built with Flutter. It brings books, note
 | iOS | ARM64 devices | iOS 16+; **unsigned.ipa** has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
 
 Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
-Beta 3 (build 6329): [downloads and release notes](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.3). Nine application packages are targeted; check the release page for available assets and their SHA-256 files. Architecture, signature and checksum checks are not a substitute for functional testing on devices.
-
-Beta 3 also corrects Xiaomi MiMo's official protocol, defaults and WAV playback; live-account listening remains unverified. Beta 3 fixes skipped first sentences and text headings, asynchronous chapter advancement, and pause/resume handling in read-aloud. Speech synthesis or playback failures now pause with an error instead of silently skipping text. Native macOS system speech passed testing; the reported book and Android device still need verification. See the [read-aloud test record (Chinese)](docs/tts-reader-regression.md). The following Beta 2 fixes remain included.
-
-Beta 2 corrects reader background image and color handling, adds Settings → Report a Bug, removes app vibration feedback, and updates Android ONNX Runtime to 1.24.3. The local-model crash reported on Xiaomi 15 Ultra still needs verification on that device; see the [verification record (Chinese)](docs/android-onnx-haptics-verification.md).
+Download the installer and its SHA-256 file from [Releases](https://github.com/sobranie2406/modureader/releases), choosing your system and architecture.
 
 Desktop apps use native installers, not ZIP or tar.gz downloads. Android `-notices.zip` files contain license information; GitHub's automatically generated `Source code (zip)` downloads contain source code. Neither is an application installer. We do not provide scripts to bypass operating-system security protections. See [Release and installation instructions (Chinese)](docs/RELEASING.md) for details.
 
 ## Features
 
-This table describes functionality integrated into the current codebase, not a claim that every feature has passed acceptance testing on every platform.
+The current version provides the following reading, AI and library features.
 
 | Area | What it does | Where to find it |
 | --- | --- | --- |
@@ -47,10 +43,11 @@ This table describes functionality integrated into the current codebase, not a c
 | AI reading skills | Ten built-in skills with Chinese names; enable/disable, inspect/edit prompts and create custom skills | Settings → AI Reading Skills |
 | Semantic search and RAG | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing | Book menu; Settings → Embedding Models |
 | Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text and full-text translation entry points | Settings → Translation; bottom reader toolbar |
-| Read aloud | System speech, Edge TTS and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
+| Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
 | Configuration transfer | Import/export AI and WebDAV settings with codes, QR-code display and QR-code image import | AI Settings / Sync → Import and Export |
 | Appearance and tools | System/dark/light themes, cover display, font import/download, network and logging options | Settings → Appearance / Reading / Advanced |
+| Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
 ### AI grounded in your reading
 
@@ -90,9 +87,15 @@ Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a backgro
 | BGE Small ZH v1.5 | Chinese | 512 |
 | Multilingual E5 Small | Multilingual | 384 |
 
-The revised Beta 1 (build 6326) **bundles all four models and tokenizers**. Local inference needs no additional download or API key. Chinese BGE is selected by default and automatic indexing is off. The first upgrade from an older build also applies these defaults while retaining remote settings and keys; later manual choices are preserved. Model assets total about 208 MiB and are prepared locally on first use. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
+The app **bundles all four models and tokenizers**. Local embedding computation needs no additional download or API key. Chinese BGE is selected by default and automatic indexing is off. Model assets total about 208 MiB and are prepared locally on first use. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
 
 Local embeddings only mean that embedding computation happens on your device. Remote chat, embedding, translation or speech services still receive the relevant text. The whole AI workflow should not be described as completely offline.
+
+### Translation and read-aloud
+
+Translate selected text or use the bottom reader toolbar, with Google translation, AI translation or DeepL/DeepLX.
+
+Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo supports built-in voices, text-based voice design and MP3/WAV audio; style, pace and pitch are controlled through natural-language instructions. Synthesis or playback failures pause at the current position for retry.
 
 ### Sync and key security
 
@@ -104,7 +107,7 @@ Local embeddings only mean that embedding computation happens on your device. Re
 
 ## Screenshots
 
-These are actual macOS screenshots from an earlier Modu `v0.1.0-beta.1` build, not upstream screenshots or design mockups. They show the Chinese UI and selected settings, not necessarily revised-build defaults. Build 6326 bundles the model weights.
+These actual Modu macOS screenshots use the project's original demo book. They come from an earlier build and illustrate the layout; available options and defaults depend on the installed version.
 
 ### Reading: text, fonts and themes
 
@@ -124,7 +127,7 @@ Home offers twelve quick questions about your library and reading records, cover
 
 ![Modu home AI with twelve quick questions and general prompt entry points](docs/images/ai-home-prompts-macos.jpg)
 
-These AI screenshots show real interface controls. **No model responses were generated or composited into them**, and they do not demonstrate model quality or endpoint availability. The demo book is original project content; screenshots contain no private books, API keys or private conversations. [Download the demo EPUB](docs/examples/modu-reading-demo.epub) to try it yourself.
+The screenshots show reading and AI controls. [Download the original demo EPUB](docs/examples/modu-reading-demo.epub) to try them yourself.
 
 <details>
 <summary>More screenshots: chapter navigation, AI skills and local embedding models</summary>
@@ -151,14 +154,9 @@ These AI screenshots show real interface controls. **No model responses were gen
 4. For semantic search, index a book from its menu using the bundled Chinese model. Choose another model or configure an optional remote endpoint in Embedding Models.
 5. Choose translation, read-aloud and sync services as needed. See the [Settings guide (Chinese)](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
 
-## Known limitations and test coverage
+## Feedback
 
-- Original Beta 1 (build 6325) had missing Windows VC++ runtime files, insufficient Android tokenizer 16 KB alignment, an invalid Apple marketing version and a default system-voice issue. Build 6326 includes fixes and packaging checks. Check release notes and the internal build number to distinguish packages; old cached downloads do not update automatically.
-- Current source uses the native default voice when no system voice is selected. Linux has no system TTS implementation: settings disable that option and explain the limitation. Users must explicitly choose an online service; Modu does not automatically switch or upload text. Online speech playback on Linux still needs device testing.
-- Password-protected PDFs are not currently supported; scanned PDFs do not undergo OCR. DRM-protected books are not promised to work. Document layout and table-of-contents quality affect reading, text extraction and indexing.
-- Free translation and Edge TTS require network access and may be rate-limited or changed by their providers. Paid services require your own valid settings. Preset model names are not guaranteed to remain available indefinitely.
-- Actual UI checks have primarily been performed on macOS. Other systems' packages have been built and checked for architecture; that does not establish that all functionality works on all platforms. See [Testing scope (Chinese)](docs/TESTING.md).
-- This project does not provide upstream store editions, signing services, dedicated Notion/Obsidian exports or a guarantee of support for every upstream file format.
+Version changes, compatibility notes and caveats are collected in the [release notes](https://github.com/sobranie2406/modureader/releases).
 
 When reporting an issue in [this repository](https://github.com/sobranie2406/modureader/issues), include your version, system, architecture, reproduction steps and a sample without private information. Never submit API keys, WebDAV passwords or configuration QR codes.
 
