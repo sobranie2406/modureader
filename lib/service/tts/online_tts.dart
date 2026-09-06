@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -7,6 +8,7 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:anx_reader/service/tts/tts_provider.dart';
+import 'package:anx_reader/service/tts/audio_mime_type.dart';
 import 'package:anx_reader/service/tts/models/tts_segment.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
@@ -42,7 +44,6 @@ class OnlineTts extends BaseTts {
   // ============ Configuration ============
   static const int _bufferCapacity = 10;
   static const int _batchSize = 5; // Max concurrent fetches
-  static const int _fetchTimeoutSeconds = 10;
   static const int _maxRetries = 2;
   static final TtsCache _audioCache = TtsCache(maxEntries: 256);
 
@@ -326,10 +327,13 @@ class OnlineTts extends BaseTts {
                 parameters: {
                   'rate': rate.toStringAsFixed(4),
                   'pitch': pitch.toStringAsFixed(4),
+                  'config':
+                      jsonEncode(currentBackend.getConfig()..remove('key')),
                 },
               ),
             )
-            .timeout(Duration(seconds: _fetchTimeoutSeconds));
+            .timeout(
+                currentBackend.synthesisTimeout + const Duration(seconds: 1));
         final bytes = audio.bytes;
 
         // Check if version is still valid (settings haven't changed during fetch)
@@ -414,7 +418,8 @@ class OnlineTts extends BaseTts {
 
         // Play audio
         _playbackCompleter = Completer<void>();
-        final source = BytesSource(segment.audio!, mimeType: 'audio/mp3');
+        final source = BytesSource(segment.audio!,
+            mimeType: ttsAudioMimeType(segment.audio!));
 
         try {
           if (_playOverride != null) {
@@ -587,7 +592,7 @@ class OnlineTts extends BaseTts {
 
     final bytes = await backend.speak(content, voice, rate, pitch);
     if (bytes.isNotEmpty) {
-      final source = BytesSource(bytes, mimeType: 'audio/mp3');
+      final source = BytesSource(bytes, mimeType: ttsAudioMimeType(bytes));
       await audioPlayer.play(source);
     }
   }
@@ -615,6 +620,6 @@ class _ProviderAdapter implements TtsProvider {
   @override
   Future<TtsAudioChunk> synthesize(TtsRequest request) async {
     final bytes = await provider.speak(request.text, voice, rate, pitch);
-    return TtsAudioChunk(bytes: bytes, mimeType: 'audio/mpeg');
+    return TtsAudioChunk(bytes: bytes, mimeType: ttsAudioMimeType(bytes));
   }
 }

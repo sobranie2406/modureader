@@ -488,7 +488,8 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     final configItems = provider.getConfigItems(context);
     if (configItems.isEmpty) return const SizedBox.shrink();
 
-    final config = ref.watch(onlineTtsConfigProvider(serviceId));
+    final savedConfig = ref.watch(onlineTtsConfigProvider(serviceId));
+    final config = serviceId == 'xiaomi' ? provider.getConfig() : savedConfig;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),

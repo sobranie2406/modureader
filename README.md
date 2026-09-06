@@ -26,9 +26,9 @@ This is an independently modified derivative, not an official release of either 
 | iOS | ARM64 真机 | iOS 16+，**unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
 
 这里的 x64 指 x86-64，ARM64 也是 64 位。iPhone/iPad 没有 x64 真机包。
-Beta 3（build 6328）：[下载与发布说明](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.3)。目标为 9 个程序包，实际可用附件以发布页为准，均附 SHA-256 校验文件。架构、签名和哈希检查不等于所有功能均经设备测试。
+Beta 3（build 6329）：[下载与发布说明](https://github.com/sobranie2406/modureader/releases/tag/v0.1.0-beta.3)。目标为 9 个程序包，实际可用附件以发布页为准，均附 SHA-256 校验文件。架构、签名和哈希检查不等于所有功能均经设备测试。
 
-Beta 3 修复朗读首句和文字标题漏读、异步跨章跳读及暂停恢复问题；语音合成或播放失败时暂停并显示错误，不再静默跳过。详见[朗读验证记录](docs/tts-reader-regression.md)：macOS 原生系统语音测试已通过，原问题书籍与 Android 真机仍待复测。下述 Beta 2 修复继续保留。
+Beta 3 同时修正 Xiaomi MiMo 官方协议、默认配置和 WAV 播放；真实账户联网试听仍待验证。Beta 3 修复朗读首句和文字标题漏读、异步跨章跳读及暂停恢复问题；语音合成或播放失败时暂停并显示错误，不再静默跳过。详见[朗读验证记录](docs/tts-reader-regression.md)：macOS 原生系统语音测试已通过，原问题书籍与 Android 真机仍待复测。下述 Beta 2 修复继续保留。
 
 Beta 2 修正阅读背景图片与颜色的应用逻辑，新增「设置 → 提交 Bug」，移除应用震动反馈，并将 Android ONNX Runtime 更新为 1.24.3。小米 15 Ultra 上的本地模型闪退尚未完成真机复测，详见[验证记录](docs/android-onnx-haptics-verification.md)。
 桌面端使用原生安装包，不再以 ZIP / tar.gz 作为应用安装入口。Android 的 `-notices.zip` 是许可证资料；GitHub 自动提供的 `Source code (zip)` 是源码，两者都不是程序安装包。

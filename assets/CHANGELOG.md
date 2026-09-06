@@ -1,6 +1,10 @@
 # Changelog
 
-## Modu 0.1.0-beta.3 (6328)
+## Modu 0.1.0-beta.3 (6329)
+
+- 小米 MiMo 改用官方聊天语音协议，修正默认地址、模型和音色；补齐官方音色和文字设计音色配置。
+- 修复 WAV 音频类型、MiMo 合成超时和参数修改后的缓存复用；旧 AAC/PCM 配置改用 MP3。真实小米服务联网试听仍待验证。
+- Implement Xiaomi MiMo's official chat-based speech protocol, presets and voice design; fix WAV playback MIME, synthesis timeout and configuration-sensitive caching. Live MiMo listening remains unverified.
 
 - 修复朗读初始化跳过首句，以及带目录链接的文字标题被过滤的问题。
 - 修复系统语音和在线语音的异步推进、暂停恢复及手动切章造成的漏读；保留重复段落。

@@ -24,6 +24,8 @@ abstract class _TtsService {}
 ///   - [getConfigItems]: Configuration items.
 ///   - [getConfig] / [saveConfig]: Configuration management.
 abstract class TtsServiceProvider extends ServiceProvider<dynamic> {
+  Duration get synthesisTimeout => const Duration(seconds: 10);
+
   String get serviceId => service.toString().split('.').last;
 
   /// The display label for this service.

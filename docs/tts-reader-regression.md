@@ -51,4 +51,4 @@ MODU_JSDOM_ROOT=/path/to/jsdom-fixture node --test test/reader_business.test.mjs
 flutter test integration_test/tts_reader_test.dart -d macos --dart-define=MODU_NATIVE_TTS_TEST=true
 ```
 
-上述验证在本地修复阶段完成。应用户后续发布要求，修复纳入 Beta3（build 6328）；不替换 Beta2 安装包。正式分发状态以 GitHub Release 和对应 CI 结果为准。
+上述验证在本地修复阶段完成。应用户后续发布要求，修复纳入 Beta3（build 6329）；不替换 Beta2 安装包。正式分发状态以 GitHub Release 和对应 CI 结果为准。

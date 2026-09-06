@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -218,6 +219,9 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
 
   XiaomiMimoTtsProvider._();
 
+  XiaomiMimoTtsProvider.forTesting({required http.Client client})
+      : super(client: client);
+
   @override
   TtsService get service => TtsService.xiaomi;
 
@@ -225,21 +229,208 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
   String get providerName => 'Xiaomi MiMo';
 
   @override
-  String get providerDescription => 'MiMo-V2.5-TTS，支持自定义音色和朗读风格';
+  String get providerDescription =>
+      '小米官方聊天语音接口：内置音色或文字设计音色。语速、音高通过风格指令控制，非精确倍率。仅播放 MP3/WAV，旧 AAC/PCM 配置自动改用 MP3。不支持声音克隆。';
 
   @override
-  String get defaultBaseUrl => '';
+  String get defaultBaseUrl => 'https://api.xiaomimimo.com';
 
   @override
-  String get defaultModel => 'MiMo-V2.5-TTS';
+  String get defaultEndpoint => '/v1/chat/completions';
 
   @override
-  String get defaultVoice => 'default';
+  String get defaultModel => 'mimo-v2.5-tts';
+
+  @override
+  String get defaultVoice => 'mimo_default';
+
+  @override
+  Duration get synthesisTimeout => const Duration(seconds: 60);
+
+  @override
+  Map<String, dynamic> getConfig() => normalizeConfig(super.getConfig());
+
+  // Effective migration is also used by the settings form. Preserve credentials
+  // and custom hosts; never silently redirect a configured proxy to Xiaomi.
+  Map<String, dynamic> normalizeConfig(Map<String, dynamic> saved) {
+    final config = Map<String, dynamic>.from(saved);
+    String value(String key) => config[key]?.toString().trim() ?? '';
+    if (value('baseUrl').isEmpty) config['baseUrl'] = defaultBaseUrl;
+    if (value('endpoint').isEmpty ||
+        const {'/v1/audio/speech', 'v1/audio/speech', '/audio/speech'}
+            .contains(value('endpoint'))) {
+      config['endpoint'] = defaultEndpoint;
+    }
+    final endpointUri = Uri.tryParse(value('endpoint'));
+    if (endpointUri?.host == 'api.xiaomimimo.com' &&
+        const {'/v1/audio/speech', '/audio/speech'}
+            .contains(endpointUri?.path)) {
+      config['endpoint'] =
+          endpointUri!.replace(path: defaultEndpoint).toString();
+    }
+    final model = value('model');
+    if (model.isEmpty || model.toLowerCase() == defaultModel) {
+      config['model'] = defaultModel;
+    }
+    if (value('voice').isEmpty || value('voice') == 'default') {
+      config['voice'] = defaultVoice;
+    }
+    if (!const {'mp3', 'wav'}.contains(value('format'))) {
+      config['format'] = 'mp3';
+    }
+    return config;
+  }
+
+  @override
+  List<ConfigItem> getConfigItems(BuildContext context) =>
+      super.getConfigItems(context).map((item) {
+        if (item.key == 'format') {
+          return ConfigItem(
+            key: 'format',
+            label: item.label,
+            type: ConfigItemType.select,
+            defaultValue: 'mp3',
+            options: const [
+              {'label': 'MP3', 'value': 'mp3'},
+              {'label': 'WAV', 'value': 'wav'},
+            ],
+          );
+        }
+        if (item.key == 'model') {
+          return ConfigItem(
+            key: 'model',
+            label: item.label,
+            type: ConfigItemType.select,
+            defaultValue: defaultModel,
+            options: [
+              {'label': 'MiMo · 内置音色', 'value': 'mimo-v2.5-tts'},
+              {'label': 'MiMo · 文字设计音色', 'value': 'mimo-v2.5-tts-voicedesign'},
+              if (!const {'mimo-v2.5-tts', 'mimo-v2.5-tts-voicedesign'}
+                  .contains(getConfig()['model']))
+                {'label': '旧模型不受支持，请重新选择', 'value': getConfig()['model']},
+            ],
+          );
+        }
+        return item;
+      }).toList();
+
+  @override
+  Future<Uint8List> speak(
+      String text, String? voice, double rate, double pitch) async {
+    final config = getConfig();
+    final key = config['key']?.toString().trim() ?? '';
+    if (key.isEmpty) throw StateError('Xiaomi MiMo：请填写 API Key。');
+    if (text.trim().isEmpty) throw StateError('Xiaomi MiMo：朗读文本为空。');
+    final model = config['model'].toString();
+    final design = model == 'mimo-v2.5-tts-voicedesign';
+    if (!design && model != defaultModel) {
+      throw StateError('Xiaomi MiMo：请选择内置音色或文字设计音色模型。');
+    }
+    final style = config['stylePrompt']?.toString().trim() ?? '';
+    if (design && style.isEmpty) {
+      throw StateError('Xiaomi MiMo：文字设计音色需要填写朗读风格/音色描述。');
+    }
+    final selected = resolveVoice(voice).trim();
+    final resolved = selected == 'default' ? defaultVoice : selected;
+    if (!design && !bundledVoices.any((v) => v.shortName == resolved)) {
+      throw StateError('Xiaomi MiMo：请选择官方内置音色。');
+    }
+    final directions = [
+      if (style.isNotEmpty) style,
+      if (rate.isFinite && rate != 1)
+        '语速约为正常语速的 ${rate.clamp(0.25, 4).toStringAsFixed(2)} 倍。',
+      if (pitch.isFinite && pitch != 1) pitch > 1 ? '音调适当提高。' : '音调适当降低。',
+    ].join('\n');
+    final uri = resolveMimoEndpoint(
+        config['baseUrl'].toString(), config['endpoint'].toString());
+    http.Response response;
+    try {
+      response = await _client
+          .post(uri,
+              headers: {
+                'Authorization': 'Bearer $key',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: jsonEncode({
+                'model': model,
+                'messages': [
+                  if (directions.isNotEmpty)
+                    {'role': 'user', 'content': directions},
+                  {'role': 'assistant', 'content': text},
+                ],
+                'audio': {
+                  'format': config['format'],
+                  if (!design) 'voice': resolved,
+                  if (design) 'optimize_text_preview': false,
+                },
+                'stream': false,
+              }))
+          .timeout(synthesisTimeout);
+    } on TimeoutException {
+      throw StateError('Xiaomi MiMo：语音生成超时，请重试或缩短文本。');
+    } on Exception {
+      // Do not expose a proxy URL, echoed key, or private text in app logs.
+      throw StateError('Xiaomi MiMo：网络请求失败，请检查地址和网络。');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final hint = switch (response.statusCode) {
+        401 || 403 => '请检查 API Key 和模型访问权限',
+        429 => '请求限流或额度不足，请稍后重试',
+        400 || 404 || 422 => '请检查接口地址、模型及音色参数',
+        _ => '服务暂不可用，请稍后重试',
+      };
+      throw StateError('Xiaomi MiMo（${response.statusCode}）：$hint。');
+    }
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final choice = (decoded['choices'] as List).first;
+      if (choice['finish_reason'] != 'stop') {
+        throw const FormatException('Incomplete speech');
+      }
+      final audio = base64Decode(choice['message']['audio']['data'] as String);
+      if (audio.isEmpty) throw const FormatException('Empty speech');
+      return audio;
+    } catch (_) {
+      throw StateError('Xiaomi MiMo：没有返回完整有效的音频，已保留原文位置，请重试。');
+    }
+  }
 
   @override
   List<TtsVoice> get bundledVoices => const [
-        TtsVoice(shortName: 'default', name: 'Default', locale: 'zh-CN'),
+        TtsVoice(shortName: 'mimo_default', name: 'MiMo 默认', locale: 'zh-CN'),
+        TtsVoice(shortName: '冰糖', name: '冰糖', locale: 'zh-CN'),
+        TtsVoice(shortName: '茉莉', name: '茉莉', locale: 'zh-CN'),
+        TtsVoice(shortName: '苏打', name: '苏打', locale: 'zh-CN'),
+        TtsVoice(shortName: '白桦', name: '白桦', locale: 'zh-CN'),
+        TtsVoice(shortName: 'Mia', name: 'Mia', locale: 'en-US'),
+        TtsVoice(shortName: 'Chloe', name: 'Chloe', locale: 'en-US'),
+        TtsVoice(shortName: 'Milo', name: 'Milo', locale: 'en-US'),
+        TtsVoice(shortName: 'Dean', name: 'Dean', locale: 'en-US'),
       ];
+}
+
+Uri resolveMimoEndpoint(String baseUrl, String endpoint) {
+  var base = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+  var path = endpoint.trim();
+  if (!path.startsWith('https://') && !path.startsWith('http://')) {
+    if (base.endsWith('/chat/completions')) {
+      path = base;
+    } else if (base.endsWith('/v1') && path.startsWith('/v1/')) {
+      base = base.substring(0, base.length - 3);
+    }
+  }
+  final uri = resolveSpeechEndpoint(base, path);
+  if (uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty ||
+      uri.hasQuery ||
+      uri.hasFragment ||
+      (uri.scheme != 'https' &&
+          !(uri.scheme == 'http' &&
+              const {'localhost', '127.0.0.1', '::1'}.contains(uri.host)))) {
+    throw const FormatException('Xiaomi MiMo：请使用不带密钥参数的 HTTPS 接口地址。');
+  }
+  return uri;
 }
 
 Uri resolveSpeechEndpoint(String baseUrl, String endpoint) {
