@@ -5,6 +5,7 @@ import plistlib
 import re
 import struct
 import zipfile
+from verify_onnx_jni import verify_onnx_jni
 
 
 def apple_version(version):
@@ -48,6 +49,7 @@ def verify_android_apk(apk, arch):
     with zipfile.ZipFile(apk) as archive:
         if archive.testzip() is not None:
             raise ValueError('Corrupt APK')
+        verify_onnx_jni(archive)
         libraries = [n for n in archive.namelist() if n.startswith('lib/') and n.endswith('.so')]
         for required in ('libapp.so', 'libflutter.so', 'libtokenizers_ffi.so'):
             if f'lib/{abi}/{required}' not in libraries:

@@ -15,6 +15,53 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
 from verify_mobile import apple_version, verify_android_elf, verify_apple_bundle
 from windows_runtime import prepare_windows_runtime, verify_crt, pe_imports
 import bundle_models
+from verify_onnx_jni import CONSTRUCTORS, REQUIRED_CLASSES, definitions, verify_definitions
+
+
+class OnnxJniReleaseTest(unittest.TestCase):
+    def valid_classes(self):
+        return {name: {('<init>', CONSTRUCTORS[name])} if name in CONSTRUCTORS else set()
+                for name in REQUIRED_CLASSES}
+
+    def test_original_classes_and_constructors_pass(self):
+        verify_definitions(self.valid_classes())
+
+    def test_beta4_6331_renamed_tensor_info_is_rejected(self):
+        classes = self.valid_classes()
+        classes['Lc/l;'] = classes.pop('Lai/onnxruntime/TensorInfo;')
+        with self.assertRaisesRegex(ValueError, 'classes removed/renamed'):
+            verify_definitions(classes)
+
+    def test_retained_class_with_rewritten_constructor_is_rejected(self):
+        classes = self.valid_classes()
+        classes['Lai/onnxruntime/OnnxTensor;'] = {('<init>', '(JLc/l;Ljava/nio/Buffer;)V')}
+        with self.assertRaisesRegex(ValueError, 'constructor removed/rewritten'):
+            verify_definitions(classes)
+
+    def test_no_dex_is_rejected(self):
+        with self.assertRaises(ValueError):
+            verify_definitions({})
+
+    def test_definitions_not_string_references(self):
+        dump = """Class #0 header:
+Class #0 -
+  Class descriptor : 'Lactual/Class;'
+  Static fields -
+    name : 'field'
+    type : 'Lai/onnxruntime/TensorInfo;'
+  Direct methods -
+    name : '<init>'
+    type : '()V'
+"""
+        # dexdump without -f has no separate class header block.
+        dump = dump.replace('Class #0 header:\n', '')
+        self.assertEqual(definitions(dump), {'Lactual/Class;': {('<init>', '()V')}})
+
+    def test_missing_native_constructor_is_rejected(self):
+        classes = self.valid_classes()
+        classes['Lai/onnxruntime/TensorInfo;'] = set()
+        with self.assertRaises(ValueError):
+            verify_definitions(classes)
 
 
 class BundledModelsTest(unittest.TestCase):

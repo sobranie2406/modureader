@@ -1,4 +1,18 @@
-# 默读 / Modu Beta 4 · build 6331
+# 默读 / Modu Beta 4 · Android build 6332 / other platforms 6331
+
+## Android 热修复 · 6332
+
+- 替换本页 ARM64 和 x86_64 两个安卓 APK，版本仍为 Beta4，构建号由 6331 升到 6332。沿用原签名，可直接覆盖安装；无需卸载或删除书籍。其他平台附件保持 6331，不变更原 Beta4 标签。
+- 修复发布混淆破坏 ONNX Java/JNI 接口：保留 `ai.onnxruntime.**` 的类及成员，防止原生代码找不到 `TensorInfo` 及输出张量构造函数而终止进程。这是四个模型共用的风险，不是 iQOO 专属问题。
+- 用户提供的 6331 堆栈与发布 APK 原生库 Build ID 一致，`0x97e4` 对应 `convertToTensorInfo` 的 JNI 方法查找；公开 APK 缺少原名 `TensorInfo`。新打包检查会拒绝该旧 APK，且同时检查类定义和原生构造函数签名，不以字符串存在代替验证。
+- 增加 Android 16 x86_64 模拟器上的 Release 混淆包推理测试，覆盖四个内嵌模型及 16/512/64 token 输入；以热修复流水线结果为准。模拟器测试不能替代 iQOO Neo8 / Android 16 与原 EPUB 的长书验收。
+- 下载后请在关于页面确认 **0.1.0-beta.4+6332**；若仍退出，请预览并提交新的崩溃诊断。此前内存优化继续保留，但不是这次已定位 JNI 崩溃的修复替代品。
+
+### Android hotfix (English)
+
+The ARM64 and x86_64 APKs on this release are replaced with build **6332**, retaining the original signing identity for in-place upgrades. Other platform packages remain build 6331 and the original Beta4 tag is unchanged. The hotfix preserves ONNX Runtime's JNI-accessed Java classes and constructors through R8. The original APK was missing the unrenamed `TensorInfo` class at the native method lookup identified in the submitted crash stack. Packaging now checks actual DEX definitions and constructor signatures. An Android 16 x86_64 emulator test exercises all four models against the minified release; see its CI result. This does not replace long-book verification on the reported iQOO device. Corresponding hotfix source is identified in the updated Android notices attachments.
+
+## 原 Beta4 更新说明 / Original Beta4 notes (6331)
 
 本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，是独立修改版，不是上游官方发行版。按 GPL-3.0-or-later 发布，保留上游许可及版权。
 
