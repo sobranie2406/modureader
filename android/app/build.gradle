@@ -59,10 +59,11 @@ android {
 
     signingConfigs {
         release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias'] ?: System.getenv('MODU_ANDROID_KEY_ALIAS')
+            keyPassword keystoreProperties['keyPassword'] ?: System.getenv('MODU_ANDROID_KEY_PASSWORD')
+            def releaseStore = keystoreProperties['storeFile'] ?: System.getenv('MODU_ANDROID_KEYSTORE')
+            storeFile releaseStore ? file(releaseStore) : null
+            storePassword keystoreProperties['storePassword'] ?: System.getenv('MODU_ANDROID_KEY_PASSWORD')
         }
     }
 
@@ -103,4 +104,6 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.24.3'
+}

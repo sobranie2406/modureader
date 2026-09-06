@@ -41,11 +41,34 @@ void main() {
         // This log contains only public model metadata, never user books or keys.
         debugPrint(
             'OFFLINE ONNX PASS: ${model.id}, ${model.dimensions} dimensions');
+        if (const bool.fromEnvironment('MODU_EMBEDDING_STRESS')) {
+          final provider =
+              LocalOnnxEmbeddingProvider(model: model, store: store);
+          for (var run = 0; run < 80; run++) {
+            final repeats = [1, 8, 32, 128, 256, 16, 96, 4][run % 8];
+            final text = List.filled(repeats,
+                    '默读测试：阅读帮助我们理解世界。 Reading expands our understanding. ')
+                .join();
+            final result = await provider.embedBatch([text]);
+            expect(result.single.length, model.dimensions);
+            expect(result.single.every((value) => value.isFinite), isTrue);
+            final norm = math.sqrt(result.single
+                .fold<double>(0, (sum, value) => sum + value * value));
+            expect(norm, closeTo(1, 0.0001));
+            if ((run + 1) % 16 == 0) {
+              debugPrint('DEVICE STRESS: ${model.id}, runs=${run + 1}');
+            }
+          }
+          await LocalOnnxEmbeddingEngine.instance.release();
+          expect((await provider.embedBatch(['释放后重新加载。'])).single.length,
+              model.dimensions);
+        }
       }
       expect(networkRequests, 0);
     } finally {
+      await LocalOnnxEmbeddingEngine.instance.release();
       store.close();
       await root.delete(recursive: true);
     }
-  }, timeout: const Timeout(Duration(minutes: 10)));
+  }, timeout: const Timeout(Duration(minutes: 30)));
 }

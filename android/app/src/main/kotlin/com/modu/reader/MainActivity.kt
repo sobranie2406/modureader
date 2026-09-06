@@ -25,6 +25,9 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        if (!flutterEngine.plugins.has(LocalEmbeddingPlugin::class.java)) {
+            flutterEngine.plugins.add(LocalEmbeddingPlugin())
+        }
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,

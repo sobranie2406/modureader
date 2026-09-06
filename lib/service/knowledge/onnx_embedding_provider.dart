@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
+import 'package:anx_reader/service/knowledge/android_embedding_bridge.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:hf_tokenizers/hf_tokenizers.dart';
@@ -51,6 +53,8 @@ class LocalOnnxEmbeddingEngine {
   String? _activeModelId;
   OrtSession? _session;
   Tokenizer? _tokenizer;
+  final _android = const AndroidEmbeddingBridge();
+  Timer? _idleRelease;
   Future<void> _tail = Future<void>.value();
 
   Future<List<List<double>>> generate(
@@ -60,18 +64,38 @@ class LocalOnnxEmbeddingEngine {
     bool Function()? isCancelled,
   }) {
     return _exclusive(() async {
-      if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');
-      await _load(model, store);
-      final vectors = <List<double>>[];
-      for (final input in inputs) {
-        // Native inference finishes first; never abandon an entire batch on
-        // the shared session after reporting that the queue has stopped.
+      _idleRelease?.cancel();
+      try {
         if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');
-        vectors.add(await _generateOne(model, input));
+        await _load(model, store);
+        final vectors = <List<double>>[];
+        for (final input in inputs) {
+          // Native inference finishes first; never abandon an entire batch on
+          // the shared session after reporting that the queue has stopped.
+          if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');
+          vectors.add(await _generateOne(model, input));
+        }
+        return vectors;
+      } catch (_) {
+        // Preserve the inference/cancellation error if teardown also fails.
+        try {
+          await _closeActiveModel();
+        } catch (_) {}
+        rethrow;
+      } finally {
+        // A finished/cancelled book must not keep model weights resident while
+        // the user reads. Cleanup shares the inference lock, never races a run.
+        if (Platform.isAndroid) {
+          _idleRelease = Timer(const Duration(seconds: 15), () {
+            // Engine teardown can remove the channel while this timer fires.
+            unawaited(release().catchError((Object _) {}));
+          });
+        }
       }
-      return vectors;
     });
   }
+
+  Future<void> release() => _exclusive(_closeActiveModel);
 
   Future<T> _exclusive<T>(Future<T> Function() action) async {
     final previous = _tail;
@@ -89,7 +113,9 @@ class LocalOnnxEmbeddingEngine {
     LocalEmbeddingModel model,
     LocalEmbeddingModelStore store,
   ) async {
-    if (_activeModelId == model.id && _session != null && _tokenizer != null) {
+    if (_activeModelId == model.id &&
+        (Platform.isAndroid || _session != null) &&
+        _tokenizer != null) {
       return;
     }
     await _closeActiveModel();
@@ -98,6 +124,12 @@ class LocalOnnxEmbeddingEngine {
     final tokenizer = await store.tokenizerFile(model);
     final loadedTokenizer = Tokenizer.fromFile(tokenizer.path);
     try {
+      if (Platform.isAndroid) {
+        await _android.load(onnx.path);
+        _tokenizer = loadedTokenizer;
+        _activeModelId = model.id;
+        return;
+      }
       final loadedSession = await OnnxRuntime().createSession(
         onnx.path,
         options: OrtSessionOptions(
@@ -119,13 +151,16 @@ class LocalOnnxEmbeddingEngine {
     LocalEmbeddingModel model,
     String text,
   ) async {
-    final session = _session!;
     final tokenizer = _tokenizer!;
     final truncated = tokenizer.truncateToTokens(text, 512);
-    final tokenIds = tokenizer.encode(truncated);
+    final tokenIds = boundEmbeddingTokens(tokenizer.encode(truncated));
     if (tokenIds.isEmpty) {
       throw const FormatException('Tokenizer 没有生成任何 token');
     }
+    if (Platform.isAndroid) {
+      return _android.embed(tokenIds, model.dimensions);
+    }
+    final session = _session!;
     final shape = [1, tokenIds.length];
     final mask = Int64List.fromList(List<int>.filled(tokenIds.length, 1));
     final zeros = Int64List(tokenIds.length);
@@ -176,13 +211,20 @@ class LocalOnnxEmbeddingEngine {
   }
 
   Future<void> _closeActiveModel() async {
+    _idleRelease?.cancel();
     _tokenizer?.close();
     _tokenizer = null;
     await _session?.close();
     _session = null;
     _activeModelId = null;
+    if (Platform.isAndroid) await _android.close();
   }
 }
+
+// Re-tokenizing a prefix can change boundary tokenization. Enforce the actual
+// tensor bound too, preserving the trailing separator for BERT/E5 tokenizers.
+List<int> boundEmbeddingTokens(List<int> ids) =>
+    ids.length <= 512 ? ids : [...ids.take(511), ids.last];
 
 List<double> poolAndNormalizeEmbedding(
   List<double> values,
