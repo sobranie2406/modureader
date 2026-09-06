@@ -25,6 +25,9 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        if (!flutterEngine.plugins.has(CrashDiagnosticsPlugin::class.java)) {
+            flutterEngine.plugins.add(CrashDiagnosticsPlugin())
+        }
         if (!flutterEngine.plugins.has(LocalEmbeddingPlugin::class.java)) {
             flutterEngine.plugins.add(LocalEmbeddingPlugin())
         }

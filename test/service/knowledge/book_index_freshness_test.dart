@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/service/knowledge/index_build_marker.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
@@ -55,6 +56,30 @@ void main() {
         .writeAsString('changed source with different length');
     await expectLater(store.save(snapshot()), throwsStateError);
     expect(await service.indexFile(book.id).exists(), isFalse);
+  });
+
+  test('interrupted rebuild cannot display an older cached index as completed',
+      () async {
+    await (await service.storeFor(book)).save(snapshot());
+    expect(await service.hasIndex(book), isTrue);
+    await indexBuildMarker(service.indexFile(book.id))
+        .writeAsString('in progress');
+    expect(await service.hasIndex(book), isFalse);
+    expect((await service.status(book)).indexed, isFalse);
+    expect(await service.loadSnapshot(book), isNotNull);
+  });
+
+  test('marker exists during work and is removed on success or handled failure',
+      () async {
+    final file = service.indexFile(book.id);
+    await withIndexBuildMarker(file, () async {
+      expect(await indexBuildMarker(file).exists(), isTrue);
+    });
+    expect(await indexBuildMarker(file).exists(), isFalse);
+    await expectLater(
+        withIndexBuildMarker(file, () async => throw StateError('fixture')),
+        throwsStateError);
+    expect(await indexBuildMarker(file).exists(), isFalse);
   });
 
   test('cancellation during final embedding batch does not persist an index',

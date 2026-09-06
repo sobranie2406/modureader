@@ -4,6 +4,19 @@ import 'package:anx_reader/service/feedback/bug_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+      'optional crash diagnostics require clipboard and never enter report URL',
+      () {
+    const report = BugReport(
+        title: 'Crash',
+        description: 'Exit',
+        steps: '1',
+        expected: '2',
+        crashLog: 'NATIVE_CRASH');
+    expect(report.markdown, contains('NATIVE_CRASH'));
+    expect(report.needsClipboard, isTrue);
+    expect(report.prefilledUri.toString(), isNot(contains('NATIVE_CRASH')));
+  });
   const report = BugReport(
     title: ' PDF & 阅读? #1 ',
     description: '无法打开\n第二行 + %',

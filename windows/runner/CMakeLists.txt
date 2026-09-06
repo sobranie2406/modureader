@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "native_crash_recorder.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
@@ -34,6 +35,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE windowsapp)
+target_link_libraries(${BINARY_NAME} PRIVATE dbghelp shell32 ole32)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 

@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 0.1.0-beta.3+6330
+version: 0.1.0-beta.4+6331
 
 environment:
   sdk: '>=3.5.2 <4.0.0'
@@ -65,6 +65,8 @@ dependencies:
   saver_gallery: ^4.0.1
   share_plus: ^11.1.0
   device_info_plus: ^11.3.2
+  modu_native_crash:
+    path: third_party/modu_native_crash
   flutter_riverpod: ^2.5.1
   riverpod_annotation: ^2.3.5
   chinese_font_library: ^1.2.0

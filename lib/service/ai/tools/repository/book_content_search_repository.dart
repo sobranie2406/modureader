@@ -50,19 +50,23 @@ class BookContentSearchRepository {
       throw StateError('The local book file is not available.');
     }
 
-    final session = await _getOrCreateSession(book);
+    // Index extraction owns a short-lived WebView. Do not cache the EPUB's
+    // JS archive/DOM for three minutes alongside the ONNX model and vectors,
+    // or dispose a session concurrently used by a normal AI search.
+    final session = _HeadlessSearchSession(
+      book: book,
+      sourceFingerprint: await bookSourceFingerprint(book),
+      idleCallback: () {},
+    );
     try {
+      await session.ensureInitialized();
       return await session.extractChapters(
         onProgress: onProgress,
         timeout: _searchTimeout,
         isCancelled: isCancelled,
       );
     } finally {
-      if (session.isActive) {
-        session.scheduleDispose(_sessionIdleTimeout);
-      } else {
-        _sessions.remove(book.id);
-      }
+      await session.dispose();
     }
   }
 

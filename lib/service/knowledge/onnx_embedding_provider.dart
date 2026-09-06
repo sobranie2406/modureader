@@ -31,6 +31,9 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   String get modelId => model.id;
 
   @override
+  Future<void> release() => _engine.release();
+
+  @override
   Future<List<List<double>>> embedBatch(List<String> inputs) =>
       embedBatchCancellable(inputs);
 

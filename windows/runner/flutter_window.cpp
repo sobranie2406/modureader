@@ -1,6 +1,9 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+#include "native_crash_recorder.h"
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -25,6 +28,17 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  AttachNativeCrashFilter();
+  flutter::MethodChannel<flutter::EncodableValue> crash_channel(
+      flutter_controller_->engine()->messenger(),
+      "com.modu.reader/crash_diagnostics", &flutter::StandardMethodCodec::GetInstance());
+  crash_channel.SetMethodCallHandler([](const auto& call, auto result) {
+    if (call.method_name() != "read") { result->NotImplemented(); return; }
+    result->Success(flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("active"), flutter::EncodableValue(NativeCrashRecorderActive())},
+        {flutter::EncodableValue("trace"), flutter::EncodableValue(ReadPreviousNativeCrash())}
+    }));
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

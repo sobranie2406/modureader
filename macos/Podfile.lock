@@ -28,6 +28,9 @@ PODS:
   - in_app_purchase_storekit (0.0.1):
     - Flutter
     - FlutterMacOS
+  - modu_native_crash (0.1.0):
+    - Flutter
+    - FlutterMacOS
   - onnxruntime-c (1.23.0)
   - onnxruntime-objc (1.23.0):
     - onnxruntime-objc/Core (= 1.23.0)
@@ -89,6 +92,7 @@ DEPENDENCIES:
   - flutter_tts (from `Flutter/ephemeral/.symlinks/plugins/flutter_tts/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - in_app_purchase_storekit (from `Flutter/ephemeral/.symlinks/plugins/in_app_purchase_storekit/darwin`)
+  - modu_native_crash (from `Flutter/ephemeral/.symlinks/plugins/modu_native_crash/darwin`)
   - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
@@ -134,6 +138,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   in_app_purchase_storekit:
     :path: Flutter/ephemeral/.symlinks/plugins/in_app_purchase_storekit/darwin
+  modu_native_crash:
+    :path: Flutter/ephemeral/.symlinks/plugins/modu_native_crash/darwin
   package_info_plus:
     :path: Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos
   path_provider_foundation:
@@ -169,6 +175,7 @@ SPEC CHECKSUMS:
   flutter_tts: ae915565cc6948444b513acc8ee021993281e027
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
   in_app_purchase_storekit: d1a48cb0f8b29dbf5f85f782f5dd79b21b90a5e6
+  modu_native_crash: bab67ad68d3d306f160ee406825516361d948d87
   onnxruntime-c: 3174c63a963d9abbc2bf9627e3d622819c0ed5f7
   onnxruntime-objc: 1254d12f8160e562e7693ff17f5aa3dd17dc409e
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94

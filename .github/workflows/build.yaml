@@ -132,6 +132,20 @@ jobs:
       - name: Verify bundled model native inference on macOS
         if: matrix.platform == 'macos' && matrix.arch == 'arm64'
         run: flutter test integration_test/bundled_embedding_test.dart -d macos --reporter expanded
+      - name: Verify Apple native crash summary privacy
+        if: matrix.platform == 'macos'
+        run: |
+          swiftc third_party/modu_native_crash/darwin/Classes/NativeCrashSummary.swift test/native/AppleCrashSummaryTest.swift -o "$RUNNER_TEMP/modu-crash-summary-test"
+          "$RUNNER_TEMP/modu-crash-summary-test"
+      - name: Verify Windows native crash capture in isolated CI account
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installation = & $vswhere -latest -products '*' -property installationPath
+          $devcmd = Join-Path $installation 'Common7\Tools\VsDevCmd.bat'
+          cmd /c "`"$devcmd`" -arch=${{ matrix.arch }} -host_arch=x64 && cl /std:c++17 /EHsc /W4 /WX /wd4100 /DUNICODE /D_UNICODE /DFLUTTER_VERSION_BUILD=6331 test\native\WindowsCrashRecorderTest.cpp windows\runner\native_crash_recorder.cpp /Fe:modu-crash-test.exe /link dbghelp.lib shell32.lib ole32.lib && modu-crash-test.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build desktop
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: '3'

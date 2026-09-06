@@ -71,6 +71,9 @@ PODS:
   - integration_test (0.0.1):
     - Flutter
   - InternalCollectionsUtilities (1.1.1)
+  - modu_native_crash (0.1.0):
+    - Flutter
+    - FlutterMacOS
   - onnxruntime-c (1.23.0)
   - onnxruntime-objc (1.23.0):
     - onnxruntime-objc/Core (= 1.23.0)
@@ -164,6 +167,7 @@ DEPENDENCIES:
   - fluttertoast (from `.symlinks/plugins/fluttertoast/ios`)
   - in_app_purchase_storekit (from `.symlinks/plugins/in_app_purchase_storekit/darwin`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - modu_native_crash (from `.symlinks/plugins/modu_native_crash/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
@@ -223,6 +227,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/in_app_purchase_storekit/darwin"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
+  modu_native_crash:
+    :path: ".symlinks/plugins/modu_native_crash/darwin"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   path_provider_foundation:
@@ -270,6 +276,7 @@ SPEC CHECKSUMS:
   in_app_purchase_storekit: d1a48cb0f8b29dbf5f85f782f5dd79b21b90a5e6
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   InternalCollectionsUtilities: af3f471602c4a67cbcb0bee0a80f6f55a33ae453
+  modu_native_crash: bab67ad68d3d306f160ee406825516361d948d87
   onnxruntime-c: 3174c63a963d9abbc2bf9627e3d622819c0ed5f7
   onnxruntime-objc: 1254d12f8160e562e7693ff17f5aa3dd17dc409e
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499

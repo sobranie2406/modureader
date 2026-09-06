@@ -17,9 +17,11 @@ class AndroidEmbeddingBridge {
     if (result is! List || result.length != dimensions) {
       throw const FormatException('Android 返回的向量维度无效');
     }
-    final values = result
-        .map((value) => (value as num).toDouble())
-        .toList(growable: false);
+    final values = result is Float64List
+        ? result
+        : Float64List.fromList(result
+            .map((value) => (value as num).toDouble())
+            .toList(growable: false));
     if (values.any((value) => !value.isFinite)) {
       throw const FormatException('Android 返回的向量包含非有限值');
     }

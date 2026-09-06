@@ -61,6 +61,9 @@ abstract class EmbeddingProvider {
 
   void close() {}
 
+  /// Awaitable teardown used before persistence to avoid model/JSON overlap.
+  Future<void> release() async => close();
+
   Future<List<List<double>>> embedBatchCancellable(List<String> inputs,
       {bool Function()? isCancelled}) async {
     if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'package:anx_reader/service/feedback/crash_journal.dart';
 
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
@@ -252,6 +253,7 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
             finishedAt: DateTime.now(),
           );
         } on Object catch (error, stackTrace) {
+          CrashJournal.recordError(error, stackTrace);
           final latest = _items[bookId] ?? queued;
           if (_cancelRequested.contains(bookId)) {
             _items[bookId] = latest.copyWith(

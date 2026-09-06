@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 class KnowledgeChunk {
   const KnowledgeChunk({
@@ -259,9 +261,9 @@ class KnowledgeIndexSnapshot {
           if (chunk == null) return null;
           return VectorEntry(
             chunk: chunk,
-            vector: (item['vector'] as List<dynamic>)
+            vector: Float64List.fromList((item['vector'] as List<dynamic>)
                 .map((number) => (number as num).toDouble())
-                .toList(growable: false),
+                .toList(growable: false)),
           );
         })
         .whereType<VectorEntry>()
@@ -287,30 +289,165 @@ abstract interface class KnowledgeIndexStore {
 
 class FileKnowledgeIndexStore implements KnowledgeIndexStore {
   const FileKnowledgeIndexStore(this.file,
-      {this.sourceFingerprint, this.isSourceCurrent});
+      {this.sourceFingerprint, this.isSourceCurrent, this.isCancelled});
 
   final File file;
   final String? sourceFingerprint;
   final Future<bool> Function()? isSourceCurrent;
+  final bool Function()? isCancelled;
+
+  void _checkCancellation() {
+    if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');
+  }
+
+  File get summaryFile => File('${file.path}.summary');
+  static Future<void> _legacyReadTail = Future<void>.value();
+
+  /// Small commit metadata avoids deserializing all vectors just to draw a badge.
+  /// Old small files migrate lazily, one at a time. Large legacy indexes remain
+  /// usable for explicit searches, but need a rebuild for a verified badge.
+  Future<Map<String, dynamic>?> summary(String bookId) async {
+    final stat = await file.stat();
+    if (stat.type != FileSystemEntityType.file) return null;
+    if (await summaryFile.exists() && await summaryFile.length() <= 4096) {
+      try {
+        final value = jsonDecode(await summaryFile.readAsString());
+        if (value is Map<String, dynamic> &&
+            value['bookId'] == bookId &&
+            value['sourceFingerprint'] == sourceFingerprint &&
+            value['size'] == stat.size &&
+            value['modified'] == stat.modified.microsecondsSinceEpoch &&
+            value['chunkCount'] is int &&
+            value['chunkCount'] > 0 &&
+            value['vectorCount'] is int &&
+            value['vectorCount'] >= 0 &&
+            (value['vectorCount'] == 0 ||
+                value['vectorCount'] == value['chunkCount'])) {
+          return value;
+        }
+      } catch (_) {}
+      // A stale commit record is not proof of a complete index.
+      return null;
+    }
+    if (stat.size > 4 * 1024 * 1024) return null;
+    final prior = _legacyReadTail;
+    final complete = Completer<void>();
+    _legacyReadTail = complete.future;
+    await prior;
+    try {
+      final snapshot = await load(bookId);
+      if (snapshot == null) return null;
+      final after = await file.stat();
+      if (after.size != stat.size || after.modified != stat.modified) {
+        return null;
+      }
+      final value = _summary(snapshot, stat);
+      await _saveSummary(value);
+      return value;
+    } finally {
+      complete.complete();
+    }
+  }
+
+  Map<String, dynamic> _summary(
+          KnowledgeIndexSnapshot snapshot, FileStat stat) =>
+      {
+        'bookId': snapshot.bookId,
+        'sourceFingerprint': sourceFingerprint ?? snapshot.sourceFingerprint,
+        'chunkCount': snapshot.chunks.length,
+        'vectorCount': snapshot.vectors.length,
+        'size': stat.size,
+        'modified': stat.modified.microsecondsSinceEpoch,
+      };
+
+  Future<void> _saveSummary(Map<String, dynamic> value) async {
+    final temporary = File('${summaryFile.path}.tmp');
+    await temporary.writeAsString(jsonEncode(value), flush: true);
+    await temporary.rename(summaryFile.path);
+  }
+
+  static void validate(KnowledgeIndexSnapshot snapshot) {
+    if (snapshot.chunks.isEmpty) throw const FormatException('索引没有可读片段');
+    final ids = snapshot.chunks.map((chunk) => chunk.id).toSet();
+    if (ids.length != snapshot.chunks.length ||
+        (snapshot.vectors.isNotEmpty &&
+            snapshot.vectors.length != ids.length) ||
+        (snapshot.embeddingMode != null &&
+            snapshot.vectors.length != ids.length)) {
+      throw const FormatException('索引片段或向量不完整');
+    }
+    final seen = <String>{};
+    final dimension = snapshot.embeddingDimensions ??
+        (snapshot.vectors.isEmpty ? 0 : snapshot.vectors.first.vector.length);
+    for (final entry in snapshot.vectors) {
+      if (!ids.contains(entry.chunk.id) ||
+          !seen.add(entry.chunk.id) ||
+          entry.vector.isEmpty ||
+          entry.vector.length != dimension ||
+          entry.vector.any((v) => !v.isFinite)) {
+        throw const FormatException('索引向量无效');
+      }
+    }
+  }
 
   @override
   Future<void> save(KnowledgeIndexSnapshot snapshot) async {
+    _checkCancellation();
+    validate(snapshot);
     if (isSourceCurrent != null && !await isSourceCurrent!()) {
       throw StateError('书籍文件已变更，请使用新文件重新建立索引。');
     }
     await file.parent.create(recursive: true);
     final temporary = File('${file.path}.tmp');
-    await temporary.writeAsString(
-        jsonEncode({
-          ...snapshot.toJson(),
-          if (sourceFingerprint != null) 'sourceFingerprint': sourceFingerprint,
-        }),
-        flush: true);
+    final output = await temporary.open(mode: FileMode.write);
+    try {
+      // Await each bounded row: no whole-book JSON string or unbounded IOSink.
+      final header = jsonEncode({
+        'bookId': snapshot.bookId,
+        'contentHash': snapshot.contentHash,
+        'sourceFingerprint': sourceFingerprint ?? snapshot.sourceFingerprint,
+        if (snapshot.embeddingMode != null)
+          'embeddingMode': snapshot.embeddingMode,
+        if (snapshot.embeddingModelId != null)
+          'embeddingModelId': snapshot.embeddingModelId,
+        if (snapshot.embeddingDimensions != null)
+          'embeddingDimensions': snapshot.embeddingDimensions,
+      });
+      await output.writeString(
+          '${header.substring(0, header.length - 1)},"chunks":[\n');
+      for (var i = 0; i < snapshot.chunks.length; i++) {
+        _checkCancellation();
+        final chunk = snapshot.chunks[i];
+        await output.writeString('${i == 0 ? '' : ','}${jsonEncode({
+              'id': chunk.id,
+              'bookId': chunk.bookId,
+              'chapterId': chunk.chapterId,
+              'text': chunk.text,
+              'startOffset': chunk.startOffset,
+            })}\n');
+      }
+      await output.writeString('],"vectors":[\n');
+      for (var i = 0; i < snapshot.vectors.length; i++) {
+        _checkCancellation();
+        final entry = snapshot.vectors[i];
+        await output.writeString('${i == 0 ? '' : ','}${jsonEncode({
+              'chunkId': entry.chunk.id,
+              'vector': entry.vector,
+            })}\n');
+      }
+      await output.writeString(']}');
+      await output.flush();
+    } finally {
+      await output.close();
+    }
+    _checkCancellation();
     if (isSourceCurrent != null && !await isSourceCurrent!()) {
       await temporary.delete();
       throw StateError('书籍文件已变更，请重新建立索引。');
     }
+    _checkCancellation();
     await temporary.rename(file.path);
+    await _saveSummary(_summary(snapshot, await file.stat()));
   }
 
   @override
@@ -327,6 +464,7 @@ class FileKnowledgeIndexStore implements KnowledgeIndexStore {
       if (snapshot.bookId != bookId) return null;
       if (sourceFingerprint != null &&
           snapshot.sourceFingerprint != sourceFingerprint) return null;
+      validate(snapshot);
       return snapshot;
     } on Object {
       return null;
@@ -345,14 +483,16 @@ class KnowledgeSearchService {
     List<double> Function(KnowledgeChunk chunk)? vectorize,
   }) {
     final chunks = <KnowledgeChunk>[];
-    final canonical = StringBuffer();
+    final digest = _IndexDigestSink();
+    final canonical = utf8.encoder
+        .startChunkedConversion(sha256.startChunkedConversion(digest));
     for (final entry in chapters.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key))) {
       canonical
-        ..write(entry.key)
-        ..write('\u0000')
-        ..write(entry.value)
-        ..write('\u0001');
+        ..add(entry.key)
+        ..add('\u0000')
+        ..add(entry.value)
+        ..add('\u0001');
       chunks.addAll(TextChunker().chunk(
         bookId: bookId,
         chapterId: entry.key,
@@ -360,6 +500,7 @@ class KnowledgeSearchService {
       ));
     }
 
+    canonical.close();
     final vectors = vectorize == null
         ? const <VectorEntry>[]
         : chunks
@@ -367,7 +508,7 @@ class KnowledgeSearchService {
             .toList(growable: false);
     final snapshot = KnowledgeIndexSnapshot(
       bookId: bookId,
-      contentHash: sha256.convert(utf8.encode(canonical.toString())).toString(),
+      contentHash: digest.value!.toString(),
       chunks: List.unmodifiable(chunks),
       vectors: vectors,
     );
@@ -424,6 +565,14 @@ class KnowledgeSearchService {
 
 enum IndexBuildStatus { completed, cancelled }
 
+class _IndexDigestSink implements Sink<Digest> {
+  Digest? value;
+  @override
+  void add(Digest data) => value = data;
+  @override
+  void close() {}
+}
+
 class IndexBuildResult {
   const IndexBuildResult({required this.status, this.snapshot});
 
@@ -466,6 +615,7 @@ class KnowledgeIndexer {
     int? embeddingDimensions,
     IndexProgressCallback? onProgress,
     bool Function()? isCancelled,
+    Future<void> Function()? beforeSave,
   }) async {
     final ordered = chapters.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
@@ -497,6 +647,7 @@ class KnowledgeIndexer {
         }
         final end = math.min(start + batchSize, snapshot.chunks.length);
         final batch = snapshot.chunks.sublist(start, end);
+        onProgress?.call('@embedding', start, snapshot.chunks.length);
         final values = await vectorizeBatch(batch);
         if (values.length != batch.length) {
           throw const FormatException(
@@ -504,7 +655,11 @@ class KnowledgeIndexer {
           );
         }
         for (var index = 0; index < batch.length; index++) {
-          vectors.add(VectorEntry(chunk: batch[index], vector: values[index]));
+          vectors.add(VectorEntry(
+              chunk: batch[index],
+              vector: values[index] is Float64List
+                  ? values[index]
+                  : Float64List.fromList(values[index])));
         }
         onProgress?.call('@embedding', end, snapshot.chunks.length);
         // The macOS ONNX plugin executes on a background task queue. Yielding
@@ -523,6 +678,10 @@ class KnowledgeIndexer {
       );
       _service.putSnapshot(snapshot);
     }
+    if (isCancelled?.call() ?? false) {
+      return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+    }
+    await beforeSave?.call();
     if (isCancelled?.call() ?? false) {
       return const IndexBuildResult(status: IndexBuildStatus.cancelled);
     }

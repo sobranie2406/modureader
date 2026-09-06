@@ -12,6 +12,8 @@ Future<void> mount(
   WidgetTester tester, {
   Future<bool> Function(Uri)? open,
   Future<String> Function()? version,
+  Future<String> Function()? crashLog,
+  Future<String> Function()? environment,
   bool mobile = false,
   bool chinese = false,
 }) async {
@@ -31,6 +33,8 @@ Future<void> mount(
       sections: BugReportSettings(
         openUrl: open ?? (_) async => true,
         loadVersion: version ?? () async => '0.1.0-beta.1+6326',
+        loadCrashLog: crashLog,
+        loadEnvironment: environment ?? () async => '',
       ),
     )),
   ));
@@ -62,6 +66,98 @@ Future<void> fill(WidgetTester tester,
 }
 
 void main() {
+  testWidgets(
+      'checked diagnostics reach clipboard only after preview confirmation, never URL',
+      (tester) async {
+    String? copied;
+    final opened = <Uri>[];
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData')
+        copied = (call.arguments as Map)['text'] as String;
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await mount(tester,
+        crashLog: () async => 'SANITIZED_CRASH_FIXTURE',
+        open: (uri) async {
+          opened.add(uri);
+          return true;
+        });
+    await fill(tester);
+    await click(tester, 'Include crash diagnostics (optional)');
+    await click(tester, 'Preview and submit');
+    expect(copied, isNull);
+    expect(opened, isEmpty);
+    await click(tester, 'Copy and open GitHub');
+    expect(copied, contains('SANITIZED_CRASH_FIXTURE'));
+    expect(opened.single, BugReport.newIssueUri);
+    expect(
+        opened.single.toString(), isNot(contains('SANITIZED_CRASH_FIXTURE')));
+  });
+  testWidgets(
+      'crash checkbox defaults off, previews only after opt-in and opt-out removes it',
+      (tester) async {
+    var reads = 0;
+    await mount(tester,
+        crashLog: () async {
+          reads++;
+          return 'NATIVE_CRASH fixture';
+        },
+        environment: () async => 'Android 16 / iQOO Neo8 / ARM64');
+    expect(reads, 0);
+    expect(find.textContaining('Android 16 / iQOO'), findsOneWidget);
+    expect(
+        tester
+            .widget<CheckboxListTile>(
+                find.byKey(const ValueKey('include-crash-log')))
+            .value,
+        isFalse);
+    await fill(tester);
+    await click(tester, 'Include crash diagnostics (optional)');
+    expect(reads, 1);
+    await click(tester, 'Preview and submit');
+    expect(find.textContaining('NATIVE_CRASH fixture'), findsWidgets);
+    expect(find.text('Copy and open GitHub'), findsOneWidget);
+    await click(tester, 'Keep editing');
+    await click(tester, 'Include crash diagnostics (optional)');
+    await click(tester, 'Preview and submit');
+    expect(find.textContaining('NATIVE_CRASH fixture'), findsNothing);
+    expect(find.text('Continue on GitHub'), findsOneWidget);
+  });
+
+  testWidgets('late diagnostic load cannot restore opted-out or disposed state',
+      (tester) async {
+    final log = Completer<String>();
+    await mount(tester, crashLog: () => log.future);
+    final tile = find.byKey(const ValueKey('include-crash-log'));
+    await tester.ensureVisible(tile);
+    await tester.tap(tile);
+    await tester.pump();
+    await tester.tap(tile);
+    await tester.pump();
+    log.complete('private fixture');
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(tile).value, isFalse);
+    expect(find.textContaining('private fixture'), findsNothing);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'diagnostic read failure allows retry without blocking ordinary report',
+      (tester) async {
+    await mount(tester,
+        crashLog: () async => throw StateError('private error'));
+    await click(tester, 'Include crash diagnostics (optional)');
+    expect(find.textContaining('Could not load crash diagnostics'),
+        findsOneWidget);
+    expect(find.textContaining('private error'), findsNothing);
+    await fill(tester);
+    await click(tester, 'Preview and submit');
+    expect(find.text('Continue on GitHub'), findsOneWidget);
+  });
   testWidgets('no navigation until a valid report is previewed and confirmed',
       (tester) async {
     final opened = <Uri>[];
@@ -97,7 +193,7 @@ void main() {
       return false;
     });
     await fill(tester);
-    await click(tester, 'Include basic environment info');
+    await click(tester, 'Include device and environment info');
     await click(tester, 'Preview and submit');
     await click(tester, 'Continue on GitHub');
     expect(opened!.queryParameters['bug_report_desktop'], isEmpty);

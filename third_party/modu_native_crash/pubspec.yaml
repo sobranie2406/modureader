@@ -1,0 +1,19 @@
+name: modu_native_crash
+description: Local-only Apple MetricKit crash summaries for Modu.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: '>=3.5.2 <4.0.0'
+  flutter: '>=3.24.0'
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: ModuNativeCrashPlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: ModuNativeCrashPlugin
+        sharedDarwinSource: true

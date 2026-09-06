@@ -32,6 +32,7 @@ void main() {
       response = Float64List(dimension)..[0] = 1;
       final vector = await bridge.embed([101, 123, 102], dimension);
       expect(vector.length, dimension);
+      expect(vector, isA<Float64List>());
       expect(vector.first, 1);
       expect(calls.single.method, 'embed');
       expect(calls.single.arguments['ids'], isA<Int64List>());

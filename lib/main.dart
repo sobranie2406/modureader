@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
 
 import 'package:anx_reader/config/app_identity.dart';
@@ -42,6 +43,24 @@ MigrationCheckResult? _migrationCheckResult;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  String diagnosticVersion = 'unknown';
+  try {
+    diagnosticVersion = RegExp(r'^version:\s*(\S+)', multiLine: true)
+            .firstMatch(await rootBundle.loadString('pubspec.yaml'))
+            ?.group(1) ??
+        'unknown';
+  } catch (_) {}
+  await CrashJournal.initialize(version: diagnosticVersion);
+  // Record startup failures too; AnxError later installs the normal handlers
+  // with the same journal calls once ordinary logging is initialized.
+  FlutterError.onError = (details) {
+    CrashJournal.recordError(details.exception, details.stack, framework: true);
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    CrashJournal.recordError(error, stack);
+    return false;
+  };
   LicenseRegistry.addLicense(() async* {
     for (final entry in {
       'Modu': 'LICENSE',
@@ -133,6 +152,7 @@ class _MyAppState extends ConsumerState<MyApp>
     await webViewEnvironment?.dispose();
     webViewEnvironment = null;
     await DBHelper.close();
+    CrashJournal.closeSession();
     await windowManager.destroy();
   }
 
@@ -175,6 +195,7 @@ class _MyAppState extends ConsumerState<MyApp>
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.detached) CrashJournal.closeSession();
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       if (Prefs().webdavStatus) {

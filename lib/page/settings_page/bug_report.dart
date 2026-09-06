@@ -1,4 +1,5 @@
 import 'package:anx_reader/service/feedback/bug_report.dart';
+import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,11 +7,18 @@ import 'package:pubspec_parse/pubspec_parse.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BugReportSettings extends StatefulWidget {
-  const BugReportSettings({super.key, this.openUrl, this.loadVersion});
+  const BugReportSettings(
+      {super.key,
+      this.openUrl,
+      this.loadVersion,
+      this.loadCrashLog,
+      this.loadEnvironment});
 
   /// Injectable boundaries keep tests offline and never create real issues.
   final Future<bool> Function(Uri)? openUrl;
   final Future<String> Function()? loadVersion;
+  final Future<String> Function()? loadCrashLog;
+  final Future<String> Function()? loadEnvironment;
 
   @override
   State<BugReportSettings> createState() => _BugReportSettingsState();
@@ -26,6 +34,11 @@ class _BugReportSettingsState extends State<BugReportSettings> {
   String? _status;
   bool _includeEnvironment = true;
   bool _busy = false;
+  bool _includeCrashLog = false;
+  bool _loadingCrashLog = false;
+  String? _crashLog;
+  String _deviceEnvironment = '';
+  int _logRequest = 0;
 
   String _tr(String zh, String en) =>
       Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -34,6 +47,45 @@ class _BugReportSettingsState extends State<BugReportSettings> {
   void initState() {
     super.initState();
     _loadVersion();
+    _loadDeviceEnvironment();
+  }
+
+  Future<void> _loadDeviceEnvironment() async {
+    String info;
+    try {
+      info = await (widget.loadEnvironment?.call() ??
+          CrashDiagnostics.loadEnvironment());
+    } catch (_) {
+      info = 'Device environment unavailable / 设备环境读取失败';
+    }
+    if (mounted) setState(() => _deviceEnvironment = info);
+  }
+
+  Future<void> _toggleCrashLog(bool enabled) async {
+    final request = ++_logRequest;
+    setState(() {
+      _includeCrashLog = enabled;
+      _loadingCrashLog = enabled;
+      _crashLog = null;
+    });
+    if (!enabled) return;
+    try {
+      final log =
+          await (widget.loadCrashLog?.call() ?? CrashDiagnostics.load());
+      if (!mounted || request != _logRequest) return;
+      setState(() {
+        _crashLog = log;
+        _loadingCrashLog = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _logRequest) return;
+      setState(() {
+        _includeCrashLog = false;
+        _loadingCrashLog = false;
+        _status = _tr('崩溃日志读取失败，可重新勾选重试；仍可提交普通报告。',
+            'Could not load crash diagnostics. Select again to retry, or submit without logs.');
+      });
+    }
   }
 
   Future<void> _loadVersion() async {
@@ -60,7 +112,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
 
   String get _environment =>
       'Modu: $_version\nPlatform: ${kIsWeb ? 'web' : defaultTargetPlatform.name}'
-      '\nLocale: ${Localizations.localeOf(context).toLanguageTag()}';
+      '\nLocale: ${Localizations.localeOf(context).toLanguageTag()}'
+      '${_deviceEnvironment.isEmpty ? '' : '\n$_deviceEnvironment'}';
 
   BugReport get _report => BugReport(
         title: _title.text,
@@ -68,6 +121,7 @@ class _BugReportSettingsState extends State<BugReportSettings> {
         steps: _steps.text,
         expected: _expected.text,
         environment: _includeEnvironment ? _environment : null,
+        crashLog: _includeCrashLog ? _crashLog : null,
       );
 
   Future<void> _copy(String value) async {
@@ -119,6 +173,7 @@ class _BugReportSettingsState extends State<BugReportSettings> {
   }
 
   Future<void> _preview() async {
+    if (_loadingCrashLog) return;
     if (!_form.currentState!.validate()) return;
     final report = _report;
     final proceed = await showDialog<bool>(
@@ -202,8 +257,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                   'Describe and preview your report, then confirm it in the Modu GitHub repository (GitHub account required). Attach screenshots on GitHub.')),
               const SizedBox(height: 12),
               Text(_tr(
-                  '不会自动收集日志、AI 配置、API Key 或书籍内容。你填写的内容会传给 GitHub，并可能留在浏览器历史中；提交后公开可见，请勿粘贴敏感信息。',
-                  'Logs, AI settings, API keys and book content are not collected automatically. Your text is sent to GitHub and may remain in browser history; submitted reports are public. Do not paste sensitive information.')),
+                  '各平台在本机保留有限的脱敏异常与操作记录，默认不附带、不上传。勾选后附带可用的系统崩溃诊断，不读取普通日志、AI 配置、密钥或书籍正文。报告提交后公开可见，请预览检查。附带日志时将复制报告，再由你粘贴到 GitHub。',
+                  'All platforms retain a small local journal of sanitized errors and checkpoints, never attached or uploaded by default. Opting in includes available crash diagnostics, not ordinary logs, AI settings, keys or book text. Review before sharing: reports become public. Reports with logs are copied for you to paste into GitHub.')),
               Wrap(
                 spacing: 8,
                 children: [
@@ -226,24 +281,50 @@ class _BugReportSettingsState extends State<BugReportSettings> {
               _field(_expected, _tr('预期行为', 'Expected behavior'), lines: 2),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: Text(_tr('附带基础运行信息', 'Include basic environment info')),
+                title: Text(
+                    _tr('附带设备与运行环境', 'Include device and environment info')),
                 subtitle: Text(_environment),
                 value: _includeEnvironment,
                 onChanged: (value) =>
                     setState(() => _includeEnvironment = value),
               ),
+              CheckboxListTile(
+                key: const ValueKey('include-crash-log'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                    _tr('附带崩溃日志（可选）', 'Include crash diagnostics (optional)')),
+                subtitle: Text(_tr(
+                    '包含当前平台可用的退出原因、内存采样、向量化进度和脱敏原生堆栈。Apple 报告可能延迟；Linux 需要系统保留记录。强制退出不保证有堆栈。提交后公开，请先预览。',
+                    'Includes available exit reasons, memory samples, index checkpoints and sanitized native frames. Apple delivery can be delayed; Linux requires retained system records. Force-kills may have no stack. Preview before public submission.')),
+                value: _includeCrashLog,
+                onChanged:
+                    _busy ? null : (value) => _toggleCrashLog(value ?? false),
+              ),
+              if (_loadingCrashLog) const LinearProgressIndicator(),
+              if (_includeCrashLog && _crashLog != null)
+                ExpansionTile(
+                  title: Text(
+                      _tr('查看将附带的崩溃日志', 'Preview attached crash diagnostics')),
+                  children: [
+                    Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SelectableText(_crashLog!))
+                  ],
+                ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _copy(_report.markdown),
+                    onPressed: _busy || _loadingCrashLog
+                        ? null
+                        : () => _copy(_report.markdown),
                     icon: const Icon(Icons.copy_outlined),
                     label: Text(_tr('复制报告', 'Copy report')),
                   ),
                   FilledButton.icon(
-                    onPressed: _busy ? null : _preview,
+                    onPressed: _busy || _loadingCrashLog ? null : _preview,
                     icon: const Icon(Icons.bug_report_outlined),
                     label: Text(_tr('预览并提交', 'Preview and submit')),
                   ),
