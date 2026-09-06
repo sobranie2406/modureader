@@ -3,6 +3,7 @@ console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
+import { TtsNavigator } from './tts-navigation.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
 const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
@@ -1875,7 +1876,11 @@ window.nextSection = () => reader.view.renderer.nextSection()
 
 window.initTts = () => reader.view.initTTS()
 
-window.ttsStop = () => reader.view.initTTS(true)
+const ttsNavigator = new TtsNavigator(() => reader.view)
+window.ttsStop = () => {
+  ttsNavigator.stop()
+  return reader.view.initTTS(true)
+}
 
 window.ttsHere = () => {
   initTts()
@@ -1915,29 +1920,13 @@ window.ttsHighlightByCfi = cfi => {
   return reader.view.tts.highlightCfi(cfi)
 }
 
-window.ttsNextSection = async () => {
-  await nextSection()
-  initTts()
-  return ttsNext()
-}
+window.ttsNextSection = () => ttsNavigator.move(1, { section: true, last: false })
 
-window.ttsPrevSection = async (last) => {
-  await prevSection()
-  initTts()
-  return last ? reader.view.tts.end() : ttsNext()
-}
+window.ttsPrevSection = (last = false) => ttsNavigator.move(-1, { section: true, last })
 
-window.ttsNext = async () => {
-  const result = reader.view.tts.next(true)
-  if (result) return result
-  return await ttsNextSection()
-}
+window.ttsNext = () => ttsNavigator.move(1)
 
-window.ttsPrev = () => {
-  const result = reader.view.tts.prev(true)
-  if (result) return result
-  return ttsPrevSection(true)
-}
+window.ttsPrev = () => ttsNavigator.move(-1)
 
 window.ttsPrepare = () => reader.view.tts.prepare()
 

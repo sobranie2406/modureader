@@ -40,5 +40,8 @@ abstract class BaseTts {
 
   String? get currentVoiceText;
 
+  /// A failed sentence stays at the cursor; resume retries instead of skipping.
+  String? get playbackError => null;
+
   Future<List<TtsVoice>> getVoices();
 }

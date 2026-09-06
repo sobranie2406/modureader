@@ -204,9 +204,10 @@ class _TtsWidgetState extends State<TtsWidget> {
             children: [
               IconButton(
                 onPressed: () async {
-                  audioHandler.stop();
-                  await widget.epubPlayerKey.currentState!.ttsPrevSection();
-                  TtsHandler().playPrevious();
+                  await audioHandler.stop();
+                  final text =
+                      await widget.epubPlayerKey.currentState!.ttsPrevSection();
+                  if (text.isNotEmpty) await audioHandler.play();
                 },
                 icon: const Icon(EvaIcons.arrowhead_left),
               ),
@@ -240,9 +241,10 @@ class _TtsWidgetState extends State<TtsWidget> {
               ),
               IconButton(
                 onPressed: () async {
-                  audioHandler.stop();
-                  await widget.epubPlayerKey.currentState!.ttsNextSection();
-                  TtsHandler().playNext();
+                  await audioHandler.stop();
+                  final text =
+                      await widget.epubPlayerKey.currentState!.ttsNextSection();
+                  if (text.isNotEmpty) await audioHandler.play();
                 },
                 icon: const Icon(EvaIcons.arrowhead_right),
               ),
@@ -311,6 +313,10 @@ class _TtsWidgetState extends State<TtsWidget> {
                 ReadingSettings.style,
               ),
               buttons(),
+              if (TtsHandler().tts.playbackError case final String error)
+                Text(error,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               const Divider(),
               stopTimerWidget(),
               sliders(),

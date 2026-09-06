@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
@@ -35,7 +34,14 @@ class SystemTts extends BaseTts {
   final FlutterTts flutterTts = FlutterTts();
 
   String? _currentVoiceText;
-  static String? _prevVoiceText;
+  int _generation = 0;
+  Future<void>? _running;
+  Future<dynamic>? _pendingAdvance;
+  Future<dynamic>? _resumeAfterAdvance;
+  String? _playbackError;
+
+  @override
+  String? get playbackError => _playbackError;
 
   bool restarting = false;
 
@@ -108,31 +114,8 @@ class SystemTts extends BaseTts {
       await getDefaultVoice();
     }
 
-    flutterTts.setStartHandler(() async {
-      updateTtsState(TtsStateEnum.playing);
-      if (!isAndroid) {
-        return;
-      }
-      _prevVoiceText = _currentVoiceText;
-      _currentVoiceText = await epubPlayerKey.currentState!.ttsPrepare();
-
-      if (_currentVoiceText?.isNotEmpty ?? false) {
-        flutterTts.speak(_currentVoiceText!);
-      }
-    });
-
-    flutterTts.setCompletionHandler(() async {
-      if (!isAndroid) {
-        return;
-      }
-      updateTtsState(TtsStateEnum.playing);
-      if (_currentVoiceText?.isEmpty ?? true) {
-        _currentVoiceText = await getNextText();
-        await speak();
-      } else {
-        await getNextText();
-      }
-    });
+    // Await one utterance, then advance once. Native start/completion callbacks
+    // must not enqueue or move the reader independently.
   }
 
   Future<void> setAwaitOptions() async {
@@ -140,7 +123,7 @@ class SystemTts extends BaseTts {
     await flutterTts.awaitSpeakCompletion(true);
     if (isAndroid) {
       await flutterTts.awaitSynthCompletion(true);
-      await flutterTts.setQueueMode(1);
+      await flutterTts.setQueueMode(0);
     }
   }
 
@@ -195,103 +178,139 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> speak({String? content}) async {
-    await setAwaitOptions();
-    if (content != null) {
-      _currentVoiceText = content;
-    }
-    if (_currentVoiceText == null) {
-      // getHereFunction() is initTts() — it initialises the JS TTS position
-      // but returns void.  Fetch the actual first sentence via getNextTextFunction.
-      await getHereFunction();
-      _currentVoiceText = await getNextTextFunction();
-    }
+    _requireSupport();
+    if (_running != null) return _running!;
+    final generation = ++_generation;
+    _playbackError = null;
+    final continuous = isPlaying;
+    final run = _speakLoop(generation, content, continuous);
+    _running = run;
+    return run.whenComplete(() {
+      if (identical(_running, run)) _running = null;
+    });
+  }
 
-    // Guard: if still null or empty (e.g. WebView not ready), abort.
-    if (_currentVoiceText == null || _currentVoiceText!.isEmpty) {
-      return;
-    }
-
-    await flutterTts.setVolume(volume);
-    await flutterTts.setSpeechRate(rate);
-    await flutterTts.setPitch(pitch);
-
-    // Apply the saved voice model
-    // Empty means use the native engine's default. Online providers still
-    // require an explicit/default provider voice through resolveVoice().
-    final selectedVoice = Prefs().getTtsVoiceModel('system');
-    await _applyVoice(selectedVoice);
-
-    await flutterTts.speak(_currentVoiceText!);
-
-    if (!isAndroid && ttsStateNotifier.value == TtsStateEnum.playing) {
-      _currentVoiceText = await getNextTextFunction();
-      speak();
+  Future<void> _speakLoop(
+      int generation, String? content, bool continuous) async {
+    bool active() => generation == _generation && (!continuous || isPlaying);
+    try {
+      await setAwaitOptions();
+      if (!active()) return;
+      final initial = content ?? _currentVoiceText ?? await getHereFunction();
+      if (!active()) return;
+      _currentVoiceText = initial as String?;
+      while (active() && (_currentVoiceText?.trim().isNotEmpty ?? false)) {
+        await flutterTts.setVolume(volume);
+        await flutterTts.setSpeechRate(rate);
+        await flutterTts.setPitch(pitch);
+        await _applyVoice(Prefs().getTtsVoiceModel('system'));
+        if (!active()) return;
+        final result = await flutterTts.speak(_currentVoiceText!);
+        if (!active()) return;
+        if (result == 0) throw StateError('System speech failed');
+        if (!continuous) return;
+        final advancing = Future<dynamic>.sync(() => getNextTextFunction());
+        _pendingAdvance = advancing;
+        final next = await advancing;
+        if (identical(_pendingAdvance, advancing)) _pendingAdvance = null;
+        if (!active()) return;
+        _currentVoiceText = next as String?;
+      }
+      if (active() && continuous) updateTtsState(TtsStateEnum.stopped);
+    } catch (error) {
+      if (active()) {
+        _pendingAdvance = null;
+        _playbackError =
+            '朗读失败，已保留当前位置，请重试 / Speech failed; retry from this sentence.';
+        updateTtsState(TtsStateEnum.paused);
+      }
+      if (!continuous) rethrow;
     }
   }
 
   @override
   Future<dynamic> stop() async {
-    updateTtsState(TtsStateEnum.stopped);
-    if (!isSupported) {
-      _currentVoiceText = null;
-      return 1;
-    }
-    final result = await flutterTts.stop();
+    ++_generation;
+    _running = null;
+    _pendingAdvance = null;
+    _resumeAfterAdvance = null;
     _currentVoiceText = null;
-    return result;
+    _playbackError = null;
+    updateTtsState(TtsStateEnum.stopped);
+    return isSupported ? await flutterTts.stop() : 1;
   }
 
   @override
   Future<void> pause() async {
-    if (!isSupported) return;
-    final result = await flutterTts.stop();
-    if (result == 1) {
-      updateTtsState(TtsStateEnum.paused);
-    }
+    _resumeAfterAdvance = _pendingAdvance;
+    ++_generation;
+    _running = null;
+    updateTtsState(TtsStateEnum.paused);
+    if (isSupported) await flutterTts.stop();
   }
 
   @override
   Future<void> resume() async {
-    if (isAndroid) {
-      speak(content: _prevVoiceText);
-      return;
+    final generation = _generation;
+    final advancing = _resumeAfterAdvance;
+    if (advancing != null) {
+      try {
+        final next = await advancing;
+        if (generation != _generation) return;
+        _currentVoiceText = next as String?;
+        _resumeAfterAdvance = null;
+      } catch (_) {
+        if (generation != _generation) return;
+        _resumeAfterAdvance = null;
+        updateTtsState(TtsStateEnum.paused);
+        return;
+      }
     }
-    speak(content: _currentVoiceText);
+    updateTtsState(TtsStateEnum.playing);
+    await speak(content: _currentVoiceText);
+  }
+
+  Future<void> _navigate(Function move, {bool forward = false}) async {
+    if (restarting) return;
+    restarting = true;
+    try {
+      final advancing = _pendingAdvance;
+      await stop();
+      final generation = _generation;
+      if (advancing != null && !forward) await advancing;
+      final text =
+          forward && advancing != null ? await advancing : await move();
+      if (generation != _generation) return;
+      if (text is! String || text.trim().isEmpty) return;
+      updateTtsState(TtsStateEnum.playing);
+      unawaited(speak(content: text));
+    } finally {
+      restarting = false;
+    }
   }
 
   @override
-  Future<void> prev() async {
-    if (restarting) {
-      return;
-    }
-    restarting = true;
-    await stop();
-    _currentVoiceText = await getPrevTextFunction();
-    speak();
-    restarting = false;
-  }
+  Future<void> prev() => _navigate(getPrevTextFunction);
 
   @override
-  Future<void> next() async {
-    if (restarting) {
-      return;
-    }
-    restarting = true;
-    await stop();
-    _currentVoiceText = await getNextTextFunction();
-    speak();
-    restarting = false;
-  }
+  Future<void> next() => _navigate(getNextTextFunction, forward: true);
 
   @override
   Future<void> restart() async {
-    if (restarting) {
-      return;
-    }
+    if (restarting || !isPlaying) return;
     restarting = true;
-    await stop();
-    speak();
-    restarting = false;
+    final text = _currentVoiceText;
+    final advancing = _pendingAdvance;
+    try {
+      await stop();
+      final generation = _generation;
+      final resumedText = advancing != null ? await advancing as String? : text;
+      if (generation != _generation) return;
+      updateTtsState(TtsStateEnum.playing);
+      unawaited(speak(content: resumedText));
+    } finally {
+      restarting = false;
+    }
   }
 
   @override
@@ -318,7 +337,6 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> dispose() async {
-    if (!isSupported) return;
-    await flutterTts.stop();
+    await stop();
   }
 }

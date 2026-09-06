@@ -350,32 +350,36 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     webViewController.evaluateJavascript(source: "clearSearch()");
   }
 
-  Future<void> initTts({String? fromCfi}) async {
-    if (fromCfi != null && fromCfi.isNotEmpty) {
-      await webViewController.evaluateJavascript(
-          source: "window.ttsFromCfi('$fromCfi')");
-    } else {
-      await webViewController.evaluateJavascript(source: "window.ttsHere()");
+  Future<String> initTts({String? fromCfi}) async {
+    final result = await webViewController.callAsyncJavaScript(
+      functionBody: fromCfi != null && fromCfi.isNotEmpty
+          ? 'return await window.ttsFromCfi(${jsonEncode(fromCfi)})'
+          : 'return await window.ttsHere()',
+    );
+    if (result?.error != null) {
+      throw StateError('TTS initialization failed: ${result!.error}');
     }
+    return result?.value as String? ?? '';
   }
 
-  void ttsStop() => webViewController.evaluateJavascript(source: "ttsStop()");
+  Future<void> ttsStop() async {
+    await webViewController.callAsyncJavaScript(
+        functionBody: 'return ttsStop()');
+  }
 
-  Future<String> ttsNext() async => (await webViewController
-          .callAsyncJavaScript(functionBody: "return await ttsNext()"))
-      ?.value;
+  Future<String> _ttsTextCall(String function) async {
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody: 'return await $function()');
+    if (result?.error != null) {
+      throw StateError('TTS navigation failed: ${result!.error}');
+    }
+    return result?.value as String? ?? '';
+  }
 
-  Future<String> ttsPrev() async => (await webViewController
-          .callAsyncJavaScript(functionBody: "return await ttsPrev()"))
-      ?.value;
-
-  Future<String> ttsPrevSection() async => (await webViewController
-          .callAsyncJavaScript(functionBody: "return await ttsPrevSection()"))
-      ?.value;
-
-  Future<String> ttsNextSection() async => (await webViewController
-          .callAsyncJavaScript(functionBody: "return await ttsNextSection()"))
-      ?.value;
+  Future<String> ttsNext() => _ttsTextCall('ttsNext');
+  Future<String> ttsPrev() => _ttsTextCall('ttsPrev');
+  Future<String> ttsPrevSection() => _ttsTextCall('ttsPrevSection');
+  Future<String> ttsNextSection() => _ttsTextCall('ttsNextSection');
 
   Future<String> ttsPrepare() async =>
       (await webViewController.evaluateJavascript(source: "ttsPrepare()"));
@@ -408,6 +412,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     final result = await webViewController.callAsyncJavaScript(
       functionBody: 'return ttsCurrentDetail()',
     );
+    if (result?.error != null) {
+      throw StateError('TTS cursor failed: ${result!.error}');
+    }
     return _parseTtsSentence(result?.value);
   }
 
@@ -420,6 +427,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       functionBody:
           'return ttsCollectDetails($count, ${includeCurrent ? 'true' : 'false'}, $offset)',
     );
+    if (result?.error != null) {
+      throw StateError('TTS collection failed: ${result!.error}');
+    }
     return _parseTtsSentences(result?.value);
   }
 

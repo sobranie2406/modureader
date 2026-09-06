@@ -77,4 +77,4 @@ jobs:
       - name: Reader JavaScript regression tests
         run: |
           npm install --prefix "$RUNNER_TEMP/modu-js-tests" jsdom@26.1.0
-          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_business.test.mjs test/reader_background.test.mjs
+          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_business.test.mjs test/reader_background.test.mjs test/reader_tts.test.mjs

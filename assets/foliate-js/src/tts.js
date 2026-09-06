@@ -12,25 +12,25 @@ function rangeIsEmpty(range) {
 
 const quoteChars = new Set(['"', "'", '“', '”', '‘', '’'])
 
-const isLocalLink = href => {
-    if (!href) return false
-    const trimmed = href.trim()
-    if (!trimmed) return false
-    if (trimmed.startsWith('#')) return true
-    return !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)
-}
-
 const shouldSkipTextNode = node => {
     const parent = node.parentElement
     if (!parent) return false
-    const anchor = parent.closest('a')
-    if (!anchor) return false
-    return isLocalLink(anchor.getAttribute('href'))
+    // A chapter heading often links back to the TOC. Local links are content,
+    // not automatically footnotes. Skip only explicit note/page markers and
+    // non-reading content (including ruby pronunciation, not the base text).
+    for (let el = parent; el; el = el.parentElement) {
+        if (['script', 'style', 'rt', 'rp'].includes(el.localName)) return true
+        if (el.hidden || el.getAttribute('aria-hidden') === 'true') return true
+        const types = (el.getAttribute('epub:type') ?? '').split(/\s+/)
+        if (types.some(type => ['noteref', 'backlink', 'pagebreak'].includes(type))) return true
+        if (['doc-noteref', 'doc-backlink', 'doc-pagebreak'].includes(el.getAttribute('role'))) return true
+    }
+    return false
 }
 
 const getRangeText = range => {
     const fragment = range.cloneContents()
-    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT)
+    const walker = range.startContainer.ownerDocument.createTreeWalker(fragment, NodeFilter.SHOW_TEXT)
     let text = ''
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         if (shouldSkipTextNode(node)) continue

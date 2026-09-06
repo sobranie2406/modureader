@@ -24,6 +24,31 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Function? _getCurrentText;
   Function? _getNextText;
   Function? _getPrevText;
+  BaseTts? _observedTts;
+
+  void _observePlayback() {
+    _observedTts?.ttsStateNotifier.removeListener(_syncPlaybackState);
+    _observedTts = tts;
+    tts.ttsStateNotifier.addListener(_syncPlaybackState);
+  }
+
+  void _syncPlaybackState() {
+    final state = tts.ttsStateNotifier.value;
+    playbackState.add(playbackState.value.copyWith(
+      playing: tts.isPlaying,
+      processingState: state == TtsStateEnum.stopped
+          ? AudioProcessingState.idle
+          : AudioProcessingState.ready,
+      controls: state == TtsStateEnum.stopped
+          ? []
+          : [
+              MediaControl.skipToPrevious,
+              tts.isPlaying ? MediaControl.pause : MediaControl.play,
+              MediaControl.stop,
+              MediaControl.skipToNext,
+            ],
+    ));
+  }
 
   Future<void> init(Function getCurrentText, Function getNextText,
       Function getPrevText) async {
@@ -31,6 +56,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     _getNextText = getNextText;
     _getPrevText = getPrevText;
     await tts.init(getCurrentText, getNextText, getPrevText);
+    _observePlayback();
   }
 
   Future<void> switchTtsType(String serviceId) async {
@@ -39,6 +65,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         _getNextText != null &&
         _getPrevText != null) {
       await tts.init(_getCurrentText!, _getNextText!, _getPrevText!);
+      _observePlayback();
     }
   }
 
@@ -148,7 +175,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     tts.updateTtsState(TtsStateEnum.stopped);
     await tts.stop();
-    epubPlayerKey.currentState?.ttsStop();
+    await epubPlayerKey.currentState?.ttsStop();
   }
 
   @override

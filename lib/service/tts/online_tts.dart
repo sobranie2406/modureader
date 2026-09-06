@@ -23,6 +23,22 @@ class OnlineTts extends BaseTts {
 
   OnlineTts._internal();
 
+  @visibleForTesting
+  OnlineTts.forTesting({
+    required Future<List<TtsSentence>> Function(int) collect,
+    required Future<Uint8List> Function(String) synthesize,
+    required Future<void> Function(TtsSegment) play,
+  })  : _collectOverride = collect,
+        _synthesizeOverride = synthesize,
+        _playOverride = play;
+
+  Future<List<TtsSentence>> Function(int)? _collectOverride;
+  Future<Uint8List> Function(String)? _synthesizeOverride;
+  Future<void> Function(TtsSegment)? _playOverride;
+  String? _playbackError;
+  @override
+  String? get playbackError => _playbackError;
+
   // ============ Configuration ============
   static const int _bufferCapacity = 10;
   static const int _batchSize = 5; // Max concurrent fetches
@@ -37,7 +53,6 @@ class OnlineTts extends BaseTts {
   // ============ Ordered Buffer ============
   // Segments are added in order; audio is fetched in background
   final List<TtsSegment> _buffer = [];
-  final Set<String> _bufferKeys = {};
   TtsSegment? _currentSegment;
   String? _currentVoiceText;
   int _audioFetchVersion = 0; // Version counter for audio fetches
@@ -56,6 +71,8 @@ class OnlineTts extends BaseTts {
   late Function getPrevTextFunction;
   bool isInit = false;
   bool _shouldStop = false;
+  int _generation = 0;
+  bool _isStarting = false;
 
   // ============ Backend ============
   TtsServiceProvider? _currentBackend;
@@ -140,7 +157,9 @@ class OnlineTts extends BaseTts {
     await _player!.setVolume(volume);
 
     _playerCompleteSubscription = _player!.onPlayerComplete.listen((_) {
-      _playbackCompleter?.complete();
+      if (_playbackCompleter?.isCompleted == false) {
+        _playbackCompleter!.complete();
+      }
     });
 
     return _player!;
@@ -155,16 +174,8 @@ class OnlineTts extends BaseTts {
   }
 
   // ============ Buffer Management ============
-  String _segmentKey(TtsSentence sentence) {
-    if (sentence.cfi != null && sentence.cfi!.isNotEmpty) {
-      return sentence.cfi!;
-    }
-    return '${sentence.text.hashCode}';
-  }
-
   void _resetBuffer() {
     _buffer.clear();
-    _bufferKeys.clear();
     _currentSegment = null;
     _currentVoiceText = null;
   }
@@ -177,6 +188,7 @@ class OnlineTts extends BaseTts {
       // Clear audio so it will be re-fetched
       segment.audio = null;
       segment.isSilent = false;
+      segment.error = null;
       segment.fetchVersion = _audioFetchVersion; // Mark with current version
     }
     AnxLog.info(
@@ -207,15 +219,16 @@ class OnlineTts extends BaseTts {
           }
         }
 
-        final neededCount = _bufferCapacity - _buffer.length;
-
-        if (neededCount <= 0) {
+        // Refill only at a stable consumer cursor. In particular, do not peek
+        // while the last sentence is advancing to the next chapter, or that
+        // chapter's current (first) sentence can be excluded from the batch.
+        if (_buffer.isNotEmpty || _currentSegment != null) {
           await Future.delayed(const Duration(milliseconds: 50));
           continue;
         }
 
         // Collect sentences from the reader
-        final sentences = await _collectSentences(neededCount);
+        final sentences = await _collectSentences(_bufferCapacity);
 
         if (sentences.isEmpty) {
           await Future.delayed(const Duration(milliseconds: 100));
@@ -226,11 +239,8 @@ class OnlineTts extends BaseTts {
         final newSegments = <TtsSegment>[];
         for (final sentence in sentences) {
           if (_shouldStop) break;
-          final key = _segmentKey(sentence);
-          if (_bufferKeys.contains(key)) continue;
-
-          _bufferKeys.add(key);
           final segment = TtsSegment(sentence: sentence);
+          segment.fetchVersion = _audioFetchVersion;
           newSegments.add(segment);
           _buffer.add(segment); // Add in order!
         }
@@ -246,6 +256,11 @@ class OnlineTts extends BaseTts {
       }
     } catch (e) {
       AnxLog.severe('Prefetcher error: $e');
+      if (!_shouldStop) {
+        _playbackError = '朗读文本获取失败，请重试 / Could not read speech text; retry.';
+        _shouldStop = true;
+        updateTtsState(TtsStateEnum.paused);
+      }
     } finally {
       _isPrefetcherRunning = false;
       _prefetcherCompleter?.complete();
@@ -254,32 +269,24 @@ class OnlineTts extends BaseTts {
   }
 
   Future<List<TtsSentence>> _collectSentences(int count) async {
+    if (_collectOverride != null) return _collectOverride!(count);
     final state = epubPlayerKey.currentState;
     if (state == null) return [];
 
     try {
       final sentences = await state.ttsCollectDetails(
         count: count,
-        includeCurrent: _buffer.isEmpty && _currentSegment == null,
+        includeCurrent: true,
       );
-
-      // Filter out already buffered sentences
-      final newSentences = <TtsSentence>[];
-      for (final s in sentences) {
-        final key = _segmentKey(s);
-        if (!_bufferKeys.contains(key)) {
-          newSentences.add(s);
-        }
-      }
 
       // Note: We do NOT call getNextTextFunction here.
       // Advancing the reader position should only happen in the player loop
       // after playback completes, to avoid interfering with highlighting.
 
-      return newSentences;
+      return sentences;
     } catch (e) {
       AnxLog.severe('Collect sentences error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -295,6 +302,13 @@ class OnlineTts extends BaseTts {
       if (segment.isReady) return;
 
       try {
+        if (_synthesizeOverride != null) {
+          final bytes = await _synthesizeOverride!(segment.sentence.text);
+          if (_shouldStop || segment.fetchVersion != targetVersion) return;
+          if (bytes.isEmpty) throw StateError('Empty speech audio');
+          segment.audio = bytes;
+          return;
+        }
         final currentBackend = backend;
         final voice = currentBackend.getSelectedVoice();
         final audio = await _audioCache
@@ -326,7 +340,7 @@ class OnlineTts extends BaseTts {
         }
 
         if (bytes.isEmpty) {
-          segment.isSilent = true;
+          throw StateError('Empty speech audio');
         } else {
           segment.audio = Uint8List.fromList(bytes);
         }
@@ -337,7 +351,7 @@ class OnlineTts extends BaseTts {
         if (attempt == _maxRetries) {
           // Check version before marking as silent
           if (segment.fetchVersion == targetVersion) {
-            segment.isSilent = true;
+            segment.error = TimeoutException('Speech synthesis timed out');
           }
         }
       } catch (e) {
@@ -345,7 +359,7 @@ class OnlineTts extends BaseTts {
         if (attempt == _maxRetries) {
           // Check version before marking as silent
           if (segment.fetchVersion == targetVersion) {
-            segment.isSilent = true;
+            segment.error = e;
           }
         }
       }
@@ -358,15 +372,19 @@ class OnlineTts extends BaseTts {
     _isPlayerRunning = true;
     _playerCompleter = Completer<void>();
 
-    final audioPlayer = await _ensurePlayer();
-
     try {
+      final audioPlayer = _playOverride == null ? await _ensurePlayer() : null;
       while (!_shouldStop) {
+        if (ttsStateNotifier.value == TtsStateEnum.paused) {
+          await Future.delayed(const Duration(milliseconds: 30));
+          continue;
+        }
         // Wait for buffer to have a segment
         while (_buffer.isEmpty && !_shouldStop) {
           await Future.delayed(const Duration(milliseconds: 50));
         }
         if (_shouldStop) break;
+        if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
 
         // Get the FIRST segment (preserving order)
         final segment = _buffer.first;
@@ -376,6 +394,14 @@ class OnlineTts extends BaseTts {
           await Future.delayed(const Duration(milliseconds: 30));
         }
         if (_shouldStop) break;
+        if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
+        if (segment.error != null || segment.isSilent) {
+          _playbackError =
+              '语音生成失败，已保留当前位置，请重试 / Speech synthesis failed; retry this sentence.';
+          _shouldStop = true;
+          updateTtsState(TtsStateEnum.paused);
+          break;
+        }
 
         // Now remove it from buffer
         _buffer.removeAt(0);
@@ -384,36 +410,54 @@ class OnlineTts extends BaseTts {
 
         // Highlight current sentence
         await _highlightSegment(segment);
-
-        // Handle silent segment
-        if (segment.isSilent) {
-          await Future.delayed(const Duration(milliseconds: 100));
-          await getNextTextFunction();
-          _currentSegment = null;
-          continue;
-        }
+        if (_shouldStop) break;
 
         // Play audio
         _playbackCompleter = Completer<void>();
         final source = BytesSource(segment.audio!, mimeType: 'audio/mp3');
 
         try {
-          await audioPlayer.play(source);
-          await _playbackCompleter!.future;
+          if (_playOverride != null) {
+            await _playOverride!(segment);
+          } else {
+            await audioPlayer!.play(source);
+            await _playbackCompleter!.future;
+          }
         } catch (e) {
           AnxLog.severe('Playback error: $e');
+          if (!_shouldStop) {
+            _buffer.insert(0, segment);
+            _playbackError =
+                '音频播放失败，请重试 / Audio playback failed; retry this sentence.';
+            _shouldStop = true;
+            updateTtsState(TtsStateEnum.paused);
+          }
         }
 
         _playbackCompleter = null;
-        _currentSegment = null;
-
         // Advance reader position
         if (!_shouldStop) {
-          await getNextTextFunction();
+          while (
+              ttsStateNotifier.value == TtsStateEnum.paused && !_shouldStop) {
+            await Future.delayed(const Duration(milliseconds: 30));
+          }
+          if (!_shouldStop) {
+            final next = await getNextTextFunction();
+            if (next == null || (next is String && next.trim().isEmpty)) {
+              _shouldStop = true;
+              updateTtsState(TtsStateEnum.stopped);
+            }
+          }
         }
+        _currentSegment = null;
       }
     } catch (e) {
       AnxLog.severe('Player loop error: $e');
+      if (!_shouldStop) {
+        _playbackError = '朗读定位失败，请重试 / Reader navigation failed; retry.';
+        _shouldStop = true;
+        updateTtsState(TtsStateEnum.paused);
+      }
     } finally {
       _isPlayerRunning = false;
       _playerCompleter?.complete();
@@ -433,13 +477,37 @@ class OnlineTts extends BaseTts {
   // ============ Public API ============
   @override
   Future<void> speak({String? content}) async {
+    if (_isPlayerRunning || _isStarting) return;
+    _isStarting = true;
+    final generation = ++_generation;
+    // A naturally ended/failed producer may still be finishing its current
+    // request. Do not revive that old loop by clearing the stop flag early.
+    if (_shouldStop) await _prefetcherCompleter?.future;
+    if (generation != _generation) return;
     _shouldStop = false;
+    _playbackError = null;
     updateTtsState(TtsStateEnum.playing);
 
     // Sync to current location first
+    dynamic here;
     try {
-      await getHereFunction();
-    } catch (_) {}
+      here = content ?? await getHereFunction();
+    } catch (_) {
+      if (generation == _generation) {
+        _shouldStop = true;
+        _playbackError = '朗读初始化失败，请重试 / Could not start reading; retry.';
+        updateTtsState(TtsStateEnum.paused);
+      }
+      return;
+    } finally {
+      if (generation == _generation) _isStarting = false;
+    }
+    if (_shouldStop || generation != _generation) return;
+    if (here is String && here.trim().isEmpty) {
+      _shouldStop = true;
+      updateTtsState(TtsStateEnum.stopped);
+      return;
+    }
 
     // Start both loops
     unawaited(_startPrefetcher());
@@ -448,11 +516,16 @@ class OnlineTts extends BaseTts {
 
   @override
   Future<void> stop() async {
+    ++_generation;
+    _isStarting = false;
     _shouldStop = true;
+    _playbackError = null;
     updateTtsState(TtsStateEnum.stopped);
 
     // Complete any pending playback
-    _playbackCompleter?.complete();
+    if (_playbackCompleter?.isCompleted == false) {
+      _playbackCompleter!.complete();
+    }
 
     // Wait for loops to finish
     await _prefetcherCompleter?.future;
@@ -465,12 +538,24 @@ class OnlineTts extends BaseTts {
 
   @override
   Future<void> pause() async {
-    await _player?.pause();
     updateTtsState(TtsStateEnum.paused);
+    await _player?.pause();
   }
 
   @override
   Future<void> resume() async {
+    if (_shouldStop && _playbackError != null) {
+      await _prefetcherCompleter?.future;
+      await _playerCompleter?.future;
+      _currentSegment = null;
+      _clearPendingAudio();
+      _playbackError = null;
+      _shouldStop = false;
+      updateTtsState(TtsStateEnum.playing);
+      unawaited(_startPrefetcher());
+      await _startPlayer();
+      return;
+    }
     await _player?.resume();
     updateTtsState(TtsStateEnum.playing);
   }
@@ -478,15 +563,15 @@ class OnlineTts extends BaseTts {
   @override
   Future<void> prev() async {
     await stop();
-    await getPrevTextFunction();
-    await speak();
+    final text = await getPrevTextFunction();
+    if (text is String && text.isNotEmpty) await speak(content: text);
   }
 
   @override
   Future<void> next() async {
     await stop();
-    await getNextTextFunction();
-    await speak();
+    final text = await getNextTextFunction();
+    if (text is String && text.isNotEmpty) await speak(content: text);
   }
 
   @override

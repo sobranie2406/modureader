@@ -1,5 +1,16 @@
 # Changelog
 
+## Modu 0.1.0-beta.3 (6328)
+
+- 修复朗读初始化跳过首句，以及带目录链接的文字标题被过滤的问题。
+- 修复系统语音和在线语音的异步推进、暂停恢复及手动切章造成的漏读；保留重复段落。
+- 合成、播放或导航失败时暂停并显示错误，重试保留当前位置；空章和书末有界处理。
+- 新增朗读回归测试；macOS 原生系统语音测试通过，原问题书籍及 Android 真机仍待复测。
+- Fix skipped first sentences and linked text headings in read-aloud.
+- Fix asynchronous cursor advancement, pause/resume and manual chapter navigation; retain repeated paragraphs.
+- Pause with an error on synthesis, playback or navigation failure instead of silently skipping text; bound empty-chapter and end-of-book navigation.
+- Add read-aloud regression tests. Native macOS system speech passed; the reported book and Android device still need testing.
+
 ## Modu 0.1.0-beta.2 (6327)
 
 - 修复阅读背景图片格式、路径与缓存处理，以及背景颜色保存和实时更新逻辑。
