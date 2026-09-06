@@ -1,6 +1,15 @@
-# 默读 / Modu Beta 3 · build 6329
+# 默读 / Modu Beta 3 · Android 6330 / 其他平台 6329
 
 本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，是独立修改版，不是上游官方发行版。整体按 GPL-3.0-or-later 发布，保留上游许可及版权。
+
+## Android 修订（6330，替换原 Beta3 安卓包）
+
+- 针对 Android 16 / iQOO Neo8 使用中文 BGE（512 维）处理 EPUB 到一定进度后退出的反馈，修正四个本地模型共用的内存风险：原生端完成池化，只返回最终向量，降低跨通道复制；串行 CPU 推理，关闭内存池与形状缓存，及时释放张量和空闲模型。
+- 实际输入再次限制为 512 tokens；可捕获的内存不足会报告任务失败，不伪装成索引完成。四个模型与分词器仍内嵌。
+- 两个 APK 已沿用原签名，构建号从 6329 提升到 6330，可覆盖升级；无需卸载。下载文件名保持原 Beta3 名称，对应 SHA-256 和许可附件一并更新。
+- 验证：242 项 Flutter 测试通过、2 项跳过；19 项阅读器测试、18 项打包工具测试通过；四个真实模型在 macOS Java 环境共完成 332 次推理。两个 APK 已通过原签名、架构、16 KB 对齐、四个内嵌模型哈希及新推理通道检查。
+- **尚未在 iQOO Neo8 / Android 16 和原 EPUB 上完成真机复测，不能保证闪退彻底解决，也不能捕获系统强杀或全部原生信号崩溃。** [详细验证记录](https://github.com/sobranie2406/modureader/blob/6261dd306fb71907f7ea102153fe794611bf3095/docs/android-vector-memory-verification.md)。
+- 仅替换 Android 附件，其他平台仍为 6329，Beta3 原标签不移动。Android 对应源码：[修订 6261dd30](https://github.com/sobranie2406/modureader/tree/6261dd306fb71907f7ea102153fe794611bf3095) / [源码压缩包](https://github.com/sobranie2406/modureader/archive/6261dd306fb71907f7ea102153fe794611bf3095.tar.gz)。发布页自动生成的 Source code 链接仍指向原标签，不是 Android 6330 的源码；安卓许可附件也提供正确链接。
 
 ## 本次更新
 
@@ -15,7 +24,7 @@
 
 ## 升级与安装
 
-新标签 `v0.1.0-beta.3`，构建号 `6329`；Beta 1、Beta 2 保留。Android 沿用原专用签名，可从相同签名的旧版覆盖升级。请先备份重要数据，不要为更新直接卸载旧版。
+标签保持 `v0.1.0-beta.3`，Android 构建号为 `6330`，其他平台为 `6329`；Beta 1、Beta 2 保留。Android 沿用原专用签名，可从相同签名的旧版覆盖升级。请先备份重要数据，不要为更新直接卸载旧版。
 
 | 平台 | 架构 | 格式与限制 |
 | --- | --- | --- |
@@ -27,7 +36,7 @@
 
 目标共 9 个应用包，以本发布页实际附件为准。Android `-notices.zip` 是许可附件，GitHub Source code 是源码，均非应用安装包。各附件附 SHA-256。Apple 营销版本为 `0.1.0`，构建号为 `6329`。
 
-## 验证范围与已知限制
+## 原始 6329 的验证范围与已知限制
 
 - 发布前本机：236 项 Flutter 测试通过、2 项联网测试跳过；19 项阅读器 JavaScript 测试通过。包含标题、空章、书末、并发导航、暂停恢复、停止取消和在线语音错误重试用例。
 - 新增 21 项小米协议、配置兼容、错误脱敏和音频格式测试，使用模拟 HTTP；**未使用用户 API Key 进行真实 MiMo 联网试听。**
@@ -48,6 +57,18 @@
 - README 截图来自早期 macOS 构建，展示真实操作入口但未生成模型回答，不作为接口可用性的验证证据；界面选项与默认值以安装版本为准。
 
 ## English summary
+
+### Android replacement: build 6330
+
+Only the two Android APKs, their license notices and checksums are replaced. Other platforms remain at build 6329, and the original Beta 3 tag is unchanged. The APK filenames and release signing identity are retained for in-place upgrades.
+
+All four local embedding models now use native pooling with bounded output transfer, sequential CPU inference without arena/memory-pattern retention, explicit tensor cleanup and idle model unloading. Actual input length is capped at 512 tokens. This addresses identified memory risks, not a confirmed sole cause of the reported crash.
+
+Checks: 242 Flutter tests passed (two skipped), 19 reader tests and 18 packaging-tool tests passed; 332 real-model inferences passed on a macOS JVM. Both APKs passed signing, ABI, 16 KB alignment and bundled-model checks. **The reported EPUB on iQOO Neo8 / Android 16 still requires device testing; this does not guarantee that the crash is resolved.**
+
+Android 6330 corresponding source: [6261dd30](https://github.com/sobranie2406/modureader/tree/6261dd306fb71907f7ea102153fe794611bf3095), [source archive](https://github.com/sobranie2406/modureader/archive/6261dd306fb71907f7ea102153fe794611bf3095.tar.gz). GitHub's automatic Source code links still refer to the original tag and are not the Android hotfix source.
+
+### Original build 6329
 
 MiMo now uses the official chat-completions speech protocol with corrected defaults, built-in voices and voice design without text rewriting. WAV playback, the 60-second MiMo synthesis timeout and configuration-sensitive caching are fixed. Legacy settings retain keys and custom proxy hosts; unsupported AAC/PCM selections use MP3. The 21 new MiMo tests use mocked HTTP, not a live account.
 
