@@ -1,79 +1,59 @@
-# 默读 / Modu Beta 4 · Android build 6332 / other platforms 6331
+# 默读 / Modu 1.0.0 正式版
 
-## Android 热修复 · 6332
+版本：**1.0.0+10000**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，是独立修改版，按 GPL-3.0-or-later 发布并保留上游版权与许可。历史 Beta 版本继续保留。
 
-- 替换本页 ARM64 和 x86_64 两个安卓 APK，版本仍为 Beta4，构建号由 6331 升到 6332。沿用原签名，可直接覆盖安装；无需卸载或删除书籍。其他平台附件保持 6331，不变更原 Beta4 标签。
-- 修复发布混淆破坏 ONNX Java/JNI 接口：保留 `ai.onnxruntime.**` 的类及成员，防止原生代码找不到 `TensorInfo` 及输出张量构造函数而终止进程。这是四个模型共用的风险，不是 iQOO 专属问题。
-- 用户提供的 6331 堆栈与发布 APK 原生库 Build ID 一致，`0x97e4` 对应 `convertToTensorInfo` 的 JNI 方法查找；公开 APK 缺少原名 `TensorInfo`。新打包检查会拒绝该旧 APK，且同时检查类定义和原生构造函数签名，不以字符串存在代替验证。
-- 增加 Android 16 x86_64 模拟器上的 Release 混淆包推理测试，覆盖四个内嵌模型及 16/512/64 token 输入；以热修复流水线结果为准。模拟器测试不能替代 iQOO Neo8 / Android 16 与原 EPUB 的长书验收。
-- 下载后请在关于页面确认 **0.1.0-beta.4+6332**；若仍退出，请预览并提交新的崩溃诊断。此前内存优化继续保留，但不是这次已定位 JNI 崩溃的修复替代品。
+## 功能与本次更新
 
-### Android hotfix (English)
+- 保留本地书架、EPUB/PDF 等格式导入、阅读排版、背景主题、目录、书签、笔记、统计、翻译和朗读。
+- 新增首页「远程书库」：连接独立 WebDAV 书籍目录，浏览文件夹、筛选当前目录、下载并导入本地书架。支持进度、取消与重复检查，单文件最多 512 MiB，一次下载一本；离开标签会取消未完成的下载。
+- 新增「设置 → 书库 WebDAV」，与原有同步分开，只读取和下载，不修改服务器文件。支持匿名或 Basic 用户名/密码认证；默认 HTTPS，可明确确认风险后允许 HTTP。不跟随重定向，请使用最终目录地址。地址与用户名只保存在本机，不参加设置导出/同步；密码仅本次运行有效，退出后需重填。
+- 新增移动端「快速标记」：开启阅读页画笔按钮后，手指直接划选文字，松手保存高亮，不弹出选字菜单。支持同页跨行、反向及跨段落选取；常驻退出按钮恢复普通手势。默认关闭，桌面不显示；已有批注不会被覆盖。PDF、扫描图片与固定版式暂不支持，也不进行拖拽自动跨页。
+- 标注传入阅读器改用 JSON 编码，正确处理引号、换行和反斜杠；文件重复检查使用流式 MD5，避免一次读取整本书。
+- 保留十个可编辑 AI 阅读技能、各模型独立参数、混合 RAG、书籍排队索引，以及四个内嵌 ONNX 模型和分词器。默认本地中文 BGE，自动索引默认关闭。
+- 包含 Beta4 Android 热修复：保留 ONNX Java/JNI 类与构造函数，防止 Release 混淆造成原生方法查找失败。打包检查实际 DEX 定义，CI 对混淆 Release 执行四模型推理测试。
+- 保留索引内存优化、完整性检查和异常中断标记、可预览的脱敏崩溃诊断，以及独立开关和加密密码控制的 API Key 同步。
 
-The ARM64 and x86_64 APKs on this release are replaced with build **6332**, retaining the original signing identity for in-place upgrades. Other platform packages remain build 6331 and the original Beta4 tag is unchanged. The hotfix preserves ONNX Runtime's JNI-accessed Java classes and constructors through R8. The original APK was missing the unrenamed `TensorInfo` class at the native method lookup identified in the submitted crash stack. Packaging now checks actual DEX definitions and constructor signatures. An Android 16 x86_64 emulator test exercises all four models against the minified release; see its CI result. This does not replace long-book verification on the reported iQOO device. Corresponding hotfix source is identified in the updated Android notices attachments.
-
-## 原 Beta4 更新说明 / Original Beta4 notes (6331)
-
-本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，是独立修改版，不是上游官方发行版。按 GPL-3.0-or-later 发布，保留上游许可及版权。
-
-## 本次修正
-
-- 修正四个本地向量模型共用的内存叠加风险：EPUB 提取完成即释放专用后台 WebView；本地模型在索引落盘前等待释放；向量使用紧凑 Float64 存储，不再保留大量逐元素对象。
-- 索引逐条写入并等待磁盘写入完成，不再一次生成整本书的大 JSON 字符串。书籍内容哈希改为增量计算，保持旧哈希算法兼容。
-- “已索引”标签改读小型完成记录，不再为刷新标签完整解析向量文件。索引缺片段、向量数量/维度不一致或出现无效数值时不能提交；中途取消保留旧的完整索引。
-- 任务开始持久保存构建中标记，进程意外退出后不会把旧索引当作本次任务完成。**Beta3 已发生的崩溃不能靠新标记追溯判断。**
-- 提交 Bug 新增默认关闭的“附带崩溃日志”可选框、日志预览及独立设备环境开关。保留少量脱敏操作记录；Android 读取系统退出原因及可用原生堆栈，macOS/iOS 接入 MetricKit，Windows 接入原生异常堆栈，Linux 读取系统保留的本应用 coredump 摘要。
-- 日志不自动上传、不进入 WebDAV、不放入 URL，不包含原始内存转储、书籍正文、API Key、账号、用户路径、设备标识或任意异常文本。先预览，确认后复制，再由用户粘贴并提交公开 GitHub Issue。
-- 四个模型和分词器继续内嵌；默认本地中文 BGE，自动向量化默认关闭。保留原有阅读、朗读、翻译、AI 阅读技能及加密密钥同步设置。
-
-## 已验证与仍待确认
-
-- 本地完整 Flutter 回归 276 项通过、2 项跳过；18 项打包工具测试通过。新增保存/释放顺序、索引完整性、取消、标签小记录和脱敏测试。各平台构建与原生测试结果见 CI 和验证文档。
-- 主机合成对照：5,000 个片段、512 维向量，索引约 41 MiB。旧式保存并刷新标签后的 RSS 约 593 MiB，改后约 248 MiB。**这是 macOS Dart 进程测试，没有加载 ONNX，也不是 Android 真机或原 EPUB 的复现，不能视为原闪退唯一根因的证明。**
-- 仍需在 **iQOO Neo8 / Android 16** 和原 EPUB 上复测。若仍退出，请重新打开 App，在“设置 → 提交 Bug”中勾选设备环境和崩溃日志，预览后提交。可用记录取决于系统保留情况，不能承诺捕获系统强杀或全部原生崩溃。
-- Apple 诊断可能延迟送达，报告区间不是精确崩溃时间；Windows fail-fast、损坏堆栈和强杀可能绕过处理器；Linux 需要 systemd-coredump 与读取权限。不会开启系统转储或申请管理员权限。
-- **升级兼容**：旧版不超过 4 MiB 的索引可自动生成完成记录；更大的旧索引不会为了显示标签自动整本读取，可能暂不显示“已索引”，请手动重新向量化一次。旧索引文件和原书保留，显式搜索仍可尝试读取旧索引。索引文件大小不是 EPUB 文件大小。
-- 本机 iOS 整包构建缺少 Xcode iOS 平台组件；原生 iOS 插件 ARM64 类型检查已通过，发行 IPA 由 GitHub Actions 构建。构建和自动化测试不等于所有平台业务功能都已真机验收。
-
-详见 [崩溃诊断与隐私验证](https://github.com/sobranie2406/modureader/blob/v0.1.0-beta.4/docs/crash-feedback-verification.md) 和 [Beta4 索引内存验证](https://github.com/sobranie2406/modureader/blob/v0.1.0-beta.4/docs/beta4-index-memory-verification.md)。
-
-## 升级与安装
-
-新标签 `v0.1.0-beta.4`，构建号 `6331`；Beta1/2/3 保留，不覆盖旧版。Android 沿用默读专用签名，可覆盖升级；请先备份重要数据，不要为更新直接卸载旧版。
+## 安装与升级
 
 | 平台 | 架构 | 格式与限制 |
 | --- | --- | --- |
-| Android | ARM64 / x86_64 | 专用签名 APK，非 Play Store 版 |
-| Windows | x64 / ARM64 | EXE 安装器，附带 VC++ CRT，仍需 WebView2；无商业代码签名 |
-| Linux | x64 / ARM64 | Debian 13 (trixie) DEB，使用 APT 安装，不保证其他发行版兼容 |
+| Android | ARM64 / x86_64 | 项目专用签名 APK，沿用 Beta 签名，可覆盖升级 |
+| Windows | x64 / ARM64 | EXE 安装器，附带 VC++ CRT，仍需 WebView2 Runtime；无商业代码签名 |
+| Linux | x64 / ARM64 | Debian 13 (trixie) DEB，使用 APT 安装；不保证其他发行版兼容 |
 | macOS | Intel x64 / Apple Silicon ARM64 | DMG，ad-hoc 签名，未经 Apple Developer ID 公证 |
-| iOS | ARM64 真机 | iOS 16+ 未签名 IPA，主程序及 Share Extension 需自行合法签名，不能直接安装 |
+| iOS | ARM64 真机 | iOS 16+ 未签名 IPA，需自行合法签署主程序及 Share Extension，不能直接安装 |
 
-目标为 9 个应用包，以本页实际附件为准；各包附 SHA-256。许可说明 ZIP 是附件，不是统一格式的安装包。
+本版本提供 **9 个程序包**及 SHA-256。安卓 `-notices.zip` 为许可附件，不是安装包。iPhone/iPad 没有 x64 真机包；未发布 App Store、TestFlight 或 Play Store 版本。更新前请备份重要数据，不要先卸载旧版。独立的 WebDAV macOS 预览版有不同应用标识，不会自动迁移其测试书架。
 
-## 功能边界
+## 已验证与未验证范围
 
-- Linux 没有系统 TTS 后端；用户需主动选择在线语音，不会自动上传正文。在线语音播放仍需目标设备验证。
-- 密码 PDF 暂不支持，扫描 PDF 没有 OCR；不保证 DRM 书籍支持。文字层、目录及文件排版影响提取和索引。
-- 免费翻译与 Edge TTS 依赖网络，可能限流或改变；付费 AI/翻译/语音需有效配置。API 预设不保证长期可用。
-- 远程 AI、翻译和语音会向所选服务发送相应文本。不要公开 API Key、同步密码、配置代码或私人书籍。
-- 不提供签名服务、上游商店版本、Notion/Obsidian 专用导出或全部上游格式支持承诺。
-- README 的早期 macOS 截图只展示界面入口，不是接口可用性证明；以实际安装版本为准。
+- 本地 Flutter 回归：296 项通过、2 项跳过。阅读器 JavaScript 回归：27 项通过，包含快速标记、原阅读业务、背景和 TTS。正式源码新增发行附件集合完整性与校验和检查，阻止缺包或混入其他版本。
+- Chromium 移动模拟已验证真实触摸的正向、反向跨段划选、CFI 定位还原、无原生 Selection、无误滚动及退出后恢复普通手势。测试使用原创 HTML 和测试保存回调，**不是 Flutter 真机端到端验收**。
+- WebDAV 鉴权、中文目录、下载、取消、路径/重定向安全边界与配置保存有自动化测试；macOS 预览界面已启动，但**用户实际服务器以及下载后打开阅读的完整真机链路尚未验收**。
+- 全平台构建、安装器检查及原生测试以本次 GitHub Actions 结果为准。构建、单元测试和模拟器推理不等于所有业务功能均已完成真机验收。
+- **iQOO Neo8 / Android 16 与原 EPUB 的长书向量化仍需复测**。JNI 修复有针对性检查，但不承诺所有设备和书籍都不会崩溃。可在「设置 → 提交 Bug」勾选环境与崩溃日志，预览后提交。
+- 快速标记的 Android/iOS 原生 WebView 真机触摸、屏幕布局与系统中断恢复仍需设备验收。
+- Apple 诊断可能延迟；Windows 强杀/fail-fast、Linux 无 systemd-coredump 或权限不足时可能无堆栈。不自动上传诊断，不包含原始内存、正文、密钥或完整用户路径；不能保证捕获所有退出。
+
+## 服务与隐私边界
+
+- API Key 同步默认关闭，独立于 WebDAV 总开关；敏感配置经 AES-256-GCM 加密后写入同步数据库，需要各设备使用同一独立密码。这不是对全部书籍或整个备份的加密。
+- 配置代码与二维码不加密，可能包含账号和密钥，勿公开；远程书库连接不加入这些导出。
+- 在线 AI、向量、翻译和朗读会向所选服务发送相关文本。Edge TTS 与免费翻译可能限流或改变；付费接口需要有效账户。本地嵌入不代表整个 AI 流程离线。
+- Linux 没有系统 TTS 后端，需主动选择在线语音，在线播放仍需目标设备验证。
+- 密码 PDF 暂不支持，扫描 PDF 无 OCR，不承诺 DRM 兼容。文字层与排版影响提取。旧版超过 4 MiB 的索引可能需重新索引才能恢复「已索引」标签；原书和旧索引不会为此删除。
+- README 仅介绍功能与使用入口；较早 macOS 截图不是所有 API 与设备可用性的证明。
 
 ## English summary
 
-Beta 4 (build 6331) addresses shared indexing memory risks across all four bundled local embedding models: extraction WebViews are disposed immediately, model teardown is awaited before persistence, vectors use compact storage, content hashing is incremental, and JSON is written with bounded per-row backpressure. Bookshelf badges read a small commit summary instead of deserializing the full vector index.
+**Modu 1.0.0 (build 10000)** is a regular, non-prerelease distribution derived from Anx Reader and ReadAny. Earlier Beta releases remain available. Upstream attribution and licenses are retained under GPL-3.0-or-later.
 
-Incomplete/invalid vectors cannot replace a completed index. Cancellation preserves the previous index, and a persistent in-progress marker prevents interrupted builds from being presented as completed.
+New features include a read-only **WebDAV remote library** with folder navigation, downloads and local import, plus **mobile quick marking**: enable the pen tool, swipe across text and release to save a highlight. A persistent Exit control restores normal navigation. Existing comments are preserved. Quick marking is off on entry, absent on desktop and unavailable for PDF/fixed-layout books; it does not automatically select across pages. Remote library credentials are separate from sync: only URL/username are stored locally, and its password is session-only. One download at a time, up to 512 MiB; leaving the tab cancels unfinished downloads.
 
-Bug reporting now offers an **off-by-default, previewable crash-diagnostics checkbox**, with separately controlled device/environment information. Android system exit traces, Apple MetricKit, Windows native exceptions and Linux systemd summaries are integrated on a best-effort basis. Reports exclude raw memory dumps, book text, credentials, personal paths and device identifiers. No automatic upload, WebDAV inclusion or diagnostic URL payload; the user previews, copies and submits the public issue.
+The release retains ten editable AI reading skills, model-specific parameters, hybrid RAG, queued indexing, four bundled ONNX models, translation, TTS and encrypted opt-in API-key sync. It includes the Beta4 Android ONNX JNI/R8 fix, bounded-memory indexing and previewable crash reporting.
 
-Host-only synthetic comparison: 5,000 chunks × 512 dimensions, approximately 41 MiB index. RSS after saving and refreshing a badge was about 593 MiB with the previous path versus 248 MiB with the bounded path. This used macOS Dart without ONNX, **not the reported EPUB on iQOO Neo8 / Android 16**. Device verification remains necessary; these changes do not establish a sole crash cause or guarantee that every crash is fixed.
+Local regressions: **296 Flutter tests passed, 2 skipped; 27 reader JavaScript tests passed**. Chromium touch tests covered reverse/cross-paragraph selection, CFI round-tripping and restored scrolling, using a synthetic page rather than an end-to-end Flutter device run. Real Android/iOS quick-mark acceptance, user WebDAV compatibility and long-book indexing on the reported iQOO device remain unverified. CI documents package builds and targeted checks, not universal feature acceptance.
 
-Legacy indexes above 4 MiB require one manual rebuild to regain the verified bookshelf badge. Existing books/index files are preserved. Smaller legacy indexes migrate their summary lazily. Apple delivery may be delayed; Windows fail-fast/force-kill and Linux systems without accessible systemd records may have no stack.
+Packages: Android ARM64/x86_64 APK; Windows x64/ARM64 EXE; Debian 13 x64/ARM64 DEB; Intel/Apple Silicon macOS DMG; iOS ARM64 **unsigned IPA**. Android retains its original signing key. macOS is unnotarized; Windows has no commercial code signature; iOS requires your own valid signing and cannot install directly. Back up data before upgrading. License ZIPs are attachments, not installers. Checksums and corresponding source accompany the release.
 
-Android retains the original signing identity for in-place upgrades. All four models remain bundled; local Chinese BGE is the default and automatic indexing stays off. Beta1/2/3 remain available. Back up important data before upgrading.
-
-Distribution targets: Android ARM64/x86_64 APK, Windows x64/ARM64 EXE, Debian 13 x64/ARM64 DEB, macOS Intel/Apple Silicon DMG, and **unsigned iOS ARM64 IPA**. macOS is unnotarized. iOS requires your own valid signing and cannot be installed directly. Checksums accompany the actual assets.
-
-Derived from Anx Reader and ReadAny, with upstream attribution and licenses retained. CI compilation, installer checks and unit tests do not constitute complete device acceptance.
+Remote services receive the relevant text. API-key sync is separately enabled and encrypted, but configuration codes/QRs are not encrypted. Do not include credentials, private books or unreviewed diagnostics in public issues.

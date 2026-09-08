@@ -312,10 +312,14 @@ jobs:
           pattern: modu-*
           path: dist-release
           merge-multiple: true
-      - name: Verify package checksums and publish prerelease
+      - name: Verify complete package set and publish release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          (cd dist-release && sha256sum --check *.sha256)
-          gh release create "$RELEASE_TAG" dist-release/* --verify-tag --prerelease --title "默读 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
+          python3 scripts/release/validate_assets.py dist-release "$RELEASE_TAG"
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            gh release create "$RELEASE_TAG" dist-release/* --verify-tag --latest --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
+          else
+            gh release create "$RELEASE_TAG" dist-release/* --verify-tag --prerelease --latest=false --title "默读 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
+          fi

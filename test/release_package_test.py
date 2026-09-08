@@ -16,6 +16,49 @@ from verify_mobile import apple_version, verify_android_elf, verify_apple_bundle
 from windows_runtime import prepare_windows_runtime, verify_crt, pe_imports
 import bundle_models
 from verify_onnx_jni import CONSTRUCTORS, REQUIRED_CLASSES, definitions, verify_definitions
+from validate_assets import validate as validate_release_assets
+
+
+class ReleaseAssetSetTest(unittest.TestCase):
+    def fixture(self, folder):
+        names = [f'Modu-1.0.0-{platform}-{arch}{suffix}'
+                 for platform, suffix in [('android', '.apk'), ('linux', '.deb'),
+                                          ('windows', '-setup.exe'), ('macos', '-unnotarized.dmg')]
+                 for arch in ('x64', 'arm64')]
+        names += ['Modu-1.0.0-ios-arm64-unsigned.ipa']
+        names += [f'Modu-1.0.0-android-{arch}-notices.zip' for arch in ('x64', 'arm64')]
+        for name in names:
+            data = b'synthetic packaging test'
+            (folder / name).write_bytes(data)
+            (folder / (name + '.sha256')).write_text(f'{hashlib.sha256(data).hexdigest()}  {name}\n')
+        return names
+
+    def test_all_nine_packages_and_two_notices_are_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            names = self.fixture(folder)
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 11)
+            (folder / names[0]).unlink()
+            with self.assertRaisesRegex(ValueError, 'missing='):
+                validate_release_assets(folder, 'v1.0.0')
+
+    def test_bad_checksum_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            names = self.fixture(folder)
+            (folder / names[0]).write_bytes(b'altered')
+            with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
+                validate_release_assets(folder, 'v1.0.0')
+
+    def test_mixed_versions_and_invalid_tags_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.fixture(folder)
+            (folder / 'Modu-old.apk').write_bytes(b'old')
+            with self.assertRaisesRegex(ValueError, 'unexpected='):
+                validate_release_assets(folder, 'v1.0.0')
+            with self.assertRaisesRegex(ValueError, 'Invalid version tag'):
+                validate_release_assets(folder, '../bad')
 
 
 class OnnxJniReleaseTest(unittest.TestCase):

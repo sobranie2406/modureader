@@ -30,6 +30,7 @@ import 'package:anx_reader/providers/bookmark.dart';
 import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/book_player/quick_mark_service.dart';
 import 'package:anx_reader/service/battery_level.dart';
 import 'package:anx_reader/service/knowledge/knowledge_chapter_source.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
@@ -108,6 +109,29 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   String? _lastSelectionContextText;
   bool _selectionClearLocked = false;
   bool _selectionClearPending = false;
+  bool _readerReady = false;
+  bool quickMarkEnabled = false;
+  final _quickMarks = QuickMarkService(bookNoteDao);
+
+  Future<bool> setQuickMarkEnabled(bool enabled) async {
+    if (!AnxPlatform.isMobile || !_readerReady) return false;
+    removeOverlay();
+    final result = await webViewController.evaluateJavascript(
+        source: 'window.setQuickMarkEnabled?.($enabled, '
+            '${jsonEncode('#${Prefs().annotationColor}')})');
+    if (!mounted) return false;
+    quickMarkEnabled = result == true;
+    return quickMarkEnabled;
+  }
+
+  void _quickMarkError() {
+    if (!mounted) return;
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(zh
+            ? '快速标记保存失败，请重试。'
+            : 'Could not save the highlight. Please retry.')));
+  }
 
   // Scroll wheel debounce
   Timer? _scrollDebounceTimer;
@@ -289,17 +313,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       webViewController.evaluateJavascript(source: "goToCfi('$cfi')");
 
   void addAnnotation(BookNote bookNote) {
-    final noteContent =
-        (bookNote.content).replaceAll('\n', ' ').replaceAll("'", "\\'");
-    webViewController.evaluateJavascript(source: '''
-      addAnnotation({
-        id: ${bookNote.id},
-        type: '${bookNote.type}',
-        value: '${bookNote.cfi}',
-        color: '#${bookNote.color}',
-        note: '$noteContent',
-      })
-      ''');
+    // JSON also safely handles quotes, backslashes and multiline excerpts.
+    webViewController.evaluateJavascript(
+        source: 'addAnnotation(${jsonEncode(bookNote.toJson())}); void 0;');
   }
 
   void addBookmark(BookmarkModel bookmark) {
@@ -739,6 +755,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         handlerName: 'onLoadEnd',
         callback: (args) async {
           if (!mounted) return;
+          _readerReady = true;
+          if (quickMarkEnabled) await setQuickMarkEnabled(true);
           try {
             await setTranslationMode(
                 Prefs().getBookTranslationMode(widget.book.id));
@@ -803,10 +821,41 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           ref.read(bookTocProvider.notifier).setToc(toc);
         });
     controller.addJavaScriptHandler(
+        handlerName: 'onQuickMark',
+        callback: (args) async {
+          if (!mounted ||
+              !AnxPlatform.isMobile ||
+              !quickMarkEnabled ||
+              args.isEmpty ||
+              args.first is! Map) return null;
+          final data = args.first as Map;
+          if (data['cfi'] is! String || data['text'] is! String) return null;
+          try {
+            final note = await _quickMarks.save(
+                bookId: book.id,
+                cfi: data['cfi'] as String,
+                text: data['text'] as String,
+                chapter: chapterTitle,
+                color: Prefs().annotationColor);
+            return note.toJson();
+          } catch (_) {
+            _quickMarkError();
+            return null;
+          }
+        });
+    controller.addJavaScriptHandler(
+        handlerName: 'onQuickMarkError',
+        callback: (args) {
+          if (AnxPlatform.isMobile) _quickMarkError();
+        });
+    controller.addJavaScriptHandler(
         handlerName: 'onSelectionEnd',
         callback: (args) {
-          removeOverlay();
           Map<String, dynamic> location = args[0];
+          if (AnxPlatform.isMobile &&
+              quickMarkEnabled &&
+              location['footnote'] != true) return;
+          removeOverlay();
           String cfi = location['cfi'];
           String text = location['text'];
           bool footnote = location['footnote'];

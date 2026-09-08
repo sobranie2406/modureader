@@ -48,7 +48,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
 2. 只在本仓库创建版本标签；GitHub Actions 并行生成各平台/架构制品。
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
-4. 各包附 SOURCE.txt、LICENSE、NOTICE；Release 发布校验和与对应标签源码。初始版本保持 prerelease。
+4. 各包附 SOURCE.txt、LICENSE、NOTICE；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包、2 个安卓许可附件及各自 SHA-256，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
 
 历史压缩包迁移可手动运行 `Native desktop installers` 工作流：校验现有附件与标签源码身份后，仅重新封装安装器，不重新编译应用、不移动既有标签。`INSTALLER-SOURCE.txt` 单独记录安装脚本提交和原始附件校验和。此迁移流程依赖旧附件仍在 Release；迁移完成后的新版本直接使用常规构建流程。

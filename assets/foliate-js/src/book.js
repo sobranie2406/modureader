@@ -4,6 +4,7 @@ console.log('AnxUA', navigator.userAgent)
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
 import { TtsNavigator } from './tts-navigation.js'
+import { installQuickMark } from './quick-mark.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
 const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
@@ -11,6 +12,9 @@ const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
 const { EPUB } = await import('./epub.js')
 
 var isPdf = false;
+let quickMarkEnabled = false;
+let quickMarkColor = '#ffd54f';
+const quickMarkDocuments = new WeakMap();
 
 const getPosition = (target) => {
   const clamp01 = value => Math.min(Math.max(value, 0), 1);
@@ -142,6 +146,7 @@ const buildRangeContextText = (range) => {
 };
 
 const handleSelection = (view, doc, index) => {
+  if (doc.__moduQuickMarkEnabled) return;
   const selection = doc.getSelection();
   const range = getSelectionRange(selection);
 
@@ -411,6 +416,7 @@ const setSelectionHandler = (view, doc, index) => {
     // this makes it possible to select across pages
 
     doc.addEventListener('selectstart', () => {
+      if (doc.__moduQuickMarkEnabled) return;
       const container = view.shadowRoot.querySelector('foliate-paginator').shadowRoot.querySelector("#container");
       if (!container) return;
       globalThis.originalScrollLeft = container.scrollLeft;
@@ -419,6 +425,7 @@ const setSelectionHandler = (view, doc, index) => {
 
 
     doc.addEventListener('selectionchange', () => {
+      if (doc.__moduQuickMarkEnabled) return;
       if (view.renderer.getAttribute('flow') !== 'paginated') return
       const { lastLocation } = view
       if (!lastLocation) return
@@ -1291,6 +1298,25 @@ class Reader {
   #onLoad({ detail: { doc, index } }) {
     this.#doc = doc
     this.#index = index
+    // Fixed-layout/PDF currently has no annotation overlayer. Do not claim
+    // success by storing a note that cannot be shown in that renderer.
+    if (!this.view.isFixedLayout && !isPdf) {
+      quickMarkDocuments.get(doc)?.destroy();
+      const marker = installQuickMark(doc, {
+        onTap: () => callFlutter('onPullUp'),
+        onError: () => callFlutter('onQuickMarkError'),
+        onCommit: async range => {
+          if (!quickMarkEnabled) return;
+          const annotation = await callFlutter('onQuickMark', {
+            cfi: this.view.getCFI(index, range), text: range.toString(),
+          });
+          if (annotation && !this.annotationsByValue.has(annotation.value))
+            this.addAnnotation(annotation);
+        },
+      });
+      quickMarkDocuments.set(doc, marker);
+      marker.setEnabled(quickMarkEnabled, quickMarkColor);
+    }
     setSelectionHandler(this.view, doc, index)
 
     // if (!this.#originalContent) {
@@ -1311,6 +1337,8 @@ class Reader {
   }
 
   #onRelocate({ detail }) {
+    for (const { doc } of this.view.renderer.getContents())
+      quickMarkDocuments.get(doc)?.cancel();
     const { cfi, fraction, location, tocItem, pageItem, chapterLocation } = detail
     const loc = pageItem
       ? `Page ${pageItem.label}`
@@ -1863,6 +1891,16 @@ window.showContextMenu = () => {
 window.getSelection = () => reader.getSelection()
 
 window.clearSelection = () => reader.view.deselect()
+
+window.setQuickMarkEnabled = (enabled, color) => {
+  if (!reader.view?.renderer) return false;
+  quickMarkEnabled = enabled === true && !isPdf && !reader.view.isFixedLayout;
+  quickMarkColor = color ?? quickMarkColor;
+  stopAutoPageSession(reader.view);
+  for (const { doc } of reader.view.renderer.getContents())
+    quickMarkDocuments.get(doc)?.setEnabled(quickMarkEnabled, quickMarkColor);
+  return quickMarkEnabled;
+}
 
 window.addAnnotation = (annotation) => reader.addAnnotation(annotation)
 

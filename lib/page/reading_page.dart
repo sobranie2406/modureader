@@ -30,6 +30,7 @@ import 'package:anx_reader/utils/ui/status_bar.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:anx_reader/widgets/reading_page/notes_widget.dart';
+import 'package:anx_reader/widgets/reading_page/quick_mark_toggle.dart';
 import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
@@ -91,6 +92,37 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   bool _isResizingAiChat = false;
   bool _isBuildingKnowledgeIndex = false;
   bool bookmarkExists = false;
+  bool _quickMarkEnabled = false;
+  bool _changingQuickMark = false;
+
+  Future<void> _toggleQuickMark() async {
+    if (!AnxPlatform.isMobile || _changingQuickMark) return;
+    setState(() => _changingQuickMark = true);
+    final requested = !_quickMarkEnabled;
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    try {
+      final enabled =
+          await epubPlayerKey.currentState?.setQuickMarkEnabled(requested) ??
+              false;
+      if (!mounted) return;
+      setState(() => _quickMarkEnabled = enabled);
+      if (requested && !enabled) {
+        AnxToast.show(zh
+            ? '请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。'
+            : 'Wait for the book to load. PDF and fixed-layout books are not supported.');
+      } else if (enabled) {
+        showOrHideAppBarAndBottomBar(false);
+        AnxToast.show(zh
+            ? '直接划过文字，松手即高亮；退出后恢复滑动翻页。'
+            : 'Swipe across text to highlight. Exit to resume swipe navigation.');
+      }
+    } catch (_) {
+      AnxToast.show(
+          zh ? '无法切换快速标记，请重试。' : 'Could not switch quick mark. Please retry.');
+    } finally {
+      if (mounted) setState(() => _changingQuickMark = false);
+    }
+  }
 
   late final FocusNode _readerFocusNode;
   // late final VolumeKeyBoard _volumeKeyBoard;
@@ -796,6 +828,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     },
                   ),
                   actions: [
+                    if (AnxPlatform.isMobile)
+                      QuickMarkToggle(
+                          enabled: _quickMarkEnabled,
+                          onPressed:
+                              _changingQuickMark ? null : _toggleQuickMark),
                     if (EnvVar.enableAIFeature) aiButton,
                     IconButton(
                       icon: const Icon(Icons.copy),
@@ -977,6 +1014,18 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                   initialThemes: widget.initialThemes,
                                   updateParent: updateState,
                                 ),
+                                if (AnxPlatform.isMobile && _quickMarkEnabled)
+                                  Positioned(
+                                      top: 8,
+                                      right: 12,
+                                      child: PointerInterceptor(
+                                          child: SafeArea(
+                                              child: QuickMarkToggle(
+                                                  enabled: true,
+                                                  showExit: true,
+                                                  onPressed: _changingQuickMark
+                                                      ? null
+                                                      : _toggleQuickMark)))),
                                 if (_isResizingAiChat)
                                   SizedBox.expand(
                                     child: Container(

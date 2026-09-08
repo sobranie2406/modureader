@@ -5,6 +5,7 @@ import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/home_page/ai_page.dart';
+import 'package:anx_reader/page/home_page/remote_library_page.dart';
 import 'package:anx_reader/service/initialization_check.dart';
 import 'package:anx_reader/page/home_page/bookshelf_page.dart';
 import 'package:anx_reader/page/home_page/notes_page.dart';
@@ -134,6 +135,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         'label': L10n.of(context).navBarBookshelf,
         'identifier': 'bookshelf'
       },
+      {
+        'icon': Icons.cloud_download_outlined,
+        'label': Localizations.localeOf(context).languageCode == 'zh'
+            ? '远程书库'
+            : 'Remote library',
+        'identifier': 'remoteLibrary'
+      },
       if (Prefs().bottomNavigatorShowStatistics)
         {
           'icon': Icons.show_chart,
@@ -173,6 +181,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     ) {
       final page = [
         BookshelfPage(controller: controller),
+        const RemoteLibraryPage(),
         if (Prefs().bottomNavigatorShowStatistics)
           StatisticPage(controller: controller),
         if (Prefs().bottomNavigatorShowAI && EnvVar.enableAIFeature)

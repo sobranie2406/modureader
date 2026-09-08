@@ -98,3 +98,6 @@ google_service_account.json
 # FVM Version Cache
 .fvm/
 .fvmrc
+
+# Local browser test fixtures, screenshots and temporary browser sessions.
+/output/playwright/

@@ -11,6 +11,7 @@ import 'package:anx_reader/page/settings_page/reading.dart';
 import 'package:anx_reader/page/settings_page/settings_page.dart';
 import 'package:anx_reader/page/settings_page/storege.dart';
 import 'package:anx_reader/page/settings_page/sync.dart';
+import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -165,6 +166,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "subtitles": [
                   L10n.of(context).settingsSyncWebdav,
                   L10n.of(context).exportAndImport,
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '书库 WebDAV'
+                    : 'Library WebDAV',
+                "icon": Icons.folder_shared_outlined,
+                "sections": const RemoteLibrarySettings(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '远程文件浏览与书籍下载（独立于同步）'
+                      : 'Browse and download books (separate from sync)'
                 ],
               },
               {

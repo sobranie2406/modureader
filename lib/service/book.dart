@@ -433,7 +433,8 @@ void _showImportDialog(
       });
 }
 
-Future<void> importBook(File file, WidgetRef ref) async {
+Future<void> importBook(File file, WidgetRef ref,
+    {void Function()? onImported}) async {
   String? md5 = await MD5Service.calculateFileMd5(file.path);
 
   if (file.path.split('.').last.toLowerCase() == 'txt') {
@@ -442,9 +443,13 @@ Future<void> importBook(File file, WidgetRef ref) async {
     file = tempFile;
   }
 
-  await getBookMetadata(file, md5: md5, ref: ref);
+  await getBookMetadata(file, md5: md5);
   if (await file.exists()) await file.delete();
-  ref.read(bookListProvider.notifier).refresh();
+  if (onImported != null) {
+    onImported();
+  } else {
+    ref.read(bookListProvider.notifier).refresh();
+  }
 }
 
 Future<void> pushToReadingPage(
