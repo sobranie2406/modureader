@@ -3,6 +3,69 @@
 // selectionchange auto-page timers and the ordinary selection action menu.
 const blocked = 'a,button,input,textarea,select,[contenteditable="true"],rt,[data-modu-quick-mark="preview"]';
 
+// Pagination is only a viewport into a chapter document. Use DOM positions,
+// never string suffixes or screen coordinates, to join consecutive strokes.
+export function continuousRange(a, b) {
+  const doc = a.startContainer.ownerDocument;
+  if (doc !== b.startContainer.ownerDocument || a.collapsed || b.collapsed ||
+      !a.startContainer.isConnected || !a.endContainer.isConnected ||
+      !b.startContainer.isConnected || !b.endContainer.isConnected) return null;
+  const start = r => { const p = r.cloneRange(); p.collapse(true); return p; };
+  const end = r => { const p = r.cloneRange(); p.collapse(false); return p; };
+  const [first, second] = start(a).compareBoundaryPoints(0, start(b)) <= 0 ? [a, b] : [b, a];
+  if (end(first).compareBoundaryPoints(0, start(second)) < 0) {
+    const gap = doc.createRange();
+    gap.setStart(first.endContainer, first.endOffset);
+    gap.setEnd(second.startContainer, second.startOffset);
+    // Whitespace at a paragraph/page boundary is okay; missing text or an
+    // intervening illustration is not a continuous text highlight.
+    if (gap.toString().trim() || gap.cloneContents().querySelector(
+      'img,svg,math,video,audio,iframe,object,hr')) return null;
+  }
+  const union = first.cloneRange();
+  if (end(second).compareBoundaryPoints(0, end(first)) > 0)
+    union.setEnd(second.endContainer, second.endOffset);
+  return union.toString().length <= 100000 ? union : null;
+}
+
+export async function planQuickMarkMerge(range, annotations, { color, resolveRange, getCFI }) {
+  const eligible = [];
+  // A repaint can supply the same stored note more than once.
+  for (const annotation of new Map(annotations.map(a => [a.id, a])).values()) {
+    if (annotation.type !== 'highlight' || annotation.hasReaderNote !== false ||
+        annotation.color?.toLowerCase() !== color.toLowerCase() ||
+        !Number.isInteger(annotation.id)) continue;
+    try {
+      const old = await resolveRange(annotation.value);
+      if (old && old.toString() === annotation.note) eligible.push({ annotation, range: old });
+    } catch { /* An unresolvable stale annotation must remain untouched. */ }
+  }
+  let union = range.cloneRange();
+  const sources = [];
+  // Repeat to allow a new middle stroke to connect both existing sides.
+  let changed = true;
+  while (changed && sources.length < 128) {
+    changed = false;
+    for (const item of eligible) {
+      if (sources.includes(item)) continue;
+      const merged = continuousRange(union, item.range);
+      if (!merged) continue;
+      union = merged;
+      sources.push(item);
+      changed = true;
+      if (sources.length === 128) break;
+    }
+  }
+  if (!sources.length) return null;
+  sources.sort((a, b) => a.range.compareBoundaryPoints(0, b.range));
+  return {
+    cfi: getCFI(union), text: union.toString(),
+    sources: sources.map(({ annotation }) => ({
+      id: annotation.id, cfi: annotation.value, text: annotation.note,
+    })),
+  };
+}
+
 export const rangeBetween = (doc, a, b) => {
   const first = doc.createRange();
   first.setStart(a.node, a.offset);

@@ -3,8 +3,9 @@ console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
+import { attachFootnoteSizing } from './footnote-size.js'
 import { TtsNavigator } from './tts-navigation.js'
-import { installQuickMark } from './quick-mark.js'
+import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
 const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
@@ -987,14 +988,21 @@ const readingFeaturesDocHandler = (doc) => {
 
 
 const footnoteDialog = document.getElementById('footnote-dialog')
+let footnoteSizing = null
 footnoteDialog.style.display = 'none'
-footnoteDialog.addEventListener('click', () => {
-  // display none
+const closeFootnote = () => {
+  footnoteSizing?.destroy()
+  footnoteSizing = null
   footnoteDialog.style.display = 'none'
   callFlutter("onFootnoteClose")
+}
+footnoteDialog.addEventListener('click', e => {
+  if (e.target === footnoteDialog) closeFootnote()
 })
 
 const replaceFootnote = (view) => {
+  footnoteSizing?.destroy()
+  footnoteSizing = null
   clearSelection()
   footnoteDialog.querySelector('main').replaceChildren(view)
 
@@ -1007,33 +1015,6 @@ const replaceFootnote = (view) => {
     doc.__isFootNote = true
 
 
-    setTimeout(() => {
-      const dialog = document.getElementById('footnote-dialog')
-      const content = document.querySelector("#footnote-dialog > main > foliate-view")
-        .shadowRoot.querySelector("foliate-paginator")
-        .shadowRoot.querySelector("#container > div > iframe")
-
-      dialog.style.display = 'block'
-
-      // dialog.style.width = 'auto'
-      // dialog.style.height = 'auto'
-
-      // const contentWidth = content.clientWidth
-      // const contentHeight = content.clientHeight
-
-      // const squareSize = contentWidth * contentHeight
-
-      // dialog.style.height = 100 + 'px'
-      // dialog.style.width = squareSize / 100 + 'px'
-
-      // if (squareSize > window.innerWidth * 100 * 0.8) {
-      //   dialog.style.width = window.innerWidth * 0.8 + 'px'
-      //   dialog.style.height = squareSize / (window.innerWidth * 3.0) + 'px'
-      // }
-
-      //dialog.style.width = `${Math.min(Math.max(contentWidth, 200), window.innerWidth * 0.8)}px`
-      //dialog.style.height = `${Math.min(Math.max(contentHeight, 100), window.innerHeight * 0.8)}px`
-    }, 0)
   })
 
   const { renderer } = view
@@ -1059,17 +1040,18 @@ const replaceFootnote = (view) => {
     useBookStyles: style.useBookStyles,
     headingFontSize: style.headingFontSize,
   }
-  renderer.setStyles(getCSS(footNoteStyle))
+  const css = getCSS(footNoteStyle)
+  const noteLayoutCSS = 'html, body { min-height: 0 !important; height: auto !important; }'
+  renderer.setStyles(css + noteLayoutCSS)
   // set background color of dialog
   // if #rrggbbaa, replace aa to ee
   footnoteDialog.style.backgroundColor = style.backgroundColor.slice(0, 7) + '33'
 }
-footnoteDialog.addEventListener('click', e =>
-  e.target === footnoteDialog ? footnoteDialog.close() : null)
 
 class Reader {
   annotations = new Map()
   annotationsByValue = new Map()
+  quickMarkQueue = Promise.resolve()
   #footnoteHandler = new FootnoteHandler()
   #doc
   #index
@@ -1089,8 +1071,9 @@ class Reader {
       replaceFootnote(view)
     })
     this.#footnoteHandler.addEventListener('render', e => {
-      const { view } = e.detail
-      footnoteDialog.showModal()
+      const { doc } = e.detail
+      footnoteSizing?.destroy()
+      footnoteSizing = attachFootnoteSizing(footnoteDialog, doc)
     })
     this.#originalContent = null
   }
@@ -1188,7 +1171,8 @@ class Reader {
         value,
         type,
         color,
-        note
+        note,
+        hasReaderNote: anno.hasReaderNote !== false,
       }
 
       this.addAnnotation(annotation)
@@ -1305,13 +1289,30 @@ class Reader {
       const marker = installQuickMark(doc, {
         onTap: () => callFlutter('onPullUp'),
         onError: () => callFlutter('onQuickMarkError'),
-        onCommit: async range => {
-          if (!quickMarkEnabled) return;
-          const annotation = await callFlutter('onQuickMark', {
-            cfi: this.view.getCFI(index, range), text: range.toString(),
+        onCommit: range => {
+          const color = quickMarkColor;
+          const commit = this.quickMarkQueue.then(async () => {
+            if (!quickMarkEnabled) return;
+            const merge = await planQuickMarkMerge(range, this.annotations.get(index) ?? [], {
+              color,
+              resolveRange: async cfi => {
+                const resolved = await this.view.resolveCFI(cfi);
+                return resolved?.index === index ? resolved.anchor(doc) : null;
+              },
+              getCFI: merged => this.view.getCFI(index, merged),
+            });
+            const result = await callFlutter('onQuickMark', {
+              cfi: this.view.getCFI(index, range), text: range.toString(), merge,
+            });
+            // Remove old overlays only after the database transaction succeeds.
+            if (!result) return;
+            for (const cfi of result.replacedCfis ?? []) this.removeAnnotation(cfi);
+            const annotation = result.annotation;
+            if (annotation && !this.annotationsByValue.has(annotation.value))
+              this.addAnnotation(annotation);
           });
-          if (annotation && !this.annotationsByValue.has(annotation.value))
-            this.addAnnotation(annotation);
+          this.quickMarkQueue = commit.catch(() => {});
+          return commit;
         },
       });
       quickMarkDocuments.set(doc, marker);
@@ -1707,6 +1708,7 @@ const setStyle = (oldStyle) => {
       break
   }
 
+  reader.view.renderer.setAttribute('mobile-image-fit', style.mobileImageFit === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('flow', turn.scroll ? 'scrolled' : 'paginated')
   reader.view.renderer.setAttribute('top-margin', `${style.topMargin}px`)
   reader.view.renderer.setAttribute('bottom-margin', `${style.bottomMargin}px`)
@@ -1921,8 +1923,7 @@ window.ttsStop = () => {
 }
 
 window.ttsHere = () => {
-  initTts()
-  return reader.view.tts.from(reader.view.lastLocation.range)
+  return ttsNavigator.start(reader.view.lastLocation?.range)
 }
 
 window.ttsFromCfi = async (cfi) => {
@@ -1934,13 +1935,13 @@ window.ttsFromCfi = async (cfi) => {
       const content = contents.find(c => c.index === resolved.index) || contents[0]
       if (content && content.doc) {
         const range = resolved.anchor(content.doc)
-        return reader.view.tts.from(range)
+        return ttsNavigator.start(range)
       }
     }
   } catch (e) {
     console.error(e)
   }
-  return reader.view.tts.from(reader.view.lastLocation.range)
+  return window.ttsHere()
 }
 
 window.ttsCurrentDetail = () => {
@@ -2011,13 +2012,9 @@ window.getChapterContentByHref = async (href, opts) =>
 
 // window.bionicReading = (enable) => reader.bionicReading(enable)
 
-window.isFootNoteOpen = () => footnoteDialog.getAttribute('style').includes('display: block')
+window.isFootNoteOpen = () => footnoteDialog.style.display === 'block'
 
-window.closeFootNote = () => {
-  // set zindex to 0
-  footnoteDialog.style.display = 'none'
-  callFlutter("onFootnoteClose")
-}
+window.closeFootNote = closeFootnote
 
 window.readingFeatures = (rules) => {
   readingRules = { ...readingRules, ...rules }

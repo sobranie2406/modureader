@@ -64,6 +64,52 @@ class BookNoteDao extends BaseDao {
     );
   }
 
+  /// Replace connected highlights atomically. Recheck the renderer's snapshot
+  /// under the write lock so an edited/deleted/commented note is never lost.
+  Future<BookNote?> mergeQuickMarks({
+    required int bookId,
+    required String cfi,
+    required String text,
+    required String color,
+    required List<({int id, String cfi, String text})> sources,
+  }) async {
+    if (sources.isEmpty ||
+        sources.length > 128 ||
+        sources.map((s) => s.id).toSet().length != sources.length) return null;
+    return transaction((txn) async {
+      final originals = <BookNote>[];
+      for (final source in sources) {
+        final rows = await txn.query(table,
+            where: 'id = ? AND book_id = ?', whereArgs: [source.id, bookId]);
+        if (rows.length != 1) return null;
+        final note = BookNote.fromDb(rows.single);
+        if (note.cfi != source.cfi ||
+            note.content != source.text ||
+            note.type != 'highlight' ||
+            note.color.toLowerCase() != color.toLowerCase() ||
+            (note.readerNote?.trim().isNotEmpty ?? false)) return null;
+        originals.add(note);
+      }
+      final collisions = await txn.query(table,
+          columns: ['id'],
+          where: 'book_id = ? AND cfi = ?',
+          whereArgs: [bookId, cfi]);
+      if (collisions.any((row) => !sources.any((s) => s.id == row['id'])))
+        return null;
+      final merged = originals.first;
+      merged.cfi = cfi;
+      merged.content = text;
+      merged.updateTime = DateTime.now();
+      await txn.update(table, merged.toMap(),
+          where: 'id = ?', whereArgs: [merged.id]);
+      for (final note in originals.skip(1)) {
+        await txn.delete(table,
+            where: 'id = ? AND book_id = ?', whereArgs: [note.id, bookId]);
+      }
+      return merged;
+    });
+  }
+
   Future<BookNote> selectBookNoteById(int id) async {
     final note = await querySingle(
       table,

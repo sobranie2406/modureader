@@ -20,12 +20,14 @@
     padding: var(safe-area-inset-top) var(safe-area-inset-right) var(safe-area-inset-bottom) var(safe-area-inset-left);
     */
     position: fixed;
-    width: 80vw;
-    height: 80vh;
-    max-width: 400px;
-    max-height: 200px;
-    min-width: 300px;
-    min-height: 200px;
+    width: 0;
+    height: 0;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 8px;
+    margin: 0;
+    overflow: hidden;
     border-radius: 15px;
     border: 1px solid grey;
     user-select: none;
@@ -44,6 +46,13 @@
     overflow: auto;
     width: 100%;
     height: 100%;
+  }
+  #footnote-dialog main > foliate-view {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
   }
 </style>
 <div id="footnote-dialog">

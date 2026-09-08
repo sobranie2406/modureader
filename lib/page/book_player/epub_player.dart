@@ -31,6 +31,7 @@ import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
+import 'package:anx_reader/service/book_player/tts_text_result.dart';
 import 'package:anx_reader/service/battery_level.dart';
 import 'package:anx_reader/service/knowledge/knowledge_chapter_source.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
@@ -237,6 +238,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       webViewController.evaluateJavascript(source: '''
       changeStyle({
         fontSize: ${style.fontSize},
+        mobileImageFit: ${AnxPlatform.isMobile},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
         paragraphSpacing: ${style.paragraphSpacing},
@@ -375,7 +377,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     if (result?.error != null) {
       throw StateError('TTS initialization failed: ${result!.error}');
     }
-    return result?.value as String? ?? '';
+    return ttsTextResult(result?.value, error: result?.error);
   }
 
   Future<void> ttsStop() async {
@@ -389,7 +391,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     if (result?.error != null) {
       throw StateError('TTS navigation failed: ${result!.error}');
     }
-    return result?.value as String? ?? '';
+    return ttsTextResult(result?.value, error: result?.error);
   }
 
   Future<String> ttsNext() => _ttsTextCall('ttsNext');
@@ -831,13 +833,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           final data = args.first as Map;
           if (data['cfi'] is! String || data['text'] is! String) return null;
           try {
-            final note = await _quickMarks.save(
+            final result = await _quickMarks.saveStroke(
                 bookId: book.id,
                 cfi: data['cfi'] as String,
                 text: data['text'] as String,
                 chapter: chapterTitle,
-                color: Prefs().annotationColor);
-            return note.toJson();
+                color: Prefs().annotationColor,
+                merge: data['merge'] is Map ? data['merge'] as Map : null);
+            return result.toJson();
           } catch (_) {
             _quickMarkError();
             return null;

@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/utils/js/convert_dart_color_to_js.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 Future<void> webviewInitialVariable(
@@ -36,6 +37,7 @@ Future<void> webviewInitialVariable(
       const url = '${replaceSingleQuote(url)}'
       let initialCfi = '${replaceSingleQuote(cfi)}'
       let style = {
+          mobileImageFit: ${AnxPlatform.isMobile},
           fontSize: ${bookStyle.fontSize},
           fontName: '${replaceSingleQuote(fontName)}',
           fontPath: '${replaceSingleQuote(fontPath)}',

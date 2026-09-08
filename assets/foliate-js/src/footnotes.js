@@ -67,7 +67,7 @@ export class FootnoteHandler extends EventTarget {
                         doc.body.replaceChildren()
                         doc.body.appendChild(frag)
                     }
-                    const detail = { view, href, type, hidden, target: el }
+                    const detail = { view, doc, href, type, hidden, target: el }
                     this.dispatchEvent(new CustomEvent('render', { detail }))
                     resolve()
                 } catch (e) {

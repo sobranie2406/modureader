@@ -63,11 +63,15 @@ This connection is separate from WebDAV sync. It only reads and downloads files;
 
 ### Quick marking on mobile
 
+Adjacent same-color highlights without comments can merge across pages within one chapter document. Missing text, intervening images or existing comments keep marks separate.
+
 Open a reflowable ebook and tap the pen button in the reader toolbar to enable Quick mark. No long press is needed: swipe from the beginning of the text you want to capture, then release to save the highlight. It uses your current highlight color and appears in the existing notes list. Marking the same location again preserves any existing comment.
 
 While enabled, swiping over text selects it. Tap text to open the reading controls, or use the persistent Quick mark · Exit button to restore normal page turns and scrolling. The mode starts off each time you enter a book and is not shown on desktop. PDF, scanned images and fixed-layout books are not supported; selection does not automatically continue across pages.
 
 ### AI grounded in your reading
+
+Reasoning effort is configurable per model, including **Off** for supported models. Full-text translation uses the selected model's parameters. Actual support depends on the provider and model.
 
 Home AI is intended for library, note and reading-history questions. In-book AI focuses on the current book, chapter or selected text. Home offers quick prompts, while the reader uses enabled reading skills. Their contexts are different: a home-screen question should not automatically be treated as referring to a current chapter.
 
@@ -111,13 +115,17 @@ Local embeddings only mean that embedding computation happens on your device. Re
 
 ### Translation and read-aloud
 
+Mobile inline images fit the reading area proportionally. Footnote popups resize to content, capped at 25% of the visible reader viewport area; longer notes scroll inside the popup.
+
+At a chapter boundary, narration automatically continues with the next chapter's heading and body, skipping empty chapters.
+
 Translate selected text or use the bottom reader toolbar, with Google translation, AI translation or DeepL/DeepLX.
 
 Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo supports built-in voices, text-based voice design and MP3/WAV audio; style, pace and pitch are controlled through natural-language instructions. Synthesis or playback failures pause at the current position for retry.
 
 ### Sync and key security
 
-- WebDAV syncs your library, notes and reading progress without a Modu cloud account.
+- WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
 - **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
 - Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.

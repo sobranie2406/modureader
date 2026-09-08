@@ -1,3 +1,5 @@
+import { fitMobileImages } from './mobile-image-fit.js'
+
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 const lerp = (min, max, x) => x * (max - min) + min
@@ -244,6 +246,12 @@ class View {
         this.#iframe.style.display = 'block'
         this.render(layout)
         this.#observer.observe(doc.body)
+        // Lazy images can obtain their intrinsic dimensions after pagination.
+        const refit = () => {
+          if (this.#layout.mobileImageFit) { this.setImageSize(); this.expand(); }
+        }
+        doc.addEventListener('load', refit, true)
+        doc.addEventListener('loadedmetadata', refit, true)
 
         // the resize observer above doesn't work in Firefox
         // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
@@ -317,6 +325,10 @@ class View {
     this.expand()
   }
   setImageSize() {
+    if (this.#layout.mobileImageFit) {
+      fitMobileImages(this.document, this.#layout, this.#vertical)
+      return
+    }
     const { width, height, margin, columnWidth } = this.#layout
     const vertical = this.#vertical
     const doc = this.document
@@ -698,7 +710,8 @@ export class Paginator extends HTMLElement {
       // this.#header.replaceChildren()
       // this.#footer.replaceChildren()
 
-      return { flow, margin, gap, columnWidth, topMargin, bottomMargin }
+      return { flow, margin, gap, columnWidth, topMargin, bottomMargin,
+        ...(this.getAttribute('mobile-image-fit') === 'true' ? { width, height, mobileImageFit: true } : {}) }
     }
 
     const divisor = maxColumnCount == 0
@@ -725,7 +738,8 @@ export class Paginator extends HTMLElement {
     // this.#header.replaceChildren(...heads)
     // this.#footer.replaceChildren(...feet)
 
-    return { height, width, margin, gap, columnWidth, topMargin, bottomMargin }
+    return { height, width, margin, gap, columnWidth, topMargin, bottomMargin,
+      mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
   }
   render() {
     if (!this.#view) return
@@ -1289,15 +1303,19 @@ export class Paginator extends HTMLElement {
   async #turnPage(dir, distance) {
     // if (this.#locked) return
     this.#locked = true
-    const prev = dir === -1
-    const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))
-    
-    if (shouldGo) await this.#goTo({
-      index: this.#adjacentIndex(dir),
-      anchor: prev ? () => 1 : () => 0,
-    })
-    if (shouldGo || !this.hasAttribute('animated')) await wait(100)
-    this.#locked = false
+    try {
+      const prev = dir === -1
+      const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))
+
+      const adjacent = this.#adjacentIndex(dir)
+      if (shouldGo && adjacent != null) await this.#goTo({
+        index: adjacent,
+        anchor: prev ? () => 1 : () => 0,
+      })
+      if (shouldGo || !this.hasAttribute('animated')) await wait(100)
+    } finally {
+      this.#locked = false
+    }
   }
   prev(distance) {
     return this.#turnPage(-1, distance)

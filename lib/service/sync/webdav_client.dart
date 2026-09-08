@@ -2,6 +2,7 @@ import 'dart:io' as io;
 
 import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
@@ -59,7 +60,7 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<void> testFullCapabilities() async {
-    const testDir = 'anx/.test';
+    const testDir = SyncPaths.connectionTest;
     const testFile = '$testDir/test.txt';
     io.File? localTestFile;
     io.File? downloadTestFile;

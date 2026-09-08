@@ -1,5 +1,6 @@
 enum AiReasoningEffort {
   auto('auto'),
+  none('none'),
   low('low'),
   medium('medium'),
   high('high');

@@ -28,6 +28,53 @@ void main() {
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  for (final online in [false, true]) {
+    test(
+        '${online ? "online" : "system"} waits for the next chapter and continues without stopping',
+        () async {
+      final loaded = Completer<void>();
+      final sentences = ['前章末句', '下一章标题', '下一章正文'];
+      final spoken = <String>[];
+      var cursor = 0;
+      var loading = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'speak') {
+          spoken.add(call.arguments is String
+              ? call.arguments as String
+              : (call.arguments as Map)['text'] as String);
+        }
+        return 1;
+      });
+      final BaseTts tts = online
+          ? OnlineTts.forTesting(
+              collect: (_) async => cursor < sentences.length
+                  ? [TtsSentence(text: sentences[cursor])]
+                  : [],
+              synthesize: (_) async => Uint8List.fromList([1]),
+              play: (segment) async => spoken.add(segment.sentence.text),
+            )
+          : SystemTts.forTesting(supported: true);
+      await tts.init(() async => sentences[cursor], () async {
+        if (cursor == 0) {
+          loading = true;
+          await loaded.future;
+        }
+        cursor++;
+        return cursor < sentences.length ? sentences[cursor] : '';
+      }, () async => '');
+      tts.updateTtsState(TtsStateEnum.playing);
+      final playing = tts.speak();
+      await until(() => loading);
+      expect(spoken, ['前章末句']);
+      expect(tts.ttsStateNotifier.value, TtsStateEnum.playing);
+      loaded.complete();
+      await playing;
+      expect(spoken, sentences);
+      expect(tts.ttsStateNotifier.value, TtsStateEnum.stopped);
+      await tts.stop();
+    });
+  }
+
   test(
       'system reads initialized title and each following sentence exactly once',
       () async {

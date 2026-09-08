@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:anx_reader/enums/ai_reasoning_effort.dart';
+import 'package:anx_reader/service/ai/reasoning_control_client.dart';
+import 'package:http/http.dart' as http;
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/providers/current_reading.dart';
@@ -15,8 +18,20 @@ import 'langchain_ai_config.dart';
 
 /// Factory responsible for building chat models based on user preferences.
 class LangchainAiRegistry {
-  const LangchainAiRegistry(this.ref);
+  const LangchainAiRegistry(this.ref, {this.clientFactory});
   final WidgetRef? ref;
+  final http.Client Function()? clientFactory;
+
+  http.Client? _client(LangchainAiConfig config, AiProtocol protocol) {
+    if (config.reasoningEffort != AiReasoningEffort.none) {
+      return clientFactory?.call();
+    }
+    return ReasoningControlClient(
+      inner: clientFactory?.call() ?? http.Client(),
+      protocol: protocol,
+      model: config.model,
+    );
+  }
 
   LangchainPipeline resolve(
     LangchainAiConfig config, {
@@ -89,6 +104,7 @@ class LangchainAiRegistry {
       baseUrl: config.baseUrl ?? 'https://api.openai.com/v1',
       headers: config.headers.isEmpty ? null : config.headers,
       defaultOptions: config.toOpenAIOptions(),
+      client: _client(config, AiProtocol.openai),
     );
   }
 
@@ -98,6 +114,7 @@ class LangchainAiRegistry {
       baseUrl: config.baseUrl ?? 'https://api.anthropic.com/v1',
       headers: config.headers.isEmpty ? null : config.headers,
       defaultOptions: config.toAnthropicOptions(),
+      client: _client(config, AiProtocol.claude),
     );
   }
 
@@ -107,6 +124,7 @@ class LangchainAiRegistry {
       baseUrl: config.baseUrl,
       headers: config.headers.isEmpty ? null : config.headers,
       defaultOptions: config.toGoogleOptions(),
+      client: _client(config, AiProtocol.gemini),
     );
   }
 

@@ -57,6 +57,10 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             SettingsTile.navigation(
                 title: Text(L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
+                description: Text(_label(
+                  '同步目录：modu。沿用旧数据时，请先暂停所有设备同步，备份后将服务器上的 anx（或 Anx）目录改名为 modu，再更新所有设备。若 modu 已存在，请勿直接覆盖。',
+                  'Sync folder: modu. To reuse old data, pause sync on all devices, back up and rename the server folder anx (or Anx) to modu, then update all devices. Do not overwrite an existing modu folder.',
+                )),
                 value: Text(Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
                     'Not set'),
                 // enabled: Prefs().webdavStatus,

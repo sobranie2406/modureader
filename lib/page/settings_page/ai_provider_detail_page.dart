@@ -376,6 +376,10 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
                 child: Text(l10n.settingsAiProviderReasoningEffortAuto),
               ),
               DropdownMenuItem(
+                value: AiReasoningEffort.none,
+                child: Text(_label('关闭推理', 'Off')),
+              ),
+              DropdownMenuItem(
                 value: AiReasoningEffort.low,
                 child: Text(l10n.settingsAiProviderReasoningEffortLow),
               ),
@@ -408,7 +412,10 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.settingsAiProviderReasoningEffortHelp,
+                  _label(
+                    '自动不发送推理控制参数，不等于关闭。关闭会请求模型停用推理，可用于减少全文翻译等待；翻译会沿用所选模型的此项设置，也影响该模型的其他 AI 请求。低/中/高适用于支持 reasoning_effort 的接口。部分模型强制推理或不支持关闭参数，需改回自动或换用支持的模型；不保证一定提速。',
+                    'Auto omits reasoning controls; it does not turn reasoning off. Off requests non-reasoning output and may reduce full-text translation latency. Translation and other AI requests use the selected model’s setting. Low/medium/high require reasoning_effort support. Some models require reasoning or reject disable parameters: use Auto or a compatible model. Speed gains are not guaranteed.',
+                  ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     height: 1.35,

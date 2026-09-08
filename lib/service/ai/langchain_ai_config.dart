@@ -255,6 +255,9 @@ extension on AiReasoningEffort {
   ChatOpenAIReasoningEffort? toOpenAiReasoningEffort() {
     return switch (this) {
       AiReasoningEffort.auto => null,
+      // The pinned SDK has no 'none' enum. The HTTP adapter adds the
+      // protocol-specific disable field after SDK serialization.
+      AiReasoningEffort.none => null,
       AiReasoningEffort.low => ChatOpenAIReasoningEffort.low,
       AiReasoningEffort.medium => ChatOpenAIReasoningEffort.medium,
       AiReasoningEffort.high => ChatOpenAIReasoningEffort.high,

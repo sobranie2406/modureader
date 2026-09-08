@@ -49,6 +49,7 @@ class BookNote {
       'value': cfi,
       'type': type,
       'color': '#$color',
+      'hasReaderNote': readerNote?.trim().isNotEmpty ?? false,
     };
   }
 

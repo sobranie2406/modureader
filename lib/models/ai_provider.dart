@@ -40,7 +40,7 @@ abstract class AiProvider with _$AiProvider {
     int? maxTokens, // Per-provider output token limit
     int? contextTurns, // Per-provider conversation history turns
     @Default(AiReasoningEffort.auto)
-    AiReasoningEffort reasoningEffort, // OpenAI reasoning effort
+    AiReasoningEffort reasoningEffort, // Auto, explicit off, or OpenAI effort
     @Default(0) int keyIndex, // Current round-robin key index
     DateTime? createdAt, // Creation time
     DateTime? updatedAt, // Last update time

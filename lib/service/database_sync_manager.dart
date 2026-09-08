@@ -2,6 +2,7 @@ import 'dart:io' as io;
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
 import 'package:anx_reader/utils/get_path/databases_path.dart';
 import 'package:anx_reader/utils/log/common.dart';
@@ -51,7 +52,7 @@ class DatabaseSyncManager {
 
       // Step 1: Download to temp file
       await client.downloadFile(
-        'anx/$remoteDbFileName',
+        SyncPaths.database(remoteDbFileName),
         tempDbPath,
         onProgress: onProgress,
       );
