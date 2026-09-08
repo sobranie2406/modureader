@@ -39,6 +39,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 ### 文档分工
 
 - `README.md` 与 `README_EN.md` 只介绍当前版本的功能、使用入口、截图和安装入口；保留必要的安装与隐私安全提醒。
+- 项目首页只维护以上中文、英文两份 README；不保留冒充默读介绍的上游多语言首页。依赖目录内的 README 与许可证仍按其原作者要求保留。
 - 各 Beta 的新增、修复、构建号、测试结果、已知问题和未验证事项写入对应 GitHub Release，不在首页逐版累积。
 - 功能发生变化时直接更新中英文 README 的功能描述，不添加“Beta X 新增/修复”段落。
 - `docs/RELEASE_NOTES.md` 用于准备当前发布的说明；发布后修改说明应同步到对应 Release。历史版本的说明保留在各自 Release 中，不覆盖为新版内容。
@@ -50,6 +51,8 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
 4. 各包附 SOURCE.txt、LICENSE、NOTICE；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包、2 个安卓许可附件及各自 SHA-256，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
+
+当前使用 `.github/workflows/build.yaml`、`pr-check.yml` 及 `scripts/release/`。旧上游独立打包和商店发布工作流已移除；Fastlane 文件仅为历史开发模板，不是默读现行分发入口，不表示已上架或获得签名服务。
 
 历史压缩包迁移可手动运行 `Native desktop installers` 工作流：校验现有附件与标签源码身份后，仅重新封装安装器，不重新编译应用、不移动既有标签。`INSTALLER-SOURCE.txt` 单独记录安装脚本提交和原始附件校验和。此迁移流程依赖旧附件仍在 Release；迁移完成后的新版本直接使用常规构建流程。
 

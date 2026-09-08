@@ -11,19 +11,16 @@ import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/current_reading_state.dart';
 import 'package:anx_reader/page/home_page.dart';
-import 'package:anx_reader/page/iap_page.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/providers/iap.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
-import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/utils/import_book.dart';
@@ -469,22 +466,6 @@ Future<void> pushToReadingPage(
     return;
   }
 
-  if (EnvVar.enableInAppPurchase) {
-    final iapAsync = ref.read(iapProvider);
-    final isFeatureAvailable = iapAsync.maybeWhen(
-      data: (state) => state.isFeatureAvailable,
-      orElse: () => ref.read(iapProvider.notifier).cachedFeatureAvailable(),
-    );
-
-    if (!isFeatureAvailable) {
-      Navigator.of(context).push(
-        CupertinoPageRoute(
-          builder: (context) => const IAPPage(),
-        ),
-      );
-      return;
-    }
-  }
   ref.read(aiChatProvider(AiChatScope.reader).notifier).clear();
   final initialThemes = await themeDao.selectThemes();
   ref.read(currentReadingProvider.notifier).start(

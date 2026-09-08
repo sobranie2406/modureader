@@ -1,46 +1,6 @@
-Modu is a thoughtfully crafted ebook reader for focused reading. Its AI reading tools, hybrid search, notes, statistics, text-to-speech, and WebDAV support make reading more intelligent while keeping the interface calm and distraction-free.
+Modu is an independent open-source AI reader derived from Anx Reader and ReadAny. It provides a local bookshelf, EPUB/PDF and other ebook reading, notes, statistics, WebDAV sync, a remote library, mobile quick marking, translation, TTS and ten editable AI reading skills.
 
-<p>📚 <strong>Rich Format Support</strong></p>
-<ul>
-<li>Support for major e-book formats: EPUB, MOBI, AZW3, FB2, TXT</li>
-<li>Perfect parsing for optimal reading experience</li>
-</ul>
-<p>☁️ <strong>Seamless Sync</strong></p>
-<ul>
-<li>Cross-device synchronization of reading progress, notes, and books via WebDAV</li>
-<li>Continue your reading journey anywhere, anytime</li>
-</ul>
-<p>🤖 <strong>Smart AI Assistant</strong></p>
-<ul>
-<li>Integration with leading AI services: OpenAI, DeepSeek, Claude, Gemini</li>
-<li>Intelligent content summarization and reading position recall for enhanced efficiency</li>
-</ul>
-<p>🎨 <strong>Personalized Reading Experience</strong></p>
-<ul>
-<li>Carefully designed theme colors with customization options</li>
-<li>Switch freely between scrolling and pagination modes</li>
-<li>Import custom fonts to create your personal reading space</li>
-</ul>
-<p>📊 <strong>Professional Reading Analytics</strong></p>
-<ul>
-<li>Comprehensive reading statistics</li>
-<li>Weekly, monthly, and yearly reading reports</li>
-<li>Intuitive reading heatmap to track every moment of your reading journey</li>
-</ul>
-<p>📝 <strong>Powerful Note System</strong></p>
-<ul>
-<li>Flexible text annotation features</li>
-<li>Export options in TXT, CSV, and Markdown formats</li>
-<li>Easily organize and share your reading insights</li>
-</ul>
-<p>🛠️ <strong>Practical Tools</strong></p>
-<ul>
-<li>Smart TTS reading to rest your eyes</li>
-<li>Full-text search for quick content location</li>
-<li>Instant word translation to enhance reading efficiency</li>
-</ul>
-<p>💻 <strong>Cross-Platform Support</strong></p>
-<ul>
-<li>Seamless experience on Android / Windows / MacOS / iOS</li>
-<li>Consistent user interface across devices</li>
-</ul>
+Four local ONNX embedding models are bundled. Chinese BGE is the default; automatic indexing after import is off by default. Online services require configuration and receive the relevant text. API-key sync is separately enabled and encrypted.
+
+Download from https://github.com/sobranie2406/modureader/releases
+This is a metadata draft, not evidence of app-store availability. See the corresponding Release for installation requirements and known limitations.

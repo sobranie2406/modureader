@@ -1,6 +1,6 @@
 # 安全报告
 
-本项目为 Beta，尚未接受独立安全审计。请使用最新预发布修复并保留本地备份。
+请使用 [最新发布版本](https://github.com/sobranie2406/modureader/releases/latest) 并保留本地备份。本项目尚未接受独立安全审计；正式版标签不等于安全认证。
 
 请使用仓库 Security → Report a vulnerability 私密报告漏洞；如该入口暂不可用，可先创建不含利用细节或敏感资料的 issue 请求私下联系。
 不要在公开 issue 上传服务密钥、私人书籍、完整数据库、对话、签名密钥或含凭据的二维码。

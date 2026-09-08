@@ -1,40 +1,55 @@
-[English](#English)
-[简体中文](#简体中文)
-[Русский](#русский)
+# 默读排障 / Modu troubleshooting
 
-# English
-## Unable to Import Books
-- Ensure the book format is supported. Please check the supported formats in the [README](../README.md).
-- Ensure the book file is not corrupted. You can try using other readers to confirm if the file is normal.
-- Ensure the file path does not contain special characters (such as spaces, “/”, etc.).
-- Check the device's webview version. If importing books fails, click the bottom right corner of the interface -> Settings -> More Settings -> Advanced -> Logs, scroll down, and in the last few entries, you can see something like `INFO^*^ 2024-08-09 17:51:22.573971^*^ [Webview: Mozilla/5.0 (Linux; Android 13; *** Build/TKQ1.220829.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.25 Mobile Safari/537.36]:null`, where Chrome/128.0.6613.25 is the webview version. If the version number is relatively low, it may cause import failures. You can try upgrading the webview version.
+[中文](#中文) | [English](#english)
 
-## How to Obtain Log Files
-After **reproducing the issue**, click on the bottom right corner of the interface: Settings -> More Settings -> Advanced -> Logs. Click the button in the top right corner to export the log file. Send the log file to the developers to help them better assist you in resolving the issue.
+## 中文
 
-For some issues, you may need to first disable the "Clear logs on startup" option in the "Advanced" interface to export the log file after reproducing the issue.
+### 无法导入或阅读
 
-# 简体中文
-## 无法导入书籍
+- 确认格式为 EPUB、PDF、MOBI、AZW3、FB2 或 TXT，文件已完整下载；先用项目的[原创示例书](examples/modu-reading-demo.epub)区分环境问题和单本书问题。
+- 正常文件名中的空格和中文不应被视为非法。不要为了排障删除原书；可使用副本测试。
+- 扫描 PDF 没有 OCR，密码 PDF 暂不支持，不承诺 DRM 兼容。文字层、目录和排版可能影响提取。
+- Android 可检查系统 WebView 是否正常。其他平台的系统依赖、签名和安装要求见[发布说明](RELEASING.md)。
 
-- 确保书籍格式支持，请从[README](../README_zh.md)中查看支持的格式。
-- 确保书籍文件没有损坏，可以尝试使用其他阅读器确认文件是否正常。
-- 确保文件路径没有特殊字符(如空格、”/“ 等)。
-- 检查设备 webview 版本，导入书籍失败后，点击界面右下角设置 -> 更多设置 -> 高级 -> 日志，向下滑动，在最后几条中可以看到类似`INFO^*^ 2024-08-09 17:51:22.573971^*^ [Webview: Mozilla/5.0 (Linux; Android 13; *** Build/TKQ1.220829.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.25 Mobile Safari/537.36]:null` ，其中`Chrome/128.0.6613.25` 为 webview 版本，如果版本号较低，可能会导致导入失败，可以尝试升级到最新 webview 版本。
+### 远程书库连接或下载失败
 
-## 如何得到日志文件
-在**重现问题后**，点击界面右下角设置 -> 更多设置 -> 高级 -> 日志，点击右上角按钮即可导出日志文件，将日志文件发送给开发者，以便更好地帮助您解决问题。
+- 使用「设置 → 书库 WebDAV」，不是原有「同步」连接。填写最终目录地址，确认账号可列出和读取该目录。
+- 推荐 HTTPS；客户端不跟随重定向。密码仅当前运行期间保留，退出应用后需要重填。
+- 一次下载一本，单文件最多 512 MiB；离开远程书库标签会取消未完成的下载。检查本机空间，不要在公开反馈中提供密码或私有目录地址。
 
-部分问题可能需要先关闭“高级”界面的“启动时清空日志”选项，以便在重现问题后导出日志文件。
+### 向量化失败或应用退出
 
-# Русский
-## Не удаётся импортировать книги
-- Убедитесь, что формат книги поддерживается. Пожалуйста, проверьте поддерживаемые форматы в [README](../README.md).
-- Проверьте, что файл книги не повреждён. Вы можете попробовать открыть его в других приложениях для чтения, чтобы убедиться, что файл в порядке.
-- Убедитесь, что путь к файлу не содержит специальных символов (например, пробелов, «/» и т.д.).
-- Проверьте версию WebView на устройстве. Если импорт книг не удаётся, нажмите в правом нижнем углу интерфейса: Настройки -> Дополнительные настройки -> Расширенные -> Логи, пролистайте вниз и в последних записях вы увидите что-то вроде `INFO^*^ 2024-08-09 17:51:22.573971^*^ [Webview: Mozilla/5.0 (Linux; Android 13; *** Build/TKQ1.220829.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.25 Mobile Safari/537.36]:null`, где Chrome/128.0.6613.25 — это версия WebView. Если номер версии низкий, это может вызывать сбои при импорте. Попробуйте обновить WebView до последней версии.
+- 在书籍菜单检查任务是否完成，记录错误及所选模型。本地嵌入与在线 AI 对话是不同设置；远程模型需要有效接口配置。
+- 切换模型后需重新向量化；不要以旧的「已索引」标签代替本次任务成功，也不要通过卸载应用来清除错误。
+- 更新到[当前发布版](https://github.com/sobranie2406/modureader/releases/latest)。设备相关限制和已知问题以对应 Release 为准。
 
-## Как получить файлы логов
-После **повторения проблемы** нажмите в правом нижнем углу интерфейса: Настройки -> Дополнительные настройки -> Расширенные -> Логи. В правом верхнем углу нажмите кнопку экспорта файла лога. Отправьте этот файл разработчикам, чтобы им было легче помочь вам решить проблему.
+### 提交问题
 
-Для некоторых проблем может потребоваться сначала отключить опцию "Очистка логов при запуске" в разделе "Расширенные", чтобы после повторения проблемы можно было экспортировать файл логов.
+进入「设置 → 提交 Bug」，说明版本、操作步骤及结果。运行环境与崩溃诊断分别可选；先预览，再复制到本仓库的 [GitHub Issue](https://github.com/sobranie2406/modureader/issues/new/choose) 中提交。
+诊断记录可能缺失或延迟；没有日志不能证明没有崩溃。不要公开正文、私人书籍、API Key、WebDAV 密码、二维码或未经检查的完整日志。
+「高级 → 日志」中的普通日志与可选的脱敏崩溃报告不同，不应直接作为公开附件。
+
+## English
+
+### Import or reading problems
+
+- Confirm the format is EPUB, PDF, MOBI, AZW3, FB2 or TXT and the download is complete. Try the project's [original demo book](examples/modu-reading-demo.epub) to distinguish an environment issue from a book-specific issue.
+- Spaces and Chinese characters in ordinary filenames are not inherently invalid. Preserve the original book and test with a copy.
+- Scanned PDFs have no OCR; password-protected PDFs are unsupported and DRM compatibility is not guaranteed. Text layers, contents and layout affect extraction.
+- On Android, check that the system WebView works. See [release guidance](RELEASING.md) for platform dependencies and signing requirements.
+
+### Remote library problems
+
+Use Settings → Library WebDAV, separate from sync. Enter the final directory URL and use an account with listing/read access. Prefer HTTPS; redirects are not followed. The password is session-only and must be entered again after restarting.
+Only one download runs at a time, up to 512 MiB. Leaving the remote-library tab cancels an unfinished download. Check local free space and never post credentials or private directory URLs.
+
+### Indexing failures or unexpected exits
+
+Check the task result and selected model in the book menu. Local embedding and online AI chat are separate settings; remote models require valid configuration.
+Rebuild the index after changing models. An old indexed badge does not establish that the latest task succeeded. Do not uninstall the app merely to clear an error.
+Use the [current release](https://github.com/sobranie2406/modureader/releases/latest) and read its device-specific limitations.
+
+### Reporting a bug
+
+Open Settings → Report a Bug. Describe the version, steps and outcome. Environment information and crash diagnostics are separately optional: preview first, then copy and submit to [this repository](https://github.com/sobranie2406/modureader/issues/new/choose).
+Missing or delayed diagnostics do not prove that no crash occurred. Never publish book text, private books, API keys, WebDAV passwords, configuration QRs or unreviewed full logs. Ordinary logs under Advanced → Logs are not the same as the optional sanitized crash report.

@@ -9,15 +9,12 @@ void main() {
     final activity = File(
       'android/app/src/main/kotlin/com/modu/reader/MainActivity.kt',
     ).readAsStringSync();
-    final playStoreService =
-        File('lib/service/iap/play_store_iap_service.dart').readAsStringSync();
 
     expect(buildGradle, contains('namespace "${AppIdentity.bundleId}"'));
     expect(buildGradle, contains('applicationId "${AppIdentity.bundleId}"'));
     expect(buildGradle, contains('minSdkVersion 26'));
     expect(activity, contains('package com.modu.reader'));
     expect(activity, contains('com.modu.reader/install_info'));
-    expect(playStoreService, contains('AppIdentity.bundleId'));
     expect(
       File('android/app/src/main/kotlin/com/example/anx_reader/MainActivity.kt')
           .existsSync(),
@@ -79,10 +76,7 @@ void main() {
       'ios/Runner/Info.plist',
       'linux/my_application.cc',
       'windows/runner/main.cpp',
-      '.github/workflows/build-android.yaml',
-      '.github/workflows/build-ios.yaml',
-      '.github/workflows/build-macos.yaml',
-      '.github/workflows/build-windows.yaml',
+      '.github/workflows/build.yaml',
       '.github/ISSUE_TEMPLATE/bug-report.yaml',
     ]
         .map((path) => File(path).readAsStringSync())

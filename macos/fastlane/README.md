@@ -1,3 +1,7 @@
+> Historical Fastlane reference, not the current Modu release procedure. No app-store publication or signing entitlement is implied. Use [Modu release guidance](../../docs/RELEASING.md) and the main package workflow.
+>
+> 历史 Fastlane 开发参考，不是默读当前发布入口，不代表应用已上架或获得签名服务。
+
 fastlane documentation
 ----
 

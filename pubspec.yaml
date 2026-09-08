@@ -101,9 +101,7 @@ dependencies:
   flutter_onnxruntime: ^1.8.1
   hf_tokenizers: ^1.2.1
   audioplayers: ^6.4.0
-  in_app_purchase: ^3.2.1
   asn1lib: ^1.6.2
-  in_app_purchase_storekit: ^0.3.21
   charset: ^2.0.1
   flutter_slidable: ^4.0.0
   cached_network_image: ^3.4.1
@@ -134,7 +132,6 @@ dependencies:
     git:
       url: https://github.com/jingluoguo/staggered_reorderable.git
       ref: 2ac799a6eeb5da74bf5080a2ba2057272fa52b78
-  in_app_purchase_android: ^0.4.0+8
 
 dependency_overrides:
   hf_tokenizers:
