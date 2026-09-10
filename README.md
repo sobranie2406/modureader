@@ -15,6 +15,8 @@ This is an independently modified derivative, not an official release of either 
 
 默读不提供内购解锁或订阅；在线服务商自行收取的费用不属于默读内购。
 
+如果默读对你有帮助，欢迎点击仓库右上角的 **Star ⭐**，让更多人发现它，也为持续改进添一份支持。谢谢！
+
 [功能介绍](#功能一览) · [界面预览](#界面预览) · [开始使用](#开始使用) · [设置指南](docs/SETTINGS.md) · [下载](#下载)
 
 ## 下载
@@ -212,6 +214,18 @@ flutter build apk --release --target-platform android-arm64,android-x64 --split-
 
 完整可复现的构建/打包步骤以 [.github/workflows/build.yaml](.github/workflows/build.yaml) 和 scripts/release 为准。
 Dart 包名暂时保留 anx_reader，以兼容现有 import；用户可见品牌及应用 ID 为 Modu / com.modu.reader。
+
+## Star 趋势
+
+感谢每一位支持默读的读者。点击图表可在 [Star History](https://www.star-history.com/?repos=sobranie2406%2Fmodureader&type=date&legend=top-left) 查看详细趋势。
+
+<a href="https://www.star-history.com/?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;theme=dark&amp;legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left" />
+    <img alt="默读 GitHub Star 数量随时间变化的趋势图" src="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left" width="800" />
+  </picture>
+</a>
 
 ## 开源许可与来源
 
