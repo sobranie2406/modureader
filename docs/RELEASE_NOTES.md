@@ -33,7 +33,7 @@
 | macOS | Intel x64 / Apple Silicon ARM64 | DMG，ad-hoc 签名，未经 Apple Developer ID 公证 |
 | iOS | ARM64 真机 | iOS 16+ 未签名 IPA，须自行合法签署主应用和 Share Extension，不能直接安装 |
 
-共 **9 个程序包**，均附 SHA-256；另有两个 Android notices ZIP 许可附件，它们不是安装包。没有 x64 iPhone 真机包，不包括应用商店或 TestFlight 发布。构建号 10004 高于本地测试包 10002、10003。
+共 **9 个程序包**，均附 SHA-256，不再提供独立 notices ZIP。许可证保留在应用包及源码仓库中，参见本版本的 [LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.2/LICENSE)、[第三方许可证](https://github.com/sobranie2406/modureader/tree/v1.0.2/LICENSES)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.2/NOTICE)、[来源说明](https://github.com/sobranie2406/modureader/blob/v1.0.2/UPSTREAM.md)及[对应源码](https://github.com/sobranie2406/modureader/tree/v1.0.2)。文件名省略签名状态后缀，实际安装限制仍如上表。没有 x64 iPhone 真机包，不包括应用商店或 TestFlight 发布。构建号 10004 高于本地测试包 10002、10003。
 
 ## 验证范围、已知问题与未验证项
 
@@ -68,7 +68,7 @@ Servers must correctly support strong ETags and conditional writes; otherwise up
 
 ### Packages and verification limits
 
-Nine application packages: Android ARM64/x86_64 APK, Windows x64/ARM64 EXE, Debian 13 x64/ARM64 DEB, Intel/Apple Silicon macOS DMG, and iOS ARM64 unsigned IPA. Android retains its signing identity. macOS is unnotarized, Windows has no commercial code signature, and iOS requires your own valid signing. SHA-256 files accompany all packages; license ZIPs are not installers.
+Nine application packages: Android ARM64/x86_64 APK, Windows x64/ARM64 EXE, Debian 13 x64/ARM64 DEB, Intel/Apple Silicon macOS DMG, and iOS ARM64 IPA. Android retains its signing identity. macOS is unnotarized, Windows has no commercial code signature, and iOS requires your own valid signing. SHA-256 files accompany all packages. Filenames omit signing-status suffixes; this does not change their actual signing status. Licenses remain bundled and in the tagged source repository linked above; no separate notices ZIP is published.
 
 Pre-release checks passed **427 Flutter tests (3 skipped: a private font fixture and two opt-in live tests), 58 reader JavaScript tests, 27 packaging tests and 6 project-identity tests**; the tag workflow reruns checks. The earlier 428/2 result included the private font fixture. Local builds 10002/10003 exercised Mac/Android reading-position sync and Android tap-only navigation on HONOR Magic4 Pro / Android 15. They are not final 1.0.2 all-platform acceptance tests. Mac text and local fonts rendered after reopening, but a prior blank capture and unreliable automated navigation remain unconfirmed issues.
 

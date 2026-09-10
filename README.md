@@ -29,12 +29,12 @@ This is an independently modified derivative, not an official release of either 
 | Linux | x64、ARM64 | DEB；面向 Debian 13 (trixie)，使用 APT 安装并解析系统依赖 |
 | Android | x86_64、arm64-v8a | 项目专用密钥签名的 APK；首次安装请核验下载来源 |
 | macOS | x64、ARM64 | DMG；打开后拖入 Applications，未公证，非 App Store 版本 |
-| iOS | ARM64 真机 | iOS 16+，**unsigned.ipa**；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
+| iOS | ARM64 真机 | iOS 16+，IPA；无 Apple 分发签名，不能直接安装，需要自行合法签名 |
 
 这里的 x64 指 x86-64，ARM64 也是 64 位。iPhone/iPad 没有 x64 真机包。
 安装包及 SHA-256 校验文件见 [Releases](https://github.com/sobranie2406/modureader/releases)，请按系统与架构选择。
 
-桌面端使用原生安装包，不再以 ZIP / tar.gz 作为应用安装入口。Android 的 `-notices.zip` 是许可证资料；GitHub 自动提供的 `Source code (zip)` 是源码，两者都不是程序安装包。
+桌面端使用原生安装包，不再以 ZIP / tar.gz 作为应用安装入口。许可证保留在应用包和源码仓库中，不再单独提供 notices ZIP。GitHub 自动提供的 `Source code (zip)` 是源码，不是程序安装包。
 不提供绕过操作系统安全机制的脚本。签名、依赖和安装说明见 [发布说明](docs/RELEASING.md)。
 
 ## 功能一览

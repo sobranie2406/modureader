@@ -90,7 +90,7 @@ def build_dmg(bundle, arch, version, output, work):
         'Modu / 默读\n将 Modu.app 拖到 Applications 安装。\n'
         '此版本没有 Apple Developer ID 公证。请勿关闭系统安全保护。\n'
         'Drag Modu.app to Applications. This release is not notarized.\n', encoding='utf-8')
-    result = output / f'Modu-{version}-macos-{arch}-unnotarized.dmg'
+    result = output / f'Modu-{version}-macos-{arch}.dmg'
     command('hdiutil', 'create', '-volname', f'Modu {version} {arch}', '-srcfolder', stage,
             '-format', 'UDZO', '-fs', 'HFS+', result)
     command('hdiutil', 'verify', result)
@@ -270,7 +270,7 @@ def build(bundle, platform, arch, version, output, build_number=None):
     if platform == 'macos':
         verify_apple_bundle(bundle / 'Modu.app', version)
     output.mkdir(parents=True, exist_ok=True)
-    names = {'macos': f'Modu-{version}-macos-{arch}-unnotarized.dmg',
+    names = {'macos': f'Modu-{version}-macos-{arch}.dmg',
              'windows': f'Modu-{version}-windows-{arch}-setup.exe',
              'linux': f'Modu-{version}-linux-{arch}.deb'}
     if (output / names[platform]).exists():

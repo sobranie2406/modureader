@@ -28,12 +28,12 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 | Linux | x64, ARM64 | DEB for Debian 13 (trixie); install with APT to resolve system dependencies |
 | Android | x86_64, arm64-v8a | APK signed with the project's dedicated key; verify the download source before installing |
 | macOS | x64, ARM64 | DMG; drag the app to Applications; unnotarized, not an App Store release |
-| iOS | ARM64 devices | iOS 16+; **unsigned.ipa** has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
+| iOS | ARM64 devices | iOS 16+; IPA has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
 
 Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
 Download the installer and its SHA-256 file from [Releases](https://github.com/sobranie2406/modureader/releases), choosing your system and architecture.
 
-Desktop apps use native installers, not ZIP or tar.gz downloads. Android `-notices.zip` files contain license information; GitHub's automatically generated `Source code (zip)` downloads contain source code. Neither is an application installer. We do not provide scripts to bypass operating-system security protections. See [Release and installation instructions (Chinese)](docs/RELEASING.md) for details.
+Desktop apps use native installers, not ZIP or tar.gz downloads. Licenses remain in the application packages and source repository; no separate notices ZIP is provided. GitHub's automatically generated `Source code (zip)` downloads contain source code, not an application installer. We do not provide scripts to bypass operating-system security protections. See [Release and installation instructions (Chinese)](docs/RELEASING.md) for details.
 
 ## Features
 

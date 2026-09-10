@@ -23,21 +23,20 @@ class ReleaseAssetSetTest(unittest.TestCase):
     def fixture(self, folder):
         names = [f'Modu-1.0.0-{platform}-{arch}{suffix}'
                  for platform, suffix in [('android', '.apk'), ('linux', '.deb'),
-                                          ('windows', '-setup.exe'), ('macos', '-unnotarized.dmg')]
+                                          ('windows', '-setup.exe'), ('macos', '.dmg')]
                  for arch in ('x64', 'arm64')]
-        names += ['Modu-1.0.0-ios-arm64-unsigned.ipa']
-        names += [f'Modu-1.0.0-android-{arch}-notices.zip' for arch in ('x64', 'arm64')]
+        names += ['Modu-1.0.0-ios-arm64.ipa']
         for name in names:
             data = b'synthetic packaging test'
             (folder / name).write_bytes(data)
             (folder / (name + '.sha256')).write_text(f'{hashlib.sha256(data).hexdigest()}  {name}\n')
         return names
 
-    def test_all_nine_packages_and_two_notices_are_required(self):
+    def test_all_nine_packages_are_required_without_notices(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             names = self.fixture(folder)
-            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 11)
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 9)
             (folder / names[0]).unlink()
             with self.assertRaisesRegex(ValueError, 'missing='):
                 validate_release_assets(folder, 'v1.0.0')
@@ -47,6 +46,23 @@ class ReleaseAssetSetTest(unittest.TestCase):
             folder = Path(tmp)
             names = self.fixture(folder)
             (folder / names[0]).write_bytes(b'altered')
+            with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
+                validate_release_assets(folder, 'v1.0.0')
+
+    def test_stale_notices_attachment_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.fixture(folder)
+            (folder / 'Modu-1.0.0-android-arm64-notices.zip').write_bytes(b'old')
+            with self.assertRaisesRegex(ValueError, 'unexpected='):
+                validate_release_assets(folder, 'v1.0.0')
+
+    def test_checksum_must_reference_the_new_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.fixture(folder)
+            checksum = folder / 'Modu-1.0.0-ios-arm64.ipa.sha256'
+            checksum.write_text(checksum.read_text().replace('.ipa', '-unsigned.ipa'))
             with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
                 validate_release_assets(folder, 'v1.0.0')
 

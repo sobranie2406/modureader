@@ -188,6 +188,9 @@ flutter:
     - pubspec.yaml
     - LICENSE
     - LICENSES/
+    - NOTICE
+    - UPSTREAM.md
+    - PRIVACY.md
     - assets/foliate-js/index.html
     - assets/foliate-js/dist/
     - assets/foliate-js/src/

@@ -85,6 +85,13 @@ class ProjectIdentityTest(unittest.TestCase):
             self.assertTrue((ROOT / name).is_file())
         self.assertIn("fonts.anxcye.com", (ROOT / "lib/providers/fonts.dart").read_text())
 
+    def test_license_and_attribution_assets_replace_notices_zip(self):
+        spec = (ROOT / 'pubspec.yaml').read_text()
+        for name in ('LICENSE', 'LICENSES/', 'NOTICE', 'UPSTREAM.md', 'PRIVACY.md'):
+            self.assertIn(f'    - {name}\n', spec)
+        package = (ROOT / 'scripts/release/package.py').read_text()
+        self.assertNotIn('shutil.make_archive', package)
+
 
 if __name__ == "__main__":
     unittest.main()

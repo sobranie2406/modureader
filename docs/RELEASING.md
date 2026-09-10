@@ -1,6 +1,6 @@
 # 发布与安装说明
 
-本项目来源于 Anx Reader (MIT) 和 ReadAny (GPL-3.0-or-later)，是独立修改版本。源码、许可及 NOTICE 随包提供。
+本项目来源于 Anx Reader (MIT) 和 ReadAny (GPL-3.0-or-later)，是独立修改版本。许可证保留在应用包中；对应版本的源码、NOTICE 及来源说明通过 Release 链接提供，不单独发布 notices ZIP。
 
 ## 构建
 
@@ -23,16 +23,16 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 - Windows：下载对应处理器的 `-setup.exe`，运行安装向导。默认仅为当前用户安装，可选桌面快捷方式；在系统“已安装的应用”中卸载。当前源码生成的安装器随应用附带 VC++ CRT，但仍需要系统 Microsoft Edge WebView2 Runtime，不自动下载 WebView2。旧 beta.1 包还需要单独安装 VC++ Redistributable。
 - Linux：下载 `.deb`，在 Debian 13 中执行 `sudo apt install ./Modu-版本-linux-架构.deb`，由 APT 安装所需系统依赖；从应用菜单或 `modureader` 命令启动。卸载使用 `sudo apt remove modureader`，不会主动清除个人书库。x64 对应 Debian amd64，ARM64 对应 arm64。不宣称兼容其他发行版。
 - Android：安装对应 ABI 的 `.apk`，更新时沿用同一专用签名。
-- iOS：`.ipa` 保留未签名标记，需自行合法签名后安装，详见下节。
+- iOS：下载 `.ipa`，需自行合法签名后安装，详见下节。文件名不含签名状态后缀，实际签名状态仍以 Release 说明为准。
 
-桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。Android 的 `-notices.zip` 只是许可证附件，不是安装包。
+桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。Release 仅上传 9 个程序包及各自 SHA-256；许可证通过内嵌资源与对应版本的仓库链接提供。macOS / iOS 文件名省略 `unnotarized` / `unsigned`，不代表获得签名或公证。
 
 ## 签名
 
 - Android 使用本项目专用签名密钥；密钥不提交 Git。CI 使用 ANDROID_KEYSTORE_BASE64、ANDROID_KEYSTORE_PASSWORD、ANDROID_KEY_ALIAS 三个 Secrets。重建/更新 APK 必须沿用同一密钥。android/key.properties 可按 Gradle 的 storeFile/storePassword/keyAlias/keyPassword 配置。
 - macOS 包仅作 ad-hoc 签名，没有 Apple Developer ID 公证。不要关闭整个系统的安全保护；可自行审查源码并本地构建/签名。
 - Windows 首版安装器和应用没有商业 Authenticode 签名；请核对下载来源和 SHA-256。
-- iOS unsigned.ipa 要求 iOS 16 或更新版本，是 ARM64 真机应用容器，**没有分发签名、不能直接安装**。需用自己的开发者账号和合法配置为主应用及 Share Extension 签名。没有 x64 iPhone 安装包，也没有 App Store / TestFlight 发布。
+- iOS IPA 要求 iOS 16 或更新版本，是 ARM64 真机应用容器，**没有分发签名、不能直接安装**。需用自己的开发者账号和合法配置为主应用及 Share Extension 签名。没有 x64 iPhone 安装包，也没有 App Store / TestFlight 发布。
 
 ## 发布流程
 

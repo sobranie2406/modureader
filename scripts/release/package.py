@@ -79,8 +79,7 @@ def notices(folder, platform):
 
 
 def package(platform, arch, version):
-    suffix = {"macos": "-unnotarized", "ios": "-unsigned"}.get(platform, "")
-    name = f"Modu-{version}-{platform}-{arch}{suffix}"
+    name = f"Modu-{version}-{platform}-{arch}"
     stage = OUT / "staging" / name
     if stage.exists():
         raise RuntimeError(f"Refusing to overwrite existing staging folder: {stage}")
@@ -91,6 +90,11 @@ def package(platform, arch, version):
         verify_android_apk(apk, arch)
         with zipfile.ZipFile(apk) as archive:
             verify_archive(archive, 'assets/flutter_assets/')
+            for notice in ('LICENSE', 'NOTICE', 'UPSTREAM.md', 'PRIVACY.md',
+                           'LICENSES/Anx-Reader-MIT.txt',
+                           'LICENSES/ReadAny-GPL-3.0-or-later.txt'):
+                if not archive.read('assets/flutter_assets/' + notice).strip():
+                    raise ValueError(f'Missing or empty bundled notice: {notice}')
             assert f"lib/{abi}/libapp.so" in archive.namelist()
             assert f"lib/{abi}/libflutter.so" in archive.namelist()
         # Gradle must have signed the APK; verify it, do not silently ship debug.
@@ -103,8 +107,8 @@ def package(platform, arch, version):
                         if "certificate SHA-256 digest:" in line]
         assert fingerprints == [expected], "APK is not signed by the Modu release identity"
         shutil.copy2(apk, OUT / f"{name}.apk")
-        notices(stage, platform)
-        shutil.make_archive(str(OUT / f"{name}-notices"), "zip", stage)
+        # Licenses are bundled as Flutter assets; source/attribution links are
+        # published in the release notes, not as separate installer-like ZIPs.
         return
     if platform == "windows":
         bundle = ROOT / f"build/windows/{arch}/runner/Release"

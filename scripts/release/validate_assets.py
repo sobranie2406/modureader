@@ -11,12 +11,10 @@ def validate(directory, tag):
     version = tag[1:]
     expected = set()
     for platform, extension in [('android', '.apk'), ('linux', '.deb'),
-                                ('windows', '-setup.exe'), ('macos', '-unnotarized.dmg')]:
+                                ('windows', '-setup.exe'), ('macos', '.dmg')]:
         for arch in ('x64', 'arm64'):
             expected.add(f'Modu-{version}-{platform}-{arch}{extension}')
-    expected.add(f'Modu-{version}-ios-arm64-unsigned.ipa')
-    for arch in ('x64', 'arm64'):
-        expected.add(f'Modu-{version}-android-{arch}-notices.zip')
+    expected.add(f'Modu-{version}-ios-arm64.ipa')
     files = {p.name for p in Path(directory).iterdir() if p.is_file()}
     complete = expected | {name + '.sha256' for name in expected}
     if files != complete:
@@ -38,4 +36,4 @@ if __name__ == '__main__':
     parser.add_argument('directory', type=Path)
     parser.add_argument('tag')
     args = parser.parse_args()
-    print(f'Verified {validate(args.directory, args.tag)} assets: 9 application packages + 2 license attachments.')
+    print(f'Verified {validate(args.directory, args.tag)} application packages and their SHA-256 files.')

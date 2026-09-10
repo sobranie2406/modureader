@@ -253,7 +253,6 @@ jobs:
           name: modu-android
           path: |
             dist-release/*.apk
-            dist-release/*.zip
             dist-release/*.sha256
           if-no-files-found: error
           retention-days: 14
@@ -292,7 +291,7 @@ jobs:
         run: python3 scripts/release/package.py ios arm64
       - uses: actions/upload-artifact@v4
         with:
-          name: modu-ios-arm64-unsigned
+          name: modu-ios-arm64
           path: |
             dist-release/*.ipa
             dist-release/*.sha256
