@@ -35,6 +35,10 @@ class ProjectIdentityTest(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertIsNone(prohibited.search(path.read_text()))
+        privacy = (ROOT / "PRIVACY.md").read_text()
+        self.assertNotIn("不进入设置导出或同步", privacy)
+        self.assertIn("默认也包含密码", privacy)
+        self.assertIn("代码和二维码未加密", privacy)
 
     def test_current_changelog_is_modu_not_upstream_version_history(self):
         version = re.search(r"^version:\s*(\S+)", (ROOT / "pubspec.yaml").read_text(),
