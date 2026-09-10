@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/book_player/reader_font_response.dart';
 
 class FontModel {
   final String label;
@@ -14,23 +15,27 @@ class FontModel {
   });
 
   String toJson() {
-    return '''
-    {
-      "label": "$label",
-      "name": "$name",
-      "path": "${path.split('/').last}"
-    }
-    ''';
+    return jsonEncode({'label': label, 'name': name, 'path': litePath});
   }
 
-  String get litePath => path.split('/').last;
+  String get litePath {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Uri.parse(path).pathSegments.last;
+    }
+    // Stored filenames are raw: a literal "%20" must remain literal.
+    return path.split('/').last;
+  }
 
-  static FontModel fromJson(String fontJson) {
+  static FontModel fromJson(String fontJson, {int? serverPort}) {
     final Map<String, dynamic> json = jsonDecode(fontJson);
+    final name = json['name'] as String;
+    final filename = json['path'] as String;
     return FontModel(
       label: json['label'],
-      name: json['name'],
-      path: 'http://127.0.0.1:${Server().port}/fonts/${json['path']}',
+      name: name,
+      path: name == 'system' || name == 'book'
+          ? filename
+          : readerFontUrl(filename, serverPort ?? Server().port),
     );
   }
 
@@ -42,5 +47,5 @@ class FontModel {
           litePath == other.litePath;
 
   @override
-  int get hashCode => name.hashCode ^ path.hashCode;
+  int get hashCode => litePath.hashCode;
 }

@@ -239,7 +239,7 @@
   "webdavUpload": "上传到 WebDAV",
   "webdavOnlyWifi": "仅在 WiFi 下同步",
   "webdavSyncAborted": "同步已取消",
-  "webdavSyncAbortedContent": "未能从 WebDAV 获取数据, 远程数据为空。请检查以下内容：\n1. 网络连接是否正常 \n2. 确保已经其他设备上上传了有效的阅读数据到 WebDAV\n\n接下来，请试试上传数据到 WebDAV",
+  "webdavSyncAbortedContent": "未能载入有效的同步书库，已停止后续文件同步。这不一定表示服务器为空。请确认两端使用相同版本、WebDAV 账号和上级目录，再尝试从 WebDAV 下载。不要从空书库上传覆盖云端数据；旧 anx 目录需先备份并迁移为 modu。",
   "webdavSyncDirection": "WebDAV 端数据可能被其他设备修改，请选择如何处理数据",
   "settingsSync": "同步",
   "settingsSyncWebdav": "WebDAV",

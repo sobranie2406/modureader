@@ -1493,6 +1493,7 @@ class Reader {
 
   #onTouchMove = ({ detail: e }) => {
     if (this.#ignoreTouch()) return;
+    if (!e.touchState || e.touchState.pinched || e.touchState.cancelled) return;
 
     const mainView = this.view.shadowRoot.children[0]
     if (e.touchState.direction === 'vertical') {
@@ -1501,7 +1502,11 @@ class Reader {
       if (deltaY > 0) {
         // Only show bookmark pull-down UI if touch did not start from top 10%
         if (!this.#ignoreBookmarkGesture) {
-          mainView.style.transform = `translateY(${Math.sqrt(deltaY * 50)}px)`;
+          // Mobile page mode must not drag the whole reading surface on a
+          // small diagonal swipe. Keep deliberate bookmark gestures available.
+          if (this.view.renderer.getAttribute('mobile-touch-paging') === 'true') {
+            if (deltaY <= 60) return;
+          } else mainView.style.transform = `translateY(${Math.sqrt(deltaY * 50)}px)`;
           this.#showBookmarkIcon(deltaY);
         }
       } else if (deltaY < -60) {
@@ -1514,6 +1519,12 @@ class Reader {
   }
 
   #onTouchEnd = ({ detail: e }) => {
+    if (!e.touchState || e.touchState.pinched || e.touchState.cancelled) {
+      const mainView = this.view.shadowRoot.children[0];
+      mainView.style.transform = '';
+      this.#hideBookmarkIcon();
+      return;
+    }
     if (this.#ignoreTouch()) {
       if (e.touchState.direction === 'vertical') {
         const renderer = this.view.renderer;
@@ -1709,6 +1720,8 @@ const setStyle = (oldStyle) => {
   }
 
   reader.view.renderer.setAttribute('mobile-image-fit', style.mobileImageFit === true ? 'true' : 'false')
+  reader.view.renderer.setAttribute('mobile-touch-paging', style.mobileTouchPaging === true ? 'true' : 'false')
+  reader.view.renderer.setAttribute('tap-only-page-turn', style.tapOnlyPageTurn === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('flow', turn.scroll ? 'scrolled' : 'paginated')
   reader.view.renderer.setAttribute('top-margin', `${style.topMargin}px`)
   reader.view.renderer.setAttribute('bottom-margin', `${style.bottomMargin}px`)

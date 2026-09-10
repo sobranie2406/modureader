@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
 import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
@@ -20,12 +19,18 @@ class ConfigTransferTile extends AbstractSettingsTile {
     required this.label,
     required this.getData,
     required this.applyData,
+    this.enabled = true,
+    this.allowReadAny = true,
+    this.importNotice,
   });
 
   final String kind;
   final String label;
   final ConfigTransferDataBuilder getData;
   final ConfigTransferImporter applyData;
+  final bool enabled;
+  final bool allowReadAny;
+  final String? importNotice;
 
   String _text(BuildContext context, String zh, String en) {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -57,12 +62,12 @@ class ConfigTransferTile extends AbstractSettingsTile {
             runSpacing: 10,
             children: [
               OutlinedButton.icon(
-                onPressed: () => _showExport(context),
+                onPressed: enabled ? () => _showExport(context) : null,
                 icon: const Icon(Icons.qr_code_2),
                 label: Text(_text(context, '导出 $label', 'Export $label')),
               ),
               OutlinedButton.icon(
-                onPressed: () => _showImport(context),
+                onPressed: enabled ? () => _showImport(context) : null,
                 icon: const Icon(Icons.download),
                 label: Text(_text(context, '导入 $label', 'Import $label')),
               ),
@@ -93,6 +98,7 @@ class ConfigTransferTile extends AbstractSettingsTile {
       } on PlatformException catch (error) {
         qrError = error.message;
       } catch (_) {
+        if (!context.mounted) return;
         qrError = _text(context, '二维码生成失败', 'Could not generate QR code');
       }
     }
@@ -222,6 +228,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
         kind: kind,
         label: label,
         applyData: applyData,
+        allowReadAny: allowReadAny,
+        importNotice: importNotice,
       ),
     );
     if (imported == true && context.mounted) {
@@ -241,11 +249,15 @@ class _ConfigImportDialog extends StatefulWidget {
     required this.kind,
     required this.label,
     required this.applyData,
+    required this.allowReadAny,
+    this.importNotice,
   });
 
   final String kind;
   final String label;
   final ConfigTransferImporter applyData;
+  final bool allowReadAny;
+  final String? importNotice;
 
   @override
   State<_ConfigImportDialog> createState() => _ConfigImportDialogState();
@@ -255,6 +267,7 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
   final TextEditingController _controller = TextEditingController();
   String? _errorText;
   bool _readingQr = false;
+  bool _importing = false;
 
   String _text(String zh, String en) {
     return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -269,18 +282,20 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
   }
 
   Future<void> _readQrImage() async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
-    final filePath = picked?.files.single.path;
-    if (filePath == null || !mounted) return;
+    if (_readingQr || _importing) return;
     setState(() {
       _readingQr = true;
       _errorText = null;
     });
     try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      final filePath = picked?.files.single.path;
+      if (filePath == null || !mounted) return;
       final value = await ConfigQrBridge.decodeImage(filePath);
+      if (!mounted) return;
       if (value == null || value.trim().isEmpty) {
         throw const FormatException('图片中没有识别到二维码');
       }
@@ -293,11 +308,17 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
   }
 
   Future<void> _importConfig() async {
-    setState(() => _errorText = null);
+    if (_readingQr || _importing) return;
+    setState(() {
+      _errorText = null;
+      _importing = true;
+    });
     try {
       final decoded = ConfigTransferCodec.decode(_controller.text);
-      if (decoded.source == ConfigTransferSource.modu &&
-          decoded.kind != widget.kind) {
+      if ((!widget.allowReadAny &&
+              decoded.source != ConfigTransferSource.modu) ||
+          (decoded.source == ConfigTransferSource.modu &&
+              decoded.kind != widget.kind)) {
         throw FormatException(
           _text(
             '该代码不是 ${widget.label}',
@@ -309,6 +330,8 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) setState(() => _errorText = _friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _importing = false);
     }
   }
 
@@ -331,6 +354,9 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
             children: [
               TextField(
                 controller: _controller,
+                enabled: !_readingQr && !_importing,
+                autocorrect: false,
+                enableSuggestions: false,
                 minLines: 4,
                 maxLines: 8,
                 style: const TextStyle(
@@ -339,10 +365,13 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
                 ),
                 decoration: InputDecoration(
                   labelText: _text('配置代码', 'Configuration code'),
-                  hintText: _text(
-                    '粘贴 modu: 或 readany: 开头的代码',
-                    'Paste a code beginning with modu: or readany:',
-                  ),
+                  hintText: widget.allowReadAny
+                      ? _text(
+                          '粘贴 modu: 或 readany: 开头的代码',
+                          'Paste a code beginning with modu: or readany:',
+                        )
+                      : _text('粘贴 modu: 开头的专用链接 / 配置代码',
+                          'Paste a modu: configuration link / code'),
                   errorText: _errorText,
                   border: const OutlineInputBorder(),
                 ),
@@ -350,7 +379,7 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
               if (ConfigQrBridge.isSupported) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: _readingQr ? null : _readQrImage,
+                  onPressed: _readingQr || _importing ? null : _readQrImage,
                   icon: _readingQr
                       ? const SizedBox.square(
                           dimension: 16,
@@ -364,10 +393,11 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
               ],
               const SizedBox(height: 10),
               Text(
-                _text(
-                  '导入将替换当前 ${widget.label}。ReadAny 口令也可直接粘贴，兼容字段会自动转换。',
-                  'Importing replaces the current ${widget.label}. ReadAny tokens are accepted and compatible fields are converted.',
-                ),
+                widget.importNotice ??
+                    _text(
+                      '导入将替换当前 ${widget.label}。ReadAny 口令也可直接粘贴，兼容字段会自动转换。',
+                      'Importing replaces the current ${widget.label}. ReadAny tokens are accepted and compatible fields are converted.',
+                    ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -380,7 +410,7 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
           child: Text(_text('取消', 'Cancel')),
         ),
         FilledButton.icon(
-          onPressed: _importConfig,
+          onPressed: _readingQr || _importing ? null : _importConfig,
           icon: const Icon(Icons.download),
           label: Text(_text('导入配置', 'Import configuration')),
         ),

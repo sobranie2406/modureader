@@ -110,7 +110,11 @@ void main() {
         request.response.statusCode = 401;
       } else if (request.method == 'PROPFIND') {
         if (request.headers.value('depth') != '1') failures.add('depth');
-        await request.drain<void>();
+        final requestedProperties = await utf8.decoder.bind(request).join();
+        if (!requestedProperties.contains('<d:creationdate/>') ||
+            !requestedProperties.contains('<d:getlastmodified/>')) {
+          failures.add('missing timestamp properties');
+        }
         request.response.statusCode = 207;
         request.response.write(listing(item('/dav/', folder: true) +
             item('/dav/book.txt', size: payload.length)));

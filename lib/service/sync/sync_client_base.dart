@@ -2,6 +2,13 @@ import 'package:anx_reader/models/remote_file.dart';
 import 'package:dio/dio.dart';
 
 abstract class SyncClientBase {
+  /// Atomic compare-and-swap. Implementations must not fall back to a plain
+  /// PUT when the server cannot validate the prior revision.
+  Future<void> uploadFileConditionally(String localPath, String remotePath,
+      {String? expectedETag, bool createOnly = false}) {
+    throw UnsupportedError('服务器不支持安全的并发同步');
+  }
+
   /// Test connection to the remote server
   Future<void> ping();
 

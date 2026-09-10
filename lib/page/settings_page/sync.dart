@@ -58,8 +58,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                 title: Text(L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
                 description: Text(_label(
-                  '同步目录：modu。沿用旧数据时，请先暂停所有设备同步，备份后将服务器上的 anx（或 Anx）目录改名为 modu，再更新所有设备。若 modu 已存在，请勿直接覆盖。',
-                  'Sync folder: modu. To reuse old data, pause sync on all devices, back up and rename the server folder anx (or Anx) to modu, then update all devices. Do not overwrite an existing modu folder.',
+                  '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体文件和本机字体选择不参与同步。新协议使用 database8.db，首次读取旧 database7.db 后保留旧文件；请先备份并更新所有设备，再恢复同步。服务器须支持强 ETag 与条件写入，否则停止上传。旧版每日累计时长按同书同日较大值迁移，不能还原丢失的原始会话。',
+                  'Sync folder: modu. Books, notes and bookmarks merge by stable identity. The latest reading action wins; reading sessions are deduplicated and deletions are retained. Fonts and local font choices stay on each device. The new protocol uses database8.db and imports, but does not overwrite, database7.db. Back up and update all devices before resuming sync. Strong ETags and conditional writes are required. Legacy daily totals use the larger value per book/day; missing original sessions cannot be reconstructed.',
                 )),
                 value: Text(Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
                     'Not set'),

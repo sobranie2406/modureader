@@ -7,7 +7,6 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/sync/sync_connection_tester.dart';
 import 'package:anx_reader/utils/toast/common.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<bool> testEnableWebdav() async {
@@ -36,36 +35,7 @@ Future<bool> testEnableWebdav() async {
 }
 
 void chooseDirection(WidgetRef ref) {
-  // BuildContext context = navigatorKey.currentContext!;
-  showDialog(
-      context: navigatorKey.currentContext!,
-      builder: (context) {
-        return SimpleDialog(
-          title: Text(L10n.of(context).webdavChoose_Sources),
-          children: [
-            SimpleDialogOption(
-              onPressed: () async {
-                Navigator.pop(context);
-                await Sync().syncData(SyncDirection.upload, ref,
-                    trigger: SyncTrigger.manual);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(L10n.of(context).webdavUpload),
-              ),
-            ),
-            SimpleDialogOption(
-              onPressed: () async {
-                Navigator.pop(context);
-                await Sync().syncData(SyncDirection.download, ref,
-                    trigger: SyncTrigger.manual);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(L10n.of(context).webdavDownload),
-              ),
-            ),
-          ],
-        );
-      });
+  // Keep the existing settings entry point, but never offer destructive
+  // whole-library upload/download choices for record-based synchronization.
+  Sync().syncData(SyncDirection.both, ref, trigger: SyncTrigger.manual);
 }

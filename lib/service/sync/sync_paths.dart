@@ -7,5 +7,14 @@ abstract final class SyncPaths {
   static const connectionTest = '$root/.test';
 
   static String database(String fileName) => '$root/$fileName';
-  static String data(String relativePath) => '$root/data/$relativePath';
+  static String data(String relativePath) {
+    final parts = relativePath.split('/');
+    if (parts.length < 2 ||
+        !const ['file', 'cover'].contains(parts.first) ||
+        parts.any((part) => part.isEmpty || part == '.' || part == '..') ||
+        relativePath.contains('\\')) {
+      throw ArgumentError('WebDAV 仅同步书籍和封面文件，不同步字体等本机资源。');
+    }
+    return '$root/data/$relativePath';
+  }
 }

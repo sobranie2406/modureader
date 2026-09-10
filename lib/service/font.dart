@@ -20,9 +20,23 @@ Future<void> importFont() async {
   List<PlatformFile> files = result.files;
   for (var file in files) {
     final fontDir = getFontDir();
-    File newFile = File(file.path!);
-    newFile.copy('${fontDir.path}/${file.name}');
-
-    AnxToast.show(L10n.of(navigatorKey.currentContext!).commonSuccess);
+    try {
+      await fontDir.create(recursive: true);
+      final source = file.path;
+      if (source == null) {
+        throw const FileSystemException('Font file unavailable');
+      }
+      // Do not refresh the list or report success while a large font is copying.
+      await File(source).copy('${fontDir.path}/${file.name}');
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        AnxToast.show(L10n.of(context).commonSuccess);
+      }
+    } on FileSystemException {
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        AnxToast.show(L10n.of(context).commonFailed);
+      }
+    }
   }
 }

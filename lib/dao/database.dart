@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:anx_reader/service/sync/row_sync_store.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book.dart';
@@ -13,7 +14,7 @@ import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Current app database version
-const int currentDbVersion = 7;
+const int currentDbVersion = 8;
 
 const createBookSQL = '''
 CREATE TABLE tb_books (
@@ -100,6 +101,9 @@ CREATE TABLE tb_groups (
 class DBHelper {
   static final DBHelper _instance = DBHelper._internal();
   static Database? _database;
+  static Future<Database>? _opening;
+  static Future<void>? _closing;
+  bool _pendingLegacyCoverRepair = false;
   static bool updatedDB = false;
 
   factory DBHelper() {
@@ -108,13 +112,28 @@ class DBHelper {
 
   DBHelper._internal();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await initDB();
-    return _database!;
-  }
+  Future<Database> get database => initDB();
 
   Future<Database> initDB() async {
+    if (_closing != null) await _closing;
+    if (_database?.isOpen == true) return _database!;
+    // main(), DAOs and restore flows must all share the same opening task.
+    // Never publish a handle while its schema transaction is still running.
+    return _opening ??= _openAndCache();
+  }
+
+  Future<Database> _openAndCache() async {
+    try {
+      final db = await _openDatabase();
+      _database = db;
+      return db;
+    } finally {
+      // Allow retry after an opening failure, without clearing user data.
+      _opening = null;
+    }
+  }
+
+  Future<Database> _openDatabase() async {
     int dbVersion = currentDbVersion;
     switch (AnxPlatform.type) {
       case AnxPlatformEnum.macos:
@@ -126,7 +145,7 @@ class DBHelper {
           path,
           version: dbVersion,
           onCreate: (db, version) async {
-            onUpgradeDatabase(db, 0, version);
+            await onUpgradeDatabase(db, 0, version);
           },
           onUpgrade: onUpgradeDatabase,
         );
@@ -145,7 +164,7 @@ class DBHelper {
           options: OpenDatabaseOptions(
             version: dbVersion,
             onCreate: (db, version) async {
-              onUpgradeDatabase(db, 0, version);
+              await onUpgradeDatabase(db, 0, version);
             },
             onUpgrade: onUpgradeDatabase,
           ),
@@ -153,9 +172,43 @@ class DBHelper {
     }
   }
 
-  static Future<void> close() async {
-    await _database?.close();
-    _database = null;
+  static Future<void> close() => _closing ??= _closeDatabase();
+
+  static Future<void> _closeDatabase() async {
+    try {
+      try {
+        await _opening;
+      } catch (_) {
+        // A failed open has no usable handle to close.
+      }
+      await _database?.close();
+    } finally {
+      _database = null;
+      _closing = null;
+    }
+  }
+
+  /// Optional legacy maintenance: only run after startup has opened the DB.
+  /// Opening another database from inside onCreate/onUpgrade corrupts the
+  /// native SQLite transaction on Android (observed on a fresh API 35 install).
+  Future<void> repairLegacyBookCovers() async {
+    if (!_pendingLegacyCoverRepair || _database?.isOpen != true) return;
+    _pendingLegacyCoverRepair = false;
+    try {
+      final books = await bookDao.selectBooks();
+      for (final book in books) {
+        if (!File(book.coverFullPath).existsSync() &&
+            File(book.fileFullPath).existsSync()) {
+          try {
+            await resetBookCover(book);
+          } catch (_) {
+            AnxLog.warning('Database: legacy cover repair failed');
+          }
+        }
+      }
+    } catch (_) {
+      AnxLog.warning('Database: legacy cover maintenance skipped');
+    }
   }
 
   /// Checkpoint WAL to merge data into main database file
@@ -381,13 +434,9 @@ class DBHelper {
       case 3:
         // remove former book style
         Prefs().removeBookStyle();
-        bookDao.selectBooks().then((books) {
-          for (var book in books) {
-            if (!File(book.coverFullPath).existsSync()) {
-              resetBookCover(book);
-            }
-          }
-        });
+        // A new empty library has nothing to repair. For old libraries defer
+        // DAO/reader work until the schema transaction has committed.
+        _pendingLegacyCoverRepair = oldVersion > 0;
         continue case4;
       case4:
       case 4:
@@ -427,6 +476,8 @@ class DBHelper {
           ''', [groupId]);
         }
     }
+
+    if (oldVersion < 8) await RowSyncStore.install(db);
 
     if (oldVersion != 0 && Prefs().webdavStatus) {
       updatedDB = true;

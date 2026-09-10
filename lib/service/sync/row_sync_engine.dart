@@ -1,0 +1,171 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:anx_reader/service/sync/row_sync_record.dart';
+import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:anx_reader/service/sync/sync_paths.dart';
+
+/// A clean SQLite transport: only portable records and opaque encrypted AI
+/// settings. Never ships local paths, fonts, indexes, or the entire app DB.
+class RowSyncArchive {
+  static const format = 1;
+  static const databaseVersion = 8;
+
+  static Future<void> write(String path, List<RowSyncRecord> records) async {
+    final db = await openDatabase(path, singleInstance: false);
+    try {
+      await db.transaction((txn) async {
+        await txn.execute(
+            'CREATE TABLE modu_sync_manifest (format INTEGER NOT NULL)');
+        await txn.insert('modu_sync_manifest', {'format': format});
+        await txn.execute('''CREATE TABLE $syncRecordsTable (
+          kind TEXT NOT NULL, sync_id TEXT NOT NULL, clock INTEGER NOT NULL,
+          revision TEXT NOT NULL, deleted INTEGER NOT NULL, payload TEXT NOT NULL,
+          PRIMARY KEY(kind,sync_id))''');
+        for (final record in records) {
+          RowSyncStore.validate(record);
+          await txn.insert(syncRecordsTable, record.toMap());
+        }
+        await txn.execute('PRAGMA user_version = $databaseVersion');
+      });
+    } finally {
+      await db.close();
+    }
+  }
+
+  static Future<List<RowSyncRecord>> read(String path,
+      {bool legacy = false}) async {
+    // A bounded metadata-only database; an oversized/corrupt download cannot
+    // be mistaken for an empty cloud library.
+    if (await File(path).length() > 64 * 1024 * 1024) {
+      throw const FormatException('同步数据库超过 64 MiB 安全限制');
+    }
+    var db = await openDatabase(path, readOnly: true, singleInstance: false);
+    try {
+      final integrity = await db.rawQuery('PRAGMA integrity_check');
+      if (integrity.length != 1 || integrity.single.values.single != 'ok') {
+        throw const FormatException('同步数据库校验失败');
+      }
+      final version = await db.getVersion();
+      if (legacy) {
+        if (version != 7) throw const FormatException('旧同步数据库版本不是 7，请先升级旧客户端');
+        final triggers = await db
+            .rawQuery("SELECT name FROM sqlite_master WHERE type='trigger'");
+        if (triggers.isNotEmpty) {
+          throw const FormatException('旧同步数据库包含未知触发器，已停止迁移');
+        }
+        // This is a disposable download, never the live library or server DB.
+        await db.close();
+        db = await openDatabase(path, singleInstance: false);
+        await db.transaction((txn) => RowSyncStore.install(txn));
+        return await RowSyncStore(db).snapshot();
+      }
+      if (version != databaseVersion) {
+        throw const FormatException('不支持的同步数据库版本');
+      }
+      final manifest = await db.query('modu_sync_manifest');
+      if (manifest.length != 1 || manifest.single['format'] != format) {
+        throw const FormatException('不支持的逐条同步格式');
+      }
+      final result = (await db.query(syncRecordsTable))
+          .map(RowSyncRecord.fromMap)
+          .toList();
+      for (final r in result) {
+        RowSyncStore.validate(r);
+      }
+      return result;
+    } finally {
+      await db.close();
+    }
+  }
+}
+
+class RowSyncEngine {
+  RowSyncEngine(
+      {required this.store,
+      required this.client,
+      required this.cache,
+      this.beforePublish,
+      this.beforeMerge,
+      this.maxAttempts = 3});
+  final RowSyncStore store;
+  final SyncClientBase client;
+  final Directory cache;
+  final Future<void> Function()? beforePublish;
+  final Future<void> Function()? beforeMerge;
+  final int maxAttempts;
+  static final remotePath = SyncPaths.database('database8.db');
+
+  Future<void> synchronize() async {
+    // Complete asset uploads first. Retrying after an interrupted transfer
+    // must not advertise unavailable new books as successfully synchronized.
+    await beforePublish?.call();
+    final staging = await cache.createTemp('modu-row-sync-');
+    var backedUp = false;
+    try {
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        final remote = await client.readProps(remotePath);
+        var path = remotePath;
+        var metadata = remote;
+        if (remote == null) {
+          path = SyncPaths.database('database7.db');
+          metadata = await client.readProps(path);
+        }
+        List<RowSyncRecord> remoteRecords = [];
+        if (metadata != null) {
+          if ((metadata.size ?? 0) > 64 * 1024 * 1024) {
+            throw const FormatException('同步数据库过大，已停止下载');
+          }
+          final download = '${staging.path}/download-$attempt.db';
+          await client.downloadFile(path, download);
+          final after = await client.readProps(path);
+          if (after == null ||
+              metadata.eTag != after.eTag ||
+              metadata.size != after.size ||
+              metadata.mTime != after.mTime) {
+            continue;
+          }
+          remoteRecords =
+              await RowSyncArchive.read(download, legacy: remote == null);
+        }
+        final local = await store.snapshot();
+        if (!backedUp &&
+            remoteRecords.isNotEmpty &&
+            !sameSyncRecords(local, mergeSyncRecords(local, remoteRecords))) {
+          await beforeMerge?.call();
+          backedUp = true;
+        }
+        final merged = await store.merge(remoteRecords);
+        if (remote != null && sameSyncRecords(merged, remoteRecords)) return;
+        // An empty new device may read a real empty/tombstone archive, but may
+        // not create the first cloud library merely by opening the app.
+        if (remote == null &&
+            metadata == null &&
+            !merged.any((r) => r.kind == 'book')) {
+          return;
+        }
+        // Include assets imported while the remote database was downloading.
+        // Changes after this merged snapshot are picked up by the next pass.
+        await beforePublish?.call();
+        final upload = '${staging.path}/upload-$attempt.db';
+        await RowSyncArchive.write(upload, merged);
+        try {
+          await client.uploadFileConditionally(upload, remotePath,
+              expectedETag: remote?.eTag, createOnly: remote == null);
+          if (sameSyncRecords(await store.snapshot(), merged)) return;
+          // Reading/import can continue during upload. If it produced another
+          // operation, include it in the next bounded pass instead of marking
+          // an older snapshot as fully synchronized.
+        } on DioException catch (e) {
+          if (e.response?.statusCode != 412) rethrow;
+          // Another device published first: reload and re-merge, preserving
+          // new local changes too. Never retry with an unconditional PUT.
+        }
+      }
+      throw StateError('其他设备正在更新云端，已保留本机改动；请稍后重试同步');
+    } finally {
+      await staging.delete(recursive: true);
+    }
+  }
+}

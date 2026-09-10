@@ -10,6 +10,12 @@ class ReadingTimeDao extends BaseDao {
   ReadingTimeDao();
 
   static const String table = 'tb_reading_time';
+  static const String dailyBookReadingQuery = '''
+    SELECT MIN(id) AS id, book_id, DATE(date) AS date,
+           SUM(reading_time) AS reading_time
+    FROM tb_reading_time WHERE book_id = ?
+    GROUP BY DATE(date) ORDER BY DATE(date) DESC
+  ''';
 
   Future<void> insertReadingTime(
     ReadingTime readingTime, {
@@ -20,33 +26,13 @@ class ReadingTimeDao extends BaseDao {
 
     readingTime.date ??= resolvedDay;
 
-    await db.transaction((txn) async {
-      final existing = await txn.rawQuery(
-        'SELECT id, reading_time FROM $table WHERE book_id = ? AND DATE(date) = DATE(?) LIMIT 1',
-        [readingTime.bookId, resolvedDay],
-      );
-
-      if (existing.isNotEmpty) {
-        final current = existing.first['reading_time'] as int? ?? 0;
-        await txn.update(
-          table,
-          {
-            'reading_time': current + readingTime.readingTime,
-            // keep legacy date value unchanged to avoid churn
-          },
-          where: 'id = ?',
-          whereArgs: [existing.first['id']],
-        );
-      } else {
-        await txn.insert(
-          table,
-          {
-            'book_id': readingTime.bookId,
-            'date': resolvedDay,
-            'reading_time': readingTime.readingTime,
-          },
-        );
-      }
+    if (readingTime.readingTime <= 0) return;
+    // Each completed reading interval is an independent sync event. Daily
+    // statistics already use SUM/GROUP BY; never modify a shared daily total.
+    await db.insert(table, {
+      'book_id': readingTime.bookId,
+      'date': resolvedDay,
+      'reading_time': readingTime.readingTime,
     });
   }
 
@@ -217,12 +203,12 @@ class ReadingTimeDao extends BaseDao {
   }
 
   Future<List<ReadingTime>> selectReadingTimeByBookId(int bookId) {
-    return queryList(
-      table,
+    // Keep the book detail UI daily, even though storage now has independent
+    // sessions. Rendering one row per interval could otherwise grow unbounded.
+    return rawQueryList(
+      dailyBookReadingQuery,
       mapper: ReadingTime.fromDb,
-      where: 'book_id = ?',
-      whereArgs: [bookId],
-      orderBy: 'datetime(date) DESC, id DESC',
+      arguments: [bookId],
     );
   }
 
@@ -258,6 +244,13 @@ class ReadingTimeDao extends BaseDao {
     return queryList(
       table,
       mapper: ReadingTime.fromDb,
+      columns: [
+        'MIN(id) AS id',
+        'book_id',
+        'DATE(date) AS date',
+        'SUM(reading_time) AS reading_time'
+      ],
+      groupBy: 'book_id, DATE(date)',
       where: where.isEmpty ? null : where.join(' AND '),
       whereArgs: where.isEmpty ? null : whereArgs,
       orderBy: 'datetime(date) DESC, id DESC',

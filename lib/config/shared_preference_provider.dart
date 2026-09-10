@@ -546,6 +546,13 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get tapOnlyPageTurn => prefs.getBool('tapOnlyPageTurn') ?? false;
+
+  set tapOnlyPageTurn(bool value) {
+    prefs.setBool('tapOnlyPageTurn', value);
+    notifyListeners();
+  }
+
   PageTurn get pageTurnStyle {
     String? style = prefs.getString('pageTurnStyle');
     if (style == null) return PageTurn.slide;

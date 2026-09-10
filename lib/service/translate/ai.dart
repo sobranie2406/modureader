@@ -46,6 +46,7 @@ class AiTranslateProvider extends TranslateServiceProvider {
           );
 
     return AiStream(
+      scrollable: false,
       prompt: prompt,
       identifier: Prefs().translationAiService,
       regenerate: true,

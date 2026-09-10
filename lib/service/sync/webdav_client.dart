@@ -8,6 +8,7 @@ import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:webdav_client/webdav_client.dart';
+import 'package:xml/xml.dart';
 
 class WebdavClient extends SyncClientBase {
   late Client _client;
@@ -184,16 +185,99 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<RemoteFile?> readProps(String path) async {
-    RemoteFile? file;
     try {
-      final normalizedPath = path.endsWith('/') && path.length > 1
-          ? path.substring(0, path.length - 1)
-          : path;
-      file = (await _client.readProps(normalizedPath)).toRemoteFile();
-    } catch (e) {
-      return null;
+      // Client.readProps calls fixSlashes(), turning database7.db into
+      // database7.db/. Strict servers reject that file-as-directory request.
+      // Use the same authenticated transport, but preserve the exact path and
+      // request only this resource (Depth: 0).
+      final response = await _client.c.wdPropfind(
+        _client,
+        _safeEncodePath(path),
+        false,
+        '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/>'
+        '<d:getcontentlength/><d:getlastmodified/><d:getetag/>'
+        '</d:prop></d:propfind>',
+      );
+      final document = XmlDocument.parse(response.data as String);
+      final resources = document.findAllElements('response', namespace: 'DAV:');
+      if (resources.length != 1) {
+        throw const FormatException('WebDAV 未返回有效的单文件元数据');
+      }
+      final resource = resources.single;
+      final resourceStatus =
+          resource.getElement('status', namespace: 'DAV:')?.innerText;
+      if (resourceStatus != null) {
+        if (RegExp(r'\s404(?:\s|$)').hasMatch(resourceStatus)) return null;
+        if (!RegExp(r'\s200(?:\s|$)').hasMatch(resourceStatus)) {
+          throw const FormatException('WebDAV 资源读取失败，不是空书库');
+        }
+      }
+      final props = resource
+          .findElements('propstat', namespace: 'DAV:')
+          .where((entry) => RegExp(r'\s200(?:\s|$)').hasMatch(
+              entry.getElement('status', namespace: 'DAV:')?.innerText ?? ''))
+          .expand((entry) => entry.findElements('prop', namespace: 'DAV:'))
+          .toList();
+      if (props.isEmpty) throw const FormatException('WebDAV 文件属性读取失败');
+      String? value(String name) {
+        for (final prop in props) {
+          final element = prop.getElement(name, namespace: 'DAV:');
+          if (element != null) return element.innerText;
+        }
+        return null;
+      }
+
+      final modified = value('getlastmodified');
+      final isDirectory = props.any((prop) =>
+          prop.findAllElements('collection', namespace: 'DAV:').isNotEmpty);
+      final name = Uri.decodeComponent(
+          path.replaceFirst(RegExp(r'/$'), '').split('/').last);
+      return RemoteFile(
+        path: path,
+        name: name,
+        isDir: isDirectory,
+        size: int.tryParse(value('getcontentlength') ?? ''),
+        mTime: modified == null || modified.isEmpty
+            ? null
+            : io.HttpDate.parse(modified),
+        eTag: value('getetag'),
+      );
+    } on DioException catch (e) {
+      // Authentication, network and server failures are not an empty library.
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
     }
-    return file;
+  }
+
+  @override
+  Future<void> uploadFileConditionally(String localPath, String remotePath,
+      {String? expectedETag, bool createOnly = false}) async {
+    if (!createOnly &&
+        (expectedETag == null ||
+            !RegExp(r'^"[^"\r\n]+"$').hasMatch(expectedETag))) {
+      throw UnsupportedError('服务器没有提供强 ETag，已停止上传以避免覆盖其他设备的数据');
+    }
+    // Replayable bytes preserve the body across a Digest authentication retry.
+    final bytes = await io.File(localPath).readAsBytes();
+    final response = await _client.c
+        .req(_client, 'PUT', _safeEncodePath(remotePath), data: bytes,
+            optionsHandler: (options) {
+      // Do not forward a conditional database upload (or its credentials) to
+      // a different location supplied in a redirect response.
+      options.followRedirects = false;
+      options.validateStatus =
+          (status) => status != null && (status < 300 || status >= 400);
+      options.headers!['content-length'] = bytes.length;
+      options.headers!['content-type'] = 'application/octet-stream';
+      options.headers![createOnly ? 'if-none-match' : 'if-match'] =
+          createOnly ? '*' : expectedETag;
+    });
+    if (![200, 201, 204].contains(response.statusCode)) {
+      throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse);
+    }
   }
 
   @override
@@ -209,14 +293,8 @@ class WebdavClient extends SyncClientBase {
     void Function(int sent, int total)? onProgress,
     CancelToken? cancelToken,
   }) async {
-    if (replace) {
-      try {
-        await remove(_safeEncodePath(remotePath));
-      } catch (e) {
-        AnxLog.severe('Failed to remove file\n$e');
-      }
-    }
-
+    // WebDAV PUT replaces an existing resource. Deleting first would destroy
+    // the last cloud database if the subsequent upload fails.
     await _client.writeFromFile(
       localPath,
       _safeEncodePath(remotePath),

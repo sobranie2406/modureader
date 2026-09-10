@@ -267,13 +267,17 @@ class DatabaseSyncManager {
   }
 
   /// Cleanup expired backup files
+  static Future<void> pruneBackups() => _cleanupOldBackups();
+
   static Future<void> _cleanupOldBackups() async {
     try {
       final cacheDir = await getAnxCacheDir();
       final backupFiles = cacheDir
           .listSync()
-          .where((file) => file.path.contains(_backupDbPrefix))
-          .cast<io.File>()
+          .whereType<io.File>()
+          .where((file) =>
+              basename(file.path).startsWith(_backupDbPrefix) &&
+              file.path.endsWith('.db'))
           .toList();
 
       // Sort by modification time, keep the latest ones

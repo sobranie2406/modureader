@@ -1,5 +1,6 @@
 import 'package:anx_reader/dao/base_dao.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/service/sync/row_sync_store.dart';
 
 class BookDao extends BaseDao {
   BookDao();
@@ -9,6 +10,7 @@ class BookDao extends BaseDao {
   Future<int> save(Book book) async {
     if (book.id != -1) {
       await updateBook(book);
+      await setDeleted(book.id, book.isDeleted);
       return book.id;
     }
     return insert(table, book.toMap());
@@ -18,12 +20,43 @@ class BookDao extends BaseDao {
 
   Future<void> updateBook(Book book) async {
     book.updateTime = DateTime.now();
+    final values = book.toMap()
+      ..remove('last_read_position')
+      ..remove('reading_percentage')
+      ..remove('is_deleted');
     await update(
       table,
-      book.toMap(),
+      values,
       where: 'id = ?',
       whereArgs: [book.id],
     );
+  }
+
+  Future<void> updateReadingPosition(
+      int bookId, String position, double percentage) async {
+    await transaction((txn) async {
+      await txn.update(
+          table,
+          {
+            'last_read_position': position,
+            'reading_percentage': percentage,
+            'update_time': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [bookId]);
+      await RowSyncStore.touchPosition(txn, bookId);
+    });
+  }
+
+  Future<void> setDeleted(int bookId, bool deleted) async {
+    await update(
+        table,
+        {
+          'is_deleted': deleted ? 1 : 0,
+          'update_time': DateTime.now().toIso8601String()
+        },
+        where: 'id = ?',
+        whereArgs: [bookId]);
   }
 
   Future<List<Book>> selectBooks({bool includeDeleted = true}) {

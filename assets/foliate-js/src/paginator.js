@@ -1,4 +1,5 @@
 import { fitMobileImages } from './mobile-image-fit.js'
+import { touchPageDirection } from './touch-paging.js'
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -449,6 +450,14 @@ export class Paginator extends HTMLElement {
   #pendingScrollFrame = null
   #touchState
   #touchScrolled
+  #suppressTouchClickUntil = 0
+  #selectionAtPointerDown = false
+  get mobileTouchPaging() {
+    return this.getAttribute('mobile-touch-paging') === 'true' && !this.scrolled
+  }
+  get tapOnlyPageTurn() {
+    return this.mobileTouchPaging && this.getAttribute('tap-only-page-turn') === 'true'
+  }
   #loadingNext = false
   #loadingPrev = false
   #pendingRelocate = null
@@ -582,13 +591,30 @@ export class Paginator extends HTMLElement {
     })
 
     const opts = { passive: false }
+    const rememberSelection = e => {
+      if (e.pointerType === 'touch')
+        this.#selectionAtPointerDown = !!(window.getSelection()?.toString() ||
+          e.target?.ownerDocument?.getSelection()?.toString())
+    }
+    this.addEventListener('pointerdown', rememberSelection, true)
     this.addEventListener('touchstart', this.#onTouchStart.bind(this), opts)
     this.addEventListener('touchmove', this.#onTouchMove.bind(this), opts)
     this.addEventListener('touchend', this.#onTouchEnd.bind(this), opts)
+    this.addEventListener('touchcancel', this.#onTouchCancel.bind(this), opts)
+    const suppressClick = e => {
+      if (Date.now() < this.#suppressTouchClickUntil) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
+    }
+    this.addEventListener('click', suppressClick, true)
     this.addEventListener('load', ({ detail: { doc } }) => {
+      doc.addEventListener('pointerdown', rememberSelection, true)
       doc.addEventListener('touchstart', this.#onTouchStart.bind(this), opts)
       doc.addEventListener('touchmove', this.#onTouchMove.bind(this), opts)
       doc.addEventListener('touchend', this.#onTouchEnd.bind(this), opts)
+      doc.addEventListener('touchcancel', this.#onTouchCancel.bind(this), opts)
+      doc.addEventListener('click', suppressClick, true)
     })
 
     this.#mediaQueryListener = () => {
@@ -692,6 +718,11 @@ export class Paginator extends HTMLElement {
     if (flow === 'scrolled') {
       this.#container.style.overflowX = 'auto'
       this.#container.style.overflowY = 'auto'
+    } else if (this.mobileTouchPaging) {
+      // Programmatic page turns still work, but the browser cannot leave the
+      // page between columns or impart momentum while the finger is down.
+      this.#container.style.overflowX = 'hidden'
+      this.#container.style.overflowY = 'hidden'
     } else if (vertical) {
       this.#container.style.overflowX = 'hidden'
       this.#container.style.overflowY = 'auto'
@@ -857,12 +888,20 @@ export class Paginator extends HTMLElement {
   }
   #onTouchStart(e) {
     const touch = e.changedTouches[0]
+    if (!touch || !e.touches.length) return
+    if (e.touches.length > 1 && this.#touchState) {
+      this.#touchState.pinched = true
+      return
+    }
     const scrollProp = this.scrollProp
     this.#touchState = {
       x: touch?.screenX, y: touch?.screenY,
       t: e.timeStamp,
       vx: 0, vy: 0,
-      pinched: false,
+      pinched: e.touches.length > 1 || (globalThis.visualViewport?.scale ?? 1) > 1,
+      cancelled: this.mobileTouchPaging && (this.#locked || this.#isSnapping ||
+        this.#selectionAtPointerDown || !!e.target?.ownerDocument?.getSelection()?.toString()),
+      startedAt: e.timeStamp,
       direction: 'none',
       startTouch: {
         x: e.touches[0].screenX,
@@ -874,6 +913,8 @@ export class Paginator extends HTMLElement {
       lockedOffset: null,
       axis: scrollProp,
     }
+    this.#selectionAtPointerDown = false
+    if (this.tapOnlyPageTurn) return
     this.dispatchEvent(new CustomEvent('doctouchstart', {
       detail: {
         touch: e.changedTouches[0],
@@ -884,11 +925,17 @@ export class Paginator extends HTMLElement {
     }))
   }
   #onTouchMove(e) {
-    if (window.getSelection()?.toString()) return
+    if (window.getSelection()?.toString() || e.target?.ownerDocument?.getSelection()?.toString()) {
+      if (this.#touchState) this.#touchState.cancelled = true
+      return
+    }
 
     const touch = e.changedTouches[0]
     const state = this.#touchState
     if (!state) return
+    if (e.touches.length > 1 || (globalThis.visualViewport?.scale ?? 1) > 1)
+      state.pinched = true
+    if (state.pinched || state.cancelled || !touch) return
 
     const deltaX = touch.screenX - state.startTouch.x
     const deltaY = touch.screenY - state.startTouch.y
@@ -899,9 +946,14 @@ export class Paginator extends HTMLElement {
     state.delta.x = deltaX
     state.delta.y = deltaY
 
+    if (this.tapOnlyPageTurn) {
+      if (Math.max(absDeltaX, absDeltaY) >= 8 && e.cancelable) e.preventDefault()
+      return
+    }
 
 
-    const threshold = 5
+
+    const threshold = this.mobileTouchPaging ? 12 : 5
 
     const notHorizontal = state.direction === 'horizontal' && absDeltaY > absDeltaX;
     const notVertical = state.direction === 'vertical' && absDeltaX > absDeltaY;
@@ -911,9 +963,9 @@ export class Paginator extends HTMLElement {
     }
 
     if ((absDeltaX > threshold || absDeltaY > threshold) && state.direction === 'none') {
-      if (absDeltaX > absDeltaY) {
+      if (absDeltaX > absDeltaY * (this.mobileTouchPaging ? 1.3 : 1)) {
         state.direction = 'horizontal'
-      } else {
+      } else if (absDeltaY > absDeltaX * (this.mobileTouchPaging ? 1.3 : 1)) {
         state.direction = 'vertical'
         if (this.scrollProp === 'scrollLeft' && state.lockedOffset == null)
           state.lockedOffset = state.startScroll ?? this.#container.scrollLeft
@@ -937,6 +989,13 @@ export class Paginator extends HTMLElement {
       composed: true
     })
     this.dispatchEvent(forwarded)
+
+    if (this.mobileTouchPaging) {
+      // Do not cancel an ordinary tap/long press, or selection handles. Once
+      // clearly moving, suppress native drag and its synthetic click.
+      if (Math.max(absDeltaX, absDeltaY) >= 12 && e.cancelable) e.preventDefault()
+      return
+    }
 
     if (state.pinched) return
     state.pinched = globalThis.visualViewport.scale > 1
@@ -979,6 +1038,25 @@ export class Paginator extends HTMLElement {
   }
   #onTouchEnd(e) {
     const state = this.#touchState
+    if (!state) return
+    if (e.touches.length) { state.pinched = true; return }
+    const touch = e.changedTouches[0]
+    if (touch) {
+      state.delta.x = touch.screenX - state.startTouch.x
+      state.delta.y = touch.screenY - state.startTouch.y
+    }
+    if (e.target?.ownerDocument?.getSelection()?.toString() || window.getSelection()?.toString())
+      state.cancelled = true
+    if (this.tapOnlyPageTurn) {
+      this.#touchScrolled = false
+      this.#touchState = null
+      const { x: dx, y: dy } = state.delta
+      if (Math.max(Math.abs(dx), Math.abs(dy)) >= 8 || state.cancelled || state.pinched) {
+        this.#suppressTouchClickUntil = Date.now() + 400
+        if (e.cancelable) e.preventDefault()
+      }
+      return
+    }
     this.dispatchEvent(new CustomEvent('doctouchend', {
       detail: {
         touch: e.changedTouches[0],
@@ -989,7 +1067,23 @@ export class Paginator extends HTMLElement {
     }))
 
     this.#touchScrolled = false
-    if (this.scrolled) {
+    if (this.mobileTouchPaging) {
+      this.#touchState = null
+      const { x: dx, y: dy } = state.delta
+      if (Math.max(Math.abs(dx), Math.abs(dy)) >= 12 && !state.cancelled && !state.pinched) {
+        this.#suppressTouchClickUntil = Date.now() + 400
+        if (e.cancelable) e.preventDefault()
+      }
+      const direction = touchPageDirection({ dx, dy,
+        duration: e.timeStamp - state.startedAt, size: this.size,
+        vertical: this.scrollProp === 'scrollTop', rtl: this.#rtl,
+        cancelled: state.cancelled || state.pinched || this.#locked || this.#isSnapping ||
+          (state.direction !== 'none' && state.direction !==
+            (this.scrollProp === 'scrollTop' ? 'vertical' : 'horizontal')) })
+      if (direction) void this.#turnPage(direction).catch(error => console.error(error))
+      return
+    }
+    if (this.scrolled || state.cancelled || state.pinched) {
       this.#touchState = null
       return
     }
@@ -1020,6 +1114,11 @@ export class Paginator extends HTMLElement {
           .finally(() => { this.#touchState = null })
       else this.#touchState = null
     })
+  }
+  #onTouchCancel(e) {
+    if (this.#touchState) this.#touchState.cancelled = true
+    this.#onTouchEnd({ ...e, target: e.target, touches: [],
+      changedTouches: e.changedTouches, timeStamp: e.timeStamp, cancelable: false })
   }
   // allows one to process rects as if they were LTR and horizontal
   #getRectMapper() {

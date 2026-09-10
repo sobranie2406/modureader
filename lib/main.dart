@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
 
@@ -91,7 +92,7 @@ Future<void> main() async {
 
   // If no migration needed, initialize paths normally
   if (!_needsMigration) {
-    initBasePath();
+    await initBasePath();
     AnxLog.init();
     AnxError.init();
     await DBHelper().initDB();
@@ -120,6 +121,7 @@ Future<void> main() async {
       child: MyApp(),
     ),
   );
+  if (!_needsMigration) unawaited(DBHelper().repairLegacyBookCovers());
 }
 
 class MyApp extends ConsumerStatefulWidget {
@@ -301,7 +303,7 @@ class _MigrationWrapperState extends State<_MigrationWrapper> {
 
   Future<void> _onMigrationComplete() async {
     // Initialize paths and DB after migration
-    initBasePath();
+    await initBasePath();
     AnxLog.init();
     AnxError.init();
     await DBHelper().initDB();
@@ -311,6 +313,7 @@ class _MigrationWrapperState extends State<_MigrationWrapper> {
         _migrationComplete = true;
       });
     }
+    unawaited(DBHelper().repairLegacyBookCovers());
   }
 
   @override

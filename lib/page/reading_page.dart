@@ -36,6 +36,8 @@ import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
+import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
 import 'package:anx_reader/widgets/reading_page/toc_widget.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
@@ -456,6 +458,42 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     });
   }
 
+  Future<void> _copyChapterContent() async {
+    try {
+      final content = await epubPlayerKey.currentState?.theChapterContent();
+      if (!mounted) return;
+      if (content != null && content.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: content));
+      }
+      if (!mounted) return;
+      AnxToast.show(
+          L10n.of(context).readingPageCopiedCharacters(content?.length ?? 0));
+    } catch (_) {
+      if (mounted) {
+        AnxToast.show(L10n.of(context).readingPageErrorCopyingContent);
+      }
+    }
+  }
+
+  void _openBookDetails() {
+    Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => BookDetail(book: widget.book),
+        ));
+  }
+
+  Future<void> showSelectionTranslation(String content,
+      {String? contextText}) async {
+    showOrHideAppBarAndBottomBar(false);
+    await showReaderPopup(context,
+        builder: (_) => TranslationMenu(
+              content: content,
+              contextText: contextText,
+            ));
+    _restoreReaderFocusAfterPanel();
+  }
+
   double _aiChatMaxWidth(BuildContext context) {
     final totalWidth = MediaQuery.of(context).size.width;
     final maxByPercentage = totalWidth * 0.65;
@@ -704,35 +742,15 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
 
     if (shouldShowAsPopup) {
-      ModalRoute<dynamic>? sheetRoute;
-      await showModalBottomSheet(
-          context: navigatorKey.currentContext!,
-          isScrollControlled: true,
-          showDragHandle: false,
-          clipBehavior: Clip.hardEdge,
-          builder: (context) {
-            sheetRoute = ModalRoute.of(context);
-            return PointerInterceptor(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: AiChatStream(
-                    key: aiChatKey,
-                    scope: AiChatScope.reader,
-                    initialMessage: content,
-                    sendImmediate: sendImmediate,
-                    quickPromptChips: quickPrompts,
-                    trailing: [_buildKnowledgeIndexButton(context)],
-                  ),
-                ),
-              ),
-            );
-          });
-      // A pop result precedes the reverse animation and native view disposal.
-      await sheetRoute?.completed;
+      await showReaderPopup(navigatorKey.currentContext!,
+          builder: (context) => AiChatStream(
+                key: aiChatKey,
+                scope: AiChatScope.reader,
+                initialMessage: content,
+                sendImmediate: sendImmediate,
+                quickPromptChips: quickPrompts,
+                trailing: [_buildKnowledgeIndexButton(context)],
+              ));
       _restoreReaderFocusAfterPanel();
     } else {
       setState(() {
@@ -769,6 +787,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   Widget build(BuildContext context) {
+    final compactToolbar = MediaQuery.sizeOf(context).width < 420;
     var aiButton = IconButton(
       tooltip: L10n.of(context).aiChat,
       icon: const Icon(Icons.auto_awesome),
@@ -835,25 +854,17 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                               _changingQuickMark ? null : _toggleQuickMark),
                     if (EnvVar.enableAIFeature) aiButton,
                     IconButton(
-                      icon: const Icon(Icons.copy),
-                      tooltip: L10n.of(context).readingPageCopyChapterContent,
-                      onPressed: () async {
-                        try {
-                          var content = await epubPlayerKey.currentState
-                              ?.theChapterContent();
-                          var len = content?.length ?? 0;
-                          if (len > 0) {
-                            await Clipboard.setData(
-                                ClipboardData(text: content!));
-                          }
-                          AnxToast.show(L10n.of(context)
-                              .readingPageCopiedCharacters(len));
-                        } catch (e) {
-                          AnxToast.show(
-                              L10n.of(context).readingPageErrorCopyingContent);
-                        }
-                      },
+                      key: const ValueKey('reader-translation-button'),
+                      tooltip: L10n.of(context).settingsTranslate,
+                      icon: const Icon(Icons.translate_outlined),
+                      onPressed: translationHandler,
                     ),
+                    if (!compactToolbar)
+                      IconButton(
+                        icon: const Icon(Icons.copy),
+                        tooltip: L10n.of(context).readingPageCopyChapterContent,
+                        onPressed: _copyChapterContent,
+                      ),
                     IconButton(
                         tooltip: L10n.of(context).readingPageBookmark,
                         onPressed: () {
@@ -868,18 +879,33 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                         icon: bookmarkExists
                             ? const Icon(Icons.bookmark)
                             : const Icon(Icons.bookmark_border)),
-                    IconButton(
-                      tooltip: L10n.of(context).readingPageBookDetails,
-                      icon: const Icon(EvaIcons.more_vertical),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          CupertinoPageRoute(
-                            builder: (context) => BookDetail(book: widget.book),
-                          ),
-                        );
-                      },
-                    ),
+                    if (compactToolbar)
+                      PopupMenuButton<String>(
+                        icon: const Icon(EvaIcons.more_vertical),
+                        onSelected: (action) {
+                          if (action == 'copy') {
+                            _copyChapterContent();
+                          } else {
+                            _openBookDetails();
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                              value: 'copy',
+                              child: Text(L10n.of(context)
+                                  .readingPageCopyChapterContent)),
+                          PopupMenuItem(
+                              value: 'details',
+                              child: Text(
+                                  L10n.of(context).readingPageBookDetails)),
+                        ],
+                      )
+                    else
+                      IconButton(
+                        tooltip: L10n.of(context).readingPageBookDetails,
+                        icon: const Icon(EvaIcons.more_vertical),
+                        onPressed: _openBookDetails,
+                      ),
                   ],
                 ),
                 const Spacer(),
@@ -922,13 +948,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       onPressed: () {
                                         styleHandler(setState);
                                       },
-                                    ),
-                                    IconButton(
-                                      tooltip:
-                                          L10n.of(context).settingsTranslate,
-                                      icon:
-                                          const Icon(Icons.translate_outlined),
-                                      onPressed: translationHandler,
                                     ),
                                     IconButton(
                                       icon: const Icon(EvaIcons.headphones),

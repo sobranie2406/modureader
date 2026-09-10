@@ -11,6 +11,15 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'sync_status.g.dart';
 
+// Metadata/cover transfers and an empty initial library have no matching book.
+List<int> syncingBookIds(Iterable<Book> books, String fileName) {
+  if (fileName.isEmpty || fileName.endsWith('.db')) return const [];
+  return books
+      .where((book) => book.filePath.split('/').last == fileName)
+      .map((book) => book.id)
+      .toList();
+}
+
 @Riverpod(keepAlive: true)
 class SyncStatus extends _$SyncStatus {
   List<Book> allBooksInBookShelf = [];
@@ -34,24 +43,14 @@ class SyncStatus extends _$SyncStatus {
 
     final isSyncing = ref.read(syncProvider.select((value) => value.isSyncing));
 
-    List<int> downloading = isSyncing &&
-            webdavInfo.direction == SyncDirection.download &&
-            !webdavInfo.fileName.endsWith('.db')
-        ? [
-            allBooksInBookShelf
-                .firstWhere((e) => e.filePath.contains(webdavInfo.fileName))
-                .id
-          ]
-        : [];
-    List<int> uploading = isSyncing &&
-            webdavInfo.direction == SyncDirection.upload &&
-            !webdavInfo.fileName.endsWith('.db')
-        ? [
-            allBooksInBookShelf
-                .firstWhere((e) => e.filePath.contains(webdavInfo.fileName))
-                .id
-          ]
-        : [];
+    final matches = syncingBookIds(allBooksInBookShelf, webdavInfo.fileName);
+    final downloading =
+        isSyncing && webdavInfo.direction == SyncDirection.download
+            ? matches
+            : <int>[];
+    final uploading = isSyncing && webdavInfo.direction == SyncDirection.upload
+        ? matches
+        : <int>[];
     return SyncStatusModel(
       localOnly: localOnly,
       remoteOnly: remoteOnly,
@@ -63,7 +62,7 @@ class SyncStatus extends _$SyncStatus {
   }
 
   Future<void> refresh() async {
-    state = AsyncData(await build());
+    state = await AsyncValue.guard(build);
   }
 
   Future<List<int>> _listRemoteFiles(List<Book> books) async {
@@ -92,7 +91,7 @@ class SyncStatus extends _$SyncStatus {
         count++;
         if (count >= maxCount) {
           AnxLog.info('Webdav: Failed to list remote files: $e');
-          return [];
+          throw StateError('无法读取云端书籍列表，请检查网络和 WebDAV 权限');
         }
       }
     }
@@ -119,19 +118,14 @@ class SyncStatus extends _$SyncStatus {
   }
 
   Future<int?> pathToBookId(String filePath) async {
-    if (filePath.endsWith('.db')) {
-      return null;
-    }
-    try {
-      return allBooksInBookShelf
-          .firstWhere((e) => filePath.contains(e.filePath))
-          .id;
-    } catch (e) {
+    final name = filePath.split('/').last;
+    if (name.isEmpty || name.endsWith('.db')) return null;
+    var matches = syncingBookIds(allBooksInBookShelf, name);
+    if (matches.isEmpty) {
       allBooksInBookShelf = await _listAllBooksInBookShelf();
-      return allBooksInBookShelf
-          .firstWhere((e) => filePath.contains(e.filePath))
-          .id;
+      matches = syncingBookIds(allBooksInBookShelf, name);
     }
+    return matches.isEmpty ? null : matches.first;
   }
 
   bool isCover(String filePath) {
@@ -178,7 +172,8 @@ class SyncStatus extends _$SyncStatus {
     );
   }
 
-  Future<void> removeDownloading(String filePath) async {
+  Future<void> removeDownloading(String filePath,
+      {bool completed = true}) async {
     if (isCover(filePath)) {
       return;
     }
@@ -190,7 +185,9 @@ class SyncStatus extends _$SyncStatus {
       SyncStatusModel(
         localOnly: state.value!.localOnly,
         remoteOnly: state.value!.remoteOnly,
-        both: [...state.value!.both, bookId],
+        both: completed
+            ? {...state.value!.both, bookId}.toList()
+            : state.value!.both,
         nonExistent: state.value!.nonExistent,
         downloading:
             state.value!.downloading.where((e) => e != bookId).toList(),
@@ -200,7 +197,7 @@ class SyncStatus extends _$SyncStatus {
     ref.invalidateSelf();
   }
 
-  Future<void> removeUploading(String filePath) async {
+  Future<void> removeUploading(String filePath, {bool completed = true}) async {
     if (isCover(filePath)) {
       return;
     }
@@ -212,7 +209,9 @@ class SyncStatus extends _$SyncStatus {
       SyncStatusModel(
         localOnly: state.value!.localOnly,
         remoteOnly: state.value!.remoteOnly,
-        both: [...state.value!.both, bookId],
+        both: completed
+            ? {...state.value!.both, bookId}.toList()
+            : state.value!.both,
         nonExistent: state.value!.nonExistent,
         downloading: state.value!.downloading,
         uploading: state.value!.uploading.where((e) => e != bookId).toList(),

@@ -7,6 +7,7 @@ import 'package:anx_reader/models/font_model.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/page/settings_page/subpage/fonts.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/book_player/reader_font_response.dart';
 import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/service/font.dart';
 import 'package:anx_reader/utils/font_parser.dart';
@@ -116,24 +117,19 @@ class StyleWidgetState extends State<StyleWidget> {
         path: 'system',
       ),
     ];
-    // fontDir.listSync().forEach((element) {
-    //   if (element is File) {
-    //     fontList.add(FontModel(
-    //       label: getFontNameFromFile(element),
-    //       name: 'customFont' + ,
-    //       path:
-    //           'http://127.0.0.1:${Server().port}/fonts/${element.path.split('/').last}',
-    //     ));
-    //   }
-    // });
-    // name = 'customFont' + index
-    for (int i = 0; i < fontDir.listSync().length; i++) {
-      File element = fontDir.listSync()[i] as File;
+    final files = fontDir
+        .listSync()
+        .whereType<File>()
+        .where((file) =>
+            RegExp(r'\.(ttf|otf)$', caseSensitive: false).hasMatch(file.path))
+        .toList();
+    for (int i = 0; i < files.length; i++) {
+      final element = files[i];
       fontList.add(FontModel(
         label: getFontNameFromFile(element),
         name: 'customFont$i',
-        path:
-            'http://127.0.0.1:${Server().port}/fonts/${element.path.split(Platform.pathSeparator).last}',
+        path: readerFontUrl(
+            element.path.split(Platform.pathSeparator).last, Server().port),
       ));
     }
 
@@ -195,6 +191,7 @@ class StyleWidgetState extends State<StyleWidget> {
             if (font.name == 'newFont') {
               widget.hideAppBarAndBottomBar(false);
               await importFont();
+              if (mounted) setState(() {});
               return;
             } else if (font.name == 'download') {
               widget.hideAppBarAndBottomBar(false);

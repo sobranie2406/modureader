@@ -25,6 +25,7 @@ class AiStream extends ConsumerStatefulWidget {
     this.canCopy = true,
     this.regenerate = false,
     this.useAgent = false,
+    this.scrollable = true,
   });
 
   final PromptTemplatePayload prompt;
@@ -34,6 +35,7 @@ class AiStream extends ConsumerStatefulWidget {
   final bool canCopy;
   final bool regenerate;
   final bool useAgent;
+  final bool scrollable;
 
   @override
   AiStreamState createState() => AiStreamState();
@@ -99,44 +101,45 @@ class AiStreamState extends ConsumerState<AiStream> {
         );
         final isCompleted = snapshot.connectionState == ConnectionState.done;
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (reasoningWidgets.isNotEmpty)
-                _buildThinkingPanel(reasoningWidgets),
-              if (reasoningWidgets.isNotEmpty && answerWidgets.isNotEmpty)
-                const SizedBox(height: 8),
-              if (answerWidgets.isNotEmpty)
-                ...answerWidgets
-              else if (!isCompleted)
-                Skeletonizer.zone(child: Bone.multiText())
-              else
-                const SizedBox.shrink(),
-              if (widget.canCopy)
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          stream = _createStream(true);
-                        });
-                      },
-                      child: Text(l10n.aiRegenerate),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: data));
-                        AnxToast.show(l10n.notesPageCopied);
-                      },
-                      child: Text(l10n.commonCopy),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (reasoningWidgets.isNotEmpty)
+              _buildThinkingPanel(reasoningWidgets),
+            if (reasoningWidgets.isNotEmpty && answerWidgets.isNotEmpty)
+              const SizedBox(height: 8),
+            if (answerWidgets.isNotEmpty)
+              ...answerWidgets
+            else if (!isCompleted)
+              Skeletonizer.zone(child: Bone.multiText())
+            else
+              const SizedBox.shrink(),
+            if (widget.canCopy)
+              Wrap(
+                alignment: WrapAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        stream = _createStream(true);
+                      });
+                    },
+                    child: Text(l10n.aiRegenerate),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: data));
+                      AnxToast.show(l10n.notesPageCopied);
+                    },
+                    child: Text(l10n.commonCopy),
+                  ),
+                ],
+              ),
+          ],
         );
+        return widget.scrollable
+            ? SingleChildScrollView(child: content)
+            : content;
       },
     );
   }

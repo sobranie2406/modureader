@@ -40,7 +40,7 @@ The current version provides the following reading, AI and library features.
 | Area | What it does | Where to find it |
 | --- | --- | --- |
 | Library and import | Import EPUB, PDF, MOBI, AZW3, FB2 and TXT; filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
-| Remote library | Connect to a separate WebDAV server, browse folders, filter the current folder and download books into your local library | Home → Remote library; Settings → Library WebDAV |
+| Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Library WebDAV |
 | Reading and layout | Chapter navigation, progress, paginated/scrolling modes, fonts, sizes, spacing, backgrounds and themes; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
 | Highlights and notes | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV | Text selection menu; Home → Notes |
 | Mobile quick mark | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page | Pen button in the mobile reader; persistent Exit button restores normal gestures |
@@ -48,10 +48,10 @@ The current version provides the following reading, AI and library features.
 | AI conversations | Home quick prompts, in-book questions and chat history; enabled tools access the library, contents, chapters, notes and reading records | Home → AI; reader AI panel |
 | AI reading skills | Ten built-in skills with Chinese names; enable/disable, inspect/edit prompts and create custom skills | Settings → AI Reading Skills |
 | Semantic search and RAG | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing | Book menu; Settings → Embedding Models |
-| Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text and full-text translation entry points | Settings → Translation; bottom reader toolbar |
+| Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text results use the same popup sizing as AI chat, with scrolling for long output | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
-| Configuration transfer | Import/export AI and WebDAV settings with codes, QR-code display and QR-code image import | AI Settings / Sync → Import and Export |
+| Configuration transfer | Import/export AI, sync WebDAV and separate library WebDAV configurations using codes and QR images | Corresponding settings page → Import and Export |
 | Appearance and tools | System/dark/light themes, cover display, font import/download, network and logging options | Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
@@ -59,7 +59,13 @@ The current version provides the following reading, AI and library features.
 
 Enter the full book-directory URL, username and password in Settings → Library WebDAV, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
 
-This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL and username stay on this device and are excluded from settings export and sync. The password lasts for the current session only and must be entered again after quitting.
+This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL and username are stored locally and excluded from automatic sync. The password lasts for the current session only and must be entered again after quitting.
+
+Library WebDAV settings support explicit export to a `modu:` configuration code or QR image, and import from a code or QR image. **Password export is on by default and can be turned off. Codes and QR images are not encrypted; do not share them publicly.** Import only fills the form; it does not automatically connect or save. Creation and modification dates come from the server; missing dates remain unknown rather than being replaced with local import times.
+
+### Mobile page-turn controls
+
+Reader styles → More settings → Other includes **Tap-only page turning**, off by default. When enabled in paginated mode, swipes and drags neither turn pages nor trigger pull gestures; taps still work. Turn it off to restore swipe navigation. Text selection, Quick mark and scrolling mode remain available. This mobile-only switch is not shown on desktop.
 
 ### Quick marking on mobile
 
@@ -119,13 +125,14 @@ Mobile inline images fit the reading area proportionally. Footnote popups resize
 
 At a chapter boundary, narration automatically continues with the next chapter's heading and body, skipping empty chapters.
 
-Translate selected text or use the bottom reader toolbar, with Google translation, AI translation or DeepL/DeepLX.
+Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
 
 Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo supports built-in voices, text-based voice design and MP3/WAV audio; style, pace and pitch are controlled through natural-language instructions. Synthesis or playback failures pause at the current position for retry.
 
 ### Sync and key security
 
 - WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
+- Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Fonts, theme images and local vector indexes are not synced. Concurrent uploads use server ETag checks; see the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
 - **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
 - Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.

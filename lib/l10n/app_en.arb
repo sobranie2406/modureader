@@ -239,7 +239,7 @@
   "webdavUpload": "Upload to WebDAV",
   "webdavOnlyWifi": "Only sync when WiFi is connected",
   "webdavSyncAborted": "Sync aborted",
-  "webdavSyncAbortedContent": "Failed to get data from WebDAV, remote data is empty. Please check the following: \n1. Network connection \n2. Ensure that valid reading data has been uploaded to WebDAV on other devices\n\nNext, please try to upload data to WebDAV",
+  "webdavSyncAbortedContent": "No valid synced library was loaded; further file sync has stopped. This does not prove the server is empty. Check that both devices use the same version, WebDAV account and parent directory, then try downloading. Do not overwrite cloud data with an empty local library. Back up and migrate the old anx folder to modu if needed.",
   "webdavSyncDirection": "WebDAV data may be modified by other devices, please choose how to handle the data",
   "settingsSync": "Sync",
   "settingsSyncWebdav": "WebDAV",

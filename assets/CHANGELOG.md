@@ -2,18 +2,18 @@
 
 Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
 
-## 1.0.1
+## 1.0.2
 
-- Set reasoning to Off independently for supported AI models.
-- Merge continuous mobile highlights across pages within one chapter, preserving comments.
-- Fit mobile inline images to the reading area and size footnotes within 25% of the viewport area.
-- Continue TTS across chapters, including titles, with reliable chapter-load waiting.
-- WebDAV sync now uses modu; back up and migrate the old anx folder before resuming sync on upgraded devices.
-- See this version's GitHub Release for package requirements and verification limits.
+- Merge WebDAV records instead of replacing the local database; sync the latest reading action, deduplicate new reading time and retain deletion markers. Fonts stay local.
+- Back up all devices and the server before upgrading every syncing client; database 8 requires server ETags and conditional writes.
+- Fix database initialization and local fonts with spaces or non-ASCII characters in their filenames.
+- Move translation next to AI; use readable text sizes and a scrollable popup matching AI chat.
+- Sort and filter the remote library; transfer library WebDAV settings through codes or QR images. Password export is on by default; codes are not encrypted.
+- Add a mobile tap-only page-turn switch and prevent accidental page dragging. See the GitHub Release for package and verification limits.
 
-- 支持的 AI 模型可独立选择关闭推理。
-- 移动端同一章节内跨页连续高亮合并，保留已有批注。
-- 移动端内嵌图片适配阅读区域，注释框按内容调整且不超过可见窗口面积的 25%。
-- 朗读等待切章完成并接续下一章标题和正文。
-- WebDAV 同步目录改为 modu；升级后恢复同步前，请备份并迁移旧 anx 目录。
-- 安装要求、详细更新和验证限制见此版本 GitHub Release。
+- WebDAV 改为逐条合并，使用最近阅读操作、新时长去重与删除标记，不再替换本机整库；字体留在本机。
+- 升级前备份各端和服务器，所有同步设备一起升级；数据库 8 要求服务器支持 ETag 与条件写入。
+- 修复数据库初始化，以及含空格或中文等字符的本地字体文件加载。
+- 翻译入口移到 AI 旁，统一字号并采用与 AI 对话一致的可滚动弹窗。
+- 远程书库支持排序筛选及代码、二维码配置迁移。默认导出密码，代码未加密，请勿公开。
+- 移动端新增仅点击翻页开关，防止误拖页面；安装要求和验证限制见 GitHub Release。

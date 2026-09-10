@@ -1,4 +1,6 @@
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:anx_reader/service/config_transfer/library_config_transfer.dart';
+import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:flutter/material.dart';
 
 class RemoteLibrarySettings extends StatefulWidget {
@@ -14,6 +16,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
   bool _loading = true, _busy = false, _http = false, _hide = true;
   String? _message;
   WebdavLibrary? _testing;
+  bool _exportPassword = true;
   bool get zh => Localizations.localeOf(context).languageCode == 'zh';
   String t(String cn, String en) => zh ? cn : en;
 
@@ -182,6 +185,42 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
       if (_message != null)
         Padding(
             padding: const EdgeInsets.only(top: 16), child: Text(_message!)),
+      const SizedBox(height: 24),
+      const Divider(),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(t('导出时包含密码', 'Include password in export')),
+        subtitle: Text(t('默认开启。二维码和 modu: 配置链接将包含未加密的密码，请勿公开分享；不需要携带密码时请关闭。',
+            'On by default. The QR image and modu: configuration link contain the unencrypted password. Keep them private; turn this off to omit the password.')),
+        value: _exportPassword,
+        onChanged:
+            _busy ? null : (value) => setState(() => _exportPassword = value),
+      ),
+      ConfigTransferTile(
+        kind: LibraryConfigTransfer.kind,
+        label: t('书库 WebDAV 配置', 'Library WebDAV configuration'),
+        enabled: !_busy,
+        allowReadAny: false,
+        importNotice: t(
+            '导入仅替换当前表单，不自动保存或连接。请核对地址、账号及 HTTP 风险后点击“保存配置”。不含密码的配置需要重新输入密码，不影响同步 WebDAV 设置。',
+            'Import only fills this form; it does not save or connect. Review the address, account and HTTP risk, then press Save. Re-enter the password if omitted. Sync WebDAV settings are not changed.'),
+        getData: () => LibraryConfigTransfer.createPayload(_value,
+            includePassword: _exportPassword),
+        applyData: (data) {
+          final value = LibraryConfigTransfer.parse(data);
+          if (!mounted) return;
+          setState(() {
+            _url.text = value.url;
+            _username.text = value.username;
+            _password.text = value.password;
+            _http = value.allowHttp;
+            _hide = true;
+            _exportPassword = true;
+            _message = t('已填入配置，尚未保存。请检查上方连接信息后保存。',
+                'Configuration filled in, not saved. Review the connection above and save.');
+          });
+        },
+      ),
     ]);
   }
 }

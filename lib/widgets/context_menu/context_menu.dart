@@ -5,7 +5,6 @@ import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
 import 'package:anx_reader/widgets/context_menu/excerpt_menu.dart';
 import 'package:anx_reader/widgets/context_menu/reader_note_menu.dart';
-import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
@@ -292,7 +291,6 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
 
   late Offset _position;
   late bool _reverse;
-  late bool _showTranslationMenu;
   bool _showReaderNoteMenu = false;
   bool _waitingForFirstMeasurement = true;
   late BoxConstraints _menuConstraints;
@@ -305,11 +303,15 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
     WidgetsBinding.instance.addObserver(this);
     _position = widget.initialPlacement.offset;
     _reverse = widget.initialPlacement.shouldReverse;
-    _showTranslationMenu = widget.showTranslationDefault;
     _noteId = widget.annoId;
     _bottomInset = widget.initialBottomInset;
     _menuConstraints = _buildConstraints(widget.initialBottomInset);
     _scheduleRecalculate();
+    if (widget.showTranslationDefault) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _toggleTranslationMenu();
+      });
+    }
   }
 
   @override
@@ -423,10 +425,12 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
   }
 
   void _toggleTranslationMenu() {
-    setState(() {
-      _showTranslationMenu = !_showTranslationMenu;
-    });
-    _scheduleRecalculate();
+    final reader = readingPageKey.currentState;
+    if (reader == null) return;
+    final content = widget.annoContent;
+    final contextText = widget.contextText;
+    widget.onClose();
+    reader.showSelectionTranslation(content, contextText: contextText);
   }
 
   void _toggleReaderNoteMenu({bool? show}) {
@@ -538,20 +542,6 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
                                 onVisibilityChange:
                                     _handleReaderNoteVisibilityChange,
                                 onSizeChanged: _handleReaderNoteSizeChanged,
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (_showTranslationMenu) ...[
-                          const SizedBox.square(dimension: 10),
-                          AxisFlex(
-                            axis: widget.axis,
-                            children: [
-                              TranslationMenu(
-                                content: widget.annoContent,
-                                decoration: widget.decoration,
-                                axis: widget.axis,
-                                contextText: widget.contextText,
                               ),
                             ],
                           ),

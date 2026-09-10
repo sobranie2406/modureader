@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:anx_reader/service/book_player/reader_background_response.dart';
+import 'package:anx_reader/service/book_player/reader_font_response.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/book_player/reader_file_access.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -100,18 +101,7 @@ class Server {
         headers: {'Content-Type': 'application/javascript'},
       );
     } else if (uriPath.startsWith('/fonts/')) {
-      Directory fontDir = getFontDir();
-      final file = ReaderFileAccess.within(fontDir, path.basename(uriPath));
-      if (file == null) {
-        return shelf.Response.notFound('Font not found');
-      }
-      return shelf.Response.ok(
-        file.openRead(),
-        headers: {
-          'Content-Type': 'font/opentype',
-          'cache-control': 'public, max-age=31536000',
-        },
-      );
+      return readerFontResponse(request.requestedUri, directory: getFontDir());
     } else if (uriPath.startsWith('/foliate-js/')) {
       if (uriPath.endsWith('.epub')) {
         final file =

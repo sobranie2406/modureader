@@ -80,11 +80,13 @@ bool _safeSegments(Uri uri) => uri.pathSegments.every((s) =>
     !s.contains(RegExp(r'[\x00-\x1f\x7f]')));
 
 class LibraryEntry {
-  const LibraryEntry(this.uri, this.name, this.isDirectory, this.size);
+  const LibraryEntry(this.uri, this.name, this.isDirectory, this.size,
+      {this.createdAt, this.modifiedAt});
   final Uri uri;
   final String name;
   final bool isDirectory;
   final int? size;
+  final DateTime? createdAt, modifiedAt;
   bool get isBook =>
       !isDirectory &&
       const ['epub', 'mobi', 'azw3', 'fb2', 'txt', 'pdf']
@@ -130,7 +132,8 @@ class WebdavLibrary {
     _check(directory);
     final response = await _dio.requestUri<ResponseBody>(directory,
         data: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop>'
-            '<d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>',
+            '<d:resourcetype/><d:getcontentlength/>'
+            '<d:creationdate/><d:getlastmodified/></d:prop></d:propfind>',
         options: Options(
             method: 'PROPFIND',
             responseType: ResponseType.stream,
@@ -191,7 +194,11 @@ class WebdavLibrary {
               ?.innerText ??
           '');
       entries[uri.toString()] = LibraryEntry(uri, segments.last, directoryType,
-          size != null && size >= 0 ? size : null);
+          size != null && size >= 0 ? size : null,
+          createdAt:
+              _propertyDate(props.expand((p) => children(p, 'creationdate'))),
+          modifiedAt: _propertyDate(
+              props.expand((p) => children(p, 'getlastmodified'))));
     }
     return entries.values.toList()
       ..sort((a, b) => a.isDirectory != b.isDirectory
@@ -248,6 +255,21 @@ class WebdavLibrary {
   }
 
   void close() => _dio.close(force: true);
+}
+
+DateTime? _propertyDate(Iterable<XmlElement> properties) {
+  for (final property in properties) {
+    final value = property.innerText.trim();
+    if (value.isEmpty) continue;
+    final iso = DateTime.tryParse(value);
+    if (iso != null) return iso.toUtc();
+    try {
+      return HttpDate.parse(value).toUtc();
+    } on HttpException {
+      // Optional metadata must never make an otherwise valid listing fail.
+    }
+  }
+  return null;
 }
 
 String libraryError(Object error, bool zh) {

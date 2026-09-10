@@ -29,6 +29,25 @@ void main() {
   });
 
   group('AI settings sync preference filter', () {
+    test(
+        'font files and local font choices stay out of sync and survive restore',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'font': 'local-font-choice',
+        'readStyle': '{"fontFamily":"device-font"}',
+        'excerptShareFont': 'local-excerpt-font',
+        'aiChatFontSize': 18.0,
+        'aiTemperature': 0.8,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final exported = collectAiSettingsForSync(prefs);
+      expect(exported.keys, ['aiTemperature']);
+      await applyAiSettingsFromSync(prefs, {'aiTemperature': 0.3});
+      expect(prefs.getString('font'), 'local-font-choice');
+      expect(prefs.getString('readStyle'), '{"fontFamily":"device-font"}');
+      expect(prefs.getString('excerptShareFont'), 'local-excerpt-font');
+      expect(prefs.getDouble('aiChatFontSize'), 18.0);
+    });
     test('includes AI service credentials but excludes unrelated secrets',
         () async {
       SharedPreferences.setMockInitialValues({

@@ -5,13 +5,17 @@ import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:anx_reader/service/remote_library/library_view_options.dart';
+import 'package:anx_reader/widgets/remote_library_controls.dart';
+import 'package:intl/intl.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class RemoteLibraryPage extends ConsumerStatefulWidget {
-  const RemoteLibraryPage({super.key});
+  const RemoteLibraryPage({super.key, this.clientFactory});
+  final WebdavLibrary Function(LibraryConnection)? clientFactory;
   @override
   ConsumerState<RemoteLibraryPage> createState() => _RemoteLibraryPageState();
 }
@@ -23,6 +27,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   CancelToken? _listing, _download;
   String? _error, _activeName;
   String _filter = '';
+  LibraryViewOptions _viewOptions = const LibraryViewOptions();
   bool _loading = true, _importing = false;
   int _received = 0, _total = -1;
   final _imported = <String>{};
@@ -32,7 +37,24 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   @override
   void initState() {
     super.initState();
-    _connect();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    final options = await LibraryViewOptionsStore.load();
+    if (!mounted) return;
+    setState(() => _viewOptions = options);
+    await _connect();
+  }
+
+  Future<void> _changeViewOptions(LibraryViewOptions options) async {
+    setState(() => _viewOptions = options);
+    try {
+      await LibraryViewOptionsStore.save(options);
+    } catch (_) {
+      _message(t('排序已生效，但无法保存到本机。',
+          'Sorting applied, but preferences could not be saved.'));
+    }
   }
 
   Future<void> _connect() async {
@@ -51,7 +73,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       return;
     }
     try {
-      _client = WebdavLibrary(connection);
+      _client =
+          widget.clientFactory?.call(connection) ?? WebdavLibrary(connection);
       await _browse(_client!.root);
     } catch (error) {
       if (mounted)
@@ -182,13 +205,30 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
               ? '${(bytes / 1024).toStringAsFixed(1)} KiB'
               : '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
 
+  String _entrySubtitle(LibraryEntry entry) {
+    final info = entry.isDirectory
+        ? t('文件夹', 'Folder')
+        : '${_size(entry.size)}${entry.isBook ? '' : t(' · 不支持导入', ' · Import not supported')}';
+    final date = switch (_viewOptions.sort) {
+      LibrarySortField.createdAt => entry.createdAt,
+      LibrarySortField.modifiedAt => entry.modifiedAt,
+      _ => null,
+    };
+    if (_viewOptions.sort != LibrarySortField.createdAt &&
+        _viewOptions.sort != LibrarySortField.modifiedAt) {
+      return info;
+    }
+    final label = _viewOptions.sort == LibrarySortField.createdAt
+        ? t('添加', 'Added')
+        : t('修改', 'Modified');
+    return '$info · $label: ${date == null ? t('未提供', 'Not provided') : DateFormat('yyyy-MM-dd HH:mm').format(date.toLocal())}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final directory = _directory;
     final root = _client?.root;
-    final visible = _entries
-        .where((e) => e.name.toLowerCase().contains(_filter.toLowerCase()))
-        .toList();
+    final visible = _viewOptions.apply(_entries, query: _filter);
     return Scaffold(
         appBar: AppBar(title: Text(t('远程书库', 'Remote library')), actions: [
           IconButton(
@@ -234,6 +274,12 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                         hintText:
                             t('筛选当前目录中的文件', 'Filter files in this folder'),
                         border: const OutlineInputBorder()))),
+          if (root != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: RemoteLibraryControls(
+                  options: _viewOptions, onChanged: _changeViewOptions),
+            ),
           if (_activeName != null)
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -300,6 +346,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                     final imported = _imported
                                         .contains(entry.uri.toString());
                                     return ListTile(
+                                        key: ValueKey(
+                                            'library-entry:${entry.uri}'),
                                         leading: Icon(entry.isDirectory
                                             ? Icons.folder_outlined
                                             : entry.isBook
@@ -307,9 +355,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                                 : Icons
                                                     .insert_drive_file_outlined),
                                         title: Text(entry.name),
-                                        subtitle: Text(entry.isDirectory
-                                            ? t('文件夹', 'Folder')
-                                            : '${_size(entry.size)}${entry.isBook ? '' : t(' · 不支持导入', ' · Import not supported')}'),
+                                        subtitle: Text(_entrySubtitle(entry)),
                                         onTap: entry.isDirectory
                                             ? () => _browse(entry.uri)
                                             : null,

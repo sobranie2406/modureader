@@ -62,7 +62,7 @@ class ExcerptShareCard extends StatelessWidget {
 
   TextStyle _getTextStyle() {
     FontWeight weight = FontWeight.normal;
-    final path = font.path.split('/').last;
+    final path = font.litePath;
     switch (font.name) {
       case 'system':
         return TextStyle(

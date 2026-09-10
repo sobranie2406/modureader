@@ -73,9 +73,7 @@ Future<void> deleteBooksFromBookshelf(
   final list = books.toList(growable: false);
   for (final book in list) {
     await bookKnowledgeIndexQueue.cancelAndRemove(book.id);
-    await bookDao.updateBook(
-      book.copyWith(isDeleted: true, updateTime: DateTime.now()),
-    );
+    await bookDao.setDeleted(book.id, true);
     await _deleteIfPresent(File(book.fileFullPath));
     await _deleteIfPresent(File(book.coverFullPath));
     await BookKnowledgeIndexService().deleteIndex(book);

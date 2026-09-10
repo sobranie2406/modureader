@@ -239,6 +239,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       changeStyle({
         fontSize: ${style.fontSize},
         mobileImageFit: ${AnxPlatform.isMobile},
+        mobileTouchPaging: ${AnxPlatform.isMobile},
+        tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
         paragraphSpacing: ${style.paragraphSpacing},
@@ -294,8 +296,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void changeFont(FontModel font) {
     webViewController.evaluateJavascript(source: '''
       changeStyle({
-        fontName: '${font.name}',
-        fontPath: '${font.path}',
+        fontName: ${jsonEncode(font.name)},
+        fontPath: ${jsonEncode(font.path)},
       })
     ''');
   }
@@ -1132,7 +1134,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     Book book = widget.book;
     book.lastReadPosition = cfi;
     book.readingPercentage = percentage;
-    await bookDao.updateBook(book);
+    await bookDao.updateReadingPosition(book.id, cfi, percentage);
     if (mounted) {
       ref.read(bookListProvider.notifier).refresh();
     }
