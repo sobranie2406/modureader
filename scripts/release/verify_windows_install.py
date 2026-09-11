@@ -2,6 +2,7 @@
 import argparse
 import ctypes
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -59,6 +60,29 @@ def verify_window_close(executable):
                 process.wait(timeout=15)
 
 
+def verify_installed_version(install):
+    source_root = Path(__file__).resolve().parents[2]
+    expected = re.search(r'^version:\s*(\S+)',
+                         (source_root / 'pubspec.yaml').read_text(encoding='utf-8'),
+                         re.MULTILINE).group(1)
+    installed = (install / 'data/flutter_assets/pubspec.yaml').read_text(encoding='utf-8')
+    if re.search(r'^version:\s*(\S+)', installed, re.MULTILINE).group(1) != expected:
+        raise RuntimeError('Installed Dart payload version mismatch')
+    executable = str(install / 'modu.exe').replace("'", "''")
+    command = (f"$v=(Get-Item -LiteralPath '{executable}').VersionInfo; "
+               'Write-Output "$($v.FileMajorPart).$($v.FileMinorPart).'
+               '$($v.FileBuildPart).$($v.FilePrivatePart)"')
+    native = subprocess.check_output(['powershell', '-NoProfile', '-NonInteractive',
+                                      '-Command', command], text=True, timeout=30).strip()
+    if native != expected.replace('+', '.'):
+        raise RuntimeError(f'Native version mismatch: {native}, expected {expected}')
+    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+                                       cwd=source_root, text=True).strip()
+    if revision not in (install / 'SOURCE.txt').read_text(encoding='utf-8'):
+        raise RuntimeError('Installed source provenance mismatch')
+    print(f'Windows installed version verified: {expected}; source={revision}')
+
+
 def smoke(installer, arch):
     if os.environ.get('GITHUB_ACTIONS') != 'true' or os.name != 'nt':
         raise RuntimeError('This installation smoke test requires a disposable Windows CI runner')
@@ -70,6 +94,7 @@ def smoke(installer, arch):
                        check=True, timeout=180)
         verify_payload(install, 'windows', arch, installed=True)
         verify_crt(install, arch)
+        verify_installed_version(install)
         if not (install / 'WINDOWS-RUNTIME.txt').is_file():
             raise RuntimeError('Missing VC++ redistributable provenance')
         if arch == 'x64':
