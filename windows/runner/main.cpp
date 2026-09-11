@@ -40,6 +40,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  // window_manager.destroy posts WM_QUIT without destroying the window.
+  // Release Flutter/WebView2 COM resources while the STA is still alive,
+  // rather than from the local window's destructor after CoUninitialize.
+  window.Destroy();
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }

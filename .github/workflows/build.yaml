@@ -174,7 +174,7 @@ jobs:
         shell: pwsh
         run: ./scripts/release/setup-inno.ps1
       - name: Retain Windows symbols separately (not in the installer)
-        if: matrix.platform == 'windows'
+        if: always() && matrix.platform == 'windows'
         uses: actions/upload-artifact@v4
         with:
           name: windows-symbols-${{ matrix.arch }}-${{ github.sha }}

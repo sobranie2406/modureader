@@ -13,6 +13,8 @@ FlutterWindow::FlutterWindow(const flutter::DartProject& project)
 FlutterWindow::~FlutterWindow() {}
 
 bool FlutterWindow::OnCreate() {
+  // Win32Window::Create first calls Destroy, even for a fresh instance.
+  destroying_ = false;
   if (!Win32Window::OnCreate()) {
     return false;
   }
