@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/main.dart' show navigatorKey;
+import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
@@ -32,6 +33,8 @@ void main() {
     documentPath = root.path;
     await tester.pumpWidget(MaterialApp(
         navigatorKey: navigatorKey,
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
         home: const Scaffold(body: Text('Synthetic reader integration test'))));
     await tester.pumpAndSettle();
     try {
