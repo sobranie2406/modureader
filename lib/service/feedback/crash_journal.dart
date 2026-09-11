@@ -9,6 +9,7 @@ class CrashJournal {
   static final List<Map<String, dynamic>> _events = [];
   static bool _closed = false;
   static String _version = 'unknown';
+  static String? _lastReaderStage;
 
   static Future<void> initialize(
       {Directory? directory, String version = 'unknown'}) async {
@@ -70,6 +71,28 @@ class CrashJournal {
     _add('session_closed');
   }
 
+  static const _readerStages = {
+    'create',
+    'load',
+    'ready',
+    'toc',
+    'chapter',
+    'dispose_pending',
+    'closing_jobs',
+    'closing_readers',
+    'closing_window',
+    'close_failed',
+  };
+
+  /// Fixed stage names only: never accept chapter titles, paths or JS errors.
+  static void readerStage(String stage) {
+    if (!_readerStages.contains(stage)) return;
+    // Chapter-level progress already has throttled numeric checkpoints.
+    if (_lastReaderStage == stage) return;
+    _lastReaderStage = stage;
+    _add('reader_stage', {'stage': stage});
+  }
+
   static void _add(String event, [Map<String, dynamic> fields = const {}]) {
     if (_file == null) return;
     _events.add({
@@ -104,7 +127,8 @@ class CrashJournal {
       'previous_session_unconfirmed',
       'index_checkpoint',
       'flutter_error',
-      'unhandled_error'
+      'unhandled_error',
+      'reader_stage'
     };
     for (final event in _events) {
       if (!allowed.contains(event['event'])) continue;
@@ -119,6 +143,10 @@ class CrashJournal {
         out.writeln('Modu=$version');
       }
       final type = event['type'];
+      if (event['event'] == 'reader_stage' &&
+          _readerStages.contains(event['stage'])) {
+        out.writeln('stage=${event['stage']}');
+      }
       if (type is String &&
           RegExp(r'^[A-Za-z_][A-Za-z0-9_]{0,60}$').hasMatch(type)) {
         out.writeln('type=$type');
@@ -145,5 +173,6 @@ class CrashJournal {
     _file = null;
     _events.clear();
     _closed = false;
+    _lastReaderStage = null;
   }
 }

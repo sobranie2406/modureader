@@ -13,6 +13,14 @@ void main() {
     CrashJournal.resetForTesting();
     await root.delete(recursive: true);
   });
+  test('reader diagnostics allow only predefined content-free stages', () {
+    CrashJournal.readerStage('create');
+    CrashJournal.readerStage('chapter');
+    CrashJournal.readerStage('sk-SECRET /book/private-title');
+    expect(CrashJournal.preview(), contains('stage=chapter'));
+    expect(File('${root.path}/session.json').readAsStringSync(),
+        isNot(contains('SECRET')));
+  });
   test('error message and absolute paths never reach disk or preview', () {
     CrashJournal.recordError(
         StateError('sk-SECRET private book'),

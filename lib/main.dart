@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:async';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
+import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
 
 import 'package:anx_reader/config/app_identity.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
@@ -134,6 +136,7 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp>
     with WidgetsBindingObserver, WindowListener {
   static const Locale _englishFallbackLocale = Locale('en');
+  bool _closingWindow = false;
 
   @override
   void initState() {
@@ -145,17 +148,50 @@ class _MyAppState extends ConsumerState<MyApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    windowManager.removeListener(this);
     super.dispose();
   }
 
   @override
   Future<void> onWindowClose() async {
-    await Server().stop();
-    await webViewEnvironment?.dispose();
-    webViewEnvironment = null;
-    await DBHelper.close();
-    CrashJournal.closeSession();
-    await windowManager.destroy();
+    if (_closingWindow) return;
+    _closingWindow = true;
+    try {
+      CrashJournal.readerStage('closing_jobs');
+      await bookKnowledgeIndexQueue
+          .pauseAndCancelAll()
+          .timeout(const Duration(seconds: 20));
+      CrashJournal.readerStage('closing_readers');
+      await AnxHeadlessWebView.disposeAll()
+          .timeout(const Duration(seconds: 20));
+    } catch (error, stack) {
+      // Do not tear down the engine underneath a still-running native job.
+      CrashJournal.readerStage('close_failed');
+      CrashJournal.recordError(error, stack);
+      _closingWindow = false;
+      bookKnowledgeIndexQueue.resumeAccepting();
+      AnxHeadlessWebView.resumeAccepting();
+      SmartDialog.showToast('后台任务尚未安全停止，请稍后重试关闭窗口。');
+      return;
+    }
+    try {
+      await Server().stop();
+      // Visible Windows WebViews are still mounted here. Their environment
+      // must outlive them; let the native plugin own its teardown with the
+      // Flutter engine instead of freeing it ahead of those controllers.
+      if (!Platform.isWindows) {
+        await webViewEnvironment?.dispose();
+        webViewEnvironment = null;
+      }
+      await DBHelper.close();
+      CrashJournal.readerStage('closing_window');
+      CrashJournal.closeSession();
+      await windowManager.destroy();
+    } catch (error, stack) {
+      CrashJournal.recordError(error, stack);
+      _closingWindow = false;
+      SmartDialog.showToast('窗口关闭失败，请重试。');
+    }
   }
 
   @override

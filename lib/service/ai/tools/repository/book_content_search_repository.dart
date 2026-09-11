@@ -12,6 +12,8 @@ import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/webView/gererate_url.dart';
 import 'package:anx_reader/utils/webView/webview_console_message.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
+import 'package:anx_reader/utils/webView/reader_operation.dart';
+import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -57,6 +59,7 @@ class BookContentSearchRepository {
       book: book,
       sourceFingerprint: await bookSourceFingerprint(book),
       idleCallback: () {},
+      isCancelled: isCancelled,
     );
     try {
       await session.ensureInitialized();
@@ -66,7 +69,13 @@ class BookContentSearchRepository {
         isCancelled: isCancelled,
       );
     } finally {
-      await session.dispose();
+      // Cleanup continues in the background if native creation is still
+      // pending. AnxHeadlessWebView retains it for ordered app shutdown.
+      try {
+        await session.dispose().timeout(const Duration(seconds: 5));
+      } on TimeoutException {
+        CrashJournal.readerStage('dispose_pending');
+      }
     }
   }
 
@@ -173,11 +182,23 @@ class _HeadlessSearchSession {
     required this.book,
     required this.sourceFingerprint,
     required this.idleCallback,
+    this.isCancelled,
   });
 
   final Book book;
   final String sourceFingerprint;
   final VoidCallback idleCallback;
+  final bool Function()? isCancelled;
+  bool _disposed = false;
+
+  Future<T> _wait<T>(Future<T> operation, String stage,
+      {Duration timeout = const Duration(seconds: 30)}) {
+    CrashJournal.readerStage(stage);
+    return waitForReaderOperation(operation,
+        stage: stage,
+        timeout: timeout,
+        isCancelled: () => _disposed || (isCancelled?.call() ?? false));
+  }
 
   AnxHeadlessWebView? _webView;
   InAppWebViewController? _controller;
@@ -223,6 +244,7 @@ class _HeadlessSearchSession {
         isInspectable: kDebugMode,
       ),
       onWebViewCreated: (controller) {
+        if (_disposed) return;
         _controller = controller;
         controller.addJavaScriptHandler(
           handlerName: 'onSearch',
@@ -287,28 +309,14 @@ class _HeadlessSearchSession {
     );
 
     _webView = headless;
-    await headless.run();
-    await loadCompleter.future.timeout(const Duration(seconds: 15),
-        onTimeout: () async {
-      await headless.dispose();
-      _webView = null;
-      _controller = null;
-      throw TimeoutException('Timed out loading reader for book ${book.id}');
-    });
+    // Observe load errors immediately, including errors before run resolves.
+    unawaited(loadCompleter.future.then<void>((_) {}, onError: (Object _) {}));
+    await _wait(headless.run(), 'create');
+    await _wait(loadCompleter.future, 'load');
 
     final readyCompleter = _readyCompleter;
     if (readyCompleter != null && !readyCompleter.isCompleted) {
-      await readyCompleter.future.timeout(
-        const Duration(seconds: 15),
-        onTimeout: () async {
-          await headless.dispose();
-          _webView = null;
-          _controller = null;
-          throw TimeoutException(
-            'Timed out waiting for reader initialization for book ${book.id}',
-          );
-        },
-      );
+      await _wait(readyCompleter.future, 'ready');
     }
   }
 
@@ -394,7 +402,8 @@ class _HeadlessSearchSession {
         _tocCompleter = tocCompleter;
       }
       if (!tocCompleter.isCompleted) {
-        await controller.evaluateJavascript(source: 'refreshToc()');
+        await _wait(
+            controller.evaluateJavascript(source: 'refreshToc()'), 'toc');
       }
       final toc = await tocCompleter.future.timeout(
         timeout,
@@ -402,9 +411,14 @@ class _HeadlessSearchSession {
           'Timed out loading table of contents for book ${book.id}',
         ),
       );
-      final indexToc = await controller.callAsyncJavaScript(
-        functionBody: 'return getIndexToc();',
-      );
+      final indexToc = await _wait(
+          controller.callAsyncJavaScript(
+            functionBody: 'return getIndexToc();',
+          ),
+          'toc');
+      if (indexToc?.error != null) {
+        throw StateError('Reader table of contents extraction failed');
+      }
       final chapters =
           _flattenToc(indexToc?.value is List ? indexToc!.value as List : toc);
       if (chapters.isEmpty) {
@@ -416,9 +430,16 @@ class _HeadlessSearchSession {
         if (isCancelled?.call() ?? false) break;
         final chapter = chapters[index];
         final hrefLiteral = jsonEncode(chapter.href);
-        final response = await controller.callAsyncJavaScript(
-          functionBody: 'return await getChapterContentByHref($hrefLiteral);',
-        );
+        final response = await _wait(
+            controller.callAsyncJavaScript(
+              functionBody:
+                  'return await getChapterContentByHref($hrefLiteral);',
+            ),
+            'chapter',
+            timeout: const Duration(seconds: 60));
+        if (response?.error != null) {
+          throw StateError('Reader chapter extraction failed');
+        }
         final text = response?.value?.toString().trim() ?? '';
         if (text.isNotEmpty) result[chapter.id] = text;
         onProgress?.call(chapter.id, index + 1, chapters.length);
@@ -476,6 +497,7 @@ class _HeadlessSearchSession {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     cancelDisposalTimer();
     final webView = _webView;
     _webView = null;

@@ -108,6 +108,17 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
   final Set<int> _cancelRequested = <int>{};
   final Map<int, Completer<void>> _settled = <int, Completer<void>>{};
   bool _isDraining = false;
+  bool _accepting = true;
+
+  /// Cancel every job before awaiting any one job, so no queued book starts
+  /// while the current worker is releasing its reader/model.
+  Future<void> pauseAndCancelAll() async {
+    _accepting = false;
+    final ids = activeItems.map((item) => item.book.id).toList();
+    await Future.wait(ids.map(cancel));
+  }
+
+  void resumeAccepting() => _accepting = true;
 
   static Future<IndexBuildResult> _defaultWorker(
     Book book,
@@ -145,6 +156,7 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
 
   /// Returns false when this book is already queued or running.
   bool enqueue(Book book) {
+    if (!_accepting) return false;
     final existing = _items[book.id];
     if (existing != null && existing.status.isActive) return false;
 

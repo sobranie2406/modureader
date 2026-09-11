@@ -114,7 +114,8 @@ def package(platform, arch, version):
         bundle = ROOT / f"build/windows/{arch}/runner/Release"
         for binary in ("modu.exe", "flutter_windows.dll", "onnxruntime.dll", "tokenizers_ffi.dll"):
             verify(bundle / binary, platform, arch)
-        shutil.copytree(bundle, stage, dirs_exist_ok=True)
+        shutil.copytree(bundle, stage, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('*.pdb', '*.ilk', '*.exp', '*.lib'))
         verify_directory(stage / 'data/flutter_assets')
     elif platform == "linux":
         bundle = ROOT / f"build/linux/{arch}/release/bundle"

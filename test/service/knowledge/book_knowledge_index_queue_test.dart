@@ -20,6 +20,35 @@ void main() {
         updateTime: DateTime(2026),
       );
 
+  test('shutdown cancels every job, waits for cleanup and rejects new work',
+      () async {
+    final release = Completer<void>();
+    late bool Function() cancelled;
+    final started = <int>[];
+    final queue =
+        BookKnowledgeIndexQueue(worker: (book, progress, isCancelled) async {
+      started.add(book.id);
+      cancelled = isCancelled;
+      await release.future;
+      return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+    });
+    queue.enqueue(book(1));
+    queue.enqueue(book(2));
+    var stopped = false;
+    final closing = queue.pauseAndCancelAll().then((_) => stopped = true);
+    expect(cancelled(), isTrue);
+    expect(queue.enqueue(book(3)), isFalse);
+    expect(stopped, isFalse);
+    expect(queue.itemFor(2)?.status, BookKnowledgeQueueStatus.cancelled);
+    release.complete();
+    await closing;
+    expect(stopped, isTrue);
+    expect(started, [1]);
+    expect(queue.activeItems, isEmpty);
+    await Future<void>.delayed(Duration.zero);
+    queue.dispose();
+  });
+
   test('processes different books in FIFO order without concurrent workers',
       () async {
     final started = <int>[];
