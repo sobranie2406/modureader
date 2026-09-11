@@ -37,7 +37,10 @@ Future<void> webviewInitialVariable(
       const url = '${replaceSingleQuote(url)}'
       let initialCfi = '${replaceSingleQuote(cfi)}'
       let style = {
+          desktopPageInput: ${AnxPlatform.isDesktop},
+          mobileTouchPaging: ${AnxPlatform.isMobile},
           mobileImageFit: ${AnxPlatform.isMobile},
+          tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
           fontSize: ${bookStyle.fontSize},
           fontName: '${replaceSingleQuote(fontName)}',
           fontPath: '${replaceSingleQuote(fontPath)}',

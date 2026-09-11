@@ -47,6 +47,8 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+        // Native inference fixtures are only in the separate CI test APK.
+        androidTest.assets.srcDirs += '../../build/model-test-fixtures'
     }
 
     defaultConfig {

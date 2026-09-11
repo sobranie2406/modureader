@@ -80,20 +80,57 @@ void main() {
         throwsFormatException);
   });
 
-  test('metadata storage never writes the session password', () async {
+  test(
+      'password persists locally across preference reload and clear removes it',
+      () async {
     SharedPreferences.setMockInitialValues({});
     await LibraryConnectionStore.clear();
     await LibraryConnectionStore.save(const LibraryConnection(
         url: 'https://host/dav/',
         username: 'reader',
-        password: 'private-session-secret'));
+        password: ' local-test-密码 &:? '));
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString(LibraryConnectionStore.key),
-        isNot(contains('private-session-secret')));
-    expect((await LibraryConnectionStore.load())!.password,
-        'private-session-secret');
+    final saved = prefs.getString(LibraryConnectionStore.key)!;
+    expect(jsonDecode(saved)['password'], ' local-test-密码 &:? ');
+    // Simulate a new process loading only persisted preferences, not a session cache.
+    SharedPreferences.setMockInitialValues({LibraryConnectionStore.key: saved});
+    expect(
+        (await LibraryConnectionStore.load())!.password, ' local-test-密码 &:? ');
     await LibraryConnectionStore.clear();
     expect(await LibraryConnectionStore.load(), isNull);
+    expect(
+        (await SharedPreferences.getInstance())
+            .getString(LibraryConnectionStore.key),
+        '',
+        reason: 'An empty deletion marker contains no credentials');
+  });
+
+  test('legacy password-free preferences load without inventing a password',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      LibraryConnectionStore.key: jsonEncode({
+        'url': 'https://host/dav/',
+        'username': 'reader',
+        'allowHttp': false
+      })
+    });
+    final value = (await LibraryConnectionStore.load())!;
+    expect(value.url, 'https://host/dav/');
+    expect(value.username, 'reader');
+    expect(value.password, '');
+  });
+
+  test('explicit empty password replaces an earlier saved password', () async {
+    SharedPreferences.setMockInitialValues({});
+    await LibraryConnectionStore.save(const LibraryConnection(
+        url: 'https://host/dav/', password: 'old-test-secret'));
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://host/dav/'));
+    expect((await LibraryConnectionStore.load())!.password, '');
+    expect(
+        (await SharedPreferences.getInstance())
+            .getString(LibraryConnectionStore.key),
+        isNot(contains('old-test-secret')));
   });
 
   test('live server: Depth 1 browsing and authenticated streamed download only',

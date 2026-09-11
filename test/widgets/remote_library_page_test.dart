@@ -41,11 +41,14 @@ void main() {
     await tester.tap(find.text('Configure library WebDAV'));
     await tester.pumpAndSettle();
     expect(find.byType(RemoteLibrarySettings), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Test connection'), 180,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
     expect(find.text('Test connection'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('settings save does not persist passwords or enable sync',
+  testWidgets('settings save persists the password without enabling sync',
       (tester) async {
     await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: RemoteLibrarySettings())));
@@ -54,13 +57,33 @@ void main() {
         find.byType(TextField).at(0), 'https://example.com/books/');
     await tester.enterText(find.byType(TextField).at(1), 'reader');
     await tester.enterText(find.byType(TextField).at(2), 'session-secret');
-    await tester.ensureVisible(find.text('Save'));
+    await tester.scrollUntilVisible(find.text('Save'), 180,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getKeys(), {LibraryConnectionStore.key});
     expect(prefs.getString(LibraryConnectionStore.key),
-        isNot(contains('session-secret')));
+        contains('session-secret'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: RemoteLibrarySettings())));
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text,
+        'session-secret');
+    expect(tester.widget<TextField>(find.byType(TextField).at(2)).obscureText,
+        isTrue);
+    await tester.scrollUntilVisible(find.text('Clear connection'), 180,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear connection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(prefs.getString(LibraryConnectionStore.key), '');
+    expect(await LibraryConnectionStore.load(), isNull);
     expect(tester.takeException(), isNull);
   });
 

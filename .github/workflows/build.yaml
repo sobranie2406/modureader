@@ -41,14 +41,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
-          path: assets/models/embeddings
-          key: bundled-models-${{ hashFiles('assets/models/embeddings/manifest.json') }}
-      - name: Fetch and verify four pinned offline models
+          path: build/model-test-fixtures
+          key: model-test-fixtures-${{ hashFiles('assets/models/embeddings/manifest.json') }}
+      - name: Fetch and verify four native test fixtures (not packaged)
         run: python3 scripts/release/bundle_models.py
       - uses: actions/upload-artifact@v4
         with:
-          name: bundled-embedding-models
-          path: assets/models/embeddings/
+          name: embedding-test-fixtures
+          path: build/model-test-fixtures/
           if-no-files-found: error
           retention-days: 7
 
@@ -74,9 +74,10 @@ jobs:
           apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        if: matrix.platform == 'macos' && matrix.arch == 'arm64'
         with:
-          name: bundled-embedding-models
-          path: assets/models/embeddings
+          name: embedding-test-fixtures
+          path: build/model-test-fixtures
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -129,9 +130,14 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           npm ci --prefix assets/foliate-js
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
-      - name: Verify bundled model native inference on macOS
+      - name: Verify downloaded model native inference on macOS
         if: matrix.platform == 'macos' && matrix.arch == 'arm64'
-        run: flutter test integration_test/bundled_embedding_test.dart -d macos --reporter expanded
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory build/model-test-fixtures &
+          fixture_server_pid=$!
+          trap 'kill "$fixture_server_pid"' EXIT
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail --silent http://127.0.0.1:8765/ > /dev/null
+          flutter test integration_test/bundled_embedding_test.dart -d macos --dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/ --reporter expanded
       - name: Verify Apple native crash summary privacy
         if: matrix.platform == 'macos'
         run: |
@@ -196,8 +202,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: bundled-embedding-models
-          path: assets/models/embeddings
+          name: embedding-test-fixtures
+          path: build/model-test-fixtures
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -265,10 +271,6 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: bundled-embedding-models
-          path: assets/models/embeddings
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

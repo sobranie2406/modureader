@@ -24,7 +24,7 @@ List<AiServiceOption> buildDefaultAiServices() {
         ? AiServiceOption(
             identifier: 'openai',
             title: '通用',
-            logo: 'assets/images/commonAi.png',
+            logo: 'assets/images/providers/qwen.png',
             defaultUrl:
                 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
             defaultApiKey: 'YOUR_API_KEY',
@@ -33,7 +33,7 @@ List<AiServiceOption> buildDefaultAiServices() {
         : AiServiceOption(
             identifier: 'openai',
             title: 'OpenAI',
-            logo: 'assets/images/openai.png',
+            logo: 'assets/images/providers/openai.png',
             defaultUrl: 'https://api.openai.com/v1/chat/completions',
             defaultApiKey: 'YOUR_API_KEY',
             defaultModel: 'gpt-4o-mini',
@@ -41,7 +41,7 @@ List<AiServiceOption> buildDefaultAiServices() {
     AiServiceOption(
       identifier: 'claude',
       title: 'Claude',
-      logo: 'assets/images/claude.png',
+      logo: 'assets/images/providers/claude.png',
       defaultUrl: 'https://api.anthropic.com/v1/messages',
       defaultApiKey: 'YOUR_API_KEY',
       defaultModel: 'claude-sonnet-4-6',
@@ -49,7 +49,7 @@ List<AiServiceOption> buildDefaultAiServices() {
     AiServiceOption(
       identifier: 'gemini',
       title: 'Gemini',
-      logo: 'assets/images/gemini.png',
+      logo: 'assets/images/providers/gemini.png',
       defaultUrl: 'https://generativelanguage.googleapis.com',
       defaultApiKey: 'YOUR_API_KEY',
       defaultModel: 'gemini-2.5-flash',
@@ -57,7 +57,7 @@ List<AiServiceOption> buildDefaultAiServices() {
     AiServiceOption(
       identifier: 'deepseek',
       title: 'DeepSeek',
-      logo: 'assets/images/deepseek.png',
+      logo: 'assets/images/providers/deepseek.png',
       defaultUrl: 'https://api.deepseek.com/v1/chat/completions',
       defaultApiKey: 'YOUR_API_KEY',
       defaultModel: 'deepseek-v4-flash',
@@ -65,7 +65,7 @@ List<AiServiceOption> buildDefaultAiServices() {
     AiServiceOption(
       identifier: 'glm',
       title: '智谱 GLM',
-      logo: 'assets/images/commonAi.png',
+      logo: 'assets/images/providers/glm.png',
       defaultUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
       defaultApiKey: 'YOUR_API_KEY',
       defaultModel: 'glm-5.2',
@@ -73,7 +73,7 @@ List<AiServiceOption> buildDefaultAiServices() {
     AiServiceOption(
       identifier: 'openrouter',
       title: 'OpenRouter',
-      logo: 'assets/images/openrouter.png',
+      logo: 'assets/images/providers/openrouter.png',
       defaultUrl: 'https://openrouter.ai/api/v1/chat/completions',
       defaultApiKey: 'YOUR_API_KEY',
       defaultModel: 'openai/gpt-4o-mini',

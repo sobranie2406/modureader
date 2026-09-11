@@ -31,6 +31,9 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   String get modelId => model.id;
 
   @override
+  Future<void> ensureReady() => store.ensureAvailable(model);
+
+  @override
   Future<void> release() => _engine.release();
 
   @override
@@ -41,9 +44,7 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   Future<List<List<double>>> embedBatchCancellable(List<String> inputs,
       {bool Function()? isCancelled}) async {
     if (inputs.isEmpty) return const [];
-    if (!await store.isDownloaded(model)) {
-      throw StateError('本地模型 ${model.name} 尚未下载，请先在设置中下载');
-    }
+    await ensureReady();
     return _engine.generate(model, inputs, store, isCancelled: isCancelled);
   }
 }

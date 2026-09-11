@@ -38,7 +38,7 @@ migrate_working_dir/
 # Local translation preferences and intermediate drafts; publish README_EN.md.
 /.baoyu-skills/
 /README-en/
-# Weights are fetched by pinned revision + SHA-256 before every release build.
+# Downloaded model weights are local files, never source or installer assets.
 /assets/models/embeddings/*/
 __pycache__/
 **/target/
@@ -101,3 +101,4 @@ google_service_account.json
 
 # Local browser test fixtures, screenshots and temporary browser sessions.
 /output/playwright/
+/.playwright-cli/

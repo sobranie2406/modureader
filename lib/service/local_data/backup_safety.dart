@@ -200,6 +200,7 @@ bool isCredentialPreference(String key) =>
       'webdavInfo',
       'ftpInfo',
       'sftpInfo',
+      'remoteLibraryConnection',
       'syncAiSettingsEncryptionPassword',
       'syncAiSettingsToWebdav'
     }.contains(key) ||

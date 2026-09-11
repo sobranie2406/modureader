@@ -51,7 +51,6 @@ jobs:
 
       - name: Get dependencies
         run: |
-          python3 scripts/release/bundle_models.py
           flutter --version
           flutter pub get
 
@@ -80,4 +79,4 @@ jobs:
       - name: Reader JavaScript regression tests
         run: |
           npm install --prefix "$RUNNER_TEMP/modu-js-tests" jsdom@26.1.0
-          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_business.test.mjs test/reader_background.test.mjs test/reader_tts.test.mjs test/reader_quick_mark.test.mjs test/reader_mobile_image.test.mjs test/reader_footnote_size.test.mjs test/reader_touch_paging.test.mjs
+          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_*.test.mjs

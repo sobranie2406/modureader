@@ -28,8 +28,9 @@ public final class EmbeddingReleaseInstrumentation extends Instrumentation {
                 File copy = File.createTempFile("modu-release-inference-", ".onnx",
                         getTargetContext().getCacheDir());
                 try {
-                    try (InputStream in = getTargetContext().getAssets().open(
-                            "flutter_assets/assets/models/embeddings/" + model + "/model_quantized.onnx");
+                    // Read from the test APK, never the production APK.
+                    try (InputStream in = getContext().getAssets().open(
+                            model + "/model_quantized.onnx");
                          FileOutputStream out = new FileOutputStream(copy)) {
                         byte[] buffer = new byte[65536];
                         int size;

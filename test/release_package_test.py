@@ -138,7 +138,7 @@ class BundledModelsTest(unittest.TestCase):
                 self.assertGreater(item['size'], 0)
                 self.assertRegex(item['sha256'], r'^[0-9a-f]{64}$')
 
-    def test_missing_or_corrupt_assets_cannot_be_packaged(self):
+    def test_catalog_only_packages_pass_and_bundled_weights_are_rejected(self):
         payload = b'public test model'
         manifest = {'models': [{'id': 'test', 'files': [{
             'name': 'model_quantized.onnx', 'size': len(payload),
@@ -147,13 +147,19 @@ class BundledModelsTest(unittest.TestCase):
             root = Path(tmp)
             base = root / 'assets/models/embeddings'
             base.mkdir(parents=True)
-            (base / 'manifest.json').write_text(json.dumps(manifest))
             with self.assertRaises(ValueError):
                 bundle_models.verify_directory(root)
+            (base / 'manifest.json').write_text(json.dumps(manifest))
+            bundle_models.verify_directory(root)
+            with zipfile.ZipFile(root / 'catalog.zip', 'w') as archive:
+                archive.write(base / 'manifest.json', 'flutter_assets/assets/models/embeddings/manifest.json')
+            with zipfile.ZipFile(root / 'catalog.zip') as archive:
+                bundle_models.verify_archive(archive, 'flutter_assets/')
             (base / 'test').mkdir()
             model = base / 'test/model_quantized.onnx'
             model.write_bytes(payload)
-            bundle_models.verify_directory(root)
+            with self.assertRaises(ValueError):
+                bundle_models.verify_directory(root)
             for content in (payload, b'x' * len(payload)):
                 model.write_bytes(content)
                 with zipfile.ZipFile(root / 'assets.zip', 'w') as archive:
@@ -161,13 +167,19 @@ class BundledModelsTest(unittest.TestCase):
                         if asset.is_file():
                             archive.write(asset, 'flutter_assets/' + asset.relative_to(root).as_posix())
                 with zipfile.ZipFile(root / 'assets.zip') as archive:
-                    if content == payload:
+                    with self.assertRaises(ValueError):
                         bundle_models.verify_archive(archive, 'flutter_assets/')
-                    else:
-                        with self.assertRaises(ValueError):
-                            bundle_models.verify_archive(archive, 'flutter_assets/')
-                        with self.assertRaises(ValueError):
-                            bundle_models.verify_directory(root)
+                    with self.assertRaises(ValueError):
+                        bundle_models.verify_directory(root)
+
+    def test_flutter_packages_only_model_manifest(self):
+        root = Path(__file__).resolve().parents[1]
+        spec = (root / 'pubspec.yaml').read_text()
+        self.assertIn('    - assets/models/embeddings/manifest.json\n', spec)
+        for model in bundle_models.manifest()['models']:
+            self.assertNotIn(f'    - assets/models/embeddings/{model["id"]}/', spec)
+        self.assertNotIn('    - assets/models/embeddings/\n', spec)
+        self.assertIn("androidTest.assets.srcDirs", (root / 'android/app/build.gradle').read_text())
 
 spec = importlib.util.spec_from_file_location(
     "release_package", Path(__file__).resolve().parents[1] / "scripts/release/package.py")

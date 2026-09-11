@@ -5,27 +5,62 @@ import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
+
+/// CI serves verified fixtures over loopback, so the sandboxed macOS test app
+/// exercises the real streaming downloader without reading the host workspace.
+class FixtureDownloadClient extends http.BaseClient {
+  FixtureDownloadClient(this.base);
+  final Uri base;
+  final http.Client _inner = http.Client();
+  bool downloadsAllowed = true;
+  int requests = 0;
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (!downloadsAllowed) {
+      throw StateError('Network requested during offline inference');
+    }
+    final segments = request.url.pathSegments;
+    if (request.url.host != 'huggingface.co' ||
+        segments.length < 5 ||
+        !LocalEmbeddingModels.all.any((m) => m.id == segments[1])) {
+      throw StateError('Unexpected model download');
+    }
+    requests++;
+    return _inner.send(
+        http.Request('GET', base.resolve('${segments[1]}/${segments.last}')));
+  }
+
+  @override
+  void close() => _inner.close();
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('all four bundled models perform real native inference offline',
+  testWidgets(
+      'all four downloaded models perform real native inference offline',
       (tester) async {
     final root =
         await Directory.systemTemp.createTemp('modu-offline-inference-');
-    var networkRequests = 0;
+    const fixtureUrl = String.fromEnvironment('MODU_MODEL_TEST_URL');
+    if (fixtureUrl.isEmpty) {
+      throw StateError(
+          'Set MODU_MODEL_TEST_URL to the loopback fixture server');
+    }
+    final client = FixtureDownloadClient(Uri.parse(fixtureUrl));
     final store = LocalEmbeddingModelStore(
       rootDirectory: root,
-      client: MockClient((request) async {
-        networkRequests++;
-        throw StateError('Model download is forbidden in this offline test');
-      }),
+      client: client,
     );
     try {
       for (final model in LocalEmbeddingModels.all) {
-        expect(await store.isBundled(model), isTrue);
+        expect(await store.isDownloaded(model), isFalse);
+        client.downloadsAllowed = true;
+        await store.download(model);
+        client.downloadsAllowed = false;
+        expect(await store.isDownloaded(model), isTrue);
         final vectors =
             await LocalOnnxEmbeddingProvider(model: model, store: store)
                 .embedBatch(
@@ -64,7 +99,9 @@ void main() {
               model.dimensions);
         }
       }
-      expect(networkRequests, 0);
+      expect(client.requests, 8,
+          reason:
+              'Only two explicit downloads per model; inference stays offline');
     } finally {
       await LocalOnnxEmbeddingEngine.instance.release();
       store.close();

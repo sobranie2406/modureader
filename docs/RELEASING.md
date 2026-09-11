@@ -13,7 +13,7 @@ Windows 封装从 Visual Studio 当前工具链的 Redist 目录复制对应架�
 
 以上修正随 build 6326 重新构建；原 build 6325 下载缓存不包含这些修复。
 
-构建前使用 Python 3.11+ 运行 `python3 scripts/release/bundle_models.py`。该脚本按 `assets/models/embeddings/manifest.json` 的固定上游提交下载四个量化 ONNX 模型及分词器，核对大小和 SHA-256。权重不进入 Git 历史，由 CI 构建阶段获取并嵌入所有安装包；用户运行本地模型无需网络。打包脚本再次检查实际 Flutter 资源，缺失即失败。首次使用将资产准备到本机缓存，需额外可用空间。许可证与来源见 UPSTREAM.md 和 LICENSES。
+普通构建无需下载模型。安装包仅含 `assets/models/embeddings/manifest.json` 模型目录，固定上游提交、大小与 SHA-256；用户在设置中按需下载模型及分词器，校验后离线使用。打包脚本检查目录一致性，并拒绝夹带权重或分词器。原生推理测试另行运行 `python3 scripts/release/bundle_models.py`（Python 3.11+），下载校验后的测试资源至 `build/model-test-fixtures`：macOS CI 在回环地址启动测试文件服务器，集成测试通过 `--dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/` 下载校验后断网推理，不要求沙盒读取宿主工作区；Android 仅将测试资源放入独立 androidTest APK，不进入正式 APK。权重不进入 Git 历史。许可证与来源见 UPSTREAM.md 和 LICENSES。
 
 Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBackend-FDO、libwpe、epoxy、GStreamer 及音频插件；不同发行版可能需要自行从源码构建。Windows 需要 Microsoft Edge WebView2 Runtime。
 
@@ -49,7 +49,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
 2. 只在本仓库创建版本标签；GitHub Actions 并行生成各平台/架构制品。
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
-4. 各包附 SOURCE.txt、LICENSE、NOTICE；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包、2 个安卓许可附件及各自 SHA-256，不发布缺包的正式版本。
+4. 各包保留 LICENSE、NOTICE，桌面包附 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包及各自 SHA-256，不再上传独立许可 ZIP，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
 
 当前使用 `.github/workflows/build.yaml`、`pr-check.yml` 及 `scripts/release/`。旧上游独立打包和商店发布工作流已移除；Fastlane 文件仅为历史开发模板，不是默读现行分发入口，不表示已上架或获得签名服务。

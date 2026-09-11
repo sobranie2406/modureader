@@ -6,6 +6,8 @@ import { FootnoteHandler } from './footnotes.js'
 import { attachFootnoteSizing } from './footnote-size.js'
 import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
+import { installDesktopPageInput } from './desktop-page-input.js'
+import { installSettledSelection } from './settled-selection.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
 const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
@@ -16,6 +18,7 @@ var isPdf = false;
 let quickMarkEnabled = false;
 let quickMarkColor = '#ffd54f';
 const quickMarkDocuments = new WeakMap();
+const desktopInputDocuments = new WeakMap();
 
 const getPosition = (target) => {
   const clamp01 = value => Math.min(Math.max(value, 0), 1);
@@ -377,37 +380,9 @@ const setSelectionHandler = (view, doc, index) => {
       }, 600);
     });
   } else { // Android
-    let hasNativeSelectionStarted = false;
-
-    doc.addEventListener('pointerdown', () => {
-      hasNativeSelectionStarted = false;
-    });
-
-    // When the native selection handles appear, the browser loses control of the pointer
-    // This event signals that the user has started dragging handles
-    doc.addEventListener('pointercancel', () => {
-      hasNativeSelectionStarted = true;
-    });
-
-    doc.addEventListener('contextmenu', e => {
-      // Allow mouse context menu (if any)
-      if (e.pointerType === 'mouse') {
-        handleSelection(view, doc, index);
-        return;
-      }
-
-      // If we haven't lost pointer control yet (no pointercancel),
-      // this is the "early" long-press event during drag start.
-      // We block it to prevent the custom menu from interfering with the drag.
-      if (!hasNativeSelectionStarted) {
-        e.preventDefault();
-        return;
-      }
-
-      // If we have entered native selection mode (pointercancel happened),
-      // this contextmenu event is likely triggered by the system or user interaction
-      // after the selection phase (e.g. on release). We handle it.
-      handleSelection(view, doc, index);
+    installSettledSelection(doc, {
+      getRange: () => getSelectionRange(doc.getSelection()),
+      onSelection: () => handleSelection(view, doc, index),
     });
   }
   // doc.addEventListener('selectionchange', () => handleSelection(view, doc, index));
@@ -698,7 +673,7 @@ const getCSS = ({ fontSize,
     @font-face {
       font-family: ${fontName};
       src: url('${fontPath}');
-      font-display: swap;
+      font-display: block;
     }
 
     html {
@@ -1082,6 +1057,8 @@ class Reader {
 
     if (importing) return
 
+    this.installDesktopInput(document)
+
     this.view.addEventListener('load', this.#onLoad.bind(this))
     this.view.addEventListener('relocate', this.#onRelocate.bind(this))
     this.view.addEventListener('click-view', this.#onClickView.bind(this))
@@ -1279,9 +1256,21 @@ class Reader {
 
   }
 
+  installDesktopInput(doc) {
+    desktopInputDocuments.get(doc)?.destroy();
+    const enabled = () => style.desktopPageInput === true && !window.isFootNoteOpen();
+    desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
+      enabled,
+      hasSelection: () => this.view.renderer.getContents().some(
+        ({ doc: content }) => !!content.getSelection()?.toString()),
+      turnPage: direction => direction > 0 ? this.view.next() : this.view.prev(),
+    }));
+  }
+
   #onLoad({ detail: { doc, index } }) {
     this.#doc = doc
     this.#index = index
+    this.installDesktopInput(doc)
     // Fixed-layout/PDF currently has no annotation overlayer. Do not claim
     // success by storing a note that cannot be shown in that renderer.
     if (!this.view.isFixedLayout && !isPdf) {
@@ -1338,8 +1327,11 @@ class Reader {
   }
 
   #onRelocate({ detail }) {
-    for (const { doc } of this.view.renderer.getContents())
+    desktopInputDocuments.get(document)?.cancel();
+    for (const { doc } of this.view.renderer.getContents()) {
+      desktopInputDocuments.get(doc)?.cancel();
       quickMarkDocuments.get(doc)?.cancel();
+    }
     const { cfi, fraction, location, tocItem, pageItem, chapterLocation } = detail
     const loc = pageItem
       ? `Page ${pageItem.label}`
@@ -1721,6 +1713,7 @@ const setStyle = (oldStyle) => {
 
   reader.view.renderer.setAttribute('mobile-image-fit', style.mobileImageFit === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('mobile-touch-paging', style.mobileTouchPaging === true ? 'true' : 'false')
+  reader.view.renderer.setAttribute('desktop-page-input', style.desktopPageInput === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('tap-only-page-turn', style.tapOnlyPageTurn === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('flow', turn.scroll ? 'scrolled' : 'paginated')
   reader.view.renderer.setAttribute('top-margin', `${style.topMargin}px`)

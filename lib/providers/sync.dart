@@ -190,6 +190,10 @@ class Sync extends _$Sync {
         enabled: Prefs().syncAiSettingsToWebdav,
         password: Prefs().syncAiSettingsEncryptionPassword,
       );
+      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
     } on AiSyncPasswordMissingException catch (e) {
       AnxToast.show(e.toString());
       AnxLog.warning('AI settings sync skipped: encryption password missing');
@@ -339,6 +343,10 @@ class Sync extends _$Sync {
     if (restored) {
       ref.read(aiProvidersProvider.notifier).refresh();
     }
+    await RemoteLibrarySettingsSyncService().restoreFromDownloadedDatabase(
+      enabled: Prefs().syncAiSettingsToWebdav,
+      password: Prefs().syncAiSettingsEncryptionPassword,
+    );
   }
 
   Future<void> uploadFile(
@@ -542,8 +550,11 @@ class Sync extends _$Sync {
   Future<void> showBackupManagementDialog() async {
     try {
       final backups = await getAvailableBackups();
-
-      await SmartDialog.show(
+      final dialogContext = navigatorKey.currentContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      // Use the same navigator route that the Cancel button dismisses.
+      await showDialog<void>(
+        context: dialogContext,
         builder: (context) => AlertDialog(
           title: Text(L10n.of(context).databaseBackupManagement),
           content: SizedBox(

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/database.dart';
+import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -275,6 +276,13 @@ class AiSettingsSyncService {
 
   SharedPreferences get _preferences => _providedPreferences ?? Prefs().prefs;
 
+  String get recordId => _aiSettingsRecordId;
+  bool get hasLocalSettings => true;
+  Map<String, Object?> collectPreferences() =>
+      collectAiSettingsForSync(_preferences);
+  Future<void> applyPreferences(Map<String, Object?> values) =>
+      applyAiSettingsFromSync(_preferences, values);
+
   static Future<Database> _defaultDatabaseProvider() => DBHelper().database;
 
   Future<bool> prepareLocalDatabase({
@@ -282,7 +290,7 @@ class AiSettingsSyncService {
     required String? password,
     bool force = false,
   }) async {
-    if (!enabled) {
+    if (!enabled || !hasLocalSettings) {
       // Disabled devices must leave an existing encrypted record untouched.
       // Removing it would make the next ordinary database upload erase the
       // opt-in secret created by another device.
@@ -294,12 +302,12 @@ class AiSettingsSyncService {
     }
     await _ensureTable(database);
 
-    final preferences = collectAiSettingsForSync(_preferences);
+    final preferences = collectPreferences();
     final existing = await database.query(
       aiSettingsSyncTable,
       columns: ['encrypted_payload'],
       where: 'id = ?',
-      whereArgs: [_aiSettingsRecordId],
+      whereArgs: [recordId],
       limit: 1,
     );
     if (!force && existing.isNotEmpty) {
@@ -325,7 +333,7 @@ class AiSettingsSyncService {
     await database.insert(
       aiSettingsSyncTable,
       {
-        'id': _aiSettingsRecordId,
+        'id': recordId,
         'encrypted_payload': encryptedPayload,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       },
@@ -353,7 +361,7 @@ class AiSettingsSyncService {
       aiSettingsSyncTable,
       columns: ['encrypted_payload'],
       where: 'id = ?',
-      whereArgs: [_aiSettingsRecordId],
+      whereArgs: [recordId],
       limit: 1,
     );
     if (rows.isEmpty) return false;
@@ -362,7 +370,7 @@ class AiSettingsSyncService {
       rows.single['encrypted_payload']! as String,
       password,
     );
-    await applyAiSettingsFromSync(_preferences, preferences);
+    await applyPreferences(preferences);
     if (_providedPreferences == null) Prefs().notifyExternalChange();
     return true;
   }
@@ -375,6 +383,36 @@ class AiSettingsSyncService {
         updated_at TEXT NOT NULL
       )
     ''');
+  }
+}
+
+/// Same opt-in switch/password/cipher as API-key sync, but a separate record.
+/// Older clients and a fresh device's empty AI settings cannot erase this data.
+class RemoteLibrarySettingsSyncService extends AiSettingsSyncService {
+  RemoteLibrarySettingsSyncService(
+      {super.databaseProvider, super.preferences, super.cipher});
+
+  @override
+  String get recordId => 'remote-library-settings-v1';
+  @override
+  bool get hasLocalSettings =>
+      _preferences.containsKey(LibraryConnectionStore.key);
+  @override
+  Map<String, Object?> collectPreferences() {
+    final raw = _preferences.getString(LibraryConnectionStore.key)!;
+    LibraryConnectionStore.decode(raw);
+    return {LibraryConnectionStore.key: raw};
+  }
+
+  @override
+  Future<void> applyPreferences(Map<String, Object?> values) async {
+    final raw = values[LibraryConnectionStore.key];
+    if (values.length != 1 || raw is! String) {
+      throw const FormatException('Invalid encrypted library settings');
+    }
+    LibraryConnectionStore.decode(raw);
+    final ok = await _preferences.setString(LibraryConnectionStore.key, raw);
+    if (!ok) throw StateError('Cannot restore library connection');
   }
 }
 

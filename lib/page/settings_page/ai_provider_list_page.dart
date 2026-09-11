@@ -2,6 +2,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/page/settings_page/ai_provider_detail_page.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
+import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -35,7 +36,7 @@ class AiProviderListPage extends ConsumerWidget {
           final hasValidKey = provider.hasValidKey;
 
           return ListTile(
-            leading: _buildProviderLogo(provider),
+            leading: AiProviderLogo(provider: provider),
             title: Text(provider.title),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,27 +101,6 @@ class AiProviderListPage extends ConsumerWidget {
                 : () => _deleteProvider(context, ref, provider),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildProviderLogo(AiProvider provider) {
-    if (provider.logoAsset != null) {
-      return Image.asset(
-        provider.logoAsset!,
-        width: 32,
-        height: 32,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildFallbackAvatar(provider),
-      );
-    }
-    return _buildFallbackAvatar(provider);
-  }
-
-  Widget _buildFallbackAvatar(AiProvider provider) {
-    return CircleAvatar(
-      child: Text(
-        provider.title.isNotEmpty ? provider.title[0].toUpperCase() : '?',
       ),
     );
   }

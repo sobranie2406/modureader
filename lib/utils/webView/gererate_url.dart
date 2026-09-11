@@ -5,6 +5,7 @@ import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/utils/js/convert_dart_color_to_js.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 
 String generateUrl(
   String url,
@@ -66,6 +67,12 @@ String generateUrl(
   // }
 
   Map<String, dynamic> style = {
+    // These are needed on first open, not only after changing reader settings.
+    // In particular, native WebView focus bypasses Flutter's page shortcuts.
+    'desktopPageInput': AnxPlatform.isDesktop,
+    'mobileTouchPaging': AnxPlatform.isMobile,
+    'mobileImageFit': AnxPlatform.isMobile,
+    'tapOnlyPageTurn': Prefs().tapOnlyPageTurn,
     'fontSize': bookStyle.fontSize,
     'fontName': fontName,
     'fontPath': fontPath,

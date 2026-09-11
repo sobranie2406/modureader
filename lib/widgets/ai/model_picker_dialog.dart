@@ -2,6 +2,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/service/ai/ai_model_service.dart';
 import 'package:anx_reader/widgets/common/anx_button.dart';
+import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
 import 'package:flutter/material.dart';
 
 /// A dialog that lets the user either type a model name manually or pick one
@@ -98,7 +99,13 @@ class _ModelPickerDialogState extends State<_ModelPickerDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: Text(l10n.aiModelSwitchTitle),
+      title: Row(
+        children: [
+          AiProviderLogo(provider: widget.provider, size: 28),
+          const SizedBox(width: 10),
+          Expanded(child: Text(l10n.aiModelSwitchTitle)),
+        ],
+      ),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       content: SizedBox(
         width: double.maxFinite,

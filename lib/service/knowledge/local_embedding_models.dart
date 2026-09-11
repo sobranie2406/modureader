@@ -1,6 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/service/knowledge/bundled_embedding_assets.dart';
+import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:crypto/crypto.dart';
 
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:http/http.dart' as http;
@@ -28,14 +29,6 @@ class LocalEmbeddingModel {
   final String languages;
   final String description;
   final bool recommended;
-
-  Uri get modelUri => Uri.parse(
-        'https://huggingface.co/$hfModelId/resolve/main/onnx/model_quantized.onnx',
-      );
-
-  Uri get tokenizerUri => Uri.parse(
-        'https://huggingface.co/$hfModelId/resolve/main/tokenizer.json',
-      );
 }
 
 class LocalEmbeddingModels {
@@ -49,7 +42,7 @@ class LocalEmbeddingModels {
       id: 'all-MiniLM-L6-v2',
       hfModelId: 'Xenova/all-MiniLM-L6-v2',
       name: 'all-MiniLM-L6-v2',
-      sizeLabel: '~23 MB',
+      sizeLabel: '~24 MB',
       dimensions: 384,
       languages: 'English',
       description: 'Small and fast English sentence embedding model.',
@@ -58,7 +51,7 @@ class LocalEmbeddingModels {
       id: 'bge-small-en-v1.5',
       hfModelId: 'Xenova/bge-small-en-v1.5',
       name: 'BGE Small EN v1.5',
-      sizeLabel: '~33 MB',
+      sizeLabel: '~35 MB',
       dimensions: 384,
       languages: 'English',
       description: 'English retrieval model with strong semantic matching.',
@@ -67,7 +60,7 @@ class LocalEmbeddingModels {
       id: 'bge-small-zh-v1.5',
       hfModelId: 'Xenova/bge-small-zh-v1.5',
       name: 'BGE Small ZH v1.5',
-      sizeLabel: '~24 MB',
+      sizeLabel: '~25 MB',
       dimensions: 512,
       languages: '中文',
       description: '针对中文语义检索优化的轻量向量模型。',
@@ -77,7 +70,7 @@ class LocalEmbeddingModels {
       id: 'multilingual-e5-small',
       hfModelId: 'Xenova/multilingual-e5-small',
       name: 'Multilingual E5 Small',
-      sizeLabel: '~118 MB',
+      sizeLabel: '~136 MB',
       dimensions: 384,
       languages: 'Multilingual',
       description: 'Multilingual retrieval for Chinese, English, and more.',
@@ -96,27 +89,23 @@ class LocalEmbeddingModelStore {
   LocalEmbeddingModelStore({
     Directory? rootDirectory,
     http.Client? client,
-    BundledEmbeddingAssets? bundledAssets,
-    this.useBundledAssets = true,
-    this.minimumModelBytes = 1024 * 1024,
-    this.minimumTokenizerBytes = 128,
+    EmbeddingModelManifest? manifest,
+    this.downloadTimeout = const Duration(seconds: 60),
   })  : _rootDirectory = rootDirectory,
         _client = client ?? http.Client(),
-        _bundledAssets = bundledAssets ?? BundledEmbeddingAssets();
+        _manifest = manifest ?? EmbeddingModelManifest();
 
   final Directory? _rootDirectory;
   final http.Client _client;
-  final int minimumModelBytes;
-  final int minimumTokenizerBytes;
-  final bool useBundledAssets;
-  final BundledEmbeddingAssets _bundledAssets;
-
-  Future<bool> isBundled(LocalEmbeddingModel model) async =>
-      useBundledAssets && await _bundledAssets.contains(model.id);
+  final EmbeddingModelManifest _manifest;
+  final Duration downloadTimeout;
+  bool _closed = false;
+  static final Map<String, Future<void>> _downloads = {};
+  final Map<String, String> _verifiedFiles = {};
 
   Future<void> ensureAvailable(LocalEmbeddingModel model) async {
-    if (await isBundled(model)) {
-      await _bundledAssets.materialize(model.id, await modelDirectory(model));
+    if (!await isDownloaded(model)) {
+      throw StateError('本地模型 ${model.name} 尚未下载或文件损坏，请前往「设置 → 向量模型」下载后重试');
     }
   }
 
@@ -149,18 +138,33 @@ class LocalEmbeddingModelStore {
   }
 
   Future<bool> isDownloaded(LocalEmbeddingModel model) async {
-    if (await isBundled(model)) return true;
-    final onnx = await modelFile(model);
-    final tokenizer = await tokenizerFile(model);
-    if (!await onnx.exists() || !await tokenizer.exists()) return false;
-    if (await onnx.length() < minimumModelBytes ||
-        await tokenizer.length() < minimumTokenizerBytes) {
-      return false;
+    final directory = await modelDirectory(model);
+    for (final item in await _manifest.files(model.id)) {
+      if (!await _valid(File(path.join(directory.path, item.name)), item)) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  Future<bool> _valid(File file, EmbeddingModelFile item) async {
     try {
-      final decoded = jsonDecode(await tokenizer.readAsString());
-      return decoded is Map && decoded['model'] is Map;
-    } catch (_) {
+      final stat = await file.stat();
+      if (stat.type != FileSystemEntityType.file || stat.size != item.size) {
+        _verifiedFiles.remove(file.path);
+        return false;
+      }
+      final stamp =
+          '${item.sha256}:${stat.size}:${stat.modified}:${stat.changed}';
+      if (_verifiedFiles[file.path] == stamp) return true;
+      if ((await sha256.bind(file.openRead()).first).toString() !=
+          item.sha256) {
+        _verifiedFiles.remove(file.path);
+        return false;
+      }
+      _verifiedFiles[file.path] = stamp;
+      return true;
+    } on FileSystemException {
       return false;
     }
   }
@@ -169,26 +173,46 @@ class LocalEmbeddingModelStore {
     LocalEmbeddingModel model, {
     ModelDownloadProgress? onProgress,
   }) async {
+    if (_closed) throw StateError('Model downloader is closed');
+    final key = (await modelDirectory(model)).absolute.path;
+    final pending = _downloads[key];
+    if (pending != null) {
+      await pending;
+      onProgress?.call(1);
+      return;
+    }
+    final operation = _download(model, onProgress: onProgress);
+    _downloads[key] = operation;
+    try {
+      await operation;
+    } finally {
+      _downloads.remove(key);
+    }
+  }
+
+  Future<void> _download(
+    LocalEmbeddingModel model, {
+    ModelDownloadProgress? onProgress,
+  }) async {
     final directory = await modelDirectory(model);
     await directory.create(recursive: true);
-    final downloads = <({Uri uri, File destination})>[
-      (uri: model.modelUri, destination: await modelFile(model)),
-      (uri: model.tokenizerUri, destination: await tokenizerFile(model)),
-    ];
+    final files = await _manifest.files(model.id);
+    final total = files.fold<int>(0, (sum, file) => sum + file.size);
+    var completed = 0;
 
     try {
-      for (var index = 0; index < downloads.length; index++) {
-        final item = downloads[index];
-        await _downloadFile(
-          item.uri,
-          item.destination,
-          onProgress: (fileProgress) {
-            onProgress?.call((index + fileProgress) / downloads.length);
-          },
-        );
+      for (final item in files) {
+        final destination = File(path.join(directory.path, item.name));
+        if (!await _valid(destination, item)) {
+          await _downloadFile(item, destination, onProgress: (fileProgress) {
+            onProgress?.call(
+                ((completed + item.size * fileProgress) / total).clamp(0, .99));
+          });
+        }
+        completed += item.size;
       }
       if (!await isDownloaded(model)) {
-        throw const FormatException('下载的模型文件不完整或 tokenizer 无效');
+        throw const FormatException('下载的模型文件校验失败，请重试');
       }
       onProgress?.call(1);
     } catch (_) {
@@ -199,38 +223,53 @@ class LocalEmbeddingModelStore {
   }
 
   Future<void> _downloadFile(
-    Uri uri,
+    EmbeddingModelFile item,
     File destination, {
     required ModelDownloadProgress onProgress,
   }) async {
     final temporary = File('${destination.path}.part');
     await _deleteIfExists(temporary);
-    final response = await _client.send(http.Request('GET', uri));
+    if (_closed) throw StateError('Model downloader is closed');
+    final response = await _client
+        .send(http.Request('GET', item.uri))
+        .timeout(downloadTimeout);
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.listen(null).cancel();
       throw HttpException(
         '模型下载失败 (${response.statusCode})',
-        uri: uri,
+        uri: item.uri,
       );
     }
 
     final sink = temporary.openWrite();
     var received = 0;
     try {
-      await for (final bytes in response.stream) {
-        sink.add(bytes);
+      // addStream applies file-sink backpressure instead of buffering a whole
+      // model in RAM (important on mobile devices).
+      await sink
+          .addStream(response.stream.timeout(downloadTimeout).map((bytes) {
+        if (_closed) throw StateError('Model downloader is closed');
         received += bytes.length;
-        if (response.contentLength != null && response.contentLength! > 0) {
-          onProgress((received / response.contentLength!).clamp(0, 1));
+        if (received > item.size) {
+          throw const FormatException('模型下载大小超出预期');
         }
-      }
+        onProgress((received / item.size).clamp(0, 1));
+        return bytes;
+      }));
       await sink.flush();
-    } finally {
-      await sink.close();
+    } catch (_) {
+      // addStream may already close the sink on a network/size error. Do not
+      // replace the useful original error with a second "File closed" error.
+      try {
+        await sink.close();
+      } catch (_) {}
+      rethrow;
     }
+    await sink.close();
 
-    if (await temporary.length() == 0) {
+    if (!await _valid(temporary, item)) {
       await _deleteIfExists(temporary);
-      throw HttpException('模型下载结果为空', uri: uri);
+      throw const FormatException('模型文件大小或 SHA-256 校验失败，请重试');
     }
     await _deleteIfExists(destination);
     await temporary.rename(destination.path);
@@ -241,5 +280,8 @@ class LocalEmbeddingModelStore {
     if (await file.exists()) await file.delete();
   }
 
-  void close() => _client.close();
+  void close() {
+    _closed = true;
+    _client.close();
+  }
 }

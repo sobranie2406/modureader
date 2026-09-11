@@ -7,6 +7,7 @@ import 'package:anx_reader/service/ai/ai_model_service.dart';
 import 'package:anx_reader/service/ai/langchain_ai_config.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
+import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
 import 'package:anx_reader/widgets/common/anx_button.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
@@ -117,6 +118,19 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               decoration: InputDecoration(
                 labelText: l10n.settingsAiProviderName,
                 border: const OutlineInputBorder(),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: AiProviderLogo(
+                    provider: AiProvider(
+                      id: widget.providerId ?? 'preview',
+                      title: _nameController.text,
+                      url: _urlController.text,
+                      model: _modelController.text,
+                      protocol: _selectedProtocol,
+                    ),
+                    size: 28,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),

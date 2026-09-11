@@ -1,4 +1,4 @@
-"""Fetch pinned public model assets at BUILD time, never at app startup."""
+"""Fetch pinned models for native TESTS; release apps contain only the catalogue."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -23,9 +23,9 @@ def valid(path, item):
         return hashlib.file_digest(source, 'sha256').hexdigest() == item['sha256']
 
 
-def fetch(job):
+def fetch(job, output):
     model, item = job
-    destination = ASSETS / model['id'] / item['name']
+    destination = output / model['id'] / item['name']
     destination.parent.mkdir(parents=True, exist_ok=True)
     if valid(destination, item):
         print('Verified cached asset:', model['id'], item['name'], flush=True)
@@ -39,7 +39,7 @@ def fetch(job):
             if not valid(temporary, item):
                 raise ValueError('Downloaded model hash/size mismatch')
             temporary.replace(destination)
-            print('Bundled:', model['id'], item['name'], item['size'], flush=True)
+            print('Test fixture:', model['id'], item['name'], item['size'], flush=True)
             return
         except Exception:
             if temporary.exists(): temporary.unlink()
@@ -51,12 +51,11 @@ def verify_directory(assets):
     expected = manifest()
     packaged_manifest = assets / 'assets/models/embeddings/manifest.json'
     if not packaged_manifest.is_file() or json.loads(packaged_manifest.read_text()) != expected:
-        raise ValueError('Missing or mismatched bundled model manifest')
-    for model in expected['models']:
-        for item in model['files']:
-            path = assets / 'assets/models/embeddings' / model['id'] / item['name']
-            if not valid(path, item):
-                raise ValueError(f'Missing/corrupt bundled model asset: {model["id"]}/{item["name"]}')
+        raise ValueError('Missing or mismatched model download manifest')
+    extras = [p for p in packaged_manifest.parent.rglob('*')
+              if p.is_file() and p != packaged_manifest]
+    if extras:
+        raise ValueError('Release must not bundle model weights or tokenizers')
 
 
 def verify_archive(archive, prefix):
@@ -64,23 +63,23 @@ def verify_archive(archive, prefix):
     base = prefix + 'assets/models/embeddings/'
     if json.loads(archive.read(base + 'manifest.json')) != expected:
         raise ValueError('Mismatched archived model manifest')
-    for model in expected['models']:
-        for item in model['files']:
-            name = base + model['id'] + '/' + item['name']
-            if archive.getinfo(name).file_size != item['size']:
-                raise ValueError(f'Wrong bundled model size: {name}')
-            with archive.open(name) as source:
-                if hashlib.file_digest(source, 'sha256').hexdigest() != item['sha256']:
-                    raise ValueError(f'Wrong bundled model hash: {name}')
+    extras = [name for name in archive.namelist()
+              if name.startswith(base) and not name.endswith('/')
+              and name != base + 'manifest.json']
+    if extras:
+        raise ValueError('Release must not bundle model weights or tokenizers')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--output', type=Path, default=ROOT / 'build/model-test-fixtures')
     args = parser.parse_args()
     jobs = [(m, f) for m in manifest()['models'] for f in m['files']]
     if not args.verify_only:
         with ThreadPoolExecutor(max_workers=4) as pool:
-            list(pool.map(fetch, jobs))
-    verify_directory(ROOT)
-    print('All four bundled models and tokenizers verified; total bytes:', sum(f['size'] for _, f in jobs))
+            list(pool.map(lambda job: fetch(job, args.output), jobs))
+    for model, item in jobs:
+        if not valid(args.output / model['id'] / item['name'], item):
+            raise ValueError('Missing or corrupt native test fixture')
+    print('Four native test fixtures verified (not packaged); total bytes:', sum(f['size'] for _, f in jobs))

@@ -4,6 +4,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/ai_provider.dart';
+import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/providers/ai_history.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
@@ -315,14 +316,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   Widget? _providerLogo(AiProvider? provider) {
-    final logo = provider?.logoAsset;
-    if (logo == null || logo.isEmpty) return null;
-    return Image.asset(
-      logo,
-      width: 20,
-      height: 20,
-      errorBuilder: (_, __, ___) => const SizedBox(),
-    );
+    return provider == null
+        ? null
+        : AiProviderLogo(provider: provider, size: 20);
   }
 
   String _deriveTitle(AiChatHistoryEntry entry) {

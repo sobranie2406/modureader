@@ -1,5 +1,6 @@
 import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
+import { waitForReaderFonts } from './reader-font-ready.js'
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -228,38 +229,49 @@ class View {
   }
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
-    return new Promise(resolve => {
-      this.#iframe.addEventListener('load', () => {
-        const doc = this.document
-        afterLoad?.(doc)
+    return new Promise((resolve, reject) => {
+      this.#iframe.addEventListener('load', async () => {
+        try {
+          const doc = this.document
+          afterLoad?.(doc)
 
-        // it needs to be visible for Firefox to get computed style
-        this.#iframe.style.display = 'block'
-        const { vertical, rtl, writingMode } = getDirection(doc)
-        this.#iframe.style.display = 'none'
+          // it needs to be visible for Firefox to get computed style
+          this.#iframe.style.visibility = 'hidden'
+          this.#iframe.style.display = 'block'
+          const { vertical, rtl, writingMode } = getDirection(doc)
+          this.#iframe.style.display = 'none'
 
-        this.#vertical = vertical
-        this.#rtl = rtl
-        this.#writingMode = writingMode
+          this.#vertical = vertical
+          this.#rtl = rtl
+          this.#writingMode = writingMode
 
-        this.#contentRange.selectNodeContents(doc.body)
-        const layout = beforeRender?.({ vertical, rtl })
-        this.#iframe.style.display = 'block'
-        this.render(layout)
-        this.#observer.observe(doc.body)
-        // Lazy images can obtain their intrinsic dimensions after pagination.
-        const refit = () => {
-          if (this.#layout.mobileImageFit) { this.setImageSize(); this.expand(); }
+          this.#contentRange.selectNodeContents(doc.body)
+          const layout = beforeRender?.({ vertical, rtl })
+          this.#iframe.style.display = 'block'
+          this.render(layout)
+          const ready = await waitForReaderFonts(doc)
+          if (!ready) console.warn('Reader font loading timed out or failed; using fallback')
+          // Font metrics may have changed while waiting; anchor only afterwards.
+          this.render(layout)
+          this.#iframe.style.visibility = ''
+          this.#observer.observe(doc.body)
+          // Lazy images can obtain their intrinsic dimensions after pagination.
+          const refit = () => {
+            if (this.#layout.mobileImageFit) { this.setImageSize(); this.expand(); }
+          }
+          doc.addEventListener('load', refit, true)
+          doc.addEventListener('loadedmetadata', refit, true)
+
+          // the resize observer above doesn't work in Firefox
+          // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
+          // until the bug is fixed we can at least account for font load
+          doc.fonts.ready.then(() => this.expand())
+
+          resolve()
+        } catch (error) {
+          this.#iframe.style.visibility = ''
+          reject(error)
         }
-        doc.addEventListener('load', refit, true)
-        doc.addEventListener('loadedmetadata', refit, true)
-
-        // the resize observer above doesn't work in Firefox
-        // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
-        // until the bug is fixed we can at least account for font load
-        doc.fonts.ready.then(() => this.expand())
-
-        resolve()
       }, { once: true })
       this.#iframe.src = src
     })
@@ -721,6 +733,11 @@ export class Paginator extends HTMLElement {
     } else if (this.mobileTouchPaging) {
       // Programmatic page turns still work, but the browser cannot leave the
       // page between columns or impart momentum while the finger is down.
+      this.#container.style.overflowX = 'hidden'
+      this.#container.style.overflowY = 'hidden'
+    } else if (this.getAttribute('desktop-page-input') === 'true') {
+      // Desktop keys/mouse gestures use discrete navigation, never native
+      // scrolling to arbitrary offsets between columns (including with AI open).
       this.#container.style.overflowX = 'hidden'
       this.#container.style.overflowY = 'hidden'
     } else if (vertical) {
@@ -1370,7 +1387,7 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.start > 0) return this.#scrollTo(
-        Math.max(0, this.start - (distance ?? this.size)), null, { animate: true })
+        Math.max(0, this.start - (distance ?? this.size * 0.8)), null, { animate: true })
       return true
     }
     if (this.atStart) return
@@ -1381,7 +1398,7 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.viewSize - this.end > 2) return this.#scrollTo(
-        Math.min(this.viewSize, distance ? this.start + distance : this.end), null, { animate: true })
+        Math.min(this.viewSize, this.start + (distance ?? this.size * 0.8)), null, { animate: true })
       return true
     }
     if (this.atEnd) return

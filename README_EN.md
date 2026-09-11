@@ -61,11 +61,13 @@ The current version provides the following reading, AI and library features.
 
 Enter the full book-directory URL, username and password in Settings → Library WebDAV, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
 
-This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL and username are stored locally and excluded from automatic sync. The password lasts for the current session only and must be entered again after quitting.
+This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Encrypted service-settings backups also include the connection; ordinary unencrypted backups omit it. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
 
 Library WebDAV settings support explicit export to a `modu:` configuration code or QR image, and import from a code or QR image. **Password export is on by default and can be turned off. Codes and QR images are not encrypted; do not share them publicly.** Import only fills the form; it does not automatically connect or save. Creation and modification dates come from the server; missing dates remain unknown rather than being replaced with local import times.
 
 ### Mobile page-turn controls
+
+In scrolling mode, page-turn taps and shortcuts move by 80% of the reading viewport, leaving 20% overlap for text near the screen edges. Free scrolling is unchanged. Desktop arrow keys turn pages when the reader is focused; in the AI input field they move the text cursor.
 
 Reader styles → More settings → Other includes **Tap-only page turning**, off by default. When enabled in paginated mode, swipes and drags neither turn pages nor trigger pull gestures; taps still work. Turn it off to restore swipe navigation. Text selection, Quick mark and scrolling mode remain available. This mobile-only switch is not shown on desktop.
 
@@ -117,7 +119,7 @@ Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a backgro
 | BGE Small ZH v1.5 | Chinese | 512 |
 | Multilingual E5 Small | Multilingual | 384 |
 
-The app **bundles all four models and tokenizers**. Local embedding computation needs no additional download or API key. Chinese BGE is selected by default and automatic indexing is off. Model assets total about 208 MiB and are prepared locally on first use. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
+The four models are **downloaded on demand, not bundled in installers**. In Settings → Embedding Models, choose **Download and use** to fetch only the selected model and tokenizer. Size and SHA-256 checks must pass before offline use; no API key is needed. Downloads use Hugging Face and consume network data. Keep the settings page open during download; interrupted transfers can be retried. Verified files prepared by older versions are reused. Chinese BGE is selected by default and automatic indexing is off. Missing models prompt you to download first; indexing never silently downloads them. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
 
 Local embeddings only mean that embedding computation happens on your device. Remote chat, embedding, translation or speech services still receive the relevant text. The whole AI workflow should not be described as completely offline.
 
@@ -186,7 +188,7 @@ The screenshots show reading and AI controls. [Download the original demo EPUB](
 1. Download the package for your system and architecture from [Releases](https://github.com/sobranie2406/modureader/releases). Read the installation limitations first.
 2. Add an ebook to the library and open it. No API key is required if you do not use AI.
 3. To use AI, configure a model in Settings → AI Settings and test the connection.
-4. For semantic search, index a book from its menu using the bundled Chinese model. Choose another model or configure an optional remote endpoint in Embedding Models.
+4. For semantic search, first download a local model in Settings → Embedding Models (Chinese BGE is the default), then index a book from its menu. You can also configure a remote embedding endpoint.
 5. Choose translation, read-aloud and sync services as needed. See the [Settings guide (Chinese)](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
 
 ## Feedback
@@ -200,7 +202,6 @@ When reporting an issue in [this repository](https://github.com/sobranie2406/mod
 The pinned Flutter version is recorded in [.github/flutter-version](.github/flutter-version); dependencies are locked in pubspec.lock. You need Flutter's native toolchain for your platform. Building the tokenizer from source also requires Rust, including the appropriate mobile targets.
 
 ```sh
-python3 scripts/release/bundle_models.py # Python 3.11+; fetch and verify pinned models at build time
 flutter pub get
 flutter gen-l10n
 dart run build_runner build --delete-conflicting-outputs

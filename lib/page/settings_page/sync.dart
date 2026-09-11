@@ -65,7 +65,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                     'Not set'),
                 // enabled: Prefs().webdavStatus,
                 onPressed: (context) async {
-                  showWebdavDialog(context);
+                  await showWebdavDialog(context);
+                  if (mounted) setState(() {});
                 }),
             SettingsTile.navigation(
                 title: Text(L10n.of(context).settingsSyncWebdavSyncNow),
@@ -119,8 +120,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
               description: Text(
                 Prefs().syncAiSettingsToWebdav
                     ? _label(
-                        '已单独开启。AI、翻译、向量和在线语音服务配置将加密后写入 WebDAV 同步数据库。',
-                        'Enabled separately. AI, translation, vector, and online speech settings are encrypted before being written to the WebDAV database.',
+                        '已单独开启。AI、翻译、向量、在线语音及远程书库配置（含书库密码）将加密后写入 WebDAV 同步数据库。',
+                        'Enabled separately. AI, translation, vector, online speech and remote library settings (including its password) are encrypted before being written to the WebDAV database.',
                       )
                     : _label(
                         '默认不随 WebDAV 同步。开启时需要设置独立加密密码并确认风险。',
@@ -204,6 +205,10 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
         enabled: true,
         password: password,
       );
+      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
+        enabled: true,
+        password: password,
+      );
       await Prefs().saveSyncAiSettingsEncryptionPassword(password);
       Prefs().syncAiSettingsToWebdav = true;
       if (mounted) setState(() {});
@@ -221,6 +226,11 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
     if (password == null || !mounted) return;
     try {
       await AiSettingsSyncService().prepareLocalDatabase(
+        enabled: true,
+        password: password,
+        force: true,
+      );
+      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
         enabled: true,
         password: password,
         force: true,
@@ -527,7 +537,7 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
                     contentPadding: EdgeInsets.zero,
                     title: const Text('包含服务配置与 API Key（加密）'),
                     subtitle: const Text(
-                        '默认不导出 AI、翻译、语音、向量和 WebDAV 的接口配置与凭据。书籍、笔记和一般设置仍会导出。'),
+                        '默认不导出 AI、翻译、语音、向量、WebDAV 和远程书库的配置与凭据。勾选后包含远程书库密码并加密设置。书籍、笔记和一般设置仍会导出。'),
                     value: _include,
                     onChanged: (value) =>
                         setState(() => _include = value ?? false)),
@@ -632,8 +642,8 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
             if (widget.confirmRisk) ...[
               Text(
                 _label(
-                  '开启后，AI、翻译、向量和在线语音服务的配置及 API Key 会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。',
-                  'When enabled, AI, translation, vector, and online speech settings and API keys are encrypted with AES-256-GCM and written to the WebDAV sync database.',
+                  '开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。',
+                  'When enabled, AI, translation, vector and online speech settings and API keys, plus remote library settings and its password, are encrypted with AES-256-GCM and written to the WebDAV sync database.',
                 ),
               ),
               const SizedBox(height: 10),
@@ -765,7 +775,7 @@ Future<File> _createPrefsBackupFile({required String password}) async {
   return backupFile;
 }
 
-void showWebdavDialog(BuildContext context) {
+Future<void> showWebdavDialog(BuildContext context) async {
   final title = L10n.of(context).settingsSyncWebdav;
   // final prefs = Prefs().saveWebdavInfo;
   final webdavInfo = Prefs().getSyncInfo(SyncProtocol.webdav);
@@ -790,7 +800,7 @@ void showWebdavDialog(BuildContext context) {
     );
   }
 
-  showDialog(
+  await showDialog<void>(
     context: context,
     builder: (context) {
       return SimpleDialog(

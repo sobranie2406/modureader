@@ -66,8 +66,8 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
       }
       if (mounted)
         setState(() => _message = save
-            ? t('已保存，请到首页“远程书库”连接。密码仅当前运行有效。',
-                'Saved. Open Remote library to connect. Password lasts for this session only.')
+            ? t('连接和密码已保存在本机，请到首页“远程书库”连接。',
+                'Connection and password saved on this device. Open Remote library to connect.')
             : t('连接成功，目录可读取（未写入任何远程文件）。',
                 'Connected. Directory is readable; no remote files were written.'));
     } catch (error) {
@@ -122,7 +122,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
           autocorrect: false,
           enableSuggestions: false,
           decoration: InputDecoration(
-              labelText: t('密码（仅当前运行期间保存）', 'Password (session only)'),
+              labelText: t('密码（保存在本机）', 'Password (saved on this device)'),
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                   tooltip: t('显示或隐藏密码', 'Show or hide password'),
@@ -138,8 +138,9 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
           title: Text(t('允许 HTTP 明文连接', 'Allow unencrypted HTTP')),
           subtitle: Text(t('风险：账号、密码和文件可能被网络中的其他人读取。优先使用 HTTPS 和专用只读账号。',
               'Risk: credentials and files may be intercepted. Prefer HTTPS and a dedicated read-only account.'))),
-      Text(t('服务器地址和用户名只保存在本机，不参加同步或设置备份。密码不落盘，退出程序后需重新输入。',
-          'Server and username stay on this device and are excluded from sync and settings backups. Password is not saved to disk; re-enter it after quitting.')),
+      Text(t(
+          '服务器地址、用户名和密码保存在本机应用配置中，重启后仍保留，本地不额外加密。开启「同步 → 同步 API Key」后，书库配置和密码会跟随自动同步加密上传，各设备需使用相同同步加密密码。导出设置备份时勾选「包含服务配置与 API Key（加密）」即可备份书库配置。清除连接也会同步清除其他已开启此开关设备的书库配置，不删除书籍。',
+          'The server, username and password persist locally without additional local encryption. Enable Sync → Sync API keys to include this connection in encrypted automatic sync; devices must use the same encryption password. For backups, select the encrypted service settings option. Clearing this connection also propagates to other opted-in devices; books are kept.')),
       const SizedBox(height: 20),
       Wrap(spacing: 12, runSpacing: 12, children: [
         OutlinedButton.icon(
@@ -159,8 +160,9 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                         builder: (c) => AlertDialog(
                                 title: Text(
                                     t('清除书库连接？', 'Clear library connection?')),
-                                content: Text(t('只清除本机连接配置，不删除本地书籍或服务器文件。',
-                                    'Only local connection settings are cleared. Books and server files are kept.')),
+                                content: Text(t(
+                                    '清除连接配置及密码。开启「同步 API Key」时，下次同步也会清除其他已开启此开关设备的书库配置。不删除本地书籍或服务器文件。',
+                                    'Clear the connection and password. If Sync API keys is enabled, the next sync also clears this connection on other opted-in devices. Books and server files are kept.')),
                                 actions: [
                                   TextButton(
                                       onPressed: () => Navigator.pop(c, false),
@@ -170,11 +172,21 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                                       child: Text(t('清除', 'Clear')))
                                 ]));
                     if (confirmed != true || !mounted) return;
-                    await LibraryConnectionStore.clear();
-                    await _load();
-                    if (mounted)
-                      setState(() =>
-                          _message = t('已清除连接配置。', 'Connection cleared.'));
+                    setState(() => _busy = true);
+                    try {
+                      await LibraryConnectionStore.clear();
+                      await _load();
+                      if (mounted) {
+                        setState(() => _message = t('已清除连接配置和保存的密码。',
+                            'Connection and saved password cleared.'));
+                      }
+                    } catch (error) {
+                      if (mounted) {
+                        setState(() => _message = libraryError(error, zh));
+                      }
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
                   },
             child: Text(t('清除连接', 'Clear connection'))),
       ]),

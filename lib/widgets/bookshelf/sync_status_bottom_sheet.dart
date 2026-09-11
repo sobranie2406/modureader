@@ -18,6 +18,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 
+String formatSyncTimestamp(DateTime time) =>
+    DateFormat('yyyy-MM-dd HH:mm:ss').format(time.toLocal());
+
 Future<void> showSyncStatusBottomSheet(BuildContext context) async {
   final dbPath = await getAnxDataBasesPath();
   showModalBottomSheet(
@@ -168,18 +171,16 @@ class SyncStatusBottomSheet extends ConsumerWidget {
       );
     }
 
-    final dateFormatter = DateFormat('yyyy-MM-dd HH:mm:ss');
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         buildTimeRow(l10n.bookSyncStatusLocalUpdateTime,
-            dateFormatter.format(localTime), theme),
+            formatSyncTimestamp(localTime), theme),
         const SizedBox(height: 5),
         buildTimeRow(
             l10n.bookSyncStatusLastSyncTime,
             lastUploadTime != null
-                ? dateFormatter.format(lastUploadTime)
+                ? formatSyncTimestamp(lastUploadTime)
                 : l10n.bookSyncStatusNoSyncYet,
             theme),
       ],

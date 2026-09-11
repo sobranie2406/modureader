@@ -36,6 +36,7 @@ test('Reader.open navigates once and waits for initialization, for new and resum
       #onLoad() {} #onRelocate() {} #onClickView() {}
       #onTouchStart() {} #onTouchMove() {} #onTouchEnd() {}
       setView() {}
+      installDesktopInput() {}
       ${openMethod}
     })`, {getView: async () => view, importing: false, setStyle() {}, document: {documentElement: {style: {}}}})
     let completed = false

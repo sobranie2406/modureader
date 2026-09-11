@@ -32,7 +32,7 @@ void main() {
   }
 
   testWidgets(
-      'import fills form only; explicit save keeps password session-only',
+      'import fills form only; saving without password clears the old saved password',
       (tester) async {
     await open(tester);
     await tester
@@ -63,8 +63,8 @@ void main() {
     expect(prefs.getString('sync-config-sentinel'), 'unchanged');
     expect(
         prefs.getKeys(), {'sync-config-sentinel', LibraryConnectionStore.key});
-    expect(prefs.getString(LibraryConnectionStore.key),
-        isNot(contains('password')));
+    expect(
+        prefs.getString(LibraryConnectionStore.key), contains('"password":""'));
     expect(tester.takeException(), isNull);
   });
 

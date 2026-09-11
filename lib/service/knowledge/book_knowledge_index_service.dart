@@ -123,25 +123,28 @@ class BookKnowledgeIndexService {
       onProgress?.call(stage, done, total);
     }
 
-    final chapters = await _chapterRepository.extractChaptersForIndex(
-      book,
-      onProgress: (chapterId, completed, total) {
-        progress('@extract:$chapterId', completed, total);
-      },
-      isCancelled: isCancelled,
-    );
-    if (isCancelled?.call() ?? false) {
-      return const IndexBuildResult(status: IndexBuildStatus.cancelled);
-    }
     final embedding = EmbeddingProviderFactory.fromPrefs();
-    modelCode = const {
-          'all-MiniLM-L6-v2': 1,
-          'bge-small-en-v1.5': 2,
-          'bge-small-zh-v1.5': 3,
-          'multilingual-e5-small': 4
-        }[embedding?.modelId] ??
-        0;
     try {
+      // Fail before expensive EPUB extraction when the chosen local model is
+      // missing. Indexing never silently downloads models or marks partial work complete.
+      await embedding?.ensureReady();
+      final chapters = await _chapterRepository.extractChaptersForIndex(
+        book,
+        onProgress: (chapterId, completed, total) {
+          progress('@extract:$chapterId', completed, total);
+        },
+        isCancelled: isCancelled,
+      );
+      if (isCancelled?.call() ?? false) {
+        return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+      }
+      modelCode = const {
+            'all-MiniLM-L6-v2': 1,
+            'bge-small-en-v1.5': 2,
+            'bge-small-zh-v1.5': 3,
+            'multilingual-e5-small': 4
+          }[embedding?.modelId] ??
+          0;
       return await KnowledgeIndexer(
         service: KnowledgeSearchService(),
         store: _DiagnosticIndexStore(store, modelCode),

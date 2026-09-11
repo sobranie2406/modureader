@@ -240,6 +240,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         fontSize: ${style.fontSize},
         mobileImageFit: ${AnxPlatform.isMobile},
         mobileTouchPaging: ${AnxPlatform.isMobile},
+        desktopPageInput: ${AnxPlatform.isDesktop},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
@@ -667,6 +668,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       removeOverlay();
       return;
     }
+    // Native WebView clicks do not automatically release a Flutter AI text
+    // field. This callback runs after JS has excluded text-selection clicks.
+    readingPageKey.currentState?.focusReaderFromTap();
     final x = location['x'];
     final y = location['y'];
     final part = coordinatesToPart(x, y);

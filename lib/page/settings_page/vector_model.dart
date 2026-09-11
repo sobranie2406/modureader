@@ -11,7 +11,9 @@ import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
 
 class VectorModelSettings extends StatefulWidget {
-  const VectorModelSettings({super.key});
+  const VectorModelSettings({super.key, this.modelStore});
+
+  final LocalEmbeddingModelStore? modelStore;
 
   @override
   State<VectorModelSettings> createState() => _VectorModelSettingsState();
@@ -26,7 +28,6 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   late final TextEditingController _dimensionController;
   late final LocalEmbeddingModelStore _localModelStore;
   final Map<String, bool> _downloadedModels = {};
-  final Set<String> _bundledModels = {};
   final Map<String, double> _downloadProgress = {};
   final Set<String> _testingModels = {};
   bool _loadingLocalModels = true;
@@ -45,7 +46,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     _dimensionController = TextEditingController(
       text: config.dimension?.toString() ?? '',
     );
-    _localModelStore = LocalEmbeddingModelStore();
+    _localModelStore = widget.modelStore ?? LocalEmbeddingModelStore();
     _refreshLocalModels();
   }
 
@@ -118,25 +119,27 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
 
   Future<void> _refreshLocalModels() async {
     final states = <String, bool>{};
-    final bundled = <String>{};
-    for (final model in LocalEmbeddingModels.all) {
-      states[model.id] = await _localModelStore.isDownloaded(model);
-      if (await _localModelStore.isBundled(model)) bundled.add(model.id);
+    try {
+      for (final model in LocalEmbeddingModels.all) {
+        states[model.id] = await _localModelStore.isDownloaded(model);
+      }
+    } catch (_) {
+      if (mounted) {
+        AnxToast.show(_label('无法读取本地模型，请重新进入设置重试',
+            'Could not check local models. Reopen settings to retry.'));
+      }
     }
     if (!mounted) return;
     setState(() {
       _downloadedModels
         ..clear()
         ..addAll(states);
-      _bundledModels
-        ..clear()
-        ..addAll(bundled);
       _loadingLocalModels = false;
     });
   }
 
   Future<void> _downloadLocalModel(LocalEmbeddingModel model) async {
-    if (_downloadProgress.containsKey(model.id)) return;
+    if (_downloadProgress.isNotEmpty) return;
     setState(() => _downloadProgress[model.id] = 0);
     try {
       await _localModelStore.download(
@@ -146,8 +149,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           setState(() => _downloadProgress[model.id] = progress);
         },
       );
-      Prefs().vectorLocalModelId = model.id;
       if (mounted) {
+        Prefs().vectorLocalModelId = model.id;
         setState(() => _downloadedModels[model.id] = true);
         AnxToast.show(_label(
           '${model.name} 下载完成并已设为当前模型',
@@ -241,7 +244,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                   segments: [
                     SegmentButtonItem(
                       value: 'builtin',
-                      label: _label('内置本地模型', 'Built-in local'),
+                      label: _label('本地模型', 'Local models'),
                       icon: const Icon(Icons.computer_rounded),
                     ),
                     SegmentButtonItem(
@@ -262,7 +265,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         ),
         if (!isRemote)
           SettingsSection(
-            title: Text(_label('内置模型', 'Built-in model')),
+            title: Text(
+                _label('本地模型 · 按需下载', 'Local models · Download on demand')),
             tiles: [
               CustomSettingsTile(
                 child: _buildLocalModels(),
@@ -302,8 +306,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             alignment: AlignmentDirectional.centerStart,
             child: Text(
               _label(
-                '四个模型已随安装包内嵌，无需下载和 API Key，首次使用会在本机准备文件。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
-                'All four models are bundled: no download or API key is needed. Files are prepared locally on first use. Automatic indexing is off by default; reindex books after switching models.',
+                '安装包不内嵌模型。请先下载需要的模型及分词器，校验完成后即可离线使用，无需 API Key。下载来源为 Hugging Face，会消耗网络流量；请保持此页面打开，离开会中断下载，可返回重试。旧版已准备的完整模型会继续复用。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
+                'Models are not bundled. Download a model and its tokenizer to use them offline without an API key. Downloads use Hugging Face and consume network data. Keep this page open; leaving interrupts the download and you can retry later. Verified files from earlier versions are reused. Automatic indexing is off by default; reindex books after switching models.',
               ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -361,7 +365,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             const SizedBox(height: 8),
             Text(
               '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${_label('维', 'dimensions')}'
-              '${_bundledModels.contains(model.id) ? ' · ${_label('已内嵌 · 无需下载', 'Bundled · No download')}' : ''}',
+              ' · ${downloaded ? _label('已下载', 'Downloaded') : _label('未下载或需修复', 'Download required')}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (progress != null) ...[
@@ -372,8 +376,12 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 progress == 0
                     ? _label('正在连接下载源…', 'Connecting…')
                     : _label(
-                        '正在下载 ${(progress * 100).round()}%',
-                        'Downloading ${(progress * 100).round()}%',
+                        progress >= .99
+                            ? '正在校验模型文件…'
+                            : '正在下载 ${(progress * 100).round()}%',
+                        progress >= .99
+                            ? 'Verifying model files…'
+                            : 'Downloading ${(progress * 100).round()}%',
                       ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -407,10 +415,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 ] else
                   AnxButton.outlined(
                     isLoading: progress != null,
-                    onPressed: progress == null
+                    onPressed: _downloadProgress.isEmpty
                         ? () => _downloadLocalModel(model)
                         : null,
-                    child: Text(_label('下载模型', 'Download model')),
+                    child: Text(_label('下载并使用', 'Download and use')),
                   ),
               ],
             ),

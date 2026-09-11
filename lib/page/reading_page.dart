@@ -211,6 +211,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
   }
 
+  /// A completed, unselected tap in the book returns keyboard ownership from
+  /// the AI editor to the reader. Keeping the panel open must not block this.
+  void focusReaderFromTap() {
+    if (!mounted || !AnxPlatform.isDesktop || !bottomBarOffstage) return;
+    _readerFocusNode.requestFocus();
+    unawaited(restoreNativeReaderFocus());
+  }
+
   void _restoreReaderFocusAfterPanel() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !bottomBarOffstage || _aiChat != null) return;
@@ -258,27 +266,36 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   // }
 
   KeyEventResult _handleReaderKeyEvent(FocusNode node, KeyEvent event) {
-    if (!_readerFocusNode.hasFocus) {
+    if (!_readerFocusNode.hasPrimaryFocus) {
       return KeyEventResult.ignored;
     }
 
-    if (event is! KeyDownEvent) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
 
     final logicalKey = event.logicalKey;
 
-    if (logicalKey == LogicalKeyboardKey.arrowRight ||
-        logicalKey == LogicalKeyboardKey.arrowDown ||
-        logicalKey == LogicalKeyboardKey.pageDown ||
-        logicalKey == LogicalKeyboardKey.space) {
+    // Selection/caret shortcuts belong to the focused control, not the book.
+    // Keep the explicit Ctrl+[ / Ctrl+] handling below available.
+    final modified = HardwareKeyboard.instance.isShiftPressed ||
+        HardwareKeyboard.instance.isAltPressed ||
+        HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed;
+
+    if (!modified &&
+        (logicalKey == LogicalKeyboardKey.arrowRight ||
+            logicalKey == LogicalKeyboardKey.arrowDown ||
+            logicalKey == LogicalKeyboardKey.pageDown ||
+            logicalKey == LogicalKeyboardKey.space)) {
       epubPlayerKey.currentState?.nextPage();
       return KeyEventResult.handled;
     }
 
-    if (logicalKey == LogicalKeyboardKey.arrowLeft ||
-        logicalKey == LogicalKeyboardKey.arrowUp ||
-        logicalKey == LogicalKeyboardKey.pageUp) {
+    if (!modified &&
+        (logicalKey == LogicalKeyboardKey.arrowLeft ||
+            logicalKey == LogicalKeyboardKey.arrowUp ||
+            logicalKey == LogicalKeyboardKey.pageUp)) {
       epubPlayerKey.currentState?.prevPage();
       return KeyEventResult.handled;
     }

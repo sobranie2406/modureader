@@ -57,6 +57,9 @@ abstract class EmbeddingProvider {
 
   int? get configuredDimension;
 
+  /// Validate local prerequisites without making a network request.
+  Future<void> ensureReady() async {}
+
   Future<List<List<double>>> embedBatch(List<String> inputs);
 
   void close() {}

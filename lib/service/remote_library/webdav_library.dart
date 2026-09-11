@@ -34,23 +34,34 @@ class LibraryConnection {
   }
 }
 
-/// Connection metadata is local-only. Passwords are deliberately session-only.
+/// Local preferences; shared only through opt-in encrypted sync/backups.
 class LibraryConnectionStore {
   static const key = 'remoteLibraryConnection';
-  static LibraryConnection? _session;
   static Future<LibraryConnection?> load() async {
-    if (_session != null) return _session;
     final raw = (await SharedPreferences.getInstance()).getString(key);
     if (raw == null) return null;
     try {
-      final map = jsonDecode(raw) as Map;
-      return LibraryConnection(
-          url: map['url'] as String,
-          username: map['username'] as String? ?? '',
-          allowHttp: map['allowHttp'] == true);
+      return decode(raw);
     } catch (_) {
       return null;
     }
+  }
+
+  static LibraryConnection? decode(String raw) {
+    if (raw.isEmpty)
+      return null; // Explicit clear marker, distinct from a new device.
+    final map = jsonDecode(raw) as Map;
+    if (map['allowHttp'] != null && map['allowHttp'] is! bool) {
+      throw const FormatException('Invalid library connection');
+    }
+    final value = LibraryConnection(
+      url: map['url'] as String,
+      username: map['username'] as String? ?? '',
+      password: map['password'] as String? ?? '',
+      allowHttp: map['allowHttp'] == true,
+    );
+    value.root;
+    return value;
   }
 
   static Future<void> save(LibraryConnection value) async {
@@ -60,15 +71,17 @@ class LibraryConnectionStore {
         jsonEncode({
           'url': value.url.trim(),
           'username': value.username,
+          'password': value.password,
           'allowHttp': value.allowHttp
         }));
     if (!ok) throw StateError('Cannot save connection');
-    _session = value;
   }
 
   static Future<void> clear() async {
-    await (await SharedPreferences.getInstance()).remove(key);
-    _session = null;
+    // Keep a credential-free deletion marker so encrypted sync can propagate
+    // an explicit clear, but a fresh device cannot erase a configured server.
+    final ok = await (await SharedPreferences.getInstance()).setString(key, '');
+    if (!ok) throw StateError('Cannot clear connection');
   }
 }
 
