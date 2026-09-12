@@ -42,7 +42,12 @@ jobs:
         shell: pwsh
         run: |
           $trace = Join-Path $env:LOCALAPPDATA 'com.modu.reader/native-crash/pending.txt'
-          if (Test-Path $trace) { Get-Content $trace }
+          New-Item -ItemType Directory -Force 'build/reader-diagnostic' | Out-Null
+          if (Test-Path $trace) {
+            Copy-Item $trace 'build/reader-diagnostic/pending.txt'
+            Get-Content $trace
+            python scripts/release/symbolize_windows_ci.py $trace build/windows/x64/runner/Debug
+          }
           Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000; StartTime=(Get-Date).AddMinutes(-30)} -ErrorAction SilentlyContinue | ForEach-Object { $_.Message }
           exit 0
       - uses: actions/upload-artifact@v4
@@ -50,7 +55,7 @@ jobs:
         with:
           name: windows-reader-diagnostic-${{ github.sha }}
           path: |
-            ~/AppData/Local/com.modu.reader/native-crash/*.txt
+            build/reader-diagnostic/*.txt
             build/windows/**/Debug/*.pdb
             build/windows/**/Debug/*.dll
             build/windows/**/Debug/modu.exe
