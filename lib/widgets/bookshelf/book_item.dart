@@ -9,11 +9,13 @@ import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
+import 'package:anx_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
+import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:anx_reader/widgets/bookshelf/book_sync_status_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum _BookCardAction { details, vectorize, more, delete }
+enum _BookCardAction { details, vectorize, vectorModel, more, delete }
 
 typedef BookSelectionChanged = void Function(Book book, bool selected);
 
@@ -145,6 +147,10 @@ class BookItem extends ConsumerWidget {
                                           case _BookCardAction.vectorize:
                                             queueBookForVectorization(book);
                                             break;
+                                          case _BookCardAction.vectorModel:
+                                            await showBookEmbeddingModelDialog(
+                                                context, book);
+                                            break;
                                           case _BookCardAction.delete:
                                             await confirmAndDeleteBooksFromBookshelf(
                                               context,
@@ -190,6 +196,20 @@ class BookItem extends ConsumerWidget {
                                                 queueItem,
                                               ),
                                             ),
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: _BookCardAction.vectorModel,
+                                          enabled:
+                                              !(queueItem?.status.isActive ??
+                                                  false),
+                                          child: ListTile(
+                                            dense: true,
+                                            leading: const Icon(Icons.tune),
+                                            title: const Text('向量化模型'),
+                                            subtitle: Text(
+                                                BookEmbeddingPreferences
+                                                    .labelFor(book)),
                                           ),
                                         ),
                                         const PopupMenuDivider(),

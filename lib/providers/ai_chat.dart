@@ -483,19 +483,36 @@ class AiChat extends _$AiChat {
     if (snapshot == null) return null;
     service.putSnapshot(snapshot);
 
-    final embedding = EmbeddingProviderFactory.fromPrefs();
+    EmbeddingProvider? embedding;
     List<double>? queryVector;
-    final provenanceMatches = (snapshot.embeddingModelId == null
-        ? embedding?.mode == 'builtin'
-        : snapshot.embeddingModelId == embedding?.modelId &&
-            snapshot.embeddingMode == embedding?.mode);
-    if (embedding != null && snapshot.vectors.isNotEmpty && provenanceMatches) {
-      try {
-        queryVector = await embedding.embed(query);
-      } catch (error) {
-        AnxLog.warning(
-          'Vector query failed; falling back to lexical RAG: $error',
-        );
+    var requestedVector = false;
+    try {
+      embedding = EmbeddingProviderFactory.fromBook(book);
+      final provenanceMatches = embedding != null &&
+          matchesEmbeddingIndex(embedding,
+              mode: snapshot.embeddingMode,
+              modelId: snapshot.embeddingModelId,
+              dimensions: snapshot.embeddingDimensions);
+      if (embedding != null &&
+          snapshot.vectors.isNotEmpty &&
+          provenanceMatches) {
+        try {
+          requestedVector = true;
+          queryVector = await embedding.embed(query);
+        } catch (error) {
+          AnxLog.warning(
+            'Vector query failed; falling back to lexical RAG: $error',
+          );
+        }
+      }
+    } catch (_) {
+      // An unavailable per-book model must not break lexical book retrieval.
+      AnxLog.warning('Book vector model unavailable; using lexical RAG');
+    } finally {
+      // A lexical fallback has not acquired a local session. Do not tear down
+      // the shared model while another book is still being indexed.
+      if (requestedVector || embedding?.mode == 'remote') {
+        await embedding?.release();
       }
     }
 

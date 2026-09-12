@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:http/http.dart' as http;
@@ -230,8 +232,39 @@ Uri normalizeEmbeddingEndpoint(String raw) {
   return parsed.replace(path: '$path/v1/embeddings');
 }
 
+/// Equal dimensions alone do not make vectors from different models compatible.
+bool matchesEmbeddingIndex(
+  EmbeddingProvider provider, {
+  required String? mode,
+  required String? modelId,
+  required int? dimensions,
+}) =>
+    modelId != null &&
+    modelId == provider.modelId &&
+    mode == provider.mode &&
+    (dimensions == null ||
+        provider.configuredDimension == null ||
+        dimensions == provider.configuredDimension);
+
 class EmbeddingProviderFactory {
   const EmbeddingProviderFactory._();
+
+  static EmbeddingProvider? fromBook(Book book) {
+    final choice = BookEmbeddingPreferences.choiceFor(book);
+    if (choice == null) return fromPrefs();
+    if (!Prefs().vectorModelEnabled) return null;
+    if (!BookEmbeddingPreferences.isValid(choice)) {
+      throw StateError('本书的向量模型不可用，请在书籍菜单中重新选择');
+    }
+    if (choice == 'remote') {
+      return OpenAiCompatibleEmbeddingProvider(
+        config: VectorModelConfig.fromJson(Prefs().vectorModelConfig),
+      );
+    }
+    return LocalOnnxEmbeddingProvider(
+      model: LocalEmbeddingModels.byId(choice.substring('local:'.length)),
+    );
+  }
 
   static EmbeddingProvider? fromPrefs() {
     final prefs = Prefs();

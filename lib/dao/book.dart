@@ -1,6 +1,7 @@
 import 'package:anx_reader/dao/base_dao.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:anx_reader/utils/reading_progress.dart';
 
 class BookDao extends BaseDao {
   BookDao();
@@ -39,7 +40,7 @@ class BookDao extends BaseDao {
           table,
           {
             'last_read_position': position,
-            'reading_percentage': percentage,
+            'reading_percentage': normalizeReadingProgress(percentage),
             'update_time': DateTime.now().toIso8601String(),
           },
           where: 'id = ?',

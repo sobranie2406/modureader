@@ -127,6 +127,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   late final FocusNode _readerFocusNode;
+  final _readerWebViewFocusScope =
+      FocusScopeNode(debugLabel: 'book_webview_focus_scope');
   // late final VolumeKeyBoard _volumeKeyBoard;
   // bool _volumeKeyListenerAttached = false;
 
@@ -199,6 +201,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     //   unawaited(_volumeKeyBoard.removeListener());
     // }
     _readerFocusNode.dispose();
+    _readerWebViewFocusScope.dispose();
     super.dispose();
   }
 
@@ -206,31 +209,46 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> setReaderFullscreen(bool value) => _fullscreen.set(value);
 
   void _requestReaderFocus() {
-    if (bottomBarOffstage && !_readerFocusNode.hasFocus) {
-      _readerFocusNode.requestFocus();
-    }
+    // Restore after menu/focus updates on every platform. Focusing the outer
+    // keyboard handler makes the native selection inactive again.
+    _restoreReaderFocusAfterPanel();
   }
 
   /// A completed, unselected tap in the book returns keyboard ownership from
   /// the AI editor to the reader. Keeping the panel open must not block this.
   void focusReaderFromTap() {
     if (!mounted || !AnxPlatform.isDesktop || !bottomBarOffstage) return;
-    _readerFocusNode.requestFocus();
-    unawaited(restoreNativeReaderFocus());
+    _focusReaderSurface();
+  }
+
+  void _focusReaderSurface() {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    if (AnxPlatform.isWindows || AnxPlatform.isLinux) {
+      // Texture-backed plugins receive keys through their own child Focus.
+      // Restore that remembered child, never the surrounding paging handler.
+      _readerWebViewFocusScope.requestFocus();
+    } else {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+    unawaited(restoreNativeReaderFocus(
+        () async => await epubPlayerKey.currentState?.requestNativeFocus()));
   }
 
   void _restoreReaderFocusAfterPanel() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !bottomBarOffstage || _aiChat != null) return;
-      _readerFocusNode.requestFocus();
-      unawaited(restoreNativeReaderFocus());
+      if (!mounted ||
+          !bottomBarOffstage ||
+          _aiChat != null ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      _focusReaderSurface();
     });
   }
 
   void _closeAiChat() {
     setState(() => _aiChat = null);
     showOrHideAppBarAndBottomBar(false);
-    _restoreReaderFocusAfterPanel();
   }
 
   void _releaseReaderFocus() {
@@ -1040,15 +1058,18 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                             onKeyEvent: _handleReaderKeyEvent,
                             child: Stack(
                               children: [
-                                EpubPlayer(
-                                  key: epubPlayerKey,
-                                  book: _book,
-                                  cfi: widget.cfi,
-                                  showOrHideAppBarAndBottomBar:
-                                      showOrHideAppBarAndBottomBar,
-                                  onLoadEnd: onLoadEnd,
-                                  initialThemes: widget.initialThemes,
-                                  updateParent: updateState,
+                                FocusScope(
+                                  node: _readerWebViewFocusScope,
+                                  child: EpubPlayer(
+                                    key: epubPlayerKey,
+                                    book: _book,
+                                    cfi: widget.cfi,
+                                    showOrHideAppBarAndBottomBar:
+                                        showOrHideAppBarAndBottomBar,
+                                    onLoadEnd: onLoadEnd,
+                                    initialThemes: widget.initialThemes,
+                                    updateParent: updateState,
+                                  ),
                                 ),
                                 if (AnxPlatform.isMobile && _quickMarkEnabled)
                                   Positioned(

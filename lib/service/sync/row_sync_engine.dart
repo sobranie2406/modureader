@@ -23,7 +23,8 @@ class RowSyncArchive {
           kind TEXT NOT NULL, sync_id TEXT NOT NULL, clock INTEGER NOT NULL,
           revision TEXT NOT NULL, deleted INTEGER NOT NULL, payload TEXT NOT NULL,
           PRIMARY KEY(kind,sync_id))''');
-        for (final record in records) {
+        for (final raw in records) {
+          final record = normalizeSyncReadingPosition(raw);
           RowSyncStore.validate(record);
           await txn.insert(syncRecordsTable, record.toMap());
         }

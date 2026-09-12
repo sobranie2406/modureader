@@ -143,6 +143,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool get _isTopOfNavigationStack =>
       ModalRoute.of(context)?.isCurrent ?? false;
 
+  Future<bool?> requestNativeFocus() async {
+    if (!mounted || !_readerReady || !_isTopOfNavigationStack) return false;
+    return webViewController.requestFocus();
+  }
+
   void prevPage() {
     webViewController.evaluateJavascript(source: 'prevPage(); void 0;');
   }
@@ -564,24 +569,28 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       ),
     );
     final chapters = await source.load();
-    final embedding = EmbeddingProviderFactory.fromPrefs();
-    return KnowledgeIndexer(
-      service: KnowledgeSearchService(),
-      store: store,
-    ).build(
-      bookId: book.id.toString(),
-      chapters: chapters,
-      vectorizeBatch: embedding == null
-          ? null
-          : (chunks) => embedding.embedBatch(
-                chunks.map((chunk) => chunk.text).toList(growable: false),
-              ),
-      embeddingMode: embedding?.mode,
-      embeddingModelId: embedding?.modelId,
-      embeddingDimensions: embedding?.configuredDimension,
-      onProgress: onProgress,
-      isCancelled: isCancelled,
-    );
+    final embedding = EmbeddingProviderFactory.fromBook(book);
+    try {
+      return await KnowledgeIndexer(
+        service: KnowledgeSearchService(),
+        store: store,
+      ).build(
+        bookId: book.id.toString(),
+        chapters: chapters,
+        vectorizeBatch: embedding == null
+            ? null
+            : (chunks) => embedding.embedBatch(
+                  chunks.map((chunk) => chunk.text).toList(growable: false),
+                ),
+        embeddingMode: embedding?.mode,
+        embeddingModelId: embedding?.modelId,
+        embeddingDimensions: embedding?.configuredDimension,
+        onProgress: onProgress,
+        isCancelled: isCancelled,
+      );
+    } finally {
+      await embedding?.release();
+    }
   }
 
   KnowledgeChapterRef _toKnowledgeChapterRef(TocItem item) {

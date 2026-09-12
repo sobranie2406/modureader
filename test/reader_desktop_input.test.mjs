@@ -82,6 +82,7 @@ test('runtime wires desktop-only input for outer document and every loaded chapt
   assert.match(book,/this\.installDesktopInput\(document\)/);
   assert.match(book,/this\.installDesktopInput\(doc\)/);
   assert.match(book,/style\.desktopPageInput === true && !window\.isFootNoteOpen\(\)/);
+  assert.match(book,/focusOnPointerDown: enabled/);
   assert.match(dart,/desktopPageInput: \$\{AnxPlatform\.isDesktop\}/);
   const initial=await readFile(new URL('../lib/utils/webView/gererate_url.dart',import.meta.url),'utf8');
   assert.match(initial,/'desktopPageInput': AnxPlatform\.isDesktop/);
@@ -89,7 +90,7 @@ test('runtime wires desktop-only input for outer document and every loaded chapt
   assert.match(legacy,/desktopPageInput: \$\{AnxPlatform\.isDesktop\}/);
 });
 
-test('completed reader taps return Flutter and native focus even with AI open', async () => {
+test('completed reader taps restore the book WebView on desktops even with AI open', async () => {
   const dart=await readFile(new URL('../lib/page/book_player/epub_player.dart',import.meta.url),'utf8');
   const page=await readFile(new URL('../lib/page/reading_page.dart',import.meta.url),'utf8');
   const click=dart.slice(dart.indexOf('  void onClick('), dart.indexOf('  void onClick(')+2200);
@@ -97,7 +98,43 @@ test('completed reader taps return Flutter and native focus even with AI open', 
   const start=page.indexOf('  void focusReaderFromTap()');
   const method=page.slice(start,page.indexOf('\n  }',start));
   assert.match(method,/!AnxPlatform\.isDesktop/);
-  assert.match(method,/_readerFocusNode\.requestFocus\(\)/);
-  assert.match(method,/restoreNativeReaderFocus\(\)/);
+  assert.match(method,/_focusReaderSurface\(\)/);
   assert.doesNotMatch(method,/_aiChat/);
+  const focusStart=page.indexOf('  void _focusReaderSurface()');
+  const focus=page.slice(focusStart,page.indexOf('\n  }',focusStart));
+  assert.match(focus,/AnxPlatform\.isWindows \|\| AnxPlatform\.isLinux/);
+  assert.match(focus,/_readerWebViewFocusScope.requestFocus\(\)/);
+  assert.match(focus,/restoreNativeReaderFocus/);
+  assert.match(focus,/requestNativeFocus/);
+  assert.doesNotMatch(focus,/_readerFocusNode\.requestFocus/);
+  assert.match(dart,/return webViewController\.requestFocus\(\)/);
+  const native=await readFile(new URL('../macos/Runner/MainFlutterWindow.swift',import.meta.url),'utf8');
+  assert.doesNotMatch(native,/makeFirstResponder\(controller\.view\)/);
+});
+
+test('desktop mouse selection regains document focus without affecting touch or clearing ranges', () => {
+  const doc = new EventTarget();
+  doc.defaultView = new EventTarget();
+  let focused = false, focusCalls = 0, enabled = true, mac = true;
+  doc.hasFocus = () => focused;
+  doc.defaultView.focus = () => { focused = true; focusCalls++; };
+  doc.getSelection = () => 'existing selection';
+  const controller = installDesktopPageInput(doc, { enabled: () => enabled,
+    focusOnPointerDown: () => mac, turnPage: () => assert.fail('must not page') });
+  const down = (props = {}) => {
+    const e = new Event('pointerdown', { cancelable: true });
+    Object.assign(e, { pointerType: 'mouse', button: 0 }, props);
+    doc.dispatchEvent(e);
+    assert.equal(e.defaultPrevented, false);
+  };
+  down(); assert.equal(focusCalls, 1);
+  down(); assert.equal(focusCalls, 1);
+  focused = false; doc.defaultView.dispatchEvent(new Event('blur'));
+  down(); assert.equal(focusCalls, 2);
+  focused = false;
+  down({ pointerType: 'touch' }); down({ button: 2 });
+  down({ composedPath: () => [{ matches: () => true }] });
+  enabled = false; down(); enabled = true; mac = false; down();
+  assert.equal(focusCalls, 2);
+  mac = true; controller.destroy(); down(); assert.equal(focusCalls, 2);
 });

@@ -123,7 +123,7 @@ class BookKnowledgeIndexService {
       onProgress?.call(stage, done, total);
     }
 
-    final embedding = EmbeddingProviderFactory.fromPrefs();
+    final embedding = EmbeddingProviderFactory.fromBook(book);
     try {
       // Fail before expensive EPUB extraction when the chosen local model is
       // missing. Indexing never silently downloads models or marks partial work complete.

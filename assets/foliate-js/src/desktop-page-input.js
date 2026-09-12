@@ -20,7 +20,7 @@ export function desktopDragDirection(dx, dy) {
 }
 
 export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
-  dragEnabled = enabled }) {
+  dragEnabled = enabled, focusOnPointerDown = () => false }) {
   let pointer = null;
   let turning = false;
   let suppressClickUntil = 0;
@@ -51,6 +51,12 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   });
   on(doc, 'pointerdown', e => {
     cancel();
+    // Restore the chapter frame's focus before WebKit starts its native
+    // selection. Never clear/re-add ranges or cancel the default mouse action.
+    // Only a reader mouse gesture may take focus from an AI/editor overlay.
+    if (enabled() && focusOnPointerDown() && e.pointerType === 'mouse' &&
+        e.button === 0 && !interactive(e) && !doc.hasFocus?.())
+      doc.defaultView?.focus();
     if (!dragEnabled() || e.pointerType !== 'mouse' || e.button !== 0 ||
         e.altKey || e.ctrlKey || e.metaKey || e.shiftKey ||
         selected() || interactive(e)) return;

@@ -7,6 +7,7 @@ import { attachFootnoteSizing, footnoteLayoutCSS } from './footnote-size.js'
 import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
+import { readerSelectionCSS } from './selection-style.js'
 import { installSettledSelection } from './settled-selection.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
@@ -676,6 +677,8 @@ const getCSS = ({ fontSize,
       font-display: block;
     }
 
+    ${readerSelectionCSS({ pdf: isPdf })}
+
     html {
         ${writingModeCSS}
         color: ${fontColor} !important;
@@ -1262,6 +1265,7 @@ class Reader {
     const enabled = () => style.desktopPageInput === true && !window.isFootNoteOpen();
     desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
       enabled,
+      focusOnPointerDown: enabled,
       hasSelection: () => this.view.renderer.getContents().some(
         ({ doc: content }) => !!content.getSelection()?.toString()),
       turnPage: direction => direction > 0 ? this.view.next() : this.view.prev(),

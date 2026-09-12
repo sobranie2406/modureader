@@ -4,7 +4,6 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var configTransferChannel: FlutterMethodChannel?
-  private var readerFocusChannel: FlutterMethodChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -14,28 +13,8 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerConfigTransferChannel(flutterViewController)
-    registerReaderFocusChannel(flutterViewController)
 
     super.awakeFromNib()
-  }
-
-  private func registerReaderFocusChannel(_ controller: FlutterViewController) {
-    let channel = FlutterMethodChannel(
-      name: "com.modu.reader/reader_focus",
-      binaryMessenger: controller.engine.binaryMessenger
-    )
-    channel.setMethodCallHandler { [weak self, weak controller] call, result in
-      guard call.method == "restore" else {
-        result(FlutterMethodNotImplemented)
-        return
-      }
-      guard let self, let controller else {
-        result(false)
-        return
-      }
-      result(self.makeFirstResponder(controller.view))
-    }
-    readerFocusChannel = channel
   }
 
   private func registerConfigTransferChannel(_ controller: FlutterViewController) {

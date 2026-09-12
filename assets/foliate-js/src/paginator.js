@@ -882,22 +882,24 @@ export class Paginator extends HTMLElement {
     }
     
     // Boundary limits
-    targetPage = Math.max(0, Math.min(pages - 1, targetPage))
+    const firstPage = this.#adjacentIndex(-1) == null ? 1 : 0
+    const lastPage = this.#adjacentIndex(1) == null ? pages - 2 : pages - 1
+    targetPage = Math.max(firstPage, Math.min(lastPage, targetPage))
     
     // Calculate animation duration based on distance
     const targetOffset = targetPage * size
     const distance = Math.abs(targetOffset - currentOffset)
     const duration = Math.max(200, Math.min(300, 250 * (distance / (size || 1))))
 
-    const pageArg = this.#rtl ? -targetPage : targetPage
     this.#isSnapping = true
     
-    return this.#scrollToPage(pageArg, 'snap', { animate: true, duration })
+    return this.#scrollToPage(targetPage, 'snap', { animate: true, duration })
       .then(() => {
         // Handle chapter boundaries (keep existing feature)
         const dir = targetPage <= 0 ? -1 : targetPage >= pages - 1 ? 1 : null
-        if (dir) return this.#goTo({
-          index: this.#adjacentIndex(dir),
+        const index = dir == null ? null : this.#adjacentIndex(dir)
+        if (index != null) return this.#goTo({
+          index,
           anchor: dir < 0 ? () => 1 : () => 0,
         })
       })
@@ -1176,6 +1178,11 @@ export class Paginator extends HTMLElement {
   async #scrollTo(offset, reason, smooth) {
     const element = this.#container
     const { scrollProp, size } = this
+    if (!Number.isFinite(offset)) return
+    // An anchor of 1 or an 80%-screen step must not scroll the final screen
+    // beyond the content. Use unsigned logical offsets before vertical-rl.
+    if (this.scrolled) offset = Math.max(0, Math.min(
+      Math.max(0, this.viewSize - size), offset))
     this.#ignoreNativeScroll = true
     
     const opts = typeof smooth === 'object' ? smooth ?? {} : {}
@@ -1187,14 +1194,14 @@ export class Paginator extends HTMLElement {
       this.#ignoreNativeScroll = false
     }
 
+    // FIXME: vertical-rl only, not -lr
+    if (this.scrolled && this.#vertical) offset = -offset
+
     // If already at target position
     if (Math.abs(element[scrollProp] - offset) < 1) {
       finish()
       return
     }
-
-    // FIXME: vertical-rl only, not -lr
-    if (this.scrolled && this.#vertical) offset = -offset
 
     const useAnimation = shouldAnimate && this.hasAttribute('animated')
 
@@ -1223,6 +1230,10 @@ export class Paginator extends HTMLElement {
     }
   }
   async #scrollToPage(page, reason, smooth) {
+    if (!Number.isFinite(page) || this.pages < 3) return
+    const firstPage = this.#adjacentIndex(-1) == null ? 1 : 0
+    const lastPage = this.#adjacentIndex(1) == null ? this.pages - 2 : this.pages - 1
+    page = Math.max(firstPage, Math.min(lastPage, page))
     const offset = this.size * (this.#rtl ? -page : page)
     return this.#scrollTo(offset, reason, smooth)
   }
@@ -1362,9 +1373,10 @@ export class Paginator extends HTMLElement {
       ? anchor(this.#view.document) : anchor) ?? 0, select)
   }
   #canGoToIndex(index) {
-    return index >= 0 && index <= this.sections.length - 1
+    return Number.isInteger(index) && index >= 0 && index < this.sections.length
   }
   async #goTo({ index, anchor, select }) {
+    if (!this.#canGoToIndex(index) || !this.sections[index]) return
     if (index === this.#index) await this.#display({ index, anchor, select })
     else {
       const onLoad = detail => {
@@ -1406,7 +1418,7 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.viewSize - this.end > 2) return this.#scrollTo(
-        Math.min(this.viewSize, this.start + (distance ?? this.size * 0.8)), null, { animate: true })
+        Math.min(Math.max(0, this.viewSize - this.size), this.start + (distance ?? this.size * 0.8)), null, { animate: true })
       return true
     }
     if (this.atEnd) return
@@ -1415,17 +1427,20 @@ export class Paginator extends HTMLElement {
     return this.#scrollToPage(page, 'page', { animate: true }).then(() => page >= pages - 1)
   }
   get atStart() {
-    return this.#adjacentIndex(-1) == null && this.page <= 1
+    return this.#adjacentIndex(-1) == null &&
+      (this.scrolled ? this.start <= 2 : this.page <= 1)
   }
   get atEnd() {
-    return this.#adjacentIndex(1) == null && this.page >= this.pages - 2
+    return this.#adjacentIndex(1) == null &&
+      (this.scrolled ? this.viewSize - this.end <= 2 : this.page >= this.pages - 2)
   }
   #adjacentIndex(dir) {
     for (let index = this.#index + dir; this.#canGoToIndex(index); index += dir)
-      if (this.sections[index]?.linear !== 'no') return index
+      if (this.sections[index] && this.sections[index].linear !== 'no') return index
   }
   async #turnPage(dir, distance) {
     if (this.#locked) return
+    if (this.#view && (dir < 0 ? this.atStart : this.atEnd)) return
     this.#locked = true
     try {
       const prev = dir === -1

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/utils/reading_progress.dart';
 
 /// Portable identity and operation clock; never a device-local integer row ID.
 class RowSyncRecord {
@@ -23,16 +24,42 @@ class RowSyncRecord {
       };
 
   factory RowSyncRecord.fromMap(Map<String, Object?> row) {
-    return RowSyncRecord(
+    return normalizeSyncReadingPosition(RowSyncRecord(
       row['kind'] as String,
       row['sync_id'] as String,
       row['clock'] as int,
       row['revision'] as String,
       row['deleted'] == 1,
       Map<String, Object?>.from(jsonDecode(row['payload'] as String) as Map),
-    );
+    ));
   }
 }
+
+/// Canonicalize only the two legacy nullable position fields. Keep identities,
+/// clocks and revisions unchanged: compatibility repair is not a new read.
+/// Missing keys, wrong types and extra fields are left for strict validation.
+RowSyncRecord normalizeSyncReadingPosition(RowSyncRecord record) {
+  if (record.kind != 'position' || record.deleted) return record;
+  final data = {...record.data};
+  if (data.containsKey('last_read_position') &&
+      data['last_read_position'] == null) {
+    data['last_read_position'] = '';
+  }
+  if (data.containsKey('reading_percentage')) {
+    final progress = data['reading_percentage'];
+    if (progress == null || progress is num) {
+      data['reading_percentage'] = normalizeReadingProgress(progress as num?);
+    }
+  }
+  return RowSyncRecord(record.kind, record.id, record.clock, record.revision,
+      record.deleted, data);
+}
+
+bool _hasReadingPosition(RowSyncRecord record) =>
+    (record.data['last_read_position'] is String &&
+        (record.data['last_read_position'] as String).isNotEmpty) ||
+    (record.data['reading_percentage'] is num &&
+        (record.data['reading_percentage'] as num) > 0);
 
 /// Commutative/idempotent union. Independent book attributes (position and
 /// deletion state) have independent records, so unrelated edits cannot move
@@ -40,7 +67,8 @@ class RowSyncRecord {
 List<RowSyncRecord> mergeSyncRecords(
     Iterable<RowSyncRecord> local, Iterable<RowSyncRecord> remote) {
   final result = <String, RowSyncRecord>{};
-  for (final record in [...local, ...remote]) {
+  for (final raw in [...local, ...remote]) {
+    final record = normalizeSyncReadingPosition(raw);
     final previous = result[record.key];
     result[record.key] = previous == null ? record : _winner(previous, record);
   }
@@ -73,6 +101,16 @@ bool sameSyncRecords(Iterable<RowSyncRecord> a, Iterable<RowSyncRecord> b) {
 }
 
 RowSyncRecord _winner(RowSyncRecord a, RowSyncRecord b) {
+  // Legacy unread rows have no reading-operation timestamp. Their book metadata
+  // may be newer than a real read on another device; do not reset that cursor.
+  // Reading backwards still wins by clock when both records have a location.
+  if (a.kind == 'position') {
+    final aUnknown = !a.deleted && !_hasReadingPosition(a);
+    final bUnknown = !b.deleted && !_hasReadingPosition(b);
+    // Tombstones belong to the known-operation tier too. Treating deletion
+    // separately here would create ordering cycles across three devices.
+    if (aUnknown != bUnknown) return aUnknown ? b : a;
+  }
   // A hard-deleted annotation/session is never revived by an offline edit.
   // Creating it again allocates a fresh identity. Book restore is represented
   // by a newer, independent 'life' operation instead.

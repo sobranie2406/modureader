@@ -74,20 +74,25 @@ export class SectionProgress {
         const { sizeTotal } = this
         const results = [0]
         let sum = 0
-        for (const size of this.sizes) results.push((sum += size) / sizeTotal)
+        for (const size of this.sizes) results.push(sizeTotal > 0 ? (sum += size) / sizeTotal : 0)
         return results
     }
     // get progress given index of and fractions within a section
     getProgress(index, fractionInSection, pageFraction = 0) {
+        fractionInSection = Number.isFinite(fractionInSection)
+            ? Math.max(0, Math.min(1, fractionInSection)) : 0
+        pageFraction = Number.isFinite(pageFraction)
+            ? Math.max(0, Math.min(1, pageFraction)) : 0
         const { sizes, sizePerLoc, sizePerTimeUnit, sizeTotal } = this
         const sizeInSection = sizes[index] ?? 0
         const sizeBefore = sizes.slice(0, index).reduce((a, b) => a + b, 0)
         const size = sizeBefore + fractionInSection * sizeInSection
-        const nextSize = size + pageFraction * sizeInSection
+        const nextSize = Math.min(sizeTotal, sizeBefore + sizeInSection,
+            size + pageFraction * sizeInSection)
         const remainingTotal = sizeTotal - size
         const remainingSection = (1 - fractionInSection) * sizeInSection
         return {
-            fraction: nextSize / sizeTotal,
+            fraction: sizeTotal > 0 ? Math.max(0, Math.min(1, nextSize / sizeTotal)) : 0,
             section: {
                 current: index,
                 total: sizes.length,

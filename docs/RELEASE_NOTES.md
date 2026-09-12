@@ -1,6 +1,15 @@
 # 默读 / Modu 1.0.4 正式版
 
-版本：**1.0.4+10013**。本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是按 GPL-3.0-or-later 发布的独立修改版本。
+版本：**1.0.4+10016**，替换原 10013 构建。本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是按 GPL-3.0-or-later 发布的独立修改版本。
+
+## 10016 修正
+
+- **Anx 数据同步兼容**：兼容 ZIP 导入、旧 `database7.db` 迁移和本机已缓存记录中的空阅读位置、空进度及数值越界。进度规范到 0～100%，保留有效 EPUB 定位；未读空记录不覆盖另一端的有效阅读位置，不伪造新的阅读时间。保留旧云端数据库、删除标记和条件写入保护。
+- **书末翻页边界**：滚动模式停在最后一屏，惯性翻页不再停入书首、书末的过渡空白页；阻止无效章节跳转，进度计算不超过 100%。支持继续往回阅读和正常跨章节导航，不按“已读完”标签禁用正文。
+- **选区与焦点**：调整菜单、AI 面板关闭后的阅读焦点恢复；根据 Windows/Linux 的纹理控件与 Apple/Android 原生视图分别处理。各平台非 PDF 正文使用一致的临时浅蓝选区；保留 PDF 专用样式和移动端触摸选字逻辑。
+- **每本书选择向量模型**：书籍弹出菜单新增“向量化模型”，可跟随全局默认、选择四个本地模型之一或全局配置的远程模型。更换选择不自动重建已有索引；索引模型不匹配时回退关键词检索，避免混用向量。全局向量功能关闭时仍不调用模型。
+
+以上修复已用合成数据和自动回归验证，包括空阅读记录、进度 `1.00010227620884`、旧库迁移、并发冲突、三端记录收敛和翻页首尾边界。未在反馈者的 Windows 11 LTSC 原始书库及所有平台真机逐一验收。
 
 ## 本次更新
 
@@ -14,7 +23,7 @@
 
 ## 升级与隐私
 
-构建号 10013 高于 1.0.3 正式版及 10011、10012 本地构建。Android 沿用默读原专用签名，可覆盖升级；请勿先卸载，升级前建议备份。
+构建号 10016 高于原 1.0.4 的 10013 及 10014、10015 本地包。Android 沿用默读原专用签名，可覆盖升级；请勿先卸载，升级前建议备份。本页附件均须使用同一构建，不要混用旧下载缓存。
 
 继续使用数据库 8 的记录级合并，不新增同步格式迁移。所有设备配置同一个 modu 上级目录，不重复拼接 /modu。强 ETag 与正确执行条件写入仍是并发保护前提。[同步与迁移说明](https://github.com/sobranie2406/modureader/blob/v1.0.4/docs/WEBDAV_RECORD_SYNC.md)。
 
@@ -46,7 +55,16 @@ API Key 和远程书库凭据仍跟随独立、默认关闭的加密同步开关
 
 ## English release notes
 
-**Modu 1.0.4 (build 10013)** is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
+**Modu 1.0.4 (build 10016)** replaces build 10013 and is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
+
+### Build 10016 fixes
+
+- Normalize nullable and out-of-range reading progress from Anx ZIP imports, legacy database7 migration and cached local sync records. Preserve exact locations and operation timestamps; unknown unread records cannot overwrite valid reading positions. Keep legacy cloud data, tombstones and conditional-write protection.
+- Stop scrolling and inertial paging at actual book boundaries, reject invalid section targets and bound progress to 0–100%. Backward reading and normal chapter transitions remain available.
+- Restore reader focus using each platform's supported view mechanism. Keep a consistent temporary blue selection for non-PDF text without replacing mobile selection gestures or PDF styling.
+- Add per-book embedding model selection to the book menu. Follow the default, choose a bundled local model, or use the configured remote model. Existing indexes require explicit rebuilding; incompatible vector queries fall back to keyword search. The global off switch remains authoritative.
+
+Synthetic regression tests cover nullable/cached positions, the reported 1.00010227620884 progress value, legacy migration, concurrent writes, three-device convergence and navigation boundaries. The reporter's original Windows LTSC library and all target devices have not been individually verified.
 
 ### Changes
 
@@ -61,7 +79,7 @@ API Key 和远程书库凭据仍跟随独立、默认关闭的加密同步开关
 
 Nine native packages plus SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB, and iOS ARM64 IPA. Android uses the existing signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. No standalone notices ZIP.
 
-Build 10013 upgrades earlier builds; back up first and do not uninstall Android before updating. Database 8 record sync is unchanged. Use the same remote parent directory on all devices. Strong ETags and correctly implemented conditional writes remain required. Optional credential encryption does not encrypt books, notes or the entire database. Explicit configuration codes and QR images are not encrypted.
+Build 10016 upgrades build 10013 and local builds 10014/10015; back up first and do not uninstall Android before updating. Database 8 record sync is unchanged. Use the same remote parent directory on all devices. Strong ETags and correctly implemented conditional writes remain required. Optional credential encryption does not encrypt books, notes or the entire database. Explicit configuration codes and QR images are not encrypted.
 
 ### Validation limits
 

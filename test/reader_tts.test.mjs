@@ -152,6 +152,7 @@ const paginatorSource = await readFile(new URL('../assets/foliate-js/src/paginat
 const turnPage = paginatorSource.slice(paginatorSource.indexOf('  async #turnPage('), paginatorSource.indexOf('  prev(distance)'))
 const PageTurn = vm.runInNewContext(`(class {
   #locked = false;
+  #view = null;
   adjacent = 1;
   failure = false;
   visits = [];

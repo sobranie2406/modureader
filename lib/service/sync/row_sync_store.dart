@@ -247,7 +247,18 @@ class RowSyncStore {
         if (id != null && data[ref.key] == null) throw StateError('同步记录缺少关联标识');
       }
       await txn.update(
-          syncRecordsTable, {'payload': jsonEncode(data), 'dirty': 0},
+          syncRecordsTable,
+          {
+            'payload': jsonEncode(normalizeSyncReadingPosition(RowSyncRecord(
+                    kind,
+                    meta['sync_id'] as String,
+                    meta['clock'] as int,
+                    meta['revision'] as String,
+                    false,
+                    data))
+                .data),
+            'dirty': 0
+          },
           where: 'kind = ? AND sync_id = ?',
           whereArgs: [kind, meta['sync_id']]);
     }
@@ -280,12 +291,16 @@ class RowSyncStore {
   /// Merge into live rows in one transaction, including changes made while
   /// the network request was in flight. No closing/replacing the live DB.
   Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote) async {
+    remote = remote.map(normalizeSyncReadingPosition).toList();
     for (final record in remote) {
       validate(record);
     }
     return db.transaction((txn) async {
       final local = await _snapshot(txn);
       final merged = mergeSyncRecords(local, remote);
+      for (final record in merged) {
+        validate(record);
+      }
       final old = {for (final r in local) r.key: jsonEncode(r.toMap())};
       await txn.update(_control, {'applying': 1});
       final ids = <String, Map<String, int>>{};

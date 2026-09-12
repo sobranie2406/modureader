@@ -1,15 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Flutter focus alone cannot restore AppKit's first responder after a native
-/// platform view / text input overlay resigns it on macOS.
-Future<void> restoreNativeReaderFocus() async {
-  if (kIsWeb || defaultTargetPlatform != TargetPlatform.macOS) return;
+/// Restore the book's native WebView, not the surrounding Flutter controls.
+/// Windows' texture-backed plugin restores its own Flutter focus scope instead;
+/// its controller does not implement requestFocus in the pinned version.
+Future<void> restoreNativeReaderFocus(
+    Future<bool?> Function() requestWebViewFocus) async {
+  if (kIsWeb ||
+      !const {
+        TargetPlatform.macOS,
+        TargetPlatform.linux,
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }.contains(defaultTargetPlatform)) {
+    return;
+  }
   try {
-    await const MethodChannel('com.modu.reader/reader_focus')
-        .invokeMethod<bool>('restore');
+    await requestWebViewFocus();
   } on MissingPluginException {
-    // Tests and non-desktop hosts still use the regular Flutter focus path.
+    // A missing/disposed native host must not break menu dismissal.
+  } on UnimplementedError {
+    // Older plugin hosts may not expose the method yet.
   } on PlatformException catch (error) {
     debugPrint('Unable to restore native reader focus: ${error.code}');
   }
