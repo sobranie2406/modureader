@@ -3,6 +3,10 @@ name: Modu Packages
 on:
   workflow_dispatch:
     inputs:
+      reader_diagnostic:
+        description: 'Only run the isolated Windows reader diagnostic (no packages or release)'
+        default: false
+        type: boolean
       targets:
         description: 'all or comma-separated targets (linux-x64,linux-arm64,windows-x64,windows-arm64,macos-x64,macos-arm64,android,ios)'
         default: all
@@ -18,7 +22,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  reader_diagnostic:
+    if: inputs.reader_diagnostic == true
+    uses: ./.github/workflows/windows-reader-diagnostic.yml
   targets:
+    if: inputs.reader_diagnostic != true
     runs-on: ubuntu-24.04
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
@@ -33,9 +41,11 @@ jobs:
         run: node scripts/release/matrix.mjs
 
   quality:
+    if: inputs.reader_diagnostic != true
     uses: ./.github/workflows/pr-check.yml
 
   models:
+    if: inputs.reader_diagnostic != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

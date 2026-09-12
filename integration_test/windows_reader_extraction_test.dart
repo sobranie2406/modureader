@@ -37,6 +37,7 @@ void main() {
         supportedLocales: L10n.supportedLocales,
         home: const Scaffold(body: Text('Synthetic reader integration test'))));
     await tester.pumpAndSettle();
+    debugPrint('WINDOWS READER STAGE localized_app_ready');
     try {
       final archive = Archive();
       void add(String name, String text) {
@@ -62,10 +63,13 @@ void main() {
       await File('${root.path}/fixture.epub')
           .writeAsBytes(ZipEncoder().encode(archive)!);
       await Server().start();
+      debugPrint('WINDOWS READER STAGE server_ready');
       expect(await WebViewEnvironment.getAvailableVersion(), isNotNull);
+      debugPrint('WINDOWS READER STAGE runtime_available');
       webViewEnvironment = await WebViewEnvironment.create(
           settings: WebViewEnvironmentSettings(
               userDataFolder: '${root.path}/webview'));
+      debugPrint('WINDOWS READER STAGE environment_ready');
       final book = Book(
           id: 1,
           title: 'Fixture',
@@ -79,6 +83,7 @@ void main() {
           createTime: DateTime(2026),
           updateTime: DateTime(2026));
       for (var cycle = 0; cycle < 3; cycle++) {
+        debugPrint('WINDOWS READER STAGE extract_start cycle=${cycle + 1}');
         final chapters = await BookContentSearchRepository()
             .extractChaptersForIndex(book)
             .timeout(const Duration(minutes: 2));

@@ -1,0 +1,57 @@
+name: Windows reader diagnostic
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  reader:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: NuGet/setup-nuget@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Prepare synthetic reader test
+        run: |
+          rustup default stable
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          npm ci --prefix assets/foliate-js
+          (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Native reader test
+        env:
+          CMAKE_BUILD_PARALLEL_LEVEL: '3'
+        run: flutter test integration_test/windows_reader_extraction_test.dart -d windows --dart-define=MODU_WINDOWS_READER_TEST=true --reporter expanded
+      - name: Retain native evidence from synthetic CI account only
+        if: always()
+        shell: pwsh
+        run: |
+          $trace = Join-Path $env:LOCALAPPDATA 'com.modu.reader/native-crash/pending.txt'
+          if (Test-Path $trace) { Get-Content $trace }
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000; StartTime=(Get-Date).AddMinutes(-30)} -ErrorAction SilentlyContinue | ForEach-Object { $_.Message }
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-reader-diagnostic-${{ github.sha }}
+          path: |
+            ~/AppData/Local/com.modu.reader/native-crash/*.txt
+            build/windows/**/Debug/*.pdb
+            build/windows/**/Debug/*.dll
+            build/windows/**/Debug/modu.exe
+          retention-days: 7
