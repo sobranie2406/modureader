@@ -9,6 +9,7 @@ import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
+import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
 import 'package:archive/archive.dart';
@@ -31,6 +32,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     final root = await Directory.systemTemp.createTemp('modu-reader-fixture-');
+    final evidenceRoot = Platform.environment['GITHUB_WORKSPACE'];
+    await CrashJournal.initialize(
+        directory: Directory(evidenceRoot == null
+            ? '${root.path}/journal'
+            : '$evidenceRoot/build/reader-diagnostic/journal'),
+        version: 'windows-reader-fixture');
     documentPath = root.path;
     await tester.pumpWidget(MaterialApp(
         navigatorKey: navigatorKey,

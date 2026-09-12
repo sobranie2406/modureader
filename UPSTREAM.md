@@ -54,6 +54,10 @@ test fixtures into `build/model-test-fixtures`, never production app assets.
 
 ## Vendored libraries
 
+- `third_party/flutter_inappwebview_windows`: 0.7.0-beta.3, Apache-2.0,
+  from https://github.com/pichillilorenzo/flutter_inappwebview. Modu fixes native
+  JavaScript callback null-pointer handling; details in `MODU_PATCH.md` and
+  original LICENSE are preserved alongside the source.
 - `third_party/hf_tokenizers`: hf_tokenizers 1.2.1, MIT, Yusuf Ihsan Gorgel.
   Original Dart API and Rust tokenizers implementation retained; Modu adds explicit
   mobile/ARM cross-compilation in the build hook. Original license is included.

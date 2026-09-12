@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 1.0.3+10011
+version: 1.0.3+10012
 
 environment:
   sdk: '>=3.5.2 <4.0.0'
@@ -135,6 +135,8 @@ dependencies:
       ref: 2ac799a6eeb5da74bf5080a2ba2057272fa52b78
 
 dependency_overrides:
+  flutter_inappwebview_windows:
+    path: third_party/flutter_inappwebview_windows
   hf_tokenizers:
     path: third_party/hf_tokenizers
   icons_plus:

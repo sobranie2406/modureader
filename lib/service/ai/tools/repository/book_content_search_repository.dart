@@ -68,6 +68,11 @@ class BookContentSearchRepository {
         timeout: _searchTimeout,
         isCancelled: isCancelled,
       );
+    } on Object catch (error, stack) {
+      // Preserve the original sanitized failure before native cleanup. A
+      // second failure while closing WebView2 must not erase this evidence.
+      CrashJournal.recordError(error, stack);
+      rethrow;
     } finally {
       // Cleanup continues in the background if native creation is still
       // pending. AnxHeadlessWebView retains it for ordered app shutdown.

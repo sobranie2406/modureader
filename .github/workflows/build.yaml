@@ -191,6 +191,13 @@ jobs:
             build/windows/**/Release/flutter_windows.dll
           if-no-files-found: error
           retention-days: 90
+      - name: Native Windows reader extraction regression
+        if: matrix.platform == 'windows' && matrix.arch == 'x64'
+        run: flutter test integration_test/windows_reader_extraction_test.dart -d windows --dart-define=MODU_WINDOWS_READER_TEST=true --reporter expanded
+      - name: Native Windows null callback regression
+        if: matrix.platform == 'windows' && matrix.arch == 'x64'
+        shell: pwsh
+        run: ./scripts/release/test-windows-js-callback.ps1
       - name: Verify architecture and package
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify Windows installation and uninstallation
@@ -213,13 +220,6 @@ jobs:
             dist-release/*.sha256
           if-no-files-found: error
           retention-days: 14
-
-      # Keep the installable release candidate available while the separate
-      # native test executable is compiled. A regression failure still fails
-      # this job; uploading the candidate is not a declaration of test success.
-      - name: Native Windows EPUB extraction regression
-        if: matrix.platform == 'windows' && matrix.arch == 'x64'
-        run: flutter test integration_test/windows_reader_extraction_test.dart -d windows --dart-define=MODU_WINDOWS_READER_TEST=true --reporter expanded
 
   android:
     needs: [targets, models]

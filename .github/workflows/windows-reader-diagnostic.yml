@@ -37,12 +37,19 @@ jobs:
         env:
           CMAKE_BUILD_PARALLEL_LEVEL: '3'
         run: flutter test integration_test/windows_reader_extraction_test.dart -d windows --dart-define=MODU_WINDOWS_READER_TEST=true --reporter expanded
+      - name: Native null callback regression
+        if: always()
+        shell: pwsh
+        run: ./scripts/release/test-windows-js-callback.ps1
       - name: Retain native evidence from synthetic CI account only
         if: always()
         shell: pwsh
         run: |
           $trace = Join-Path $env:LOCALAPPDATA 'com.modu.reader/native-crash/pending.txt'
           New-Item -ItemType Directory -Force 'build/reader-diagnostic' | Out-Null
+          if (Test-Path 'build/reader-diagnostic/journal/session.json') {
+            Get-Content 'build/reader-diagnostic/journal/session.json'
+          }
           if (Test-Path $trace) {
             Copy-Item $trace 'build/reader-diagnostic/pending.txt'
             Get-Content $trace
@@ -56,6 +63,7 @@ jobs:
           name: windows-reader-diagnostic-${{ github.sha }}
           path: |
             build/reader-diagnostic/*.txt
+            build/reader-diagnostic/journal/*.json
             build/windows/**/Debug/*.pdb
             build/windows/**/Debug/*.dll
             build/windows/**/Debug/modu.exe
