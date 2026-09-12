@@ -8,6 +8,7 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
 import 'package:archive/archive.dart';
@@ -91,6 +92,25 @@ void main() {
         expect(chapters.values.join('\n'), contains('MODU_SENTINEL_two'));
         debugPrint('WINDOWS EPUB EXTRACTION PASS cycle=${cycle + 1}');
       }
+      // TXT import uses the production TXT-to-EPUB converter. Keep exactly
+      // 42 characters to cover the user's size-independent reproduction.
+      const tinyText = 'MODU tiny TXT indexing fixture has 42 chars';
+      expect(tinyText.length, 42);
+      final txt = await File('${root.path}/tiny.txt').writeAsString(tinyText);
+      final converted = await convertFromTxt(txt);
+      await converted.copy('${root.path}/tiny.epub');
+      final tinyChapters = await BookContentSearchRepository()
+          .extractChaptersForIndex(book.copyWith(id: 2, filePath: 'tiny.epub'))
+          .timeout(const Duration(minutes: 2));
+      expect(tinyChapters.values.join('\n'), contains(tinyText));
+      debugPrint('WINDOWS TXT EXTRACTION PASS chars=42');
+
+      await File('${root.path}/tiny.pdf').writeAsBytes(_tinyPdf());
+      final pdfChapters = await BookContentSearchRepository()
+          .extractChaptersForIndex(book.copyWith(id: 3, filePath: 'tiny.pdf'))
+          .timeout(const Duration(minutes: 2));
+      expect(pdfChapters.values.join('\n'), contains('MODU_PDF_SENTINEL'));
+      debugPrint('WINDOWS PDF EXTRACTION PASS');
     } finally {
       await AnxHeadlessWebView.disposeAll()
           .timeout(const Duration(seconds: 20));
@@ -101,4 +121,31 @@ void main() {
       // Leave only this synthetic OS temp directory for the CI runner cleanup.
     }
   }, timeout: const Timeout(Duration(minutes: 8)));
+}
+
+// ASCII-only, one-page PDF with real selectable text and exact xref offsets.
+// No user document, external resources, encryption or scanned-image OCR.
+List<int> _tinyPdf() {
+  const stream = 'BT /F1 12 Tf 40 100 Td (MODU_PDF_SENTINEL) Tj ET\n';
+  final objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] '
+        '/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Length ${stream.length} >>\nstream\n${stream}endstream',
+  ];
+  final data = StringBuffer('%PDF-1.4\n');
+  final offsets = <int>[];
+  for (var i = 0; i < objects.length; i++) {
+    offsets.add(data.length);
+    data.write('${i + 1} 0 obj\n${objects[i]}\nendobj\n');
+  }
+  final xref = data.length;
+  data.write('xref\n0 6\n0000000000 65535 f \n');
+  for (final offset in offsets) {
+    data.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+  }
+  data.write('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n$xref\n%%EOF\n');
+  return ascii.encode(data.toString());
 }

@@ -28,6 +28,8 @@ const char* PublicModule(HMODULE module) {
   struct Library { const wchar_t* wide; const char* narrow; };
   static const Library allowed[] = {
     {L"modu.exe", "modu.exe"}, {L"flutter_windows.dll", "flutter_windows.dll"},
+    {L"flutter_inappwebview_windows_plugin.dll", "flutter_inappwebview_windows_plugin.dll"},
+    {L"WebView2Loader.dll", "webview2loader.dll"},
     {L"onnxruntime.dll", "onnxruntime.dll"}, {L"tokenizers_ffi.dll", "tokenizers_ffi.dll"},
     {L"ntdll.dll", "ntdll.dll"}, {L"kernel32.dll", "kernel32.dll"},
     {L"kernelbase.dll", "kernelbase.dll"}, {L"ucrtbase.dll", "ucrtbase.dll"},

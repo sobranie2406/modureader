@@ -32,6 +32,8 @@ class NativeStackDiagnostics {
     'UIKitCore',
     'modu.exe',
     'flutter_windows.dll',
+    'flutter_inappwebview_windows_plugin.dll',
+    'webview2loader.dll',
     'onnxruntime.dll',
     'tokenizers_ffi.dll',
     'ntdll.dll',

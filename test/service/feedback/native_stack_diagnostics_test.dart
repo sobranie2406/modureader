@@ -69,6 +69,8 @@ void main() {
       'active': true,
       'trace': 'modu-native-v1\ncode=c0000005\ntime=1000\nbuild=6330\n'
           'frame=onnxruntime.dll|123|aa-bb\n'
+          'frame=flutter_inappwebview_windows_plugin.dll|124|aa-bb\n'
+          'frame=webview2loader.dll|125|aa-bb\n'
           'frame=secret.dll|456|cc-dd\n'
           'frame=/Users/SECRET|789|aa\n'
           'frame=onnxruntime.dll|SECRET|aa\n'
@@ -77,6 +79,8 @@ void main() {
     expect(report, contains('Exception: 0xc0000005'));
     expect(report, contains('Crash app build: 6330'));
     expect(report, contains('onnxruntime.dll +0x123'));
+    expect(report, contains('flutter_inappwebview_windows_plugin.dll +0x124'));
+    expect(report, contains('webview2loader.dll +0x125'));
     expect(report, contains('omitted +0x456'));
     expect(report, isNot(contains('SECRET')));
     expect(report, isNot(contains('secret.dll')));
