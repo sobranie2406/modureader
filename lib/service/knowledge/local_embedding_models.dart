@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:anx_reader/service/knowledge/bundled_embedding_assets.dart';
 import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:crypto/crypto.dart';
 
@@ -90,24 +91,34 @@ class LocalEmbeddingModelStore {
     Directory? rootDirectory,
     http.Client? client,
     EmbeddingModelManifest? manifest,
+    BundledEmbeddingAssets? bundledAssets,
+    this.useBundledAssets = true,
     this.downloadTimeout = const Duration(seconds: 60),
   })  : _rootDirectory = rootDirectory,
         _client = client ?? http.Client(),
-        _manifest = manifest ?? EmbeddingModelManifest();
+        _manifest = manifest ?? EmbeddingModelManifest(),
+        _bundledAssets = bundledAssets ?? BundledEmbeddingAssets();
 
   final Directory? _rootDirectory;
   final http.Client _client;
   final EmbeddingModelManifest _manifest;
+  final BundledEmbeddingAssets _bundledAssets;
+  final bool useBundledAssets;
   final Duration downloadTimeout;
   bool _closed = false;
   static final Map<String, Future<void>> _downloads = {};
   final Map<String, String> _verifiedFiles = {};
 
   Future<void> ensureAvailable(LocalEmbeddingModel model) async {
+    if (await isDownloaded(model)) return;
+    if (await isBundled(model)) await download(model);
     if (!await isDownloaded(model)) {
       throw StateError('本地模型 ${model.name} 尚未下载或文件损坏，请前往「设置 → 向量模型」下载后重试');
     }
   }
+
+  Future<bool> isBundled(LocalEmbeddingModel model) async =>
+      useBundledAssets && await _bundledAssets.contains(model.id);
 
   Future<Directory> get rootDirectory async {
     if (_rootDirectory != null) return _rootDirectory;
@@ -197,6 +208,7 @@ class LocalEmbeddingModelStore {
     final directory = await modelDirectory(model);
     await directory.create(recursive: true);
     final files = await _manifest.files(model.id);
+    final bundled = await isBundled(model);
     final total = files.fold<int>(0, (sum, file) => sum + file.size);
     var completed = 0;
 
@@ -204,10 +216,23 @@ class LocalEmbeddingModelStore {
       for (final item in files) {
         final destination = File(path.join(directory.path, item.name));
         if (!await _valid(destination, item)) {
-          await _downloadFile(item, destination, onProgress: (fileProgress) {
+          void report(double fileProgress) {
             onProgress?.call(
                 ((completed + item.size * fileProgress) / total).clamp(0, .99));
-          });
+          }
+
+          if (bundled) {
+            final temporary = File('${destination.path}.part');
+            await _bundledAssets.copyFile(model.id, item.name, temporary);
+            if (!await _valid(temporary, item)) {
+              throw const FormatException('内嵌模型文件校验失败，请重新安装完整安装包');
+            }
+            await _deleteIfExists(destination);
+            await temporary.rename(destination.path);
+            report(1);
+          } else {
+            await _downloadFile(item, destination, onProgress: report);
+          }
         }
         completed += item.size;
       }

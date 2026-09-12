@@ -170,8 +170,8 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
               },
               {
                 "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '书库 WebDAV'
-                    : 'Library WebDAV',
+                    ? '远程书库设置'
+                    : 'Remote library settings',
                 "icon": Icons.folder_shared_outlined,
                 "sections": const RemoteLibrarySettings(),
                 "subtitles": [

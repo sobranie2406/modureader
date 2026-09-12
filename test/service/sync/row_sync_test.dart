@@ -55,6 +55,37 @@ class MemorySyncClient extends SyncClientBase {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class MissingValidatorClient extends MemorySyncClient {
+  MissingValidatorClient(this.missingAttempts);
+  final int missingAttempts;
+  int attempts = 0;
+  Future<void> Function()? onMissing;
+
+  @override
+  Future<RemoteFile?> readProps(String path) async {
+    final file = await super.readProps(path);
+    if (file == null || attempts >= missingAttempts) return file;
+    return RemoteFile(
+        path: file.path,
+        name: file.name,
+        isDir: file.isDir,
+        size: file.size,
+        mTime: file.mTime);
+  }
+
+  @override
+  Future<void> uploadFileConditionally(String localPath, String remotePath,
+      {String? expectedETag, bool createOnly = false}) async {
+    attempts++;
+    if (!createOnly && !WebdavClient.isStrongETag(expectedETag)) {
+      await onMissing?.call();
+      throw MissingSyncValidatorException();
+    }
+    await super.uploadFileConditionally(localPath, remotePath,
+        expectedETag: expectedETag, createOnly: createOnly);
+  }
+}
+
 Future<Database> fixture(
     {int bookId = 1, bool install = true, String? path}) async {
   final db = await databaseFactoryFfi.openDatabase(path ?? inMemoryDatabasePath,
@@ -391,7 +422,10 @@ void main() {
     expect(source, isNot(contains('determineSyncDirection(')));
     expect(
         source, isNot(contains('await client.remove(SyncPaths.data(file))')));
-    expect(source, contains('if (_syncRunning) return;'));
+    expect(
+        source,
+        contains(RegExp(
+            r'if \(_syncRunning\) \{\s*if \(!automatic\) _pendingManualDirection = direction;\s*return;')));
   });
 
   test(
@@ -406,18 +440,74 @@ void main() {
       final client = MemorySyncClient();
       final original = await File('${temp.path}/legacy.db').readAsBytes();
       client.files['modu/database7.db'] = original;
-      await RowSyncEngine(store: sa, client: client, cache: temp).synchronize();
+      expect(
+          await RowSyncEngine(store: sa, client: client, cache: temp)
+              .synchronize(),
+          RowSyncOutcome.published);
       expect(client.files['modu/database7.db'], original);
       expect(client.files.containsKey('modu/database8.db'), isTrue);
       expect((await a.query('tb_notes')).map((r) => r['content']).toSet(),
           {'old cloud note', 'new local note'});
       final writes = client.writes;
-      await RowSyncEngine(store: sa, client: client, cache: temp).synchronize();
+      expect(
+          await RowSyncEngine(store: sa, client: client, cache: temp)
+              .synchronize(),
+          RowSyncOutcome.unchanged);
       expect(client.writes, writes);
     } finally {
       await temp.delete(recursive: true);
     }
   });
+
+  for (final missingAttempts in [1, 10]) {
+    test('missing validator retries safely ($missingAttempts failures)',
+        () async {
+      final temp =
+          await Directory.systemTemp.createTemp('modu-validator-test-');
+      try {
+        final client = MissingValidatorClient(missingAttempts);
+        final cloudPath = '${temp.path}/cloud.db';
+        await RowSyncArchive.write(cloudPath, await sb.snapshot());
+        client.files[RowSyncEngine.remotePath] =
+            await File(cloudPath).readAsBytes();
+        await a.insert('tb_notes', noteRow(1, 'local note'));
+        // A second device publishes while the validator is missing. Retrying
+        // must download that new snapshot, not just fetch its new ETag.
+        client.onMissing = () async {
+          if (client.attempts != 1) return;
+          await b.insert('tb_notes', noteRow(77, 'concurrent cloud note'));
+          final concurrentPath = '${temp.path}/concurrent.db';
+          await RowSyncArchive.write(concurrentPath, await sb.snapshot());
+          client.files[RowSyncEngine.remotePath] =
+              await File(concurrentPath).readAsBytes();
+          client.revisions[RowSyncEngine.remotePath] = 2;
+        };
+        final run = RowSyncEngine(
+                store: sa,
+                client: client,
+                cache: temp,
+                validatorRetryDelay: Duration.zero)
+            .synchronize();
+        if (missingAttempts == 1) {
+          expect(await run, RowSyncOutcome.published);
+          expect(client.attempts, 2);
+          expect(client.writes, 1);
+          await File(cloudPath)
+              .writeAsBytes(client.files[RowSyncEngine.remotePath]!);
+          final records = await RowSyncArchive.read(cloudPath);
+          expect(records.where((r) => r.kind == 'note').length, 2);
+        } else {
+          await expectLater(run, throwsA(isA<MissingSyncValidatorException>()));
+          expect(client.attempts, 3);
+          expect(client.writes, 0);
+        }
+        expect((await a.query('tb_notes')).map((r) => r['content']).toSet(),
+            {'local note', 'concurrent cloud note'});
+      } finally {
+        await temp.delete(recursive: true);
+      }
+    });
+  }
 
   test('fresh empty device downloads records without overwriting cloud',
       () async {

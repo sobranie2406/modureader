@@ -28,6 +28,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   late final TextEditingController _dimensionController;
   late final LocalEmbeddingModelStore _localModelStore;
   final Map<String, bool> _downloadedModels = {};
+  final Map<String, bool> _bundledModels = {};
   final Map<String, double> _downloadProgress = {};
   final Set<String> _testingModels = {};
   bool _loadingLocalModels = true;
@@ -119,9 +120,12 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
 
   Future<void> _refreshLocalModels() async {
     final states = <String, bool>{};
+    final bundled = <String, bool>{};
     try {
       for (final model in LocalEmbeddingModels.all) {
-        states[model.id] = await _localModelStore.isDownloaded(model);
+        bundled[model.id] = await _localModelStore.isBundled(model);
+        states[model.id] =
+            bundled[model.id]! || await _localModelStore.isDownloaded(model);
       }
     } catch (_) {
       if (mounted) {
@@ -134,6 +138,9 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       _downloadedModels
         ..clear()
         ..addAll(states);
+      _bundledModels
+        ..clear()
+        ..addAll(bundled);
       _loadingLocalModels = false;
     });
   }
@@ -265,8 +272,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         ),
         if (!isRemote)
           SettingsSection(
-            title: Text(
-                _label('本地模型 · 按需下载', 'Local models · Download on demand')),
+            title:
+                Text(_label('本地模型 · 离线内嵌', 'Local models · Bundled offline')),
             tiles: [
               CustomSettingsTile(
                 child: _buildLocalModels(),
@@ -306,8 +313,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             alignment: AlignmentDirectional.centerStart,
             child: Text(
               _label(
-                '安装包不内嵌模型。请先下载需要的模型及分词器，校验完成后即可离线使用，无需 API Key。下载来源为 Hugging Face，会消耗网络流量；请保持此页面打开，离开会中断下载，可返回重试。旧版已准备的完整模型会继续复用。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
-                'Models are not bundled. Download a model and its tokenizer to use them offline without an API key. Downloads use Hugging Face and consume network data. Keep this page open; leaving interrupts the download and you can retry later. Verified files from earlier versions are reused. Automatic indexing is off by default; reindex books after switching models.',
+                '安装包内嵌四个模型及分词器，无需下载或 API Key。首次使用时自动准备所选模型并校验文件，可离线完成。旧版完整模型会继续复用；若安装资源缺失，可手动下载修复（来自 Hugging Face，会消耗流量）。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
+                'All four models and tokenizers are bundled. No download or API key is needed. The selected model is prepared and verified offline on first use. Valid existing files are reused. If packaged assets are missing, a manual repair download from Hugging Face is available and consumes data. Automatic indexing is off by default; reindex books after switching models.',
               ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -319,6 +326,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
 
   Widget _buildLocalModelCard(LocalEmbeddingModel model, bool selected) {
     final downloaded = _downloadedModels[model.id] ?? false;
+    final bundled = _bundledModels[model.id] ?? false;
     final progress = _downloadProgress[model.id];
     final testing = _testingModels.contains(model.id);
     final colors = Theme.of(context).colorScheme;
@@ -365,7 +373,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             const SizedBox(height: 8),
             Text(
               '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${_label('维', 'dimensions')}'
-              ' · ${downloaded ? _label('已下载', 'Downloaded') : _label('未下载或需修复', 'Download required')}',
+              ' · ${bundled ? _label('已内嵌 · 离线可用', 'Bundled · Offline ready') : downloaded ? _label('已下载', 'Downloaded') : _label('未下载或需修复', 'Download required')}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (progress != null) ...[

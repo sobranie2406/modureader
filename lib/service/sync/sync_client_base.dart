@@ -1,6 +1,12 @@
 import 'package:anx_reader/models/remote_file.dart';
 import 'package:dio/dio.dart';
 
+/// Raised before any upload when the current revision cannot be protected.
+class MissingSyncValidatorException extends UnsupportedError {
+  MissingSyncValidatorException()
+      : super('本次未取得同步数据库的强 ETag，已保留本机改动并停止上传。请稍后重试；若持续出现，请检查服务器 ETag 支持。');
+}
+
 abstract class SyncClientBase {
   /// Atomic compare-and-swap. Implementations must not fall back to a plain
   /// PUT when the server cannot validate the prior revision.

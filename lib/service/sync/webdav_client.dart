@@ -43,19 +43,20 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<void> ping() async {
-    int count = 0;
-    while (count < 3) {
-      try {
-        await _client.ping();
-        return;
-      } catch (e) {
-        AnxLog.warning('WebDAV ping failed, retrying... ($count)');
-        count++;
-        if (count >= 3) {
-          AnxLog.severe('WebDAV ping failed after 3 attempts: $e');
-          rethrow;
-        }
-      }
+    // Automatic startup probes are retried with backoff by SyncPreflight.
+    // Do not stack three immediate retries (or log private request URLs).
+    // Bound only the probe, not large book uploads on slow connections.
+    final response =
+        await _client.c.req(_client, 'OPTIONS', '/', optionsHandler: (options) {
+      options.headers?['depth'] = '0';
+      options.receiveTimeout = const Duration(seconds: 12);
+      options.sendTimeout = const Duration(seconds: 12);
+    });
+    if (response.statusCode != 200) {
+      throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse);
     }
   }
 
@@ -185,6 +186,7 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<RemoteFile?> readProps(String path) async {
+    var receivedProperties = false;
     try {
       // Client.readProps calls fixSlashes(), turning database7.db into
       // database7.db/. Strict servers reject that file-as-directory request.
@@ -198,6 +200,7 @@ class WebdavClient extends SyncClientBase {
         '<d:getcontentlength/><d:getlastmodified/><d:getetag/>'
         '</d:prop></d:propfind>',
       );
+      receivedProperties = true;
       final document = XmlDocument.parse(response.data as String);
       final resources = document.findAllElements('response', namespace: 'DAV:');
       if (resources.length != 1) {
@@ -232,6 +235,31 @@ class WebdavClient extends SyncClientBase {
           prop.findAllElements('collection', namespace: 'DAV:').isNotEmpty);
       final name = Uri.decodeComponent(
           path.replaceFirst(RegExp(r'/$'), '').split('/').last);
+      var eTag = value('getetag')?.trim();
+      if (!isDirectory &&
+          RegExp(r'^database\d+\.db$').hasMatch(name) &&
+          !isStrongETag(eTag)) {
+        // PROPFIND's response ETag identifies the XML, not the database.
+        // Ask HEAD for THIS file instead; never invent a validator from dates
+        // or promote a weak ETag. RowSyncEngine compares metadata before/after
+        // downloading and still uses If-Match on the resulting strong tag.
+        final head = await _client.c.req(_client, 'HEAD', _safeEncodePath(path),
+            optionsHandler: (options) {
+          options.followRedirects = false;
+          options.validateStatus =
+              (status) => status != null && (status < 300 || status >= 400);
+          options.headers!['cache-control'] = 'no-cache';
+        });
+        if (head.statusCode == 200) {
+          final candidate = head.headers.value('etag')?.trim();
+          if (isStrongETag(candidate)) eTag = candidate;
+        } else if (![405, 501].contains(head.statusCode)) {
+          throw DioException(
+              requestOptions: head.requestOptions,
+              response: head,
+              type: DioExceptionType.badResponse);
+        }
+      }
       return RemoteFile(
         path: path,
         name: name,
@@ -240,22 +268,23 @@ class WebdavClient extends SyncClientBase {
         mTime: modified == null || modified.isEmpty
             ? null
             : io.HttpDate.parse(modified),
-        eTag: value('getetag'),
+        eTag: eTag,
       );
     } on DioException catch (e) {
       // Authentication, network and server failures are not an empty library.
-      if (e.response?.statusCode == 404) return null;
+      if (!receivedProperties && e.response?.statusCode == 404) return null;
       rethrow;
     }
   }
 
+  static bool isStrongETag(String? value) =>
+      value != null && RegExp(r'^"[\x21\x23-\x7E\x80-\xFF]*"$').hasMatch(value);
+
   @override
   Future<void> uploadFileConditionally(String localPath, String remotePath,
       {String? expectedETag, bool createOnly = false}) async {
-    if (!createOnly &&
-        (expectedETag == null ||
-            !RegExp(r'^"[^"\r\n]+"$').hasMatch(expectedETag))) {
-      throw UnsupportedError('服务器没有提供强 ETag，已停止上传以避免覆盖其他设备的数据');
+    if (!createOnly && !isStrongETag(expectedETag)) {
+      throw MissingSyncValidatorException();
     }
     // Replayable bytes preserve the body across a Digest authentication retry.
     final bytes = await io.File(localPath).readAsBytes();

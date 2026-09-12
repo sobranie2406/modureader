@@ -1,4 +1,4 @@
-"""Fetch pinned models for native TESTS; release apps contain only the catalogue."""
+"""Fetch pinned models, stage offline assets and verify release payloads."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -39,7 +39,7 @@ def fetch(job, output):
             if not valid(temporary, item):
                 raise ValueError('Downloaded model hash/size mismatch')
             temporary.replace(destination)
-            print('Test fixture:', model['id'], item['name'], item['size'], flush=True)
+            print('Verified model:', model['id'], item['name'], item['size'], flush=True)
             return
         except Exception:
             if temporary.exists(): temporary.unlink()
@@ -51,11 +51,11 @@ def verify_directory(assets):
     expected = manifest()
     packaged_manifest = assets / 'assets/models/embeddings/manifest.json'
     if not packaged_manifest.is_file() or json.loads(packaged_manifest.read_text()) != expected:
-        raise ValueError('Missing or mismatched model download manifest')
-    extras = [p for p in packaged_manifest.parent.rglob('*')
-              if p.is_file() and p != packaged_manifest]
-    if extras:
-        raise ValueError('Release must not bundle model weights or tokenizers')
+        raise ValueError('Missing or mismatched bundled model manifest')
+    for model in expected['models']:
+        for item in model['files']:
+            if not valid(packaged_manifest.parent / model['id'] / item['name'], item):
+                raise ValueError(f'Missing or corrupt bundled model: {model["id"]}/{item["name"]}')
 
 
 def verify_archive(archive, prefix):
@@ -63,16 +63,37 @@ def verify_archive(archive, prefix):
     base = prefix + 'assets/models/embeddings/'
     if json.loads(archive.read(base + 'manifest.json')) != expected:
         raise ValueError('Mismatched archived model manifest')
-    extras = [name for name in archive.namelist()
-              if name.startswith(base) and not name.endswith('/')
-              and name != base + 'manifest.json']
-    if extras:
-        raise ValueError('Release must not bundle model weights or tokenizers')
+    for model in expected['models']:
+        for item in model['files']:
+            name = base + model['id'] + '/' + item['name']
+            try:
+                info = archive.getinfo(name)
+                with archive.open(name) as source:
+                    digest = hashlib.file_digest(source, 'sha256').hexdigest()
+            except KeyError as error:
+                raise ValueError(f'Missing bundled model: {name}') from error
+            if info.file_size != item['size'] or digest != item['sha256']:
+                raise ValueError(f'Corrupt bundled model: {name}')
+
+
+def install_assets(source, destination=ASSETS):
+    for model in manifest()['models']:
+        for item in model['files']:
+            original = source / model['id'] / item['name']
+            if not valid(original, item):
+                raise ValueError(f'Missing or corrupt model to stage: {original}')
+            target = destination / model['id'] / item['name']
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if original.resolve() != target.resolve() and not valid(target, item):
+                shutil.copyfile(original, target)
+            if not valid(target, item):
+                raise ValueError(f'Corrupt staged model: {target}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--install-assets', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/model-test-fixtures')
     args = parser.parse_args()
     jobs = [(m, f) for m in manifest()['models'] for f in m['files']]
@@ -82,4 +103,6 @@ if __name__ == '__main__':
     for model, item in jobs:
         if not valid(args.output / model['id'] / item['name'], item):
             raise ValueError('Missing or corrupt native test fixture')
-    print('Four native test fixtures verified (not packaged); total bytes:', sum(f['size'] for _, f in jobs))
+    if args.install_assets:
+        install_assets(args.output)
+    print('Four pinned models verified; total bytes:', sum(f['size'] for _, f in jobs))

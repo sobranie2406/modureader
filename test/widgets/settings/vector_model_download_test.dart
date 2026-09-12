@@ -11,10 +11,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ControlledModelStore extends LocalEmbeddingModelStore {
+  ControlledModelStore({this.bundled = false});
+  final bool bundled;
   final ready = <String>{};
   final done = Completer<void>();
   var calls = 0;
   bool closed = false;
+  @override
+  Future<bool> isBundled(LocalEmbeddingModel model) async => bundled;
   @override
   Future<bool> isDownloaded(LocalEmbeddingModel model) async =>
       ready.contains(model.id);
@@ -36,6 +40,25 @@ class ControlledModelStore extends LocalEmbeddingModelStore {
 }
 
 void main() {
+  testWidgets('bundled models show offline availability without downloading',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await Prefs().initPrefs();
+    final store = ControlledModelStore(bundled: true);
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: L10n.supportedLocales,
+      localizationsDelegates: L10n.localizationsDelegates,
+      home: Scaffold(body: VectorModelSettings(modelStore: store)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('已内嵌 · 离线可用'), findsNWidgets(4));
+    expect(find.text('测试推理'), findsNWidgets(4));
+    expect(find.text('下载并使用'), findsNothing);
+    expect(store.calls, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   for (final size in [const Size(390, 844), const Size(1100, 1000)]) {
     testWidgets('on-demand download, progress and availability at $size',
         (tester) async {
@@ -55,7 +78,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       AnxToast.fToast.init(tester.element(find.byType(VectorModelSettings)));
-      expect(find.text('本地模型 · 按需下载'), findsOneWidget);
+      expect(find.text('本地模型 · 离线内嵌'), findsOneWidget);
       expect(find.text('下载并使用'), findsNWidgets(4));
       expect(find.text('测试推理'), findsNothing);
       expect(store.calls, 0);

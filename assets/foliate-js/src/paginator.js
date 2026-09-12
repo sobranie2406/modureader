@@ -1,6 +1,7 @@
 import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
 import { waitForReaderFonts } from './reader-font-ready.js'
+import { SectionWindowCache } from './section-window-cache.js'
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -451,6 +452,7 @@ export class Paginator extends HTMLElement {
   #rtl = false
   #margin = 0
   #index = -1
+  #sectionCache
   #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
   #justAnchored = false
   #locked = false // while true, prevent any further navigation
@@ -663,8 +665,10 @@ export class Paginator extends HTMLElement {
     }
   }
   open(book) {
+    this.#sectionCache?.destroy()
     this.bookDir = book.dir
     this.sections = book.sections
+    this.#sectionCache = new SectionWindowCache(this.sections)
   }
   #applyBackground() {
     const url = this.getAttribute('bgimg-url') ?? 'none'
@@ -1363,25 +1367,29 @@ export class Paginator extends HTMLElement {
   async #goTo({ index, anchor, select }) {
     if (index === this.#index) await this.#display({ index, anchor, select })
     else {
-      const oldIndex = this.#index
       const onLoad = detail => {
-        this.sections[oldIndex]?.unload?.()
         this.setStyles(this.#styles)
         this.dispatchEvent(new CustomEvent('load', { detail }))
       }
-      await this.#display(Promise.resolve(this.sections[index].load())
+      await this.#display(this.#sectionCache.load(index)
         .then(src => ({ index, src, anchor, onLoad, select }))
         .catch(e => {
           console.warn(e)
           console.warn(new Error(`Failed to load section ${index}`))
-          return {}
+          throw e
         }))
     }
+    this.#sectionCache.setCurrent(index)
   }
   async goTo(target) {
     if (this.#locked) return
-    const resolved = await target
-    if (this.#canGoToIndex(resolved.index)) return this.#goTo(resolved)
+    this.#locked = true
+    try {
+      const resolved = await target
+      if (this.#canGoToIndex(resolved.index)) return await this.#goTo(resolved)
+    } finally {
+      this.#locked = false
+    }
   }
   #scrollPrev(distance) {
     if (!this.#view) return true
@@ -1417,7 +1425,7 @@ export class Paginator extends HTMLElement {
       if (this.sections[index]?.linear !== 'no') return index
   }
   async #turnPage(dir, distance) {
-    // if (this.#locked) return
+    if (this.#locked) return
     this.#locked = true
     try {
       const prev = dir === -1
@@ -1482,9 +1490,9 @@ export class Paginator extends HTMLElement {
   }
   destroy() {
     this.#observer.unobserve(this)
-    this.#view.destroy()
+    this.#view?.destroy()
     this.#view = null
-    this.sections[this.#index]?.unload?.()
+    this.#sectionCache?.destroy()
     this.#mediaQuery.removeEventListener('change', this.#mediaQueryListener)
     if (this.#pendingScrollFrame) {
       cancelAnimationFrame(this.#pendingScrollFrame)

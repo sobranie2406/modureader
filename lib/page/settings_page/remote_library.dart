@@ -90,7 +90,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     return ListView(padding: const EdgeInsets.all(24), children: [
-      Text(t('书库 WebDAV', 'Library WebDAV'),
+      Text(t('远程书库设置', 'Remote library settings'),
           style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 12),
       Text(t('连接独立的远程书籍目录，只浏览和下载。不会修改服务器文件，也不会改变现有 WebDAV 同步设置。',

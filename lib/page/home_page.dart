@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:anx_reader/dao/database.dart';
@@ -106,7 +107,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     InitializationCheck.check();
     if (Prefs().webdavStatus) {
       await Sync().init();
-      await Sync().syncData(SyncDirection.both, ref, trigger: SyncTrigger.auto);
+      unawaited(
+          Sync().syncData(SyncDirection.both, null, trigger: SyncTrigger.auto));
     }
     loadDefaultFont();
 

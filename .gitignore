@@ -38,8 +38,10 @@ migrate_working_dir/
 # Local translation preferences and intermediate drafts; publish README_EN.md.
 /.baoyu-skills/
 /README-en/
-# Downloaded model weights are local files, never source or installer assets.
-/assets/models/embeddings/*/
+# Pinned model payloads are staged for packaging, not committed as source.
+/assets/models/embeddings/*/*.onnx
+/assets/models/embeddings/*/tokenizer.json
+/assets/models/embeddings/*/*.part
 __pycache__/
 **/target/
 *.p12

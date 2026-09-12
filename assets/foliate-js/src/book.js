@@ -3,7 +3,7 @@ console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
-import { attachFootnoteSizing } from './footnote-size.js'
+import { attachFootnoteSizing, footnoteLayoutCSS } from './footnote-size.js'
 import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
@@ -1016,8 +1016,7 @@ const replaceFootnote = (view) => {
     headingFontSize: style.headingFontSize,
   }
   const css = getCSS(footNoteStyle)
-  const noteLayoutCSS = 'html, body { min-height: 0 !important; height: auto !important; }'
-  renderer.setStyles(css + noteLayoutCSS)
+  renderer.setStyles(css + footnoteLayoutCSS)
   // set background color of dialog
   // if #rrggbbaa, replace aa to ee
   footnoteDialog.style.backgroundColor = style.backgroundColor.slice(0, 7) + '33'
@@ -1048,7 +1047,9 @@ class Reader {
     this.#footnoteHandler.addEventListener('render', e => {
       const { doc } = e.detail
       footnoteSizing?.destroy()
-      footnoteSizing = attachFootnoteSizing(footnoteDialog, doc)
+      footnoteSizing = attachFootnoteSizing(footnoteDialog, doc, {
+        desktop: style.desktopPageInput === true,
+      })
     })
     this.#originalContent = null
   }

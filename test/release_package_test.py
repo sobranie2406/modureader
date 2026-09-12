@@ -138,7 +138,7 @@ class BundledModelsTest(unittest.TestCase):
                 self.assertGreater(item['size'], 0)
                 self.assertRegex(item['sha256'], r'^[0-9a-f]{64}$')
 
-    def test_catalog_only_packages_pass_and_bundled_weights_are_rejected(self):
+    def test_bundled_packages_require_all_files_and_matching_hashes(self):
         payload = b'public test model'
         manifest = {'models': [{'id': 'test', 'files': [{
             'name': 'model_quantized.onnx', 'size': len(payload),
@@ -150,16 +150,17 @@ class BundledModelsTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bundle_models.verify_directory(root)
             (base / 'manifest.json').write_text(json.dumps(manifest))
-            bundle_models.verify_directory(root)
+            with self.assertRaises(ValueError):
+                bundle_models.verify_directory(root)
             with zipfile.ZipFile(root / 'catalog.zip', 'w') as archive:
                 archive.write(base / 'manifest.json', 'flutter_assets/assets/models/embeddings/manifest.json')
             with zipfile.ZipFile(root / 'catalog.zip') as archive:
-                bundle_models.verify_archive(archive, 'flutter_assets/')
+                with self.assertRaises(ValueError):
+                    bundle_models.verify_archive(archive, 'flutter_assets/')
             (base / 'test').mkdir()
             model = base / 'test/model_quantized.onnx'
             model.write_bytes(payload)
-            with self.assertRaises(ValueError):
-                bundle_models.verify_directory(root)
+            bundle_models.verify_directory(root)
             for content in (payload, b'x' * len(payload)):
                 model.write_bytes(content)
                 with zipfile.ZipFile(root / 'assets.zip', 'w') as archive:
@@ -167,19 +168,45 @@ class BundledModelsTest(unittest.TestCase):
                         if asset.is_file():
                             archive.write(asset, 'flutter_assets/' + asset.relative_to(root).as_posix())
                 with zipfile.ZipFile(root / 'assets.zip') as archive:
-                    with self.assertRaises(ValueError):
+                    if content == payload:
                         bundle_models.verify_archive(archive, 'flutter_assets/')
-                    with self.assertRaises(ValueError):
                         bundle_models.verify_directory(root)
+                    else:
+                        with self.assertRaises(ValueError):
+                            bundle_models.verify_archive(archive, 'flutter_assets/')
+                        with self.assertRaises(ValueError):
+                            bundle_models.verify_directory(root)
 
-    def test_flutter_packages_only_model_manifest(self):
+    def test_flutter_declares_all_four_model_asset_directories(self):
         root = Path(__file__).resolve().parents[1]
         spec = (root / 'pubspec.yaml').read_text()
         self.assertIn('    - assets/models/embeddings/manifest.json\n', spec)
         for model in bundle_models.manifest()['models']:
-            self.assertNotIn(f'    - assets/models/embeddings/{model["id"]}/', spec)
+            self.assertIn(f'    - assets/models/embeddings/{model["id"]}/', spec)
         self.assertNotIn('    - assets/models/embeddings/\n', spec)
         self.assertIn("androidTest.assets.srcDirs", (root / 'android/app/build.gradle').read_text())
+
+    def test_staging_copies_verified_files_and_repairs_corrupt_assets(self):
+        payload = b'pinned offline fixture'
+        manifest = {'models': [{'id': 'fixture', 'files': [{
+            'name': 'model_quantized.onnx', 'size': len(payload),
+            'sha256': hashlib.sha256(payload).hexdigest()}]}]}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(bundle_models, 'manifest', return_value=manifest):
+            source = Path(tmp) / 'source'
+            target = Path(tmp) / 'assets'
+            (source / 'fixture').mkdir(parents=True)
+            original = source / 'fixture/model_quantized.onnx'
+            original.write_bytes(payload)
+            bundle_models.install_assets(source, target)
+            staged = target / 'fixture/model_quantized.onnx'
+            self.assertEqual(staged.read_bytes(), payload)
+            staged.write_bytes(b'corrupt')
+            bundle_models.install_assets(source, target)
+            self.assertEqual(staged.read_bytes(), payload)
+            original.write_bytes(b'corrupt input')
+            with self.assertRaises(ValueError):
+                bundle_models.install_assets(source, target)
+            self.assertEqual(staged.read_bytes(), payload)
 
 spec = importlib.util.spec_from_file_location(
     "release_package", Path(__file__).resolve().parents[1] / "scripts/release/package.py")

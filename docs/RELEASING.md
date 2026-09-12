@@ -13,7 +13,7 @@ Windows 封装从 Visual Studio 当前工具链的 Redist 目录复制对应架�
 
 以上修正随 build 6326 重新构建；原 build 6325 下载缓存不包含这些修复。
 
-普通构建无需下载模型。安装包仅含 `assets/models/embeddings/manifest.json` 模型目录，固定上游提交、大小与 SHA-256；用户在设置中按需下载模型及分词器，校验后离线使用。打包脚本检查目录一致性，并拒绝夹带权重或分词器。原生推理测试另行运行 `python3 scripts/release/bundle_models.py`（Python 3.11+），下载校验后的测试资源至 `build/model-test-fixtures`：macOS CI 在回环地址启动测试文件服务器，集成测试通过 `--dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/` 下载校验后断网推理，不要求沙盒读取宿主工作区；Android 仅将测试资源放入独立 androidTest APK，不进入正式 APK。权重不进入 Git 历史。许可证与来源见 UPSTREAM.md 和 LICENSES。
+1.0.4 安装包内嵌四个固定版本 ONNX 模型及分词器。构建前运行 `python3 scripts/release/bundle_models.py --install-assets`（Python 3.11+），按清单校验大小与 SHA-256 并暂存到 Flutter 资源目录。CI 共享已校验的下载制品，各平台在构建前重新校验并写入资源；打包时逐文件复核，缺少或损坏任何模型即停止打包。模型从包内按需提取到本机缓存后离线使用，保留手动下载兼容入口。原生推理测试覆盖包内模型；Android 测试 APK 的额外夹具不混入正式应用。权重不进入 Git 历史。许可证与来源见 UPSTREAM.md 和 LICENSES。
 
 Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBackend-FDO、libwpe、epoxy、GStreamer 及音频插件；不同发行版可能需要自行从源码构建。Windows 需要 Microsoft Edge WebView2 Runtime。
 
@@ -47,7 +47,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 ### 发布步骤
 
 1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
-2. 只在本仓库创建版本标签；GitHub Actions 并行生成各平台/架构制品。
+2. 可先运行 Modu Packages，targets 选择 all、release_tag 填正式标签（例如 v1.0.4）；GitHub Actions 并行生成各平台制品，全部校验通过后才创建对应源码的标签与 Release。也兼容直接推送本仓库版本标签触发构建；既有标签不得指向不同源码。
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
 4. 各包保留 LICENSE、NOTICE，桌面包附 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包及各自 SHA-256，不再上传独立许可 ZIP，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。

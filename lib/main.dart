@@ -235,15 +235,18 @@ class _MyAppState extends ConsumerState<MyApp>
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.detached) CrashJournal.closeSession();
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
-      if (Prefs().webdavStatus) {
-        ref
-            .read(syncProvider.notifier)
-            .syncData(SyncDirection.both, ref, trigger: SyncTrigger.auto);
-      }
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      Sync().pauseAutomaticSync();
     } else if (state == AppLifecycleState.resumed) {
       if (AnxPlatform.isIOS) {
         Server().start();
+      }
+      if (Prefs().webdavStatus) {
+        unawaited(ref
+            .read(syncProvider.notifier)
+            .syncData(SyncDirection.both, null, trigger: SyncTrigger.auto));
       }
     }
   }

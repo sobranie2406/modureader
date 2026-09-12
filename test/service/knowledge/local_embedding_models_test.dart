@@ -53,6 +53,7 @@ void main() {
   LocalEmbeddingModelStore makeStore({http.Client? client, Duration? timeout}) {
     return LocalEmbeddingModelStore(
       rootDirectory: root,
+      useBundledAssets: false,
       manifest: EmbeddingModelManifest(bundle: DownloadManifestBundle()),
       downloadTimeout: timeout ?? const Duration(seconds: 5),
       client: client ??

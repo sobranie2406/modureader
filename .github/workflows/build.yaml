@@ -11,6 +11,10 @@ on:
         description: 'all or comma-separated targets (linux-x64,linux-arm64,windows-x64,windows-arm64,macos-x64,macos-arm64,android,ios)'
         default: all
         type: string
+      release_tag:
+        description: 'Optional version tag to publish only after all packages pass (for example v1.0.4)'
+        default: ''
+        type: string
   push:
     tags: ['v*']
 
@@ -53,7 +57,7 @@ jobs:
         with:
           path: build/model-test-fixtures
           key: model-test-fixtures-${{ hashFiles('assets/models/embeddings/manifest.json') }}
-      - name: Fetch and verify four native test fixtures (not packaged)
+      - name: Fetch and verify four pinned offline models
         run: python3 scripts/release/bundle_models.py
       - uses: actions/upload-artifact@v4
         with:
@@ -84,7 +88,6 @@ jobs:
           apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        if: matrix.platform == 'macos' && matrix.arch == 'arm64'
         with:
           name: embedding-test-fixtures
           path: build/model-test-fixtures
@@ -95,6 +98,8 @@ jobs:
         if: matrix.platform != 'linux'
         with:
           python-version: '3.12'
+      - name: Stage verified offline model assets
+        run: python scripts/release/bundle_models.py --verify-only --install-assets
       - name: Linux native dependencies
         if: matrix.platform == 'linux'
         run: |
@@ -198,6 +203,9 @@ jobs:
         if: matrix.platform == 'windows' && matrix.arch == 'x64'
         shell: pwsh
         run: ./scripts/release/test-windows-js-callback.ps1
+      - name: Native Windows bundled models offline inference
+        if: matrix.platform == 'windows' && matrix.arch == 'x64'
+        run: flutter test integration_test/bundled_embedding_test.dart -d windows --reporter expanded
       - name: Verify architecture and package
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify Windows installation and uninstallation
@@ -232,6 +240,8 @@ jobs:
         with:
           name: embedding-test-fixtures
           path: build/model-test-fixtures
+      - name: Stage verified offline model assets
+        run: python3 scripts/release/bundle_models.py --verify-only --install-assets
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -299,6 +309,15 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: embedding-test-fixtures
+          path: build/model-test-fixtures
+      - name: Stage verified offline model assets
+        run: python3 scripts/release/bundle_models.py --verify-only --install-assets
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -329,7 +348,7 @@ jobs:
           retention-days: 14
 
   release:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
     needs: [quality, desktop, android, ios]
     runs-on: ubuntu-24.04
     permissions:
@@ -344,9 +363,22 @@ jobs:
       - name: Verify complete package set and publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          CREATE_RELEASE_TAG: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
+          expected_tag="v$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+          test "$RELEASE_TAG" = "$expected_tag"
           python3 scripts/release/validate_assets.py dist-release "$RELEASE_TAG"
+          if [[ "$CREATE_RELEASE_TAG" == "true" ]]; then
+            # GitHub's workflow token creates the tag only after validation;
+            # this does not dispatch another tag-triggered packaging run.
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > "$RUNNER_TEMP/modu-release-tag.json"; then
+              python3 -c 'import json,os,sys; ref=json.load(open(sys.argv[1])); assert ref["object"]["type"] == "commit" and ref["object"]["sha"] == os.environ["RELEASE_COMMIT"], "Existing tag points to different source"' "$RUNNER_TEMP/modu-release-tag.json"
+            else
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$RELEASE_COMMIT"
+            fi
+          fi
           if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             gh release create "$RELEASE_TAG" dist-release/* --verify-tag --latest --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
           else

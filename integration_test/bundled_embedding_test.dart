@@ -39,26 +39,30 @@ class FixtureDownloadClient extends http.BaseClient {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets(
-      'all four downloaded models perform real native inference offline',
+  testWidgets('all four models perform real native inference offline',
       (tester) async {
     final root =
         await Directory.systemTemp.createTemp('modu-offline-inference-');
     const fixtureUrl = String.fromEnvironment('MODU_MODEL_TEST_URL');
-    if (fixtureUrl.isEmpty) {
-      throw StateError(
-          'Set MODU_MODEL_TEST_URL to the loopback fixture server');
-    }
-    final client = FixtureDownloadClient(Uri.parse(fixtureUrl));
+    final bundled = fixtureUrl.isEmpty;
+    final client = FixtureDownloadClient(
+        Uri.parse(bundled ? 'http://127.0.0.1:1/' : fixtureUrl));
+    client.downloadsAllowed = !bundled;
     final store = LocalEmbeddingModelStore(
       rootDirectory: root,
       client: client,
+      useBundledAssets: bundled,
     );
     try {
       for (final model in LocalEmbeddingModels.all) {
         expect(await store.isDownloaded(model), isFalse);
-        client.downloadsAllowed = true;
-        await store.download(model);
+        client.downloadsAllowed = !bundled;
+        if (bundled) {
+          expect(await store.isBundled(model), isTrue);
+          await store.ensureAvailable(model);
+        } else {
+          await store.download(model);
+        }
         client.downloadsAllowed = false;
         expect(await store.isDownloaded(model), isTrue);
         final vectors =
@@ -99,9 +103,9 @@ void main() {
               model.dimensions);
         }
       }
-      expect(client.requests, 8,
+      expect(client.requests, bundled ? 0 : 8,
           reason:
-              'Only two explicit downloads per model; inference stays offline');
+              'Bundled models never use network; inference always stays offline');
     } finally {
       await LocalOnnxEmbeddingEngine.instance.release();
       store.close();

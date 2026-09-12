@@ -26,6 +26,8 @@ void main() {
     await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: RemoteLibrarySettings())));
     await tester.pumpAndSettle();
+    expect(find.text('Remote library settings'), findsOneWidget);
+    expect(find.text('Library WebDAV'), findsNothing);
     await tester.scrollUntilVisible(find.byType(ConfigTransferTile), 300,
         scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();

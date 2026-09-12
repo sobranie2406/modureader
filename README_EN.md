@@ -42,8 +42,8 @@ The current version provides the following reading, AI and library features.
 | Area | What it does | Where to find it |
 | --- | --- | --- |
 | Library and import | Import EPUB, PDF, MOBI, AZW3, FB2 and TXT; filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
-| Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Library WebDAV |
-| Reading and layout | Chapter navigation, progress, paginated/scrolling modes, fonts, sizes, spacing, backgrounds and themes; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
+| Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Remote library settings |
+| Reading and layout | Chapter navigation, adjacent resource preloading, paginated/scrolling modes, fonts and themes; adaptive footnotes with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
 | Highlights and notes | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV | Text selection menu; Home → Notes |
 | Mobile quick mark | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page | Pen button in the mobile reader; persistent Exit button restores normal gestures |
 | Reading statistics | Reading time, trends, heatmap and per-book records | Home → Statistics |
@@ -59,7 +59,7 @@ The current version provides the following reading, AI and library features.
 
 ### WebDAV remote library
 
-Enter the full book-directory URL, username and password in Settings → Library WebDAV, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
+Enter the full book-directory URL, username and password in Settings → Remote library settings, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
 
 This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Encrypted service-settings backups also include the connection; ordinary unencrypted backups omit it. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
 
@@ -119,7 +119,7 @@ Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a backgro
 | BGE Small ZH v1.5 | Chinese | 512 |
 | Multilingual E5 Small | Multilingual | 384 |
 
-The four models are **downloaded on demand, not bundled in installers**. In Settings → Embedding Models, choose **Download and use** to fetch only the selected model and tokenizer. Size and SHA-256 checks must pass before offline use; no API key is needed. Downloads use Hugging Face and consume network data. Keep the settings page open during download; interrupted transfers can be retried. Verified files prepared by older versions are reused. Chinese BGE is selected by default and automatic indexing is off. Missing models prompt you to download first; indexing never silently downloads them. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
+All four models and tokenizers are **bundled in installers**. The selected model is prepared offline on first use and verified by size and SHA-256; no download or API key is needed. Valid files from earlier versions are reused. If packaged assets are missing, a manual repair download from Hugging Face remains available; indexing never silently downloads models. Chinese BGE is selected by default and automatic indexing is off. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
 
 Local embeddings only mean that embedding computation happens on your device. Remote chat, embedding, translation or speech services still receive the relevant text. The whole AI workflow should not be described as completely offline.
 

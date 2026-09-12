@@ -7,7 +7,10 @@ void main() {
   late HttpServer server;
   late WebdavClient client;
   var status = 207;
+  var optionsStatus = 200;
   var malformed = false;
+  var headStatus = 200;
+  String? headETag;
   String? xmlOverride;
   final calls = <String>[];
   final requestHeaders = <Map<String, String?>>[];
@@ -16,11 +19,15 @@ void main() {
 <d:href>/library/modu/database7.db</d:href><d:propstat><d:prop>
 <d:resourcetype/><d:getcontentlength>32768</d:getcontentlength>
 <d:getlastmodified>Wed, 09 Sep 2026 13:56:15 GMT</d:getlastmodified>
+<d:getetag>"version-a"</d:getetag>
 </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response></d:multistatus>''';
   setUp(() async {
     status = 207;
+    optionsStatus = 200;
     malformed = false;
+    headStatus = 200;
+    headETag = null;
     xmlOverride = null;
     calls.clear();
     requestHeaders.clear();
@@ -33,13 +40,18 @@ void main() {
       });
       await request.drain<void>();
       request.response.statusCode = request.method == 'OPTIONS'
-          ? 200
-          : request.method == 'MKCOL'
-              ? 201
-              : request.uri.path.endsWith('.db/')
-                  ? 400
-                  : status;
+          ? optionsStatus
+          : request.method == 'HEAD'
+              ? headStatus
+              : request.method == 'MKCOL'
+                  ? 201
+                  : request.uri.path.endsWith('.db/')
+                      ? 400
+                      : status;
       request.response.headers.contentType = ContentType('application', 'xml');
+      if (request.method == 'HEAD' && headETag != null) {
+        request.response.headers.set('etag', headETag!);
+      }
       request.response.write(malformed ? '<bad>' : (xmlOverride ?? xml));
       await request.response.close();
     });
@@ -49,6 +61,22 @@ void main() {
         password: 'test');
   });
   tearDown(() => server.close(force: true));
+
+  for (final code in [200, 403, 503]) {
+    test('connection probe preserves root and error status ($code)', () async {
+      optionsStatus = code;
+      if (code == 200) {
+        await client.ping();
+      } else {
+        await expectLater(
+            client.ping(),
+            throwsA(isA<DioException>()
+                .having((e) => e.response?.statusCode, 'status', code)));
+      }
+      expect(calls, ['OPTIONS /library/']);
+      expect(requestHeaders.single['depth'], '0');
+    });
+  }
 
   test('real WebDAV client reads database metadata under the configured parent',
       () async {
@@ -63,6 +91,57 @@ void main() {
         '<d:resourcetype><d:collection/></d:resourcetype>');
     expect((await client.readProps('modu/data/file/'))?.isDir, isTrue);
     expect(calls.single, 'PROPFIND /library/modu/data/file/');
+  });
+  test('property whitespace is normalized without an additional request',
+      () async {
+    xmlOverride = xml.replaceFirst('"version-a"', ' \n "version-a" \n ');
+    expect((await client.readProps('modu/database8.db'))?.eTag, '"version-a"');
+    expect(calls.length, 1);
+  });
+  for (final value in ['', 'W/"weak"']) {
+    test(
+        'missing or weak PROPFIND ETag falls back to the exact file HEAD: $value',
+        () async {
+      xmlOverride = xml.replaceFirst('"version-a"', value);
+      headETag = '"head-revision"';
+      expect((await client.readProps('modu/database8.db'))?.eTag, headETag);
+      expect(calls, [
+        'PROPFIND /library/modu/database8.db',
+        'HEAD /library/modu/database8.db'
+      ]);
+    });
+  }
+  for (final code in [200, 405, 501]) {
+    test(
+        'no strong HEAD validator does not permit an unconditional upload ($code)',
+        () async {
+      xmlOverride = xml.replaceFirst('"version-a"', 'W/"weak"');
+      headStatus = code;
+      headETag = 'W/"still-weak"';
+      final props = await client.readProps('modu/database8.db');
+      await expectLater(
+          client.uploadFileConditionally('/not-read.db', 'modu/database8.db',
+              expectedETag: props?.eTag),
+          throwsUnsupportedError);
+      expect(calls.any((call) => call.startsWith('PUT ')), isFalse);
+    });
+  }
+  for (final code in [401, 403, 404, 503]) {
+    test(
+        'HEAD failure after positive PROPFIND is not a missing database ($code)',
+        () async {
+      xmlOverride = xml.replaceFirst('"version-a"', '');
+      headStatus = code;
+      await expectLater(
+          client.readProps('modu/database8.db'), throwsA(isA<DioException>()));
+    });
+  }
+  test('strong ETags accept the RFC empty opaque tag, not weak/control tags',
+      () {
+    expect(WebdavClient.isStrongETag('""'), isTrue);
+    for (final value in ['W/"v"', '"a\nb"', '"a b"', '"a\tb"', 'plain']) {
+      expect(WebdavClient.isStrongETag(value), isFalse);
+    }
   });
   test('207 resource-level 404 is absent, but a missing property is not',
       () async {

@@ -81,6 +81,8 @@ class RowSyncArchive {
   }
 }
 
+enum RowSyncOutcome { unchanged, published }
+
 class RowSyncEngine {
   RowSyncEngine(
       {required this.store,
@@ -88,21 +90,24 @@ class RowSyncEngine {
       required this.cache,
       this.beforePublish,
       this.beforeMerge,
-      this.maxAttempts = 3});
+      this.maxAttempts = 3,
+      this.validatorRetryDelay = const Duration(seconds: 1)});
   final RowSyncStore store;
   final SyncClientBase client;
   final Directory cache;
   final Future<void> Function()? beforePublish;
   final Future<void> Function()? beforeMerge;
   final int maxAttempts;
+  final Duration validatorRetryDelay;
   static final remotePath = SyncPaths.database('database8.db');
 
-  Future<void> synchronize() async {
+  Future<RowSyncOutcome> synchronize() async {
     // Complete asset uploads first. Retrying after an interrupted transfer
     // must not advertise unavailable new books as successfully synchronized.
     await beforePublish?.call();
     final staging = await cache.createTemp('modu-row-sync-');
     var backedUp = false;
+    var published = false;
     try {
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         final remote = await client.readProps(remotePath);
@@ -137,13 +142,17 @@ class RowSyncEngine {
           backedUp = true;
         }
         final merged = await store.merge(remoteRecords);
-        if (remote != null && sameSyncRecords(merged, remoteRecords)) return;
+        if (remote != null && sameSyncRecords(merged, remoteRecords)) {
+          return published
+              ? RowSyncOutcome.published
+              : RowSyncOutcome.unchanged;
+        }
         // An empty new device may read a real empty/tombstone archive, but may
         // not create the first cloud library merely by opening the app.
         if (remote == null &&
             metadata == null &&
             !merged.any((r) => r.kind == 'book')) {
-          return;
+          return RowSyncOutcome.unchanged;
         }
         // Include assets imported while the remote database was downloading.
         // Changes after this merged snapshot are picked up by the next pass.
@@ -153,10 +162,17 @@ class RowSyncEngine {
         try {
           await client.uploadFileConditionally(upload, remotePath,
               expectedETag: remote?.eTag, createOnly: remote == null);
-          if (sameSyncRecords(await store.snapshot(), merged)) return;
+          published = true;
+          if (sameSyncRecords(await store.snapshot(), merged))
+            return RowSyncOutcome.published;
           // Reading/import can continue during upload. If it produced another
           // operation, include it in the next bounded pass instead of marking
           // an older snapshot as fully synchronized.
+        } on MissingSyncValidatorException {
+          if (attempt + 1 >= maxAttempts) rethrow;
+          // No PUT was sent. Reload and re-merge the whole remote snapshot;
+          // never attach a newly fetched ETag to an older merged upload.
+          await Future<void>.delayed(validatorRetryDelay);
         } on DioException catch (e) {
           if (e.response?.statusCode != 412) rethrow;
           // Another device published first: reload and re-merge, preserving

@@ -12,7 +12,8 @@ void main() {
     // Flutter's unit-test binding otherwise replaces every HTTP response by 400.
     await HttpOverrides.runWithHttpOverrides(() async {
       final root = await Directory.systemTemp.createTemp('modu-live-download-');
-      final store = LocalEmbeddingModelStore(rootDirectory: root);
+      final store = LocalEmbeddingModelStore(
+          rootDirectory: root, useBundledAssets: false);
       try {
         final model =
             LocalEmbeddingModels.byId(LocalEmbeddingModels.defaultModelId);

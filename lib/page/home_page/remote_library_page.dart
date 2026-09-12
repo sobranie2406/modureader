@@ -113,7 +113,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         context,
         MaterialPageRoute(
             builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(t('书库 WebDAV', 'Library WebDAV'))),
+                appBar:
+                    AppBar(title: Text(t('远程书库设置', 'Remote library settings'))),
                 body: const RemoteLibrarySettings())));
     if (mounted) await _connect();
   }
@@ -238,7 +239,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                   : () => directory == null ? _connect() : _browse(directory),
               icon: const Icon(Icons.refresh)),
           IconButton(
-              tooltip: t('书库 WebDAV 设置', 'Library WebDAV settings'),
+              tooltip: t('远程书库设置', 'Remote library settings'),
               onPressed: _activeName == null ? _settings : null,
               icon: const Icon(Icons.settings_outlined)),
         ]),

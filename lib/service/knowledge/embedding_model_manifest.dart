@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
-/// Small, bundled catalogue only. Model weights are downloaded explicitly.
+/// Pinned integrity metadata shared by bundled assets and repair downloads.
 class EmbeddingModelManifest {
   EmbeddingModelManifest({AssetBundle? bundle})
       : _bundle = bundle ?? rootBundle;

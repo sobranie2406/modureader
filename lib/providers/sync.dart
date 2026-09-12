@@ -14,6 +14,7 @@ import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:anx_reader/service/sync/sync_preflight.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
@@ -47,6 +48,21 @@ class Sync extends _$Sync {
   Sync._internal();
 
   bool _syncRunning = false;
+  bool _pendingAutomatic = false;
+  SyncDirection? _pendingManualDirection;
+  final _autoStart = AutoSyncStartGate();
+
+  bool get _autoSyncAllowed {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return Prefs().webdavStatus &&
+        Prefs().autoSync &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+  }
+
+  void pauseAutomaticSync() {
+    _autoStart.invalidate();
+    _pendingAutomatic = false;
+  }
 
   @override
   SyncStateModel build() {
@@ -91,12 +107,13 @@ class Sync extends _$Sync {
     }
   }
 
-  Future<bool> shouldSync() async {
+  Future<bool> shouldSync({bool automatic = false}) async {
     if (!Prefs().webdavStatus) {
       return false;
     }
 
-    if (Prefs().onlySyncWhenWifi &&
+    if (!automatic &&
+        Prefs().onlySyncWhenWifi &&
         !(await Connectivity().checkConnectivity())
             .contains(ConnectivityResult.wifi)) {
       if (Prefs().syncCompletedToast) {
@@ -132,22 +149,53 @@ class Sync extends _$Sync {
     WidgetRef? ref, {
     SyncTrigger trigger = SyncTrigger.auto,
   }) async {
+    final automatic = trigger == SyncTrigger.auto;
+    if (automatic) {
+      if (!_autoSyncAllowed) return;
+      if (_syncRunning) {
+        _pendingAutomatic = true;
+        return;
+      }
+      if (!await _autoStart.wait(() => _autoSyncAllowed)) return;
+    } else {
+      _autoStart.invalidate();
+    }
     // Covers preflight and direction selection as well as byte transfer.
-    if (_syncRunning) return;
+    if (_syncRunning) {
+      if (!automatic) _pendingManualDirection = direction;
+      return;
+    }
     _syncRunning = true;
     try {
       await _syncData(direction, ref, trigger: trigger);
-    } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      AnxToast.show(status == 401 || status == 403
-          ? 'WebDAV 账号或目录权限校验失败，请检查手机端配置。'
-          : 'WebDAV 请求失败，请检查网络和服务器；未将失败当作空书库处理。');
-      AnxLog.warning('Sync preflight failed: ${e.type.name}, HTTP $status');
     } catch (e) {
-      AnxToast.show('同步未完成：$e');
+      // Avoid logging DioException.toString(): it can contain private URLs.
+      final status = e is DioException ? e.response?.statusCode : null;
+      AnxLog.warning(
+          'Sync incomplete: ${e.runtimeType}, HTTP $status, automatic=$automatic');
+      if (automatic && (isTemporarySyncError(e) || !_autoSyncAllowed)) return;
+      if (isSyncAuthError(e)) {
+        AnxToast.show('WebDAV 服务器拒绝登录或目录访问（HTTP $status），请检查同步账号及目录权限。');
+      } else if (isTemporarySyncError(e)) {
+        AnxToast.show('同步暂未完成，请检查网络后重试；本机改动已保留。');
+      } else if (e is DioException) {
+        AnxToast.show('WebDAV 请求失败（HTTP ${status ?? '未知'}），未将错误当作空书库处理。');
+      } else {
+        AnxToast.show('同步未完成：$e');
+      }
     } finally {
       _syncRunning = false;
       changeState(state.copyWith(isSyncing: false));
+      final pending = _pendingManualDirection;
+      final pendingAutomatic = _pendingAutomatic;
+      _pendingManualDirection = null;
+      _pendingAutomatic = false;
+      if (pending != null) {
+        unawaited(syncData(pending, null, trigger: SyncTrigger.manual));
+      } else if (pendingAutomatic && _autoSyncAllowed) {
+        unawaited(
+            syncData(SyncDirection.both, null, trigger: SyncTrigger.auto));
+      }
     }
   }
 
@@ -166,7 +214,7 @@ class Sync extends _$Sync {
       return;
     }
 
-    if (!(await shouldSync())) {
+    if (!(await shouldSync(automatic: trigger == SyncTrigger.auto))) {
       return;
     }
 
@@ -177,7 +225,21 @@ class Sync extends _$Sync {
     }
 
     // Fail visibly without treating authentication/network errors as absence.
-    await client.ping();
+    final generation = _autoStart.generation;
+    if (!await SyncPreflight().run(
+      automatic: trigger == SyncTrigger.auto,
+      enabled: () =>
+          Prefs().webdavStatus &&
+          (trigger != SyncTrigger.auto ||
+              (_autoSyncAllowed && generation == _autoStart.generation)),
+      networkReady: () async {
+        final connections = await Connectivity().checkConnectivity();
+        return connections.any((value) => value != ConnectivityResult.none) &&
+            (!Prefs().onlySyncWhenWifi ||
+                connections.contains(ConnectivityResult.wifi));
+      },
+      probe: client.ping,
+    )) return;
     await _createSyncDir();
 
     AnxLog.info('Sync ping success');
@@ -243,14 +305,6 @@ class Sync extends _$Sync {
       if (Prefs().syncCompletedToast) {
         AnxToast.show(L10n.of(navigatorKey.currentContext!).webdavSyncComplete);
       }
-    } catch (e, s) {
-      if (e is DioException && e.type == DioExceptionType.connectionError) {
-        AnxToast.show('Sync connection failed, check your network');
-        AnxLog.severe('Sync connection failed, connection error\n$e, $s');
-      } else {
-        AnxToast.show('Sync failed\n$e');
-        AnxLog.severe('Sync failed\n$e, $s');
-      }
     } finally {
       changeState(state.copyWith(isSyncing: false));
       // _deleteBackUpDb();
@@ -313,13 +367,14 @@ class Sync extends _$Sync {
     if (client == null) return;
     // Existing upload/download callers now converge records safely in both
     // directions; no entry point may overwrite a whole live library.
-    await RowSyncEngine(
+    final outcome = await RowSyncEngine(
       store: RowSyncStore(await DBHelper().database),
       client: client,
       cache: await getAnxCacheDir(),
       beforePublish: syncFiles,
       beforeMerge: _createMergeBackup,
     ).synchronize();
+    AnxLog.info('Row sync database outcome: ${outcome.name}');
     await _restoreAiSettingsAfterDatabaseDownload();
     final metadata = await client.readProps(RowSyncEngine.remotePath);
     if (metadata?.mTime != null) Prefs().lastUploadBookDate = metadata!.mTime;

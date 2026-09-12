@@ -27,15 +27,17 @@ hybrid RAG, ONNX models and background indexing queue; translation and TTS servi
 encrypted opt-in credential sync and backups; local-file access restrictions;
 PDF import/navigation fixes; multi-platform release packaging. See git history.
 
-## On-demand embedding models
+## Bundled offline embedding models
 
-The four quantized ONNX models and tokenizer files are downloaded on demand.
+The four quantized ONNX models and tokenizer files are bundled in installers.
 Exact Xenova repository revisions, file sizes and SHA-256 hashes are pinned in
-`assets/models/embeddings/manifest.json`. Installers contain only this catalogue;
-the app downloads the selected model explicitly and verifies its size and hash.
-No weight modifications are made by Modu. Native inference works offline once
-files are downloaded. `scripts/release/bundle_models.py` fetches separate native
-test fixtures into `build/model-test-fixtures`, never production app assets.
+`assets/models/embeddings/manifest.json`. The app prepares the selected model
+offline on first use and verifies its size and hash. No weight modifications
+are made by Modu. A manual repair download is available if packaged assets are
+missing. Before building locally, run
+`python3 scripts/release/bundle_models.py --install-assets` to fetch verified files into
+`build/model-test-fixtures` and stage production assets. CI performs the same
+staging step; packaging rejects missing or corrupt weights and tokenizers.
 
 - MiniLM: https://huggingface.co/Xenova/all-MiniLM-L6-v2; original model
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2, Apache-2.0.
