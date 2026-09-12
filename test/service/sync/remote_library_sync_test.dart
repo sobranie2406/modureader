@@ -137,52 +137,55 @@ void main() {
     expect(prefs.getString(LibraryConnectionStore.key), config);
   });
 
-  test(
-      'actual row-sync pipeline carries encrypted library config and deletion between devices',
-      () async {
-    final a = await fixture();
-    final b = await fixture();
-    final cache = await Directory.systemTemp.createTemp('modu-library-sync-');
-    try {
-      SharedPreferences.setMockInitialValues(
-          {LibraryConnectionStore.key: config});
-      final prefsA = await SharedPreferences.getInstance();
-      SharedPreferences.setMockInitialValues({});
-      final prefsB = await SharedPreferences.getInstance();
-      final syncA = RemoteLibrarySettingsSyncService(
-          databaseProvider: () async => a, preferences: prefsA);
-      final syncB = RemoteLibrarySettingsSyncService(
-          databaseProvider: () async => b, preferences: prefsB);
-      final server = MemorySyncClient();
-      final engineA =
-          RowSyncEngine(store: RowSyncStore(a), client: server, cache: cache);
-      final engineB =
-          RowSyncEngine(store: RowSyncStore(b), client: server, cache: cache);
-      await syncA.prepareLocalDatabase(enabled: true, password: password);
-      await engineA.synchronize();
-      expect(
-          utf8.decode(server.files[RowSyncEngine.remotePath]!,
-              allowMalformed: true),
-          isNot(contains('library-test-secret')));
-      await syncB.prepareLocalDatabase(enabled: true, password: password);
-      await engineB.synchronize();
-      await syncB.restoreFromDownloadedDatabase(
-          enabled: true, password: password);
-      expect(prefsB.getString(LibraryConnectionStore.key), config);
-      await prefsA.setString(LibraryConnectionStore.key, '');
-      await syncA.prepareLocalDatabase(enabled: true, password: password);
-      await engineA.synchronize();
-      expect(
-          await syncB.prepareLocalDatabase(enabled: true, password: password),
-          isFalse);
-      await engineB.synchronize();
-      await syncB.restoreFromDownloadedDatabase(
-          enabled: true, password: password);
-      expect(prefsB.getString(LibraryConnectionStore.key), '');
-    } finally {
-      await a.close();
-      await b.close();
-      await cache.delete(recursive: true);
-    }
-  });
+  for (final atomic in [true, false]) {
+    test(
+        'actual row-sync pipeline carries encrypted library config and deletion between devices (atomic=$atomic)',
+        () async {
+      final a = await fixture();
+      final b = await fixture();
+      final cache = await Directory.systemTemp.createTemp('modu-library-sync-');
+      try {
+        SharedPreferences.setMockInitialValues(
+            {LibraryConnectionStore.key: config});
+        final prefsA = await SharedPreferences.getInstance();
+        SharedPreferences.setMockInitialValues({});
+        final prefsB = await SharedPreferences.getInstance();
+        final syncA = RemoteLibrarySettingsSyncService(
+            databaseProvider: () async => a, preferences: prefsA);
+        final syncB = RemoteLibrarySettingsSyncService(
+            databaseProvider: () async => b, preferences: prefsB);
+        final server = MemorySyncClient()..atomic = atomic;
+        final engineA =
+            RowSyncEngine(store: RowSyncStore(a), client: server, cache: cache);
+        final engineB =
+            RowSyncEngine(store: RowSyncStore(b), client: server, cache: cache);
+        await syncA.prepareLocalDatabase(enabled: true, password: password);
+        await engineA.synchronize();
+        expect(
+            server.files.values
+                .map((bytes) => utf8.decode(bytes, allowMalformed: true))
+                .join(),
+            isNot(contains('library-test-secret')));
+        await syncB.prepareLocalDatabase(enabled: true, password: password);
+        await engineB.synchronize();
+        await syncB.restoreFromDownloadedDatabase(
+            enabled: true, password: password);
+        expect(prefsB.getString(LibraryConnectionStore.key), config);
+        await prefsA.setString(LibraryConnectionStore.key, '');
+        await syncA.prepareLocalDatabase(enabled: true, password: password);
+        await engineA.synchronize();
+        expect(
+            await syncB.prepareLocalDatabase(enabled: true, password: password),
+            isFalse);
+        await engineB.synchronize();
+        await syncB.restoreFromDownloadedDatabase(
+            enabled: true, password: password);
+        expect(prefsB.getString(LibraryConnectionStore.key), '');
+      } finally {
+        await a.close();
+        await b.close();
+        await cache.delete(recursive: true);
+      }
+    });
+  }
 }

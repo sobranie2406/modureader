@@ -14,6 +14,14 @@ import 'package:anx_reader/models/remote_file.dart';
 import 'package:dio/dio.dart';
 
 class MemorySyncClient extends SyncClientBase {
+  @override
+  String get protocolName => 'memory';
+  @override
+  Map<String, dynamic> get config =>
+      {'url': 'memory://test', 'username': 'fixture'};
+  bool atomic = true;
+  @override
+  Future<bool> supportsAtomicSyncWrites() async => atomic;
   final files = <String, List<int>>{};
   final revisions = <String, int>{};
   int writes = 0;
@@ -27,7 +35,34 @@ class MemorySyncClient extends SyncClientBase {
           size: files[path]!.length,
           eTag: '"${revisions[path] ?? 1}"',
           mTime: DateTime.utc(2026, 9, 9))
-      : null;
+      : files.keys.any((key) => key.startsWith('$path/'))
+          ? RemoteFile(path: path, name: path.split('/').last, isDir: true)
+          : null;
+  @override
+  Future<void> mkdirAll(String path) async {}
+  @override
+  Future<List<RemoteFile>> readDir(String path) async {
+    final children = <String, RemoteFile>{};
+    for (final key in files.keys.where((key) => key.startsWith('$path/'))) {
+      final suffix = key.substring(path.length + 1);
+      final name = suffix.split('/').first;
+      children[name] = RemoteFile(
+          name: name,
+          path: '$path/$name',
+          isDir: suffix.contains('/'),
+          size: files[key]!.length);
+    }
+    return children.values.toList();
+  }
+
+  @override
+  Future<void> uploadFile(String localPath, String remotePath,
+      {bool replace = true,
+      void Function(int, int)? onProgress,
+      CancelToken? cancelToken}) async {
+    files[remotePath] = await File(localPath).readAsBytes();
+  }
+
   @override
   Future<void> downloadFile(String remotePath, String localPath,
       {void Function(int, int)? onProgress}) async {
@@ -53,6 +88,15 @@ class MemorySyncClient extends SyncClientBase {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+// The HTTP CAS regression below has a pre-verified endpoint. Capability probing
+// against real HTTP servers is covered separately in webdav_capabilities_test.
+class VerifiedWebdavClient extends WebdavClient {
+  VerifiedWebdavClient(
+      {required super.url, required super.username, required super.password});
+  @override
+  Future<bool> supportsAtomicSyncWrites() async => true;
 }
 
 class MissingValidatorClient extends MemorySyncClient {
@@ -358,7 +402,10 @@ void main() {
       final requests = <String>[];
       server.listen((request) async {
         requests.add('${request.method} ${request.uri.path}');
-        if (request.method == 'OPTIONS') {
+        if (request.uri.path.endsWith('/record-log-v1')) {
+          await request.drain<void>();
+          request.response.statusCode = 404;
+        } else if (request.method == 'OPTIONS') {
           await request.drain<void>();
           request.response.statusCode = 200;
         } else if (request.method == 'PROPFIND') {
@@ -394,14 +441,17 @@ void main() {
         }
         await request.response.close();
       });
-      final client = WebdavClient(
+      final client = VerifiedWebdavClient(
           url: 'http://127.0.0.1:${server.port}/library',
           username: 'test',
           password: 'test');
       await RowSyncEngine(store: sa, client: client, cache: temp).synchronize();
       expect(puts, 2);
       expect(requests.any((r) => r.startsWith('DELETE')), isFalse);
-      expect(requests.every((r) => r.endsWith('/library/modu/database8.db')),
+      expect(
+          requests.every((r) =>
+              r.endsWith('/library/modu/database8.db') ||
+              r.endsWith('/record-log-v1')),
           isTrue);
       await File('${temp.path}/published.db').writeAsBytes(cloud);
       await sb.merge(await RowSyncArchive.read('${temp.path}/published.db'));
@@ -497,9 +547,11 @@ void main() {
           final records = await RowSyncArchive.read(cloudPath);
           expect(records.where((r) => r.kind == 'note').length, 2);
         } else {
-          await expectLater(run, throwsA(isA<MissingSyncValidatorException>()));
+          expect(await run, RowSyncOutcome.published);
           expect(client.attempts, 3);
           expect(client.writes, 0);
+          expect(client.files.keys.any((p) => p.contains('/record-log-v1/')),
+              isTrue);
         }
         expect((await a.query('tb_notes')).map((r) => r['content']).toSet(),
             {'local note', 'concurrent cloud note'});

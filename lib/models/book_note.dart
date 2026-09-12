@@ -9,6 +9,18 @@ class BookNote {
   String? readerNote;
   DateTime? createTime;
   DateTime updateTime;
+  // Local optimistic-write baseline, deliberately excluded from serialization.
+  Map<String, Object?>? persistedValues;
+
+  void inheritVersion(BookNote source) {
+    persistedValues = source.persistedValues == null
+        ? null
+        : Map.unmodifiable(source.persistedValues!);
+  }
+
+  void markPersisted(Map<String, Object?> values) {
+    persistedValues = Map.unmodifiable(values);
+  }
 
   void setId(int id) {
     this.id = id;
@@ -57,7 +69,7 @@ class BookNote {
     final createTimeString = map['create_time'] as String?;
     final updateTimeString = map['update_time'] as String?;
 
-    return BookNote(
+    final note = BookNote(
       id: map['id'] as int?,
       bookId: map['book_id'] as int,
       content: map['content'] as String? ?? '',
@@ -72,5 +84,7 @@ class BookNote {
           ? DateTime.parse(updateTimeString)
           : DateTime.now(),
     );
+    note.markPersisted(map);
+    return note;
   }
 }

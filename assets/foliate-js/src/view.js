@@ -172,7 +172,7 @@ export class View extends HTMLElement {
   #emit(name, detail, cancelable) {
     return this.dispatchEvent(new CustomEvent(name, { detail, cancelable }))
   }
-  #onRelocate({ reason, range, index, fraction, size }) {
+  #onRelocate({ reason, range, index, fraction, size, readingAction }) {
     this.#index = index
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
@@ -180,7 +180,8 @@ export class View extends HTMLElement {
     const cfi = this.getCFI(index, range)
     const chapterLocation = getChapterLocation(this.renderer, progress.section)
 
-    this.lastLocation = { ...progress, tocItem, pageItem, cfi, range, chapterLocation }
+    this.lastLocation = { ...progress, tocItem, pageItem, cfi, range, chapterLocation, reason,
+      readingAction: readingAction ?? (reason === 'page' || reason === 'navigation') }
     if (reason === 'snap' || reason === 'page' || reason === 'scroll')
       this.history.replaceState(cfi)
 

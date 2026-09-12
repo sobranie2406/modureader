@@ -1,4 +1,5 @@
 import 'dart:io' as io;
+import 'package:uuid/uuid.dart';
 
 import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
@@ -10,9 +11,13 @@ import 'package:dio/dio.dart';
 import 'package:webdav_client/webdav_client.dart';
 import 'package:xml/xml.dart';
 
+part 'webdav_sync_support.dart';
+
 class WebdavClient extends SyncClientBase {
   late Client _client;
   late Map<String, dynamic> _config;
+  bool? _atomicSupport;
+  DateTime? _atomicCheckedAt;
 
   WebdavClient({
     required String url,
@@ -28,6 +33,8 @@ class WebdavClient extends SyncClientBase {
   }
 
   void _initClient() {
+    _atomicSupport = null;
+    _atomicCheckedAt = null;
     _client = newClient(
       _config['url'],
       user: _config['username'],
@@ -176,6 +183,24 @@ class WebdavClient extends SyncClientBase {
   Future<bool> isExist(String path) async {
     return (await readProps(path)) != null;
   }
+
+  @override
+  Future<bool> supportsAtomicSyncWrites() async {
+    final checked = _atomicCheckedAt;
+    if (checked != null &&
+        DateTime.now().difference(checked) <
+            Duration(seconds: _atomicSupport == true ? 900 : 30)) {
+      return _atomicSupport!;
+    }
+    final supported = await _probeAtomicSyncWrites();
+    _atomicSupport = supported;
+    _atomicCheckedAt = DateTime.now();
+    return supported;
+  }
+
+  @override
+  Future<List<RemoteFile>> readSyncDirectory(String path) =>
+      _readCompleteSyncDirectory(path);
 
   @override
   Future<List<RemoteFile>> readDir(String path) async {

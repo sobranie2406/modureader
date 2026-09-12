@@ -1,5 +1,7 @@
 import 'package:anx_reader/dao/base_dao.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/models/reading_position_snapshot.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/utils/reading_progress.dart';
 
@@ -33,19 +35,48 @@ class BookDao extends BaseDao {
     );
   }
 
-  Future<void> updateReadingPosition(
-      int bookId, String position, double percentage) async {
-    await transaction((txn) async {
+  Future<ReadingPositionSnapshot> readReadingPosition(int bookId) =>
+      transaction((txn) => _readPosition(txn, bookId));
+
+  Future<ReadingPositionSnapshot> _readPosition(
+      Transaction txn, int bookId) async {
+    final rows = await txn.rawQuery('''SELECT b.last_read_position,
+      b.reading_percentage, b.is_deleted, r.clock, r.revision
+      FROM tb_books b JOIN $syncRecordsTable r
+      ON r.kind='position' AND r.local_id=b.id WHERE b.id=?''', [bookId]);
+    if (rows.length != 1) throw StateError('Reading position unavailable');
+    final row = rows.single;
+    return ReadingPositionSnapshot(
+      row['last_read_position'] as String? ?? '',
+      normalizeReadingProgress(row['reading_percentage'] as num?),
+      '${row['clock']}:${row['revision']}',
+      deleted: row['is_deleted'] == 1,
+    );
+  }
+
+  /// Only explicit reading actions call this. A stale page cannot overwrite a
+  /// position imported by sync, even if the old page is saved later in time.
+  Future<ReadingPositionSnapshot?> updateReadingPosition(
+      int bookId, String position, double percentage,
+      {required String expectedRevision}) async {
+    return transaction((txn) async {
+      final current = await _readPosition(txn, bookId);
+      if (current.deleted || current.revision != expectedRevision) return null;
+      final normalized = normalizeReadingProgress(percentage);
+      if (current.position == position && current.percentage == normalized) {
+        return current;
+      }
       await txn.update(
           table,
           {
             'last_read_position': position,
-            'reading_percentage': normalizeReadingProgress(percentage),
+            'reading_percentage': normalized,
             'update_time': DateTime.now().toIso8601String(),
           },
           where: 'id = ?',
           whereArgs: [bookId]);
-      await RowSyncStore.touchPosition(txn, bookId);
+      // The position trigger already records the actual change, exactly once.
+      return _readPosition(txn, bookId);
     });
   }
 

@@ -8,6 +8,13 @@ class MissingSyncValidatorException extends UnsupportedError {
 }
 
 abstract class SyncClientBase {
+  /// Verify conditional writes on an isolated disposable object, never on the
+  /// user's database. Unknown backends must use immutable record transport.
+  Future<bool> supportsAtomicSyncWrites() async => false;
+
+  /// Complete, validated listing. A truncated list must never mean empty data.
+  Future<List<RemoteFile>> readSyncDirectory(String path) => readDir(path);
+
   /// Atomic compare-and-swap. Implementations must not fall back to a plain
   /// PUT when the server cannot validate the prior revision.
   Future<void> uploadFileConditionally(String localPath, String remotePath,

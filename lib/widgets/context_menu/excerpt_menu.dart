@@ -110,8 +110,10 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     final existingNote = await _fetchLatestNote() ?? _currentNote;
     final now = DateTime.now();
 
-    final resolvedContent = (content ?? widget.annoContent).trim().isNotEmpty
-        ? (content ?? widget.annoContent)
+    final candidateContent =
+        content ?? existingNote?.content ?? widget.annoContent;
+    final resolvedContent = candidateContent.trim().isNotEmpty
+        ? candidateContent
         : (existingNote?.content ?? widget.annoContent);
     final resolvedType = type ?? existingNote?.type ?? annoType;
     final resolvedColor = color ?? existingNote?.color ?? annoColor;
@@ -130,6 +132,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
       createTime: existingNote?.createTime ?? now,
       updateTime: now,
     );
+    if (existingNote != null) bookNote.inheritVersion(existingNote);
 
     final id = await bookNoteDao.save(bookNote);
     bookNote.setId(id);
@@ -184,7 +187,16 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     } else {
       annoColor = color;
     }
-    final bookNote = await _persistNote(color: color);
+    BookNote bookNote;
+    try {
+      bookNote = await _persistNote(color: color);
+    } on NoteConflictException {
+      if (mounted) {
+        AnxToast.show(NoteConflictException.message(
+            Localizations.localeOf(context).languageCode == 'zh'));
+      }
+      return;
+    }
     epubPlayerKey.currentState!.addAnnotation(bookNote);
     if (close) {
       widget.onClose();
@@ -200,7 +212,16 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     } else {
       annoType = type;
     }
-    final bookNote = await _persistNote(type: type);
+    BookNote bookNote;
+    try {
+      bookNote = await _persistNote(type: type);
+    } on NoteConflictException {
+      if (mounted) {
+        AnxToast.show(NoteConflictException.message(
+            Localizations.localeOf(context).languageCode == 'zh'));
+      }
+      return;
+    }
     epubPlayerKey.currentState!.addAnnotation(bookNote);
   }
 

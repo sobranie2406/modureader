@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:anx_reader/service/sync/immutable_sync_log.dart';
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:anx_reader/service/sync/row_sync_record.dart';
@@ -89,6 +91,7 @@ class RowSyncEngine {
       {required this.store,
       required this.client,
       required this.cache,
+      this.durableDirectory,
       this.beforePublish,
       this.beforeMerge,
       this.maxAttempts = 3,
@@ -96,6 +99,7 @@ class RowSyncEngine {
   final RowSyncStore store;
   final SyncClientBase client;
   final Directory cache;
+  final Directory? durableDirectory;
   final Future<void> Function()? beforePublish;
   final Future<void> Function()? beforeMerge;
   final int maxAttempts;
@@ -109,12 +113,19 @@ class RowSyncEngine {
     final staging = await cache.createTemp('modu-row-sync-');
     var backedUp = false;
     var published = false;
+    bool? atomicSupport;
     try {
+      final log = ImmutableSyncLog(client, staging, cache,
+          durableDirectory: durableDirectory ?? cache);
+      published = await log.resumePending();
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        // Both transports always consume the immutable log, including after
+        // ETags recover. Otherwise intermittent capabilities split the library.
+        final journal = await log.read();
         final remote = await client.readProps(remotePath);
         var path = remotePath;
         var metadata = remote;
-        if (remote == null) {
+        if (remote == null && journal.isEmpty) {
           path = SyncPaths.database('database7.db');
           metadata = await client.readProps(path);
         }
@@ -135,6 +146,7 @@ class RowSyncEngine {
           remoteRecords =
               await RowSyncArchive.read(download, legacy: remote == null);
         }
+        remoteRecords = mergeSyncRecords(remoteRecords, journal);
         final local = await store.snapshot();
         if (!backedUp &&
             remoteRecords.isNotEmpty &&
@@ -143,7 +155,8 @@ class RowSyncEngine {
           backedUp = true;
         }
         final merged = await store.merge(remoteRecords);
-        if (remote != null && sameSyncRecords(merged, remoteRecords)) {
+        if ((remote != null || journal.isNotEmpty) &&
+            sameSyncRecords(merged, remoteRecords)) {
           return published
               ? RowSyncOutcome.published
               : RowSyncOutcome.unchanged;
@@ -158,23 +171,62 @@ class RowSyncEngine {
         // Include assets imported while the remote database was downloading.
         // Changes after this merged snapshot are picked up by the next pass.
         await beforePublish?.call();
+        atomicSupport ??= await client.supportsAtomicSyncWrites();
+        Future<void> publishLog() async {
+          // On first legacy migration, seed all legacy records as well. Once
+          // the log exists, database7 must not be re-imported repeatedly.
+          final baseline = remote == null ? journal : remoteRecords;
+          final known = {
+            for (final r in baseline) r.key: jsonEncode(r.toMap())
+          };
+          final delta = merged
+              .where((r) => known[r.key] != jsonEncode(r.toMap()))
+              .toList();
+          if (delta.isNotEmpty) await log.publish(delta);
+          published = true;
+        }
+
+        if (!atomicSupport) {
+          await publishLog();
+          if (sameSyncRecords(await store.snapshot(), merged)) {
+            return RowSyncOutcome.published;
+          }
+          continue;
+        }
         final upload = '${staging.path}/upload-$attempt.db';
         await RowSyncArchive.write(upload, merged);
         try {
           await client.uploadFileConditionally(upload, remotePath,
               expectedETag: remote?.eTag, createOnly: remote == null);
           published = true;
-          if (sameSyncRecords(await store.snapshot(), merged))
+          if (sameSyncRecords(await store.snapshot(), merged)) {
             return RowSyncOutcome.published;
+          }
           // Reading/import can continue during upload. If it produced another
           // operation, include it in the next bounded pass instead of marking
           // an older snapshot as fully synchronized.
         } on MissingSyncValidatorException {
-          if (attempt + 1 >= maxAttempts) rethrow;
+          if (attempt + 1 >= maxAttempts) {
+            await publishLog();
+            if (sameSyncRecords(await store.snapshot(), merged)) {
+              return RowSyncOutcome.published;
+            }
+            break;
+          }
           // No PUT was sent. Reload and re-merge the whole remote snapshot;
           // never attach a newly fetched ETag to an older merged upload.
           await Future<void>.delayed(validatorRetryDelay);
         } on DioException catch (e) {
+          if ([405, 501].contains(e.response?.statusCode)) {
+            // A capability can disappear after a successful earlier probe.
+            // Only the immutable log may use plain PUT, never the shared file.
+            atomicSupport = false;
+            await publishLog();
+            if (sameSyncRecords(await store.snapshot(), merged)) {
+              return RowSyncOutcome.published;
+            }
+            continue;
+          }
           if (e.response?.statusCode != 412) rethrow;
           // Another device published first: reload and re-merge, preserving
           // new local changes too. Never retry with an unconditional PUT.

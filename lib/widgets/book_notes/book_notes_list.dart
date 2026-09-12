@@ -3,6 +3,7 @@ import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/book_note.dart';
+import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/models/book_notes_state.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/providers/book_notes.dart';
@@ -517,11 +518,19 @@ class BookNotesList extends ConsumerWidget {
                       readerNote: noteController.text.trim(),
                       createTime: bookNote.createTime,
                       updateTime: DateTime.now(),
-                    );
-                    Navigator.of(context).pop();
-                    await ref
-                        .read(bookNotesControllerProvider(book).notifier)
-                        .updateNote(updatedNote);
+                    )..inheritVersion(bookNote);
+                    try {
+                      await ref
+                          .read(bookNotesControllerProvider(book).notifier)
+                          .updateNote(updatedNote);
+                      if (context.mounted) Navigator.of(context).pop();
+                    } on NoteConflictException {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(NoteConflictException.message(
+                              Localizations.localeOf(context).languageCode ==
+                                  'zh'))));
+                    }
                   },
                   child: Text(L10n.of(context).commonSave),
                 ),

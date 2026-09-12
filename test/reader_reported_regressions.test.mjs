@@ -53,6 +53,7 @@ test('actual chapter loader stays hidden until custom font metrics are ready, on
   const paginator = await source('paginator.js');
   const method = paginator.slice(paginator.indexOf('  async load(src,'), paginator.indexOf('\n  render(layout) {'));
   const Harness = runInNewContext(`class Harness {
+    #destroyed = false; #cancelLoad; #cleanup = [];
     #iframe; #vertical; #rtl; #writingMode; #layout = {};
     #contentRange = {selectNodeContents(){}}; #observer = {observe(){}};
     constructor(doc) {this.#iframe = new EventTarget(); this.#iframe.style = {}; this.doc = doc; this.renders = [];}
@@ -69,9 +70,11 @@ test('actual chapter loader stays hidden until custom font metrics are ready, on
     reader.frame.dispatchEvent(new Event('load'));
     await Promise.resolve();
     assert.equal(reader.frame.style.visibility, 'hidden'); assert.equal(done, false);
+    assert.equal(reader.renders.length, 0, 'no pagination with fallback metrics');
     doc.loaded = true; release(); await pending;
     assert.equal(reader.frame.style.visibility, '');
     assert.equal(reader.renders.at(-1), true);
+    assert.equal(reader.renders.length, 1, 'paginate only once after fonts settle');
   }
 });
 test('actual scrolled next/previous retain 20 percent overlap; explicit distances are unchanged', async () => {

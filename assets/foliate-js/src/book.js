@@ -1143,7 +1143,7 @@ class Reader {
     })
   }
 
-  renderAnnotation(annotations) {
+  async renderAnnotation(annotations) {
     const annos = annotations ?? allAnnotations ?? []
     for (const anno of annos) {
       const { value, type, color, note } = anno
@@ -1156,9 +1156,25 @@ class Reader {
         hasReaderNote: anno.hasReaderNote !== false,
       }
 
-      this.addAnnotation(annotation)
+      await this.addAnnotation(annotation)
     }
 
+  }
+
+  async replaceReadingAnnotations(annotations) {
+    const work = (this.annotationRefreshWork ?? Promise.resolve()).then(async () => {
+      // Remove visual overlays only. removeAnnotation() also performs bookmark
+      // actions and must not be used to apply remote deletions to the display.
+      for (const annotation of this.annotationsByValue.values()) {
+        if (annotation.type !== 'bookmark') await this.view.addAnnotation(annotation, true)
+      }
+      this.annotations.clear()
+      this.annotationsByValue.clear()
+      await this.renderAnnotation(annotations)
+      this.#checkCurrentPageBookmark()
+    })
+    this.annotationRefreshWork = work.catch(() => {})
+    return work
   }
 
   showContextMenu() {
@@ -1185,7 +1201,7 @@ class Reader {
         }
       }
     } else {
-      this.view.addAnnotation(annotation)
+      return this.view.addAnnotation(annotation)
     }
 
   }
@@ -1343,6 +1359,7 @@ class Reader {
       : `Loc ${location.current}`
     this.#checkCurrentPageBookmark()
     onRelocated({
+      readingAction: detail.readingAction === true,
       cfi,
       fraction,
       loc,
@@ -1716,6 +1733,10 @@ const setStyle = (oldStyle) => {
       break
   }
 
+  // E-ink keeps the chosen paginated/scrolled layout, but does not animate
+  // intermediate frames. Do not overwrite the user's saved page-turn style.
+  if (style.eInkMode === true) turn.animated = false
+
   reader.view.renderer.setAttribute('mobile-image-fit', style.mobileImageFit === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('mobile-touch-paging', style.mobileTouchPaging === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('desktop-page-input', style.desktopPageInput === true ? 'true' : 'false')
@@ -1797,6 +1818,7 @@ const onRelocated = (currentInfo) => {
   const percentage = currentInfo.fraction
 
   callFlutter('onRelocated', {
+    readingAction: currentInfo.readingAction === true && !window.readerApplyingSync,
     chapterTitle,
     chapterHref,
     chapterTotalPages,
@@ -1860,6 +1882,17 @@ window.changeStyle = (newStyle) => {
 window.goToHref = href => reader.view.goTo(href)
 
 window.goToCfi = cfi => reader.view.goTo(cfi)
+
+window.restoreSyncedReadingPosition = async cfi => {
+  if (reader.view.renderer.isNavigating) return false
+  window.readerApplyingSync = true
+  try {
+    const resolved = await reader.view.goTo(cfi)
+    return resolved != null
+  } finally {
+    window.readerApplyingSync = false
+  }
+}
 
 window.goToPercent = percent => reader.view.goToFraction(percent)
 
@@ -2011,6 +2044,7 @@ window.back = () => reader.view.history.back()
 window.forward = () => reader.view.history.forward()
 
 window.renderAnnotations = (annotations) => reader.renderAnnotation(annotations)
+window.replaceReadingAnnotations = annotations => reader.replaceReadingAnnotations(annotations)
 
 window.theChapterContent = () => reader.getChapterContent()
 

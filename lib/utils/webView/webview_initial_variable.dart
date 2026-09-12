@@ -41,6 +41,7 @@ Future<void> webviewInitialVariable(
           mobileTouchPaging: ${AnxPlatform.isMobile},
           mobileImageFit: ${AnxPlatform.isMobile},
           tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
+          eInkMode: ${Prefs().eInkMode},
           fontSize: ${bookStyle.fontSize},
           fontName: '${replaceSingleQuote(fontName)}',
           fontPath: '${replaceSingleQuote(fontPath)}',

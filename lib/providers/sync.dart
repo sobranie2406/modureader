@@ -8,6 +8,9 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/models/sync_state_model.dart';
 import 'package:anx_reader/providers/book_list.dart';
+import 'package:anx_reader/providers/book_notes.dart';
+import 'package:anx_reader/providers/bookmark.dart';
+import 'package:anx_reader/providers/sync_database_revision.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
@@ -367,17 +370,27 @@ class Sync extends _$Sync {
     if (client == null) return;
     // Existing upload/download callers now converge records safely in both
     // directions; no entry point may overwrite a whole live library.
-    final outcome = await RowSyncEngine(
-      store: RowSyncStore(await DBHelper().database),
-      client: client,
-      cache: await getAnxCacheDir(),
-      beforePublish: syncFiles,
-      beforeMerge: _createMergeBackup,
-    ).synchronize();
-    AnxLog.info('Row sync database outcome: ${outcome.name}');
-    await _restoreAiSettingsAfterDatabaseDownload();
-    final metadata = await client.readProps(RowSyncEngine.remotePath);
-    if (metadata?.mTime != null) Prefs().lastUploadBookDate = metadata!.mTime;
+    try {
+      final outcome = await RowSyncEngine(
+        store: RowSyncStore(await DBHelper().database),
+        client: client,
+        cache: await getAnxCacheDir(),
+        durableDirectory: await getAnxDataBasesDir(),
+        beforePublish: syncFiles,
+        beforeMerge: _createMergeBackup,
+      ).synchronize();
+      AnxLog.info('Row sync database outcome: ${outcome.name}');
+      await _restoreAiSettingsAfterDatabaseDownload();
+      // Compatibility mode may not have a database8.db at all. Completion is
+      // determined by the verified transport, not the old shared file's mtime.
+      Prefs().lastUploadBookDate = DateTime.now();
+    } finally {
+      // A local merge may succeed even if a later upload fails. Refresh live
+      // readers/editors in that case too; never leave stale snapshots active.
+      ref.invalidate(bookNotesControllerProvider);
+      ref.invalidate(bookmarkProvider);
+      ref.read(syncDatabaseRevisionProvider.notifier).state++;
+    }
   }
 
   Future<void> _createMergeBackup() async {

@@ -1,6 +1,17 @@
 import 'package:anx_reader/dao/base_dao.dart';
 import 'package:anx_reader/models/book_note.dart';
 
+class NoteConflictException implements Exception {
+  const NoteConflictException();
+  static String message(bool chinese) => chinese
+      ? '这条笔记已被更新或删除，未覆盖最新内容。草稿已保留，请复制草稿后重新打开笔记。'
+      : 'This note was updated or deleted. The latest version was not overwritten. '
+          'Your draft is kept here; copy it before reopening the note.';
+  @override
+  String toString() =>
+      'This note changed or was deleted. Your draft was not saved.';
+}
+
 class BookNoteDao extends BaseDao {
   BookNoteDao();
 
@@ -26,12 +37,19 @@ class BookNoteDao extends BaseDao {
     final duplicates =
         await selectBookNoteByCfiAndBookId(bookNote.cfi, bookNote.bookId);
     if (duplicates.isNotEmpty) {
-      bookNote.id = duplicates.last.id;
+      final existing = duplicates.last;
+      bookNote.id = existing.id;
+      bookNote.readerNote ??= existing.readerNote;
+      bookNote.createTime = existing.createTime;
+      bookNote.inheritVersion(existing);
       await updateBookNoteById(bookNote);
       return bookNote.id!;
     }
 
-    return insert(table, bookNote.toMap());
+    final id = await insert(table, bookNote.toMap());
+    bookNote.id = id;
+    bookNote.markPersisted(bookNote.toMap());
+    return id;
   }
 
   Future<List<BookNote>> selectBookNoteByCfiAndBookId(
@@ -56,12 +74,32 @@ class BookNoteDao extends BaseDao {
   }
 
   Future<void> updateBookNoteById(BookNote bookNote) async {
-    await update(
-      table,
-      bookNote.toMap(),
-      where: 'id = ?',
-      whereArgs: [bookNote.id],
-    );
+    final saved = await transaction((txn) async {
+      final baseline = bookNote.persistedValues;
+      if (baseline == null || bookNote.id == null) {
+        throw const NoteConflictException();
+      }
+      final rows =
+          await txn.query(table, where: 'id = ?', whereArgs: [bookNote.id]);
+      final values = bookNote.toMap();
+      if (rows.length != 1 ||
+          values.keys.any((key) => rows.single[key] != baseline[key])) {
+        throw const NoteConflictException();
+      }
+      if (values.keys
+          .where((k) => k != 'update_time')
+          .every((key) => values[key] == rows.single[key])) {
+        return rows.single;
+      }
+      values['update_time'] = DateTime.now().toIso8601String();
+      await txn
+          .update(table, values, where: 'id = ?', whereArgs: [bookNote.id]);
+      return values;
+    });
+    bookNote.updateTime =
+        DateTime.tryParse(saved['update_time'] as String? ?? '') ??
+            bookNote.updateTime;
+    bookNote.markPersisted(saved);
   }
 
   /// Replace connected highlights atomically. Recheck the renderer's snapshot

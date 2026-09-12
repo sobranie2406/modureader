@@ -2,18 +2,18 @@
 
 Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
 
-## 1.0.4
+## 1.0.5
 
-- Bundle four verified local embedding models for offline use; automatic indexing remains off by default.
-- Fix Windows WebView null JavaScript replies and order native shutdown safely.
-- Preload adjacent chapter resources with a bounded cache to reduce repeated chapter loading.
-- Delay foreground automatic sync and recover missing ETags without unconditional database overwrites.
-- Fit desktop footnotes within 25 percent of the viewport; preserve end padding on desktop and mobile so the last line remains reachable.
-- Rename the library connection entry to Remote library settings.
+- Reject stale reading-position writes after sync; preserve intentional backward reading.
+- Keep note drafts on conflicts instead of overwriting newer or deleted notes.
+- Support unreliable ETag servers through verified immutable record batches; retain conditional writes for reliable servers.
+- Prepare chapter fonts and layout before switching pages; remove unnecessary transition delays.
+- Include Anx progress compatibility, book-end boundaries and per-book embedding model selection; keep four offline models bundled.
+- Back up and upgrade every syncing device to 1.0.5; older clients cannot read the compatible record log.
 
-- 内嵌四个已校验本地向量模型，支持离线使用；自动向量化仍默认关闭。
-- 修复 Windows WebView 空 JavaScript 回调及原生退出顺序问题。
-- 有限缓存并预加载相邻章节资源，减少来回切换章节的重复加载。
-- 回前台自动同步增加延迟与网络重试；补查缺失 ETag，保留并发写入保护，不无条件覆盖数据库。
-- 桌面注释在阅读窗口 25% 面积内优先完整显示；电脑、手机均保留末尾留白，长注释可滚动查看最后一行。
-- 书库连接入口统一命名为「远程书库设置」。
+- 同步后拒绝旧页面进度回写，主动往回阅读仍正常保存。
+- 笔记冲突时保留草稿，不覆盖新版或恢复已删除笔记。
+- 无可靠 ETag 服务使用校验过的独立记录批次，可靠服务仍使用条件写入。
+- 新章节字体和布局就绪后再切换页面，减少不必要的切章等待。
+- 纳入 Anx 进度兼容、书末边界和每书向量模型选择，保留四个内嵌离线模型。
+- 请先备份并将所有同步设备升级到 1.0.5，旧版不能读取兼容记录通道。

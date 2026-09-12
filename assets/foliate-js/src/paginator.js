@@ -2,8 +2,7 @@ import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
 import { waitForReaderFonts } from './reader-font-ready.js'
 import { SectionWindowCache } from './section-window-cache.js'
-
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+import { ReadingActionGate } from './reading-action-gate.js'
 
 const lerp = (min, max, x) => x * (max - min) + min
 const easeOutSine = x => Math.sin((x * Math.PI) / 2)
@@ -182,6 +181,9 @@ const setStylesImportant = (el, styles) => {
 }
 
 class View {
+  #destroyed = false
+  #cancelLoad
+  #cleanup = []
   #observer = new ResizeObserver(() => this.expand())
   #element = document.createElement('div')
   #iframe = document.createElement('iframe')
@@ -231,8 +233,9 @@ class View {
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
     return new Promise((resolve, reject) => {
-      this.#iframe.addEventListener('load', async () => {
+      const loaded = async () => {
         try {
+          if (this.#destroyed) throw new Error('Reader view closed')
           const doc = this.document
           afterLoad?.(doc)
 
@@ -247,12 +250,14 @@ class View {
           this.#writingMode = writingMode
 
           this.#contentRange.selectNodeContents(doc.body)
-          const layout = beforeRender?.({ vertical, rtl })
           this.#iframe.style.display = 'block'
-          this.render(layout)
+          // Trigger font discovery without paginating/anchoring with fallback
+          // metrics. Keep the outgoing chapter visible during this wait.
           const ready = await waitForReaderFonts(doc)
+          if (this.#destroyed) throw new Error('Reader view closed')
           if (!ready) console.warn('Reader font loading timed out or failed; using fallback')
-          // Font metrics may have changed while waiting; anchor only afterwards.
+          // Measure the latest viewport, including resizes during font loading.
+          const layout = beforeRender?.({ vertical, rtl })
           this.render(layout)
           this.#iframe.style.visibility = ''
           this.#observer.observe(doc.body)
@@ -262,18 +267,32 @@ class View {
           }
           doc.addEventListener('load', refit, true)
           doc.addEventListener('loadedmetadata', refit, true)
+          this.#cleanup.push(() => {
+            doc.removeEventListener('load', refit, true)
+            doc.removeEventListener('loadedmetadata', refit, true)
+          })
 
           // the resize observer above doesn't work in Firefox
           // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
           // until the bug is fixed we can at least account for font load
-          doc.fonts.ready.then(() => this.expand())
+          // Do not expand again for the ready promise we just awaited. Only
+          // account for genuinely later fonts (including a timed-out font).
+          const fontsChanged = () => { if (!this.#destroyed) this.expand() }
+          doc.fonts?.addEventListener?.('loadingdone', fontsChanged)
+          this.#cleanup.push(() => doc.fonts?.removeEventListener?.('loadingdone', fontsChanged))
 
+          this.#cancelLoad = null
           resolve()
         } catch (error) {
-          this.#iframe.style.visibility = ''
+          this.#cancelLoad = null
           reject(error)
         }
-      }, { once: true })
+      }
+      this.#cancelLoad = () => {
+        this.#iframe.removeEventListener('load', loaded)
+        reject(new Error('Reader view closed'))
+      }
+      this.#iframe.addEventListener('load', loaded, { once: true })
       this.#iframe.src = src
     })
   }
@@ -369,6 +388,7 @@ class View {
     }
   }
   expand() {
+    if (this.#destroyed) return
     const { documentElement } = this.document
     if (this.#column) {
       const side = this.#vertical ? 'height' : 'width'
@@ -429,7 +449,12 @@ class View {
     return this.#writingMode
   }
   destroy() {
-    if (this.document) this.#observer.unobserve(this.document.body)
+    this.#destroyed = true
+    this.#cancelLoad?.()
+    this.#cancelLoad = null
+    this.#observer.disconnect()
+    for (const cleanup of this.#cleanup) cleanup()
+    this.#cleanup = []
   }
 }
 
@@ -448,7 +473,11 @@ export class Paginator extends HTMLElement {
   // #header
   // #footer
   #view
+  #retiringView
+  #preparingView = false
+  #destroyed = false
   #vertical = false
+  #readingActions = new ReadingActionGate()
   #rtl = false
   #margin = 0
   #index = -1
@@ -585,6 +614,10 @@ export class Paginator extends HTMLElement {
     this.#top = this.#root.getElementById('top')
     this.#background = this.#root.getElementById('background')
     this.#container = this.#root.getElementById('container')
+    for (const event of ['wheel', 'touchstart', 'touchmove']) {
+      this.#container.addEventListener(event, e => this.#readingActions.input(e),
+        { passive: true, capture: true })
+    }
     // this.#header = this.#root.getElementById('header')
     // this.#footer = this.#root.getElementById('footer')
 
@@ -623,6 +656,12 @@ export class Paginator extends HTMLElement {
     }
     this.addEventListener('click', suppressClick, true)
     this.addEventListener('load', ({ detail: { doc } }) => {
+      // Events inside a chapter iframe do not bubble to the outer container.
+      for (const event of ['wheel', 'touchstart', 'touchmove']) {
+        doc.addEventListener(event, e => this.#readingActions.input(e),
+          { passive: true, capture: true })
+      }
+      doc.defaultView.addEventListener('blur', () => this.#readingActions.reset())
       doc.addEventListener('pointerdown', rememberSelection, true)
       doc.addEventListener('touchstart', this.#onTouchStart.bind(this), opts)
       doc.addEventListener('touchmove', this.#onTouchMove.bind(this), opts)
@@ -678,13 +717,17 @@ export class Paginator extends HTMLElement {
     applyBackground(this.#background, url, blur, opacity, fit)
   }
   #createView() {
-    if (this.#view) {
-      this.#view.destroy()
-      this.#container.removeChild(this.#view.element)
-    }
     this.#view = new View({
       container: this,
-      onExpand: () => this.scrollToAnchor(this.#anchor),
+      onExpand: () => {
+        if (!this.#preparingView && !this.#destroyed) this.scrollToAnchor(this.#anchor)
+      },
+    })
+    // Keep the old iframe attached: moving/cloning it would reload its document
+    // or lose selections. Prepare the incoming view outside normal flex flow.
+    Object.assign(this.#view.element.style, {
+      position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
+      left: '0', top: '0', contentVisibility: 'visible',
     })
     this.#container.append(this.#view.element)
     return this.#view
@@ -794,7 +837,7 @@ export class Paginator extends HTMLElement {
       mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
   }
   render() {
-    if (!this.#view) return
+    if (!this.#view || this.#preparingView || this.#destroyed) return
     this.#view.render(this.#beforeRender({
       vertical: this.#vertical,
       rtl: this.#rtl,
@@ -1237,7 +1280,7 @@ export class Paginator extends HTMLElement {
     const offset = this.size * (this.#rtl ? -page : page)
     return this.#scrollTo(offset, reason, smooth)
   }
-  async scrollToAnchor(anchor, select) {
+  async scrollToAnchor(anchor, select, reason = 'anchor') {
     this.#anchor = anchor
     const rects = uncollapse(anchor)?.getClientRects?.()
     // if anchor is an element or a range
@@ -1247,20 +1290,20 @@ export class Paginator extends HTMLElement {
       const rect = Array.from(rects)
         .find(r => r.width > 0 && r.height > 0) || rects[0]
       if (!rect) return
-      await this.#scrollToRect(rect, 'anchor')
+      await this.#scrollToRect(rect, reason)
       if (select) this.#selectAnchor()
       return
     }
     // if anchor is a fraction
     if (this.scrolled) {
-      await this.#scrollTo(anchor * this.viewSize, 'anchor')
+      await this.#scrollTo(anchor * this.viewSize, reason)
       return
     }
     const { pages } = this
     if (!pages) return
     const textPages = pages - 2
     const newPage = Math.round(anchor * (textPages - 1))
-    await this.#scrollToPage(newPage + 1, 'anchor')
+    await this.#scrollToPage(newPage + 1, reason)
   }
   #selectAnchor() {
     const { defaultView } = this.#view.document
@@ -1278,13 +1321,15 @@ export class Paginator extends HTMLElement {
       this.start - size, this.end - size, this.#getRectMapper())
   }
   #afterScroll(reason) {
+    if (this.#preparingView || this.#destroyed || !this.#view) return
     const range = this.#getVisibleRange()
     // don't set new anchor if relocation was to scroll to anchor
-    if (reason !== 'anchor') this.#anchor = range
+    if (reason !== 'anchor' && reason !== 'navigation') this.#anchor = range
     else this.#justAnchored = true
 
     const index = this.#index
-    const detail = { reason, range, index }
+    const detail = { reason, range, index,
+      readingAction: this.#readingActions.isAction(reason) }
     if (this.scrolled) detail.fraction = this.start / this.viewSize
     else if (this.pages > 0) {
       const { page, pages } = this
@@ -1346,8 +1391,16 @@ export class Paginator extends HTMLElement {
   }
   async #display(promise) {
     const { index, src, anchor, onLoad, select } = await promise
+    if (this.#destroyed) return
+    const oldIndex = this.#index
+    const oldDirection = { vertical: this.#vertical, rtl: this.#rtl }
     this.#index = index
     if (src) {
+      this.#preparingView = true
+      this.#pendingRelocate = null
+      const oldView = this.#view
+      this.#retiringView = oldView
+      if (oldView) oldView.element.inert = true
       const view = this.#createView()
       const afterLoad = doc => {
         if (doc.head) {
@@ -1360,7 +1413,36 @@ export class Paginator extends HTMLElement {
         onLoad?.({ doc, index })
       }
       const beforeRender = this.#beforeRender.bind(this)
-      await view.load(src, afterLoad, beforeRender)
+      try {
+        await view.load(src, afterLoad, beforeRender)
+      } catch (error) {
+        view.destroy()
+        view.element.remove()
+        this.#preparingView = false
+        this.#retiringView = null
+        if (!this.#destroyed) {
+          this.#view = oldView
+          this.#index = oldIndex
+          this.#vertical = oldDirection.vertical
+          this.#rtl = oldDirection.rtl
+          if (oldView) {
+            oldView.element.inert = false
+            onLoad?.({ doc: oldView.document, index: oldIndex })
+            this.render()
+          }
+        }
+        throw error
+      }
+      if (this.#destroyed) return
+      // Commit synchronously, with no animation through an empty sentinel page.
+      oldView?.destroy()
+      oldView?.element.remove()
+      this.#retiringView = null
+      Object.assign(view.element.style, {
+        position: 'relative', visibility: '', pointerEvents: '', left: '', top: '',
+        contentVisibility: 'auto',
+      })
+      this.#preparingView = false
       this.dispatchEvent(new CustomEvent('create-overlayer', {
         detail: {
           doc: view.document, index,
@@ -1370,7 +1452,7 @@ export class Paginator extends HTMLElement {
       this.#view = view
     }
     await this.scrollToAnchor((typeof anchor === 'function'
-      ? anchor(this.#view.document) : anchor) ?? 0, select)
+      ? anchor(this.#view.document) : anchor) ?? 0, select, 'navigation')
   }
   #canGoToIndex(index) {
     return Number.isInteger(index) && index >= 0 && index < this.sections.length
@@ -1407,23 +1489,25 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.start > 0) return this.#scrollTo(
-        Math.max(0, this.start - (distance ?? this.size * 0.8)), null, { animate: true })
+        Math.max(0, this.start - (distance ?? this.size * 0.8)), 'page', { animate: true })
       return true
     }
     if (this.atStart) return
     const page = this.page - 1
+    if (page <= 0) return true
     return this.#scrollToPage(page, 'page', { animate: true }).then(() => page <= 0)
   }
   #scrollNext(distance) {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.viewSize - this.end > 2) return this.#scrollTo(
-        Math.min(Math.max(0, this.viewSize - this.size), this.start + (distance ?? this.size * 0.8)), null, { animate: true })
+        Math.min(Math.max(0, this.viewSize - this.size), this.start + (distance ?? this.size * 0.8)), 'page', { animate: true })
       return true
     }
     if (this.atEnd) return
     const page = this.page + 1
     const pages = this.pages
+    if (page >= pages - 1) return true
     return this.#scrollToPage(page, 'page', { animate: true }).then(() => page >= pages - 1)
   }
   get atStart() {
@@ -1451,7 +1535,6 @@ export class Paginator extends HTMLElement {
         index: adjacent,
         anchor: prev ? () => 1 : () => 0,
       })
-      if (shouldGo || !this.hasAttribute('animated')) await wait(100)
     } finally {
       this.#locked = false
     }
@@ -1498,14 +1581,22 @@ export class Paginator extends HTMLElement {
     this.#applyBackground()
 
     // needed because the resize observer doesn't work in Firefox
-    this.#view?.document?.fonts?.ready?.then(() => this.#view.expand())
+    const view = this.#view
+    if (!this.#preparingView) view?.document?.fonts?.ready?.then(() => {
+      if (this.#view === view && !this.#preparingView) view.expand()
+    })
   }
   get writingMode() {
     return this.#view?.writingMode
   }
+  get isNavigating() { return this.#locked }
   destroy() {
-    this.#observer.unobserve(this)
+    this.#destroyed = true
+    this.#observer.disconnect()
     this.#view?.destroy()
+    this.#retiringView?.destroy()
+    this.#retiringView?.element.remove()
+    this.#retiringView = null
     this.#view = null
     this.#sectionCache?.destroy()
     this.#mediaQuery.removeEventListener('change', this.#mediaQueryListener)

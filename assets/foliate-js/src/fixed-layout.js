@@ -273,7 +273,7 @@ export class FixedLayout extends HTMLElement {
         const section = book.sections[resolved.index]
         if (!section) return
         const { index, side } = this.getSpreadOf(section)
-        await this.goToSpread(index, side)
+        await this.goToSpread(index, side, 'navigation')
     }
     async next() {
         const s = this.rtl ? this.#goLeft() : this.#goRight()

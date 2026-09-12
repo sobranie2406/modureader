@@ -1,33 +1,23 @@
-# 默读 / Modu 1.0.4 正式版
+# 默读 / Modu 1.0.5 正式版
 
-版本：**1.0.4+10016**，替换原 10013 构建。本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是按 GPL-3.0-or-later 发布的独立修改版本。
-
-## 10016 修正
-
-- **Anx 数据同步兼容**：兼容 ZIP 导入、旧 `database7.db` 迁移和本机已缓存记录中的空阅读位置、空进度及数值越界。进度规范到 0～100%，保留有效 EPUB 定位；未读空记录不覆盖另一端的有效阅读位置，不伪造新的阅读时间。保留旧云端数据库、删除标记和条件写入保护。
-- **书末翻页边界**：滚动模式停在最后一屏，惯性翻页不再停入书首、书末的过渡空白页；阻止无效章节跳转，进度计算不超过 100%。支持继续往回阅读和正常跨章节导航，不按“已读完”标签禁用正文。
-- **选区与焦点**：调整菜单、AI 面板关闭后的阅读焦点恢复；根据 Windows/Linux 的纹理控件与 Apple/Android 原生视图分别处理。各平台非 PDF 正文使用一致的临时浅蓝选区；保留 PDF 专用样式和移动端触摸选字逻辑。
-- **每本书选择向量模型**：书籍弹出菜单新增“向量化模型”，可跟随全局默认、选择四个本地模型之一或全局配置的远程模型。更换选择不自动重建已有索引；索引模型不匹配时回退关键词检索，避免混用向量。全局向量功能关闭时仍不调用模型。
-
-以上修复已用合成数据和自动回归验证，包括空阅读记录、进度 `1.00010227620884`、旧库迁移、并发冲突、三端记录收敛和翻页首尾边界。未在反馈者的 Windows 11 LTSC 原始书库及所有平台真机逐一验收。
+版本：**1.0.5+10017**。本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是按 GPL-3.0-or-later 发布的独立修改版本。
 
 ## 本次更新
 
-- **内嵌本地向量模型**：包含 MiniLM、BGE-en、BGE-zh、E5 四个固定版本 ONNX 模型及分词器，校验大小与 SHA-256。首次使用从包内提取到缓存，无需联网下载，有效缓存可复用。默认中文 BGE，自动向量化默认关闭。安装包因此增大，仍保留手动下载兼容入口。
-- **Windows 阅读器稳定性**：修复 WebView 空 JavaScript 返回值处理及 Flutter 引擎与 COM 的退出顺序；针对小 TXT、PDF、EPUB 提取路径补充原生回归。个别安装器“文件损坏”反馈未获得下载文件哈希，不能将应用内修复当作该问题的根因确认。
-- **相邻章节预加载**：打开章节后延迟预取前后相邻章节资源，最多缓存三个章节，前台阅读优先，过大章节按需加载。字体和页面排版仍需计算，不保证切章零延迟。
-- **WebDAV 自动同步恢复**：启动、回前台后延迟约两秒；短暂网络失败有限重试，持续认证拒绝仍明确提示。同步期间的新请求合并排队，避免并行写入。
-- **间歇缺失 ETag 的兼容**：PROPFIND 缺少强 ETag 时向同一数据库文件发起 HEAD 补查；必要时重新读取并合并。保持条件写入和有限冲突重试，绝不降级为无条件覆盖。持续缺失时保留本机改动并停止上传；日志区分“无需上传”和“实际发布数据库”。
-- **注释显示**：桌面测量实际换行，在阅读窗口面积 **25%** 上限内优先完整展开，不固定成偏宽、偏矮的弹框。过长时允许框内滚动。**桌面与移动端均保留末尾留白**，避免最后一行贴边、裁切。
-- **设置名称统一**：「书库 WebDAV」改为「远程书库设置」，配置不变，仍独立于数据同步连接。
+- **防止旧页面覆盖同步进度**：锁屏、退后台和关闭阅读器不再用缓存位置刷新阅读时间，只保存实际阅读操作。事务内检查位置版本，拒绝旧页面回写并刷新阅读位置。主动往回阅读仍正常保存，不采用“最远进度”规则。
+- **笔记冲突保护**：同步后刷新打开的阅读器和笔记。保存时核对原记录，冲突时保留草稿并提示，不覆盖新版笔记、不恢复已删除笔记。调整划线颜色不顺带覆盖新摘录。
+- **无可靠 ETag 的 WebDAV 兼容**：用独立合成文件验证服务器条件写入能力；可靠服务继续使用 ETag。其他服务使用内容散列命名的独立记录批次，不无条件覆盖共享数据库。中断上传持久排队，上传后读回校验；ETag 恢复后仍合并兼容记录。
+- **章节切换优化**：保留相邻章节资源预取，新章节字体和布局准备好再替换旧页面，避免默认字体闪现和重复排版。去掉切章固定等待和滑入空白边界的动画；墨水屏模式禁用翻页动画。仍需加载与排版，不保证零延迟。
+- **纳入此前 10016 修正**：兼容 Anx 导入的空阅读位置与越界进度；修正书末翻页边界；改善跨平台临时选区和焦点；书籍菜单支持单独选择向量模型，未选择时跟随默认。
+- **保留四个内嵌模型**：MiniLM、BGE-en、BGE-zh、E5 及分词器继续随安装包提供，自动向量化默认关闭。
 
-## 升级与隐私
+## 升级与同步注意事项
 
-构建号 10016 高于原 1.0.4 的 10013 及 10014、10015 本地包。Android 沿用默读原专用签名，可覆盖升级；请勿先卸载，升级前建议备份。本页附件均须使用同一构建，不要混用旧下载缓存。
+**请先备份，并将所有参与同步的设备升级到 1.0.5；升级期间暂停旧版自动同步。** 旧版不识别新的兼容记录通道，也没有旧页面回写保护，不能保证新旧混用的同步完整性。
 
-继续使用数据库 8 的记录级合并，不新增同步格式迁移。所有设备配置同一个 modu 上级目录，不重复拼接 /modu。强 ETag 与正确执行条件写入仍是并发保护前提。[同步与迁移说明](https://github.com/sobranie2406/modureader/blob/v1.0.4/docs/WEBDAV_RECORD_SYNC.md)。
+各端使用相同的 `modu` 上级目录，不重复拼接 `/modu`。保留旧数据库，不需要手动改名或清空服务器。新增的 `modu/record-log-v1/` 是同步数据，**不要删除**。批次与本地缓存暂不自动压缩，会逐渐增长，达到安全扫描限额时明确停止而不是忽略数据。详情见[记录同步说明](https://github.com/sobranie2406/modureader/blob/v1.0.5/docs/WEBDAV_RECORD_SYNC.md)。
 
-API Key 和远程书库凭据仍跟随独立、默认关闭的加密同步开关，使用单独密码与 AES-256-GCM。书籍、笔记和整个数据库并不因此全部加密。字体、主题图片和向量索引留在各端；显式配置代码与二维码未加密，不要公开。
+Android 沿用原专用签名，构建号 10017 高于此前正式及本地版本，可覆盖升级，请勿先卸载。API Key 和远程书库凭据仍只按默认关闭的独立加密同步开关发送；这不代表书籍、笔记和整个数据库已加密。字体和向量索引不参与同步。不要公开配置代码、二维码或密钥。
 
 ## 安装包
 
@@ -39,50 +29,29 @@ API Key 和远程书库凭据仍跟随独立、默认关闭的加密同步开关
 | Linux | x64 / ARM64 | Debian 13 (trixie) DEB，不保证其他发行版兼容 |
 | iOS | ARM64 真机 | iOS 16+ IPA，无分发签名，须自行合法签署主应用及 Share Extension |
 
-共 **9 个程序包及各自 SHA-256**。不提供独立 notices ZIP；许可证保留在包内和源码中。没有 x64 iPhone 包，不包含应用商店或 TestFlight 发布。
+共 **9 个程序包及各自 SHA-256**。不提供独立 notices ZIP，许可保留在包内和源码中。不包含应用商店或 TestFlight 发布。
 
-## 验证范围与限制
+## 验证范围
 
-- 发布流程运行 Flutter、阅读器 JavaScript、打包和项目身份回归测试；各平台构建和包校验通过后才发布完整附件，见 [GitHub Actions](https://github.com/sobranie2406/modureader/actions)。
-- 先行 1.0.3+10012 的 macOS ARM64 DMG 与 Android ARM64 APK 已构建，检查过模型资源、架构、签名完整性、Android 16 KB 对齐和 Release DEX 中的 ONNX JNI 接口；这不是最终 1.0.4 所有平台的实机功能验收。
-- 合成内容的浏览器验证覆盖短、中、长注释、25% 面积限制和滚动到底的末行；移动端横竖屏及留白有自动回归。尚未在截图原书和所有字体上逐一验证。
-- 已授权 WebDAV 只读检查中，多轮认证和强 ETag 读取正常；手机冷启动时的间歇故障没有现场复现。只读检查不能证明条件写入正确，也不能替代长期双端并发测试。
-- Windows 先行诊断构建验证了小 TXT/PDF/EPUB 路径；iQOO Neo8 / Android 16 原书长时间向量化及其他厂商偶发退出仍需实机复测，不宣称排除全部卡死或闪退。
-- 在线 AI、翻译、TTS 依赖网络与服务商，未全面验收全部接口。Linux 无系统 TTS 后端，需选在线语音。
-- 提交问题时可预览并勾选附带脱敏诊断；不要上传个人书籍、密钥或完整配置代码。
+- 本地 Flutter 回归 **577 项通过、5 项跳过**；阅读器 JavaScript **105 项通过**。包含可靠与无可靠 ETag 两种通道的双端合成数据库测试、旧页面回写拒绝、真正回退阅读、笔记冲突与草稿保留。
+- 合成 HTTP 服务验证 ETag 能力检测与兼容日志；合成章节浏览器验证字体等待、前后切章及滚动布局。未使用个人书籍或真实云端数据进行破坏性测试。
+- 发布流程在全平台构建、包校验和自动回归完成后才上传完整附件；具体执行记录见 [Actions](https://github.com/sobranie2406/modureader/actions)。
+- **尚未完成本次改动在实际墨水屏、坚果云账号写入及长期多端并发下的验收**。构建与模拟测试不等于所有目标设备实测。在线 AI、翻译及 TTS 依赖服务商，未全面验收全部接口；Linux 无系统 TTS 后端，需选在线语音。
 
-许可及对应源码：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.4/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.4/NOTICE)、[第三方许可证](https://github.com/sobranie2406/modureader/tree/v1.0.4/LICENSES)、[来源](https://github.com/sobranie2406/modureader/blob/v1.0.4/UPSTREAM.md)、[v1.0.4 源码](https://github.com/sobranie2406/modureader/tree/v1.0.4)。
+许可与来源：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.5/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.5/NOTICE)、[第三方许可证](https://github.com/sobranie2406/modureader/tree/v1.0.5/LICENSES)、[UPSTREAM](https://github.com/sobranie2406/modureader/blob/v1.0.5/UPSTREAM.md)、[对应源码](https://github.com/sobranie2406/modureader/tree/v1.0.5)。
 
 ## English release notes
 
-**Modu 1.0.4 (build 10016)** replaces build 10013 and is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
+**Modu 1.0.5 (build 10017)** is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
 
-### Build 10016 fixes
+- Prevent a suspended reader from rewriting an old position with a new timestamp. Save actual reading actions only; reject stale writes transactionally and refresh the open reader after sync. Deliberate backward reading remains supported.
+- Protect newer or deleted notes against stale edits. Keep the draft and show a conflict instead of overwriting another device's changes. Refresh annotations without deleting bookmarks.
+- Probe conditional-write correctness using isolated synthetic files. Reliable ETag servers retain conditional database writes; other servers use content-addressed immutable record batches with durable pending uploads and read-back verification. Both paths read the compatible history. Never fall back to unconditional shared-database overwrites.
+- Prepare chapter fonts and layout before replacing the visible page. Retain adjacent-resource prefetching, avoid duplicate layout and fixed transition delays, and disable animations in e-ink mode. Chapter changes can still require loading and layout.
+- Include earlier build 10016 fixes for nullable/out-of-range Anx progress, book-end navigation, selection/focus and per-book embedding model choices. Keep all four offline ONNX models bundled; automatic indexing remains off by default.
 
-- Normalize nullable and out-of-range reading progress from Anx ZIP imports, legacy database7 migration and cached local sync records. Preserve exact locations and operation timestamps; unknown unread records cannot overwrite valid reading positions. Keep legacy cloud data, tombstones and conditional-write protection.
-- Stop scrolling and inertial paging at actual book boundaries, reject invalid section targets and bound progress to 0–100%. Backward reading and normal chapter transitions remain available.
-- Restore reader focus using each platform's supported view mechanism. Keep a consistent temporary blue selection for non-PDF text without replacing mobile selection gestures or PDF styling.
-- Add per-book embedding model selection to the book menu. Follow the default, choose a bundled local model, or use the configured remote model. Existing indexes require explicit rebuilding; incompatible vector queries fall back to keyword search. The global off switch remains authoritative.
+**Back up and upgrade every syncing device to 1.0.5; pause older clients during the upgrade.** Older clients do not understand the compatible record log and lack stale-reader protection. Do not remove `modu/record-log-v1/` or the legacy databases. History and local caches currently grow without automatic compaction; safety limits stop an incomplete scan. Use the same remote parent directory on every device.
 
-Synthetic regression tests cover nullable/cached positions, the reported 1.00010227620884 progress value, legacy migration, concurrent writes, three-device convergence and navigation boundaries. The reporter's original Windows LTSC library and all target devices have not been individually verified.
+Nine native packages with SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB, iOS ARM64 IPA. Android keeps its signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. Licenses stay inside packages; no separate notices ZIP.
 
-### Changes
-
-- Bundle four pinned, hash-verified ONNX models and tokenizers for offline use. Valid caches are reused; Chinese BGE remains the default and automatic indexing remains off. Installers are larger; manual download remains a fallback.
-- Fix Windows null JavaScript replies and native engine/COM shutdown ordering. Add tiny TXT/PDF/EPUB regression coverage. A reported corrupt installer remains unconfirmed without the downloaded file hash.
-- Preload adjacent chapter resources with a bounded three-section cache and foreground priority. Oversized chapters remain on demand; layout can still cause delay.
-- Delay foreground automatic WebDAV sync, retry temporary connection failures and coalesce requests. Recover missing ETags through HEAD on the same resource and bounded re-read/re-merge attempts. Never overwrite databases unconditionally.
-- Measure desktop footnote wrapping within 25% of the reading viewport. Long notes can scroll; desktop and mobile retain end padding so the last line remains reachable.
-- Rename the connection entry to **Remote library settings** without changing stored settings or the separate sync connection.
-
-### Packages, upgrades and privacy
-
-Nine native packages plus SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB, and iOS ARM64 IPA. Android uses the existing signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. No standalone notices ZIP.
-
-Build 10016 upgrades build 10013 and local builds 10014/10015; back up first and do not uninstall Android before updating. Database 8 record sync is unchanged. Use the same remote parent directory on all devices. Strong ETags and correctly implemented conditional writes remain required. Optional credential encryption does not encrypt books, notes or the entire database. Explicit configuration codes and QR images are not encrypted.
-
-### Validation limits
-
-CI runs regressions, native builds and package checks before publishing the complete set. Earlier build 10012 passed macOS ARM64/Android ARM64 package checks, not final all-platform acceptance. Synthetic browser tests cover footnote sizing and end visibility; mobile sizing/padding has regression coverage. The original reported book and every custom font have not been verified.
-
-Authorized WebDAV read-only probes returned valid authentication and stable strong ETags; mobile cold-start failures were not reproduced, and read-only probes do not verify conditional writes. Long-book indexing on the reported iQOO/Android 16 device, all online providers and prolonged concurrent sync still need real-device testing. Review diagnostics and never share private books or credentials.
+Local verification: 577 Flutter tests passed, 5 skipped; 105 reader JavaScript tests passed. Synthetic dual-device tests cover both transport modes, stale positions, intentional backward reading and note conflicts. CI gates publication on builds and package checks. This is not real-device acceptance on e-ink hardware, live Nutstore write testing or prolonged multi-device concurrency validation. Optional encrypted credential sync remains off by default; it does not encrypt the entire library.

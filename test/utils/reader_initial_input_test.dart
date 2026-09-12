@@ -29,4 +29,17 @@ void main() {
       expect(style['tapOnlyPageTurn'], tapOnly);
     }
   });
+
+  test('reader receives e-ink mode without changing the saved page style', () {
+    final savedStyle = Prefs().pageTurnStyle;
+    for (final eInk in [true, false]) {
+      Prefs().eInkMode = eInk;
+      final uri = Uri.parse(generateUrl('https://example.test/book.epub', '',
+          fontName: 'serif', fontPath: ''));
+      final style = jsonDecode(uri.queryParameters['style']!);
+      expect(style['eInkMode'], eInk);
+      expect(style['pageTurnStyle'], savedStyle.name);
+      expect(Prefs().pageTurnStyle, savedStyle);
+    }
+  });
 }

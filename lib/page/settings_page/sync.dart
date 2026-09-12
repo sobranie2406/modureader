@@ -58,8 +58,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                 title: Text(L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
                 description: Text(_label(
-                  '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体文件和本机字体选择不参与同步。新协议使用 database8.db，首次读取旧 database7.db 后保留旧文件；请先备份并更新所有设备，再恢复同步。服务器须支持强 ETag 与条件写入，否则停止上传。旧版每日累计时长按同书同日较大值迁移，不能还原丢失的原始会话。',
-                  'Sync folder: modu. Books, notes and bookmarks merge by stable identity. The latest reading action wins; reading sessions are deduplicated and deletions are retained. Fonts and local font choices stay on each device. The new protocol uses database8.db and imports, but does not overwrite, database7.db. Back up and update all devices before resuming sync. Strong ETags and conditional writes are required. Legacy daily totals use the larger value per book/day; missing original sessions cannot be reconstructed.',
+                  '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。通过隔离测试确认强 ETag 和条件写入可靠时，使用 database8.db 条件更新；不可靠时自动使用 record-log-v1 独立记录文件，不覆盖共享数据库。首次读取旧 database7.db 后保留旧文件。请先备份并更新所有设备，再恢复同步；旧客户端无法读取兼容模式的记录。旧版每日累计时长按同书同日较大值迁移。兼容记录保留删除历史，暂不自动清理。',
+                  'Sync folder: modu. Books, notes and bookmarks merge by stable identity; the latest reading action wins and reading sessions are deduplicated. Fonts stay local. Isolated checks verify strong ETags and conditional writes before updating database8.db. Otherwise, immutable record-log-v1 batches are used without overwriting the shared database. Legacy database7.db is preserved. Back up and update every device first: older clients cannot read compatibility records. Legacy daily totals use the larger value per book/day. Compatibility history and tombstones are retained without automatic cleanup.',
                 )),
                 value: Text(Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
                     'Not set'),

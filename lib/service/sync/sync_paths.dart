@@ -5,6 +5,7 @@ abstract final class SyncPaths {
   static const books = '$root/data/file';
   static const covers = '$root/data/cover';
   static const connectionTest = '$root/.test';
+  static const recordLog = '$root/record-log-v1';
 
   static String database(String fileName) => '$root/$fileName';
   static String data(String relativePath) {

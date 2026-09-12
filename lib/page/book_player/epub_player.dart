@@ -29,6 +29,8 @@ import 'package:anx_reader/providers/book_toc.dart';
 import 'package:anx_reader/providers/bookmark.dart';
 import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
+import 'package:anx_reader/providers/sync_database_revision.dart';
+import 'package:anx_reader/service/book_player/reader_progress_session.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
 import 'package:anx_reader/service/book_player/tts_text_result.dart';
@@ -113,6 +115,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool _readerReady = false;
   bool quickMarkEnabled = false;
   final _quickMarks = QuickMarkService(bookNoteDao);
+  late final ReaderProgressSession _progress;
+  Future<void>? _syncRefresh;
+  bool _refreshRequested = false;
+  bool _remotePositionPending = false;
+  Timer? _syncRefreshRetry;
+  int _syncRestoreAttempts = 0;
 
   Future<bool> setQuickMarkEnabled(bool enabled) async {
     if (!AnxPlatform.isMobile || !_readerReady) return false;
@@ -312,6 +320,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     webViewController.evaluateJavascript(source: '''
       changeStyle({
         pageTurnStyle: '${pageTurnStyle.name}',
+        eInkMode: ${Prefs().eInkMode},
       })
     ''');
   }
@@ -733,13 +742,107 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   Future<void> renderAnnotations(InAppWebViewController controller) async {
     List<BookNote> annotationList =
         await bookNoteDao.selectBookNotesByBookId(widget.book.id);
-    String allAnnotations =
-        jsonEncode(annotationList.map((e) => e.toJson()).toList())
-            .replaceAll('\'', '\\\'');
-    controller.evaluateJavascript(source: '''
-     const allAnnotations = $allAnnotations
-     renderAnnotations()
-    ''');
+    await controller.callAsyncJavaScript(
+        functionBody: 'await window.replaceReadingAnnotations('
+            '${jsonEncode(annotationList.map((e) => e.toJson()).toList())});');
+  }
+
+  Future<void> refreshReadingAfterSync() {
+    if (!mounted || !_readerReady || widget.cfi != null) return Future.value();
+    _refreshRequested = true;
+    return _syncRefresh ??= _refreshSyncedReader().whenComplete(() {
+      _syncRefresh = null;
+      if (_refreshRequested && mounted) unawaited(refreshReadingAfterSync());
+    });
+  }
+
+  Future<void> _refreshSyncedReader() async {
+    try {
+      while (_refreshRequested && mounted) {
+        _refreshRequested = false;
+        final previous = _progress.current;
+        final latest = await _progress.refresh();
+        if (previous?.revision != latest.revision) _syncRestoreAttempts = 0;
+        if (!mounted) return;
+        if (latest.deleted) {
+          _remotePositionPending = true;
+          return;
+        }
+        if (latest.position.isNotEmpty &&
+            (_remotePositionPending ||
+                previous?.revision != latest.revision ||
+                !_readerPositionInitialized)) {
+          _remotePositionPending = true;
+          final result = await webViewController.callAsyncJavaScript(
+              functionBody: 'return await window.restoreSyncedReadingPosition('
+                  '${jsonEncode(latest.position)});');
+          if (!mounted) return;
+          if (result?.value != true) {
+            _syncRefreshRetry?.cancel();
+            if (++_syncRestoreAttempts >= 3) {
+              final zh = Localizations.localeOf(context).languageCode == 'zh';
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(zh
+                      ? '同步后的阅读位置暂时无法打开，请重新打开书籍。未覆盖云端进度。'
+                      : 'Could not open the synced position. Reopen the book; the synced progress was not overwritten.')));
+              return;
+            }
+            _syncRefreshRetry = Timer(const Duration(milliseconds: 400), () {
+              if (mounted) unawaited(refreshReadingAfterSync());
+            });
+            return;
+          }
+          _remotePositionPending = false;
+          _syncRestoreAttempts = 0;
+          setState(() {
+            percentage = latest.percentage;
+          });
+          ref
+              .read(currentReadingProvider.notifier)
+              .update(percentage: percentage);
+        }
+        _readerPositionInitialized = true;
+        widget.book.lastReadPosition = latest.position;
+        widget.book.readingPercentage = latest.percentage;
+        await renderAnnotations(webViewController);
+      }
+    } catch (error) {
+      // No private CFI, note content or server data in diagnostics.
+      AnxLog.warning('Reader sync refresh failed: ${error.runtimeType}');
+    }
+  }
+
+  bool _readerPositionInitialized = false;
+
+  Future<void> _recordReadingAction(String position, double fraction) async {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null &&
+        lifecycle != AppLifecycleState.resumed &&
+        !TtsHandler().isPlaying) {
+      return;
+    }
+    if (!_readerReady ||
+        !_readerPositionInitialized ||
+        _remotePositionPending ||
+        widget.cfi != null ||
+        position.isEmpty) {
+      return;
+    }
+    try {
+      final accepted = await _progress.record(position, fraction,
+          generation: _progress.generation);
+      if (!mounted) return;
+      if (!accepted) {
+        _remotePositionPending = true;
+        await refreshReadingAfterSync();
+        return;
+      }
+      widget.book.lastReadPosition = position;
+      widget.book.readingPercentage = fraction;
+      ref.read(bookListProvider.notifier).refresh();
+    } catch (error) {
+      AnxLog.warning('Reading action save failed: ${error.runtimeType}');
+    }
   }
 
   void getThemeColor() {
@@ -773,6 +876,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         callback: (args) async {
           if (!mounted) return;
           _readerReady = true;
+          await refreshReadingAfterSync();
+          if (!mounted) return;
           if (quickMarkEnabled) await setQuickMarkEnabled(true);
           try {
             await setTranslationMode(
@@ -788,7 +893,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         handlerName: 'onRelocated',
         callback: (args) {
           Map<String, dynamic> location = args[0];
-          if (cfi == location['cfi']) return;
+          if (!mounted) return;
+          if (cfi == location['cfi']) {
+            if (location['readingAction'] == true) {
+              unawaited(_recordReadingAction(cfi, percentage));
+            }
+            return;
+          }
           // if (chapterHref != location['chapterHref']) {
           //   refreshToc();
           // }
@@ -814,7 +925,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
                 chapterTotalPages: chapterTotalPages,
               );
           widget.updateParent();
-          saveReadingProgress();
+          if (location['readingAction'] == true) {
+            unawaited(_recordReadingAction(cfi, percentage));
+          }
           readingPageKey.currentState?.resetAwakeTimer();
         });
     controller.addJavaScriptHandler(
@@ -1111,6 +1224,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   @override
   void initState() {
+    _progress = ReaderProgressSession(bookDao, widget.book.id);
     book = widget.book;
     getThemeColor();
 
@@ -1143,18 +1257,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   Future<void> saveReadingProgress() async {
-    if (cfi == '' || widget.cfi != null) return;
-    Book book = widget.book;
-    book.lastReadPosition = cfi;
-    book.readingPercentage = percentage;
-    await bookDao.updateReadingPosition(book.id, cfi, percentage);
-    if (mounted) {
-      ref.read(bookListProvider.notifier).refresh();
-    }
+    await _progress.flush();
   }
 
   @override
   void dispose() {
+    _syncRefreshRetry?.cancel();
     _scrollDebounceTimer?.cancel();
     _animationController?.dispose();
     saveReadingProgress();
@@ -1437,6 +1545,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(syncDatabaseRevisionProvider, (_, __) {
+      unawaited(refreshReadingAfterSync());
+    });
     String url = Server().bookUrl(File(widget.book.fileFullPath));
     String initialCfi = widget.cfi ?? widget.book.lastReadPosition;
 
