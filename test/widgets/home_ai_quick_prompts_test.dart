@@ -81,12 +81,22 @@ void main() {
   }
 
   Finder prompt(String id) => find.byKey(ValueKey('home-prompt-$id'));
+  Future<void> togglePrompts(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey('ai-skill-prompts-toggle')));
+    await tester.pumpAndSettle();
+  }
 
   testWidgets(
-      'shows every home prompt in stable order, including after new chat',
+      'prompts are hidden by default and after new chat, toggle preserves all prompts',
       (tester) async {
     await mount(tester, const Size(1100, 760));
     final ids = homeAiPromptPolicies.keys.toList();
+    for (final id in ids) {
+      expect(prompt(id), findsNothing);
+    }
+    expect(find.byType(ActionChip), findsNothing);
+    expect(find.byTooltip('展开技能提示词'), findsOneWidget);
+    await togglePrompts(tester);
     for (final id in ids) {
       expect(prompt(id), findsOneWidget);
     }
@@ -95,8 +105,13 @@ void main() {
         matching: find.byType(ActionChip));
     expect(tester.widgetList<ActionChip>(chips).map((chip) => chip.key),
         ids.map((id) => ValueKey('home-prompt-$id')));
+    await togglePrompts(tester);
+    expect(find.byType(ActionChip), findsNothing);
+    await togglePrompts(tester);
     await tester.tap(find.byIcon(Icons.edit_document));
     await tester.pumpAndSettle();
+    expect(find.byType(ActionChip), findsNothing);
+    await togglePrompts(tester);
     expect(tester.widgetList<ActionChip>(chips).map((chip) => chip.key),
         ids.map((id) => ValueKey('home-prompt-$id')));
     expect(tester.takeException(), isNull);
@@ -105,6 +120,7 @@ void main() {
   testWidgets('all twelve prompts retain their own request policy on click',
       (tester) async {
     final chat = await mount(tester, const Size(1100, 760));
+    await togglePrompts(tester);
     for (final id in homeAiPromptPolicies.keys) {
       final chip = tester.widget<ActionChip>(prompt(id));
       final expectedText = (chip.label as Text).data;
@@ -122,6 +138,7 @@ void main() {
       'small window and large text scroll to the final prompt without overflow',
       (tester) async {
     final chat = await mount(tester, const Size(360, 640), textScale: 1.5);
+    await togglePrompts(tester);
     final last = prompt(homePromptOrganizeByProgress);
     expect(last, findsOneWidget);
     await tester.ensureVisible(last);

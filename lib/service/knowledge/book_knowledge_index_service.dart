@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
 import 'package:anx_reader/service/knowledge/index_build_marker.dart';
 import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
+import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
 
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
@@ -90,20 +91,27 @@ class BookKnowledgeIndexService {
     Book book, {
     IndexProgressCallback? onProgress,
     bool Function()? isCancelled,
-  }) =>
-      withIndexBuildMarker(indexFile(book.id), () async {
-        try {
-          await CrashDiagnostics.recordIndexState(1);
-          final result = await _build(book,
-              onProgress: onProgress, isCancelled: isCancelled);
-          await CrashDiagnostics.recordIndexState(
-              result.status == IndexBuildStatus.cancelled ? 7 : 5);
-          return result;
-        } catch (_) {
-          await CrashDiagnostics.recordIndexState(6);
-          rethrow;
-        }
-      });
+  }) async {
+    if (isCancelled?.call() ?? false) {
+      return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+    }
+    // Recheck at execution time as well as at the menu entry: a queued file
+    // may have been removed. Do this before markers, model loading or extraction.
+    await requireLocalBookForIndexing(book);
+    return withIndexBuildMarker(indexFile(book.id), () async {
+      try {
+        await CrashDiagnostics.recordIndexState(1);
+        final result = await _build(book,
+            onProgress: onProgress, isCancelled: isCancelled);
+        await CrashDiagnostics.recordIndexState(
+            result.status == IndexBuildStatus.cancelled ? 7 : 5);
+        return result;
+      } catch (_) {
+        await CrashDiagnostics.recordIndexState(6);
+        rethrow;
+      }
+    });
+  }
 
   Future<IndexBuildResult> _build(
     Book book, {

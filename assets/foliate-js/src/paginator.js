@@ -3,6 +3,7 @@ import { touchPageDirection } from './touch-paging.js'
 import { waitForReaderFonts } from './reader-font-ready.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
+import { bookFrameSandbox } from './frame-script-policy.js'
 
 const lerp = (min, max, x) => x * (max - min) + min
 const easeOutSine = x => Math.sin((x * Math.PI) / 2)
@@ -219,9 +220,7 @@ class View {
       display: 'none',
       width: '100%', height: '100%',
     })
-    // `allow-scripts` is needed for events because of WebKit bug
-    // https://bugs.webkit.org/show_bug.cgi?id=218086
-    this.#iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')
+    this.#iframe.setAttribute('sandbox', bookFrameSandbox())
     this.#iframe.setAttribute('scrolling', 'no')
   }
   get element() {

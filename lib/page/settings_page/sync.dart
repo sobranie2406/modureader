@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:anx_reader/widgets/settings/reading_sync_settings.dart';
 
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/service/local_data/backup_safety.dart';
@@ -86,7 +87,11 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                   });
                 }),
             SettingsTile.switchTile(
-                title: Text(L10n.of(context).settingsSyncCompletedToast),
+                title: Text(_label('同步成功提示', 'Sync success notification')),
+                description: Text(_label(
+                  '仅在同步成功时提示；失败始终显示原因。同步过程中不弹出提示。',
+                  'Notify on success only; failures always show a reason. No in-progress notifications.',
+                )),
                 leading: const Icon(Icons.notifications),
                 initialValue: Prefs().syncCompletedToast,
                 onToggle: (bool value) {
@@ -104,6 +109,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                     Prefs().autoSync = value;
                   });
                 }),
+            const ReadingSyncSettings(),
             SettingsTile.navigation(
                 title: Text(L10n.of(context).restoreBackup),
                 leading: const Icon(Icons.restore),

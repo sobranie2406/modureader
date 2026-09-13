@@ -64,6 +64,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('打开阅读AI'));
     await tester.pumpAndSettle();
+    expect(find.text('智能翻译'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('ai-skill-prompts-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('智能翻译'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ai-skill-prompts-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('智能翻译'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('ai-skill-prompts-toggle')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('智能翻译'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('ai-request-error')), findsOneWidget);

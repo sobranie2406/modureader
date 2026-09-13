@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/utils/reader_route_observer.dart';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
@@ -271,6 +272,7 @@ class _MyAppState extends ConsumerState<MyApp>
               // },
             ),
             navigatorObservers: [
+              readerRouteObserver,
               FlutterSmartDialog.observer,
               heroineController
             ],

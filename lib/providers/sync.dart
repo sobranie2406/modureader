@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' as io;
+import 'package:anx_reader/service/sync/sync_feedback.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -54,6 +55,12 @@ class Sync extends _$Sync {
   bool _pendingAutomatic = false;
   SyncDirection? _pendingManualDirection;
   final _autoStart = AutoSyncStartGate();
+
+  bool get _chineseFeedback {
+    final context = navigatorKey.currentContext;
+    return context == null ||
+        Localizations.maybeLocaleOf(context)?.languageCode == 'zh';
+  }
 
   bool get _autoSyncAllowed {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -112,6 +119,7 @@ class Sync extends _$Sync {
 
   Future<bool> shouldSync({bool automatic = false}) async {
     if (!Prefs().webdavStatus) {
+      if (!automatic) throw const SyncFeedbackFailure(SyncFailureCode.disabled);
       return false;
     }
 
@@ -119,39 +127,19 @@ class Sync extends _$Sync {
         Prefs().onlySyncWhenWifi &&
         !(await Connectivity().checkConnectivity())
             .contains(ConnectivityResult.wifi)) {
-      if (Prefs().syncCompletedToast) {
-        AnxToast.show(L10n.of(navigatorKey.currentContext!).webdavOnlyWifi);
-      }
-      return false;
+      throw const SyncFeedbackFailure(SyncFailureCode.wifiRequired);
     }
 
     return true;
-  }
-
-  Future<void> _showDatabaseVersionMismatchDialog(int remoteVersion) async {
-    await SmartDialog.show(
-      clickMaskDismiss: false,
-      builder: (context) => AlertDialog(
-        title: Text(L10n.of(context).webdavSyncAborted),
-        content: Text(
-            L10n.of(context).syncMismatchTip(currentDbVersion, remoteVersion)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              SmartDialog.dismiss();
-            },
-            child: Text(L10n.of(context).commonOk),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> syncData(
     SyncDirection direction,
     WidgetRef? ref, {
     SyncTrigger trigger = SyncTrigger.auto,
+    bool Function()? shouldStart,
   }) async {
+    if (shouldStart != null && (!shouldStart() || _syncRunning)) return;
     final automatic = trigger == SyncTrigger.auto;
     if (automatic) {
       if (!_autoSyncAllowed) return;
@@ -159,7 +147,10 @@ class Sync extends _$Sync {
         _pendingAutomatic = true;
         return;
       }
-      if (!await _autoStart.wait(() => _autoSyncAllowed)) return;
+      if (!await _autoStart
+          .wait(() => _autoSyncAllowed && (shouldStart?.call() ?? true))) {
+        return;
+      }
     } else {
       _autoStart.invalidate();
     }
@@ -170,22 +161,20 @@ class Sync extends _$Sync {
     }
     _syncRunning = true;
     try {
-      await _syncData(direction, ref, trigger: trigger);
+      if (!(shouldStart?.call() ?? true)) return;
+      await _syncData(direction, ref,
+          trigger: trigger, shouldStart: shouldStart);
     } catch (e) {
       // Avoid logging DioException.toString(): it can contain private URLs.
       final status = e is DioException ? e.response?.statusCode : null;
       AnxLog.warning(
           'Sync incomplete: ${e.runtimeType}, HTTP $status, automatic=$automatic');
-      if (automatic && (isTemporarySyncError(e) || !_autoSyncAllowed)) return;
-      if (isSyncAuthError(e)) {
-        AnxToast.show('WebDAV 服务器拒绝登录或目录访问（HTTP $status），请检查同步账号及目录权限。');
-      } else if (isTemporarySyncError(e)) {
-        AnxToast.show('同步暂未完成，请检查网络后重试；本机改动已保留。');
-      } else if (e is DioException) {
-        AnxToast.show('WebDAV 请求失败（HTTP ${status ?? '未知'}），未将错误当作空书库处理。');
-      } else {
-        AnxToast.show('同步未完成：$e');
+      // Intentional pause/cancellation is not a failed synchronization. Final
+      // automatic network failures are reported only after preflight retries.
+      if (automatic && (!_autoSyncAllowed || !(shouldStart?.call() ?? true))) {
+        return;
       }
+      AnxToast.show(syncFailureMessage(e, chinese: _chineseFeedback));
     } finally {
       _syncRunning = false;
       changeState(state.copyWith(isSyncing: false));
@@ -206,19 +195,19 @@ class Sync extends _$Sync {
     SyncDirection direction,
     WidgetRef? ref, {
     SyncTrigger trigger = SyncTrigger.auto,
+    bool Function()? shouldStart,
   }) async {
-    final client = _syncClient;
-    if (client == null) {
-      AnxLog.info('No sync client configured');
-      return;
-    }
-
     if (trigger == SyncTrigger.auto && !Prefs().autoSync) {
       return;
     }
 
     if (!(await shouldSync(automatic: trigger == SyncTrigger.auto))) {
       return;
+    }
+
+    final client = _syncClient;
+    if (client == null) {
+      throw const SyncFeedbackFailure(SyncFailureCode.notConfigured);
     }
 
     // Do not overlap a library sync with an active file transfer.
@@ -232,6 +221,7 @@ class Sync extends _$Sync {
     if (!await SyncPreflight().run(
       automatic: trigger == SyncTrigger.auto,
       enabled: () =>
+          (shouldStart?.call() ?? true) &&
           Prefs().webdavStatus &&
           (trigger != SyncTrigger.auto ||
               (_autoSyncAllowed && generation == _autoStart.generation)),
@@ -242,7 +232,10 @@ class Sync extends _$Sync {
                 connections.contains(ConnectivityResult.wifi));
       },
       probe: client.ping,
-    )) return;
+    )) {
+      return;
+    }
+    if (!(shouldStart?.call() ?? true)) return;
     await _createSyncDir();
 
     AnxLog.info('Sync ping success');
@@ -259,14 +252,13 @@ class Sync extends _$Sync {
         enabled: Prefs().syncAiSettingsToWebdav,
         password: Prefs().syncAiSettingsEncryptionPassword,
       );
-    } on AiSyncPasswordMissingException catch (e) {
-      AnxToast.show(e.toString());
+    } on AiSyncPasswordMissingException {
       AnxLog.warning('AI settings sync skipped: encryption password missing');
-      return;
+      rethrow;
     } catch (e) {
-      AnxToast.show('AI 设置加密失败，本次同步已取消');
-      AnxLog.severe('Failed to prepare encrypted AI settings for sync: $e');
-      return;
+      AnxLog.severe(
+          'Failed to prepare encrypted AI settings for sync: ${e.runtimeType}');
+      throw const SyncFeedbackFailure(SyncFailureCode.encryptionFailed);
     }
 
     // Reject future formats. Never guess which whole database should win.
@@ -274,22 +266,14 @@ class Sync extends _$Sync {
     for (final file in remoteFiles) {
       final match = RegExp(r'^database(\d+)\.db$').firstMatch(file.name ?? '');
       if (match != null && int.parse(match.group(1)!) > currentDbVersion) {
-        await _showDatabaseVersionMismatchDialog(int.parse(match.group(1)!));
-        return;
+        throw const SyncFeedbackFailure(SyncFailureCode.newerDatabase);
       }
     }
+    if (!(shouldStart?.call() ?? true)) return;
     changeState(state.copyWith(isSyncing: true));
-
-    if (Prefs().syncCompletedToast) {
-      AnxToast.show(L10n.of(navigatorKey.currentContext!).webdavSyncing);
-    }
 
     try {
       await syncDatabase(direction);
-
-      if (Prefs().syncCompletedToast) {
-        AnxToast.show(L10n.of(navigatorKey.currentContext!).webdavSyncingFiles);
-      }
 
       await syncFiles();
 
@@ -306,7 +290,7 @@ class Sync extends _$Sync {
       // Backup cleanup is now handled by DatabaseSyncManager
 
       if (Prefs().syncCompletedToast) {
-        AnxToast.show(L10n.of(navigatorKey.currentContext!).webdavSyncComplete);
+        AnxToast.show(syncSuccessMessage(chinese: _chineseFeedback));
       }
     } finally {
       changeState(state.copyWith(isSyncing: false));

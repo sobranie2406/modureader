@@ -2,18 +2,16 @@
 
 Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
 
-## 1.0.5
+## 1.0.6
 
-- Reject stale reading-position writes after sync; preserve intentional backward reading.
-- Keep note drafts on conflicts instead of overwriting newer or deleted notes.
-- Support unreliable ETag servers through verified immutable record batches; retain conditional writes for reliable servers.
-- Prepare chapter fonts and layout before switching pages; remove unnecessary transition delays.
-- Include Anx progress compatibility, book-end boundaries and per-book embedding model selection; keep four offline models bundled.
-- Back up and upgrade every syncing device to 1.0.5; older clients cannot read the compatible record log.
+- Tighten iframe permissions when EPUB scripts are disabled; retain scoped WebKit event compatibility and content sanitization.
+- Coalesce AI streaming updates, reuse unchanged Markdown, normalize typography and hide skill prompts by default.
+- Require local book files before indexing and skip unavailable books in batch requests.
+- Add reading-only timed sync and terminal-only sync feedback.
+- Disable all book-opening transitions with one setting and export mind maps as PNG, SVG, Markdown, FreeMind or JSON.
 
-- 同步后拒绝旧页面进度回写，主动往回阅读仍正常保存。
-- 笔记冲突时保留草稿，不覆盖新版或恢复已删除笔记。
-- 无可靠 ETag 服务使用校验过的独立记录批次，可靠服务仍使用条件写入。
-- 新章节字体和布局就绪后再切换页面，减少不必要的切章等待。
-- 纳入 Anx 进度兼容、书末边界和每书向量模型选择，保留四个内嵌离线模型。
-- 请先备份并将所有同步设备升级到 1.0.5，旧版不能读取兼容记录通道。
+- 收紧 EPUB 脚本关闭时的 iframe 权限；WebKit 保留受控事件兼容，书籍脚本仍受清理和禁用策略约束。
+- AI 输出合并高频刷新、减少重复渲染，统一字号；技能提示词默认收起。
+- 向量化前检查本地书籍，未下载时明确提示；批量操作跳过缺失文件。
+- 阅读时定时同步支持 1、2、3、5、10、15、30 分钟及 1 小时；同步仅提示最终结果。
+- 完整关闭打开书籍的动画；思维导图支持 PNG、SVG、Markdown、FreeMind 和 JSON 导出。

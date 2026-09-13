@@ -99,6 +99,10 @@ String generateUrl(
     'bgimgOpacity': Prefs().bgimg.opacity,
     'bgimgFit': Prefs().bgimgFit.code,
     'allowScript': Prefs().enableJsForEpub,
+    // WKWebView and WPE WebKit need iframe script permission for reader-owned
+    // DOM events. EPUB sanitization/CSP remains controlled solely by allowScript.
+    'readerScriptEvents':
+        AnxPlatform.isMacOS || AnxPlatform.isIOS || AnxPlatform.isLinux,
     'customCSS': Prefs().customCSS,
     'customCSSEnabled': Prefs().customCSSEnabled,
     'useBookStyles': Prefs().useBookStyles,

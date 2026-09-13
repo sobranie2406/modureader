@@ -322,7 +322,6 @@ class SyncStatusBottomSheet extends ConsumerWidget {
                   ref
                       .read(syncProvider.notifier)
                       .downloadMultipleBooks(remoteOnlyIds);
-                  AnxToast.show('');
                 } else {
                   AnxToast.show(l10n.allBooksAreDownloaded);
                 }
@@ -333,16 +332,13 @@ class SyncStatusBottomSheet extends ConsumerWidget {
               child: FilledButton.icon(
                 icon: const Icon(Icons.sync),
                 label: Text(L10n.of(context).syncNow),
-                onPressed: () {
-                  final isSyncing = ref.watch(syncProvider).isSyncing;
-                  if (isSyncing) {
-                    AnxToast.show(l10n.webdavSyncing);
-                  } else {
-                    ref.read(syncProvider.notifier).syncData(
-                        SyncDirection.both, ref,
-                        trigger: SyncTrigger.manual);
-                  }
-                },
+                onPressed: ref.watch(syncProvider).isSyncing
+                    ? null
+                    : () {
+                        ref.read(syncProvider.notifier).syncData(
+                            SyncDirection.both, ref,
+                            trigger: SyncTrigger.manual);
+                      },
               ),
             ),
           ],

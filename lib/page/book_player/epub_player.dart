@@ -119,6 +119,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   Future<void>? _syncRefresh;
   bool _refreshRequested = false;
   bool _remotePositionPending = false;
+  late final bool _animateOpening;
   Timer? _syncRefreshRetry;
   int _syncRestoreAttempts = 0;
 
@@ -1237,7 +1238,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         // removeOverlay();
       },
     );
-    if (Prefs().openBookAnimation) {
+    _animateOpening = Prefs().openBookAnimation;
+    if (_animateOpening) {
       _animationController = AnimationController(
         duration: const Duration(milliseconds: 600),
         vsync: this,
@@ -1562,7 +1564,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             buildWebviewWithIOSWorkaround(context, url, initialCfi),
             readingInfoWidget(),
             if (showHistory) _buildHistoryCapsule(),
-            if (Prefs().openBookAnimation)
+            if (_animateOpening)
               SizedBox.expand(
                   child: IgnorePointer(
                 ignoring: true,

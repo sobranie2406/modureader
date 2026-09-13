@@ -91,6 +91,8 @@ Enable AI tools as needed, including finding books and notes, searching text, re
 
 ### Ten built-in reading skills
 
+Quick skills in AI chat are collapsed by default; expand them with the skill button beside the input. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
+
 The built-in names are displayed in Chinese; their English meanings are provided below.
 
 | Skill | Purpose |
@@ -134,6 +136,8 @@ Translate selected text or use the translation button next to AI in the top read
 Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo supports built-in voices, text-based voice design and MP3/WAV audio; style, pace and pitch are controlled through natural-language instructions. Synthesis or playback failures pause at the current position for retry.
 
 ### Sync and key security
+
+Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10, 15 or 30 minutes, or one hour. It respects automatic-sync and Wi-Fi settings and shows only terminal success/failure feedback.
 
 - WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
 - Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images and local vector indexes are not synced. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.

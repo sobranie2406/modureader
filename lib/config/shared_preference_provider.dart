@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:core';
+import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
 
 import 'package:anx_reader/enums/ai_prompts.dart';
 import 'package:anx_reader/enums/bgimg_alignment.dart';
@@ -1185,12 +1186,16 @@ class Prefs extends ChangeNotifier {
   }
 
   set aiChatFontSize(double size) {
-    prefs.setDouble('aiChatFontSize', size);
+    prefs.setDouble('aiChatFontSize',
+        size.isFinite && size >= 10 && size <= 24 ? size : 14.0);
     notifyListeners();
   }
 
   double get aiChatFontSize {
-    return prefs.getDouble('aiChatFontSize') ?? 14.0;
+    final value = prefs.get('aiChatFontSize');
+    return value is num && value.isFinite && value >= 10 && value <= 24
+        ? value.toDouble()
+        : 14.0;
   }
 
   set volumeKeyTurnPage(bool status) {
@@ -1371,6 +1376,27 @@ class Prefs extends ChangeNotifier {
 
   bool get autoSync {
     return prefs.getBool('autoSync') ?? true;
+  }
+
+  bool get readingTimedSync => prefs.getBool('readingTimedSync') ?? false;
+
+  set readingTimedSync(bool value) {
+    prefs.setBool('readingTimedSync', value);
+    notifyListeners();
+  }
+
+  int get readingSyncMinutes {
+    final value = prefs.getInt('readingSyncMinutes') ?? 5;
+    return readingSyncIntervals.contains(value) ? value : 5;
+  }
+
+  set readingSyncMinutes(int value) {
+    if (!readingSyncIntervals.contains(value)) {
+      throw ArgumentError.value(
+          value, 'value', 'Unsupported reading sync interval');
+    }
+    prefs.setInt('readingSyncMinutes', value);
+    notifyListeners();
   }
 
   bool get syncAiSettingsToWebdav {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/widgets/page_router/reading_route.dart';
 
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/theme.dart';
@@ -481,7 +482,8 @@ Future<void> pushToReadingPage(
 
   await Navigator.push(
     navigatorKey.currentContext!,
-    CupertinoPageRoute(
+    readingRoute<void>(
+      animate: Prefs().openBookAnimation,
       builder: (c) => ReadingPage(
         key: readingPageKey,
         book: book,

@@ -107,6 +107,11 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               SettingsTile.switchTile(
                 title:
                     Text(L10n.of(context).settingsAppearanceOpenBookAnimation),
+                description: Text(Localizations.localeOf(context)
+                            .languageCode ==
+                        'zh'
+                    ? '控制从书架进入书籍时的滑入、封面过渡和淡出。关闭后直接进入阅读，不影响正文翻页设置。'
+                    : 'Animate opening books from the library. Turn off for instant navigation; page-turn settings are unchanged.'),
                 leading: const Icon(Icons.animation),
                 initialValue: Prefs().openBookAnimation,
                 onToggle: (bool value) {

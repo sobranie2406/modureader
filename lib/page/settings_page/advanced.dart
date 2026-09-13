@@ -158,6 +158,10 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
             SettingsTile.switchTile(
               title: Text(
                   L10n.of(context).settingsAdvancedEnableJavascriptForEpub),
+              description: Text(Localizations.localeOf(context).languageCode ==
+                      'zh'
+                  ? '仅允许可信 EPUB 内附的脚本。关闭不影响阅读器自身脚本；更改后请重新打开书籍。部分 WebKit 平台需保留事件兼容权限，但关闭时仍清理并禁用书籍脚本。'
+                  : 'Only enable scripts in trusted EPUBs. Reader-owned scripts remain active. Reopen the book after changes. WebKit retains event compatibility permission, while book scripts are still sanitized and blocked when disabled.'),
               leading: const Icon(Icons.code),
               initialValue: Prefs().enableJsForEpub,
               onToggle: (value) {

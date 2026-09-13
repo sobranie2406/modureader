@@ -1,57 +1,58 @@
-# 默读 / Modu 1.0.5 正式版
+# 默读 / Modu 1.0.6 正式版
 
-版本：**1.0.5+10017**。本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是按 GPL-3.0-or-later 发布的独立修改版本。
+版本：**1.0.6+10018**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是 GPL-3.0-or-later 独立修改版本。
 
 ## 本次更新
 
-- **防止旧页面覆盖同步进度**：锁屏、退后台和关闭阅读器不再用缓存位置刷新阅读时间，只保存实际阅读操作。事务内检查位置版本，拒绝旧页面回写并刷新阅读位置。主动往回阅读仍正常保存，不采用“最远进度”规则。
-- **笔记冲突保护**：同步后刷新打开的阅读器和笔记。保存时核对原记录，冲突时保留草稿并提示，不覆盖新版笔记、不恢复已删除笔记。调整划线颜色不顺带覆盖新摘录。
-- **无可靠 ETag 的 WebDAV 兼容**：用独立合成文件验证服务器条件写入能力；可靠服务继续使用 ETag。其他服务使用内容散列命名的独立记录批次，不无条件覆盖共享数据库。中断上传持久排队，上传后读回校验；ETag 恢复后仍合并兼容记录。
-- **章节切换优化**：保留相邻章节资源预取，新章节字体和布局准备好再替换旧页面，避免默认字体闪现和重复排版。去掉切章固定等待和滑入空白边界的动画；墨水屏模式禁用翻页动画。仍需加载与排版，不保证零延迟。
-- **纳入此前 10016 修正**：兼容 Anx 导入的空阅读位置与越界进度；修正书末翻页边界；改善跨平台临时选区和焦点；书籍菜单支持单独选择向量模型，未选择时跟随默认。
-- **保留四个内嵌模型**：MiniLM、BGE-en、BGE-zh、E5 及分词器继续随安装包提供，自动向量化默认关闭。
+- **EPUB 脚本权限加固**：Android、Windows 关闭 EPUB JavaScript 时，不再为书籍 iframe 开放脚本权限。macOS、iOS 和采用 WebKit 的 Linux 保留父页面事件兼容权限，但关闭时仍清理书籍活动内容并应用脚本禁用策略。分页和固定布局共用规则，缺失或非法配置默认不开放权限。不再屏蔽相关浏览器警告。设置变化后请重新打开书籍，仅为可信书籍开启脚本。
+- **AI 渲染与字号**：高频累计输出按约 80 毫秒合并更新，完成时补齐最后文本；复用未变化的 Markdown，减少整个界面的重复刷新。上翻历史时不再强制回到底部。正文、列表和标题使用一致的字号比例；异常配置回退到 14，修复最小字号 10 时思考区计算越界，保留系统无障碍缩放。
+- **技能提示词默认收起**：首页和书内 AI 可从输入区星光按钮展开，新建对话恢复收起。不删除技能，不改变提示词配置或请求策略。
+- **未下载书籍向量化提示**：缺少本地文件时提示先下载，不加入失败任务。批量操作跳过缺失书籍并显示数量，其他书继续排队；执行前再次检查文件。
+- **阅读时定时同步**：默认关闭，支持 1、2、3、5、10、15、30 分钟和 1 小时。仅在前台阅读页面生效，遵循 WebDAV、自动同步和仅 Wi-Fi 设置；同步已保存笔记、阅读位置及原同步内容，不提交草稿，不额外启用密钥同步。
+- **简化同步提示**：过程不弹提示，成功遵循提示开关，失败显示脱敏后的原因。自动预检重试期间不提示，最终失败才提示，主动取消不报失败。
+- **动画与导出**：关闭打开书籍动画后，同时禁用路由、封面过渡和淡出，不改变正文翻页方式。思维导图支持完整 PNG、SVG、Markdown、FreeMind（.mm）和 JSON 导出，取消保存不提示成功。
+- 四个离线 ONNX 模型及分词器继续内嵌，自动向量化默认关闭。
 
 ## 升级与同步注意事项
 
-**请先备份，并将所有参与同步的设备升级到 1.0.5；升级期间暂停旧版自动同步。** 旧版不识别新的兼容记录通道，也没有旧页面回写保护，不能保证新旧混用的同步完整性。
+先备份，使用覆盖安装升级；Android 沿用原项目专用签名。所有同步设备建议保持同一新版。继续兼容 1.0.5 的可靠 ETag 条件写入和无可靠 ETag 独立记录通道，不回退到无条件覆盖整库。
 
-各端使用相同的 `modu` 上级目录，不重复拼接 `/modu`。保留旧数据库，不需要手动改名或清空服务器。新增的 `modu/record-log-v1/` 是同步数据，**不要删除**。批次与本地缓存暂不自动压缩，会逐渐增长，达到安全扫描限额时明确停止而不是忽略数据。详情见[记录同步说明](https://github.com/sobranie2406/modureader/blob/v1.0.5/docs/WEBDAV_RECORD_SYNC.md)。
+各端使用相同的 `modu` 上级目录，不重复拼接 `/modu`。**不要删除 `modu/record-log-v1/` 或旧数据库**。旧于 1.0.5 的客户端不能识别兼容记录通道，升级期间请暂停旧版自动同步。[记录同步说明](https://github.com/sobranie2406/modureader/blob/v1.0.6/docs/WEBDAV_RECORD_SYNC.md)。
 
-Android 沿用原专用签名，构建号 10017 高于此前正式及本地版本，可覆盖升级，请勿先卸载。API Key 和远程书库凭据仍只按默认关闭的独立加密同步开关发送；这不代表书籍、笔记和整个数据库已加密。字体和向量索引不参与同步。不要公开配置代码、二维码或密钥。
+API Key 和远程书库凭据仍按默认关闭的独立加密开关同步，这不代表整个书库已加密。字体和本地向量索引不参与同步。
 
 ## 安装包
 
 | 平台 | 架构 | 格式与限制 |
 | --- | --- | --- |
 | Android | ARM64 / x86_64 | APK，原专用签名，Android 8+ |
-| macOS | Apple Silicon ARM64 / Intel x64 | DMG，ad-hoc 签名，未经 Apple Developer ID 公证 |
+| macOS | ARM64 / Intel x64 | DMG，ad-hoc 签名，未经 Apple Developer ID 公证 |
 | Windows | x64 / ARM64 | EXE，附带 VC++ CRT，需要 WebView2 Runtime，无商业代码签名 |
 | Linux | x64 / ARM64 | Debian 13 (trixie) DEB，不保证其他发行版兼容 |
-| iOS | ARM64 真机 | iOS 16+ IPA，无分发签名，须自行合法签署主应用及 Share Extension |
+| iOS | ARM64 真机 | iOS 16+ IPA，须自行合法签署主应用及 Share Extension |
 
-共 **9 个程序包及各自 SHA-256**。不提供独立 notices ZIP，许可保留在包内和源码中。不包含应用商店或 TestFlight 发布。
+共 **9 个程序包及各自 SHA-256**。许可保留在包内和源码中，不另附 notices ZIP。不包含应用商店或 TestFlight 发布。
 
-## 验证范围
+## 验证范围与限制
 
-- 本地 Flutter 回归 **577 项通过、5 项跳过**；阅读器 JavaScript **105 项通过**。包含可靠与无可靠 ETag 两种通道的双端合成数据库测试、旧页面回写拒绝、真正回退阅读、笔记冲突与草稿保留。
-- 合成 HTTP 服务验证 ETag 能力检测与兼容日志；合成章节浏览器验证字体等待、前后切章及滚动布局。未使用个人书籍或真实云端数据进行破坏性测试。
-- 发布流程在全平台构建、包校验和自动回归完成后才上传完整附件；具体执行记录见 [Actions](https://github.com/sobranie2406/modureader/actions)。
-- **尚未完成本次改动在实际墨水屏、坚果云账号写入及长期多端并发下的验收**。构建与模拟测试不等于所有目标设备实测。在线 AI、翻译及 TTS 依赖服务商，未全面验收全部接口；Linux 无系统 TTS 后端，需选在线语音。
+- 本地 Flutter **667 项通过、5 项跳过**；阅读器 JavaScript **112 项通过**。包含输出合并、最终文本、历史滚动、字号、技能调用、缺失书籍、同步与脚本权限策略。
+- 全平台构建、安装包检查和 CI 回归通过后才发布附件。执行记录见 [Actions](https://github.com/sobranie2406/modureader/actions)。
+- 浏览器合成页面验证不等于全部 Android WebView、WKWebView、WPE 的实机验收；本次未在报告中的小米手机测量 AI 帧率。WebKit 兼容分支仍可能产生沙箱组合警告，不代表检测到攻击，也不构成绝对安全保证。
+- 未进行真实坚果云数据破坏性测试、长期多端并发或墨水屏设备验收。在线 AI、翻译和 TTS 取决于服务商；Linux 无系统 TTS 后端，需选择在线语音。设备如提示 `No voice selected`，请先获取列表并选择音色。
 
-许可与来源：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.5/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.5/NOTICE)、[第三方许可证](https://github.com/sobranie2406/modureader/tree/v1.0.5/LICENSES)、[UPSTREAM](https://github.com/sobranie2406/modureader/blob/v1.0.5/UPSTREAM.md)、[对应源码](https://github.com/sobranie2406/modureader/tree/v1.0.5)。
+来源与许可：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.6/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.6/NOTICE)、[UPSTREAM](https://github.com/sobranie2406/modureader/blob/v1.0.6/UPSTREAM.md)、[对应源码](https://github.com/sobranie2406/modureader/tree/v1.0.6)。
 
 ## English release notes
 
-**Modu 1.0.5 (build 10017)** is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
+**Modu 1.0.6 (build 10018)** is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
 
-- Prevent a suspended reader from rewriting an old position with a new timestamp. Save actual reading actions only; reject stale writes transactionally and refresh the open reader after sync. Deliberate backward reading remains supported.
-- Protect newer or deleted notes against stale edits. Keep the draft and show a conflict instead of overwriting another device's changes. Refresh annotations without deleting bookmarks.
-- Probe conditional-write correctness using isolated synthetic files. Reliable ETag servers retain conditional database writes; other servers use content-addressed immutable record batches with durable pending uploads and read-back verification. Both paths read the compatible history. Never fall back to unconditional shared-database overwrites.
-- Prepare chapter fonts and layout before replacing the visible page. Retain adjacent-resource prefetching, avoid duplicate layout and fixed transition delays, and disable animations in e-ink mode. Chapter changes can still require loading and layout.
-- Include earlier build 10016 fixes for nullable/out-of-range Anx progress, book-end navigation, selection/focus and per-book embedding model choices. Keep all four offline ONNX models bundled; automatic indexing remains off by default.
+- Remove iframe script permission on Android and Windows when EPUB scripts are disabled. WKWebView/WPE retain the event-listener workaround, while book sanitization and script restrictions remain active. Malformed policy fails closed; sandbox warnings are no longer suppressed. Reopen books after changing this setting and enable scripts only for trusted EPUBs.
+- Coalesce AI updates, flush final text, reuse unchanged Markdown and stop forcing readers away from history. Normalize typography while retaining accessibility scaling. Hide skill prompts by default with a manual toggle.
+- Require local files before indexing; skip unavailable books in batch requests. Add opt-in foreground reading sync at one minute through one hour and show only final sync feedback.
+- Disable all book-opening transitions using the existing setting. Export complete mind maps as PNG, SVG, Markdown, FreeMind or JSON. Keep all four offline models bundled.
 
-**Back up and upgrade every syncing device to 1.0.5; pause older clients during the upgrade.** Older clients do not understand the compatible record log and lack stale-reader protection. Do not remove `modu/record-log-v1/` or the legacy databases. History and local caches currently grow without automatic compaction; safety limits stop an incomplete scan. Use the same remote parent directory on every device.
+Nine native packages with SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB and iOS ARM64 IPA. Android retains its signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. Licenses remain inside packages.
 
-Nine native packages with SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB, iOS ARM64 IPA. Android keeps its signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. Licenses stay inside packages; no separate notices ZIP.
+Back up before upgrading. Keep syncing devices updated; clients older than 1.0.5 cannot read the compatible record log. Do not delete remote history or legacy databases. Optional encrypted credential sync does not encrypt the whole library.
 
-Local verification: 577 Flutter tests passed, 5 skipped; 105 reader JavaScript tests passed. Synthetic dual-device tests cover both transport modes, stale positions, intentional backward reading and note conflicts. CI gates publication on builds and package checks. This is not real-device acceptance on e-ink hardware, live Nutstore write testing or prolonged multi-device concurrency validation. Optional encrypted credential sync remains off by default; it does not encrypt the entire library.
+Local checks: 667 Flutter tests passed, 5 skipped; 112 reader JavaScript tests passed. CI gates publication on build/package checks. Synthetic browser tests do not replace native-WebView acceptance; no frame-rate measurements on the reported Xiaomi device or prolonged real-cloud concurrency tests were performed. WebKit may still emit its sandbox warning. Linux system TTS is unavailable; online services depend on their providers.

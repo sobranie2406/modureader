@@ -5,25 +5,63 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void queueBookForVectorization(Book book) {
-  final added = bookKnowledgeIndexQueue.enqueue(book);
-  AnxToast.show(
+Future<void> queueBookForVectorization(
+  Book book, {
+  BookKnowledgeIndexQueue? queue,
+  void Function(String)? showMessage,
+}) async {
+  final notify = showMessage ?? (message) => AnxToast.show(message);
+  try {
+    await requireLocalBookForIndexing(book);
+  } on LocalBookRequiredException {
+    notify('《${book.title}》${LocalBookRequiredException.message}');
+    return;
+  }
+  final added = (queue ?? bookKnowledgeIndexQueue).enqueue(book);
+  notify(
     added ? '《${book.title}》已加入向量化队列' : '《${book.title}》已在向量化队列中',
   );
 }
 
-void queueBooksForVectorization(Iterable<Book> books) {
-  final list = books.toList(growable: false);
-  final added = bookKnowledgeIndexQueue.enqueueAll(list);
+Future<void> queueBooksForVectorization(
+  Iterable<Book> books, {
+  BookKnowledgeIndexQueue? queue,
+  void Function(String)? showMessage,
+}) async {
+  final notify = showMessage ?? (message) => AnxToast.show(message);
+  // Count each book once, even when a selection contains duplicate records.
+  final list = {for (final book in books) book.id: book}.values.toList();
+  if (list.isEmpty) return;
+  final localBooks = <Book>[];
+  for (final book in list) {
+    try {
+      await requireLocalBookForIndexing(book);
+      localBooks.add(book);
+    } on LocalBookRequiredException {
+      // Continue with local books; missing files must not become failed jobs.
+    }
+  }
+  final added = (queue ?? bookKnowledgeIndexQueue).enqueueAll(localBooks);
+  final missing = list.length - localBooks.length;
+  if (missing > 0) {
+    final queued = added > 0
+        ? '已将 $added 本书加入向量化队列。'
+        : localBooks.isNotEmpty
+            ? '本地书籍已在队列中或队列暂不可用。'
+            : '';
+    notify('$queued已跳过 $missing 本尚未下载或本地文件不可用的书籍，请先下载后再向量化。');
+    return;
+  }
   if (added == 0) {
-    AnxToast.show('所选书籍已在向量化队列中');
+    notify('所选书籍已在向量化队列中');
   } else {
-    AnxToast.show('已将 $added 本书加入向量化队列');
+    notify('已将 $added 本书加入向量化队列');
   }
 }
 

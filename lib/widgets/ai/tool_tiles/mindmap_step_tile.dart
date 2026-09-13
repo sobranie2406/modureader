@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:anx_reader/service/ai/mindmap_export.dart';
+import 'package:anx_reader/utils/save_file_to_download.dart';
 
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/ai_reasoning_parser.dart';
@@ -12,9 +15,12 @@ class MindmapStepTile extends StatefulWidget {
   const MindmapStepTile({
     super.key,
     required this.step,
+    this.saveExport,
   });
 
   final ParsedToolStep step;
+  final Future<String?> Function(Uint8List bytes, String name, String mimeType)?
+      saveExport;
 
   @override
   State<MindmapStepTile> createState() => _MindmapStepTileState();
@@ -26,13 +32,15 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
 
   MindmapGraphBundle? _bundle;
   String? _error;
+  MindmapExportDocument? _document;
+  bool _exporting = false;
   final GlobalKey _viewportKey = GlobalKey(debugLabel: 'mindmapViewport');
   final TransformationController _transformController =
       TransformationController();
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _refreshBundle();
   }
 
@@ -55,6 +63,7 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
     if (output == null || output.trim().isEmpty) {
       setState(() {
         _bundle = null;
+        _document = null;
         _error = L10n.of(context).mindmapWaitingForOutput;
       });
       return;
@@ -78,14 +87,14 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
         throw const FormatException('Mindmap payload missing data object');
       }
 
-      // If there's only one child under root, the root node is redundant
-      // because it duplicates the title. Promote the child as new root.
-      if (data['root']['children'].length == 1) {
-        data['root'] = data['root']['children'][0];
-      }
-
-      final payload = MindmapPayload.fromJson(data, context);
+      // Keep the complete root and regenerate unique IDs for malformed AI IDs.
+      final document = MindmapExportDocument.fromJson(data);
+      final payload = MindmapPayload.fromJson({
+        ...data,
+        'root': document.root.toJson(),
+      }, context);
       setState(() {
+        _document = document;
         _bundle = MindmapGraphBundle.fromPayload(payload);
         _error = null;
         _transformController.value = Matrix4.identity();
@@ -93,6 +102,7 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
     } catch (error) {
       setState(() {
         _bundle = null;
+        _document = null;
         _error = L10n.of(context).mindmapParseFailed(error.toString());
       });
     }
@@ -126,6 +136,39 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: PopupMenuButton<MindmapExportFormat>(
+            key: const ValueKey('mindmap-export'),
+            enabled: !_exporting && _document != null,
+            tooltip: Localizations.localeOf(context).languageCode == 'zh'
+                ? '导出思维导图'
+                : 'Export mind map',
+            onSelected: _export,
+            itemBuilder: (_) => MindmapExportFormat.values
+                .map((format) => PopupMenuItem(
+                      value: format,
+                      child: Text('${format.label} (.${format.extension})'),
+                    ))
+                .toList(),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (_exporting)
+                  const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  const Icon(Icons.file_download_outlined, size: 20),
+                const SizedBox(width: 6),
+                Text(Localizations.localeOf(context).languageCode == 'zh'
+                    ? '导出'
+                    : 'Export'),
+              ]),
+            ),
+          ),
+        ),
         FilledContainer(
           width: double.infinity,
           height: 360,
@@ -195,6 +238,36 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
           ),
       ],
     );
+  }
+
+  Future<void> _export(MindmapExportFormat format) async {
+    final document = _document;
+    if (_exporting || document == null) return;
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    setState(() => _exporting = true);
+    try {
+      final bytes = await document.export(format);
+      if (!mounted) return;
+      final name = document.fileName(format);
+      final path = widget.saveExport != null
+          ? await widget.saveExport!(bytes, name, format.mimeType)
+          : await saveFileToDownload(
+              bytes: bytes, fileName: name, mimeType: format.mimeType);
+      if (mounted && path != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(zh ? '导图已保存：$path' : 'Mind map saved: $path'),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(zh
+                ? '导出失败，请重试。大型导图可选择 SVG 或 Markdown。'
+                : 'Export failed. Try again, or use SVG / Markdown for large maps.')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   void _handlePointerScroll(PointerScrollEvent event) {

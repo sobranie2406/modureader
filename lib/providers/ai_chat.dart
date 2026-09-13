@@ -8,6 +8,7 @@ import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/index.dart';
+import 'package:anx_reader/service/ai/coalesced_stream.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/service/ai/reading_skill_execution.dart';
 import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
@@ -92,8 +93,9 @@ class AiChat extends _$AiChat {
     if (isRegenerate) {
       final lastHuman =
           previousMessages.lastIndexWhere((m) => m is HumanChatMessage);
-      if (lastHuman >= 0)
+      if (lastHuman >= 0) {
         previousMessages.removeRange(lastHuman, previousMessages.length);
+      }
     }
     final messages = <ChatMessage>[
       ...previousMessages,
@@ -191,7 +193,7 @@ class AiChat extends _$AiChat {
 
     String assistantResponse = "";
     try {
-      await for (final chunk in aiGenerateStream(
+      await for (final chunk in coalesceSnapshots(aiGenerateStream(
         requestMessages,
         regenerate: isRegenerate,
         useAgent: skillRequest?.useAgent ?? homeRequest?.useAgent ?? true,
@@ -199,7 +201,7 @@ class AiChat extends _$AiChat {
             skillRequest?.allowedToolIds ?? homeRequest?.allowedToolIds,
         ref: widgetRef,
         requestRunner: requestRunner,
-      )) {
+      ))) {
         assistantResponse = chunk;
 
         final updatedMessagesWithResponse =

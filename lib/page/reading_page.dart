@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
+import 'package:anx_reader/utils/reader_route_observer.dart';
+import 'package:anx_reader/utils/log/common.dart';
 import 'dart:math' as math;
 import 'package:anx_reader/service/reader_fullscreen.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
@@ -75,7 +78,7 @@ final GlobalKey<ReadingPageState> readingPageKey =
 final epubPlayerKey = GlobalKey<EpubPlayerState>();
 
 class ReadingPageState extends ConsumerState<ReadingPage>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with WidgetsBindingObserver, TickerProviderStateMixin, RouteAware {
   static const empty = SizedBox.shrink();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late Book _book;
@@ -83,6 +86,68 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   final Stopwatch _readTimeWatch = Stopwatch();
   DateTime? _sessionStart;
   Timer? _awakeTimer;
+  PageRoute<dynamic>? _observedRoute;
+  bool _readingRouteVisible = true;
+  late final _readingSync = ReadingSyncScheduler(
+    sync: (stillAllowed) async {
+      if (!mounted || !stillAllowed()) return;
+      // Drain actual saved reading actions; never create a new position/time.
+      await epubPlayerKey.currentState?.saveReadingProgress();
+      if (!mounted || !stillAllowed()) return;
+      await ref.read(syncProvider.notifier).syncData(
+            SyncDirection.both,
+            ref,
+            trigger: SyncTrigger.auto,
+            shouldStart: () => mounted && stillAllowed(),
+          );
+    },
+    onError: (error, _) =>
+        AnxLog.warning('Reading timed sync: ${error.runtimeType}'),
+  );
+
+  void _updateReadingSync() {
+    if (!mounted) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _readingSync.update(
+      enabled:
+          Prefs().readingTimedSync && Prefs().webdavStatus && Prefs().autoSync,
+      foreground: lifecycle == null || lifecycle == AppLifecycleState.resumed,
+      readingVisible: _readingRouteVisible && !widget.book.isDeleted,
+      minutes: Prefs().readingSyncMinutes,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute && route != _observedRoute) {
+      readerRouteObserver.unsubscribe(this);
+      _observedRoute = route;
+      _readingRouteVisible = route.isCurrent;
+      readerRouteObserver.subscribe(this, route);
+    }
+    _updateReadingSync();
+  }
+
+  @override
+  void didPushNext() {
+    _readingRouteVisible = false;
+    _updateReadingSync();
+  }
+
+  @override
+  void didPopNext() {
+    _readingRouteVisible = true;
+    _updateReadingSync();
+  }
+
+  @override
+  void didPop() {
+    _readingRouteVisible = false;
+    _updateReadingSync();
+  }
+
   bool bottomBarOffstage = true;
   late String heroTag;
   Widget? _aiChat;
@@ -153,6 +218,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
 
     WidgetsBinding.instance.addObserver(this);
+    Prefs().addListener(_updateReadingSync);
     _readTimeWatch.start();
     _sessionStart = DateTime.now();
     setAwakeTimer(Prefs().awakeTime);
@@ -181,6 +247,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   void dispose() {
+    Prefs().removeListener(_updateReadingSync);
+    readerRouteObserver.unsubscribe(this);
+    _readingSync.dispose();
     if (AnxPlatform.isDesktop) unawaited(_fullscreen.close());
     Sync().syncData(SyncDirection.upload, ref, trigger: SyncTrigger.auto);
     _readTimeWatch.stop();
@@ -363,6 +432,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    _updateReadingSync();
     switch (state) {
       case AppLifecycleState.resumed:
         if (!_readTimeWatch.isRunning) {

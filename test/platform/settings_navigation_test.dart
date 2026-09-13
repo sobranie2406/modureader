@@ -69,6 +69,9 @@ void main() {
     expect(readingSkills, contains('内置阅读技能'));
     expect(readingSkills, contains('自定义技能'));
     expect(readingSkills, contains('功能提示词'));
-    expect(aiChat, contains('if (widget.quickPromptChips.isEmpty) ...['));
+    expect(
+        aiChat,
+        contains(
+            'if (_showSkillPrompts && widget.quickPromptChips.isEmpty) ...['));
   });
 }
