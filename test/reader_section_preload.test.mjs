@@ -55,6 +55,20 @@ test('back and forth across a chapter boundary reuse the original URLs', async (
   f.cache.destroy();
 });
 
+test('layout switches transfer resource ownership without revoking or reloading the active document', async () => {
+  const f = fixture();
+  const src = await f.cache.load(2);
+  assert.equal(f.cache.take(2), src);
+  f.cache.destroy();
+  assert.deepEqual(f.unloads, []);
+  const next = new SectionWindowCache(f.sections);
+  next.adopt(2, src);
+  assert.equal(await next.load(2), src);
+  assert.deepEqual(f.loads, [2]);
+  next.destroy();
+  assert.deepEqual(f.unloads, [2]);
+});
+
 test('window stays bounded and releases old resources after long jumps', async () => {
   const f = fixture(60);
   for (const index of [1, 30, 50, 2, 48]) {

@@ -1033,6 +1033,7 @@ class Reader {
   #doc
   #index
   #originalContent
+  #originalByDocument = new WeakMap()
   #bookMarkExists = false
   #upTriggered = false
   #bookmarkInfo = {
@@ -1064,6 +1065,11 @@ class Reader {
     this.installDesktopInput(document)
 
     this.view.addEventListener('load', this.#onLoad.bind(this))
+    this.view.addEventListener('activate', ({ detail: { doc, index } }) => {
+      this.#doc = doc
+      this.#index = index
+      this.#saveOriginalContent()
+    })
     this.view.addEventListener('relocate', this.#onRelocate.bind(this))
     this.view.addEventListener('click-view', this.#onClickView.bind(this))
     this.view.addEventListener('doctouchstart', this.#onTouchStart.bind(this))
@@ -1398,6 +1404,10 @@ class Reader {
   }
 
   #saveOriginalContent = () => {
+    if (this.#originalByDocument.has(this.#doc)) {
+      this.#originalContent = this.#originalByDocument.get(this.#doc)
+      return
+    }
     // this.#originalContent = this.#doc.cloneNode(true)
 
     // save original content
@@ -1411,6 +1421,7 @@ class Reader {
     while (walker.nextNode()) {
       this.#originalContent.push(walker.currentNode.textContent);
     }
+    this.#originalByDocument.set(this.#doc, this.#originalContent)
   }
 
   #restoreOriginalContent = () => {
@@ -1533,6 +1544,9 @@ class Reader {
   }
 
   #onTouchEnd = ({ detail: e }) => {
+    // Native continuous scrolling already crossed the boundary. Reusing the
+    // old end-of-chapter swipe here would advance twice and skip text.
+    if (this.view.renderer.continuous) return
     if (!e.touchState || e.touchState.pinched || e.touchState.cancelled) {
       const mainView = this.view.shadowRoot.children[0];
       mainView.style.transform = '';
@@ -1742,6 +1756,10 @@ const setStyle = (oldStyle) => {
   reader.view.renderer.setAttribute('desktop-page-input', style.desktopPageInput === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('tap-only-page-turn', style.tapOnlyPageTurn === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('flow', turn.scroll ? 'scrolled' : 'paginated')
+  // Keep script-enabled / vertical books and note popups on the single-view
+  // renderer: speculative documents must never execute author scripts.
+  reader.view.renderer.setAttribute('continuous-scroll',
+    !style.allowScript && !style.writingMode?.startsWith('vertical') ? 'true' : 'false')
   reader.view.renderer.setAttribute('top-margin', `${style.topMargin}px`)
   reader.view.renderer.setAttribute('bottom-margin', `${style.bottomMargin}px`)
   reader.view.renderer.setAttribute('gap', `${style.sideMargin}%`)
@@ -1797,13 +1815,10 @@ const setStyle = (oldStyle) => {
 
 const refreshLayout = () => {
   const cfi = reader.view.lastLocation?.cfi
-  window.nextSection().then(() => {
-    if (cfi) {
-      setTimeout(() => {
-        window.goToCfi(cfi)
-      }, 0)
-    }
-  })
+  // Refresh in place; visiting the next chapter here used to publish a false
+  // reading position and could move an active speech cursor.
+  if (cfi) return reader.view.goTo(cfi)
+  reader.view.renderer.render?.()
 }
 
 

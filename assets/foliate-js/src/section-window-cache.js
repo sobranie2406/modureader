@@ -23,6 +23,17 @@ export class SectionWindowCache {
     this.#maxPrefetchSize = maxPrefetchSize
   }
   get indices() { return [...this.#entries.keys()] }
+  adopt(index, src) {
+    if (this.#closed || this.#entries.has(index)) throw new Error('Cannot adopt chapter resource')
+    this.#entries.set(index, { index, src, state: 'ready', discarded: false,
+      promise: Promise.resolve(src) })
+  }
+  take(index) {
+    const entry = this.#entries.get(index)
+    if (entry?.state !== 'ready') return
+    this.#entries.delete(index)
+    return entry.src
+  }
   #stopTimer() {
     if (this.#timer !== null) this.#cancel(this.#timer)
     this.#timer = null
@@ -83,6 +94,7 @@ export class SectionWindowCache {
         entry.reject(new Error('Chapter preload cancelled'))
       } else {
         entry.state = 'ready'
+        entry.src = src
         entry.resolve(src)
       }
     } catch (error) {

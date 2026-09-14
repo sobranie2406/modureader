@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8">
+<title>Continuous reader regression</title>
+<style>body{margin:0;background:#faf8ef}foliate-view{display:block;width:390px;height:640px}button{margin:4px}</style>
+<button id="forward">Next 80%</button><button id="back">Previous 80%</button>
+<button id="speech">Start speech cursor</button><button id="speak-next">Next sentence</button>
+<pre id="result"></pre>
+<script type="module">
+import '../../assets/foliate-js/src/view.js';
+import { TtsNavigator } from '../../assets/foliate-js/src/tts-navigation.js';
+const view = document.createElement('foliate-view'); document.body.append(view);
+const loads = [], unloads = [], events = [];
+const sections = Array.from({length:30}, (_, index) => {
+  let url;
+  return { id: String(index), size: 600, linear: index === 4 ? 'no' : 'yes',
+    load: async () => {
+      loads.push(index);
+      url = URL.createObjectURL(new Blob([`<!doctype html><html><head><meta charset="utf-8"></head><body><h1>Chapter ${index}</h1><p>First sentence ${index}.</p><p>Last sentence ${index}.</p></body></html>`], {type:'text/html'}));
+      return url;
+    }, unload() { unloads.push(index); URL.revokeObjectURL(url); },
+  };
+});
+await view.open({sections, dir:'ltr', metadata:{language:'en'}, toc:[],
+  splitTOCHref: href => [href, null], getTOCFragment: doc => doc.body});
+const r = view.renderer;
+for (const [name,value] of Object.entries({flow:'scrolled','continuous-scroll':'true',gap:'5%',
+  'top-margin':'0px','bottom-margin':'0px','mobile-image-fit':'true','mobile-touch-paging':'true'})) r.setAttribute(name,value);
+r.setStyles('html{font:18px/1.5 sans-serif}h1{font-size:22px}p{margin:1em 0}');
+view.addEventListener('load', e => events.push(['load',e.detail.index]));
+view.addEventListener('relocate', e => events.push(['relocate',e.detail.cfi,e.detail.readingAction]));
+const nav = new TtsNavigator(() => view);
+window.fixture = {view,r,nav,loads,unloads,events,
+  state() {const c=r.shadowRoot.querySelector('#container');return {scroll:c.scrollTop,height:c.scrollHeight,
+    active:r.getContents()[0]?.index,indices:r.getContents().map(x=>x.index),loads:[...loads],unloads:[...unloads]};}};
+document.querySelector('#forward').onclick=()=>r.next();
+document.querySelector('#back').onclick=()=>r.prev();
+document.querySelector('#speech').onclick=async()=>document.querySelector('#result').textContent=await nav.start();
+document.querySelector('#speak-next').onclick=async()=>document.querySelector('#result').textContent=await nav.move(1);
+await r.goTo({index:2});
+window.ready = true;
+</script>

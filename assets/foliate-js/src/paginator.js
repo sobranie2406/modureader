@@ -4,6 +4,7 @@ import { waitForReaderFonts } from './reader-font-ready.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
+import { ContinuousSectionWindow } from './continuous-section-window.js'
 
 const lerp = (min, max, x) => x * (max - min) + min
 const easeOutSine = x => Math.sin((x * Math.PI) / 2)
@@ -196,7 +197,7 @@ class View {
   #column = true
   #size
   #layout = {}
-  constructor({ container, onExpand }) {
+  constructor({ container, onExpand, allowAutoplay = true }) {
     this.container = container
     this.onExpand = onExpand
     this.#iframe.setAttribute('part', 'filter')
@@ -221,6 +222,7 @@ class View {
       width: '100%', height: '100%',
     })
     this.#iframe.setAttribute('sandbox', bookFrameSandbox())
+    if (!allowAutoplay) this.#iframe.setAttribute('allow', "autoplay 'none'")
     this.#iframe.setAttribute('scrolling', 'no')
   }
   get element() {
@@ -472,6 +474,8 @@ export class Paginator extends HTMLElement {
   // #header
   // #footer
   #view
+  #continuous
+  #continuousDisabled = false
   #retiringView
   #preparingView = false
   #destroyed = false
@@ -836,6 +840,32 @@ export class Paginator extends HTMLElement {
       mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
   }
   render() {
+    if (this.#continuous) {
+      if (!this.continuousEnabled) {
+        const entry = this.#continuous.entries.get(this.#continuous.pinned) ?? this.#continuous.current
+        if (!entry) return
+        if (entry !== this.#continuous.current) {
+          this.#continuous.select(entry)
+          this.#anchor = 0
+        }
+        // Transfer ownership without moving/reloading the active iframe.
+        this.#continuous.entries.delete(entry.index)
+        this.#sectionCache.adopt(entry.index, entry.src)
+        this.#continuous.destroy()
+        this.#continuous = null
+        this.#view = entry.view
+        this.#view.onExpand = () => {
+          if (!this.#preparingView && !this.#destroyed) this.scrollToAnchor(this.#anchor)
+        }
+        this.#view.render(this.#beforeRender({ vertical: false, rtl: this.#rtl }))
+        this.scrollToAnchor(this.#anchor)
+        return
+      }
+      for (const entry of this.#continuous.ordered)
+        entry.view.render(this.#beforeRender({ vertical: false, rtl: false }))
+      this.scrollToAnchor(this.#anchor)
+      return
+    }
     if (!this.#view || this.#preparingView || this.#destroyed) return
     this.#view.render(this.#beforeRender({
       vertical: this.#vertical,
@@ -846,6 +876,11 @@ export class Paginator extends HTMLElement {
   get scrolled() {
     return this.getAttribute('flow') === 'scrolled'
   }
+  get continuousEnabled() {
+    return this.scrolled && !this.#continuousDisabled && this.getAttribute('continuous-scroll') === 'true'
+  }
+  get continuous() { return !!this.#continuous }
+  pinTtsSection(index) { if (this.#continuous) this.#continuous.pinned = index }
   get scrollProp() {
     const { scrolled } = this
     return this.#vertical ? (scrolled ? 'scrollLeft' : 'scrollTop')
@@ -863,6 +898,7 @@ export class Paginator extends HTMLElement {
     return this.#container.getBoundingClientRect()[this.sideProp]
   }
   get viewSize() {
+    if (this.#continuous) return this.#container.scrollHeight
     return this.#view.element.getBoundingClientRect()[this.sideProp]
   }
   get start() {
@@ -872,9 +908,11 @@ export class Paginator extends HTMLElement {
     return this.start + this.size
   }
   get page() {
+    if (this.#continuous) return undefined
     return Math.floor(((this.start + this.end) / 2) / this.size)
   }
   get pages() {
+    if (this.#continuous) return undefined
     return Math.round(this.viewSize / this.size)
   }
   scrollBy(dx, dy) {
@@ -1280,6 +1318,23 @@ export class Paginator extends HTMLElement {
     return this.#scrollTo(offset, reason, smooth)
   }
   async scrollToAnchor(anchor, select, reason = 'anchor') {
+    if (this.#continuous) {
+      const doc = anchor?.startContainer?.ownerDocument ?? anchor?.ownerDocument
+      const entry = doc ? [...this.#continuous.entries.values()].find(e => e.view.document === doc)
+        : this.#continuous.current
+      if (!entry) return
+      this.#continuous.select(entry)
+      this.#anchor = anchor
+      const rect = uncollapse(anchor)?.getBoundingClientRect?.()
+      const offset = this.#continuous.top(entry) + (rect ? rect.top + this.#margin
+        : Math.max(0, Math.min(1, Number(anchor) || 0)) * Math.max(0,
+          entry.view.element.getBoundingClientRect().height - this.size))
+      this.#container.scrollTop = offset
+      if (select) this.#selectAnchor()
+      this.#continuous.remember()
+      this.#afterScroll(reason)
+      return
+    }
     this.#anchor = anchor
     const rects = uncollapse(anchor)?.getClientRects?.()
     // if anchor is an element or a range
@@ -1321,6 +1376,21 @@ export class Paginator extends HTMLElement {
   }
   #afterScroll(reason) {
     if (this.#preparingView || this.#destroyed || !this.#view) return
+    if (this.#continuous) {
+      if (reason === 'scroll') this.#continuous.track()
+      const entry = this.#continuous.current
+      if (!entry) return
+      const start = this.#container.scrollTop - this.#continuous.top(entry)
+      const height = entry.view.element.getBoundingClientRect().height
+      const range = getVisibleRange(entry.view.document, Math.max(0, start - this.#margin),
+        Math.min(height, start + this.size - this.#margin),
+        ({ top, bottom }) => ({ left: top, right: bottom }))
+      this.#anchor = range
+      this.dispatchEvent(new CustomEvent('relocate', { detail: { reason, range,
+        index: entry.index, fraction: Math.max(0, Math.min(1, start / Math.max(1, height))),
+        readingAction: this.#readingActions.isAction(reason) } }))
+      return
+    }
     const range = this.#getVisibleRange()
     // don't set new anchor if relocation was to scroll to anchor
     if (reason !== 'anchor' && reason !== 'navigation') this.#anchor = range
@@ -1456,8 +1526,97 @@ export class Paginator extends HTMLElement {
   #canGoToIndex(index) {
     return Number.isInteger(index) && index >= 0 && index < this.sections.length
   }
+  #styleDocument(doc) {
+    let pair = this.#styleMap.get(doc)
+    if (!pair && doc.head) {
+      pair = [doc.createElement('style'), doc.createElement('style')]
+      doc.head.prepend(pair[0]); doc.head.append(pair[1])
+      this.#styleMap.set(doc, pair)
+    }
+    if (pair) {
+      pair[0].textContent = Array.isArray(this.#styles) ? this.#styles[0] : ''
+      pair[1].textContent = Array.isArray(this.#styles) ? this.#styles[1] : this.#styles ?? ''
+    }
+  }
+  #ensureContinuous() {
+    if (this.#continuous) return
+    const retained = this.#view
+    const retainedIndex = this.#index
+    const retainedSrc = retained ? this.#sectionCache?.take(retainedIndex) : null
+    if (!retainedSrc) {
+      this.#view?.destroy()
+      this.#view?.element.remove()
+      this.#view = null
+    }
+    this.#sectionCache?.destroy()
+    this.#sectionCache = new SectionWindowCache(this.sections)
+    this.#continuous = new ContinuousSectionWindow({
+      container: this.#container, sections: this.sections,
+      changed: () => this.#continuous?.track(),
+      create: async (index, src) => {
+        const window = this.#continuous
+        const view = new View({ container: this, allowAutoplay: false, onExpand: () => window?.resize() })
+        Object.assign(view.element.style, { position: 'absolute', visibility: 'hidden',
+          left: '0', top: '0', pointerEvents: 'none', contentVisibility: 'visible' })
+        this.#container.append(view.element)
+        try {
+          await view.load(src, doc => this.#styleDocument(doc), ({ vertical, rtl }) => {
+            if (vertical) throw new Error('Continuous scroll requires horizontal writing')
+            return this.#beforeRender({ vertical, rtl })
+          })
+          // Wheel events in a newly visible iframe do not bubble to the host.
+          // Record trusted input even before its first chapter activation.
+          for (const type of ['wheel', 'touchstart', 'touchmove'])
+            view.document.addEventListener(type, event => this.#readingActions.input(event),
+              { capture: true, passive: true })
+          for (const type of ['pointerdown', 'touchstart'])
+            view.document.addEventListener(type, () => {
+              const entry = window.entries.get(index)
+              if (entry) window.select(entry)
+            }, { capture: true, passive: true })
+          return view
+        } catch (error) { view.destroy(); view.element.remove(); throw error }
+      },
+      activate: entry => {
+        this.#view = entry.view
+        this.#index = entry.index
+        const detail = { doc: entry.view.document, index: entry.index }
+        if (!entry.activated) {
+          this.dispatchEvent(new CustomEvent('load', { detail }))
+          this.dispatchEvent(new CustomEvent('create-overlayer', { detail: {
+            ...detail, attach: overlayer => entry.view.overlayer = overlayer,
+          } }))
+        }
+        this.dispatchEvent(new CustomEvent('activate', { detail }))
+      },
+    })
+    if (retainedSrc) {
+      const entry = { index: retainedIndex, src: retainedSrc, view: retained, ready: true, activated: true }
+      this.#continuous.entries.set(retainedIndex, entry)
+      this.#continuous.current = entry
+      retained.element.style.order = String(retainedIndex)
+      const window = this.#continuous
+      retained.onExpand = () => window.resize()
+      window.remember()
+    }
+    this.dispatchEvent(new CustomEvent('continuous-start'))
+  }
   async #goTo({ index, anchor, select }) {
     if (!this.#canGoToIndex(index) || !this.sections[index]) return
+    if (this.continuousEnabled) {
+      this.#ensureContinuous()
+      try {
+        return await this.#continuous.goTo(index, anchor, select,
+          (target, selected) => this.scrollToAnchor(target, selected, 'navigation'))
+      } catch (error) {
+        if (error.message !== 'Continuous scroll requires horizontal writing') throw error
+        this.#continuousDisabled = true
+        this.#continuous.destroy()
+        this.#continuous = null
+        this.#view = null
+        this.#index = -1
+      }
+    }
     if (index === this.#index) await this.#display({ index, anchor, select })
     else {
       const onLoad = detail => {
@@ -1522,6 +1681,24 @@ export class Paginator extends HTMLElement {
       if (this.sections[index] && this.sections[index].linear !== 'no') return index
   }
   async #turnPage(dir, distance) {
+    if (this.#continuous) {
+      if (this.#locked) return
+      this.#locked = true
+      try {
+        const old = this.#container.scrollTop
+        this.#container.scrollTop += dir * (distance ?? this.size * 0.8)
+        this.#afterScroll('page')
+        this.#continuous.track()
+        this.#afterScroll('page')
+        if (Math.abs(this.#container.scrollTop - old) < 1) {
+          const list = this.#continuous.ordered
+          const edge = dir > 0 ? list.at(-1) : list[0]
+          const index = this.#continuous.adjacent(edge.index, dir)
+          if (index != null) await this.#goTo({ index, anchor: dir > 0 ? 0 : 1 })
+        }
+      } finally { this.#locked = false }
+      return
+    }
     if (this.#locked) return
     if (this.#view && (dir < 0 ? this.atStart : this.atEnd)) return
     this.#locked = true
@@ -1559,6 +1736,11 @@ export class Paginator extends HTMLElement {
     return this.goTo({ index })
   }
   getContents() {
+    if (this.#continuous) {
+      const entries = [...this.#continuous.entries.values()].filter(e => e.ready)
+      entries.sort((a, b) => (b === this.#continuous.current) - (a === this.#continuous.current))
+      return entries.map(e => ({ index: e.index, doc: e.view.document, overlayer: e.view.overlayer }))
+    }
     if (this.#view) return [{
       index: this.#index,
       overlayer: this.#view.overlayer,
@@ -1568,6 +1750,11 @@ export class Paginator extends HTMLElement {
   }
   setStyles(styles) {
     this.#styles = styles
+    if (this.#continuous) {
+      for (const entry of this.#continuous.entries.values()) this.#styleDocument(entry.view.document)
+      this.render()
+      return
+    }
     const $$styles = this.#styleMap.get(this.#view?.document)
     if (!$$styles) return
     const [$beforeStyle, $style] = $$styles
@@ -1591,6 +1778,8 @@ export class Paginator extends HTMLElement {
   get isNavigating() { return this.#locked }
   destroy() {
     this.#destroyed = true
+    this.#continuous?.destroy()
+    this.#continuous = null
     this.#observer.disconnect()
     this.#view?.destroy()
     this.#retiringView?.destroy()

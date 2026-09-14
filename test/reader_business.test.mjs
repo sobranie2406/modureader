@@ -41,6 +41,7 @@ test('Reader.open navigates once and waits for initialization, for new and resum
     }
     const Reader = runInNewContext(`(class {
       #onLoad() {} #onRelocate() {} #onClickView() {}
+      #doc; #index; #saveOriginalContent() {}
       #onTouchStart() {} #onTouchMove() {} #onTouchEnd() {}
       setView() {}
       installDesktopInput() {}

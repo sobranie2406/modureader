@@ -7,6 +7,7 @@ const between = (a, b) => source.slice(source.indexOf(a), source.indexOf(b));
 // Execute the production navigation methods with deterministic layout metrics.
 const Renderer = runInNewContext(`class Renderer {
   #view = {}; #locked = false; #index = 0; #rtl = false; #vertical = false;
+  #continuous; #continuousDisabled = false; #ensureContinuous() {}
   #ignoreNativeScroll = false; #justAnchored = false; #isSnapping = false; #touchState;
   #container = { scrollLeft: 600, scrollTop: 0, style: {} };
   #sectionCache = { load: async index => index, setCurrent() {} };
@@ -36,7 +37,8 @@ const Renderer = runInNewContext(`class Renderer {
   go(index) {return this.#goTo({index, anchor: () => 0})}
   ${between('  snap(vx, vy, touchState)', '  #onTouchStart(e)')}
   ${between('  async #scrollTo(offset,', '  async scrollToAnchor(')}
-  ${between('  #canGoToIndex(index)', '  async goTo(target)')}
+  ${between('  #canGoToIndex(index)', '  #styleDocument(')}
+  ${between('  async #goTo({', '  async goTo(target)')}
   ${between('  #scrollPrev(distance)', '  prevSection()')}
 }; Renderer`, {wait: async () => {}, easeOutSine: x => x, CustomEvent: class {},
   console, Promise, Math, Number});

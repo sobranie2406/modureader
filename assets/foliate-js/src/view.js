@@ -112,6 +112,11 @@ export class View extends HTMLElement {
     }
     this.renderer.setAttribute('exportparts', 'head,foot,filter')
     this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
+    this.renderer.addEventListener('activate', e => this.#emit('activate', e.detail))
+    this.renderer.addEventListener('continuous-start', () => {
+      const speaking = this.renderer.getContents().find(x => x.doc === this.tts?.doc)
+      if (speaking) this.renderer.pinTtsSection(speaking.index)
+    })
     this.renderer.addEventListener('relocate', e => this.#onRelocate(e.detail))
     this.renderer.addEventListener('create-overlayer', e =>
       e.detail.attach(this.#createOverlayer(e.detail)))
@@ -128,7 +133,7 @@ export class View extends HTMLElement {
         this.renderer.goTo(resolved)
           .then(() => {
             const { doc } = this.renderer.getContents()
-              .find(x => x.index = resolved.index)
+              .find(x => x.index === resolved.index)
             const el = resolved.anchor(doc)
             el.classList.add(activeClass)
             lastActive = new WeakRef(el)
@@ -552,32 +557,43 @@ export class View extends HTMLElement {
     this.#searchResults.clear()
   }
   oldValue = null
-  initTTS(stop) {
-    if (stop)
-      return this.#getOverlayer(this.#index)?.overlayer.remove(this.oldValue)
+  initTTS(stop, { force = false } = {}) {
+    if (stop) {
+      this.renderer.pinTtsSection?.(null)
+      this.#getOverlayer(this.tts?.sectionIndex ?? this.#index)?.overlayer.remove(this.oldValue)
+      this.tts = null
+      this.oldValue = null
+      return
+    }
 
-    const doc = this.renderer.getContents()[0].doc;
+    if (this.renderer.continuous && this.tts && !force) return
+
+    const { doc, index } = this.renderer.getContents()[0];
     if (this.tts && this.tts.doc === doc) return;
+    this.#getOverlayer(this.tts?.sectionIndex ?? index)?.overlayer.remove(this.oldValue)
+    this.oldValue = null
+    this.renderer.pinTtsSection?.(index)
     this.tts = new TTS(
       doc,
       textWalker,
       (range) => {
-        const obj = this.#getOverlayer(this.#index);
+        const obj = this.#getOverlayer(index);
         let value = null;
         if (obj) {
           const { overlayer } = obj;
           if (this.oldValue) {
             overlayer.remove(this.oldValue);
           }
-          value = this.getCFI(this.#index, range);
+          value = this.getCFI(index, range);
           overlayer.add(value, range, Overlayer.highlight, { color: '#39c5bc83' });
           this.oldValue = value;
         }
         this.renderer.scrollToAnchor(range);
         return value;
       },
-      (range) => this.getCFI(this.#index, range),
+      (range) => this.getCFI(index, range),
     );
+    this.tts.sectionIndex = index;
   }
   startMediaOverlay() {
     const { index } = this.renderer.getContents()[0]

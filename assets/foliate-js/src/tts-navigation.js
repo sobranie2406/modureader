@@ -31,7 +31,10 @@ export class TtsNavigator {
         const operation = async () => {
             if (generation !== this.#generation) return ''
             const view = this.getView()
-            view.initTTS()
+            // Reading ahead in a continuous viewport must not reset speech to
+            // the new visible chapter. Only an explicit start/section change
+            // rebinds the TTS document; its CFI closure owns a stable index.
+            if (start || !view.tts || !view.renderer.continuous) view.initTTS(false, { force: start })
             if (start) {
                 const text = range ? view.tts.from(range) : view.tts.start()
                 if (text?.trim()) return text
@@ -42,12 +45,17 @@ export class TtsNavigator {
             const sections = view.book.sections
             for (let attempts = 0; attempts < sections.length; attempts++) {
                 if (generation !== this.#generation) return ''
-                const before = view.renderer.getContents()[0]
+                const before = view.renderer.continuous && Number.isInteger(view.tts?.sectionIndex)
+                    ? { index: view.tts.sectionIndex, doc: view.tts.doc }
+                    : view.renderer.getContents()[0]
                 let index = before.index + direction
                 while (index >= 0 && index < sections.length && sections[index].linear === 'no') index += direction
-                if (index < 0 || index >= sections.length) return ''
+                if (index < 0 || index >= sections.length) {
+                    view.renderer.pinTtsSection?.(null)
+                    return ''
+                }
                 if (!await this.#loadSection(view, index, before, generation)) return ''
-                view.initTTS()
+                view.initTTS(false, { force: true })
                 const text = last ? view.tts.end() : view.tts.start()
                 if (text?.trim()) return text
             }
