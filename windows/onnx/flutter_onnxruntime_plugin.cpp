@@ -45,12 +45,15 @@ public:
 // static
 void FlutterOnnxruntimePlugin::RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar) {
   auto plugin = std::make_unique<FlutterOnnxruntimePlugin>();
-  plugin->messenger_ = registrar->messenger();
+  const std::weak_ptr<int> message_lifetime = plugin->message_lifetime_;
   // Decode/encode large tensor payloads on the worker too. Only BinaryReply is
   // invoked on the platform thread, via the message-only reply window.
   registrar->messenger()->SetMessageHandler("flutter_onnxruntime",
-      [plugin_pointer = plugin.get()](const uint8_t* bytes, size_t size,
+      [plugin_pointer = plugin.get(), message_lifetime](const uint8_t* bytes, size_t size,
                                      flutter::BinaryReply reply) {
+    // This callback and destruction both run on the platform thread. Do not
+    // access the plugin or reply through a stopped engine during teardown.
+    if (message_lifetime.expired()) return;
     struct Job {
       std::vector<uint8_t> request;
       std::unique_ptr<std::vector<uint8_t>> response;
@@ -95,7 +98,11 @@ FlutterOnnxruntimePlugin::FlutterOnnxruntimePlugin()
     : worker_(std::make_unique<modu::PlatformWorker>([this] { impl_.reset(); })) {}
 
 FlutterOnnxruntimePlugin::~FlutterOnnxruntimePlugin() {
-  if (messenger_) messenger_->SetMessageHandler("flutter_onnxruntime", nullptr);
+  // FlutterWindowsEngine clears the messenger's engine BEFORE destroying
+  // plugins. SetMessageHandler(nullptr) here would dereference that null
+  // engine (0xc0000005 in release). The registrar owns and releases the
+  // handler; expire its gate without calling any Flutter messaging API.
+  message_lifetime_.reset();
   worker_.reset();
 }
 

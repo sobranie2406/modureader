@@ -72,7 +72,9 @@ private:
 
   // Private implementation
   std::unique_ptr<FlutterOnnxruntimePluginImpl> impl_;
-  flutter::BinaryMessenger* messenger_ = nullptr;
+  // Platform-thread lifetime gate for the registrar-owned message handler.
+  // The handler may outlive this plugin during engine teardown.
+  std::shared_ptr<int> message_lifetime_ = std::make_shared<int>(0);
   // Destroy/join before impl_, which owns all sessions and tensors.
   std::unique_ptr<modu::PlatformWorker> worker_;
 };

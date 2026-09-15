@@ -24,10 +24,24 @@ class WindowsOnnxWorkerTest(unittest.TestCase):
         self.assertLess(submit, decode)
         self.assertLess(decode, infer)
         self.assertLess(infer, reply)
-        self.assertIn('messenger_->SetMessageHandler("flutter_onnxruntime", nullptr)', source)
         self.assertIn('[this] { impl_.reset(); }', source)
         platform = (ROOT / 'windows/onnx/platform_worker.h').read_text()
         self.assertLess(platform.index('worker_.reset()'), platform.index('DestroyWindow(window_)'))
+
+    def test_shutdown_invalidates_handler_without_accessing_stopped_engine(self):
+        source = (ROOT / 'windows/onnx/flutter_onnxruntime_plugin.cpp').read_text()
+        destructor = source.split('FlutterOnnxruntimePlugin::~FlutterOnnxruntimePlugin() {', 1)[1].split('\n}', 1)[0]
+        # Comments document the unsafe API; executable teardown must not call it.
+        statements = '\n'.join(line for line in destructor.splitlines()
+                               if not line.strip().startswith('//'))
+        self.assertNotIn('SetMessageHandler', statements)
+        self.assertNotIn('messenger_', statements)
+        self.assertLess(statements.index('message_lifetime_.reset()'),
+                        statements.index('worker_.reset()'))
+        self.assertIn('const std::weak_ptr<int> message_lifetime', source)
+        self.assertIn('[plugin_pointer = plugin.get(), message_lifetime]', source)
+        self.assertLess(source.index('if (message_lifetime.expired()) return;'),
+                        source.index('plugin_pointer->worker_->Post('))
 
     def test_windows_dart_worker_owns_tokenizer_and_model(self):
         source = (ROOT / 'lib/service/knowledge/onnx_embedding_provider.dart').read_text()

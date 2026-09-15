@@ -13,7 +13,7 @@ Changes:
   maintained MIT-licensed adapter in `windows/onnx`. All native operations and
   tensor message decoding/encoding run on one lower-priority serial worker.
   Binary responses are posted back to the owning Windows message thread.
-- Shutdown unregisters the channel, drops queued work, joins active inference,
+- Shutdown expires the channel handler's lifetime gate, drops queued work, joins active inference,
   releases the model on the worker and destroys the reply window last. There
   are no detached worker threads or callbacks into a destroyed plugin.
 - A persistent Windows Dart isolate owns the tokenizer, tensor materialization
@@ -57,3 +57,22 @@ has been published by this change. On a Windows test account:
 
 The fix removes identified blocking paths; hardware/renderer performance and
 end-to-end Windows behavior must be assessed separately using these tests.
+
+## Release shutdown regression (2026-09-15)
+
+The first 1.0.7 release attempt (Actions run 34937906783, commit 81fbbefa)
+passed Windows x64 compilation, reader extraction, null callback and bundled
+model tests, but the installed app crashed on normal close with `0xc0000005`.
+Publication was blocked by the installation smoke check.
+
+Flutter 3.47.2 clears `FlutterDesktopMessenger`'s engine before invoking plugin
+destruction callbacks. The adapter called `SetMessageHandler(nullptr)` from its
+destructor, which resolves that already-cleared engine. Teardown now invalidates
+a weak lifetime gate without calling the messenger. The registrar releases its
+handler, and late platform messages cannot dereference the destroyed plugin.
+Worker shutdown still joins active inference and suppresses pending replies.
+
+Source-wiring regression checks reject a messaging call in the destructor and
+require invalidation before worker shutdown. These do not replace native tests:
+the release workflow retains three installed-app launch/normal-close cycles,
+uninstallation, and all native inference/reader checks. No checks were disabled.

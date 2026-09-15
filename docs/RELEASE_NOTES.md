@@ -9,7 +9,7 @@
 - **批注定位**：补齐预加载章节批注图层的留白和尺寸初始化，统一正文与图层坐标转换。返回缓存章节或发生内部滚动时更新标记和点击范围，不修改已有批注数据。
 - **注释排版**：弹出注释字号为正文设置的 70%；保留不超过屏幕 25% 面积的自适应尺寸和底部留白，过长注释仍可滚动。
 - **AI 阅读技能**：对话恢复默认显示技能标签；技能消息显示名称，隐藏长提示词正文。完整提示词仍用于模型请求，并可在技能设置中查看和编辑。
-- **Windows 操作与向量化**：修复方向键与 Ctrl+[ / Ctrl+] 翻页；原生模型推理使用后台串行工作线程，分词与索引准备移出界面线程，补充安全退出和取消处理。
+- **Windows 操作与向量化**：修复方向键与 Ctrl+[ / Ctrl+] 翻页；原生模型推理使用后台串行工作线程，分词与索引准备移出界面线程；修复插件销毁时访问已停止的 Flutter 通道导致正常关闭崩溃，保留退出和取消检查。
 - **Android 链接关联**：不再把默读注册为普通网页链接的打开程序；保留本地电子书打开及主动分享导入。
 - 继续内嵌四个离线 ONNX 模型及分词器，自动向量化默认关闭。
 
@@ -35,7 +35,7 @@ API Key 和远程书库凭据仍按默认关闭的独立加密开关同步，不
 
 ## 验证范围与限制
 
-- 本地 Flutter **686 项通过、5 项跳过**，Python **46 项通过**，阅读器 JavaScript **156 项通过**。
+- 本地 Flutter **686 项通过、5 项跳过**，Python **47 项通过**，阅读器 JavaScript **156 项通过**。
 - 发布由全平台构建、安装包架构/校验和检查和 CI 回归共同把关，全部通过后才创建正式发布。执行记录见 [Actions](https://github.com/sobranie2406/modureader/actions)。
 - 浏览器合成书验证了 18 个精确搜索命中、跨章往返、新增批注、字号变化和重开章节；批注检查覆盖 33 个状态，坐标误差小于 1 CSS 像素。
 - 浏览器检查不是所有 Android WebView、WKWebView、WPE 的实机验收。逐渐累积式批注漂移未在 Chrome 中完整复现；已修正的坐标转换、内部滚动和缓存恢复路径另有回归覆盖。
@@ -54,11 +54,11 @@ API Key 和远程书库凭据仍按默认关闭的独立加密开关同步，不
 - Initialize annotation overlays when preloaded chapters become active; map chapter and overlay coordinates consistently, and refresh marks after internal scrolling or cached-chapter activation. Existing annotation data is unchanged.
 - Display footnotes at 70% of the reader font size, with the existing 25%-of-screen area limit, end padding and scrolling for longer notes.
 - Keep AI skill shortcuts visible. Skill messages show names instead of long prompt text; full prompts remain in model requests and skill settings.
-- Restore Windows arrow-key and Ctrl+[ / Ctrl+] paging. Move Windows native inference to a serial background worker and move tokenization/index preparation off the UI isolate, with lifecycle and cancellation checks.
+- Restore Windows arrow-key and Ctrl+[ / Ctrl+] paging. Move Windows native inference to a serial background worker and move tokenization/index preparation off the UI isolate. Fix normal-close crashes caused by accessing the stopped Flutter messenger during plugin destruction; retain lifecycle and cancellation checks.
 - Stop claiming ordinary web links on Android. Retain local ebook opening and explicit share/import flows. Keep all four offline embedding models bundled.
 
 Nine native packages with SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB and iOS ARM64 IPA. Android retains its signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. Licenses remain inside packages.
 
 Back up before upgrading. Keep syncing devices updated; clients older than 1.0.5 cannot read the compatible record log. Do not delete remote history or legacy databases. Optional encrypted credential sync does not encrypt the whole library.
 
-Local checks: 686 Flutter tests passed, 5 skipped; 46 Python tests and 156 reader JavaScript tests passed. Browser checks covered 18 exact search matches and 33 annotation/navigation states. CI gates publication on builds, regression tests and package verification. Browser tests do not replace native-WebView acceptance or Windows performance measurements. Progressive backward drift was not fully reproduced in Chrome; coordinate, scroll and cache paths have dedicated regression coverage. No destructive real-cloud or prolonged concurrency testing was performed.
+Local checks: 686 Flutter tests passed, 5 skipped; 47 Python tests and 156 reader JavaScript tests passed. Browser checks covered 18 exact search matches and 33 annotation/navigation states. CI gates publication on builds, regression tests and package verification. Browser tests do not replace native-WebView acceptance or Windows performance measurements. Progressive backward drift was not fully reproduced in Chrome; coordinate, scroll and cache paths have dedicated regression coverage. No destructive real-cloud or prolonged concurrency testing was performed.

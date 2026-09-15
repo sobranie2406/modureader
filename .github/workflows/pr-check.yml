@@ -70,6 +70,7 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -pthread test/native/OnnxSerialWorkerTest.cpp -o "$RUNNER_TEMP/modu-onnx-worker-test"
           "$RUNNER_TEMP/modu-onnx-worker-test"
+          python3 -m unittest discover -s test -p 'windows_onnx_worker_test.py' -v
 
       - name: Release architecture validation tests
         run: python3 -m unittest discover -s test -p 'release_package_test.py' -v

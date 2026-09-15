@@ -10,6 +10,7 @@ Details, installation limits and historical releases: https://github.com/sobrani
 - Add a Spotlight-style floating book search dialog with keyboard-aware layout and Escape/outside-click dismissal.
 - Use selection-style text highlights for exact search ranges, including inline-tag and chapter-end matches; scale footnote text to 70% of the reader font size while retaining the area cap and end padding.
 - Correct annotation overlay origins and refresh marks when cached chapters are activated or internally scrolled.
+- Avoid accessing the stopped Flutter messenger when shutting down the Windows embedding plugin.
 - Stable release, build 10025.
 
 - Tighten iframe permissions when EPUB scripts are disabled; retain scoped WebKit event compatibility and content sanitization.
@@ -27,6 +28,7 @@ Details, installation limits and historical releases: https://github.com/sobrani
 - 书内搜索改为聚焦搜索风格的浮动弹框，适配键盘弹出，支持 Esc 和点击框外关闭。
 - 搜索匹配改为文字选中式底色，修正跨标签和章末匹配范围，不再绘制外围框；注释字号为正文的 70%，保留面积限制和底部留白。
 - 修正跨章批注图层原点，缓存章节恢复和内部滚动时更新标记，避免跨章偏移。
+- 修复 Windows 向量插件退出清理时访问已关闭的 Flutter 消息通道。
 - 正式版，构建号 10025。
 - 收紧 EPUB 脚本关闭时的 iframe 权限；WebKit 保留受控事件兼容，书籍脚本仍受清理和禁用策略约束。
 - AI 输出合并高频刷新、减少重复渲染，统一字号。
