@@ -22,6 +22,7 @@ class AiChatHistoryEntry {
     required this.completed,
     this.homePromptId,
     this.readingRequest,
+    this.skillLabels = const {},
   });
 
   final String id;
@@ -35,6 +36,9 @@ class AiChatHistoryEntry {
   final String? homePromptId;
   final ReadingRequestSnapshot? readingRequest;
 
+  /// Human-message index to skill name; display metadata, not model context.
+  final Map<int, String> skillLabels;
+
   AiChatHistoryEntry copyWith({
     List<ChatMessage>? messages,
     int? updatedAt,
@@ -44,6 +48,7 @@ class AiChatHistoryEntry {
     String? model,
     Object? homePromptId = _unchanged,
     Object? readingRequest = _unchanged,
+    Map<int, String>? skillLabels,
   }) {
     return AiChatHistoryEntry(
       id: id,
@@ -53,6 +58,7 @@ class AiChatHistoryEntry {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       messages: messages ?? this.messages,
+      skillLabels: skillLabels ?? this.skillLabels,
       completed: completed ?? this.completed,
       homePromptId: identical(homePromptId, _unchanged)
           ? this.homePromptId
@@ -73,6 +79,9 @@ class AiChatHistoryEntry {
       'updatedAt': updatedAt,
       'completed': completed,
       'messages': messages.map((m) => m.toMap()).toList(growable: false),
+      if (skillLabels.isNotEmpty)
+        'skillLabels':
+            skillLabels.map((index, label) => MapEntry('$index', label)),
       if (homePromptId != null) 'homePromptId': homePromptId,
       if (readingRequest != null) 'readingRequest': readingRequest!.toJson(),
     };
@@ -115,6 +124,17 @@ class AiChatHistoryEntry {
           : DateTime.now().millisecondsSinceEpoch,
       completed: json['completed'] == true,
       messages: messages,
+      skillLabels: {
+        if (json['skillLabels'] is Map)
+          for (final entry in (json['skillLabels'] as Map).entries)
+            if (int.tryParse(entry.key.toString()) case final int index)
+              if (index >= 0 &&
+                  index < messages.length &&
+                  messages[index] is HumanChatMessage &&
+                  entry.value is String &&
+                  (entry.value as String).isNotEmpty)
+                index: entry.value as String,
+      },
       homePromptId: json['homePromptId']?.toString(),
       readingRequest: readingRequest,
     );

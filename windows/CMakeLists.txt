@@ -62,6 +62,7 @@ add_subdirectory("runner")
 # them to the application.
 include(cmake/modu_onnxruntime.cmake)
 include(flutter/generated_plugins.cmake)
+include(cmake/modu_onnx_worker.cmake)
 
 
 # === Installation ===

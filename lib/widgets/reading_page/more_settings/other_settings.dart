@@ -320,6 +320,7 @@ class _OtherSettingsState extends State<OtherSettings> {
           value: Prefs().keyboardShortcutTurnPage,
           onChanged: (bool value) => setState(() {
             Prefs().keyboardShortcutTurnPage = value;
+            epubPlayerKey.currentState?.changeStyle(null);
           }),
         ),
       );

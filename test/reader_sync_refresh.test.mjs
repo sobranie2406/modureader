@@ -24,7 +24,9 @@ test('wake/resize scroll is passive, real scroll and explicit backward navigatio
 test('sync restore labels navigation callbacks as passive and releases suppression on failure', async () => {
   const win = {}, seen = [];
   const renderer = {isNavigating: false};
-  const view = {renderer, async goTo() {seen.push(win.readerApplyingSync); return {index:1};}};
+  const view = {renderer, async goTo(_cfi, options) {
+    assert.equal(options?.recordHistory,false,'automatic sync is not a user jump');
+    seen.push(win.readerApplyingSync); return {index:1};}};
   runInNewContext(chunk('window.restoreSyncedReadingPosition =', '\nwindow.goToPercent'), {window:win, reader:{view}});
   assert.equal(await win.restoreSyncedReadingPosition('synthetic-cfi'), true);
   assert.deepEqual(seen, [true]); assert.equal(win.readerApplyingSync, false);

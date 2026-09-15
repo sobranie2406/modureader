@@ -12,6 +12,10 @@ class TocSearchState {
     this.results = const [],
     this.isSearching = false,
     this.scrollOffset = 0.0,
+    this.originCfi,
+    this.activeCfi,
+    this.requestId = 0,
+    this.isNavigating = false,
   });
 
   final String? query;
@@ -19,6 +23,13 @@ class TocSearchState {
   final List<SearchResultModel> results;
   final bool isSearching;
   final double scrollOffset;
+  final String? originCfi;
+  final String? activeCfi;
+  final int requestId;
+  final bool isNavigating;
+  List<SearchResultSubitemModel> get matches =>
+      results.expand((group) => group.subitems).toList(growable: false);
+  int get activeIndex => matches.indexWhere((item) => item.cfi == activeCfi);
 
   bool get isActive => query != null && query!.isNotEmpty;
 
@@ -28,6 +39,8 @@ class TocSearchState {
     List<SearchResultModel>? results,
     bool? isSearching,
     double? scrollOffset,
+    Object? activeCfi = _noValue,
+    bool? isNavigating,
   }) {
     return TocSearchState(
       query: identical(query, _noValue) ? this.query : query as String?,
@@ -35,6 +48,12 @@ class TocSearchState {
       results: results ?? this.results,
       isSearching: isSearching ?? this.isSearching,
       scrollOffset: scrollOffset ?? this.scrollOffset,
+      originCfi: originCfi,
+      activeCfi: identical(activeCfi, _noValue)
+          ? this.activeCfi
+          : activeCfi as String?,
+      requestId: requestId,
+      isNavigating: isNavigating ?? this.isNavigating,
     );
   }
 }
@@ -46,13 +65,15 @@ class TocSearch extends _$TocSearch {
   @override
   TocSearchState build() => const TocSearchState();
 
-  void start(String query) {
+  void start(String query, {String? originCfi}) {
     final sanitized = query.trim();
     state = TocSearchState(
       query: sanitized,
       progress: 0.0,
       results: const [],
       isSearching: true,
+      originCfi: state.originCfi ?? originCfi,
+      requestId: state.requestId + 1,
     );
   }
 
@@ -75,6 +96,9 @@ class TocSearch extends _$TocSearch {
   }
 
   void clear() {
-    state = const TocSearchState();
+    state = TocSearchState(requestId: state.requestId + 1);
   }
+
+  void selectMatch(String cfi) => state = state.copyWith(activeCfi: cfi);
+  void setNavigating(bool busy) => state = state.copyWith(isNavigating: busy);
 }

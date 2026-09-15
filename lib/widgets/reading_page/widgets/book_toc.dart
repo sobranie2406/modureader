@@ -1,10 +1,6 @@
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/models/search_result_model.dart';
 import 'package:anx_reader/models/toc_item.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
 import 'package:anx_reader/providers/book_toc.dart';
-import 'package:anx_reader/providers/toc_search.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -26,8 +22,6 @@ class BookToc extends ConsumerStatefulWidget {
 }
 
 class _BookTocState extends ConsumerState<BookToc> {
-  final TextEditingController searchBarController = TextEditingController();
-  final ScrollController searchResultsScrollController = ScrollController();
   late List<TocItem> tocItems;
   List<_VisibleTocEntry> _visibleItems = const [];
   final Set<String> _expandedItemKeys = {};
@@ -37,30 +31,6 @@ class _BookTocState extends ConsumerState<BookToc> {
   String? _lastAutoScrolledHref;
   String? _pendingScrollKey;
   bool _pendingScrollAnimated = false;
-  bool _hasRestoredScrollPosition = false;
-
-  @override
-  void initState() {
-    super.initState();
-    searchBarController.text = ref.read(tocSearchProvider).query ?? '';
-    // Add listener to save scroll position
-    searchResultsScrollController.addListener(_saveScrollPosition);
-  }
-
-  void _saveScrollPosition() {
-    if (searchResultsScrollController.hasClients) {
-      ref.read(tocSearchProvider.notifier).updateScrollOffset(
-            searchResultsScrollController.offset,
-          );
-    }
-  }
-
-  @override
-  void dispose() {
-    searchBarController.dispose();
-    searchResultsScrollController.dispose();
-    super.dispose();
-  }
 
   String _keyForItem(TocItem item) => '${item.id}_${item.href}';
 
@@ -244,50 +214,12 @@ class _BookTocState extends ConsumerState<BookToc> {
     _pruneExpandedKeys(tocItems);
     _visibleItems = _buildVisibleItems(tocItems);
     _fulfillPendingScrollIfPossible();
-    final tocSearchState = ref.watch(tocSearchProvider);
-    final currentQuery = tocSearchState.query ?? '';
-    if (searchBarController.text != currentQuery) {
-      searchBarController.value = TextEditingValue(
-        text: currentQuery,
-        selection: TextSelection.collapsed(offset: currentQuery.length),
-      );
-    }
-    final isSearchActive = tocSearchState.isActive;
-    final searchResults = tocSearchState.results;
-    final showSearchProgress = tocSearchState.isSearching;
-    final progressValue = tocSearchState.progress <= 0.0
-        ? null
-        : tocSearchState.progress.clamp(0.0, 1.0);
-
-    // Restore scroll position when search results are available (only once)
-    if (isSearchActive &&
-        searchResults.isNotEmpty &&
-        !_hasRestoredScrollPosition &&
-        tocSearchState.scrollOffset > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && searchResultsScrollController.hasClients) {
-          final targetOffset = tocSearchState.scrollOffset.clamp(
-            0.0,
-            searchResultsScrollController.position.maxScrollExtent,
-          );
-          searchResultsScrollController.jumpTo(targetOffset);
-          _hasRestoredScrollPosition = true;
-        }
-      });
-    }
-
-    // Reset the flag when search becomes inactive
-    if (!isSearchActive && _hasRestoredScrollPosition) {
-      _hasRestoredScrollPosition = false;
-    }
-
     final currentHref = widget.epubPlayerKey.currentState?.chapterHref ?? '';
     final currentPath = currentHref.isEmpty
         ? <TocItem>[]
         : (_findPath(tocItems, currentHref) ?? <TocItem>[]);
 
-    if (!isSearchActive &&
-        currentHref.isNotEmpty &&
+    if (currentHref.isNotEmpty &&
         currentHref != _lastAutoScrolledHref &&
         currentPath.isNotEmpty) {
       _lastAutoScrolledHref = currentHref;
@@ -313,178 +245,42 @@ class _BookTocState extends ConsumerState<BookToc> {
       },
     );
 
-    var searchBox = SizedBox(
-      height: 35,
-      child: SearchBar(
-        controller: searchBarController,
-        shadowColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
-        padding: const WidgetStatePropertyAll<EdgeInsets>(
-            EdgeInsets.symmetric(horizontal: 16.0)),
-        leading: const Icon(Icons.search),
-        trailing: [
-          isSearchActive
-              ? IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    searchBarController.clear();
-                    widget.epubPlayerKey.currentState?.clearSearch();
-                  },
-                )
-              : const SizedBox(),
-        ],
-        onSubmitted: (value) {
-          final trimmed = value.trim();
-          if (trimmed.isEmpty) {
-            searchBarController.clear();
-            widget.epubPlayerKey.currentState?.clearSearch();
-          } else {
-            widget.epubPlayerKey.currentState?.search(trimmed);
-          }
-        },
-      ),
-    );
-    var searchResult = Expanded(
-        child: Column(
-      children: [
-        const SizedBox(height: 6.0),
-        if (showSearchProgress)
-          LinearProgressIndicator(
-            value: progressValue,
-          ),
-        Expanded(
-          child: searchResults.isEmpty
-              ? const SizedBox()
-              : ListView.builder(
-                  controller: searchResultsScrollController,
-                  itemCount: searchResults.length,
-                  itemBuilder: (context, index) {
-                    return searchResultWidget(
-                      searchResult: searchResults[index],
-                      hideAppBarAndBottomBar: widget.hideAppBarAndBottomBar,
-                      epubPlayerKey: widget.epubPlayerKey,
-                      closeDrawer: widget.closeDrawer,
-                    );
-                  },
-                ),
+    return Column(children: [
+      Align(alignment: Alignment.centerRight, child: locatingButton),
+      Expanded(
+        child: ScrollablePositionedList.builder(
+          itemScrollController: _itemScrollController,
+          itemPositionsListener: _itemPositionsListener,
+          itemCount: _visibleItems.length,
+          itemBuilder: (context, index) {
+            final entry = _visibleItems[index];
+            final tocItem = entry.item;
+            final key = entry.key;
+            final isSelected = selectedKeys.contains(key);
+            final isCurrentLeaf =
+                currentHref == tocItem.href && tocItem.subitems.isEmpty;
+
+            return TocItemWidget(
+              tocItem: tocItem,
+              depth: entry.depth,
+              isExpanded: entry.isExpanded,
+              isSelected: isSelected,
+              showProgress: isCurrentLeaf,
+              progressText: currentProgress,
+              onToggle: tocItem.subitems.isEmpty
+                  ? null
+                  : () => _toggleExpanded(tocItem),
+              onTap: () {
+                widget.hideAppBarAndBottomBar(false);
+                widget.epubPlayerKey.currentState!.goToHref(tocItem.href);
+                widget.closeDrawer();
+              },
+            );
+          },
         ),
-      ],
-    ));
-    final columnChildren = <Widget>[
-      Row(
-        children: [
-          Expanded(child: searchBox),
-          if (!isSearchActive) locatingButton,
-        ],
-      ),
-    ];
-
-    columnChildren.add(
-      isSearchActive
-          ? searchResult
-          : Expanded(
-              child: ScrollablePositionedList.builder(
-                itemScrollController: _itemScrollController,
-                itemPositionsListener: _itemPositionsListener,
-                itemCount: _visibleItems.length,
-                itemBuilder: (context, index) {
-                  final entry = _visibleItems[index];
-                  final tocItem = entry.item;
-                  final key = entry.key;
-                  final isSelected = selectedKeys.contains(key);
-                  final isCurrentLeaf =
-                      currentHref == tocItem.href && tocItem.subitems.isEmpty;
-
-                  return TocItemWidget(
-                    tocItem: tocItem,
-                    depth: entry.depth,
-                    isExpanded: entry.isExpanded,
-                    isSelected: isSelected,
-                    showProgress: isCurrentLeaf,
-                    progressText: currentProgress,
-                    onToggle: tocItem.subitems.isEmpty
-                        ? null
-                        : () => _toggleExpanded(tocItem),
-                    onTap: () {
-                      widget.hideAppBarAndBottomBar(false);
-                      widget.epubPlayerKey.currentState!.goToHref(tocItem.href);
-                      widget.closeDrawer();
-                    },
-                  );
-                },
-              ),
-            ),
-    );
-    return Column(children: columnChildren);
+      )
+    ]);
   }
-}
-
-Widget searchResultWidget({
-  required SearchResultModel searchResult,
-  required Function hideAppBarAndBottomBar,
-  required GlobalKey<EpubPlayerState> epubPlayerKey,
-  required VoidCallback closeDrawer,
-}) {
-  bool isExpanded = true;
-  TextStyle matchStyle = TextStyle(
-    color: Theme.of(navigatorKey.currentContext!).colorScheme.primary,
-    fontWeight: FontWeight.bold,
-  );
-  TextStyle prePostStyle = const TextStyle(
-    color: Colors.grey,
-  );
-  return StatefulBuilder(
-    builder: (context, setState) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                isExpanded = !isExpanded;
-              });
-            },
-            child: Row(
-              children: [
-                Flexible(child: Text(searchResult.label)),
-                isExpanded
-                    ? const Icon(Icons.expand_less)
-                    : const Icon(Icons.expand_more),
-                // const Spacer(),
-                Text(
-                  searchResult.subitems.length.toString(),
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-          if (isExpanded)
-            for (var subItem in searchResult.subitems)
-              FilledContainer(
-                margin: EdgeInsets.only(bottom: 5),
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                radius: 10,
-                child: InkWell(
-                  onTap: () {
-                    hideAppBarAndBottomBar(false);
-                    epubPlayerKey.currentState!.goToCfi(subItem.cfi);
-                    closeDrawer();
-                  },
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(text: subItem.pre, style: prePostStyle),
-                        TextSpan(text: subItem.match, style: matchStyle),
-                        TextSpan(text: subItem.post, style: prePostStyle),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-        ],
-      );
-    },
-  );
 }
 
 class TocItemWidget extends StatelessWidget {

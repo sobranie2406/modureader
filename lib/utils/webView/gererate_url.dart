@@ -70,6 +70,7 @@ String generateUrl(
     // These are needed on first open, not only after changing reader settings.
     // In particular, native WebView focus bypasses Flutter's page shortcuts.
     'desktopPageInput': AnxPlatform.isDesktop,
+    'keyboardShortcutTurnPage': Prefs().keyboardShortcutTurnPage,
     'mobileTouchPaging': AnxPlatform.isMobile,
     'mobileImageFit': AnxPlatform.isMobile,
     'tapOnlyPageTurn': Prefs().tapOnlyPageTurn,

@@ -27,6 +27,7 @@ import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/service/reader_focus.dart';
+import 'package:anx_reader/service/reader_keyboard.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/utils/ui/status_bar.dart';
@@ -39,6 +40,7 @@ import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
+import 'package:anx_reader/widgets/reading_page/book_search.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
@@ -159,6 +161,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   bool _isResizingAiChat = false;
   bool _isBuildingKnowledgeIndex = false;
   bool bookmarkExists = false;
+  bool _searchDialogOpen = false;
+  bool _readerDrawerOpen = false;
   bool _quickMarkEnabled = false;
   bool _changingQuickMark = false;
 
@@ -307,6 +311,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           !bottomBarOffstage ||
+          _readerDrawerOpen ||
+          _searchDialogOpen ||
           _aiChat != null ||
           ModalRoute.of(context)?.isCurrent != true) {
         return;
@@ -353,7 +359,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   // }
 
   KeyEventResult _handleReaderKeyEvent(FocusNode node, KeyEvent event) {
-    if (!_readerFocusNode.hasPrimaryFocus) {
+    if (_searchDialogOpen || ModalRoute.of(context)?.isCurrent != true) {
+      return KeyEventResult.ignored;
+    }
+    if (!readerOwnsPageKeys(_readerFocusNode, _readerWebViewFocusScope,
+        windows: AnxPlatform.isWindows)) {
       return KeyEventResult.ignored;
     }
 
@@ -363,56 +373,32 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
     final logicalKey = event.logicalKey;
 
-    // Selection/caret shortcuts belong to the focused control, not the book.
-    // Keep the explicit Ctrl+[ / Ctrl+] handling below available.
-    final modified = HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.isAltPressed ||
-        HardwareKeyboard.instance.isMetaPressed ||
-        HardwareKeyboard.instance.isControlPressed;
-
-    if (!modified &&
-        (logicalKey == LogicalKeyboardKey.arrowRight ||
-            logicalKey == LogicalKeyboardKey.arrowDown ||
-            logicalKey == LogicalKeyboardKey.pageDown ||
-            logicalKey == LogicalKeyboardKey.space)) {
-      epubPlayerKey.currentState?.nextPage();
+    final keyboard = HardwareKeyboard.instance;
+    final direction = readerPageKeyDirection(event,
+        control: keyboard.isControlPressed,
+        shift: keyboard.isShiftPressed,
+        alt: keyboard.isAltPressed,
+        meta: keyboard.isMetaPressed,
+        ctrlBrackets: Prefs().keyboardShortcutTurnPage);
+    if (direction != 0) {
+      if (AnxPlatform.isDesktop) {
+        // A bubbled Windows key must use the same DOM editor/selection guards
+        // as a key received directly by the native WebView.
+        epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
+      } else if (direction > 0) {
+        epubPlayerKey.currentState?.nextPage();
+      } else {
+        epubPlayerKey.currentState?.prevPage();
+      }
       return KeyEventResult.handled;
     }
 
-    if (!modified &&
-        (logicalKey == LogicalKeyboardKey.arrowLeft ||
-            logicalKey == LogicalKeyboardKey.arrowUp ||
-            logicalKey == LogicalKeyboardKey.pageUp)) {
-      epubPlayerKey.currentState?.prevPage();
-      return KeyEventResult.handled;
-    }
+    // Other shortcuts belong to the child WebView/control, not its ancestor.
+    if (!_readerFocusNode.hasPrimaryFocus) return KeyEventResult.ignored;
 
     if (logicalKey == LogicalKeyboardKey.enter) {
       showOrHideAppBarAndBottomBar(true);
       return KeyEventResult.handled;
-    }
-
-    // Handle Ctrl+[ and Ctrl+] for page turning when keyboard shortcut is enabled
-    if (Prefs().keyboardShortcutTurnPage) {
-      final isControlPressed = HardwareKeyboard.instance.isControlPressed;
-      if (isControlPressed && logicalKey == LogicalKeyboardKey.bracketLeft) {
-        epubPlayerKey.currentState?.prevPage();
-        return KeyEventResult.handled;
-      }
-      if (isControlPressed && logicalKey == LogicalKeyboardKey.bracketRight) {
-        epubPlayerKey.currentState?.nextPage();
-        return KeyEventResult.handled;
-      }
-      final bool isSimulatedCtrlLeft = event.character == '\u001b';
-      final bool isSimulatedCtrlRight = event.character == '\u001d';
-      if (isSimulatedCtrlLeft) {
-        epubPlayerKey.currentState?.prevPage();
-        return KeyEventResult.handled;
-      }
-      if (isSimulatedCtrlRight) {
-        epubPlayerKey.currentState?.nextPage();
-        return KeyEventResult.handled;
-      }
     }
 
     if (Prefs().volumeKeyTurnPage) {
@@ -511,8 +497,28 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> tocHandler() async {
+    _readerDrawerOpen = true;
     hideBottomBar();
     _scaffoldKey.currentState?.openDrawer();
+  }
+
+  Future<void> searchHandler() async {
+    if (_searchDialogOpen || !mounted) return;
+    _searchDialogOpen = true;
+    hideBottomBar();
+    _releaseReaderFocus();
+    try {
+      await showBookSearchDialog(
+        context,
+        onSearch: (query) => epubPlayerKey.currentState?.search(query),
+        onClear: () => epubPlayerKey.currentState?.clearSearch(),
+        onNavigate: (cfi) async =>
+            await epubPlayerKey.currentState?.navigateSearch(cfi),
+      );
+    } finally {
+      _searchDialogOpen = false;
+      if (mounted) _requestReaderFocus();
+    }
   }
 
   void noteHandler() {
@@ -964,13 +970,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                       icon: const Icon(Icons.translate_outlined),
                       onPressed: translationHandler,
                     ),
-                    if (!compactToolbar)
-                      IconButton(
-                        icon: const Icon(Icons.copy),
-                        tooltip: L10n.of(context).readingPageCopyChapterContent,
-                        onPressed: _copyChapterContent,
-                      ),
                     IconButton(
+                      key: const ValueKey('reader-search-button'),
+                      tooltip: L10n.of(context).contextMenuSearch,
+                      icon: const Icon(Icons.search),
+                      onPressed: searchHandler,
+                    ),
+                    IconButton(
+                        key: const ValueKey('reader-bookmark-button'),
                         tooltip: L10n.of(context).readingPageBookmark,
                         onPressed: () {
                           if (bookmarkExists) {
@@ -984,6 +991,12 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                         icon: bookmarkExists
                             ? const Icon(Icons.bookmark)
                             : const Icon(Icons.bookmark_border)),
+                    if (!compactToolbar)
+                      IconButton(
+                        icon: const Icon(Icons.copy),
+                        tooltip: L10n.of(context).readingPageCopyChapterContent,
+                        onPressed: _copyChapterContent,
+                      ),
                     if (compactToolbar)
                       PopupMenuButton<String>(
                         icon: const Icon(EvaIcons.more_vertical),
@@ -1088,6 +1101,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             child: Scaffold(
               key: _scaffoldKey,
               resizeToAvoidBottomInset: false,
+              onDrawerChanged: (open) {
+                _readerDrawerOpen = open;
+                if (!open) _requestReaderFocus();
+              },
               drawer: PointerInterceptor(
                 child: Drawer(
                   width: math.min(

@@ -4,9 +4,15 @@ const interactive = event => (event.composedPath?.() ?? [event.target]).some(
   node => node?.isContentEditable || node?.matches?.(
     'input, textarea, select, button, a[href], [role="textbox"], [role="slider"], [role="button"]'));
 
-export function desktopPageKey(event) {
+export function desktopPageKey(event, ctrlBrackets = false) {
   if (event.defaultPrevented || event.isComposing || event.altKey ||
-      event.ctrlKey || event.metaKey || event.shiftKey || interactive(event)) return 0;
+      event.metaKey || event.shiftKey || interactive(event)) return 0;
+  if (event.ctrlKey) {
+    if (!ctrlBrackets) return 0;
+    if (event.key === '[' || event.code === 'BracketLeft') return -1;
+    if (event.key === ']' || event.code === 'BracketRight') return 1;
+    return 0;
+  }
   if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) return 1;
   if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) return -1;
   return 0;
@@ -20,7 +26,7 @@ export function desktopDragDirection(dx, dy) {
 }
 
 export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
-  dragEnabled = enabled, focusOnPointerDown = () => false }) {
+  dragEnabled = enabled, focusOnPointerDown = () => false, ctrlBrackets = () => false }) {
   let pointer = null;
   let turning = false;
   let suppressClickUntil = 0;
@@ -44,7 +50,7 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   };
   on(doc, 'keydown', e => {
     if (!enabled() || selected()) return;
-    const direction = desktopPageKey(e);
+    const direction = desktopPageKey(e, ctrlBrackets());
     if (!direction) return;
     consume(e); // Suppress native scrolling even during an in-flight page turn.
     turn(direction);
@@ -84,5 +90,14 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   on(doc, 'pointercancel', cancel);
   on(doc, 'mouseleave', cancel);
   on(doc.defaultView, 'blur', cancel);
-  return { cancel, destroy() { cancel(); listeners.forEach(remove => remove()); } };
+  return { cancel,
+    // Windows texture focus can deliver the key to Flutter instead of the DOM.
+    // Reuse the DOM selection/editor guards without moving native focus.
+    turnFromKeyboard(direction) {
+      if (![1, -1].includes(direction) || !enabled() || selected() ||
+          interactive({ target: doc.activeElement })) return false;
+      turn(direction);
+      return true;
+    },
+    destroy() { cancel(); listeners.forEach(remove => remove()); } };
 }

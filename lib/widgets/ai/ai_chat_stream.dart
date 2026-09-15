@@ -11,6 +11,7 @@ import 'package:anx_reader/providers/ai_history.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/ai_services.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
+import 'package:anx_reader/service/ai/skill_message_label.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -69,7 +70,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   final AiChatScrollController _scrollController = AiChatScrollController();
   final FocusNode _inputFocusNode = FocusNode();
   bool _isStreaming = false;
-  bool _showSkillPrompts = false;
+  bool _showSkillPrompts = true;
   double _fontSize = 14.0;
   String? _readerSourceText;
   String? _lastSubmittedSkillId;
@@ -401,7 +402,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _lastSubmittedSourceText = null;
       _lastSubmittedHomePromptId = null;
       _messageStream = null;
-      _showSkillPrompts = false;
+      _showSkillPrompts = true;
     });
   }
 
@@ -507,7 +508,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _messageController = null;
     setState(() {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
-      _showSkillPrompts = false;
+      _showSkillPrompts = true;
       _readerSourceText = null;
       _lastSubmittedSkillId = null;
       _lastSubmittedSourceText = null;
@@ -705,6 +706,28 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       child: SafeArea(
         child: Column(
           children: [
+            if (_showSkillPrompts && widget.quickPromptChips.isNotEmpty)
+              SingleChildScrollView(
+                key: const ValueKey('reader-skill-chips'),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  spacing: 8,
+                  children: widget.quickPromptChips
+                      .map((chip) => ActionChip(
+                            avatar: Icon(chip.icon, size: 18),
+                            label: Text(chip.label),
+                            onPressed: _isStreaming
+                                ? null
+                                : () {
+                                    inputController.text = chip.prompt;
+                                    _sendMessage(
+                                        skillId: chip.skillId,
+                                        sourceText: _readerSourceText);
+                                  },
+                          ))
+                      .toList(),
+                ),
+              ),
             if (_showSkillPrompts && widget.quickPromptChips.isEmpty) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -778,10 +801,10 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                 IconButton(
                   key: const ValueKey('ai-skill-prompts-toggle'),
                   tooltip: Localizations.localeOf(context).languageCode == 'zh'
-                      ? (_showSkillPrompts ? '收起技能提示词' : '展开技能提示词')
+                      ? (_showSkillPrompts ? '收起技能标签' : '展开技能标签')
                       : (_showSkillPrompts
-                          ? 'Hide skill prompts'
-                          : 'Show skill prompts'),
+                          ? 'Hide skill shortcuts'
+                          : 'Show skill shortcuts'),
                   isSelected: _showSkillPrompts,
                   icon: const Icon(Icons.auto_awesome_outlined, size: 18),
                   selectedIcon: const Icon(Icons.auto_awesome, size: 18),
@@ -802,48 +825,6 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     Widget buildEmptyState() {
       if (!_showSkillPrompts) return const SizedBox.expand();
       final theme = Theme.of(context);
-
-      Widget buildQuickChipColumn() {
-        if (widget.quickPromptChips.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final chips = <Widget>[];
-        for (var i = 0; i < widget.quickPromptChips.length; i++) {
-          final chip = widget.quickPromptChips[i];
-          chips.add(
-            Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : 8.0),
-              child: ActionChip(
-                avatar: Icon(chip.icon, size: 18),
-                label: Text(chip.label),
-                onPressed: () {
-                  inputController.text = chip.prompt;
-                  _sendMessage(
-                    skillId: chip.skillId,
-                    sourceText: _readerSourceText,
-                  );
-                },
-              ),
-            ),
-          );
-        }
-
-        return Positioned(
-          right: 16,
-          bottom: 16,
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.3,
-            child: SingleChildScrollView(
-              // scrollDirection: Axis.horizontal,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: chips,
-              ),
-            ),
-          ),
-        );
-      }
 
       return Stack(
         children: [
@@ -885,7 +866,6 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                 ),
               ),
             ),
-          buildQuickChipColumn(),
         ],
       );
     }
@@ -1032,6 +1012,17 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   Widget _buildMessageList(List<ChatMessage> messages) {
+    final sessionId =
+        ref.read(aiChatProvider(widget.scope).notifier).currentSessionId;
+    final history =
+        ref.watch(aiHistoryProvider).value ?? const <AiChatHistoryEntry>[];
+    final labels = <int, String>{};
+    for (final entry in history) {
+      if (entry.id == sessionId) {
+        labels.addAll(entry.skillLabels);
+        break;
+      }
+    }
     return NotificationListener<ScrollNotification>(
       onNotification: _scrollController.handleNotification,
       child: ListView.builder(
@@ -1040,7 +1031,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         itemBuilder: (context, index) {
           final message = messages[index];
           final isStreaming = _isStreaming && index == messages.length - 1;
-          return _buildMessageItem(message, index, isStreaming);
+          return _buildMessageItem(message, index, isStreaming,
+              skillLabel: labels[index]);
         },
       ),
     );
@@ -1049,10 +1041,33 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   Widget _buildMessageItem(
     ChatMessage message,
     int index,
-    bool isStreaming,
-  ) {
+    bool isStreaming, {
+    String? skillLabel,
+  }) {
     final isUser = message is HumanChatMessage;
     final content = chatMessageDisplayContent(message);
+    if (isUser) {
+      skillLabel ??= skillMessageLabel(content);
+      for (final chip in widget.quickPromptChips) {
+        if (skillLabel == null && chip.prompt.trim() == content.trim()) {
+          skillLabel = chip.label;
+          break;
+        }
+      }
+      if (skillLabel != null) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Chip(
+              key: ValueKey('ai-message-skill-$index'),
+              avatar: const Icon(Icons.auto_awesome_outlined, size: 16),
+              label: Text(skillLabel),
+            ),
+          ),
+        );
+      }
+    }
     final parsed = parseReasoningContent(content);
     final isLongMessage = content.length > 300;
     final lastAssistantMessage = _getLastAssistantMessage();

@@ -18,6 +18,26 @@ const { sanitizeBookDocument } = await loadSource('script_policy.js')
 const { makePDF } = await loadSource('pdf.js')
 const { getChapterLocation } = await loadSource('progress.js')
 
+test('chapter click setup does not multiply renderer background page-turn listeners', async () => {
+  const source = await readFile(new URL('../assets/foliate-js/src/view.js', import.meta.url), 'utf8')
+  const clickMethod = source.slice(source.indexOf('  #handleClick(doc) {'), source.indexOf('\n  async addAnnotation('))
+  const dom = new JSDOM('<div id="renderer"></div>')
+  const renderer = dom.window.document.querySelector('#renderer')
+  const View = runInNewContext(`(class {
+    events = []; constructor(renderer) { this.renderer = renderer }
+    #emit(type, detail) { this.events.push([type, detail]) }
+    wire(doc) { this.#handleClick(doc) }
+    ${clickMethod}
+  })`, {window: {innerWidth:390, isFootNoteOpen:()=>false}})
+  const view = new View(renderer)
+  for(let i=0;i<9;i++)view.wire(new JSDOM('<p>Chapter</p>').window.document)
+  renderer.dispatchEvent(new dom.window.MouseEvent('click', {clientX:300,clientY:500}))
+  assert.equal(view.events.length,0,'document setup must not add host click handlers')
+  const open = source.slice(source.indexOf('  async open(book) {'), source.indexOf('\n  async init('))
+  assert.equal((open.match(/renderer\.addEventListener\('click',/g)||[]).length,1,
+    'exactly one host click handler per renderer')
+})
+
 test('fixed-layout display pages are one-based without changing EPUB paginator pages', () => {
   assert.deepEqual(getChapterLocation({}, {current: 0, total: 3}), {current: 1, total: 3})
   assert.deepEqual(getChapterLocation({}, {current: 2, total: 3}), {current: 3, total: 3})

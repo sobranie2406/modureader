@@ -5,14 +5,14 @@ const source = await readFile(new URL('../assets/foliate-js/src/continuous-secti
 const {ContinuousSectionWindow} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const pause = () => new Promise(r => setTimeout(r, 160));
 
-function fixture() {
+function fixture(chapterHeight = 120) {
   const nodes = [], loaded = [], unloaded = [], activated = [];
   let scroll = 0, fail = -1, releases;
   const container = {style:{}, clientHeight:600, getBoundingClientRect:()=>({top:0}),
     ownerDocument:{createElement:()=>element(null)}, append:e=>nodes.push(e),
     get scrollHeight(){return ordered().reduce((h,e)=>h+height(e),0)},
     get scrollTop(){return scroll},set scrollTop(v){scroll=Math.max(0,Math.min(v,this.scrollHeight-this.clientHeight))}};
-  const height = e => e.style.display === 'none' || e.style.position === 'absolute' ? 0 : e.index == null ? parseFloat(e.style.height)||0 : 120;
+  const height = e => e.style.display === 'none' || e.style.position === 'absolute' ? 0 : e.index == null ? parseFloat(e.style.height)||0 : chapterHeight;
   const ordered = () => nodes.filter(e=>!e.removed).sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0));
   function element(index) {return {index,style:{},removed:false,remove(){this.removed=true},
     getBoundingClientRect(){let y=0;for(const e of ordered()){if(e===this)break;y+=height(e)}return {top:y-scroll,height:height(this)}}};}
@@ -67,6 +67,51 @@ test('equal-distance neighbors cannot evict each other in an idle warm loop',asy
     const count=f.loaded.length;
     for(let i=0;i<4;i++){f.window.track();await pause()}
     assert.equal(f.loaded.length,count);
+  }finally{f.window.destroy()}
+});
+test('long chapters preload both neighbors before scrolling near the boundary',async()=>{
+  const f=fixture(3000);try {
+    await f.go(2);await pause();
+    assert.deepEqual(f.window.ordered.map(e=>e.index),[1,2,3]);
+    assert.deepEqual(f.activated,[2]);
+    assert.equal(f.window.top(f.window.current)-f.container.scrollTop,0);
+    const count=f.loaded.length;await pause();assert.equal(f.loaded.length,count);
+  }finally{f.window.destroy()}
+});
+test('cached next chapter just outside the viewport advances exactly one 80% step',async()=>{
+  const f=fixture(3000);try {
+    await f.go(2);await pause();
+    for(const hiddenBy of [0,1,20]) {
+      f.container.scrollTop=f.window.top(f.window.entries.get(3))-f.container.clientHeight-hiddenBy;
+      f.window.track();const origin=f.window.current;
+      const offset=f.window.top(origin)-f.container.scrollTop;
+      await f.window.scrollBy(480);
+      assert.equal(offset-(f.window.top(origin)-f.container.scrollTop),480);
+    }
+  }finally{f.window.destroy()}
+});
+test('uncached forward and backward boundaries prepare content before one scroll step',async()=>{
+  for(const dir of [1,-1]) {
+    const f=fixture(3000);try {
+      await f.go(2); // do not wait for speculative preparation
+      const origin=f.window.current;
+      if(dir>0)f.container.scrollTop=2400;
+      const offset=f.window.top(origin)-f.container.scrollTop;
+      await f.window.scrollBy(dir*480);
+      assert.equal(offset-(f.window.top(origin)-f.container.scrollTop),dir*480);
+      assert.equal(f.loaded.filter(i=>i===2+dir).length,1);
+    }finally{f.window.destroy()}
+  }
+});
+test('scrolling back to a detached speaking chapter restores it without reload',async()=>{
+  const f=fixture(3000);try {
+    await f.go(3);const speaking=f.window.current;f.window.pinned=3;
+    await f.go(0);assert.equal(speaking.detached,true);
+    await f.window.ensure(1);await f.window.ensure(2);await f.window.ensure(3);
+    assert.equal(speaking.detached,false);
+    assert.equal(f.loaded.filter(i=>i===3).length,1);
+    assert.equal(speaking.view.destroyed,undefined);
+    assert.deepEqual(f.window.ordered.map(e=>e.index),[0,1,2,3]);
   }finally{f.window.destroy()}
 });
 test('foreground load failure retains the readable chapter and allows a retry',async()=>{

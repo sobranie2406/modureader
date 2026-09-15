@@ -12,6 +12,7 @@ import 'package:anx_reader/service/ai/coalesced_stream.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/service/ai/reading_skill_execution.dart';
 import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
+import 'package:anx_reader/service/ai/skill_message_label.dart';
 import 'package:anx_reader/service/ai/tools/repository/chapter_content_repository.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
@@ -101,6 +102,14 @@ class AiChat extends _$AiChat {
       ...previousMessages,
       ChatMessage.humanText(message),
     ];
+    final skillLabels = <int, String>{
+      for (final label in (entry?.skillLabels ?? <int, String>{}).entries)
+        if (label.key < previousMessages.length) label.key: label.value,
+    };
+    final skillLabel =
+        (isRegenerate ? entry?.skillLabels[previousMessages.length] : null) ??
+            skillMessageLabel(message, skillId: skillId);
+    if (skillLabel != null) skillLabels[previousMessages.length] = skillLabel;
 
     ReadingSkillRequest? replay;
     if (isRegenerate && _scope == AiChatScope.reader) {
@@ -182,6 +191,7 @@ class AiChat extends _$AiChat {
       model: model,
       homePromptId: homePromptId,
       readingRequest: readingRequest,
+      skillLabels: skillLabels,
     );
 
     await historyNotifier.upsert(draftEntry);

@@ -35,6 +35,35 @@ test('all directions mean discrete previous/next, not native movement', () => {
   assert.equal(desktopPageKey({ key: 'ArrowRight', composedPath: () => [{isContentEditable:true}] }), 0);
   assert.equal(desktopPageKey({ key: 'ArrowLeft', composedPath: () => [{matches:()=>true}] }), 0);
 });
+test('Ctrl brackets work only when enabled and leave editing/modifiers untouched', () => {
+  for (const [key,code,d] of [['[','BracketLeft',-1],[']','BracketRight',1]]) {
+    assert.equal(desktopPageKey({key,code,ctrlKey:true}),0);
+    assert.equal(desktopPageKey({key,code,ctrlKey:true},true),d);
+    assert.equal(desktopPageKey({key:'Unidentified',code,ctrlKey:true},true),d);
+    for(const flag of ['shiftKey','altKey','metaKey','isComposing'])
+      assert.equal(desktopPageKey({key,ctrlKey:true,[flag]:true},true),0);
+    assert.equal(desktopPageKey({key,ctrlKey:true,target:{isContentEditable:true}},true),0);
+  }
+});
+test('native-key fallback shares selection and editor guards without taking focus',async()=>{
+  const f=fixture();
+  assert.equal(f.controller.turnFromKeyboard(1),true);await settle();
+  assert.deepEqual(f.turns,[1]);
+  f.doc.activeElement={isContentEditable:true};
+  assert.equal(f.controller.turnFromKeyboard(-1),false);
+  f.doc.activeElement=null;f.select('text');
+  assert.equal(f.controller.turnFromKeyboard(-1),false);
+  f.select('');f.disable();assert.equal(f.controller.turnFromKeyboard(-1),false);
+  assert.deepEqual(f.turns,[1]);
+});
+test('Ctrl-bracket setting updates a live DOM handler without reopening',async()=>{
+  const doc=new EventTarget();doc.getSelection=()=>null;
+  let enabled=false;const turns=[];
+  const controller=installDesktopPageInput(doc,{enabled:()=>true,ctrlBrackets:()=>enabled,turnPage:d=>turns.push(d)});
+  const send=()=>{const e=new Event('keydown',{cancelable:true});Object.assign(e,{key:']',ctrlKey:true});doc.dispatchEvent(e);return e.defaultPrevented};
+  assert.equal(send(),false);enabled=true;assert.equal(send(),true);await settle();
+  assert.deepEqual(turns,[1]);enabled=false;assert.equal(send(),false);controller.destroy();
+});
 test('empty-space drag turns one page, jitter and ambiguous diagonals do not', () => {
   for (const [x,y,wanted] of [[-60,0,1],[60,0,-1],[0,-60,1],[0,60,-1],[20,0,0],[-60,60,0]])
     assert.equal(desktopDragDirection(x,y), wanted);
@@ -88,6 +117,15 @@ test('runtime wires desktop-only input for outer document and every loaded chapt
   assert.match(initial,/'desktopPageInput': AnxPlatform\.isDesktop/);
   const legacy=await readFile(new URL('../lib/utils/webView/webview_initial_variable.dart',import.meta.url),'utf8');
   assert.match(legacy,/desktopPageInput: \$\{AnxPlatform\.isDesktop\}/);
+  assert.match(initial,/'keyboardShortcutTurnPage': Prefs\(\)\.keyboardShortcutTurnPage/);
+  assert.match(dart,/keyboardShortcutTurnPage: \$\{Prefs\(\)\.keyboardShortcutTurnPage\}/);
+  assert.match(legacy,/keyboardShortcutTurnPage: \$\{Prefs\(\)\.keyboardShortcutTurnPage\}/);
+  assert.match(book,/ctrlBrackets: \(\) => style\.keyboardShortcutTurnPage === true/);
+  const settings=await readFile(new URL('../lib/widgets/reading_page/more_settings/other_settings.dart',import.meta.url),'utf8');
+  assert.match(settings,/Prefs\(\)\.keyboardShortcutTurnPage = value;\s+epubPlayerKey\.currentState\?\.changeStyle\(null\)/);
+  const page=await readFile(new URL('../lib/page/reading_page.dart',import.meta.url),'utf8');
+  assert.match(page,/readerOwnsPageKeys\(_readerFocusNode, _readerWebViewFocusScope/);
+  assert.match(page,/turnPageFromKeyboard\(direction\)/);
 });
 
 test('completed reader taps restore the book WebView on desktops even with AI open', async () => {

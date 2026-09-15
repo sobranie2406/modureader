@@ -1,3 +1,6 @@
+import { SearchHighlighter } from './search-highlighter.js'
+import { annotationPointMapper, annotationRect } from './annotation-geometry.js'
+
 const createSVGElement = tag =>
     document.createElementNS('http://www.w3.org/2000/svg', tag)
 
@@ -5,16 +8,42 @@ export class Overlayer {
     #svg = createSVGElement('svg')
     #map = new Map()
     #doc = null
+    #search
+    #redrawFrame = null
+    #scheduleRedraw = () => {
+        if (this.#redrawFrame != null) return
+        this.#redrawFrame = this.#doc.defaultView.requestAnimationFrame(() => {
+            this.#redrawFrame = null
+            this.redraw()
+        })
+    }
     constructor(doc) {
         this.#doc = doc
+        this.#search = new SearchHighlighter(doc)
         Object.assign(this.#svg.style, {
             position: 'absolute', top: '0', left: '0',
             width: '100%', height: '100%',
             pointerEvents: 'none',
         })
+        // Native selection/focus can scroll an iframe or an inner overflow
+        // container without resizing it. Cached Range rectangles then go stale.
+        doc.addEventListener('scroll', this.#scheduleRedraw, true)
+        doc.defaultView?.addEventListener('resize', this.#scheduleRedraw)
     }
     get element() {
         return this.#svg
+    }
+    addSearch(key, range) { this.#search.add(key, range) }
+    clearSearch() { this.#search.clear() }
+    destroy() {
+        this.clearSearch()
+        this.#doc.removeEventListener('scroll', this.#scheduleRedraw, true)
+        this.#doc.defaultView?.removeEventListener('resize', this.#scheduleRedraw)
+        if (this.#redrawFrame != null)
+            this.#doc.defaultView?.cancelAnimationFrame(this.#redrawFrame)
+        this.#redrawFrame = null
+        this.#map.clear()
+        this.#svg.replaceChildren()
     }
     get #zoom() {
         // Safari does not zoom the client rects, while Chrome, Edge and Firefox does
@@ -29,7 +58,7 @@ export class Overlayer {
 
         const splitRanges = []
         paragraphs.forEach((p) => {
-            const pRange = document.createRange()
+            const pRange = this.#doc.createRange()
             if (range.intersectsNode(p)) {
                 pRange.selectNodeContents(p)
                 if (pRange.compareBoundaryPoints(Range.START_TO_START, range) < 0) {
@@ -46,45 +75,29 @@ export class Overlayer {
     add(key, range, draw, options) {
         if (this.#map.has(key)) this.remove(key)
         if (typeof range === 'function') range = range(this.#svg.getRootNode())
-        const zoom = this.#zoom
-        let rects = []
-        this.#splitRangeByParagraph(range).forEach((pRange) => {
-            const pRects = Array.from(pRange.getClientRects()).map(rect => ({
-                left: rect.left * zoom,
-                top: rect.top * zoom,
-                right: rect.right * zoom,
-                bottom: rect.bottom * zoom,
-                width: rect.width * zoom,
-                height: rect.height * zoom,
-            }))
-            rects = rects.concat(pRects)
-        })
+        const rects = this.#rects(range)
         const element = draw(rects, options)
         this.#svg.append(element)
         this.#map.set(key, { range, draw, options, element, rects })
     }
+    #rects(range, map = annotationPointMapper(this.#doc, this.#svg)) {
+        const zoom = this.#zoom
+        return this.#splitRangeByParagraph(range).flatMap(part =>
+            Array.from(part.getClientRects(), rect => annotationRect(rect, map, zoom)))
+    }
     remove(key) {
+        this.#search.remove(key)
         if (!this.#map.has(key)) return
         this.#svg.removeChild(this.#map.get(key).element)
         this.#map.delete(key)
     }
     redraw() {
+        this.#search.redraw()
+        const map = annotationPointMapper(this.#doc, this.#svg)
         for (const obj of this.#map.values()) {
             const { range, draw, options, element } = obj
             this.#svg.removeChild(element)
-            const zoom = this.#zoom
-            let rects = []
-            this.#splitRangeByParagraph(range).forEach((pRange) => {
-                const pRects = Array.from(pRange.getClientRects()).map(rect => ({
-                    left: rect.left * zoom,
-                    top: rect.top * zoom,
-                    right: rect.right * zoom,
-                    bottom: rect.bottom * zoom,
-                    width: rect.width * zoom,
-                    height: rect.height * zoom,
-                }))
-                rects = rects.concat(pRects)
-            })
+            const rects = this.#rects(range, map)
             const el = draw(rects, options)
             this.#svg.append(el)
             obj.element = el
@@ -92,11 +105,14 @@ export class Overlayer {
         }
     }
     hitTest({ x, y }) {
+        const map = annotationPointMapper(this.#doc, this.#svg)
+        ;({ x, y } = map({ x, y }))
         const arr = Array.from(this.#map.entries())
         // loop in reverse to hit more recently added items first
         for (let i = arr.length - 1; i >= 0; i--) {
             const [key, obj] = arr[i]
-            for (const { left, top, right, bottom } of obj.rects)
+            // Do not depend on a pending animation-frame redraw to hit a mark.
+            for (const { left, top, right, bottom } of this.#rects(obj.range, map))
                 if (top <= y && left <= x && bottom > y && right > x)
                     return [key, obj.range]
         }

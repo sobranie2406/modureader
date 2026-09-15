@@ -66,6 +66,11 @@ jobs:
       - name: Run tests
         run: flutter test
 
+      - name: Native inference worker lifecycle regression
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pthread test/native/OnnxSerialWorkerTest.cpp -o "$RUNNER_TEMP/modu-onnx-worker-test"
+          "$RUNNER_TEMP/modu-onnx-worker-test"
+
       - name: Release architecture validation tests
         run: python3 -m unittest discover -s test -p 'release_package_test.py' -v
 

@@ -70,7 +70,20 @@ export class ContinuousSectionWindow {
   ensure(index, foreground = false) {
     const operation = async () => {
       if (this.closed) return
-      if (this.entries.has(index)) return this.entries.get(index)
+      if (this.entries.has(index)) {
+        const entry = this.entries.get(index)
+        const list = this.ordered
+        if (entry.detached && list.length &&
+          (this.adjacent(list[0].index, -1) === index || this.adjacent(list.at(-1).index, 1) === index)) {
+          this.remember()
+          entry.detached = false
+          entry.view.element.style.display = 'flex'
+          this.compensate()
+          this.updateTail()
+          if (!this.busy) this.changed?.()
+        }
+        return entry
+      }
       if (!this.sections[index]?.load || !this.makeRoom(index, foreground)) return
       if (!foreground && this.sections[index].size > 2 * 1024 * 1024) return
       const src = await this.sections[index].load()
@@ -138,9 +151,15 @@ export class ContinuousSectionWindow {
         if (!list.length) return
         const first = list[0], last = list.at(-1)
         const bottom = this.top(last) + last.view.element.getBoundingClientRect().height
-        const next = bottom < this.container.scrollTop + this.height * 2
+        // Always prepare both immediate neighbors, even at the start of a
+        // long chapter. Waiting until its last viewport is too late for a fling.
+        const neighborNext = this.adjacent(this.current.index, 1)
+        const neighborPrev = this.adjacent(this.current.index, -1)
+        const next = (neighborNext != null && (!this.entries.has(neighborNext) || this.entries.get(neighborNext).detached)) ||
+          bottom < this.container.scrollTop + this.height * 2
           ? this.adjacent(last.index, 1) : undefined
-        const prev = this.top(first) > this.container.scrollTop - this.height
+        const prev = (neighborPrev != null && (!this.entries.has(neighborPrev) || this.entries.get(neighborPrev).detached)) ||
+          this.top(first) > this.container.scrollTop - this.height
           ? this.adjacent(first.index, -1) : undefined
         let added = false
         for (const index of [next, prev]) {
@@ -170,6 +189,36 @@ export class ContinuousSectionWindow {
     const needed = !last || this.adjacent(last.index, 1) != null
       ? Math.max(0, this.container.scrollTop + this.height * 1.5 - end) : 0
     this.tailSpace.style.height = `${Math.min(this.height, needed)}px`
+  }
+  async scrollBy(distance) {
+    if (this.closed || !this.current || !Number.isFinite(distance) || !distance) return
+    this.busy = true
+    // Keep the origin relative to a retained document: prepending a previous
+    // chapter changes scrollTop, but must not change the requested page step.
+    const origin = this.current
+    const offset = this.top(origin) - this.container.scrollTop
+    const target = () => this.top(origin) - offset + distance
+    try {
+      for (let n = 0; n < this.maxViews && !this.closed; n++) {
+        const list = this.ordered
+        const edge = distance > 0 ? list.at(-1) : list[0]
+        const covered = distance > 0
+          ? this.top(edge) + edge.view.element.getBoundingClientRect().height >= target() + this.height
+          : this.top(edge) <= target()
+        if (covered) break
+        const index = this.adjacent(edge.index, Math.sign(distance))
+        if (index == null || !await this.ensure(index, true)) break
+      }
+      if (this.closed) return
+      // Never land in the temporary loading spacer at the end of the window.
+      const last = this.ordered.at(-1)
+      const end = this.top(last) + last.view.element.getBoundingClientRect().height
+      this.container.scrollTop = Math.max(0, Math.min(target(), end - this.height))
+    } finally {
+      this.busy = false
+      this.track()
+      if (!this.closed) this.updateTail()
+    }
   }
   async goTo(index, anchor, select, scroll) {
     this.busy = true

@@ -388,7 +388,7 @@ class View {
       })
     }
   }
-  expand() {
+  expand(notify = true) {
     if (this.#destroyed) return
     const { documentElement } = this.document
     if (this.#column) {
@@ -437,11 +437,14 @@ class View {
         this.#overlayer.redraw()
       }
     }
-    this.onExpand()
+    if (notify) this.onExpand()
   }
   set overlayer(overlayer) {
     this.#overlayer = overlayer
     this.#element.append(overlayer.element)
+    // A preloaded chapter has already been laid out before activation creates
+    // its overlay. Apply that layout now, not at some later font/image resize.
+    this.expand(false)
   }
   get overlayer() {
     return this.#overlayer
@@ -451,6 +454,7 @@ class View {
   }
   destroy() {
     this.#destroyed = true
+    this.#overlayer?.destroy()
     this.#cancelLoad?.()
     this.#cancelLoad = null
     this.#observer.disconnect()
@@ -1587,6 +1591,9 @@ export class Paginator extends HTMLElement {
             ...detail, attach: overlayer => entry.view.overlayer = overlayer,
           } }))
         }
+        // Restored cached chapters may have been hidden, resized or internally
+        // scrolled since their marks were last painted.
+        entry.view.overlayer?.redraw()
         this.dispatchEvent(new CustomEvent('activate', { detail }))
       },
     })
@@ -1685,17 +1692,8 @@ export class Paginator extends HTMLElement {
       if (this.#locked) return
       this.#locked = true
       try {
-        const old = this.#container.scrollTop
-        this.#container.scrollTop += dir * (distance ?? this.size * 0.8)
+        await this.#continuous.scrollBy(dir * (distance ?? this.size * 0.8))
         this.#afterScroll('page')
-        this.#continuous.track()
-        this.#afterScroll('page')
-        if (Math.abs(this.#container.scrollTop - old) < 1) {
-          const list = this.#continuous.ordered
-          const edge = dir > 0 ? list.at(-1) : list[0]
-          const index = this.#continuous.adjacent(edge.index, dir)
-          if (index != null) await this.#goTo({ index, anchor: dir > 0 ? 0 : 1 })
-        }
       } finally { this.#locked = false }
       return
     }

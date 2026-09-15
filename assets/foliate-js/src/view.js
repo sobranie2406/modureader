@@ -12,7 +12,7 @@ class History extends EventTarget {
   #index = -1
   pushState(x) {
     const last = this.#arr[this.#index]
-    if (last === x || last?.fraction && last.fraction === x.fraction) return
+    if (last === x || (typeof last?.fraction === 'number' && last.fraction === x?.fraction)) return
     this.#arr[++this.#index] = x
     this.#arr.length = this.#index + 1
     this.dispatchEvent(new Event('index-change'))
@@ -20,6 +20,7 @@ class History extends EventTarget {
   }
   replaceState(x) {
     const index = this.#index
+    if (index < 0) return this.clear(x)
     this.#arr[index] = x
   }
   back() {
@@ -44,9 +45,10 @@ class History extends EventTarget {
   get canGoForward() {
     return this.#index < this.#arr.length - 1
   }
-  clear() {
-    this.#arr = []
-    this.#index = -1
+  clear(current) {
+    this.#arr = current == null ? [] : [current]
+    this.#index = this.#arr.length - 1
+    this.dispatchEvent(new Event('index-change'))
   }
 }
 
@@ -70,6 +72,7 @@ export class View extends HTMLElement {
   #tocProgress
   #pageProgress
   #searchResults = new Map()
+  #searchGeneration = 0
   #index
   isFixedLayout = false
   lastLocation
@@ -111,6 +114,9 @@ export class View extends HTMLElement {
       this.renderer = document.createElement('foliate-paginator')
     }
     this.renderer.setAttribute('exportparts', 'head,foot,filter')
+    // The renderer survives chapter loads. Bind its background/margin click
+    // once, not once per visible document (which multiplies page turns).
+    this.renderer.addEventListener('click', this.#handleRendererClick)
     this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
     this.renderer.addEventListener('activate', e => this.#emit('activate', e.detail))
     this.renderer.addEventListener('continuous-start', () => {
@@ -145,6 +151,7 @@ export class View extends HTMLElement {
     }
   }
   close() {
+    this.clearSearch()
     this.renderer?.destroy()
     this.renderer?.remove()
     this.#sectionProgress = null
@@ -163,10 +170,11 @@ export class View extends HTMLElement {
       ?.href ?? this.book.sections.findIndex(s => s.linear !== 'no'))
   }
   async init({ lastLocation, showTextStart }) {
+    this.history.clear()
     const resolved = lastLocation ? this.resolveNavigation(lastLocation) : null
     if (resolved) {
       await this.renderer.goTo(resolved)
-      this.history.pushState(lastLocation)
+      this.history.clear(this.lastLocation?.cfi ?? lastLocation)
     }
     else if (showTextStart) await this.goToTextStart()
     else {
@@ -325,19 +333,20 @@ export class View extends HTMLElement {
 
       this.#emit('click-view', { x: clientX, y: clientY })
     })
-    this.renderer.addEventListener('click', e => {
-      const { clientX, clientY } = e
-      while (clientX > window.innerWidth) {
-        clientX -= window.innerWidth
-      }
-      this.#emit('click-view', { x: clientX, y: clientY })
-    })
+  }
+  #handleRendererClick = e => {
+    let { clientX, clientY } = e
+    while (window.innerWidth > 0 && clientX > window.innerWidth)
+      clientX -= window.innerWidth
+    this.#emit('click-view', { x: clientX, y: clientY })
   }
   async addAnnotation(annotation, remove) {
     const { value } = annotation
     if (value.startsWith(SEARCH_PREFIX)) {
+      const generation = this.#searchGeneration
       const cfi = value.replace(SEARCH_PREFIX, '')
       const { index, anchor } = await this.resolveNavigation(cfi)
+      if (!remove && generation !== this.#searchGeneration) return
       const obj = this.#getOverlayer(index)
       if (obj) {
         const { overlayer, doc } = obj
@@ -346,7 +355,7 @@ export class View extends HTMLElement {
           return
         }
         const range = doc ? anchor(doc) : anchor
-        overlayer.add(value, range, Overlayer.outline, { color: '#39c5bbaa' });
+        overlayer.addSearch(value, range)
       }
       return
     }
@@ -427,11 +436,24 @@ export class View extends HTMLElement {
       console.error(`Could not resolve target ${target}`)
     }
   }
-  async goTo(target) {
+  #recordNavigation(target, previous, recordHistory = true) {
+    const current = this.lastLocation?.cfi ?? target
+    if (!recordHistory) return this.history.replaceState(current)
+    // Save the actual position before a deliberate jump, not an old href or
+    // fraction. A native scroll during goTo may otherwise replace that origin.
+    if (previous != null) this.history.replaceState(previous)
+    this.history.pushState(current)
+  }
+  clearNavigationHistory() {
+    this.history.clear(this.lastLocation?.cfi)
+  }
+  async goTo(target, { recordHistory = true } = {}) {
     const resolved = this.resolveNavigation(target)
+    if (!resolved) return
+    const previous = this.lastLocation?.cfi
     try {
       await this.renderer.goTo(resolved)
-      this.history.pushState(target)
+      this.#recordNavigation(target, previous, recordHistory)
       return resolved
     } catch (e) {
       console.error(e)
@@ -439,15 +461,18 @@ export class View extends HTMLElement {
     }
   }
   async goToFraction(frac) {
+    const previous = this.lastLocation?.cfi
     const [index, anchor] = this.#sectionProgress.getSection(frac)
     await this.renderer.goTo({ index, anchor })
-    this.history.pushState({ fraction: frac })
+    this.#recordNavigation({ fraction: frac }, previous)
   }
   async select(target) {
+    const previous = this.lastLocation?.cfi
     try {
       const obj = await this.resolveNavigation(target)
+      if (!obj) return
       await this.renderer.goTo({ ...obj, select: true })
-      this.history.pushState(target)
+      this.#recordNavigation(target, previous)
     } catch (e) {
       console.error(e)
       console.error(`Could not go to ${target}`)
@@ -518,10 +543,12 @@ export class View extends HTMLElement {
   async * search(opts) {
     console.log('search', opts)
     this.clearSearch()
+    const generation = this.#searchGeneration
     const { searchMatcher } = await import('./search.js')
+    if (generation !== this.#searchGeneration) return
     const { query, index } = opts
     const matcher = searchMatcher(textWalker,
-      { defaultLocale: this.language, ...opts })
+      { defaultLocale: this.language.canonical, ...opts })
     const iter = index != null
       ? this.#searchSection(matcher, query, index)
       : this.#searchBook(matcher, query)
@@ -530,6 +557,7 @@ export class View extends HTMLElement {
     this.#searchResults.set(index, list)
 
     for await (const result of iter) {
+      if (generation !== this.#searchGeneration) return
       if (result.subitems) {
         const list = result.subitems
           .map(({ cfi }) => ({ value: SEARCH_PREFIX + cfi }))
@@ -552,8 +580,11 @@ export class View extends HTMLElement {
     yield 'done'
   }
   clearSearch() {
-    for (const list of this.#searchResults.values())
-      for (const item of list) this.deleteAnnotation(item)
+    this.#searchGeneration++
+    // Clear synchronously: an old async CFI removal must not erase the same
+    // hit re-added by a new query. Includes every live preloaded chapter.
+    for (const { overlayer } of this.renderer?.getContents() ?? [])
+      overlayer?.clearSearch()
     this.#searchResults.clear()
   }
   oldValue = null

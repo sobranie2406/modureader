@@ -627,17 +627,36 @@ class KnowledgeIndexer {
       final entry = ordered[index];
       collected[entry.key] = entry.value;
       onProgress?.call(entry.key, index + 1, ordered.length);
-      await Future<void>.value();
+      if (index % 16 == 0) await Future<void>.delayed(Duration.zero);
     }
 
     if (isCancelled?.call() ?? false) {
       return const IndexBuildResult(status: IndexBuildStatus.cancelled);
     }
-    var snapshot = _service.rebuild(
-      bookId: bookId,
-      chapters: collected,
-      vectorize: vectorize,
-    );
+    // Pure text/hash work can be large even before the first inference. Keep
+    // it off the UI isolate. Pass data, not this indexer's service/callbacks.
+    var snapshot = await _prepareIndex(bookId, collected);
+    if (isCancelled?.call() ?? false) {
+      return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+    }
+    // Custom synchronous callbacks may own unsendable UI/plugin objects. Keep
+    // that compatibility API on its caller; production uses vectorizeBatch.
+    if (vectorize != null) {
+      final vectors = <VectorEntry>[];
+      for (final chunk in snapshot.chunks) {
+        if (isCancelled?.call() ?? false) {
+          return const IndexBuildResult(status: IndexBuildStatus.cancelled);
+        }
+        vectors.add(VectorEntry(chunk: chunk, vector: vectorize(chunk)));
+        if (vectors.length % 16 == 0) await Future<void>.delayed(Duration.zero);
+      }
+      snapshot = KnowledgeIndexSnapshot(
+          bookId: snapshot.bookId,
+          contentHash: snapshot.contentHash,
+          chunks: snapshot.chunks,
+          vectors: vectors);
+    }
+    _service.putSnapshot(snapshot);
     if (vectorizeBatch != null) {
       final vectors = <VectorEntry>[];
       const batchSize = 16;
@@ -691,4 +710,10 @@ class KnowledgeIndexer {
       snapshot: snapshot,
     );
   }
+}
+
+Future<KnowledgeIndexSnapshot> _prepareIndex(
+    String bookId, Map<String, String> chapters) {
+  return Isolate.run(() =>
+      KnowledgeSearchService().rebuild(bookId: bookId, chapters: chapters));
 }

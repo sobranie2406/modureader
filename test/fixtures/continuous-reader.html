@@ -3,18 +3,24 @@
 <style>body{margin:0;background:#faf8ef}foliate-view{display:block;width:390px;height:640px}button{margin:4px}</style>
 <button id="forward">Next 80%</button><button id="back">Previous 80%</button>
 <button id="speech">Start speech cursor</button><button id="speak-next">Next sentence</button>
+<button id="jump-note">Jump to note chapter</button><button id="jump-back">History back</button>
+<button id="jump-forward">History forward</button><button id="dismiss-trail">Close history</button>
+<button id="sync-position">Restore sync position</button><button id="reopen">Reopen position</button>
+<output id="history-state"></output>
 <pre id="result"></pre>
 <script type="module">
 import '../../assets/foliate-js/src/view.js';
 import { TtsNavigator } from '../../assets/foliate-js/src/tts-navigation.js';
+import { installDesktopPageInput } from '../../assets/foliate-js/src/desktop-page-input.js';
 const view = document.createElement('foliate-view'); document.body.append(view);
 const loads = [], unloads = [], events = [];
+const longChapters = new URL(location.href).searchParams.has('long');
 const sections = Array.from({length:30}, (_, index) => {
   let url;
   return { id: String(index), size: 600, linear: index === 4 ? 'no' : 'yes',
     load: async () => {
       loads.push(index);
-      url = URL.createObjectURL(new Blob([`<!doctype html><html><head><meta charset="utf-8"></head><body><h1>Chapter ${index}</h1><p>First sentence ${index}.</p><p>Last sentence ${index}.</p></body></html>`], {type:'text/html'}));
+      url = URL.createObjectURL(new Blob([`<!doctype html><html><head><meta charset="utf-8"></head><body><h1>Chapter ${index}</h1><p>First sentence ${index}.</p>${longChapters ? '<p>Reading fixture text.</p>'.repeat(80) : ''}<p>Last sentence ${index}.</p></body></html>`], {type:'text/html'}));
       return url;
     }, unload() { unloads.push(index); URL.revokeObjectURL(url); },
   };
@@ -22,12 +28,35 @@ const sections = Array.from({length:30}, (_, index) => {
 await view.open({sections, dir:'ltr', metadata:{language:'en'}, toc:[],
   splitTOCHref: href => [href, null], getTOCFragment: doc => doc.body});
 const r = view.renderer;
+// Optional desktop input fixture; leave the original touch/history cases alone.
+if (new URL(location.href).searchParams.has('keys')) {
+  const label = document.createElement('label');
+  label.innerHTML = '<input id="ctrl-brackets" type="checkbox">Ctrl bracket paging';
+  document.body.prepend(label);
+  const input = document.createElement('input');
+  input.placeholder = 'AI editor fixture';
+  document.body.prepend(input);
+  const install = doc => installDesktopPageInput(doc, {
+    enabled: () => true,
+    ctrlBrackets: () => label.firstChild.checked,
+    hasSelection: () => r.getContents().some(({doc}) => !!doc.getSelection()?.toString()),
+    turnPage: direction => direction > 0 ? r.next() : r.prev(),
+  });
+  install(document);
+  view.addEventListener('load', ({detail}) => install(detail.doc));
+}
 for (const [name,value] of Object.entries({flow:'scrolled','continuous-scroll':'true',gap:'5%',
   'top-margin':'0px','bottom-margin':'0px','mobile-image-fit':'true','mobile-touch-paging':'true'})) r.setAttribute(name,value);
 r.setStyles('html{font:18px/1.5 sans-serif}h1{font-size:22px}p{margin:1em 0}');
 view.addEventListener('load', e => events.push(['load',e.detail.index]));
 view.addEventListener('relocate', e => events.push(['relocate',e.detail.cfi,e.detail.readingAction]));
 const nav = new TtsNavigator(() => view);
+window.isFootNoteOpen = () => false;
+view.addEventListener('click-view', e => {
+  events.push(['click-view',e.detail.x,e.detail.y]);
+  // Stand in for Flutter's callback: one received click requests one page.
+  r.next();
+});
 window.fixture = {view,r,nav,loads,unloads,events,
   state() {const c=r.shadowRoot.querySelector('#container');return {scroll:c.scrollTop,height:c.scrollHeight,
     active:r.getContents()[0]?.index,indices:r.getContents().map(x=>x.index),loads:[...loads],unloads:[...unloads]};}};
@@ -35,6 +64,16 @@ document.querySelector('#forward').onclick=()=>r.next();
 document.querySelector('#back').onclick=()=>r.prev();
 document.querySelector('#speech').onclick=async()=>document.querySelector('#result').textContent=await nav.start();
 document.querySelector('#speak-next').onclick=async()=>document.querySelector('#result').textContent=await nav.move(1);
+const showHistory=()=>document.querySelector('#history-state').textContent=
+  `back=${view.history.canGoBack};forward=${view.history.canGoForward}`;
+view.history.addEventListener('index-change',showHistory);
+document.querySelector('#jump-note').onclick=()=>view.goTo(8);
+document.querySelector('#jump-back').onclick=()=>view.history.back();
+document.querySelector('#jump-forward').onclick=()=>view.history.forward();
+document.querySelector('#dismiss-trail').onclick=()=>view.clearNavigationHistory();
+document.querySelector('#sync-position').onclick=()=>view.goTo(view.lastLocation.cfi,{recordHistory:false});
+document.querySelector('#reopen').onclick=()=>view.init({lastLocation:view.lastLocation.cfi});
 await r.goTo({index:2});
+showHistory();
 window.ready = true;
 </script>

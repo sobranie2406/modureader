@@ -3,7 +3,7 @@ console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
-import { attachFootnoteSizing, footnoteLayoutCSS } from './footnote-size.js'
+import { attachFootnoteSizing, footnoteLayoutCSS, footnoteFontSize } from './footnote-size.js'
 import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
@@ -1001,7 +1001,7 @@ const replaceFootnote = (view) => {
   renderer.setAttribute('top-margin', '0px')
   renderer.setAttribute('bottom-margin', '0px')
   const footNoteStyle = {
-    fontSize: style.fontSize,
+    fontSize: footnoteFontSize(style.fontSize),
     fontName: style.fontName,
     fontPath: style.fontPath,
     letterSpacing: style.letterSpacing,
@@ -1018,7 +1018,11 @@ const replaceFootnote = (view) => {
     useBookStyles: style.useBookStyles,
     headingFontSize: style.headingFontSize,
   }
-  const css = getCSS(footNoteStyle)
+  // The popup keeps the book's formatting, but its base text size follows the
+  // reader even when "use book styles" would omit getCSS's root font rule.
+  const css = getCSS(footNoteStyle) + `
+    html { font-size: ${footNoteStyle.fontSize}em !important; }
+  `
   renderer.setStyles(css + footnoteLayoutCSS)
   // set background color of dialog
   // if #rrggbbaa, replace aa to ee
@@ -1129,7 +1133,10 @@ class Reader {
         this.view.goTo(e.detail.href)
       }))
 
-    view.history.addEventListener('pushstate', e => {
+    view.history.addEventListener('index-change', () => {
+      // Inline footnotes have their own renderer/history; they must not
+      // replace the main book's return controls when opening or closing.
+      if (view !== this.view) return
       callFlutter('onPushState', {
         canGoBack: view.history.canGoBack,
         canGoForward: view.history.canGoForward
@@ -1287,11 +1294,17 @@ class Reader {
     const enabled = () => style.desktopPageInput === true && !window.isFootNoteOpen();
     desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
       enabled,
+      ctrlBrackets: () => style.keyboardShortcutTurnPage === true,
       focusOnPointerDown: enabled,
       hasSelection: () => this.view.renderer.getContents().some(
         ({ doc: content }) => !!content.getSelection()?.toString()),
       turnPage: direction => direction > 0 ? this.view.next() : this.view.prev(),
     }));
+  }
+
+  turnFromKeyboard(direction) {
+    const doc = this.view.renderer.getContents().find(({ doc }) => doc.hasFocus())?.doc ?? document;
+    return desktopInputDocuments.get(doc)?.turnFromKeyboard(direction) ?? false;
   }
 
   #onLoad({ detail: { doc, index } }) {
@@ -1817,7 +1830,7 @@ const refreshLayout = () => {
   const cfi = reader.view.lastLocation?.cfi
   // Refresh in place; visiting the next chapter here used to publish a false
   // reading position and could move an active speech cursor.
-  if (cfi) return reader.view.goTo(cfi)
+  if (cfi) return reader.view.goTo(cfi, { recordHistory: false })
   reader.view.renderer.render?.()
 }
 
@@ -1897,12 +1910,14 @@ window.changeStyle = (newStyle) => {
 window.goToHref = href => reader.view.goTo(href)
 
 window.goToCfi = cfi => reader.view.goTo(cfi)
+// Search has its own origin/previous/next controls, not a history entry per hit.
+window.goToSearchResult = async cfi => !!(await reader.view.goTo(cfi, { recordHistory: false }))
 
 window.restoreSyncedReadingPosition = async cfi => {
   if (reader.view.renderer.isNavigating) return false
   window.readerApplyingSync = true
   try {
-    const resolved = await reader.view.goTo(cfi)
+    const resolved = await reader.view.goTo(cfi, { recordHistory: false })
     return resolved != null
   } finally {
     window.readerApplyingSync = false
@@ -1912,6 +1927,8 @@ window.restoreSyncedReadingPosition = async cfi => {
 window.goToPercent = percent => reader.view.goToFraction(percent)
 
 window.nextPage = () => reader.view.next()
+
+window.turnPageFromKeyboard = direction => reader.turnFromKeyboard(direction)
 
 window.prevPage = () => reader.view.prev()
 
@@ -2028,9 +2045,14 @@ window.ttsPrev = () => ttsNavigator.move(-1)
 
 window.ttsPrepare = () => reader.view.tts.prepare()
 
-window.clearSearch = () => reader.view.clearSearch()
+let searchGeneration = 0
+window.clearSearch = () => {
+  searchGeneration++
+  reader.view.clearSearch()
+}
 
 window.search = async (text, opts) => {
+  const generation = ++searchGeneration
   opts == null && (opts = {
     'scope': 'book',
     'matchCase': false,
@@ -2042,19 +2064,27 @@ window.search = async (text, opts) => {
 
   const index = opts.scope === 'section' ? reader.index : null
 
+  try {
   for await (const result of reader.view.search({ ...opts, query, index })) {
+    if (generation !== searchGeneration) return
     if (result === 'done') {
-      callFlutter('onSearch', { process: 1.0 })
+      callFlutter('onSearch', { process: 1.0, requestId: opts.requestId })
     }
     else if ('progress' in result)
-      callFlutter('onSearch', { process: result.progress })
+      callFlutter('onSearch', { process: result.progress, requestId: opts.requestId })
     else {
-      callFlutter('onSearch', result)
+      callFlutter('onSearch', { ...result, requestId: opts.requestId })
     }
+  }
+  } catch (_) {
+    if (generation === searchGeneration)
+      callFlutter('onSearch', { error: true, requestId: opts.requestId })
   }
 }
 
 window.back = () => reader.view.history.back()
+
+window.clearNavigationHistory = () => reader.view.clearNavigationHistory()
 
 window.forward = () => reader.view.history.forward()
 

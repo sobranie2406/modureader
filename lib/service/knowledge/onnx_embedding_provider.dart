@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -8,6 +9,8 @@ import 'package:anx_reader/service/knowledge/android_embedding_bridge.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:hf_tokenizers/hf_tokenizers.dart';
+import 'package:flutter/services.dart';
+import 'package:anx_reader/service/knowledge/isolate_worker.dart';
 
 class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   LocalOnnxEmbeddingProvider({
@@ -57,6 +60,7 @@ class LocalOnnxEmbeddingEngine {
   String? _activeModelId;
   OrtSession? _session;
   Tokenizer? _tokenizer;
+  IsolateWorker? _windowsWorker;
   final _android = const AndroidEmbeddingBridge();
   Timer? _idleRelease;
   Future<void> _tail = Future<void>.value();
@@ -77,7 +81,15 @@ class LocalOnnxEmbeddingEngine {
           // Native inference finishes first; never abandon an entire batch on
           // the shared session after reporting that the queue has stopped.
           if (isCancelled?.call() ?? false) throw StateError('向量任务已取消');
-          vectors.add(await _generateOne(model, input));
+          if (Platform.isWindows) {
+            final result = await _windowsWorker!.call('embed', [model, input]);
+            vectors.add((result as List).cast<double>());
+          } else {
+            vectors.add(await _generateOne(model, input));
+          }
+          // One bounded native request at a time; let input/frame events run
+          // between chunks rather than waiting for the entire batch of 16.
+          await Future<void>.delayed(Duration.zero);
         }
         return vectors;
       } catch (_) {
@@ -118,24 +130,37 @@ class LocalOnnxEmbeddingEngine {
     LocalEmbeddingModelStore store,
   ) async {
     if (_activeModelId == model.id &&
-        (Platform.isAndroid || _session != null) &&
-        _tokenizer != null) {
+        ((Platform.isWindows && _windowsWorker != null) ||
+            ((Platform.isAndroid || _session != null) && _tokenizer != null))) {
       return;
     }
     await _closeActiveModel();
     await store.ensureAvailable(model);
     final onnx = await store.modelFile(model);
     final tokenizer = await store.tokenizerFile(model);
-    final loadedTokenizer = Tokenizer.fromFile(tokenizer.path);
+    if (Platform.isWindows) {
+      final token = RootIsolateToken.instance;
+      if (token == null) throw StateError('无法初始化后台向量处理进程');
+      _windowsWorker = await IsolateWorker.start(_windowsEmbeddingMain, token);
+      await _windowsWorker!.call('load', [model, onnx.path, tokenizer.path]);
+      _activeModelId = model.id;
+      return;
+    }
+    await _loadPaths(model, onnx.path, tokenizer.path);
+  }
+
+  Future<void> _loadPaths(
+      LocalEmbeddingModel model, String onnxPath, String tokenizerPath) async {
+    final loadedTokenizer = Tokenizer.fromFile(tokenizerPath);
     try {
       if (Platform.isAndroid) {
-        await _android.load(onnx.path);
+        await _android.load(onnxPath);
         _tokenizer = loadedTokenizer;
         _activeModelId = model.id;
         return;
       }
       final loadedSession = await OnnxRuntime().createSession(
-        onnx.path,
+        onnxPath,
         options: OrtSessionOptions(
           providers: const [OrtProvider.CPU],
           intraOpNumThreads: 2,
@@ -216,6 +241,16 @@ class LocalOnnxEmbeddingEngine {
 
   Future<void> _closeActiveModel() async {
     _idleRelease?.cancel();
+    final worker = _windowsWorker;
+    _windowsWorker = null;
+    _activeModelId = null;
+    if (worker != null) {
+      try {
+        await worker.call('close', null);
+      } finally {
+        worker.dispose();
+      }
+    }
     _tokenizer?.close();
     _tokenizer = null;
     await _session?.close();
@@ -223,6 +258,34 @@ class LocalOnnxEmbeddingEngine {
     _activeModelId = null;
     if (Platform.isAndroid) await _android.close();
   }
+}
+
+// All tokenizer FFI, tensor materialization and mean-pooling live here on
+// Windows. The native channel independently dispatches ONNX onto its worker.
+@pragma('vm:entry-point')
+void _windowsEmbeddingMain(List<Object?> initialization) async {
+  BackgroundIsolateBinaryMessenger.ensureInitialized(
+      initialization[1] as RootIsolateToken);
+  final engine = LocalOnnxEmbeddingEngine._();
+  await serveIsolateWorker(initialization[0] as SendPort,
+      (method, value) async {
+    switch (method) {
+      case 'load':
+        final args = value as List;
+        await engine._loadPaths(args[0] as LocalEmbeddingModel,
+            args[1] as String, args[2] as String);
+        return null;
+      case 'embed':
+        final args = value as List;
+        return engine._generateOne(
+            args[0] as LocalEmbeddingModel, args[1] as String);
+      case 'close':
+        await engine._closeActiveModel();
+        return null;
+      default:
+        throw ArgumentError('Unknown embedding request');
+    }
+  });
 }
 
 // Re-tokenizing a prefix can change boundary tokenization. Enforce the actual

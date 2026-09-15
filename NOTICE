@@ -12,6 +12,9 @@ ReadAny Team; see LICENSES/ReadAny-GPL-3.0-or-later.txt.
 Source: https://github.com/sobranie2406/modureader
 Third-party notices remain in their original source and dependency distributions.
 
+Windows ONNX dispatcher includes modified flutter_onnxruntime 1.8.4 code,
+Copyright (c) 2025 MASIC AI, licensed under MIT; see LICENSES/flutter_onnxruntime-MIT.txt.
+
 AI service logos are sourced from their official websites and identify compatible
 services, without implying endorsement or affiliation. All artwork and trademark
 rights remain with their respective owners. See assets/images/providers/SOURCES.md.

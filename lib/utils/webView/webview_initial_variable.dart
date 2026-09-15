@@ -38,6 +38,7 @@ Future<void> webviewInitialVariable(
       let initialCfi = '${replaceSingleQuote(cfi)}'
       let style = {
           desktopPageInput: ${AnxPlatform.isDesktop},
+          keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
           mobileTouchPaging: ${AnxPlatform.isMobile},
           mobileImageFit: ${AnxPlatform.isMobile},
           tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},

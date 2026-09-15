@@ -2,6 +2,10 @@ import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/models/ai_quick_prompt_chip.dart';
+import 'package:anx_reader/service/ai/ai_history.dart';
+import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/skill_message_label.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
@@ -23,6 +27,7 @@ class _Paths extends PathProviderPlatform {
 
 class _RecordingAiChat extends AiChat {
   final requests = <({String? id, String text})>[];
+  bool showReply = false;
 
   @override
   Stream<List<ChatMessage>> sendMessageStream(
@@ -36,13 +41,15 @@ class _RecordingAiChat extends AiChat {
   }) async* {
     requests.add((id: homePromptId, text: message));
     // Exercise the UI callbacks without networking or writing real history.
-    yield const [];
+    yield showReply
+        ? [ChatMessage.humanText(message), ChatMessage.ai('这里是模型回答')]
+        : const [];
   }
 }
 
 void main() {
   Future<_RecordingAiChat> mount(WidgetTester tester, Size size,
-      {double textScale = 1}) async {
+      {double textScale = 1, List<AiQuickPromptChip> chips = const []}) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     final directory = Directory.systemTemp.createTempSync('modu-home-prompts-');
@@ -73,7 +80,7 @@ void main() {
               .copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
-        home: const AiChatStream(),
+        home: AiChatStream(quickPromptChips: chips),
       ),
     ));
     await tester.pumpAndSettle();
@@ -86,17 +93,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets(
-      'prompts are hidden by default and after new chat, toggle preserves all prompts',
+  testWidgets('skill shortcuts are visible by default and after new chat',
       (tester) async {
     await mount(tester, const Size(1100, 760));
     final ids = homeAiPromptPolicies.keys.toList();
-    for (final id in ids) {
-      expect(prompt(id), findsNothing);
-    }
-    expect(find.byType(ActionChip), findsNothing);
-    expect(find.byTooltip('展开技能提示词'), findsOneWidget);
-    await togglePrompts(tester);
+    expect(find.byTooltip('收起技能标签'), findsOneWidget);
     for (final id in ids) {
       expect(prompt(id), findsOneWidget);
     }
@@ -110,8 +111,6 @@ void main() {
     await togglePrompts(tester);
     await tester.tap(find.byIcon(Icons.edit_document));
     await tester.pumpAndSettle();
-    expect(find.byType(ActionChip), findsNothing);
-    await togglePrompts(tester);
     expect(tester.widgetList<ActionChip>(chips).map((chip) => chip.key),
         ids.map((id) => ValueKey('home-prompt-$id')));
     expect(tester.takeException(), isNull);
@@ -120,7 +119,6 @@ void main() {
   testWidgets('all twelve prompts retain their own request policy on click',
       (tester) async {
     final chat = await mount(tester, const Size(1100, 760));
-    await togglePrompts(tester);
     for (final id in homeAiPromptPolicies.keys) {
       final chip = tester.widget<ActionChip>(prompt(id));
       final expectedText = (chip.label as Text).data;
@@ -138,7 +136,6 @@ void main() {
       'small window and large text scroll to the final prompt without overflow',
       (tester) async {
     final chat = await mount(tester, const Size(360, 640), textScale: 1.5);
-    await togglePrompts(tester);
     final last = prompt(homePromptOrganizeByProgress);
     expect(last, findsOneWidget);
     await tester.ensureVisible(last);
@@ -147,5 +144,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(chat.requests.single.id, homePromptOrganizeByProgress);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('skill body is hidden but shortcuts and ordinary messages remain',
+      (tester) async {
+    final skill = readAnySkills.first;
+    final chat = await mount(tester, const Size(390, 800), chips: [
+      AiQuickPromptChip(
+          icon: Icons.summarize,
+          label: skill.name,
+          prompt: skill.defaultPrompt,
+          skillId: skill.id),
+    ]);
+    chat.showReply = true;
+    expect(find.byKey(const ValueKey('reader-skill-chips')), findsOneWidget);
+    await tester.tap(find.widgetWithText(ActionChip, skill.name));
+    await tester.pumpAndSettle();
+    expect(chat.requests.single.text, skill.defaultPrompt.trim());
+    expect(find.byKey(const ValueKey('ai-message-skill-0')), findsOneWidget);
+    expect(find.textContaining('你是一名注重准确性'), findsNothing);
+    expect(find.widgetWithText(ActionChip, skill.name), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '我想问一下主角的动机');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ai-message-skill-0')), findsNothing);
+    expect(find.text('我想问一下主角的动机'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('history retains skill labels without replacing model prompts',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    await Prefs().initPrefs();
+    final prompt = readAnySkills.first.defaultPrompt;
+    final entry = AiChatHistoryEntry(
+        id: 'test',
+        scope: 'reader',
+        serviceId: 'test',
+        model: 'test',
+        createdAt: 1,
+        updatedAt: 1,
+        completed: true,
+        messages: [ChatMessage.humanText(prompt), ChatMessage.ai('answer')],
+        skillLabels: const {0: '本章总结'});
+    final restored = AiChatHistoryEntry.fromJson(entry.toJson());
+    expect(restored.skillLabels, {0: '本章总结'});
+    expect(restored.messages.first.contentAsString, prompt);
+    expect(restored.copyWith(updatedAt: 2).skillLabels, {0: '本章总结'});
+    final legacy = entry.toJson()..remove('skillLabels');
+    expect(AiChatHistoryEntry.fromJson(legacy).skillLabels, isEmpty);
+    expect(skillMessageLabel(prompt), '本章总结');
+    expect(skillMessageLabel('请解释本章总结为什么会失败'), isNull);
   });
 }

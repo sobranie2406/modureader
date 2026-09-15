@@ -1,0 +1,70 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<title>Annotation scroll alignment regression</title>
+<style>body{margin:16px;background:#eee;font:16px sans-serif}button{padding:8px;margin:4px}foliate-view{display:block;width:390px;height:640px;background:#fffdf4;border:1px solid #888}</style>
+<button id="next">向后翻页</button><button id="prev">向前翻页</button>
+<button id="mark">新增批注</button><button id="font">改变字号</button>
+<button id="reopen">重新打开本章</button><output id="status"></output>
+<script type="module">
+import '../../assets/foliate-js/src/view.js';
+import {Overlayer} from '../../assets/foliate-js/src/overlayer.js';
+const view=document.createElement('foliate-view');document.body.append(view);
+window.isFootNoteOpen=()=>false;
+const html=index=>`<!doctype html><html lang="zh"><head><meta charset="utf-8"></head><body><h2>第 ${index} 章</h2>${Array.from({length:16},(_,line)=>`<p>测试批注：第 ${index} 章，第 ${line} 行。这段合成文字用于检查划线、高亮是否与原文字对齐。</p>`).join('')}</body></html>`;
+const sections=Array.from({length:12},(_,index)=>{let url;return {id:String(index),size:4000,
+  load:async()=>url??=URL.createObjectURL(new Blob([html(index)],{type:'text/html'})),
+  unload(){if(url)URL.revokeObjectURL(url);url=null;}};});
+const notes=new Map();let large=false;
+const rangeAt=(doc,line)=>{const text=doc.querySelectorAll('p')[line].firstChild;const range=doc.createRange();range.setStart(text,0);range.setEnd(text,4);return range;};
+await view.open({sections,dir:'ltr',metadata:{language:'zh'},toc:[],splitTOCHref:href=>[href,null],getTOCFragment:doc=>doc.body});
+const r=view.renderer;
+for(let index=0;index<12;index++){
+  const doc=new DOMParser().parseFromString(html(index),'text/html');
+  for(const line of [0,4,8,12]){const value=view.getCFI(index,rangeAt(doc,line));notes.set(value,{value,type:'highlight',color:'#ff9800'});}
+}
+view.addEventListener('create-overlay',({detail:{index}})=>{
+  for(const annotation of notes.values())if(view.resolveCFI(annotation.value).index===index)view.addAnnotation(annotation);
+});
+view.addEventListener('draw-annotation',({detail:{draw,annotation}})=>draw(annotation.type==='underline'?Overlayer.underline:Overlayer.highlight,{color:annotation.color}));
+const style=()=>r.setStyles(`html{font:${large?27:20}px/1.8 serif;background:#fffdf4;color:#222}p{margin:1em 0}h2{font-size:1.2em}`);
+for(const [key,val] of Object.entries({flow:'scrolled','continuous-scroll':'true',gap:'5%','top-margin':'32px','bottom-margin':'32px'}))r.setAttribute(key,val);
+style();
+const geometry=()=>{
+  const errors=[];
+  for(const {index,doc,overlayer} of r.getContents()){
+    if(!overlayer)continue;
+    const frame=doc.defaultView.frameElement,box=frame.getBoundingClientRect();
+    const sx=box.width/frame.offsetWidth,sy=box.height/frame.offsetHeight;
+    // Groups have the same insertion order as notes restored/added in this chapter.
+    const groups=[...overlayer.element.children];
+    const chapterNotes=[...notes.values()].filter(n=>view.resolveCFI(n.value).index===index);
+    chapterNotes.forEach((note,i)=>{
+      const rect=groups[i]?.firstElementChild?.getBoundingClientRect();if(!rect)return;
+      const raw=view.resolveCFI(note.value).anchor(doc).getClientRects()[0];
+      const expectedTop=box.top+(frame.clientTop+(note.type==='underline'?raw.bottom-1:raw.top))*sy;
+      errors.push({index,type:note.type,dx:rect.left-(box.left+(frame.clientLeft+raw.left)*sx),dy:rect.top-expectedTop,
+        scrollY:doc.defaultView.scrollY,visible:rect.bottom>view.getBoundingClientRect().top&&rect.top<view.getBoundingClientRect().bottom});
+    });
+  }
+  return errors;
+};
+const state=()=>({active:r.getContents()[0]?.index,indices:r.getContents().map(x=>x.index),errors:geometry()});
+const display=()=>document.querySelector('#status').textContent='章节 '+state().active;
+view.addEventListener('relocate',display);
+const add=async()=>{
+  const {index,doc}=r.getContents()[0];
+  const frame=doc.defaultView.frameElement.getBoundingClientRect(),bounds=view.getBoundingClientRect();
+  const ps=[...doc.querySelectorAll('p')];
+  const line=ps.findIndex(p=>{const rect=p.getBoundingClientRect();return rect.top+frame.top>bounds.top+40&&rect.bottom+frame.top<bounds.bottom-20;});
+  if(line<0)throw Error('No visible paragraph');
+  const range=rangeAt(doc,line),value=view.getCFI(index,range);
+  if(notes.has(value)) { // Pick another part of the same visible line.
+    range.setStart(range.startContainer,5);range.setEnd(range.endContainer,9);
+  }
+  const cfi=view.getCFI(index,range),note={value:cfi,type:'underline',color:'#2196f3'};
+  notes.set(cfi,note);await view.addAnnotation(note);return state();
+};
+document.querySelector('#next').onclick=()=>r.next();document.querySelector('#prev').onclick=()=>r.prev();
+document.querySelector('#mark').onclick=add;document.querySelector('#font').onclick=()=>{large=!large;style();};
+document.querySelector('#reopen').onclick=async()=>{const index=state().active;await r.goTo({index:10});await r.goTo({index});};
+window.fixture={view,r,notes,state,add};await r.goTo({index:4});window.ready=true;
+</script>

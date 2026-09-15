@@ -68,13 +68,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <!-- Accept local files only. Registering http/https here makes
+                     Modu a candidate browser/download handler. Keep the broad
+                     MIME match for file providers that mislabel ebook types;
+                     the importer validates supported file extensions. -->
                 <data android:mimeType="*/*" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="file" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
                 <data android:scheme="content" />
-                <data android:host="*" />
             </intent-filter>
 
             <intent-filter>

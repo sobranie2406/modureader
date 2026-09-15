@@ -1,0 +1,76 @@
+<!doctype html><meta charset="utf-8">
+<title>Search text selection regression</title>
+<style>
+body{margin:16px;background:#eee;font:16px sans-serif} button{margin:4px;padding:8px}
+foliate-view{display:block;width:390px;height:600px;background:#fffdf4;border:1px solid #999}
+</style>
+<button id="search">搜索革命</button><button id="previous">上一处</button><button id="next">下一处</button>
+<button id="clear">关闭搜索</button><button id="resize">窄屏 / 桌面</button>
+<button id="theme">深色 / 浅色</button><button id="font">大字号 / 常规</button>
+<button id="flow">滚动 / 分页</button><button id="zoom">缩放</button><button id="manual">真正选择当前文字</button>
+<output id="count">0/0</output><pre id="status"></pre>
+<script type="module">
+import '../../assets/foliate-js/src/view.js';
+const params=new URL(location.href).searchParams;
+const view=document.createElement('foliate-view');document.body.append(view);
+window.isFootNoteOpen=()=>false;
+const sectionHTML=index=>`<!doctype html><html lang="zh"><head><meta charset="utf-8"></head><body>
+<h2>合成测试章节 ${index+1}</h2>
+<p>第一处：革命。这一段用于检查命中的文字与高亮是否对应。</p>
+<p>第二处：革<b>命</b>，两个字分属不同标签，不能选中后面的普通文字。</p>
+<p>第三处：<span>革<i>命</i></span>。改变屏幕宽度后检查高亮仍跟随文字。</p>
+<p>重复的第四和第五处：革命革命，两个命中必须各自保持正确范围。</p>
+${'<p>这里是没有关键词的阅读正文，用于验证翻页、字体变化与前后章节缓存。</p>'.repeat(5)}
+<p>章节最后一处：革命</p></body></html>`;
+const sections=Array.from({length:3},(_,index)=>{
+  let url;
+  return {id:String(index),size:1200,
+    createDocument:async()=>new DOMParser().parseFromString(sectionHTML(index),'text/html'),
+    load:async()=>url??=(URL.createObjectURL(new Blob([sectionHTML(index)],{type:'text/html'}))),
+    unload(){if(url)URL.revokeObjectURL(url);url=null;}};
+});
+view.addEventListener('load',({detail:{doc}})=>{
+  if(params.has('fallback')) Object.defineProperty(doc.defaultView,'Highlight',{value:undefined,configurable:true});
+});
+await view.open({sections,dir:'ltr',metadata:{language:'zh'},toc:[],
+  splitTOCHref:href=>[href,null],getTOCFragment:doc=>doc.body});
+const r=view.renderer;
+for(const [key,val] of Object.entries({flow:'scrolled','continuous-scroll':'true',gap:'5%',
+  'top-margin':'0px','bottom-margin':'0px'}))r.setAttribute(key,val);
+let dark=false,large=false,zoom=false,wide=false,hits=[],current=-1;
+const styles=()=>r.setStyles(`html{font:${large?30:22}px/1.65 serif;zoom:${zoom?1.35:1};background:${dark?'#121212':'#fffdf4'};color:${dark?'#eee':'#222'}}
+  h2{font-size:1.2em}p{margin:1em 0}::selection{background:rgba(47,143,255,.42)}`);
+styles();
+const count=()=>document.querySelector('#count').textContent=`${current+1}/${hits.length}`;
+const navigate=async index=>{
+  if(index<0||index>=hits.length)return;
+  current=index;await view.goTo(hits[index].cfi,{recordHistory:false});count();
+};
+const doSearch=async()=>{
+  hits=[];current=-1;
+  for await(const result of view.search({query:'革命'}))if(result.subitems)hits.push(...result.subitems);
+  await navigate(0);count();
+};
+document.querySelector('#search').onclick=doSearch;
+document.querySelector('#previous').onclick=()=>navigate(current-1);
+document.querySelector('#next').onclick=()=>navigate(current+1);
+document.querySelector('#clear').onclick=()=>{view.clearSearch();hits=[];current=-1;count();};
+document.querySelector('#resize').onclick=()=>{wide=!wide;view.style.width=wide?'850px':'320px';};
+document.querySelector('#theme').onclick=()=>{dark=!dark;styles();};
+document.querySelector('#font').onclick=()=>{large=!large;styles();};
+document.querySelector('#zoom').onclick=()=>{zoom=!zoom;styles();};
+document.querySelector('#flow').onclick=()=>r.setAttribute('flow',r.getAttribute('flow')==='scrolled'?'paginated':'scrolled');
+document.querySelector('#manual').onclick=()=>{
+  if(current<0)return;
+  const {index,anchor}=view.resolveCFI(hits[current].cfi), doc=r.getContents().find(x=>x.index===index).doc;
+  const selection=doc.getSelection();selection.removeAllRanges();selection.addRange(anchor(doc));
+};
+window.fixture={view,r,search:doSearch,navigate,
+  state(){return {count:hits.length,current:current+1,hits:hits.map(hit=>hit.excerpt.match),
+    chapters:r.getContents().map(({index,doc})=>({index,selection:doc.getSelection()?.toString(),
+      native:!!doc.defaultView.CSS?.highlights?.has('modu-search-match'),
+      matches:Array.from(doc.defaultView.CSS?.highlights?.get('modu-search-match')??[],range=>range.toString()),
+      fallbackRects:doc.querySelectorAll('[data-modu-search-overlay] rect').length,
+      overlayStrokes:doc.querySelectorAll('[data-modu-search-overlay] [stroke]').length}))};}};
+await r.goTo({index:0});window.ready=true;
+</script>

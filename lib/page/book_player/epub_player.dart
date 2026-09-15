@@ -39,6 +39,8 @@ import 'package:anx_reader/service/knowledge/knowledge_chapter_source.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/providers/toc_search.dart';
+import 'package:anx_reader/widgets/reading_page/search_navigation_bar.dart';
+import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
@@ -255,6 +257,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         mobileImageFit: ${AnxPlatform.isMobile},
         mobileTouchPaging: ${AnxPlatform.isMobile},
         desktopPageInput: ${AnxPlatform.isDesktop},
+        keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
@@ -329,6 +332,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void goToHref(String href) =>
       webViewController.evaluateJavascript(source: "goToHref('$href')");
 
+  void turnPageFromKeyboard(int direction) {
+    if (direction != 1 && direction != -1) return;
+    webViewController.evaluateJavascript(
+        source: 'window.turnPageFromKeyboard($direction)');
+  }
+
   void goToCfi(String cfi) =>
       webViewController.evaluateJavascript(source: "goToCfi('$cfi')");
 
@@ -364,6 +373,80 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     _clearSearchHighlights();
   }
 
+  Future<void>? _searchNavigation;
+
+  Future<void> navigateSearch(String target) async {
+    if (_searchNavigation != null) return;
+    final state = ref.read(tocSearchProvider);
+    if (!state.isActive) return;
+    final notifier = ref.read(tocSearchProvider.notifier);
+    notifier.setNavigating(true);
+    try {
+      _searchNavigation = _goToSearchCfi(target);
+      await _searchNavigation;
+      if (mounted && ref.read(tocSearchProvider).requestId == state.requestId) {
+        notifier.selectMatch(target);
+      }
+    } catch (_) {
+      if (mounted)
+        AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
+            ? '无法跳转到搜索结果，请重试'
+            : 'Could not open this search result');
+    } finally {
+      _searchNavigation = null;
+      if (mounted) {
+        notifier.setNavigating(false);
+        final current = ref.read(tocSearchProvider);
+        if (current.requestId != state.requestId &&
+            current.isActive &&
+            current.activeCfi == null &&
+            current.matches.isNotEmpty) {
+          unawaited(navigateSearch(current.matches.first.cfi));
+        }
+      }
+    }
+  }
+
+  Future<void> _goToSearchCfi(String target) async {
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody:
+            'return await window.goToSearchResult(${jsonEncode(target)})');
+    if (result?.error != null || result?.value != true) {
+      throw StateError('Search navigation failed');
+    }
+  }
+
+  void moveSearch(int direction) {
+    final state = ref.read(tocSearchProvider);
+    final index = state.activeIndex + direction;
+    final matches = state.matches;
+    if (index >= 0 && index < matches.length) {
+      unawaited(navigateSearch(matches[index].cfi));
+    }
+  }
+
+  Future<void> closeBookSearch({bool returnToOrigin = false}) async {
+    final origin = ref.read(tocSearchProvider).originCfi;
+    final pending = _searchNavigation;
+    clearSearch();
+    try {
+      await pending;
+    } catch (_) {
+      // A failed hit navigation must not prevent returning to the saved page.
+      // navigateSearch already reports that navigation failure.
+    }
+    try {
+      if (mounted && returnToOrigin && origin?.isNotEmpty == true) {
+        await _goToSearchCfi(origin!);
+      }
+    } catch (_) {
+      if (mounted)
+        AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
+            ? '无法返回原阅读位置'
+            : 'Could not return to the original position');
+    }
+  }
+
   void search(String text) {
     final sanitized = text.trim();
     if (sanitized.isEmpty) {
@@ -371,9 +454,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       return;
     }
     _clearSearchHighlights();
-    ref.read(tocSearchProvider.notifier).start(sanitized);
+    ref.read(tocSearchProvider.notifier).start(sanitized, originCfi: cfi);
+    final requestId = ref.read(tocSearchProvider).requestId;
     webViewController.evaluateJavascript(source: '''
-      search('$sanitized', {
+      search(${jsonEncode(sanitized)}, {
+        'requestId': $requestId,
         'scope': 'book',
         'matchCase': false,
         'matchDiacritics': false,
@@ -484,6 +569,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   void forwardHistory() {
     webViewController.evaluateJavascript(source: "forward()");
+  }
+
+  void closeHistory() {
+    setState(() {
+      showHistory = false;
+      canGoBack = false;
+      canGoForward = false;
+    });
+    // End this jump trail as well as hiding it. Ordinary reading/sync must not
+    // bring a dismissed return capsule back; a new deliberate jump still can.
+    webViewController.evaluateJavascript(source: 'clearNavigationHistory()');
   }
 
   void refreshToc() {
@@ -1069,15 +1165,25 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       handlerName: 'onSearch',
       callback: (args) {
         Map<String, dynamic> search = args[0];
-        setState(() {
-          final tocSearch = ref.read(tocSearchProvider.notifier);
-          if (search['process'] != null) {
-            final progress = search['process'].toDouble();
-            tocSearch.updateProgress(progress);
-          } else {
-            tocSearch.addResult(SearchResultModel.fromJson(search));
+        final state = ref.read(tocSearchProvider);
+        if (!state.isActive || search['requestId'] != state.requestId)
+          return null;
+        final tocSearch = ref.read(tocSearchProvider.notifier);
+        if (search['error'] == true) {
+          tocSearch.updateProgress(1);
+          AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
+              ? '书内搜索失败，请重试'
+              : 'Book search failed; please retry');
+        } else if (search['process'] != null) {
+          final progress = search['process'].toDouble();
+          tocSearch.updateProgress(progress);
+        } else {
+          tocSearch.addResult(SearchResultModel.fromJson(search));
+          final current = ref.read(tocSearchProvider);
+          if (current.activeCfi == null && current.matches.isNotEmpty) {
+            unawaited(navigateSearch(current.matches.first.cfi));
           }
-        });
+        }
       },
     );
     controller.addJavaScriptHandler(
@@ -1325,7 +1431,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     buttons.add(createHistoryButton(
       Icons.close,
       l10n.historyClose,
-      () => setState(() => showHistory = false),
+      closeHistory,
     ));
 
     if (canGoForward) {
@@ -1563,7 +1669,34 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           children: [
             buildWebviewWithIOSWorkaround(context, url, initialCfi),
             readingInfoWidget(),
-            if (showHistory) _buildHistoryCapsule(),
+            Consumer(builder: (context, ref, _) {
+              final state = ref.watch(tocSearchProvider);
+              if (!state.isActive)
+                return showHistory
+                    ? _buildHistoryCapsule()
+                    : const SizedBox.shrink();
+              return Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 38),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: PointerInterceptor(
+                              child: SearchNavigationBar(
+                            state: state,
+                            onSearch: () =>
+                                readingPageKey.currentState?.searchHandler(),
+                            onPrevious: () => moveSearch(-1),
+                            onNext: () => moveSearch(1),
+                            onReturn: () => unawaited(
+                                closeBookSearch(returnToOrigin: true)),
+                            onClose: () => unawaited(closeBookSearch()),
+                          )),
+                        ),
+                      )));
+            }),
             if (_animateOpening)
               SizedBox.expand(
                   child: IgnorePointer(
