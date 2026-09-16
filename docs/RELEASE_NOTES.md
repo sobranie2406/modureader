@@ -1,8 +1,10 @@
 # 默读 / Modu 1.0.9 正式版
 
-版本：**1.0.9+10027**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是 GPL-3.0-or-later 独立修改版本。
+版本：**1.0.9+10028**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是 GPL-3.0-or-later 独立修改版本。
 
 ## 本次更新
+
+- **镜像清单兼容修正**：兼容 Gitee 原始文件 CDN 的 HTTPS 跳转，仅允许官方仓库的固定清单路径；在 GitHub 不可访问时也能从 Gitee 完成检查。新增真实线上清单验证与越界跳转回归。本次按要求保留 1.0.9 版本号，构建号更新为 10028；更新同版本对应源码标签与全部平台包。已安装 1.0.9+10027 的用户需手动下载安装，因为旧更新器不识别同版本构建号变化。
 
 - **应用更新**：启动检查正式版；「设置 → 关于默读 → 版本检查与更新」支持检查、下载、取消及打开安装器。不会自动下载或静默安装。
 - **Gitee 优先**：优先读取镜像清单，核对 GitHub 防止镜像滞后。安装包优先镜像；不可用或校验失败时重新下载 GitHub 相同版本，取消不会触发回退。
@@ -28,7 +30,7 @@ Gitee 仅托管 Release 安装包、说明及更新清单，不上传应用源�
 | Linux | x64 / ARM64 | Debian 13 DEB，由系统包管理器安装，不保证其他发行版兼容 |
 | iOS | ARM64 | iOS 16+ IPA，须自行合法签署主应用及 Share Extension；应用内只能下载/导出 |
 
-九个平台包各附 SHA-256。旧版没有该更新功能，需手动安装本版后使用。升级前建议备份；书籍、笔记、进度和同步协议保持不变。模型下载源与应用更新镜像是独立设置。更新请求不携带书籍、密钥或服务凭据。
+九个平台包各附 SHA-256。1.0.8 及更早版本没有该更新功能，需手动安装本版。1.0.9+10027 不识别同版本构建号升级，需手动安装本次 10028 修正版。升级前建议备份；书籍、笔记、进度和同步协议保持不变。模型下载源与应用更新镜像是独立设置。更新请求不携带书籍、密钥或服务凭据。
 
 ## 验证范围
 
@@ -38,7 +40,9 @@ Gitee 仅托管 Release 安装包、说明及更新清单，不上传应用源�
 
 ## English
 
-Modu 1.0.9 (build 10027), an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny, adds launch-time update checks and About → App updates. Downloads prefer Gitee, fall back to the identical GitHub asset, verify size/SHA-256, and require installation consent. Android also verifies package identity, signing identity and version.
+This release adds narrowly scoped support for Gitee's raw-file CDN, verified against the public manifest with GitHub unavailable. This replaces build 10027 under version 1.0.9 with build 10028 and its matching source. Users of 1.0.9+10027 must manually reinstall: that updater does not detect build-only upgrades.
+
+Modu 1.0.9 (build 10028), an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny, adds launch-time update checks and About → App updates. Downloads prefer Gitee, fall back to the identical GitHub asset, verify size/SHA-256, and require installation consent. Android also verifies package identity, signing identity and version.
 
 Four embedding models are now downloaded on demand, not bundled. Choose Hugging Face (default) or Gitee under Embedding Models. Existing verified models are reused; E5 parts are streamed together and checked against the original digest. Models run locally after download.
 

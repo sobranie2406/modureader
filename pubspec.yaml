@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 1.0.9+10027
+version: 1.0.9+10028
 
 environment:
   sdk: '>=3.5.2 <4.0.0'

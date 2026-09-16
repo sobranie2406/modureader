@@ -181,6 +181,45 @@ void main() {
     expect(adapter.requests.first.uri.toString(), moduMirrorManifest);
   });
 
+  test('Gitee raw CDN serves the exact official manifest without GitHub', () async {
+    final adapter = Adapter((o) {
+      if (o.uri.host == 'gitee.com') {
+        return ResponseBody.fromString('', 302, headers: {
+          'location': [
+            'https://raw.giteeusercontent.com/sobranie2406/modureader/raw/master/updates/latest.json?signature=public-link'
+          ]
+        });
+      }
+      if (o.uri.host == 'raw.giteeusercontent.com') {
+        return ResponseBody.fromString(jsonEncode(mirrorJson()), 200);
+      }
+      return ResponseBody.fromString('unavailable', 503);
+    });
+    final r = await transport(adapter).latest('android', 'android_arm64');
+    expect(r.fromMirror, isTrue);
+    expect(r.asset!.digest, asset.digest);
+    expect(adapter.requests.map((r) => r.uri.host),
+        ['gitee.com', 'raw.giteeusercontent.com', 'api.github.com']);
+  });
+
+  test('raw CDN rejects other repositories, paths, ports and lookalikes', () async {
+    for (final url in [
+      'https://raw.giteeusercontent.com/other/modureader/raw/master/updates/latest.json',
+      'https://raw.giteeusercontent.com/sobranie2406/modureader/raw/master/evil.json',
+      'https://raw.giteeusercontent.com.evil.test/sobranie2406/modureader/raw/master/updates/latest.json',
+      'http://raw.giteeusercontent.com/sobranie2406/modureader/raw/master/updates/latest.json',
+      'https://raw.giteeusercontent.com:444/sobranie2406/modureader/raw/master/updates/latest.json',
+    ]) {
+      final adapter = Adapter((o) => o.uri.host == 'gitee.com'
+          ? ResponseBody.fromString('', 302, headers: {'location': [url]})
+          : ResponseBody.fromString(jsonEncode(releaseJson()), 200));
+      final r = await transport(adapter).latest('android', 'android_arm64');
+      expect(r.fromMirror, isFalse);
+      expect(adapter.requests.map((r) => r.uri.host),
+          ['gitee.com', 'api.github.com']);
+    }
+  });
+
   test('healthy mirror has priority when both release records agree', () async {
     final adapter = Adapter((o) => ResponseBody.fromString(
         jsonEncode(o.uri.host == 'gitee.com' ? mirrorJson() : releaseJson()),

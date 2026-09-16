@@ -147,6 +147,7 @@ class UpdateTransport {
         'objects.githubusercontent.com',
         'gitee.com',
         'foruda.gitee.com',
+        'raw.giteeusercontent.com',
       }.contains(uri.host);
 
   Future<ResponseBody> _get(String url, CancelToken cancel,
@@ -158,9 +159,13 @@ class UpdateTransport {
               !((uri.host == 'gitee.com' &&
                       uri.path.startsWith('/sobranie2406/modureader/')) ||
                   (uri.host == 'foruda.gitee.com' &&
-                      uri.path.startsWith('/attach_file/')))) ||
+                      uri.path.startsWith('/attach_file/')) ||
+                  (uri.host == 'raw.giteeusercontent.com' &&
+                      uri.path == Uri.parse(moduMirrorManifest).path))) ||
           (!mirror &&
-              (uri.host == 'gitee.com' || uri.host == 'foruda.gitee.com'))) {
+              (uri.host == 'gitee.com' ||
+                  uri.host == 'foruda.gitee.com' ||
+                  uri.host == 'raw.giteeusercontent.com'))) {
         throw const FormatException('Untrusted update URL');
       }
       final response = await dio.get<ResponseBody>(uri.toString(),

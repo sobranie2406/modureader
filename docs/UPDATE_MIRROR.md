@@ -4,7 +4,7 @@
 
 `https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json`
 
-这是待部署的协议地址，不代表镜像已上线。未部署、需要登录、请求失败、清单无效时，客户端回退到 GitHub。不要在 README 宣称镜像可下载，直到实际验证通过。
+镜像仓库仅存放说明、更新清单和发行附件，不导入应用源码。1.0.9 的九个平台附件和校验文件已匿名下载核对，与 GitHub 摘要一致。正式更新清单已上线；1.0.9+10028 起兼容 Gitee 原始文件 CDN 跳转，1.0.9+10027 仍可通过 GitHub 元数据检查并优先下载 Gitee 附件。
 
 ## 发布顺序
 
@@ -22,8 +22,10 @@
 - 镜像版本滞后时使用较新的 GitHub 版本；相同版本大小或摘要不一致时以 GitHub 信息为准。当前安装版本不会被降级。
 - 下载首先使用镜像；请求失败、大小或摘要不符则清除部分文件，从头下载同版本 GitHub 资产。镜像和备用源使用同一 SHA-256，备用源再次校验失败即终止。
 - 用户取消或磁盘写入失败不会开始备用下载。已有完整文件重新校验通过才复用，安装前再次校验。
-- 仅允许 HTTPS；Gitee 跳转限制在 `gitee.com/sobranie2406/modureader/` 和已核实的 `foruda.gitee.com/attach_file/`，GitHub 跳转限制在代码列出的官方资源域名。若 Gitee 改用新的附件 CDN，须先核对实际官方域名并补充测试，不能改成允许任意跳转。
+- 仅允许 HTTPS；Gitee 跳转限制在 `gitee.com/sobranie2406/modureader/`、已核实的附件 CDN `foruda.gitee.com/attach_file/`，以及 `raw.giteeusercontent.com` 上与清单完全相同的 `/sobranie2406/modureader/raw/master/updates/latest.json` 路径。拒绝其他账号、文件路径、端口和相似域名。GitHub 跳转限制在代码列出的官方资源域名。不能改成允许任意跳转。
 - 镜像清单通过固定官方账号地址及 HTTPS 建立信任，SHA-256 用于完整性校验，不等于数字签名。需保护两个发布账号；不能把不受信任的第三方镜像当作官方更新源。
 - Gitee 单文件容量、总附件容量或审核限制若无法承载现有完整安装包，应报告限制并确认方案；不要用分卷或 HTML 下载页冒充可安装文件。
 
 客户端无需 Gitee 登录，不读取浏览器登录状态，不携带书库配置或 API Key。商店分发、Android 系统安装确认和 iOS 自签名限制保持不变。
+
+发布后可运行 `flutter test test/service/update/app_update_mirror_live_test.dart --dart-define=MODU_VERIFY_UPDATE_MIRROR=true`，验证真实清单跳转，并模拟 GitHub 不可用。该检查仅取公开元数据，不下载或安装应用，不替代九个平台包的独立 SHA-256 验证。
