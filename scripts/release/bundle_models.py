@@ -1,4 +1,4 @@
-"""Fetch pinned models, stage offline assets and verify release payloads."""
+"""Fetch native-test fixtures; production packages carry ONLY the manifest."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -54,8 +54,10 @@ def verify_directory(assets):
         raise ValueError('Missing or mismatched bundled model manifest')
     for model in expected['models']:
         for item in model['files']:
-            if not valid(packaged_manifest.parent / model['id'] / item['name'], item):
-                raise ValueError(f'Missing or corrupt bundled model: {model["id"]}/{item["name"]}')
+            if (packaged_manifest.parent / model['id'] / item['name']).exists():
+                raise ValueError(f'Unexpected bundled model in on-demand package: {model["id"]}/{item["name"]}')
+    if any(packaged_manifest.parent.rglob('*.onnx')):
+        raise ValueError('Unexpected ONNX weights in production assets')
 
 
 def verify_archive(archive, prefix):
@@ -66,14 +68,10 @@ def verify_archive(archive, prefix):
     for model in expected['models']:
         for item in model['files']:
             name = base + model['id'] + '/' + item['name']
-            try:
-                info = archive.getinfo(name)
-                with archive.open(name) as source:
-                    digest = hashlib.file_digest(source, 'sha256').hexdigest()
-            except KeyError as error:
-                raise ValueError(f'Missing bundled model: {name}') from error
-            if info.file_size != item['size'] or digest != item['sha256']:
-                raise ValueError(f'Corrupt bundled model: {name}')
+            if name in archive.namelist():
+                raise ValueError(f'Unexpected bundled model in on-demand package: {name}')
+    if any(n.startswith(base) and n.endswith('.onnx') for n in archive.namelist()):
+        raise ValueError('Unexpected ONNX weights in production archive')
 
 
 def install_assets(source, destination=ASSETS):

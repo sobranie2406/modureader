@@ -134,7 +134,15 @@ Future<void> openAboutDialog() async {
                 ),
                 if (EnvVar.enableCheckUpdate)
                   ListTile(
-                      title: Text(L10n.of(context).aboutCheckForUpdates),
+                      leading: const Icon(Icons.system_update_outlined),
+                      title: Text(
+                          Localizations.localeOf(context).languageCode == 'zh'
+                              ? '版本检查与更新'
+                              : 'App updates'),
+                      subtitle: Text(
+                          Localizations.localeOf(context).languageCode == 'zh'
+                              ? '检查版本 · 下载 · 安装'
+                              : 'Check version · Download · Install'),
                       onTap: () => checkUpdate(true)),
                 ListTile(
                   title: const Text('开源项目与来源'),

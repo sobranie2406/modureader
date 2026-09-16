@@ -2,7 +2,15 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
-/// Pinned integrity metadata shared by bundled assets and repair downloads.
+enum EmbeddingDownloadSource { huggingFace, gitee }
+
+/// Mirror assets are immutable per pinned upstream revision. Large files use
+/// 64 MiB parts; the assembled file MUST match the original SHA-256.
+const embeddingMirrorBase =
+    'https://gitee.com/sobranie2406/modu-models/releases/download/models-v1';
+const embeddingMirrorPartSize = 64 * 1024 * 1024;
+
+/// Pinned integrity metadata for on-demand model downloads.
 class EmbeddingModelManifest {
   EmbeddingModelManifest({AssetBundle? bundle})
       : _bundle = bundle ?? rootBundle;
@@ -46,6 +54,7 @@ class EmbeddingModelManifest {
         sha256: hash,
         uri: Uri.parse(
             'https://huggingface.co/$repository/resolve/$revision/$remotePath'),
+        mirrorName: '$id-$revision-$name',
       );
     }).toList(growable: false);
     if (files.length != 2 ||
@@ -61,9 +70,32 @@ class EmbeddingModelFile {
       {required this.name,
       required this.size,
       required this.sha256,
-      required this.uri});
+      required this.uri,
+      this.mirrorName});
   final String name;
   final int size;
   final String sha256;
   final Uri uri;
+  final String? mirrorName;
+
+  List<({Uri uri, int size})> downloads(EmbeddingDownloadSource source) {
+    if (source == EmbeddingDownloadSource.huggingFace) {
+      return [(uri: uri, size: size)];
+    }
+    final name = mirrorName;
+    if (name == null || !RegExp(r'^[\w.-]+$').hasMatch(name)) {
+      throw const FormatException('模型镜像元数据不完整');
+    }
+    final count = (size / embeddingMirrorPartSize).ceil();
+    return [
+      for (var i = 0; i < count; i++)
+        (
+          uri: Uri.parse(
+              '$embeddingMirrorBase/$name${count == 1 ? '' : '.part-${(i + 1).toString().padLeft(2, '0')}'}'),
+          size: i == count - 1
+              ? size - i * embeddingMirrorPartSize
+              : embeddingMirrorPartSize
+        ),
+    ];
+  }
 }

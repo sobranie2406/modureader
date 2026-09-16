@@ -42,6 +42,7 @@ void main() {
   late int networkCalls;
 
   LocalEmbeddingModelStore makeStore() => LocalEmbeddingModelStore(
+        useBundledAssets: true, // Explicit legacy fixture mode, not production.
         rootDirectory: root,
         bundledAssets: BundledEmbeddingAssets(bundle: bundle),
         manifest: EmbeddingModelManifest(bundle: bundle),

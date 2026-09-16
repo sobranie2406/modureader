@@ -1,62 +1,47 @@
-# 默读 / Modu 1.0.8 正式版
+# 默读 / Modu 1.0.9 正式版
 
-版本：**1.0.8+10026**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是 GPL-3.0-or-later 独立修改版本。
+版本：**1.0.9+10027**。来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，保留原作者版权与许可，是 GPL-3.0-or-later 独立修改版本。
 
 ## 本次更新
 
-- **注释字号**：弹出注释框文字调整为正文字号的 80%，继续保留屏幕 25% 面积上限、底部留白和长注释滚动。
-- **WebDAV 同步**：同步记录目录及分片目录忽略明确的系统辅助文件 `.DS_Store`、`Thumbs.db`、`desktop.ini`，避免浏览服务器目录后出现“同步数据格式或完整性校验失败”。只忽略这些确切名称的普通文件；未知文件、异常目录及真实同步数据的格式、哈希和完整性校验仍保留。无需清空 WebDAV，也无需删除同步数据库。
-- **翻译结果**：过滤 AI 返回的 `<think>` 思考内容，避免写入书籍译文。处理大小写、分段输出及不完整标签，未结束的思考内容不会展示为译文。
-- **翻译控制**：提供明确的停止翻译入口，停止后取消请求并丢弃迟到结果；关闭书籍或重开应用不会自动恢复上次翻译任务。翻译优先处理当前可见段落，避免启动时同时提交大量整章内容。
-- **书内搜索**：输入关键词后只列出结果，不自动跳到第一处，也不改动原阅读位置。点击结果或上一处/下一处才跳转，保留返回原处、匹配计数及关闭按钮。
-- **替换书籍后的远程文件**：对新版记录到的明确文件替换，在同步完成、核对两端引用及文件内容后，将不再被引用的旧文件从 `modu/data/file/` 移出。先保存并验证 `modu/replaced-files-v1/` 下的恢复副本，再删除原路径；失败则延后处理，不影响已完成的数据同步。不会按文件名猜测或批量清除无法确认来源的历史文件。**恢复副本仍占用云端空间，本次不是永久清理功能。**
-- **特殊文件名**：修正 WebDAV 删除请求中中文、`#`、`%` 等文件名的路径编码。
-- 继续内嵌四个离线 ONNX 模型及分词器，自动向量化默认关闭。
+- **应用更新**：启动检查正式版；「设置 → 关于默读 → 版本检查与更新」支持检查、下载、取消及打开安装器。不会自动下载或静默安装。
+- **Gitee 优先**：优先读取镜像清单，核对 GitHub 防止镜像滞后。安装包优先镜像；不可用或校验失败时重新下载 GitHub 相同版本，取消不会触发回退。
+- **更新安全**：按平台和进程架构选包，校验大小与 SHA-256，安装前再次校验。Android 另验包名、签名和版本，使用系统安装器，不删除书库。
+- **按需向量模型**：安装包不再内嵌四模型权重及分词器。「设置 → 向量模型 → 模型下载源」可选 Hugging Face（默认）或 Gitee。只主动下载所需模型，大小/SHA-256 验证通过后离线使用；旧版已准备的完整模型继续复用。保存来源选择，不静默切换。
+- **公开模型镜像**：MiniLM、BGE EN、BGE ZH、E5 固定版本及原许可证见 [Gitee 模型镜像](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1)。E5 分片自动顺序合并并校验完整文件。默认中文 BGE、自动向量化关闭保持不变。
 
-## 升级与同步注意事项
+## 下载与对应源码
 
-建议先备份并覆盖安装。Android 沿用原项目专用签名；参与同步的设备建议全部升级，旧客户端仍可能被系统辅助文件阻断。本次不更改已有书籍、笔记和阅读位置的同步格式。
+[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.0.9) · [Gitee 安装包镜像](https://gitee.com/sobranie2406/modureader/releases/tag/v1.0.9)
 
-各端使用相同的 modu 上级目录，不重复拼接 /modu。**不要删除 modu/record-log-v1/ 或旧数据库**。旧于 1.0.5 的客户端不能识别无可靠 ETag 的兼容记录通道，升级期间请暂停旧版自动同步。[记录同步说明](https://github.com/sobranie2406/modureader/blob/v1.0.8/docs/WEBDAV_RECORD_SYNC.md)。
+Gitee 仅托管 Release 安装包、说明及更新清单，不上传应用源码。两站分发同一次构建的原始文件，不二次打包；请用各包的 SHA-256 文件校验。镜像逐包下载验证后才发布更新清单，清单尚未就绪时客户端回退 GitHub。
 
-API Key 和远程书库凭据仍按默认关闭的独立加密开关同步，不代表整个书库已加密。字体和本地向量索引不参与同步。
+**对应版本完整源码（免费获取）**：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.0.9)、[源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.0.9.zip)、[构建说明](https://github.com/sobranie2406/modureader/blob/v1.0.9/docs/RELEASING.md)。源码包含依赖锁定与构建脚本。包内保留许可证及版权声明：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.9/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.9/NOTICE)、[UPSTREAM](https://github.com/sobranie2406/modureader/blob/v1.0.9/UPSTREAM.md)。
 
-## 安装包
+## 安装包与限制
 
 | 平台 | 架构 | 格式与限制 |
 | --- | --- | --- |
-| Android | ARM64 / x86_64 | APK，原专用签名，Android 8+ |
-| macOS | ARM64 / Intel x64 | DMG，ad-hoc 签名，未经 Apple Developer ID 公证 |
-| Windows | x64 / ARM64 | EXE，附带 VC++ CRT，需要 WebView2 Runtime，无商业代码签名 |
-| Linux | x64 / ARM64 | Debian 13 (trixie) DEB，不保证其他发行版兼容 |
-| iOS | ARM64 真机 | iOS 16+ IPA，须自行合法签署主应用及 Share Extension，不能直接安装 |
+| Android | ARM64 / x86_64 | APK，原专用签名，Android 8+；系统确认后安装 |
+| macOS | ARM64 / Intel x64 | DMG，ad-hoc 签名，未公证；退出旧应用后拖入 Applications 替换 |
+| Windows | x64 / ARM64 | EXE，附 VC++ CRT，需 WebView2 Runtime，无商业签名 |
+| Linux | x64 / ARM64 | Debian 13 DEB，由系统包管理器安装，不保证其他发行版兼容 |
+| iOS | ARM64 | iOS 16+ IPA，须自行合法签署主应用及 Share Extension；应用内只能下载/导出 |
 
-全平台发布包含 **9 个程序包及各自 SHA-256**。许可保留在包内和源码中，不另附 notices ZIP。不包含应用商店或 TestFlight 发布。
+九个平台包各附 SHA-256。旧版没有该更新功能，需手动安装本版后使用。升级前建议备份；书籍、笔记、进度和同步协议保持不变。模型下载源与应用更新镜像是独立设置。更新请求不携带书籍、密钥或服务凭据。
 
-## 验证范围与限制
+## 验证范围
 
-- 本地 Flutter **717 项通过、5 项跳过**，阅读器 JavaScript **163 项通过**。
-- 同步测试覆盖两类写入能力、根目录及分片中的系统辅助文件，并确认未知文件、同名目录和损坏的真实记录仍被拒绝。
-- 回归测试覆盖翻译停止/重启/迟到结果隔离、搜索结果不自动跳转、替换文件引用检查、恢复副本校验及失败重试。
-- 发布由全平台构建、安装包架构/校验和检查和 CI 回归共同把关，全部通过后才创建正式发布。执行记录见 [Actions](https://github.com/sobranie2406/modureader/actions)。
-- 本次回归不等于各平台的全部实机验收，也不代表已验证长期多端并发。恢复副本用于降低不参与新版协议的旧客户端并发写入风险；清理与云端更新不是一个跨文件原子事务。
-- 在线 AI、翻译和 TTS 取决于服务商；Linux 无系统 TTS 后端，需选择在线语音。连续滚动仍限横排流式书籍；固定版式、竖排及开启书籍脚本的内容沿用对应阅读路径。
+全平台构建、架构/完整安装包集合/SHA-256 及 CI 回归全部通过后才创建正式发布。四模型匿名下载与完整 SHA-256（含 E5 合并）已实测；更新测试覆盖镜像优先、回退、取消、损坏拒绝和附件 CDN。
 
-来源与许可：[LICENSE](https://github.com/sobranie2406/modureader/blob/v1.0.8/LICENSE)、[NOTICE](https://github.com/sobranie2406/modureader/blob/v1.0.8/NOTICE)、[UPSTREAM](https://github.com/sobranie2406/modureader/blob/v1.0.8/UPSTREAM.md)、[对应源码](https://github.com/sobranie2406/modureader/tree/v1.0.8)。
+这不等于全部设备的实机验收。桌面端安装仍须用户按系统提示完成，iOS 仍需自行签名。[构建记录](https://github.com/sobranie2406/modureader/actions)。
 
-## English release notes
+## English
 
-**Modu 1.0.8 (build 10026)** is an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny.
+Modu 1.0.9 (build 10027), an independent GPL-3.0-or-later derivative of Anx Reader and ReadAny, adds launch-time update checks and About → App updates. Downloads prefer Gitee, fall back to the identical GitHub asset, verify size/SHA-256, and require installation consent. Android also verifies package identity, signing identity and version.
 
-- Display footnotes at 80% of the reader font size, retaining the 25%-of-screen area cap, end padding and scrolling for longer notes.
-- Ignore exact known system sidecar files (`.DS_Store`, `Thumbs.db`, `desktop.ini`) in the WebDAV record log and its shards. Unknown files, directories and corrupt records still fail validation. Do not clear your remote library or delete synchronization databases.
-- Remove AI `<think>` output from translations, including partial streamed reasoning. Add explicit stop controls, cancel requests and reject late results. Reopening a book or the app does not restart translation. Translate visible paragraphs serially instead of eagerly submitting whole chapters.
-- Show search results without automatically navigating to the first match. Navigate only when a result or previous/next match is selected; retain return-to-origin controls and match counts.
-- Track explicit book-file replacements made by this version. After successful synchronization and reference/content checks, preserve a verified recovery copy outside `data/file` before removing the obsolete path. Unknown historical files remain untouched. Recovery copies still consume cloud space; this is not permanent garbage collection.
-- Encode special characters correctly in WebDAV deletion paths. Keep all four offline embedding models bundled.
+Four embedding models are now downloaded on demand, not bundled. Choose Hugging Face (default) or Gitee under Embedding Models. Existing verified models are reused; E5 parts are streamed together and checked against the original digest. Models run locally after download.
 
-Nine native packages with SHA-256: Android ARM64/x86_64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB and iOS ARM64 IPA. Android retains its signing identity. macOS is unnotarized, Windows has no commercial signature, and iOS requires your own valid signing. Licenses remain inside packages.
+Gitee hosts binaries, documentation and update metadata only. Free corresponding source, dependency metadata and build scripts: [v1.0.9 source](https://github.com/sobranie2406/modureader/tree/v1.0.9), [source ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.0.9.zip). Licenses and original attribution remain included. Both sites distribute identical binaries/checksums; mirror metadata is published after download verification.
 
-Back up before upgrading and update all syncing devices. Clients older than 1.0.5 cannot read the compatible record log. Do not delete remote history or legacy databases. Optional encrypted credential sync does not encrypt the whole library.
-
-Local checks: 717 Flutter tests passed, 5 skipped; 163 reader JavaScript tests passed. CI gates publication on builds, regression tests and package verification. These checks do not replace physical-device or prolonged multi-device concurrency testing. Recovery copies mitigate legacy-client races; cleanup and remote updates are not a single cross-file atomic transaction.
+Nine native packages: Android ARM64/x64 APK, macOS ARM64/x64 DMG, Windows ARM64/x64 EXE, Debian 13 ARM64/x64 DEB, iOS ARM64 IPA. Android retains its signing identity. macOS is unnotarized, Windows lacks commercial signing, and iOS requires your own valid signing. Desktop installation is user-assisted. Install this version manually to obtain the updater. CI/package checks do not replace full physical-device testing.

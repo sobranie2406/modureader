@@ -92,7 +92,8 @@ class LocalEmbeddingModelStore {
     http.Client? client,
     EmbeddingModelManifest? manifest,
     BundledEmbeddingAssets? bundledAssets,
-    this.useBundledAssets = true,
+    this.useBundledAssets = false,
+    this.downloadSource = EmbeddingDownloadSource.huggingFace,
     this.downloadTimeout = const Duration(seconds: 60),
   })  : _rootDirectory = rootDirectory,
         _client = client ?? http.Client(),
@@ -104,6 +105,7 @@ class LocalEmbeddingModelStore {
   final EmbeddingModelManifest _manifest;
   final BundledEmbeddingAssets _bundledAssets;
   final bool useBundledAssets;
+  EmbeddingDownloadSource downloadSource;
   final Duration downloadTimeout;
   bool _closed = false;
   static final Map<String, Future<void>> _downloads = {};
@@ -192,7 +194,8 @@ class LocalEmbeddingModelStore {
       onProgress?.call(1);
       return;
     }
-    final operation = _download(model, onProgress: onProgress);
+    final operation =
+        _download(model, source: downloadSource, onProgress: onProgress);
     _downloads[key] = operation;
     try {
       await operation;
@@ -203,6 +206,7 @@ class LocalEmbeddingModelStore {
 
   Future<void> _download(
     LocalEmbeddingModel model, {
+    required EmbeddingDownloadSource source,
     ModelDownloadProgress? onProgress,
   }) async {
     final directory = await modelDirectory(model);
@@ -231,7 +235,8 @@ class LocalEmbeddingModelStore {
             await temporary.rename(destination.path);
             report(1);
           } else {
-            await _downloadFile(item, destination, onProgress: report);
+            await _downloadFile(item, destination,
+                source: source, onProgress: report);
           }
         }
         completed += item.size;
@@ -250,37 +255,35 @@ class LocalEmbeddingModelStore {
   Future<void> _downloadFile(
     EmbeddingModelFile item,
     File destination, {
+    required EmbeddingDownloadSource source,
     required ModelDownloadProgress onProgress,
   }) async {
     final temporary = File('${destination.path}.part');
     await _deleteIfExists(temporary);
     if (_closed) throw StateError('Model downloader is closed');
-    final response = await _client
-        .send(http.Request('GET', item.uri))
-        .timeout(downloadTimeout);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      await response.stream.listen(null).cancel();
-      throw HttpException(
-        '模型下载失败 (${response.statusCode})',
-        uri: item.uri,
-      );
-    }
-
     final sink = temporary.openWrite();
     var received = 0;
     try {
       // addStream applies file-sink backpressure instead of buffering a whole
       // model in RAM (important on mobile devices).
-      await sink
-          .addStream(response.stream.timeout(downloadTimeout).map((bytes) {
-        if (_closed) throw StateError('Model downloader is closed');
-        received += bytes.length;
-        if (received > item.size) {
-          throw const FormatException('模型下载大小超出预期');
+      for (final part in item.downloads(source)) {
+        final response = await _get(part.uri, source);
+        var partReceived = 0;
+        await sink
+            .addStream(response.stream.timeout(downloadTimeout).map((bytes) {
+          if (_closed) throw StateError('Model downloader is closed');
+          received += bytes.length;
+          partReceived += bytes.length;
+          if (received > item.size || partReceived > part.size) {
+            throw const FormatException('模型下载大小超出预期');
+          }
+          onProgress((received / item.size).clamp(0, 1));
+          return bytes;
+        }));
+        if (partReceived != part.size) {
+          throw const FormatException('模型文件或分片不完整，请重试');
         }
-        onProgress((received / item.size).clamp(0, 1));
-        return bytes;
-      }));
+      }
       await sink.flush();
     } catch (_) {
       // addStream may already close the sink on a network/size error. Do not
@@ -299,6 +302,49 @@ class LocalEmbeddingModelStore {
     await _deleteIfExists(destination);
     await temporary.rename(destination.path);
     onProgress(1);
+  }
+
+  Future<http.StreamedResponse> _get(
+      Uri uri, EmbeddingDownloadSource source) async {
+    for (var hop = 0; hop <= 5; hop++) {
+      if (_closed) throw StateError('Model downloader is closed');
+      final host = uri.host;
+      final allowed = source == EmbeddingDownloadSource.gitee
+          ? (host == 'gitee.com' &&
+                  uri.path.startsWith('/sobranie2406/modu-models/')) ||
+              // Observed public Release attachment redirect. Never send app
+              // credentials here; the complete file still requires pinned SHA.
+              (host == 'foruda.gitee.com' &&
+                  uri.path.startsWith('/attach_file/'))
+          : host == 'huggingface.co' ||
+              host.endsWith('.huggingface.co') ||
+              host == 'hf.co' ||
+              host.endsWith('.hf.co') ||
+              host.endsWith('.xethub.hf.co');
+      if (uri.scheme != 'https' ||
+          uri.userInfo.isNotEmpty ||
+          uri.port != 443 ||
+          !allowed) {
+        throw const FormatException('不可信的模型下载地址');
+      }
+      final response = await _client
+          .send(http.Request('GET', uri)..followRedirects = false)
+          .timeout(downloadTimeout);
+      if (response.statusCode == 200) return response;
+      await response.stream.listen(null).cancel();
+      final location = response.headers['location'];
+      if ([301, 302, 303, 307, 308].contains(response.statusCode) &&
+          location != null) {
+        uri = uri.resolve(location);
+        continue;
+      }
+      throw HttpException(
+          source == EmbeddingDownloadSource.gitee
+              ? 'Gitee 模型镜像暂不可用 (${response.statusCode})，请重试或切换 Hugging Face'
+              : '模型下载失败 (${response.statusCode})',
+          uri: uri);
+    }
+    throw const FormatException('模型下载重定向次数过多');
   }
 
   Future<void> _deleteIfExists(File file) async {

@@ -11,7 +11,7 @@ class EnvVar {
 
   static bool get isStoreBuild => isAppStore || isPlayStore;
 
-  static bool get enableCheckUpdate => false;
+  static bool get enableCheckUpdate => true;
 
   static bool get showBeian => false;
   static bool get enableOpenAiConfig => true;

@@ -20,7 +20,9 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 ## Downloads
 
-[GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Build status](https://github.com/sobranie2406/modureader/actions) · [Report an issue](https://github.com/sobranie2406/modureader/issues)
+[GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee package mirror](https://gitee.com/sobranie2406/modureader/releases) · [Build status](https://github.com/sobranie2406/modureader/actions) · [Report an issue](https://github.com/sobranie2406/modureader/issues)
+
+Modu checks for updates at launch. Settings → About Modu → App updates supports checking, downloading, cancelling and opening installers. Updates prefer Gitee and fall back to GitHub; identical packages are verified by size and SHA-256 before installation. Installation requires your action. Gitee hosts release packages, documentation and update metadata only; each release links to its corresponding GitHub source.
 
 | Platform | Published architectures | Package and limitations |
 | --- | --- | --- |
@@ -43,7 +45,7 @@ The current version provides the following reading, AI and library features.
 | --- | --- | --- |
 | Library and import | Import EPUB, PDF, MOBI, AZW3, FB2 and TXT; filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
 | Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Remote library settings |
-| Reading and layout | Chapter navigation, adjacent chapter preloading and paginated/scrolling modes; continuous chapter scrolling for horizontal reflowable books with book scripts disabled; adaptive footnotes at 70% of the reader font size with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
+| Reading and layout | Chapter navigation, adjacent chapter preloading and paginated/scrolling modes; continuous chapter scrolling for horizontal reflowable books with book scripts disabled; adaptive footnotes at 80% of the reader font size with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
 | In-book search | Floating search dialog, selection-style text highlights, previous/next match and current/total counter; return to the original position or close search at the current position | Reader toolbar, between Translation and Bookmarks |
 | Highlights and notes | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV | Text selection menu; Home → Notes |
 | Mobile quick mark | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page | Pen button in the mobile reader; persistent Exit button restores normal gestures |
@@ -122,7 +124,7 @@ Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a backgro
 | BGE Small ZH v1.5 | Chinese | 512 |
 | Multilingual E5 Small | Multilingual | 384 |
 
-All four models and tokenizers are **bundled in installers**. The selected model is prepared offline on first use and verified by size and SHA-256; no download or API key is needed. Valid files from earlier versions are reused. If packaged assets are missing, a manual repair download from Hugging Face remains available; indexing never silently downloads models. Chinese BGE is selected by default and automatic indexing is off. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
+All four models and tokenizers are **downloaded on demand, not bundled in installers**. In Settings → Embedding Models → Model download source, choose [Gitee mirror](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1) or Hugging Face (default), then select Download and use. If the mirror is unavailable, switch to Hugging Face manually; the app never switches sources silently. Downloads are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused; startup and indexing never download missing models automatically. Chinese BGE is selected by default and automatic indexing is off. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
 
 Local embeddings only mean that embedding computation happens on your device. Remote chat, embedding, translation or speech services still receive the relevant text. The whole AI workflow should not be described as completely offline.
 
@@ -193,7 +195,7 @@ The screenshots show reading and AI controls. [Download the original demo EPUB](
 1. Download the package for your system and architecture from [Releases](https://github.com/sobranie2406/modureader/releases). Read the installation limitations first.
 2. Add an ebook to the library and open it. No API key is required if you do not use AI.
 3. To use AI, configure a model in Settings → AI Settings and test the connection.
-4. For semantic search, select a bundled local model in Settings → Embedding Models (Chinese BGE is the default), then index a downloaded book from its menu. You can also configure a remote embedding endpoint.
+4. For semantic search, download a local model in Settings → Embedding Models (Chinese BGE is the default), then index a downloaded book from its menu. You can also configure a remote embedding endpoint.
 5. Choose translation, read-aloud and sync services as needed. See the [Settings guide (Chinese)](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
 
 ## Feedback

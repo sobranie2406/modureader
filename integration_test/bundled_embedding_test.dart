@@ -44,25 +44,21 @@ void main() {
     final root =
         await Directory.systemTemp.createTemp('modu-offline-inference-');
     const fixtureUrl = String.fromEnvironment('MODU_MODEL_TEST_URL');
-    final bundled = fixtureUrl.isEmpty;
-    final client = FixtureDownloadClient(
-        Uri.parse(bundled ? 'http://127.0.0.1:1/' : fixtureUrl));
-    client.downloadsAllowed = !bundled;
+    if (fixtureUrl.isEmpty) {
+      throw StateError(
+          'Serve model fixtures and set MODU_MODEL_TEST_URL; production has no bundled weights');
+    }
+    final client = FixtureDownloadClient(Uri.parse(fixtureUrl));
     final store = LocalEmbeddingModelStore(
       rootDirectory: root,
       client: client,
-      useBundledAssets: bundled,
+      useBundledAssets: false,
     );
     try {
       for (final model in LocalEmbeddingModels.all) {
         expect(await store.isDownloaded(model), isFalse);
-        client.downloadsAllowed = !bundled;
-        if (bundled) {
-          expect(await store.isBundled(model), isTrue);
-          await store.ensureAvailable(model);
-        } else {
-          await store.download(model);
-        }
+        client.downloadsAllowed = true;
+        await store.download(model);
         client.downloadsAllowed = false;
         expect(await store.isDownloaded(model), isTrue);
         final vectors =
@@ -103,9 +99,8 @@ void main() {
               model.dimensions);
         }
       }
-      expect(client.requests, bundled ? 0 : 8,
-          reason:
-              'Bundled models never use network; inference always stays offline');
+      expect(client.requests, 8,
+          reason: 'Models download once; inference always stays offline');
     } finally {
       await LocalOnnxEmbeddingEngine.instance.release();
       store.close();

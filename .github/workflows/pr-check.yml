@@ -75,6 +75,11 @@ jobs:
       - name: Release architecture validation tests
         run: python3 -m unittest discover -s test -p 'release_package_test.py' -v
 
+      - name: Update manifest and model mirror validation
+        run: |
+          python3 -m unittest discover -s test -p 'update_manifest_test.py' -v
+          python3 -m unittest discover -s test -p 'model_mirror_test.py' -v
+
       - name: Project documentation and identity checks
         run: python3 -m unittest discover -s test -p 'project_identity_test.py' -v
 

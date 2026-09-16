@@ -21,7 +21,9 @@ This is an independently modified derivative, not an official release of either 
 
 ## 下载
 
-[GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [构建状态](https://github.com/sobranie2406/modureader/actions) · [问题反馈](https://github.com/sobranie2406/modureader/issues)
+[GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee 安装包镜像](https://gitee.com/sobranie2406/modureader/releases) · [构建状态](https://github.com/sobranie2406/modureader/actions) · [问题反馈](https://github.com/sobranie2406/modureader/issues)
+
+应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」检查、下载、取消并打开安装器。应用更新优先 Gitee，失败后回退 GitHub；两站使用相同安装包及 SHA-256，安装前再次校验，不静默安装。Gitee 仅托管安装包、说明与更新清单，同版本完整源码链接保留在各 Release。
 
 | 平台 | 已发布架构 | 分发形式与限制 |
 | --- | --- | --- |
@@ -45,7 +47,7 @@ This is an independently modified derivative, not an official release of either 
 | --- | --- | --- |
 | 书架与导入 | 导入 EPUB、PDF、MOBI、AZW3、FB2、TXT；按阅读状态筛选、搜索、分组及管理标签 | 首页「书架」，添加按钮或书籍菜单 |
 | 远程书库 | 独立连接 WebDAV，浏览文件夹；按名称、添加/修改时间、大小升降序排列，搜索及格式筛选，下载导入书架 | 首页「远程书库」；设置 → 远程书库设置 |
-| 阅读与排版 | 目录跳转、相邻章节预加载、分页/滚动；关闭书籍脚本时横排流式书籍支持跨章连续滚动；注释字号为正文的 70%，自适应大小并保留末尾留白；TXT 按规则转为 EPUB | 阅读页面；设置 → 阅读 |
+| 阅读与排版 | 目录跳转、相邻章节预加载、分页/滚动；关闭书籍脚本时横排流式书籍支持跨章连续滚动；注释字号为正文的 80%，自适应大小并保留末尾留白；TXT 按规则转为 EPUB | 阅读页面；设置 → 阅读 |
 | 书内搜索 | 浮动搜索框、正文选中式高亮、上一处/下一处、当前匹配数/总数；返回搜索前位置或关闭搜索留在当前位置 | 阅读工具栏，翻译与书签之间 |
 | 标注与笔记 | 选文标注、记录想法、按章节整理；复制或导出 Markdown、TXT、CSV | 选中文本菜单；首页「笔记」 |
 | 移动端快速标记 | 开启后直接用手指划选正文，松手自动高亮；支持跨行、反向和同页跨段选取 | 手机阅读页画笔按钮；常驻退出按钮恢复普通手势 |
@@ -122,7 +124,7 @@ AI 对话中的快捷技能默认收起，可点输入栏旁的技能按钮展�
 | BGE Small ZH v1.5 | 中文 | 512 |
 | Multilingual E5 Small | 多语言 | 384 |
 
-以上四个模型及分词器**内嵌在安装包中**，首次使用时离线准备所选模型，并校验文件大小与 SHA-256，无需下载或 API Key。旧版完整模型可继续复用；安装资源缺失时仍可手动从 Hugging Face 下载修复，不会自动联网。默认选择中文 BGE，自动向量化默认关闭。也可选择远程嵌入 API。切换模型后应对旧书重新向量化；聊天和向量模型是两套配置。
+以上四个模型及分词器**按需下载，不再内嵌在安装包中**。在「设置 → 向量模型 → 模型下载源」选择 [Gitee 镜像](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1)或 Hugging Face（默认），再点击所需模型的「下载并使用」。镜像不可用时可手动选择 Hugging Face，不会静默更换来源。下载校验大小与 SHA-256，完成后可离线推理，无需 API Key。旧版已准备的完整模型继续复用，启动和索引不会自动下载缺少的模型。默认选择中文 BGE，自动向量化默认关闭。也可选择远程嵌入 API。切换模型后应对旧书重新向量化；聊天和向量模型是两套配置。
 
 本地嵌入只表示向量计算在本机完成：若使用远程聊天、远程嵌入、翻译或语音接口，相关文本仍会发送给所选服务，不应将整个 AI 工作流宣传为完全离线。
 
@@ -193,7 +195,7 @@ AI 对话中的快捷技能默认收起，可点输入栏旁的技能按钮展�
 1. 从 [Releases](https://github.com/sobranie2406/modureader/releases) 下载对应系统和架构的包，先阅读该平台的安装限制。
 2. 在书架添加电子书，打开后即可阅读；不使用 AI 时无需填写任何 API Key。
 3. 需要 AI 时，在「设置 → AI 设置」配置模型，并先做连接测试。
-4. 需要语义检索时，在「设置 → 向量模型」选择内嵌的本地模型（默认中文 BGE），再从已下载书籍的菜单建立索引；也可配置远程向量接口。
+4. 需要语义检索时，在「设置 → 向量模型」按需下载本地模型（默认中文 BGE），再从已下载书籍的菜单建立索引；也可配置远程向量接口。
 5. 按需选择翻译、朗读与同步服务。详细操作、参数含义和安全注意事项见[设置指南](docs/SETTINGS.md)。
 
 ## 问题反馈

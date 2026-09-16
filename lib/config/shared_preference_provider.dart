@@ -964,6 +964,17 @@ class Prefs extends ChangeNotifier {
   String get vectorLocalModelId =>
       prefs.getString('vectorLocalModelId') ?? 'bge-small-zh-v1.5';
 
+  String get vectorModelDownloadSource =>
+      prefs.getString('vectorModelDownloadSource') == 'gitee'
+          ? 'gitee'
+          : 'huggingFace';
+
+  set vectorModelDownloadSource(String value) {
+    prefs.setString('vectorModelDownloadSource',
+        value == 'gitee' ? 'gitee' : 'huggingFace');
+    notifyListeners();
+  }
+
   set vectorLocalModelId(String value) {
     prefs.setString('vectorLocalModelId', value);
     notifyListeners();

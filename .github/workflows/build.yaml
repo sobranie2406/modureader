@@ -57,7 +57,7 @@ jobs:
         with:
           path: build/model-test-fixtures
           key: model-test-fixtures-${{ hashFiles('assets/models/embeddings/manifest.json') }}
-      - name: Fetch and verify four pinned offline models
+      - name: Fetch and verify four pinned native-test fixtures (not app assets)
         run: python3 scripts/release/bundle_models.py
       - uses: actions/upload-artifact@v4
         with:
@@ -98,8 +98,8 @@ jobs:
         if: matrix.platform != 'linux'
         with:
           python-version: '3.12'
-      - name: Stage verified offline model assets
-        run: python scripts/release/bundle_models.py --verify-only --install-assets
+      - name: Verify native-test fixtures (never install in app assets)
+        run: python scripts/release/bundle_models.py --verify-only
       - name: Linux native dependencies
         if: matrix.platform == 'linux'
         run: |
@@ -203,9 +203,14 @@ jobs:
         if: matrix.platform == 'windows' && matrix.arch == 'x64'
         shell: pwsh
         run: ./scripts/release/test-windows-js-callback.ps1
-      - name: Native Windows bundled models offline inference
+      - name: Native Windows on-demand models offline inference
         if: matrix.platform == 'windows' && matrix.arch == 'x64'
-        run: flutter test integration_test/bundled_embedding_test.dart -d windows --reporter expanded
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 --directory build/model-test-fixtures &
+          fixture_server_pid=$!
+          trap 'kill "$fixture_server_pid"' EXIT
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail --silent http://127.0.0.1:8765/ > /dev/null
+          flutter test integration_test/bundled_embedding_test.dart -d windows --dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/ --reporter expanded
       - name: Verify architecture and package
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify Windows installation and uninstallation
@@ -240,8 +245,8 @@ jobs:
         with:
           name: embedding-test-fixtures
           path: build/model-test-fixtures
-      - name: Stage verified offline model assets
-        run: python3 scripts/release/bundle_models.py --verify-only --install-assets
+      - name: Verify separate instrumentation model fixtures
+        run: python3 scripts/release/bundle_models.py --verify-only
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -302,7 +307,7 @@ jobs:
           retention-days: 14
 
   ios:
-    needs: [targets, models]
+    needs: [targets]
     if: needs.targets.outputs.ios == 'true'
     name: ios-arm64
     runs-on: macos-15
@@ -312,12 +317,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          name: embedding-test-fixtures
-          path: build/model-test-fixtures
-      - name: Stage verified offline model assets
-        run: python3 scripts/release/bundle_models.py --verify-only --install-assets
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

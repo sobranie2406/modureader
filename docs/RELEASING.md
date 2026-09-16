@@ -13,7 +13,7 @@ Windows 封装从 Visual Studio 当前工具链的 Redist 目录复制对应架�
 
 以上修正随 build 6326 重新构建；原 build 6325 下载缓存不包含这些修复。
 
-1.0.4 安装包内嵌四个固定版本 ONNX 模型及分词器。构建前运行 `python3 scripts/release/bundle_models.py --install-assets`（Python 3.11+），按清单校验大小与 SHA-256 并暂存到 Flutter 资源目录。CI 共享已校验的下载制品，各平台在构建前重新校验并写入资源；打包时逐文件复核，缺少或损坏任何模型即停止打包。模型从包内按需提取到本机缓存后离线使用，保留手动下载兼容入口。原生推理测试覆盖包内模型；Android 测试 APK 的额外夹具不混入正式应用。权重不进入 Git 历史。许可证与来源见 UPSTREAM.md 和 LICENSES。
+安装包不内嵌模型权重和分词器，仅保留固定版本及 SHA-256 清单。用户在「设置 → 向量模型」选择 Hugging Face（默认）或 Gitee 按需下载，已校验旧模型继续复用。CI 使用 `python3 scripts/release/bundle_models.py` 获取独立原生推理测试夹具，不使用 `--install-assets`；正式包验证拒绝权重资源，Android 夹具只在测试 APK，桌面测试经本机服务器下载后离线推理。模型镜像与分片校验步骤见 docs/MODEL_MIRROR.md，许可证与来源见 UPSTREAM.md 和 LICENSES。
 
 Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBackend-FDO、libwpe、epoxy、GStreamer 及音频插件；不同发行版可能需要自行从源码构建。Windows 需要 Microsoft Edge WebView2 Runtime。
 

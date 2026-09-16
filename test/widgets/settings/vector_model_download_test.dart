@@ -4,6 +4,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
+import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
@@ -40,10 +41,29 @@ class ControlledModelStore extends LocalEmbeddingModelStore {
 }
 
 void main() {
+  test('model source defaults to Hugging Face and preserves saved choices',
+      () async {
+    for (final value in [null, 'huggingFace', 'gitee', 'invalid']) {
+      SharedPreferences.setMockInitialValues({
+        if (value != null) 'vectorModelDownloadSource': value,
+      });
+      await Prefs().initPrefs();
+      expect(Prefs().vectorModelDownloadSource,
+          value == 'gitee' ? 'gitee' : 'huggingFace');
+    }
+    Prefs().vectorModelDownloadSource = 'gitee';
+    await Prefs().initPrefs();
+    expect(Prefs().vectorModelDownloadSource, 'gitee');
+    Prefs().vectorModelDownloadSource = 'huggingFace';
+    await Prefs().initPrefs();
+    expect(Prefs().vectorModelDownloadSource, 'huggingFace');
+  });
+
   testWidgets('bundled models show offline availability without downloading',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
+    expect(Prefs().vectorModelDownloadSource, 'huggingFace');
     final store = ControlledModelStore(bundled: true);
     await tester.pumpWidget(MaterialApp(
       locale: const Locale('zh'),
@@ -78,16 +98,30 @@ void main() {
       ));
       await tester.pumpAndSettle();
       AnxToast.fToast.init(tester.element(find.byType(VectorModelSettings)));
-      expect(find.text('本地模型 · 离线内嵌'), findsOneWidget);
+      expect(find.text('本地模型 · 按需下载'), findsOneWidget);
       expect(find.text('下载并使用'), findsNWidgets(4));
       expect(find.text('测试推理'), findsNothing);
       expect(store.calls, 0);
+      expect(store.downloadSource, EmbeddingDownloadSource.huggingFace);
+      final source = find.byType(DropdownButtonFormField<String>);
+      await tester.ensureVisible(source);
+      await tester.tap(source);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gitee 镜像').last);
+      await tester.pumpAndSettle();
+      expect(Prefs().vectorModelDownloadSource, 'gitee');
+      expect(store.downloadSource, EmbeddingDownloadSource.gitee);
+      expect(store.calls, 0,
+          reason: 'Selecting a source does not download models');
       final download = find.text('下载并使用').first;
       await tester.ensureVisible(download);
       await tester.tap(download);
       await tester.pump();
       expect(store.calls, 1);
       expect(find.text('正在下载 50%'), findsOneWidget);
+      expect(tester.widget<DropdownButtonFormField<String>>(source).onChanged,
+          isNull,
+          reason: 'Source cannot change during a download');
       expect(find.text('测试推理'), findsNothing);
       store.done.complete();
       await tester.pumpAndSettle();

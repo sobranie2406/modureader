@@ -1,5 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
+import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:anx_reader/utils/toast/common.dart';
@@ -48,6 +49,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       text: config.dimension?.toString() ?? '',
     );
     _localModelStore = widget.modelStore ?? LocalEmbeddingModelStore();
+    _localModelStore.downloadSource =
+        Prefs().vectorModelDownloadSource == 'gitee'
+            ? EmbeddingDownloadSource.gitee
+            : EmbeddingDownloadSource.huggingFace;
     _refreshLocalModels();
   }
 
@@ -272,9 +277,35 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         ),
         if (!isRemote)
           SettingsSection(
-            title:
-                Text(_label('本地模型 · 离线内嵌', 'Local models · Bundled offline')),
+            title: Text(
+                _label('本地模型 · 按需下载', 'Local models · On-demand download')),
             tiles: [
+              CustomSettingsTile(
+                  child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: DropdownButtonFormField<String>(
+                  initialValue: prefs.vectorModelDownloadSource,
+                  decoration: InputDecoration(
+                      labelText: _label('模型下载源', 'Model download source')),
+                  items: [
+                    const DropdownMenuItem(
+                        value: 'huggingFace', child: Text('Hugging Face')),
+                    DropdownMenuItem(
+                        value: 'gitee',
+                        child: Text(_label('Gitee 镜像', 'Gitee mirror'))),
+                  ],
+                  onChanged: _downloadProgress.isNotEmpty
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          prefs.vectorModelDownloadSource = value;
+                          _localModelStore.downloadSource = value == 'gitee'
+                              ? EmbeddingDownloadSource.gitee
+                              : EmbeddingDownloadSource.huggingFace;
+                          setState(() {});
+                        },
+                ),
+              )),
               CustomSettingsTile(
                 child: _buildLocalModels(),
               ),
@@ -313,8 +344,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             alignment: AlignmentDirectional.centerStart,
             child: Text(
               _label(
-                '安装包内嵌四个模型及分词器，无需下载或 API Key。首次使用时自动准备所选模型并校验文件，可离线完成。旧版完整模型会继续复用；若安装资源缺失，可手动下载修复（来自 Hugging Face，会消耗流量）。自动向量化默认关闭；切换模型后请重新向量化已有书籍。',
-                'All four models and tokenizers are bundled. No download or API key is needed. The selected model is prepared and verified offline on first use. Valid existing files are reused. If packaged assets are missing, a manual repair download from Hugging Face is available and consumes data. Automatic indexing is off by default; reindex books after switching models.',
+                '安装包不内嵌模型。请选择下载源，再按需下载所选模型及分词器；下载会消耗流量，请保持页面打开直到完成。文件经大小与 SHA-256 校验后可离线使用，无需 API Key。旧版已准备的完整模型继续复用。Gitee 镜像不可用时，可切换 Hugging Face；不会自动更换下载源。自动向量化默认关闭，启动或索引不会自动下载模型。切换模型后请重新向量化已有书籍。',
+                'Models are not bundled. Select a source and download only the model and tokenizer you need. Downloads consume data; keep this page open until complete. Files are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused. Switch to Hugging Face if the mirror is unavailable; sources never switch silently. Automatic indexing is off and neither startup nor indexing downloads models automatically. Reindex books after switching models.',
               ),
               style: Theme.of(context).textTheme.bodySmall,
             ),

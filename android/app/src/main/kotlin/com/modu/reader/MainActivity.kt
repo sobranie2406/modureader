@@ -32,6 +32,14 @@ class MainActivity : AudioServiceActivity() {
             flutterEngine.plugins.add(LocalEmbeddingPlugin())
         }
 
+        val updateInstaller = AppUpdateInstaller(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "com.modu.reader/app_update").setMethodCallHandler { call, result ->
+            if (call.method == "install") {
+                updateInstaller.install(call.argument<String>("path"), result)
+            } else result.notImplemented()
+        }
+
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             INSTALL_INFO_CHANNEL
