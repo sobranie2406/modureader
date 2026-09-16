@@ -8,6 +8,8 @@ import 'package:anx_reader/service/config/config_item.dart';
 import 'package:anx_reader/service/translate/index.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/service/ai/langchain_runner.dart';
+import 'package:anx_reader/service/translate/translation_answer.dart';
 
 class AiTranslateProvider extends TranslateServiceProvider {
   @override
@@ -46,6 +48,7 @@ class AiTranslateProvider extends TranslateServiceProvider {
           );
 
     return AiStream(
+      outputFilter: translationAnswer,
       scrollable: false,
       prompt: prompt,
       identifier: Prefs().translationAiService,
@@ -60,6 +63,7 @@ class AiTranslateProvider extends TranslateServiceProvider {
     LangListEnum to, {
     String? contextText,
     bool isFullText = false,
+    CancelableLangchainRunner? requestRunner,
   }) async* {
     try {
       final payload = isFullText
@@ -81,11 +85,12 @@ class AiTranslateProvider extends TranslateServiceProvider {
         messages,
         identifier: Prefs().translationAiService,
         regenerate: false,
+        requestRunner: requestRunner,
       )) {
-        yield result;
+        yield translationAnswer(result);
       }
     } catch (e) {
-      yield L10n.of(navigatorKey.currentContext!).translateError + e.toString();
+      rethrow;
     }
   }
 

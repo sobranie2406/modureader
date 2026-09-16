@@ -27,6 +27,8 @@ class _TranslationWidgetState extends State<TranslationWidget> {
   late TranslateService _activeService;
   late LangListEnum _activeTarget;
   bool _translating = false;
+  int _operation = 0;
+  ValueNotifier<TranslationModeEnum>? _mode;
   String? _error;
 
   bool get _isChinese => Localizations.localeOf(context).languageCode == 'zh';
@@ -37,12 +39,25 @@ class _TranslationWidgetState extends State<TranslationWidget> {
   void initState() {
     super.initState();
     final savedMode = Prefs().getBookTranslationMode(widget.bookId);
-    _activeMode = savedMode;
+    _activeMode = widget.epubPlayerKey.currentState?.translationMode.value ??
+        TranslationModeEnum.off;
     _displayMode = savedMode == TranslationModeEnum.translationOnly
         ? TranslationModeEnum.translationOnly
         : TranslationModeEnum.bilingual;
     _activeService = Prefs().fullTextTranslateService;
     _activeTarget = Prefs().fullTextTranslateTo;
+    _mode = widget.epubPlayerKey.currentState?.translationMode;
+    _mode?.addListener(_syncMode);
+  }
+
+  void _syncMode() {
+    if (mounted) setState(() => _activeMode = _mode!.value);
+  }
+
+  @override
+  void dispose() {
+    _mode?.removeListener(_syncMode);
+    super.dispose();
   }
 
   Future<void> _showServicePicker() async {
@@ -136,6 +151,8 @@ class _TranslationWidgetState extends State<TranslationWidget> {
     final player = widget.epubPlayerKey.currentState;
     if (player == null) return;
 
+    final operation = ++_operation;
+
     final service = Prefs().fullTextTranslateService;
     final target = Prefs().fullTextTranslateTo;
     final needsFreshTranslation = _activeMode != TranslationModeEnum.off &&
@@ -150,23 +167,29 @@ class _TranslationWidgetState extends State<TranslationWidget> {
         _displayMode,
         force: needsFreshTranslation,
       );
-      Prefs().setBookTranslationMode(widget.bookId, _displayMode);
-      if (!mounted) return;
+      if (!mounted || operation != _operation) return;
       setState(() {
-        _activeMode = _displayMode;
+        _activeMode = player.translationMode.value;
         _activeService = service;
         _activeTarget = target;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || operation != _operation) return;
       setState(() => _error = error.toString());
       AnxToast.show(_label('翻译失败：$error', 'Translation failed: $error'));
     } finally {
-      if (mounted) setState(() => _translating = false);
+      if (mounted && operation == _operation) {
+        setState(() => _translating = false);
+      }
     }
   }
 
   Future<void> _stopTranslation() async {
+    ++_operation;
+    setState(() {
+      _translating = false;
+      _activeMode = TranslationModeEnum.off;
+    });
     final player = widget.epubPlayerKey.currentState;
     if (player == null) return;
     try {
@@ -207,11 +230,12 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                 style: theme.textTheme.titleMedium,
               ),
               const Spacer(),
-              if (_activeMode != TranslationModeEnum.off)
+              if (_translating || _activeMode != TranslationModeEnum.off)
                 TextButton.icon(
-                  onPressed: _translating ? null : _stopTranslation,
-                  icon: const Icon(Icons.visibility_off_outlined, size: 18),
-                  label: Text(_label('隐藏翻译', 'Hide translation')),
+                  key: const ValueKey('reader-stop-translation'),
+                  onPressed: _stopTranslation,
+                  icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                  label: Text(_label('停止翻译', 'Stop translation')),
                 ),
             ],
           ),
@@ -295,7 +319,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                 _translating
                     ? _label('翻译中…', 'Translating…')
                     : _activeMode == TranslationModeEnum.off
-                        ? _label('开始翻译', 'Start translation')
+                        ? _label('翻译当前阅读内容', 'Translate visible content')
                         : settingsChanged
                             ? _label(
                                 '按新设置重新翻译', 'Retranslate with new settings')
@@ -309,8 +333,8 @@ class _TranslationWidgetState extends State<TranslationWidget> {
           const SizedBox(height: 8),
           Text(
             _label(
-              '按下开始翻译后，正文会发送到所选服务；翻译按当前阅读内容逐步加载。',
-              'After you start, text is sent to the selected service and translation loads progressively.',
+              '仅在你启动后翻译可见段落，滚动时逐段加载，不会一次发送整章。可随时停止；关闭书籍后停止，重新打开不会自动继续。',
+              'Translate visible paragraphs only after you start; scrolling loads them one at a time. Stop at any time. Closing the book stops translation; reopening never resumes it automatically.',
             ),
             style: theme.textTheme.bodySmall,
           ),

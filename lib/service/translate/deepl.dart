@@ -66,13 +66,18 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
     LangListEnum to, {
     String? contextText,
     bool isFullText = false,
+    Future<void>? whenCancelled,
   }) async* {
+    final cancelToken = CancelToken();
+    whenCancelled?.then((_) => cancelToken.cancel());
     try {
       final config = getConfig();
 
       yield "...";
-      yield await _translateWithReadAnyConfig(text, from, to, config);
+      yield await _translateWithReadAnyConfig(
+          text, from, to, config, cancelToken);
     } catch (e) {
+      if (cancelToken.isCancelled) return;
       AnxLog.severe(
           "Deepl ${L10n.of(navigatorKey.currentContext!).translateError}: $e");
       yield* Stream.error(Exception(e));
@@ -122,6 +127,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
     LangListEnum from,
     LangListEnum to,
     Map<String, dynamic> config,
+    CancelToken cancelToken,
   ) async {
     final apiKey = config['api_key']?.toString().trim() ?? '';
     final rawUrl = config['api_url']?.toString().trim() ?? '';
@@ -138,7 +144,8 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
 
     if (isOfficial) {
       if (apiKey.isEmpty) throw Exception('Invalid DeepL API key');
-      return _translateOfficial(text, from, to, apiKey, normalized);
+      return _translateOfficial(
+          text, from, to, apiKey, normalized, cancelToken);
     }
 
     final exactUrl = rawUrl.replaceFirst(RegExp(r'/+$'), '');
@@ -169,6 +176,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
       to,
       resolvedApiKey,
       endpoint,
+      cancelToken,
     );
   }
 
@@ -178,6 +186,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
     LangListEnum to,
     String apiKey,
     String baseUrl,
+    CancelToken cancelToken,
   ) async {
     final params = <String, dynamic>{
       'text': text,
@@ -186,6 +195,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
     };
     final response = await Dio().post(
       '$baseUrl/translate',
+      cancelToken: cancelToken,
       data: params,
       options: Options(
         contentType: Headers.formUrlEncodedContentType,
@@ -213,6 +223,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
     LangListEnum to,
     String apiKey,
     String endpoint,
+    CancelToken cancelToken,
   ) async {
     var uri = Uri.parse(endpoint);
     if (apiKey.isNotEmpty) {
@@ -223,6 +234,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
 
     final response = await Dio().post(
       uri.toString(),
+      cancelToken: cancelToken,
       data: {
         'text': text,
         'source_lang':

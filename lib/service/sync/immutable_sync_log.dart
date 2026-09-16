@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
+import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
@@ -30,6 +31,13 @@ class ImmutableSyncLog {
   static const maxBatchBytes = 64 * 1024 * 1024;
   static const maxScanBytes = 256 * 1024 * 1024;
 
+  // Finder/Explorer may create these files when the WebDAV directory is browsed.
+  // Ignore exact, known non-record filenames only, never arbitrary hidden files,
+  // directories, database batches, or entries with an unknown resource type.
+  static bool _isSystemSidecar(RemoteFile file) =>
+      file.isDir == false &&
+      const {'.DS_Store', 'Thumbs.db', 'desktop.ini'}.contains(file.name);
+
   Future<bool> resumePending() async {
     if (!await pending.exists()) return false;
     var published = false;
@@ -57,11 +65,13 @@ class ImmutableSyncLog {
     var count = 0;
     await verifiedCache.create(recursive: true);
     for (final first in await client.readSyncDirectory(SyncPaths.recordLog)) {
+      if (_isSystemSidecar(first)) continue;
       if (first.isDir != true || !_shard.hasMatch(first.name ?? '')) {
         throw const FormatException('未知同步记录目录，请更新所有客户端');
       }
       final firstPath = '${SyncPaths.recordLog}/${first.name}';
       for (final item in await client.readSyncDirectory(firstPath)) {
+        if (_isSystemSidecar(item)) continue;
         final match = _batch.firstMatch(item.name ?? '');
         if (item.isDir != false ||
             match == null ||

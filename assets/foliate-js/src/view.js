@@ -632,8 +632,8 @@ export class View extends HTMLElement {
   }
   
   // Translation control methods
-  setTranslationMode(mode) {
-    this.#translator.setTranslationMode(mode)
+  setTranslationMode(mode, sessionId) {
+    return this.#translator.setTranslationMode(mode, sessionId)
   }
   
   getTranslationMode() {

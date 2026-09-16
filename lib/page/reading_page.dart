@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:anx_reader/enums/translation_mode.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
 import 'package:anx_reader/utils/reader_route_observer.dart';
 import 'package:anx_reader/utils/log/common.dart';
@@ -1170,6 +1171,46 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                                   onPressed: _changingQuickMark
                                                       ? null
                                                       : _toggleQuickMark)))),
+                                if (epubPlayerKey.currentState != null)
+                                  Positioned(
+                                    bottom: 56,
+                                    right: 12,
+                                    child: ValueListenableBuilder<
+                                        TranslationModeEnum>(
+                                      valueListenable: epubPlayerKey
+                                          .currentState!.translationMode,
+                                      builder: (context, mode, _) => mode ==
+                                              TranslationModeEnum.off
+                                          ? const SizedBox.shrink()
+                                          : PointerInterceptor(
+                                              child: SafeArea(
+                                                  child: ActionChip(
+                                              key: const ValueKey(
+                                                  'reader-floating-stop-translation'),
+                                              avatar: const Icon(
+                                                  Icons.stop_circle_outlined,
+                                                  size: 18),
+                                              label: Text(
+                                                  Localizations.localeOf(
+                                                                  context)
+                                                              .languageCode ==
+                                                          'zh'
+                                                      ? '停止翻译'
+                                                      : 'Stop translation'),
+                                              onPressed: () async {
+                                                try {
+                                                  await epubPlayerKey
+                                                      .currentState
+                                                      ?.setTranslationMode(
+                                                          TranslationModeEnum
+                                                              .off);
+                                                } catch (_) {
+                                                  // The session is already cancelled before touching the WebView.
+                                                }
+                                              },
+                                            ))),
+                                    ),
+                                  ),
                                 if (_isResizingAiChat)
                                   SizedBox.expand(
                                     child: Container(

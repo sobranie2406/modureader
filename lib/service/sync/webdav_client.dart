@@ -336,7 +336,9 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<void> remove(String path) async {
-    await _client.remove(path);
+    // Match upload/download encoding: '#' and '%' in a book title are literal
+    // filename characters, never fragments or pre-encoded path separators.
+    await _client.remove(_safeEncodePath(path));
   }
 
   @override

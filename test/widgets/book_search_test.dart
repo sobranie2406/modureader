@@ -76,7 +76,8 @@ void main() {
               .focusNode
               .hasFocus,
           isTrue);
-      expect(tester.getSize(find.byType(BookSearch)).width, lessThanOrEqualTo(680));
+      expect(tester.getSize(find.byType(BookSearch)).width,
+          lessThanOrEqualTo(680));
       if (viewport.width < 1000) {
         tester.view.viewInsets =
             FakeViewPadding(bottom: viewport.height > 500 ? 320 : 180);
@@ -91,6 +92,14 @@ void main() {
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
       expect(find.byType(Dialog), findsOneWidget);
+      expect(targets, isEmpty);
+      expect(container.read(tocSearchProvider).activeIndex, -1);
+      expect(container.read(tocSearchProvider).originCfi, 'origin');
+      // Dismiss an unselected search without issuing any reader navigation.
+      await tester.tap(find.byKey(const ValueKey('book-search-close')));
+      await tester.pumpAndSettle();
+      expect(targets, isEmpty);
+      await open();
       final result = find.text('Before word 1 after', findRichText: true);
       await tester.ensureVisible(result);
       await tester.pumpAndSettle();
@@ -220,8 +229,10 @@ void main() {
         tester.widget<TextField>(query).controller!.text, 'unfinished draft');
     notifier.updateProgress(1);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Before word 1 after', findRichText: true));
-    expect(targets, ['hit-1']);
+    expect(targets, isEmpty);
+    expect(container.read(tocSearchProvider).activeCfi, isNull);
+    await tester.tap(find.text('Before word 2 after', findRichText: true));
+    expect(targets, ['hit-2']);
     await tester.tap(find.byKey(const ValueKey('book-search-clear')));
     await tester.pumpAndSettle();
     expect(container.read(tocSearchProvider).isActive, isFalse);

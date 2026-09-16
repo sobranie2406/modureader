@@ -160,6 +160,72 @@ void main() {
     expect(client.writes, 0);
   });
 
+  for (final atomic in [true, false]) {
+    test(
+        'known system sidecars at both levels do not block sync (atomic=$atomic)',
+        () async {
+      final client = MemorySyncClient()..atomic = atomic;
+      await a.insert('tb_notes', noteRow(1, 'kept-note'));
+      // Seed the journal before switching to reliable ETag transport so both
+      // transports actually have to read the same batch plus these sidecars.
+      client.atomic = false;
+      await sync(sa, client);
+      client.atomic = atomic;
+      final batch = client.files.keys.single;
+      final shard = batch.substring(0, batch.lastIndexOf('/'));
+      final extras = <String, List<int>>{};
+      for (final name in ['.DS_Store', 'Thumbs.db', 'desktop.ini']) {
+        extras['modu/record-log-v1/$name'] = [1, 2, 3];
+        extras['$shard/$name'] = [4, 5, 6];
+      }
+      client.files.addAll(extras);
+      await sync(sb, client);
+      expect((await b.query('tb_notes')).single['content'], 'kept-note');
+      for (final entry in extras.entries) {
+        expect(client.files[entry.key], entry.value); // Ignore, not delete.
+      }
+      // Ignoring sidecars must NOT mask a tampered real batch, including a
+      // previous success which might otherwise reuse a verified local cache.
+      client.files[batch] = [9, 9];
+      final fresh = await fixture(bookId: 99);
+      final uncached =
+          await Directory.systemTemp.createTemp('modu-sidecar-check-');
+      try {
+        await expectLater(
+            RowSyncEngine(
+                    store: RowSyncStore(fresh), client: client, cache: uncached)
+                .synchronize(),
+            throwsFormatException);
+        expect(await fresh.query('tb_notes'), isEmpty);
+      } finally {
+        await fresh.close();
+        await uncached.delete(recursive: true);
+      }
+    });
+  }
+
+  for (final path in [
+    '.unknown',
+    '.DS_Store.db',
+    '.ds_store',
+    '._unknown',
+    '.DS_Store/child.db',
+    '0/.DS_Store/child.db',
+    '0/.unknown',
+    '0/future.db'
+  ]) {
+    test('sidecar whitelist does not suppress unknown file/directory $path',
+        () async {
+      final client = MemorySyncClient()..atomic = false;
+      client.files['modu/record-log-v1/$path'] = [1];
+      final before = await sa.snapshot();
+      await expectLater(sync(sa, client), throwsFormatException);
+      expect(sameSyncRecords(before, await sa.snapshot()), isTrue);
+      expect(client.files.length, 1);
+      expect(client.writes, 0);
+    });
+  }
+
   test('pending publication survives disposable cache removal', () async {
     final client = ConcurrentLogClient()
       ..atomic = false

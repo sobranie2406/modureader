@@ -3,6 +3,7 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/reading_position_snapshot.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:anx_reader/service/sync/replaced_book_files.dart';
 import 'package:anx_reader/utils/reading_progress.dart';
 
 class BookDao extends BaseDao {
@@ -27,12 +28,14 @@ class BookDao extends BaseDao {
       ..remove('last_read_position')
       ..remove('reading_percentage')
       ..remove('is_deleted');
-    await update(
-      table,
-      values,
-      where: 'id = ?',
-      whereArgs: [book.id],
-    );
+    await transaction((txn) async {
+      final previous =
+          await txn.query(table, where: 'id = ?', whereArgs: [book.id]);
+      if (previous.length == 1) {
+        await ReplacedBookFiles.record(txn, previous.single, book.filePath);
+      }
+      await txn.update(table, values, where: 'id = ?', whereArgs: [book.id]);
+    });
   }
 
   Future<ReadingPositionSnapshot> readReadingPosition(int bookId) =>

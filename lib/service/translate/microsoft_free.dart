@@ -43,7 +43,10 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
     LangListEnum to, {
     String? contextText,
     bool isFullText = false,
+    Future<void>? whenCancelled,
   }) async* {
+    final cancelToken = CancelToken();
+    whenCancelled?.then((_) => cancelToken.cancel());
     if (text.trim().isEmpty) {
       yield '';
       return;
@@ -55,10 +58,11 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
       final chunks = _splitText(text);
       final translated = <String>[];
       for (final chunk in chunks) {
-        translated.add(await _translateChunk(chunk, from, to));
+        translated.add(await _translateChunk(chunk, from, to, cancelToken));
       }
       yield translated.join();
     } catch (error) {
+      if (cancelToken.isCancelled) return;
       AnxLog.severe('Free translation failed: $error');
       yield* Stream.error(Exception(error));
     }
@@ -68,9 +72,11 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
     String text,
     LangListEnum from,
     LangListEnum to,
+    CancelToken cancelToken,
   ) async {
     final response = await Dio().get(
       _readAnyFreeTranslateUrl,
+      cancelToken: cancelToken,
       queryParameters: {
         'client': 'gtx',
         'sl': from == LangListEnum.auto ? 'auto' : from.code.toLowerCase(),

@@ -12,14 +12,13 @@ if (typeof window !== 'undefined') {
 }
 
 // Translation function that calls Flutter's translation service
-const translate = async (text) => {
+const translate = async (text, sessionId) => {
   try {
     // Call Flutter's translation handler
-      const result = await window.flutter_inappwebview.callHandler('translateText', text)
-      return result || `Translation failed: ${text}`
+      return await window.flutter_inappwebview.callHandler('translateText', text, sessionId)
   } catch (error) {
     console.error('Translation failed:', error)
-    return `Translation error: ${text}`
+    return null
   }
 }
 
@@ -28,6 +27,12 @@ export class Translator {
   observedElements = new Set()
   #translatedElements = new WeakMap()
   #observer = null
+  #generation = 0
+  #sessionId = null
+  #queue = []
+  #pending = new Set()
+  #running = false
+  #destroyed = false
   
   constructor() {
     this.#initializeObserver()
@@ -40,20 +45,19 @@ export class Translator {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             // console.log('Element intersecting, translating:', entry.target.tagName, entry.target.textContent?.substring(0, 30))
-            this.#translateElement(entry.target).catch(error => 
-              console.warn('Translation failed in observer:', error)
-            )
+            this.#enqueue(entry.target)
           }
         })
       },
       {
-        rootMargin: '1280px',
+        rootMargin: '0px',
         threshold: 0
       }
     )
   }
 
-  async setTranslationMode(mode) {
+  async setTranslationMode(mode, sessionId) {
+    if (this.#destroyed) return
     if (!Object.values(TranslationMode).includes(mode)) {
       console.warn(`Invalid translation mode: ${mode}`)
       return
@@ -61,6 +65,12 @@ export class Translator {
     
     const oldMode = this.#translationMode
     this.#translationMode = mode
+    this.#sessionId = sessionId
+    if (mode === TranslationMode.OFF) {
+      this.#generation++
+      this.#queue = []
+      this.#pending.clear()
+    }
     
     if (oldMode !== mode) {
       // console.log(`Translation mode changed from ${oldMode} to ${mode}`)
@@ -70,7 +80,8 @@ export class Translator {
         this.#updateTranslationDisplay()
       } else if (oldMode === TranslationMode.OFF) {
         // Turn on translation - force translate visible elements and wait for completion
-        await this.#forceTranslateVisibleElements()
+        this.#updateTranslationDisplay()
+        this.#forceTranslateVisibleElements()
       } else {
         // Just update display mode
         this.#updateTranslationDisplay()
@@ -93,7 +104,7 @@ export class Translator {
 
   observeDocument(doc) {
     // console.log('Observing document for translation, doc:', doc)
-    if (!doc) {
+    if (!doc || this.#destroyed) {
       console.warn('No document provided to observeDocument')
       return
     }
@@ -113,6 +124,9 @@ export class Translator {
   }
 
   clearTranslations() {
+    this.#generation++
+    this.#queue = []
+    this.#pending.clear()
     const previousElements = Array.from(this.observedElements)
 
     // Remove all translation elements and restore original content
@@ -130,12 +144,11 @@ export class Translator {
     this.#translatedElements = new WeakMap()
     
     // Reinitialize observer
-    this.#initializeObserver()
 
     // Keep observing the current chapter so a target-language or provider
     // change can immediately retranslate without waiting for navigation.
     previousElements.forEach(element => {
-      if (element?.isConnected) {
+      if (!this.#destroyed && element?.isConnected) {
         this.#observer.observe(element)
         this.observedElements.add(element)
       }
@@ -171,7 +184,8 @@ export class Translator {
         
         if (child.children.length === 0 && child.textContent?.trim()) {
           elements.push(child)
-        } else if (hasDirectText) {
+        } else if (hasDirectText && !child.querySelector(
+          'p,div,section,article,blockquote,ul,ol,table,h1,h2,h3,h4,h5,h6')) {
           elements.push(child)
         } else if (child.children.length > 0) {
           walk(child, depth + 1)
@@ -183,7 +197,54 @@ export class Translator {
     return elements
   }
 
-  async #translateElement(element) {
+  #isVisible(element) {
+    if (!element.isConnected) return false
+    let {top, bottom, left, right} = element.getBoundingClientRect()
+    let owner = element.ownerDocument.defaultView
+    // Chapter rectangles are iframe-local, not reader-window coordinates.
+    while (owner && owner !== window) {
+      const frame = owner.frameElement
+      if (!frame?.isConnected) return false
+      const rect = frame.getBoundingClientRect()
+      const sx = frame.offsetWidth ? rect.width / frame.offsetWidth : 1
+      const sy = frame.offsetHeight ? rect.height / frame.offsetHeight : 1
+      top = rect.top + (top + frame.clientTop) * sy
+      bottom = rect.top + (bottom + frame.clientTop) * sy
+      left = rect.left + (left + frame.clientLeft) * sx
+      right = rect.left + (right + frame.clientLeft) * sx
+      owner = frame.ownerDocument.defaultView
+    }
+    return top < window.innerHeight && bottom > 0 &&
+      left < window.innerWidth && right > 0
+  }
+
+  #enqueue(element) {
+    if (this.#destroyed || this.#translationMode === TranslationMode.OFF ||
+        this.#translatedElements.has(element) || this.#pending.has(element) ||
+        !this.#isVisible(element)) return
+    this.#pending.add(element)
+    this.#queue.push({element, generation: this.#generation, sessionId: this.#sessionId})
+    void this.#drain()
+  }
+
+  async #drain() {
+    if (this.#running) return
+    this.#running = true
+    try {
+      while (this.#queue.length && !this.#destroyed) {
+        const job = this.#queue.shift()
+        try {
+          if (job.generation === this.#generation && this.#isVisible(job.element)) {
+            await this.#translateElement(job.element, job.generation, job.sessionId)
+          }
+        } finally {
+          if (job.generation === this.#generation) this.#pending.delete(job.element)
+        }
+      }
+    } finally { this.#running = false }
+  }
+
+  async #translateElement(element, generation, sessionId) {
     if (this.#translationMode === TranslationMode.OFF) return
     if (this.#translatedElements.has(element)) return
     
@@ -191,7 +252,10 @@ export class Translator {
     if (!text) return
     
     try {
-      const translatedText = await translate(text)
+      const translatedText = await translate(text, sessionId)
+      if (this.#destroyed || generation !== this.#generation ||
+          this.#translationMode === TranslationMode.OFF || !element.isConnected ||
+          typeof translatedText !== 'string' || !translatedText.trim()) return
       
       // Mark as translated to prevent re-processing
       this.#translatedElements.set(element, {
@@ -213,7 +277,7 @@ export class Translator {
     }
     
     // Create translation wrapper
-    const wrapper = document.createElement('span')
+    const wrapper = element.ownerDocument.createElement('span')
     wrapper.className = 'translated-text'
     wrapper.setAttribute('data-translation-mark', '1')
     wrapper.style.display = 'block'
@@ -317,37 +381,8 @@ export class Translator {
     element.classList.remove('translation-source-hidden')
   }
 
-  async #forceTranslateVisibleElements() {
-    // console.log('Force translating visible elements')
-    
-    const translationPromises = []
-    
-    // Find elements in viewport and translate them immediately
-    this.observedElements.forEach(element => {
-      const rect = element.getBoundingClientRect()
-      const isVisible = rect.top < window.innerHeight && rect.bottom > 0
-      
-      if (isVisible && !this.#translatedElements.has(element)) {
-        // console.log('Force translating visible element:', element)
-        const translationPromise = this.#translateElement(element).catch(error => {
-          console.warn('Force translation failed:', error)
-        })
-        translationPromises.push(translationPromise)
-      } else if (isVisible && this.#translatedElements.has(element)) {
-        // Element already translated, just update display
-        const translationWrapper = element.querySelector('.translated-text')
-        if (translationWrapper) {
-          this.#updateElementDisplay(element, translationWrapper)
-        }
-      }
-    })
-    
-    // Wait for all visible translations to complete
-    if (translationPromises.length > 0) {
-      // console.log(`Waiting for ${translationPromises.length} translations to complete`)
-      await Promise.allSettled(translationPromises)
-      // console.log('All visible translations completed')
-    }
+  #forceTranslateVisibleElements() {
+    this.observedElements.forEach(element => this.#enqueue(element))
   }
 
   #updateTranslationDisplay() {
@@ -364,6 +399,8 @@ export class Translator {
   }
 
   destroy() {
+    this.#destroyed = true
+    this.#translationMode = TranslationMode.OFF
     this.clearTranslations()
     this.#observer = null
   }

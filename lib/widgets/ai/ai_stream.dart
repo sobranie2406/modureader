@@ -26,6 +26,7 @@ class AiStream extends ConsumerStatefulWidget {
     this.regenerate = false,
     this.useAgent = false,
     this.scrollable = true,
+    this.outputFilter,
   });
 
   final PromptTemplatePayload prompt;
@@ -36,6 +37,7 @@ class AiStream extends ConsumerStatefulWidget {
   final bool regenerate;
   final bool useAgent;
   final bool scrollable;
+  final String Function(String)? outputFilter;
 
   @override
   AiStreamState createState() => AiStreamState();
@@ -61,7 +63,7 @@ class AiStreamState extends ConsumerState<AiStream> {
     _requestRunner?.cancel();
     final runner = _requestRunner = CancelableLangchainRunner();
     final messages = widget.prompt.buildMessages();
-    return aiGenerateStream(
+    final result = aiGenerateStream(
       messages,
       identifier: widget.identifier,
       config: widget.config,
@@ -71,6 +73,9 @@ class AiStreamState extends ConsumerState<AiStream> {
       ref: ref,
       requestRunner: runner,
     );
+    return widget.outputFilter == null
+        ? result
+        : result.map(widget.outputFilter!);
   }
 
   @override

@@ -1,10 +1,10 @@
 // Keep the final line (including custom-font descenders) inside the iframe's
 // measured flow, with scrollable end space rather than clipped overflow.
 // Reader font sizes are em multipliers, not CSS pixels. Keep the annotation
-// at 70% of the reader instead of imposing a fixed device size.
+// at 80% of the reader instead of imposing a fixed device size.
 export function footnoteFontSize(readerFontSize) {
   const size = Number(readerFontSize);
-  return (Number.isFinite(size) && size > 0 ? size : 1.4) * 0.7;
+  return (Number.isFinite(size) && size > 0 ? size : 1.4) * 0.8;
 }
 
 export const footnoteLayoutCSS = `

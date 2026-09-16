@@ -5,13 +5,13 @@ import { createRequire } from 'node:module';
 const source = await readFile(new URL('../assets/foliate-js/src/footnote-size.js', import.meta.url), 'utf8');
 const { footnoteBoxSize, attachFootnoteSizing, footnoteFontSize } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
-test('footnote type follows the reader at 70 percent without changing its size', async () => {
+test('footnote type follows the reader at 80 percent without changing its size', async () => {
   for (const size of [.6, 1, 1.4, 2, 3, 5]) {
-    assert.ok(Math.abs(footnoteFontSize(size) - size * .7) < 1e-10);
+    assert.ok(Math.abs(footnoteFontSize(size) - size * .8) < 1e-10);
     assert.ok(footnoteFontSize(size) < size);
   }
   for (const invalid of [undefined, null, '', 'invalid', 0, -1, Infinity, NaN]) {
-    assert.ok(Math.abs(footnoteFontSize(invalid) - .98) < 1e-10);
+    assert.ok(Math.abs(footnoteFontSize(invalid) - 1.12) < 1e-10);
   }
   const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   assert.match(book, /const footNoteStyle = \{\s*fontSize: footnoteFontSize\(style.fontSize\)/);

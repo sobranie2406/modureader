@@ -21,6 +21,7 @@ import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
+import 'package:anx_reader/service/sync/replaced_book_files.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/database_sync_manager.dart';
@@ -277,6 +278,19 @@ class Sync extends _$Sync {
 
       await syncFiles();
 
+      // Never reclaim before publication: syncFiles also runs as beforePublish.
+      // Cleanup is recoverable maintenance; failure must not undo a good sync.
+      try {
+        await ReplacedBookFiles(
+          store: RowSyncStore(await DBHelper().database),
+          client: client,
+          cache: await getAnxCacheDir(),
+          durableDirectory: await getAnxDataBasesDir(),
+        ).reclaim();
+      } catch (error) {
+        AnxLog.warning('Replaced-book cleanup deferred: ${error.runtimeType}');
+      }
+
       imageCache.clear();
       imageCache.clearLiveImages();
 
@@ -345,7 +359,8 @@ class Sync extends _$Sync {
 
     // Do not garbage-collect by absence: an offline/concurrent device can
     // still reference these files. Deletions are synchronized as tombstones;
-    // physical file reclamation needs a separately acknowledged GC protocol.
+    // Explicit replacements are reclaimed separately, AFTER successful sync,
+    // with verified recovery copies. Unknown historical files remain untouched.
     ref.read(syncStatusProvider.notifier).refresh();
   }
 

@@ -71,6 +71,18 @@ test('Dart bridge encodes quotes/newlines and validates request IDs',async()=>{
   assert.ok(dart.includes('await _goToSearchCfi(origin!)'));
 });
 
+test('search arrivals and completion of older navigation never auto-select a result',async()=>{
+  const dart=await readFile(new URL('../lib/page/book_player/epub_player.dart',import.meta.url),'utf8');
+  const handler=dart.slice(dart.indexOf("handlerName: 'onSearch'"),
+    dart.indexOf("handlerName: 'renderAnnotations'"));
+  assert.ok(handler.includes('tocSearch.addResult(SearchResultModel.fromJson(search))'));
+  assert.doesNotMatch(handler,/navigateSearch|_goToSearchCfi|selectMatch|goToCfi/);
+  const navigation=dart.slice(dart.indexOf('Future<void> navigateSearch('),
+    dart.indexOf('Future<void> _goToSearchCfi('));
+  assert.ok(navigation.includes('_goToSearchCfi(target)'));
+  assert.doesNotMatch(navigation.slice(navigation.indexOf('finally')),/navigateSearch|_goToSearchCfi|selectMatch/);
+});
+
 test('ordinary note/TTS marks retain their existing appearance',async()=>{
   const requireDOM=createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`);
   const {JSDOM}=requireDOM('jsdom');

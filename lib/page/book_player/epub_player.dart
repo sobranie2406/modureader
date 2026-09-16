@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'package:anx_reader/service/translate/ai.dart';
+import 'package:anx_reader/service/translate/deepl.dart';
+import 'package:anx_reader/service/translate/microsoft_free.dart';
+import 'package:anx_reader/service/translate/reader_translation_session.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
@@ -115,6 +119,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool _selectionClearLocked = false;
   bool _selectionClearPending = false;
   bool _readerReady = false;
+  final translationMode = ValueNotifier(TranslationModeEnum.off);
+  final _translationSession = ReaderTranslationSession();
   bool quickMarkEnabled = false;
   final _quickMarks = QuickMarkService(bookNoteDao);
   late final ReaderProgressSession _progress;
@@ -187,25 +193,39 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     TranslationModeEnum mode, {
     bool force = false,
   }) async {
-    final result = await webViewController.callAsyncJavaScript(
-      functionBody: '''
+    final generation = mode == TranslationModeEnum.off
+        ? (_translationSession..stop()).generation
+        : _translationSession.start();
+    translationMode.value = mode;
+    // A persisted display preference is not permission to resume API requests.
+    Prefs().setBookTranslationMode(widget.book.id, TranslationModeEnum.off);
+    try {
+      final result = await webViewController.callAsyncJavaScript(
+        functionBody: '''
         if (typeof reader === 'undefined' ||
             typeof reader.view === 'undefined' ||
             !reader.view.setTranslationMode) {
           return false;
         }
+        await reader.view.setTranslationMode('off');
         if (${force ? 'true' : 'false'}) {
-          await reader.view.setTranslationMode('off');
           if (reader.view.clearTranslations) {
             reader.view.clearTranslations();
           }
         }
-        await reader.view.setTranslationMode(${jsonEncode(mode.code)});
+        await reader.view.setTranslationMode(${jsonEncode(mode.code)}, $generation);
         return true;
       ''',
-    );
-    if (result?.value != true) {
-      throw StateError('Translation is not available for this book');
+      );
+      if (result?.value != true) {
+        throw StateError('Translation is not available for this book');
+      }
+    } catch (_) {
+      if (_translationSession.generation == generation) {
+        _translationSession.stop();
+        translationMode.value = TranslationModeEnum.off;
+      }
+      rethrow;
     }
   }
 
@@ -396,13 +416,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       _searchNavigation = null;
       if (mounted) {
         notifier.setNavigating(false);
-        final current = ref.read(tocSearchProvider);
-        if (current.requestId != state.requestId &&
-            current.isActive &&
-            current.activeCfi == null &&
-            current.matches.isNotEmpty) {
-          unawaited(navigateSearch(current.matches.first.cfi));
-        }
       }
     }
   }
@@ -976,12 +989,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           await refreshReadingAfterSync();
           if (!mounted) return;
           if (quickMarkEnabled) await setQuickMarkEnabled(true);
-          try {
-            await setTranslationMode(
-                Prefs().getBookTranslationMode(widget.book.id));
-          } catch (error) {
-            AnxLog.warning('Unable to restore book translation mode: $error');
-          }
+          // Opening/reloading a reader always requires a new explicit start.
+          _translationSession.stop();
+          translationMode.value = TranslationModeEnum.off;
+          Prefs()
+              .setBookTranslationMode(widget.book.id, TranslationModeEnum.off);
           if (!mounted) return;
           widget.onLoadEnd();
         });
@@ -1178,11 +1190,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           final progress = search['process'].toDouble();
           tocSearch.updateProgress(progress);
         } else {
+          // Collect results without changing the reading position. Navigation
+          // requires an explicit result tap or search-toolbar action.
           tocSearch.addResult(SearchResultModel.fromJson(search));
-          final current = ref.read(tocSearchProvider);
-          if (current.activeCfi == null && current.matches.isNotEmpty) {
-            unawaited(navigateSearch(current.matches.first.cfi));
-          }
         }
       },
     );
@@ -1270,16 +1280,42 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       handlerName: 'translateText',
       callback: (args) async {
         try {
+          if (!mounted || args.length < 2 || args[1] is! int) return null;
           String text = args[0];
           final service = Prefs().fullTextTranslateService;
           final from = Prefs().fullTextTranslateFrom;
           final to = Prefs().fullTextTranslateTo;
 
-          return await service.provider
-              .translateTextOnly(text, from, to, isFullText: true);
+          final provider = service.provider;
+          return await _translationSession.translate(
+              args[1] as int,
+              (runner) => provider is AiTranslateProvider
+                  ? provider.translateStream(text, from, to,
+                      isFullText: true, requestRunner: runner)
+                  : provider is MicrosoftFreeTranslateProvider
+                      ? provider.translateStream(text, from, to,
+                          isFullText: true, whenCancelled: runner.whenCancelled)
+                      : provider is DeepLTranslateProvider
+                          ? provider.translateStream(text, from, to,
+                              isFullText: true,
+                              whenCancelled: runner.whenCancelled)
+                          : provider.translateStream(text, from, to,
+                              isFullText: true));
+        } on TranslationCancelled {
+          return null;
         } catch (e) {
-          AnxLog.severe('Translation error: $e');
-          return 'Translation error: $e';
+          AnxLog.warning('Reader translation request failed: ${e.runtimeType}');
+          if (mounted &&
+              _translationSession.enabled &&
+              args.length > 1 &&
+              args[1] == _translationSession.generation) {
+            unawaited(
+                setTranslationMode(TranslationModeEnum.off).catchError((_) {}));
+            AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
+                ? '翻译失败，已停止。请检查翻译服务后重试。'
+                : 'Translation failed and stopped. Check the service and try again.');
+          }
+          return null;
         }
       },
     );
@@ -1293,7 +1329,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     setHandler(controller);
     _registerChapterContentBridge();
 
-    // Translation is restored by onLoadEnd after the reader view is ready.
+    // Translation starts only from an explicit action in this reader session.
   }
 
   void removeOverlay() {
@@ -1370,6 +1406,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   @override
   void dispose() {
+    _translationSession.stop();
+    translationMode.dispose();
     _syncRefreshRetry?.cancel();
     _scrollDebounceTimer?.cancel();
     _animationController?.dispose();

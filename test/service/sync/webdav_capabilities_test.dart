@@ -126,6 +126,22 @@ void main() {
   });
   tearDown(() => server.close(force: true));
 
+  test('removal addresses the exact book filename including URL characters',
+      () async {
+    const name = '中文 #100% %2F.epub';
+    final relative = 'modu/data/file/$name';
+    // Store the URL form used by the loopback server, as with ordinary PUT.
+    final target = Uri.parse('http://localhost/library/'
+            '${Uri.encodeComponent(relative).replaceAll('%2F', '/')}')
+        .path;
+    files[target] = [1, 2, 3];
+    files['/library/modu/data/file/中文 '] = [4, 5, 6];
+    await client.remove(relative);
+    expect(calls, ['DELETE $target']);
+    expect(files.containsKey(target), isFalse);
+    expect(files['/library/modu/data/file/中文 '], [4, 5, 6]);
+  });
+
   for (final value in [
     'strong',
     'none',
