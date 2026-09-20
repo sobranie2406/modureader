@@ -288,7 +288,7 @@ export class TTS {
     start() {
         this.#lastMark = null
         const entry = this.#list.first()
-        if (!entry) return this.next()
+        if (!entry) return this.next(true)
         return this.#resultFrom(entry, { highlight: true })?.text
     }
 

@@ -3,9 +3,9 @@ import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/page/settings_page/ai_provider_detail_page.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
+import 'package:anx_reader/widgets/ai/ai_provider_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class AiProviderListPage extends ConsumerWidget {
   const AiProviderListPage({super.key});
@@ -35,7 +35,7 @@ class AiProviderListPage extends ConsumerWidget {
           final isSelected = provider.id == selectedId;
           final hasValidKey = provider.hasValidKey;
 
-          return ListTile(
+          final tile = ListTile(
             leading: AiProviderLogo(provider: provider),
             title: Text(provider.title),
             subtitle: Column(
@@ -100,6 +100,25 @@ class AiProviderListPage extends ConsumerWidget {
                 ? null
                 : () => _deleteProvider(context, ref, provider),
           );
+          if (provider.isBuiltin) return tile;
+          return Dismissible(
+            key: ValueKey('provider-${provider.id}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              color: Theme.of(context).colorScheme.errorContainer,
+              alignment: AlignmentDirectional.centerEnd,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Icon(Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.onErrorContainer),
+            ),
+            confirmDismiss: (_) async {
+              // Remove from the provider store after confirmation; keep the
+              // swipe route from deleting a row whose backing data changed.
+              await _deleteProvider(context, ref, provider);
+              return false;
+            },
+            child: tile,
+          );
         },
       ),
     );
@@ -119,33 +138,7 @@ class AiProviderListPage extends ConsumerWidget {
     WidgetRef ref,
     AiProvider provider,
   ) async {
-    final l10n = L10n.of(context);
-    bool confirmed = false;
-
-    await SmartDialog.show(
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.commonConfirm),
-        content: Text(l10n.settingsAiProviderDeleteConfirm),
-        actions: [
-          TextButton(
-            onPressed: () {
-              confirmed = false;
-              SmartDialog.dismiss();
-            },
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () {
-              confirmed = true;
-              SmartDialog.dismiss();
-            },
-            child: Text(l10n.commonConfirm),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed && context.mounted) {
+    if (await confirmDeleteAiProvider(context, provider) && context.mounted) {
       ref.read(aiProvidersProvider.notifier).deleteProvider(provider.id);
     }
   }

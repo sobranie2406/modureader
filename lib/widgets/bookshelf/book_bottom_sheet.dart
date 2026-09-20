@@ -21,7 +21,8 @@ import 'package:anx_reader/utils/share_file.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
-import 'package:anx_reader/widgets/delete_confirm.dart';
+import 'package:anx_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
+import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:anx_reader/widgets/icon_and_text.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -30,25 +31,44 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:path/path.dart' as p;
 
+enum BookAction {
+  details,
+  vectorize,
+  vectorModel,
+  share,
+  replace,
+  release,
+  delete
+}
+
 class BookBottomSheet extends ConsumerWidget {
   const BookBottomSheet({
     super.key,
     required this.book,
+    this.menuOnly = false,
+    this.menuKey,
+    this.child,
   });
 
   final Book book;
 
+  /// Both the cover button and the drag bottom bar use this same menu.
+  final bool menuOnly;
+  final GlobalKey<PopupMenuButtonState<BookAction>>? menuKey;
+  final Widget? child;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> handleDelete(BuildContext context) async {
-      Navigator.pop(context);
-      await deleteBooksFromBookshelf(ref, [book]);
+      final deleted =
+          await confirmAndDeleteBooksFromBookshelf(context, ref, [book]);
+      if (deleted && !menuOnly && context.mounted) Navigator.pop(context);
     }
 
     void handleDetail(BuildContext context) {
-      Navigator.pop(context);
-      Navigator.push(
-        context,
+      final navigator = Navigator.of(context);
+      if (!menuOnly) navigator.pop();
+      navigator.push(
         MaterialPageRoute(
           builder: (context) => BookDetail(book: book),
         ),
@@ -244,7 +264,7 @@ class BookBottomSheet extends ConsumerWidget {
         }
 
         ref.read(bookListProvider.notifier).refresh();
-        if (context.mounted) Navigator.pop(context);
+        if (!menuOnly && context.mounted) Navigator.pop(context);
 
         if (Prefs().webdavStatus) {
           ref.read(syncProvider.notifier).syncData(SyncDirection.upload, ref);
@@ -255,83 +275,128 @@ class BookBottomSheet extends ConsumerWidget {
       }
     }
 
-    final actions = [
-      {
-        "icon": EvaIcons.share,
-        "text": L10n.of(context).shareFile,
-        "onTap": () => handleShare()
-      },
-      {
-        "icon": EvaIcons.refresh,
-        "text": L10n.of(context).bookBottomSheetReplaceFile,
-        "onTap": () => handleReplace(context)
-      },
-      {
-        "icon": EvaIcons.cloud_upload,
-        "text": L10n.of(context).bookSyncStatusReleaseSpace,
-        "onTap": () => handleUpload(context)
-      },
-      {
-        "icon": EvaIcons.more_vertical,
-        "text": L10n.of(context).notesPageDetail,
-        "onTap": () => handleDetail(context)
-      },
-    ];
-
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final menu = AnimatedBuilder(
+      animation: bookKnowledgeIndexQueue,
+      builder: (context, _) => FutureBuilder<bool>(
+        future: BookKnowledgeIndexService().hasIndex(book),
+        builder: (context, snapshot) {
+          final item = bookKnowledgeIndexQueue.itemFor(book.id);
+          final active = item?.status.isActive ?? false;
+          final indexed = snapshot.data == true ||
+              item?.status == BookKnowledgeQueueStatus.completed;
+          final local = File(book.fileFullPath).existsSync();
+          PopupMenuItem<BookAction> entry(
+                  BookAction action, IconData icon, String label,
+                  {bool enabled = true, String? subtitle}) =>
+              PopupMenuItem<BookAction>(
+                key: ValueKey('book-action-${action.name}'),
+                value: action,
+                enabled: enabled,
+                child: ListTile(
+                  dense: true,
+                  enabled: enabled,
+                  textColor: action == BookAction.delete ? Colors.red : null,
+                  iconColor: action == BookAction.delete ? Colors.red : null,
+                  leading: Icon(icon),
+                  title: Text(label),
+                  subtitle: subtitle == null ? null : Text(subtitle),
+                ),
+              );
+          return PopupMenuButton<BookAction>(
+            key: menuKey,
+            tooltip: zh ? '书籍操作' : 'Book actions',
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            onSelected: (action) async {
+              switch (action) {
+                case BookAction.details:
+                  handleDetail(context);
+                  break;
+                case BookAction.vectorize:
+                  await queueBookForVectorization(book);
+                  break;
+                case BookAction.vectorModel:
+                  await showBookEmbeddingModelDialog(context, book);
+                  break;
+                case BookAction.share:
+                  await handleShare();
+                  break;
+                case BookAction.replace:
+                  await handleReplace(context);
+                  break;
+                case BookAction.release:
+                  handleUpload(context);
+                  break;
+                case BookAction.delete:
+                  await handleDelete(context);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              entry(BookAction.details, Icons.info_outline,
+                  zh ? '书籍详情' : 'Book details'),
+              entry(
+                  BookAction.vectorize,
+                  active
+                      ? Icons.hourglass_top_rounded
+                      : indexed
+                          ? Icons.refresh
+                          : Icons.hub_outlined,
+                  _vectorActionLabel(indexed, item, zh),
+                  enabled: !active),
+              entry(BookAction.vectorModel, Icons.tune,
+                  zh ? '向量化模型' : 'Embedding model',
+                  enabled: !active,
+                  subtitle: BookEmbeddingPreferences.labelFor(book)),
+              const PopupMenuDivider(),
+              entry(
+                  BookAction.share, EvaIcons.share, L10n.of(context).shareFile,
+                  enabled: local),
+              entry(BookAction.replace, EvaIcons.refresh,
+                  L10n.of(context).bookBottomSheetReplaceFile),
+              entry(BookAction.release, EvaIcons.cloud_upload,
+                  L10n.of(context).bookSyncStatusReleaseSpace,
+                  enabled: local && Prefs().webdavStatus && !active),
+              const PopupMenuDivider(),
+              entry(BookAction.delete, Icons.delete_outline,
+                  L10n.of(context).commonDelete),
+            ],
+            child: child ??
+                IconAndText(
+                  icon: const Icon(EvaIcons.more_vertical),
+                  text: L10n.of(context).more,
+                ),
+          );
+        },
+      ),
+    );
+    if (menuOnly) return menu;
     return Container(
       padding: const EdgeInsets.all(20),
-      // Leave room for DeleteConfirm's padding and larger accessibility text.
       constraints: const BoxConstraints(minHeight: 112),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(height: 60, child: BookCover(book: book, width: 40)),
           const SizedBox(width: 10),
           Expanded(
-            child: SingleChildScrollView(
-              child: Text(book.title,
-                  style: Theme.of(context).textTheme.titleMedium),
-            ),
-          ),
-          DeleteConfirm(
-            delete: () {
-              handleDelete(context);
-            },
-            deleteIcon: IconAndText(
-              icon: const Icon(EvaIcons.trash),
-              text: L10n.of(context).commonDelete,
-            ),
-            confirmIcon: IconAndText(
-              icon: const Icon(
-                EvaIcons.checkmark_circle_2,
-                color: Colors.red,
-              ),
-              text: L10n.of(context).commonConfirm,
-            ),
-          ),
-          PopupMenuButton(
-              itemBuilder: (context) {
-                return actions.map((action) {
-                  return PopupMenuItem(
-                      onTap: () {
-                        (action["onTap"] as Function())();
-                      },
-                      child: Row(
-                        children: [
-                          Icon(action["icon"] as IconData),
-                          const SizedBox(width: 8),
-                          Text(action["text"] as String),
-                        ],
-                      ));
-                }).toList();
-              },
-              child: IconAndText(
-                icon: const Icon(EvaIcons.more_vertical),
-                text: L10n.of(context).more,
-              ))
+              child: SingleChildScrollView(
+            child: Text(book.title,
+                style: Theme.of(context).textTheme.titleMedium),
+          )),
+          menu,
         ],
       ),
     );
   }
+}
+
+String _vectorActionLabel(bool indexed, BookKnowledgeQueueItem? item, bool zh) {
+  final status = item?.status;
+  if (status == BookKnowledgeQueueStatus.queued) return zh ? '排队中' : 'Queued';
+  if (status == BookKnowledgeQueueStatus.cancelling)
+    return zh ? '正在取消' : 'Cancelling';
+  if (status?.isActive == true) return zh ? '正在向量化' : 'Indexing';
+  if (status == BookKnowledgeQueueStatus.failed)
+    return zh ? '重新排队' : 'Retry indexing';
+  return indexed ? (zh ? '重新向量化' : 'Reindex') : (zh ? '向量化' : 'Vectorize');
 }

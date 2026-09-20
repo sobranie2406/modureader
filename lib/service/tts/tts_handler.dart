@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
+import 'package:anx_reader/service/tts/tts_media_state.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
@@ -33,21 +34,8 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   void _syncPlaybackState() {
-    final state = tts.ttsStateNotifier.value;
-    playbackState.add(playbackState.value.copyWith(
-      playing: tts.isPlaying,
-      processingState: state == TtsStateEnum.stopped
-          ? AudioProcessingState.idle
-          : AudioProcessingState.ready,
-      controls: state == TtsStateEnum.stopped
-          ? []
-          : [
-              MediaControl.skipToPrevious,
-              tts.isPlaying ? MediaControl.pause : MediaControl.play,
-              MediaControl.stop,
-              MediaControl.skipToNext,
-            ],
-    ));
+    playbackState
+        .add(ttsMediaState(playbackState.value, tts.ttsStateNotifier.value));
   }
 
   Future<void> init(Function getCurrentText, Function getNextText,
@@ -80,6 +68,10 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
           ? AVAudioSessionCategoryOptions.mixWithOthers
           : AVAudioSessionCategoryOptions.none,
       avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+      androidAudioAttributes: const AndroidAudioAttributes(
+        contentType: AndroidAudioContentType.speech,
+        usage: AndroidAudioUsage.media,
+      ),
     ));
     session.interruptionEventStream.listen((event) {
       if (event.begin) {
@@ -106,38 +98,26 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> play() async {
+    final reader = epubPlayerKey.currentState;
+    if (reader == null) return;
     final session = await AudioSession.instance;
-    if (await session.setActive(true)) {
-      playbackState.add(playbackState.value.copyWith(
-        controls: [MediaControl.pause, MediaControl.stop],
-        processingState: AudioProcessingState.ready,
-        playing: true,
-      ));
-    }
+    if (!await session.setActive(true)) return;
 
     final item = MediaItem(
-      id: epubPlayerKey.currentState!.chapterTitle,
-      title: epubPlayerKey.currentState!.chapterTitle,
-      album: epubPlayerKey.currentState!.book.title,
-      artist: epubPlayerKey.currentState!.book.author,
+      id: reader.book.id.toString(),
+      title: reader.book.title,
+      album: reader.chapterTitle,
+      artist: reader.book.author,
       // Use -1 to tell system not to render a progress bar.
       duration: const Duration(milliseconds: -1),
-      artUri: Uri.tryParse(
-          'file://${epubPlayerKey.currentState!.book.coverFullPath}'),
+      artUri: Uri.file(reader.book.coverFullPath),
     );
 
     // Ensure system receives queue + active index for control center metadata.
     queue.add([item]);
     mediaItem.add(item);
-    playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.pause,
-        MediaControl.stop,
-        MediaControl.skipToNext,
-      ],
-      processingState: AudioProcessingState.ready,
-      playing: true,
+    playbackState
+        .add(ttsMediaState(playbackState.value, TtsStateEnum.playing).copyWith(
       queueIndex: 0,
       updatePosition: Duration.zero,
       bufferedPosition: Duration.zero,
@@ -155,6 +135,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> pause() async {
     playbackState.add(playbackState.value.copyWith(
       controls: [MediaControl.play, MediaControl.stop],
+      androidCompactActionIndices: [0, 1],
       queueIndex: queue.value.isNotEmpty ? 0 : null,
       processingState: AudioProcessingState.ready,
       playing: false,
@@ -168,14 +149,22 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> stop() async {
     playbackState.add(playbackState.value.copyWith(
       controls: [],
+      androidCompactActionIndices: [],
       queueIndex: null,
       processingState: AudioProcessingState.idle,
       playing: false,
     ));
 
     tts.updateTtsState(TtsStateEnum.stopped);
-    await tts.stop();
-    await epubPlayerKey.currentState?.ttsStop();
+    try {
+      await tts.stop();
+    } finally {
+      try {
+        await epubPlayerKey.currentState?.ttsStop();
+      } finally {
+        await (await AudioSession.instance).setActive(false);
+      }
+    }
   }
 
   @override

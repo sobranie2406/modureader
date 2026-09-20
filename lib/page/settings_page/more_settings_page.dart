@@ -13,6 +13,7 @@ import 'package:anx_reader/page/settings_page/storege.dart';
 import 'package:anx_reader/page/settings_page/sync.dart';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
+import 'package:anx_reader/page/settings_page/dictionaries.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/settings/about.dart';
@@ -108,6 +109,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   L10n.of(context).downloadFonts,
                   L10n.of(context).readingPageStyle,
                   L10n.of(context).readingPageOther,
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '自定义字典'
+                    : 'Custom dictionaries',
+                "icon": Icons.menu_book_outlined,
+                "sections": const DictionarySettings(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '本地导入 · 离线选词查询'
+                      : 'Local import · Offline word lookup'
                 ],
               },
               if (EnvVar.enableAIFeature)

@@ -5,6 +5,7 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,24 @@ Future<void> until(bool Function() ready) async {
   fail('Playback did not reach expected state');
 }
 
+class FailingCleanupPlayer extends Fake implements AudioPlayer {
+  final stopped = Completer<void>();
+  int stops = 0;
+  int disposals = 0;
+  @override
+  Future<void> stop() async {
+    stops++;
+    await stopped.future;
+    throw Exception('native stop failed');
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposals++;
+    throw Exception('native dispose failed');
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final channel = const MethodChannel('flutter_tts');
@@ -27,6 +46,31 @@ void main() {
     await Prefs().initPrefs();
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+  test(
+      'overlapping stop cleans up once even if native release fails, then restarts',
+      () async {
+    final player = FailingCleanupPlayer();
+    final spoken = <String>[];
+    final tts = OnlineTts.forTesting(
+      player: player,
+      collect: (_) async => [const TtsSentence(text: '重新朗读')],
+      synthesize: (_) async => Uint8List.fromList([1]),
+      play: (segment) async => spoken.add(segment.sentence.text),
+    );
+    await tts.init(() async => '重新朗读', () async => '', () async => '');
+    final first = tts.stop();
+    final second = tts.stop();
+    await until(() => player.stops == 1);
+    player.stopped.complete();
+    await Future.wait([first, second]);
+    expect(player.stops, 1);
+    expect(player.disposals, 1);
+    await tts.speak();
+    expect(spoken, ['重新朗读']);
+    await tts.stop();
+    expect(player.disposals, 1);
+  });
 
   for (final online in [false, true]) {
     test(

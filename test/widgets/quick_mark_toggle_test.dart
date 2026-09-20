@@ -38,4 +38,27 @@ void main() {
     await tester.tap(find.text('Quick mark · Exit'));
     expect(exits, 1);
   });
+  testWidgets(
+      'floating quick mark toolbar toggles the menu independently of exit',
+      (tester) async {
+    var menu = false, exits = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: StatefulBuilder(
+            builder: (context, setState) => Scaffold(
+                body: QuickMarkToggle(
+                    enabled: true,
+                    showExit: true,
+                    platform: AnxPlatformEnum.android,
+                    showMenu: menu,
+                    onToggleMenu: () => setState(() => menu = !menu),
+                    onPressed: () => exits++)))));
+    expect(find.byTooltip('Menu after marking: off'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('quick-mark-menu-toggle')));
+    await tester.pump();
+    expect(menu, isTrue);
+    expect(find.byTooltip('Menu after marking: on'), findsOneWidget);
+    expect(exits, 0);
+    await tester.tap(find.text('Quick mark · Exit'));
+    expect(exits, 1);
+  });
 }

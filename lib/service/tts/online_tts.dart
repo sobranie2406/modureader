@@ -29,10 +29,14 @@ class OnlineTts extends BaseTts {
   OnlineTts.forTesting({
     required Future<List<TtsSentence>> Function(int) collect,
     required Future<Uint8List> Function(String) synthesize,
-    required Future<void> Function(TtsSegment) play,
+    Future<void> Function(TtsSegment)? play,
+    AudioPlayer? player,
+    AudioPlayer Function()? createPlayer,
   })  : _collectOverride = collect,
         _synthesizeOverride = synthesize,
-        _playOverride = play;
+        _playOverride = play,
+        _player = player,
+        _createPlayer = createPlayer;
 
   Future<List<TtsSentence>> Function(int)? _collectOverride;
   Future<Uint8List> Function(String)? _synthesizeOverride;
@@ -49,7 +53,9 @@ class OnlineTts extends BaseTts {
 
   // ============ Audio Player ============
   AudioPlayer? _player;
+  AudioPlayer Function()? _createPlayer;
   StreamSubscription<void>? _playerCompleteSubscription;
+  Future<void>? _stopping;
 
   // ============ Ordered Buffer ============
   // Segments are added in order; audio is fetched in background
@@ -73,7 +79,9 @@ class OnlineTts extends BaseTts {
   bool isInit = false;
   bool _shouldStop = false;
   int _generation = 0;
+  int _commandVersion = 0;
   bool _isStarting = false;
+  bool _isResuming = false;
 
   // ============ Backend ============
   TtsServiceProvider? _currentBackend;
@@ -103,7 +111,12 @@ class OnlineTts extends BaseTts {
   @override
   set volume(double volume) {
     Prefs().ttsVolume = volume;
-    _player?.setVolume(volume);
+    final player = _player;
+    if (player != null) {
+      unawaited(player.setVolume(volume).catchError((Object error) {
+        AnxLog.warning('TTS volume update failed: ${error.runtimeType}');
+      }));
+    }
   }
 
   @override
@@ -111,6 +124,8 @@ class OnlineTts extends BaseTts {
 
   @override
   set pitch(double pitch) {
+    if (!pitch.isFinite || pitch < 0.5 || pitch > 2 || pitch == this.pitch)
+      return;
     Prefs().ttsPitch = pitch;
     // Clear pending audio so it will be re-fetched with new pitch
     _clearPendingAudio();
@@ -118,6 +133,7 @@ class OnlineTts extends BaseTts {
 
   @override
   set rate(double rate) {
+    if (!rate.isFinite || rate < 0 || rate > 2 || rate == this.rate) return;
     Prefs().ttsRate = rate;
     // Clear pending audio so it will be re-fetched with new rate
     _clearPendingAudio();
@@ -126,7 +142,6 @@ class OnlineTts extends BaseTts {
   @override
   double get rate => Prefs().ttsRate;
 
-  @override
   @override
   bool get isPlaying => ttsStateNotifier.value == TtsStateEnum.playing;
 
@@ -152,26 +167,50 @@ class OnlineTts extends BaseTts {
   Future<AudioPlayer> _ensurePlayer() async {
     if (_player != null) return _player!;
 
-    _player = AudioPlayer();
-    await _player!.setReleaseMode(ReleaseMode.stop);
-    await _player!.setPlayerMode(PlayerMode.mediaPlayer);
-    await _player!.setVolume(volume);
-
-    _playerCompleteSubscription = _player!.onPlayerComplete.listen((_) {
-      if (_playbackCompleter?.isCompleted == false) {
-        _playbackCompleter!.complete();
-      }
-    });
-
-    return _player!;
+    final player = _createPlayer?.call() ?? AudioPlayer();
+    try {
+      await player.setReleaseMode(ReleaseMode.stop);
+      await player.setPlayerMode(PlayerMode.mediaPlayer);
+      await player.setVolume(volume);
+      _playerCompleteSubscription = player.onPlayerComplete.listen((_) {
+        if (identical(_player, player) &&
+            _playbackCompleter?.isCompleted == false) {
+          _playbackCompleter!.complete();
+        }
+      });
+      // Publish only after successful native initialization. Never reuse a
+      // half-configured player on the next sentence/retry.
+      _player = player;
+      return player;
+    } catch (_) {
+      await _releasePlayer(player, null);
+      rethrow;
+    }
   }
 
   Future<void> _disposePlayer() async {
-    await _player?.stop();
-    await _playerCompleteSubscription?.cancel();
-    _playerCompleteSubscription = null;
-    await _player?.dispose();
+    final player = _player;
+    final subscription = _playerCompleteSubscription;
     _player = null;
+    _playerCompleteSubscription = null;
+    await _releasePlayer(player, subscription);
+  }
+
+  Future<void> _releasePlayer(
+      AudioPlayer? player, StreamSubscription<void>? subscription) async {
+    // Detach before awaiting. A plugin failure must not retain a half-disposed
+    // player or prevent subsequent cleanup/restart from the notification.
+    for (final release in <Future<void> Function()>[
+      if (player != null) player.stop,
+      if (subscription != null) subscription.cancel,
+      if (player != null) player.dispose,
+    ]) {
+      try {
+        await release();
+      } catch (error) {
+        AnxLog.warning('TTS player cleanup failed: ${error.runtimeType}');
+      }
+    }
   }
 
   // ============ Buffer Management ============
@@ -299,7 +338,7 @@ class OnlineTts extends BaseTts {
     final targetVersion = segment.fetchVersion;
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
-      if (_shouldStop) return;
+      if (_shouldStop || segment.fetchVersion != targetVersion) return;
       if (segment.isReady) return;
 
       try {
@@ -337,7 +376,7 @@ class OnlineTts extends BaseTts {
         final bytes = audio.bytes;
 
         // Check if version is still valid (settings haven't changed during fetch)
-        if (segment.fetchVersion != targetVersion) {
+        if (_shouldStop || segment.fetchVersion != targetVersion) {
           AnxLog.info(
               'Audio fetch completed but version changed - discarding (segment version: ${segment.fetchVersion}, target: $targetVersion)');
           return;
@@ -350,8 +389,9 @@ class OnlineTts extends BaseTts {
         }
         return; // Success, exit retry loop
       } on TimeoutException {
+        if (_shouldStop || segment.fetchVersion != targetVersion) return;
         AnxLog.severe(
-            'Fetch timeout (attempt ${attempt + 1}/$_maxRetries): "${segment.sentence.text.substring(0, segment.sentence.text.length.clamp(0, 20))}..."');
+            'TTS fetch timeout (attempt ${attempt + 1}/${_maxRetries + 1})');
         if (attempt == _maxRetries) {
           // Check version before marking as silent
           if (segment.fetchVersion == targetVersion) {
@@ -359,7 +399,9 @@ class OnlineTts extends BaseTts {
           }
         }
       } catch (e) {
-        AnxLog.severe('Fetch error (attempt ${attempt + 1}): $e');
+        if (_shouldStop || segment.fetchVersion != targetVersion) return;
+        AnxLog.severe(
+            'TTS fetch failed (attempt ${attempt + 1}): ${e.runtimeType}');
         if (attempt == _maxRetries) {
           // Check version before marking as silent
           if (segment.fetchVersion == targetVersion) {
@@ -482,6 +524,8 @@ class OnlineTts extends BaseTts {
   // ============ Public API ============
   @override
   Future<void> speak({String? content}) async {
+    final stopping = _stopping;
+    if (stopping != null) await stopping;
     if (_isPlayerRunning || _isStarting) return;
     _isStarting = true;
     final generation = ++_generation;
@@ -521,6 +565,19 @@ class OnlineTts extends BaseTts {
 
   @override
   Future<void> stop() async {
+    ++_commandVersion;
+    final pending = _stopping;
+    if (pending != null) return pending;
+    final operation = _stop();
+    _stopping = operation;
+    try {
+      await operation;
+    } finally {
+      _stopping = null;
+    }
+  }
+
+  Future<void> _stop() async {
     ++_generation;
     _isStarting = false;
     _shouldStop = true;
@@ -544,45 +601,94 @@ class OnlineTts extends BaseTts {
   @override
   Future<void> pause() async {
     updateTtsState(TtsStateEnum.paused);
-    await _player?.pause();
+    final command = _commandVersion;
+    try {
+      await _player?.pause();
+    } catch (error) {
+      if (command == _commandVersion) _controlFailed(error);
+    }
   }
 
   @override
   Future<void> resume() async {
-    if (_shouldStop && _playbackError != null) {
-      await _prefetcherCompleter?.future;
-      await _playerCompleter?.future;
-      _currentSegment = null;
-      _clearPendingAudio();
-      _playbackError = null;
-      _shouldStop = false;
-      updateTtsState(TtsStateEnum.playing);
-      unawaited(_startPrefetcher());
-      await _startPlayer();
-      return;
+    if (_isResuming) return;
+    _isResuming = true;
+    final command = _commandVersion;
+    Future<void>? playback;
+    try {
+      final stopping = _stopping;
+      if (stopping != null) await stopping;
+      if (command != _commandVersion) return;
+      if (_shouldStop && _playbackError != null) {
+        await _prefetcherCompleter?.future;
+        await _playerCompleter?.future;
+        if (command != _commandVersion) return;
+        await _disposePlayer();
+        if (command != _commandVersion) return;
+        _currentSegment = null;
+        _clearPendingAudio();
+        _playbackError = null;
+        _shouldStop = false;
+        updateTtsState(TtsStateEnum.playing);
+        unawaited(_startPrefetcher());
+        playback = _startPlayer();
+      } else {
+        await _player?.resume();
+        if (command == _commandVersion) updateTtsState(TtsStateEnum.playing);
+      }
+    } catch (error) {
+      if (command == _commandVersion) _controlFailed(error);
+    } finally {
+      _isResuming = false;
     }
-    await _player?.resume();
-    updateTtsState(TtsStateEnum.playing);
+    // The lock covers recovery only, not the duration of the resumed audio.
+    // A later pause must still be resumable while this future is running.
+    if (playback != null) await playback;
+  }
+
+  void _controlFailed(Object error) {
+    _playbackError =
+        '音频控制失败，已保留当前位置，请重试 / Audio control failed; retry this sentence.';
+    _shouldStop = true;
+    final segment = _currentSegment;
+    if (segment != null && !_buffer.contains(segment))
+      _buffer.insert(0, segment);
+    if (_playbackCompleter?.isCompleted == false)
+      _playbackCompleter!.complete();
+    updateTtsState(TtsStateEnum.paused);
+    AnxLog.warning('TTS player control failed: ${error.runtimeType}');
   }
 
   @override
   Future<void> prev() async {
-    await stop();
-    final text = await getPrevTextFunction();
-    if (text is String && text.isNotEmpty) await speak(content: text);
+    await _navigate(() => getPrevTextFunction());
   }
 
   @override
   Future<void> next() async {
-    await stop();
-    final text = await getNextTextFunction();
-    if (text is String && text.isNotEmpty) await speak(content: text);
+    await _navigate(() => getNextTextFunction());
   }
 
   @override
   Future<void> restart() async {
-    await stop();
-    await speak();
+    await _navigate(() => getHereFunction());
+  }
+
+  Future<void> _navigate(FutureOr<dynamic> Function() locate) async {
+    final stopping = stop();
+    final command = _commandVersion;
+    await stopping;
+    if (command != _commandVersion) return;
+    try {
+      final text = await locate();
+      if (command != _commandVersion) return;
+      if (text is String && text.isNotEmpty) await speak(content: text);
+    } catch (error) {
+      if (command != _commandVersion) return;
+      _playbackError = '朗读定位失败，请重试 / Reader navigation failed; retry.';
+      updateTtsState(TtsStateEnum.paused);
+      AnxLog.warning('TTS navigation failed: ${error.runtimeType}');
+    }
   }
 
   /// For testing a specific voice in settings

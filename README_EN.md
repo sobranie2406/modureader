@@ -49,6 +49,7 @@ The current version provides the following reading, AI and library features.
 | In-book search | Floating search dialog, selection-style text highlights, previous/next match and current/total counter; return to the original position or close search at the current position | Reader toolbar, between Translation and Bookmarks |
 | Highlights and notes | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV | Text selection menu; Home → Notes |
 | Mobile quick mark | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page | Pen button in the mobile reader; persistent Exit button restores normal gestures |
+| Local dictionaries | Import, name, enable/disable and delete MDX / StarDict dictionaries; look up selected text offline; no dictionaries bundled | Settings → Custom dictionaries; text selection menu |
 | Reading statistics | Reading time, trends, heatmap and per-book records | Home → Statistics |
 | AI conversations | Home quick prompts, in-book questions and chat history; enabled tools access the library, contents, chapters, notes and reading records | Home → AI; reader AI panel |
 | AI reading skills | Ten built-in skills with Chinese names; enable/disable, inspect/edit prompts and create custom skills; keep skill shortcuts in chat while showing skill names instead of long prompt messages | AI input area; Settings → AI Reading Skills |
@@ -76,6 +77,8 @@ Reader styles → More settings → Other includes **Tap-only page turning**, of
 
 ### Quick marking on mobile
 
+The top-right menu toggle controls whether saving a quick highlight immediately opens the selection menu. It is off by default and remembered on this device.
+
 Adjacent same-color highlights without comments can merge across pages within one chapter document. Missing text, intervening images or existing comments keep marks separate.
 
 Open a reflowable ebook and tap the pen button in the reader toolbar to enable Quick mark. No long press is needed: swipe from the beginning of the text you want to capture, then release to save the highlight. It uses your current highlight color and appears in the existing notes list. Marking the same location again preserves any existing comment.
@@ -89,6 +92,8 @@ Reasoning effort is configurable per model, including **Off** for supported mode
 Home AI is intended for library, note and reading-history questions. In-book AI focuses on the current book, chapter or selected text. Home offers quick prompts, while the reader uses enabled reading skills. Their contexts are different: a home-screen question should not automatically be treated as referring to a current chapter.
 
 Add or edit models under Settings → AI Settings → Provider Configuration. Each model can have its own endpoint, model name, API key, temperature, maximum output tokens and number of conversation-history turns. OpenAI-compatible, Claude and Gemini protocols are supported. Presets include OpenAI, Claude, Gemini, DeepSeek, Zhipu GLM and OpenRouter; compatible custom endpoints can also be configured. Model discovery, tool calling and parameter ranges depend on the provider.
+
+Built-in provider details support restoring defaults: endpoint and parameters reset, saved keys are cleared, and the default enabled state is restored after confirmation. Custom providers can be deleted by swiping the list or from their detail page.
 
 Enable AI tools as needed, including finding books and notes, searching text, reading chapters, inspecting reading records and generating mind maps. AI output can be wrong. Book summaries are limited by the text retrieved, search results and the model's context window; one request is not guaranteed to read an arbitrarily long book in full.
 
@@ -114,6 +119,8 @@ The built-in names are displayed in Chinese; their English meanings are provided
 Open a skill to inspect its prompt, edit and save it, or restore the default. Custom skills appear alongside built-in skills in the reader AI panel. Prompts for recalling previous content, translation/dictionary and full-text translation are managed on the same settings page.
 
 ### Book indexing and local models
+
+AI text search reuses the same keyword/vector hybrid retrieval. Reading skills retain their chapter, selection or reading scope. Optional index sync under Settings → Sync matches actual book bytes by SHA-256; download the identical book on the receiving device first. Indexes contain excerpts and are not encrypted by API-key sync. See the [index sync guide (Chinese)](docs/INDEX_SYNC_AND_READING_CONTROLS.md).
 
 Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a background queue, so you can leave the indexing screen. Check task status and error messages to confirm completion. For automatic indexing of new imports, enable both the embedding model and **Automatically index after import** in Settings → Embedding Models. Automatic indexing is off by default.
 
@@ -143,7 +150,7 @@ Read-aloud controls include play, pause, resume, previous/next sentence and chap
 Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10, 15 or 30 minutes, or one hour. It respects automatic-sync and Wi-Fi settings and shows only terminal success/failure feedback.
 
 - WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
-- Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images and local vector indexes are not synced. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
+- Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images and local dictionaries are not synced. Vector indexes can be synced with the separate, optional Sync vector data switch. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
 - **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
 - Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.

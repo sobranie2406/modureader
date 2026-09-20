@@ -26,7 +26,6 @@ import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
 import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/service/reader_focus.dart';
 import 'package:anx_reader/service/reader_keyboard.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -35,6 +34,7 @@ import 'package:anx_reader/utils/ui/status_bar.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:anx_reader/widgets/reading_page/notes_widget.dart';
+import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/quick_mark_toggle.dart';
 import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
@@ -160,12 +160,35 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   static const double _aiChatMinHeight = 200;
   late double _aiChatHeight;
   bool _isResizingAiChat = false;
-  bool _isBuildingKnowledgeIndex = false;
   bool bookmarkExists = false;
   bool _searchDialogOpen = false;
   bool _readerDrawerOpen = false;
   bool _quickMarkEnabled = false;
   bool _changingQuickMark = false;
+
+  Future<void> _toggleQuickMarkMenu() async {
+    if (_changingQuickMark) return;
+    final previous = Prefs().quickMarkShowMenu;
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    setState(() {
+      _changingQuickMark = true;
+      Prefs().quickMarkShowMenu = !previous;
+    });
+    try {
+      final applied = await epubPlayerKey.currentState
+          ?.setQuickMarkEnabled(_quickMarkEnabled);
+      if (applied != true) throw StateError('Reader not ready');
+    } catch (_) {
+      Prefs().quickMarkShowMenu = previous;
+      if (mounted) {
+        AnxToast.show(zh
+            ? '无法切换标记菜单，请重试。'
+            : 'Could not switch the marking menu. Please retry.');
+      }
+    } finally {
+      if (mounted) setState(() => _changingQuickMark = false);
+    }
+  }
 
   Future<void> _toggleQuickMark() async {
     if (!AnxPlatform.isMobile || _changingQuickMark) return;
@@ -419,6 +442,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    final reader = epubPlayerKey.currentState;
+    if (reader != null) {
+      unawaited(reader.setTtsBackground(state != AppLifecycleState.resumed));
+    }
     _updateReadingSync();
     switch (state) {
       case AppLifecycleState.resumed:
@@ -606,6 +633,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _restoreReaderFocusAfterPanel();
   }
 
+  Future<void> showSelectionDictionary(String content) async {
+    showOrHideAppBarAndBottomBar(false);
+    await showReaderPopup(context,
+        builder: (_) => DictionaryLookup(word: content));
+    _restoreReaderFocusAfterPanel();
+  }
+
   double _aiChatMaxWidth(BuildContext context) {
     final totalWidth = MediaQuery.of(context).size.width;
     final maxByPercentage = totalWidth * 0.65;
@@ -685,7 +719,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   List<Widget> _buildAiChatTrailing(BuildContext context) {
     return [
-      _buildKnowledgeIndexButton(context),
       IconButton(
         onPressed: () {
           setState(() {
@@ -711,56 +744,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         icon: const Icon(Icons.close),
       ),
     ];
-  }
-
-  Widget _buildKnowledgeIndexButton(BuildContext context) {
-    return IconButton(
-      onPressed: _isBuildingKnowledgeIndex
-          ? null
-          : () => _buildKnowledgeIndex(context),
-      icon: _isBuildingKnowledgeIndex
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.library_add_check_outlined),
-      tooltip: '建立本书知识库',
-    );
-  }
-
-  Future<void> _buildKnowledgeIndex(BuildContext context) async {
-    setState(() => _isBuildingKnowledgeIndex = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('正在读取章节并建立知识库…')),
-    );
-    try {
-      final result = await epubPlayerKey.currentState?.buildKnowledgeIndex(
-        onProgress: (chapterId, completed, total) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('知识库进度：$completed/$total'),
-              duration: const Duration(milliseconds: 700),
-            ),
-          );
-        },
-      );
-      if (!mounted) return;
-      final message = result?.status == IndexBuildStatus.completed
-          ? '本书知识库已建立'
-          : '知识库建立已取消';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('知识库建立失败：$error')),
-      );
-    } finally {
-      if (mounted) setState(() => _isBuildingKnowledgeIndex = false);
-    }
   }
 
   void _rebuildAiChat() {
@@ -861,7 +844,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                 initialMessage: content,
                 sendImmediate: sendImmediate,
                 quickPromptChips: quickPrompts,
-                trailing: [_buildKnowledgeIndexButton(context)],
               ));
       _restoreReaderFocusAfterPanel();
     } else {
@@ -1168,6 +1150,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                               child: QuickMarkToggle(
                                                   enabled: true,
                                                   showExit: true,
+                                                  showMenu:
+                                                      Prefs().quickMarkShowMenu,
+                                                  onToggleMenu:
+                                                      _toggleQuickMarkMenu,
                                                   onPressed: _changingQuickMark
                                                       ? null
                                                       : _toggleQuickMark)))),

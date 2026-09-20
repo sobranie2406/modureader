@@ -11,6 +11,10 @@ export class TtsNavigator {
     stop() { this.#generation++ }
     start(range) { return this.move(1, { start: true, range }) }
     async #loadSection(view, index, before, generation) {
+        // Speech must not wait for an iframe load/font/layout while the screen
+        // is off. Parse the chapter offscreen; presentation follows separately.
+        if (view.loadTTSSection && view.book.sections[index]?.createDocument)
+            return view.loadTTSSection(index, () => generation === this.#generation)
         const deadline = Date.now() + this.navigationTimeoutMs
         while (generation === this.#generation) {
             await view.renderer.goTo({ index })
@@ -34,7 +38,7 @@ export class TtsNavigator {
             // Reading ahead in a continuous viewport must not reset speech to
             // the new visible chapter. Only an explicit start/section change
             // rebinds the TTS document; its CFI closure owns a stable index.
-            if (start || !view.tts || !view.renderer.continuous) view.initTTS(false, { force: start })
+            if (start || !view.tts) view.initTTS(false, { force: start })
             if (start) {
                 const text = range ? view.tts.from(range) : view.tts.start()
                 if (text?.trim()) return text
@@ -45,7 +49,7 @@ export class TtsNavigator {
             const sections = view.book.sections
             for (let attempts = 0; attempts < sections.length; attempts++) {
                 if (generation !== this.#generation) return ''
-                const before = view.renderer.continuous && Number.isInteger(view.tts?.sectionIndex)
+                const before = Number.isInteger(view.tts?.sectionIndex)
                     ? { index: view.tts.sectionIndex, doc: view.tts.doc }
                     : view.renderer.getContents()[0]
                 let index = before.index + direction
@@ -55,7 +59,7 @@ export class TtsNavigator {
                     return ''
                 }
                 if (!await this.#loadSection(view, index, before, generation)) return ''
-                view.initTTS(false, { force: true })
+                if (view.tts?.sectionIndex !== index) view.initTTS(false, { force: true })
                 const text = last ? view.tts.end() : view.tts.start()
                 if (text?.trim()) return text
             }

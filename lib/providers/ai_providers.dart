@@ -1,5 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/ai_provider.dart';
+import 'package:anx_reader/enums/ai_reasoning_effort.dart';
 import 'package:anx_reader/service/ai/ai_services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
@@ -223,22 +224,52 @@ class AiProviders extends _$AiProviders {
 
   /// Delete a provider (only custom providers can be deleted)
   void deleteProvider(String providerId) {
-    final provider = state.firstWhere((p) => p.id == providerId);
+    final provider = getProviderById(providerId);
+    if (provider == null) return;
 
-    if (provider.isBuiltin) {
+    if (provider.isBuiltin ||
+        buildDefaultAiServices().any((p) => p.identifier == providerId)) {
       throw Exception('Cannot delete built-in provider');
     }
 
     state = state.where((p) => p.id != providerId).toList();
     Prefs().saveAiProviders(state);
 
-    // If deleted provider was selected, select another
-    if (Prefs().selectedAiService == providerId) {
-      final enabled = state.where((p) => p.enabled).toList();
-      if (enabled.isNotEmpty) {
-        setSelectedProvider(enabled.first.id);
-      }
+    _ensureValidSelection(state);
+    if (Prefs().prefs.getString('translationAiService') == providerId) {
+      Prefs().translationAiService = '';
     }
+  }
+
+  /// Restore the shipped template, never the old/migrated saved configuration.
+  /// Reset credentials, rotation and enabled state along with the template.
+  AiProvider restoreBuiltinDefaults(String providerId) {
+    final provider = getProviderById(providerId);
+    final option = buildDefaultAiServices()
+        .where((p) => p.identifier == providerId)
+        .firstOrNull;
+    if (provider == null || option == null || !provider.isBuiltin) {
+      throw ArgumentError('Only built-in providers have a default template');
+    }
+    final restored = provider.copyWith(
+      title: option.title,
+      logoAsset: option.logo,
+      url: option.defaultUrl,
+      protocol: _protocolForIdentifier(option.identifier),
+      model: option.defaultModel,
+      temperature: 0.7,
+      maxTokens: 8192,
+      contextTurns: 8,
+      apiKeys: const [],
+      keyIndex: 0,
+      enabled: true,
+      reasoningEffort: AiReasoningEffort.auto,
+      updatedAt: DateTime.now(),
+    );
+    // Remove legacy credentials too, so migration cannot resurrect old keys.
+    Prefs().deleteAiConfig(providerId);
+    updateProvider(restored);
+    return getProviderById(providerId)!;
   }
 
   /// Toggle provider enabled state

@@ -108,8 +108,11 @@ Future<void> main() async {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.modu.reader.tts.channel.audio',
       androidNotificationChannelName: 'Modu TTS',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
+      androidNotificationOngoing: false,
+      androidNotificationIcon: 'drawable/ic_stat_read_aloud',
+      // Keep the media service resumable from the lock screen after a pause.
+      // Explicit stop/end-of-book still changes processingState to idle.
+      androidStopForegroundOnPause: false,
     ),
   );
 

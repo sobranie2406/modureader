@@ -1,25 +1,19 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/book_sync_status.dart';
 import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/page/book_detail.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
-import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
-import 'package:anx_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:anx_reader/widgets/bookshelf/book_sync_status_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum _BookCardAction { details, vectorize, vectorModel, more, delete }
-
 typedef BookSelectionChanged = void Function(Book book, bool selected);
 
-class BookItem extends ConsumerWidget {
+class BookItem extends ConsumerStatefulWidget {
   const BookItem({
     super.key,
     required this.book,
@@ -34,8 +28,29 @@ class BookItem extends ConsumerWidget {
   final BookSelectionChanged? onSelectionChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final menuKey = GlobalKey<PopupMenuButtonState<_BookCardAction>>();
+  ConsumerState<BookItem> createState() => _BookItemState();
+}
+
+class _BookItemState extends ConsumerState<BookItem> {
+  // Sync status/progress refreshes must not dispose the button that is awaiting
+  // an open popup's result, otherwise Flutter silently drops onSelected.
+  var menuKey = GlobalKey<PopupMenuButtonState<BookAction>>();
+  Book get book => widget.book;
+  bool get selectionMode => widget.selectionMode;
+  bool get selected => widget.selected;
+  BookSelectionChanged? get onSelectionChanged => widget.onSelectionChanged;
+
+  @override
+  void didUpdateWidget(covariant BookItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.book.id != widget.book.id) {
+      // A genuinely different book must never inherit another book's popup.
+      menuKey = GlobalKey<PopupMenuButtonState<BookAction>>();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     void toggleSelection() {
       onSelectionChanged?.call(book, !selected);
     }
@@ -128,111 +143,10 @@ class BookItem extends ConsumerWidget {
                                   Positioned(
                                     right: 6,
                                     bottom: 6,
-                                    child: PopupMenuButton<_BookCardAction>(
-                                      key: menuKey,
-                                      tooltip: '书籍操作',
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainer,
-                                      onSelected: (action) async {
-                                        switch (action) {
-                                          case _BookCardAction.details:
-                                            await Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    BookDetail(book: book),
-                                              ),
-                                            );
-                                            break;
-                                          case _BookCardAction.vectorize:
-                                            queueBookForVectorization(book);
-                                            break;
-                                          case _BookCardAction.vectorModel:
-                                            await showBookEmbeddingModelDialog(
-                                                context, book);
-                                            break;
-                                          case _BookCardAction.delete:
-                                            await confirmAndDeleteBooksFromBookshelf(
-                                              context,
-                                              ref,
-                                              [book],
-                                            );
-                                            break;
-                                          case _BookCardAction.more:
-                                            await showModalBottomSheet<void>(
-                                              context: context,
-                                              builder: (_) =>
-                                                  BookBottomSheet(book: book),
-                                            );
-                                            break;
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: _BookCardAction.details,
-                                          child: ListTile(
-                                            dense: true,
-                                            leading: Icon(Icons.info_outline),
-                                            title: Text('书籍详情'),
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: _BookCardAction.vectorize,
-                                          enabled:
-                                              !(queueItem?.status.isActive ??
-                                                  false),
-                                          child: ListTile(
-                                            dense: true,
-                                            leading: Icon(
-                                              queueItem?.status.isActive == true
-                                                  ? Icons.hourglass_top_rounded
-                                                  : indexed
-                                                      ? Icons.refresh
-                                                      : Icons.hub_outlined,
-                                            ),
-                                            title: Text(
-                                              _vectorActionLabel(
-                                                indexed,
-                                                queueItem,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: _BookCardAction.vectorModel,
-                                          enabled:
-                                              !(queueItem?.status.isActive ??
-                                                  false),
-                                          child: ListTile(
-                                            dense: true,
-                                            leading: const Icon(Icons.tune),
-                                            title: const Text('向量化模型'),
-                                            subtitle: Text(
-                                                BookEmbeddingPreferences
-                                                    .labelFor(book)),
-                                          ),
-                                        ),
-                                        const PopupMenuDivider(),
-                                        const PopupMenuItem(
-                                          value: _BookCardAction.more,
-                                          child: ListTile(
-                                              dense: true,
-                                              leading: Icon(Icons.more_horiz),
-                                              title: Text('更多操作（分享、替换文件）')),
-                                        ),
-                                        PopupMenuItem(
-                                          value: _BookCardAction.delete,
-                                          child: ListTile(
-                                            dense: true,
-                                            textColor: Colors.red,
-                                            iconColor: Colors.red,
-                                            leading: const Icon(
-                                              Icons.delete_outline,
-                                            ),
-                                            title: const Text('删除'),
-                                          ),
-                                        ),
-                                      ],
+                                    child: BookBottomSheet(
+                                      book: book,
+                                      menuOnly: true,
+                                      menuKey: menuKey,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           color: Colors.black.withAlpha(150),
@@ -328,30 +242,6 @@ class BookItem extends ConsumerWidget {
       },
     );
   }
-}
-
-String _vectorActionLabel(
-  bool indexed,
-  BookKnowledgeQueueItem? item,
-) {
-  if (item != null) {
-    switch (item.status) {
-      case BookKnowledgeQueueStatus.queued:
-        return '排队中';
-      case BookKnowledgeQueueStatus.extracting:
-      case BookKnowledgeQueueStatus.preparing:
-      case BookKnowledgeQueueStatus.vectorizing:
-        return '正在向量化';
-      case BookKnowledgeQueueStatus.cancelling:
-        return '正在取消';
-      case BookKnowledgeQueueStatus.failed:
-        return '重新排队';
-      case BookKnowledgeQueueStatus.completed:
-      case BookKnowledgeQueueStatus.cancelled:
-        break;
-    }
-  }
-  return indexed ? '重新向量化' : '向量化';
 }
 
 class _KnowledgeStatusBadge extends StatelessWidget {

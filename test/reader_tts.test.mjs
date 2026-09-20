@@ -147,6 +147,91 @@ test('stop invalidates pending chapter movement and queued requests', async () =
   assert.deepEqual(visited, [1])
 })
 
+// Use the real View speech methods without a real WebView renderer. Any
+// attempted renderer load here remains pending, as it does on affected phones.
+const viewSource = await readFile(new URL('../assets/foliate-js/src/view.js', import.meta.url), 'utf8')
+const speechMethods = viewSource.slice(viewSource.indexOf('  oldValue = null'), viewSource.indexOf('  startMediaOverlay()'))
+const SpeechView = vm.runInNewContext(`(class {
+  #index = 0;
+  #sectionProgress = { getProgress: (index, fraction) => ({fraction: (index + fraction) / 4}) };
+  progressEvents = [];
+  #emit(name, detail) { if (name === 'tts-progress') this.progressEvents.push(detail) }
+  overlays = [];
+  #getOverlayer(index) { return this.overlays[index] }
+  getCFI(index, range) { return index + ':' + range.toString() }
+  resolveNavigation(cfi) {
+    const index = Number(cfi.split(':')[0]);
+    return {index, anchor: doc => { const r = doc.createRange(); r.selectNodeContents(doc.body); return r }}
+  }
+  ${speechMethods}
+})`, { TTS, textWalker: null, Overlayer: {highlight() {}}, document: {hidden: false}, console })
+function backgroundReader(chapters) {
+  const docs = chapters.map(documentFor)
+  const view = new SpeechView()
+  let loads = 0
+  view.book = {sections: docs.map(doc => ({createDocument: async () => doc}))}
+  view.renderer = {
+    getContents: () => [{index: 0, doc: docs[0]}],
+    pinTtsSection() {},
+    scrollToAnchor: async () => {},
+    goTo: () => { loads++; return new Promise(() => {}) },
+  }
+  view.ttsBackground = true
+  const nav = new TtsNavigator(() => view)
+  return {view, nav, get loads() { return loads }}
+}
+test('locked-screen speech crosses empty and title-only chapters without loading any iframe', async () => {
+  const fixture = backgroundReader(['<p>末句。</p>', '', '<h1>下一章</h1>', '<h1>第三章</h1><p>完。</p>'])
+  const {view, nav} = fixture
+  assert.equal(await nav.start(), '末句。')
+  assert.equal(await nav.move(1), '下一章')
+  // The producer calls initTTS during collection. It must retain the speech
+  // document, not return to the stale chapter still visible on screen.
+  view.initTTS()
+  assert.equal(view.tts.currentDetail().text, '下一章')
+  assert.equal(await nav.move(1), '第三章')
+  assert.equal(await nav.move(1), '完。')
+  assert.equal(await nav.move(1), '')
+  assert.equal(fixture.loads, 0)
+  assert.ok(view.progressEvents.some(event => event.cfi.startsWith('2:')))
+  assert.ok(view.progressEvents.some(event => event.cfi.startsWith('3:')))
+  assert.ok(view.progressEvents.every(event => Number.isFinite(event.fraction)))
+})
+test('foreground presentation blocked in goTo does not block speech or reset its cursor', async () => {
+  const fixture = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1><p>正文。</p>', '<h1>最后章</h1>'])
+  const {view, nav} = fixture
+  await nav.start()
+  await nav.move(1)
+  view.ttsBackground = false
+  void view.syncTTSHighlight()
+  assert.equal(fixture.loads, 1)
+  assert.equal(await nav.move(1), '正文。')
+  assert.equal(await nav.move(1), '最后章')
+  assert.equal(await nav.move(1), '')
+})
+test('stop during offscreen chapter extraction rejects the late document', async () => {
+  const {view, nav} = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1>'])
+  let complete
+  view.book.sections[1].createDocument = () => new Promise(resolve => { complete = resolve })
+  await nav.start()
+  const moving = nav.move(1)
+  await new Promise(resolve => setImmediate(resolve))
+  nav.stop()
+  view.initTTS(true)
+  complete(documentFor('<h1>下一章</h1>'))
+  assert.equal(await moving, '')
+  assert.equal(view.tts, null)
+})
+test('failed offscreen extraction can retry the same chapter, never skipping it', async () => {
+  const {view, nav} = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1>'])
+  const load = view.book.sections[1].createDocument
+  view.book.sections[1].createDocument = async () => { throw new Error('read failed') }
+  await nav.start()
+  await assert.rejects(nav.move(1), /read failed/)
+  view.book.sections[1].createDocument = load
+  assert.equal(await nav.move(1), '下一章')
+})
+
 // Exercise the actual private page-turn method with only its renderer IO stubbed.
 const paginatorSource = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8')
 const turnPage = paginatorSource.slice(paginatorSource.indexOf('  async #turnPage('), paginatorSource.indexOf('  prev(distance)'))

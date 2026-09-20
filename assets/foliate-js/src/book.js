@@ -17,6 +17,7 @@ const { EPUB } = await import('./epub.js')
 
 var isPdf = false;
 let quickMarkEnabled = false;
+let quickMarkShowMenu = false;
 let quickMarkColor = '#ffd54f';
 const quickMarkDocuments = new WeakMap();
 const desktopInputDocuments = new WeakMap();
@@ -1075,6 +1076,11 @@ class Reader {
       this.#saveOriginalContent()
     })
     this.view.addEventListener('relocate', this.#onRelocate.bind(this))
+    this.view.addEventListener('tts-progress', ({ detail }) => {
+      if (Number.isFinite(detail.fraction))
+        void callFlutter('onTtsProgress', { cfi: detail.cfi, percentage: detail.fraction })
+          .catch(() => {});
+    })
     this.view.addEventListener('click-view', this.#onClickView.bind(this))
     this.view.addEventListener('doctouchstart', this.#onTouchStart.bind(this))
     this.view.addEventListener('doctouchmove', this.#onTouchMove.bind(this))
@@ -1339,6 +1345,11 @@ class Reader {
             const annotation = result.annotation;
             if (annotation && !this.annotationsByValue.has(annotation.value))
               this.addAnnotation(annotation);
+            if (annotation && quickMarkEnabled && quickMarkShowMenu && range.startContainer.isConnected)
+              await callFlutter('onAnnotationClick', {
+                annotation, quickMark: true, pos: getPosition(range),
+                contextText: buildRangeContextText(range),
+              });
           });
           this.quickMarkQueue = commit.catch(() => {});
           return commit;
@@ -1970,10 +1981,11 @@ window.getSelection = () => reader.getSelection()
 
 window.clearSelection = () => reader.view.deselect()
 
-window.setQuickMarkEnabled = (enabled, color) => {
+window.setQuickMarkEnabled = (enabled, color, showMenu = false) => {
   if (!reader.view?.renderer) return false;
   quickMarkEnabled = enabled === true && !isPdf && !reader.view.isFixedLayout;
   quickMarkColor = color ?? quickMarkColor;
+  quickMarkShowMenu = showMenu === true;
   stopAutoPageSession(reader.view);
   for (const { doc } of reader.view.renderer.getContents())
     quickMarkDocuments.get(doc)?.setEnabled(quickMarkEnabled, quickMarkColor);
@@ -1993,6 +2005,13 @@ window.nextSection = () => reader.view.renderer.nextSection()
 window.initTts = () => reader.view.initTTS()
 
 const ttsNavigator = new TtsNavigator(() => reader.view)
+window.ttsSetBackground = background => {
+  reader.view.ttsBackground = background === true
+  if (!background) void reader.view.syncTTSHighlight()
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void reader.view.syncTTSHighlight()
+})
 window.ttsStop = () => {
   ttsNavigator.stop()
   return reader.view.initTTS(true)

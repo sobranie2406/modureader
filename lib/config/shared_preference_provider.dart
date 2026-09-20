@@ -54,6 +54,7 @@ const Set<String> _prefsImportSkipKeys = {
   // Enabling sensitive sync requires an explicit risk confirmation on each
   // device. Never restore this switch or its local-only password silently.
   'syncAiSettingsToWebdav',
+  'syncKnowledgeIndexes',
   'syncAiSettingsEncryptionPassword',
 };
 
@@ -64,6 +65,19 @@ const Set<String> _prefsExportSkipKeys = {
 };
 
 class Prefs extends ChangeNotifier {
+  bool get quickMarkShowMenu => prefs.getBool('quickMarkShowMenu') ?? false;
+  set quickMarkShowMenu(bool value) {
+    prefs.setBool('quickMarkShowMenu', value);
+    notifyListeners();
+  }
+
+  bool get syncKnowledgeIndexes =>
+      prefs.getBool('syncKnowledgeIndexes') ?? false;
+  set syncKnowledgeIndexes(bool value) {
+    prefs.setBool('syncKnowledgeIndexes', value);
+    notifyListeners();
+  }
+
   late SharedPreferences prefs;
   static final Prefs _instance = Prefs._internal();
 

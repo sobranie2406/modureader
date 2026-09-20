@@ -151,6 +151,7 @@ export class View extends HTMLElement {
     }
   }
   close() {
+    this.initTTS(true)
     this.clearSearch()
     this.renderer?.destroy()
     this.renderer?.remove()
@@ -588,8 +589,51 @@ export class View extends HTMLElement {
     this.#searchResults.clear()
   }
   oldValue = null
-  initTTS(stop, { force = false } = {}) {
+  #ttsPresentation = null
+  #ttsPresenting = false
+  ttsBackground = false
+  async loadTTSSection(index, isCurrent = () => true) {
+    const doc = await this.book.sections[index].createDocument()
+    if (!isCurrent()) return false
+    if (!doc?.body) throw new Error('Speech chapter has no text document')
+    this.initTTS(false, { force: true, content: { doc, index }, detached: true })
+    return true
+  }
+  // Never awaited by the speech cursor. A suspended WebView layout must not
+  // prevent synthesis/playback of subsequent chapters.
+  async syncTTSHighlight() {
+    if (this.ttsBackground || document.hidden || this.#ttsPresenting || !this.#ttsPresentation) return
+    this.#ttsPresenting = true
+    const current = this.#ttsPresentation
+    try {
+      const { cfi, tts } = current
+      const resolved = this.resolveNavigation(cfi)
+      if (!resolved) return
+      const { index, anchor } = resolved
+      if (this.renderer.getContents()[0]?.index !== index)
+        await this.renderer.goTo(resolved)
+      if (this.tts !== tts || this.#ttsPresentation !== current || this.ttsBackground || document.hidden) return
+      const content = this.renderer.getContents().find(x => x.index === index)
+      if (!content) return
+      const range = anchor(content.doc)
+      const obj = this.#getOverlayer(index)
+      if (obj) {
+        obj.overlayer.remove(this.oldValue)
+        obj.overlayer.add(cfi, range, Overlayer.highlight, { color: '#39c5bc83' })
+        this.oldValue = cfi
+      }
+      await this.renderer.scrollToAnchor(range)
+    } catch (error) {
+      console.warn('Speech presentation could not follow the cursor', error)
+    } finally {
+      this.#ttsPresenting = false
+      if (this.#ttsPresentation && this.#ttsPresentation !== current)
+        void this.syncTTSHighlight()
+    }
+  }
+  initTTS(stop, { force = false, content, detached = false } = {}) {
     if (stop) {
+      this.#ttsPresentation = null
       this.renderer.pinTtsSection?.(null)
       this.#getOverlayer(this.tts?.sectionIndex ?? this.#index)?.overlayer.remove(this.oldValue)
       this.tts = null
@@ -597,29 +641,30 @@ export class View extends HTMLElement {
       return
     }
 
-    if (this.renderer.continuous && this.tts && !force) return
+    if (this.tts && !force) return
 
-    const { doc, index } = this.renderer.getContents()[0];
+    const { doc, index } = content ?? this.renderer.getContents()[0];
     if (this.tts && this.tts.doc === doc) return;
     this.#getOverlayer(this.tts?.sectionIndex ?? index)?.overlayer.remove(this.oldValue)
     this.oldValue = null
-    this.renderer.pinTtsSection?.(index)
+    this.renderer.pinTtsSection?.(detached ? null : index)
     this.tts = new TTS(
       doc,
       textWalker,
       (range) => {
-        const obj = this.#getOverlayer(index);
-        let value = null;
-        if (obj) {
-          const { overlayer } = obj;
-          if (this.oldValue) {
-            overlayer.remove(this.oldValue);
-          }
-          value = this.getCFI(index, range);
-          overlayer.add(value, range, Overlayer.highlight, { color: '#39c5bc83' });
-          this.oldValue = value;
+        const value = this.getCFI(index, range)
+        this.#ttsPresentation = { cfi: value, tts: this.tts }
+        // Persist the speech cursor even when no visible page is being laid
+        // out. Percent is text-based here; the CFI remains the exact position.
+        if (this.ttsBackground || document.hidden || detached) {
+          const prefix = doc.createRange()
+          prefix.selectNodeContents(doc.body)
+          prefix.setEnd(range.startContainer, range.startOffset)
+          const fraction = Math.min(1, prefix.toString().length / Math.max(1, doc.body.textContent.length))
+          const progress = this.#sectionProgress?.getProgress(index, fraction) ?? {}
+          this.#emit('tts-progress', { cfi: value, fraction: progress.fraction })
         }
-        this.renderer.scrollToAnchor(range);
+        void this.syncTTSHighlight()
         return value;
       },
       (range) => this.getCFI(index, range),

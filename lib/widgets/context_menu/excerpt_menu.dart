@@ -11,6 +11,8 @@ import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/book_share/excerpt_share_service.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
 import 'package:anx_reader/widgets/icon_and_text.dart';
+import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
+import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icons_plus/icons_plus.dart';
@@ -315,6 +317,28 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             onTap: widget.toggleTranslationMenu,
             icon: const Icon(Icons.translate),
             text: L10n.of(context).contextMenuTranslate,
+          ),
+          // Offline dictionary
+          IconAndText(
+            compact: true,
+            onTap: () async {
+              // Keep a navigator-owned context: closing the selection removes
+              // this overlay and invalidates its own BuildContext.
+              final popupContext = Navigator.of(context).context;
+              final word = widget.annoContent;
+              final reader = readingPageKey.currentState;
+              widget.onClose();
+              if (reader != null) {
+                await reader.showSelectionDictionary(word);
+              } else {
+                await showReaderPopup(popupContext,
+                    builder: (_) => DictionaryLookup(word: word));
+              }
+            },
+            icon: const Icon(Icons.menu_book_outlined),
+            text: Localizations.localeOf(context).languageCode == 'zh'
+                ? '字典'
+                : 'Dictionary',
           ),
           // narrate
           IconAndText(

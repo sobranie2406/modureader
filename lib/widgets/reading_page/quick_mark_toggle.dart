@@ -8,11 +8,15 @@ class QuickMarkToggle extends StatelessWidget {
       required this.enabled,
       required this.onPressed,
       this.platform,
+      this.showMenu = false,
+      this.onToggleMenu,
       this.showExit = false});
   final bool enabled;
   final VoidCallback? onPressed;
   final AnxPlatformEnum? platform;
   final bool showExit;
+  final bool showMenu;
+  final VoidCallback? onToggleMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +30,25 @@ class QuickMarkToggle extends StatelessWidget {
         elevation: 2,
         borderRadius: BorderRadius.circular(24),
         color: Theme.of(context).colorScheme.secondaryContainer,
-        child: TextButton.icon(
-            onPressed: onPressed,
-            icon: const Icon(Icons.close, size: 18),
-            label: Text(zh ? '快速标记中 · 退出' : 'Quick mark · Exit')),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (onToggleMenu != null)
+            IconButton(
+              key: const ValueKey('quick-mark-menu-toggle'),
+              tooltip: zh
+                  ? (showMenu ? '标记后弹出菜单：开' : '标记后弹出菜单：关')
+                  : (showMenu
+                      ? 'Menu after marking: on'
+                      : 'Menu after marking: off'),
+              isSelected: showMenu,
+              icon: const Icon(Icons.speaker_notes_off_outlined, size: 20),
+              selectedIcon: const Icon(Icons.speaker_notes, size: 20),
+              onPressed: onToggleMenu,
+            ),
+          TextButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.close, size: 18),
+              label: Text(zh ? '快速标记中 · 退出' : 'Quick mark · Exit')),
+        ]),
       );
     }
     return IconButton(

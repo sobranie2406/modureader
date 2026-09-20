@@ -104,16 +104,15 @@ class _TtsWidgetState extends State<TtsWidget> {
               Text(L10n.of(context).ttsPitch),
               Expanded(
                 child: Slider(
-                  value: TtsHandler().pitch,
+                  value: this.pitch,
                   onChanged: (newPitch) {
-                    setState(() {
-                      TtsHandler().pitch = newPitch;
-                    });
+                    setState(() => this.pitch = newPitch);
                   },
+                  onChangeEnd: (value) => TtsHandler().pitch = value,
                   min: 0.5,
                   max: 2.0,
                   divisions: 15,
-                  label: TtsHandler().pitch.toStringAsFixed(1),
+                  label: this.pitch.toStringAsFixed(1),
                 ),
               ),
             ],
@@ -126,16 +125,17 @@ class _TtsWidgetState extends State<TtsWidget> {
               Text(L10n.of(context).ttsRate),
               Expanded(
                 child: Slider(
-                  value: TtsHandler().rate,
+                  value: this.rate,
                   onChanged: (newRate) {
-                    setState(() {
-                      TtsHandler().rate = newRate;
-                    });
+                    setState(() => this.rate = newRate);
                   },
+                  // Dragging previews the value; commit once on release so
+                  // each pointer event does not invalidate all speech requests.
+                  onChangeEnd: (value) => TtsHandler().rate = value,
                   min: 0.0,
                   max: 2.0,
                   divisions: 10,
-                  label: TtsHandler().rate.toStringAsFixed(1),
+                  label: this.rate.toStringAsFixed(1),
                 ),
               ),
             ],

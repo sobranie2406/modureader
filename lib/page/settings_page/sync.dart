@@ -110,6 +110,17 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                   });
                 }),
             const ReadingSyncSettings(),
+            SettingsTile.switchTile(
+              title: Text(_label('同步向量化数据', 'Sync book vector indexes')),
+              leading: const Icon(Icons.hub_outlined),
+              description: Text(_label(
+                '默认关闭。同步完整索引（含书籍原文片段和向量），按书籍文件 SHA-256 校验匹配，不按书名或本机编号匹配。两端需先下载同一书籍并开启此项，再同步；已有有效索引不覆盖。语义检索仍需对应模型，模型文件、API Key 不随索引上传。关闭不会删除已同步的数据。',
+                'Off by default. Transfers complete indexes including book excerpts and vectors, matched by file SHA-256, never title or local ID. Download the same book on both devices and enable this option, then sync. Valid local indexes are preserved. Semantic queries still require the matching model; model files and API keys are excluded. Turning off does not delete existing data.',
+              )),
+              initialValue: Prefs().syncKnowledgeIndexes,
+              onToggle: (value) =>
+                  setState(() => Prefs().syncKnowledgeIndexes = value),
+            ),
             SettingsTile.navigation(
                 title: Text(L10n.of(context).restoreBackup),
                 leading: const Icon(Icons.restore),

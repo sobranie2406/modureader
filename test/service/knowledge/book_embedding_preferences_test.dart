@@ -103,18 +103,30 @@ void main() {
     expect(matches(null), isFalse);
   });
 
-  test('queue builder, reader builder and AI query all resolve per-book models',
+  test('single queue builder and shared AI retrieval resolve per-book models',
       () {
     for (final path in [
       'lib/service/knowledge/book_knowledge_index_service.dart',
-      'lib/page/book_player/epub_player.dart',
-      'lib/providers/ai_chat.dart'
+      'lib/service/knowledge/book_knowledge_retriever.dart',
     ]) {
       final source = File(path).readAsStringSync();
-      expect(source, contains('EmbeddingProviderFactory.fromBook(book)'));
+      expect(source, contains('EmbeddingProviderFactory.fromBook'));
       expect(source, isNot(contains('EmbeddingProviderFactory.fromPrefs()')));
     }
+    expect(File('lib/providers/ai_chat.dart').readAsStringSync(),
+        contains('BookKnowledgeRetriever().search(book, query)'));
+    expect(
+        File('lib/service/ai/tools/repository/book_content_search_repository.dart')
+            .readAsStringSync(),
+        contains('_knowledgeRetriever.search(book, keyword'));
+    expect(File('lib/page/book_player/epub_player.dart').readAsStringSync(),
+        isNot(contains('buildKnowledgeIndex')));
+    expect(File('lib/page/reading_page.dart').readAsStringSync(),
+        isNot(contains('建立本书知识库')));
     expect(File('lib/widgets/bookshelf/book_item.dart').readAsStringSync(),
+        contains('BookBottomSheet('));
+    expect(
+        File('lib/widgets/bookshelf/book_bottom_sheet.dart').readAsStringSync(),
         matches(RegExp(r'showBookEmbeddingModelDialog\(\s*context,\s*book\)')));
   });
 

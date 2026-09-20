@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/service/knowledge/book_index_lock.dart';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
 import 'package:anx_reader/service/knowledge/index_build_marker.dart';
 import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
@@ -91,6 +92,16 @@ class BookKnowledgeIndexService {
     Book book, {
     IndexProgressCallback? onProgress,
     bool Function()? isCancelled,
+  }) =>
+      withBookIndexLock(
+          book.id,
+          () => _buildLocked(book,
+              onProgress: onProgress, isCancelled: isCancelled));
+
+  Future<IndexBuildResult> _buildLocked(
+    Book book, {
+    IndexProgressCallback? onProgress,
+    bool Function()? isCancelled,
   }) async {
     if (isCancelled?.call() ?? false) {
       return const IndexBuildResult(status: IndexBuildStatus.cancelled);
@@ -177,18 +188,18 @@ class BookKnowledgeIndexService {
     }
   }
 
-  Future<void> deleteIndex(Book book) async {
-    final file = indexFile(book.id);
-    if (await file.exists()) await file.delete();
-    final temporary = File('${file.path}.tmp');
-    if (await temporary.exists()) await temporary.delete();
-    for (final suffix in ['.summary', '.summary.tmp']) {
-      final metadata = File('${file.path}$suffix');
-      if (await metadata.exists()) await metadata.delete();
-    }
-    final marker = indexBuildMarker(file);
-    if (await marker.exists()) await marker.delete();
-  }
+  Future<void> deleteIndex(Book book) => withBookIndexLock(book.id, () async {
+        final file = indexFile(book.id);
+        if (await file.exists()) await file.delete();
+        final temporary = File('${file.path}.tmp');
+        if (await temporary.exists()) await temporary.delete();
+        for (final suffix in ['.summary', '.summary.tmp']) {
+          final metadata = File('${file.path}$suffix');
+          if (await metadata.exists()) await metadata.delete();
+        }
+        final marker = indexBuildMarker(file);
+        if (await marker.exists()) await marker.delete();
+      });
 }
 
 class _DiagnosticIndexStore implements KnowledgeIndexStore {

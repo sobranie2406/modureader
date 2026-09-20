@@ -39,6 +39,30 @@ function fixture() {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('quick mark menu is opt-in and opens the saved annotation only after successful save', async () => {
+  const bookSource = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
+  const start = bookSource.indexOf('onCommit: range => {');
+  const end = bookSource.indexOf('\n        },', start);
+  const callback = bookSource.slice(start + 'onCommit: '.length, end) + '\n}';
+  for (const showMenu of [false, true]) for (const success of [false, true]) {
+    const f = fixture();
+    const range = f.doc.createRange(); range.selectNodeContents(f.text);
+    const events = [];
+    const annotation = {id: 9, value: 'epubcfi(merged)', note: '合并后的批注'};
+    const view = {quickMarkQueue: Promise.resolve(), annotations: new Map(), annotationsByValue: new Map(),
+      view: {getCFI: () => 'epubcfi(new)'}, removeAnnotation() {}, addAnnotation() {events.push('paint')} };
+    const handler = new Function('callFlutter', 'planQuickMarkMerge', 'quickMarkEnabled', 'quickMarkShowMenu',
+      'quickMarkColor', 'index', 'getPosition', 'buildRangeContextText', `return (${callback})`).call(view,
+      async (event, data) => { events.push(event); if (event === 'onQuickMark') return success ? {annotation} : null;
+        assert.equal(data.annotation.id, 9); assert.equal(data.annotation.value, 'epubcfi(merged)'); },
+      async () => null, true, showMenu, '#ffcc00', 0, () => ({left:0,top:0,right:1,bottom:1}), () => 'context');
+    await handler(range);
+    assert.deepEqual(events, !success ? ['onQuickMark'] : showMenu
+      ? ['onQuickMark', 'paint', 'onAnnotationClick'] : ['onQuickMark', 'paint']);
+    assert.equal(f.doc.getSelection().toString(), '');
+  }
+});
+
 test('disabled mode leaves scrolling alone and creates no note', async () => {
   const f = fixture();
   assert.equal(f.touch('touchstart', 0).defaultPrevented, false);
