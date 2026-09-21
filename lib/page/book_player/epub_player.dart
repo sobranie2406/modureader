@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:anx_reader/widgets/reading_page/vertical_page_chrome.dart';
 import 'package:anx_reader/service/translate/ai.dart';
 import 'package:anx_reader/service/translate/deepl.dart';
 import 'package:anx_reader/service/translate/microsoft_free.dart';
@@ -98,6 +99,39 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   String chapterHref = '';
   int chapterCurrentPage = 0;
   int chapterTotalPages = 0;
+  int bookCurrentPage = 0;
+  int bookTotalPages = 0;
+  Map<String, double>? _lastVerticalInsets;
+
+  bool get _verticalPage =>
+      Prefs().writingMode.isVertical ||
+      (Prefs().writingMode == WritingModeEnum.auto && writingMode.isVertical);
+
+  VerticalPageGeometry get _verticalGeometry {
+    final info = Prefs().readingInfo;
+    final media = MediaQuery.of(context);
+    return VerticalPageGeometry(
+        media.padding,
+        media.textScaler.scale(info.header.fontSize.clamp(8, 24)),
+        media.textScaler.scale(info.footer.fontSize.clamp(8, 24)));
+  }
+
+  VerticalPageChrome get _verticalChrome => VerticalPageChrome(
+        geometry: _verticalGeometry,
+        chapterTitle: chapterTitle.isEmpty ? widget.book.title : chapterTitle,
+        remainingPages:
+            (chapterTotalPages - chapterCurrentPage).clamp(0, 100000000),
+        currentPage: bookCurrentPage + 1,
+        totalPages: bookTotalPages,
+        color: Color(int.parse('0x${textColor ?? Prefs().readTheme.textColor}'))
+            .withAlpha(180),
+        redFrame: Prefs().verticalRedFrame,
+      );
+
+  Map<String, dynamic>? get _webVerticalChrome => AnxPlatform.isMacOS
+      ? _verticalChrome.toWebStyle(Localizations.localeOf(context))
+      : null;
+
   OverlayEntry? contextMenuEntry;
   AnimationController? _animationController;
   Animation<double>? _animation;
@@ -254,11 +288,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       changeStyle({
         backgroundColor: '#$bc',
         fontColor: '#$tc',
+        verticalPageChrome: ${jsonEncode(_webVerticalChrome)},
       })
       ''');
   }
 
   void changeStyle(BookStyle? bookStyle) {
+    if (mounted) setState(() {});
     styleTimer?.cancel();
     styleTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
@@ -286,6 +322,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         maxColumnCount: ${style.maxColumnCount},
         columnThreshold: ${style.columnThreshold},
         writingMode: '${Prefs().writingMode.code}',
+        verticalPageInsets: ${jsonEncode(_verticalGeometry.toJson())},
+        verticalPageChrome: ${jsonEncode(_webVerticalChrome)},
+        verticalRedFrame: ${Prefs().verticalRedFrame},
         textAlign: '${Prefs().textAlignment.code}',
         backgroundImage: ${jsonEncode(bgimgUrl)},
         bgimgBlur: ${Prefs().bgimg.blur},
@@ -948,7 +987,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         callback: (args) {
           Map<String, dynamic> location = args[0];
           if (!mounted) return;
-          if (cfi == location['cfi']) {
+          if (cfi == location['cfi'] &&
+              writingMode.code == location['writingMode'] &&
+              chapterCurrentPage == location['chapterCurrentPage'] &&
+              chapterTotalPages == location['chapterTotalPages'] &&
+              bookCurrentPage == location['bookCurrentPage'] &&
+              bookTotalPages == location['bookTotalPages']) {
             if (location['readingAction'] == true) {
               unawaited(_recordReadingAction(cfi, percentage));
             }
@@ -965,11 +1009,20 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             chapterHref = location['chapterHref'] ?? '';
             chapterCurrentPage = location['chapterCurrentPage'] ?? 0;
             chapterTotalPages = location['chapterTotalPages'] ?? 0;
+            bookCurrentPage = location['bookCurrentPage'] ?? 0;
+            bookTotalPages = location['bookTotalPages'] ?? 0;
             bookmarkExists = location['bookmark']['exists'] ?? false;
             bookmarkCfi = location['bookmark']['cfi'] ?? '';
             writingMode =
                 WritingModeEnum.fromCode(location['writingMode'] ?? '');
           });
+          if (AnxPlatform.isMacOS) {
+            // Only update labels. changeStyle here would repaginate and emit
+            // another relocation on every page turn.
+            controller.evaluateJavascript(
+                source: 'window.updateVerticalPageChrome?.('
+                    '${jsonEncode(_webVerticalChrome)})');
+          }
           ref.read(currentReadingProvider.notifier).update(
                 cfi: cfi,
                 percentage: percentage,
@@ -987,11 +1040,18 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     controller.addJavaScriptHandler(
         handlerName: 'onTtsProgress',
         callback: (args) {
-          if (!mounted || !TtsHandler().isPlaying || args.isEmpty || args.first is! Map) return;
+          if (!mounted ||
+              !TtsHandler().isPlaying ||
+              args.isEmpty ||
+              args.first is! Map) return;
           final value = args.first as Map;
           final position = value['cfi'];
           final progress = value['percentage'];
-          if (position is! String || progress is! num || !progress.isFinite || progress < 0 || progress > 1) return;
+          if (position is! String ||
+              progress is! num ||
+              !progress.isFinite ||
+              progress < 0 ||
+              progress > 1) return;
           unawaited(_recordReadingAction(position, progress.toDouble()));
         });
     controller.addJavaScriptHandler(
@@ -1090,7 +1150,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         callback: (args) {
           Map<String, dynamic> annotation = args[0];
           if (annotation['quickMark'] == true &&
-              (!AnxPlatform.isMobile || !quickMarkEnabled || !Prefs().quickMarkShowMenu)) return;
+              (!AnxPlatform.isMobile ||
+                  !quickMarkEnabled ||
+                  !Prefs().quickMarkShowMenu)) return;
           removeOverlay();
 
           if (annotation['annotation'] == null) {
@@ -1324,6 +1386,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Keep the DOM gutters in sync with rotation/safe areas and UI text scaling.
+    final insets = _verticalGeometry.toJson();
+    if (!mapEquals(_lastVerticalInsets, insets)) {
+      _lastVerticalInsets = insets;
+      if (_readerReady) changeStyle(null);
+    }
+  }
+
+  @override
   void initState() {
     _progress = ReaderProgressSession(bookDao, widget.book.id);
     book = widget.book;
@@ -1353,11 +1426,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     super.initState();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-  }
-
   Future<void> saveReadingProgress() async {
     await _progress.flush();
   }
@@ -1385,7 +1453,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       Theme.of(navigatorKey.currentContext!).brightness == Brightness.dark;
 
   void changeReadingInfo() {
-    setState(() {});
+    changeStyle(null);
   }
 
   Widget _buildHistoryCapsule() {
@@ -1470,6 +1538,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   Widget readingInfoWidget() {
+    if (_verticalPage) {
+      return AnxPlatform.isMacOS ? const SizedBox.shrink() : _verticalChrome;
+    }
     if (chapterCurrentPage == 0 && percentage == 0.0) {
       return const SizedBox();
     }
@@ -1618,6 +1689,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             backgroundColor: backgroundColor,
             textColor: textColor,
             isDarkMode: Theme.of(context).brightness == Brightness.dark,
+            verticalPageInsets: _verticalGeometry.toJson(),
+            verticalPageChrome: _webVerticalChrome,
           ),
         ),
       ),

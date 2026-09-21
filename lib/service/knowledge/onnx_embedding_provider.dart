@@ -23,6 +23,7 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   final LocalEmbeddingModel model;
   final LocalEmbeddingModelStore store;
   final LocalOnnxEmbeddingEngine _engine;
+  Future<void Function()>? _modelUse;
 
   @override
   int get configuredDimension => model.dimensions;
@@ -34,10 +35,35 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   String get modelId => model.id;
 
   @override
-  Future<void> ensureReady() => store.ensureAvailable(model);
+  Future<void> ensureReady() async {
+    final use = _modelUse ??= store.acquireUse(model);
+    try {
+      await use;
+      await store.ensureAvailable(model);
+    } catch (_) {
+      if (identical(_modelUse, use)) {
+        _modelUse = null;
+        try {
+          (await use)();
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
 
   @override
-  Future<void> release() => _engine.release();
+  Future<void> release() async {
+    final use = _modelUse;
+    if (use == null) return;
+    try {
+      await _engine.release();
+    } finally {
+      if (identical(_modelUse, use)) {
+        _modelUse = null;
+        (await use)();
+      }
+    }
+  }
 
   @override
   Future<List<List<double>>> embedBatch(List<String> inputs) =>
@@ -112,6 +138,10 @@ class LocalOnnxEmbeddingEngine {
   }
 
   Future<void> release() => _exclusive(_closeActiveModel);
+
+  Future<void> releaseModel(String modelId) => _exclusive(() async {
+        if (_activeModelId == modelId) await _closeActiveModel();
+      });
 
   Future<T> _exclusive<T>(Future<T> Function() action) async {
     final previous = _tail;

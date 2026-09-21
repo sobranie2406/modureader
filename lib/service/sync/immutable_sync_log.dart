@@ -56,7 +56,9 @@ class ImmutableSyncLog {
     return published;
   }
 
-  Future<List<RowSyncRecord>> read() async {
+  Future<List<RowSyncRecord>> read({
+    Future<void> Function(List<RowSyncRecord>)? onVerifiedBatch,
+  }) async {
     final root = await client.readProps(SyncPaths.recordLog);
     if (root == null) return [];
     if (root.isDir != true) throw const FormatException('同步记录目录无效');
@@ -105,8 +107,9 @@ class ImmutableSyncLog {
           // success; retry next sync, never interpret partial bytes as empty.
           throw const FormatException('同步记录尚未完整上传或校验失败，请稍后重试');
         }
-        records =
-            mergeSyncRecords(records, await RowSyncArchive.read(local.path));
+        final batch = await RowSyncArchive.read(local.path);
+        await onVerifiedBatch?.call(batch);
+        records = mergeSyncRecords(records, batch);
       }
     }
     return records;

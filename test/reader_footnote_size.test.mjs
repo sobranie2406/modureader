@@ -15,7 +15,8 @@ test('footnote type follows the reader at 80 percent without changing its size',
   }
   const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   assert.match(book, /const footNoteStyle = \{\s*fontSize: footnoteFontSize\(style.fontSize\)/);
-  assert.ok(book.includes('html { font-size: ${footNoteStyle.fontSize}em !important; }'));
+  assert.ok(book.includes('html { font-size: ${noteSizePx}px !important; }'));
+  assert.match(book, /applyFootnoteTypography\(doc, sourceFontSize > 0/);
   assert.ok(!book.includes('style.fontSize = footnoteFontSize'));
 });
 
@@ -78,6 +79,64 @@ test('smaller resized viewport recomputes the cap instead of retaining previous 
   const phone = footnoteBoxSize({...base,width:390,height:844});
   assert.ok(phone.width < desktop.width);
   assert.ok(phone.width * phone.height <= 390 * 844 / 4);
+});
+test('vertical notes transpose the horizontal fitting policy along the writing axes', () => {
+  for (const desktop of [false, true]) for (const textLength of [8, 120, 2000]) {
+    const base = {width:900,height:900,desktop,textLength,fontSize:20};
+    const horizontal = footnoteBoxSize({...base,contentHeight:360,chromeHeight:22});
+    const vertical = footnoteBoxSize({...base,vertical:true,contentWidth:360,chromeWidth:22});
+    assert.equal(vertical.width, horizontal.height);
+    assert.equal(vertical.height, horizontal.width);
+    assert.equal(vertical.maxWidth, horizontal.maxHeight);
+  }
+});
+test('vertical fitting uses measured column width and preserves the area/screen limits', () => {
+  for (const [width,height] of [[390,844],[844,390],[1400,900],[320,480],[80,120]]) {
+    for (const desktop of [false,true]) {
+      const measure = inline => inline < 700 ? 900 : 220;
+      const vertical = footnoteBoxSize({width,height,desktop,vertical:true,textLength:300,
+        contentWidth:4000,measureWidth:measure});
+      const horizontal = footnoteBoxSize({width:height,height:width,desktop,textLength:300,
+        contentHeight:4000,measureHeight:measure});
+      assert.equal(vertical.width, horizontal.height);
+      assert.equal(vertical.height, horizontal.width);
+      assert.ok(vertical.width*vertical.height <= width*height*.25);
+      assert.ok(vertical.width<=width && vertical.height<=height);
+    }
+  }
+});
+test('only notes lock scrolling to their writing block axis; book scrolling is unchanged', async () => {
+  const paginator = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8');
+  const start = paginator.indexOf("    const flow = this.getAttribute('flow')");
+  const end = paginator.indexOf('} else if (this.mobileTouchPaging)', start);
+  const branch = paginator.slice(start,end).replaceAll('this.#container','this.container')+'}';
+  const renderScroll = new Function('vertical',branch);
+  for (const vertical of [true,false]) for (const footnote of [true,false]) {
+    const renderer = {container:{style:{}},getAttribute:()=> 'scrolled',hasAttribute:()=>footnote};
+    renderScroll.call(renderer,vertical);
+    assert.equal(renderer.container.style.overflowX,footnote&&!vertical?'hidden':'auto');
+    assert.equal(renderer.container.style.overflowY,footnote&&vertical?'hidden':'auto');
+  }
+  const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
+  assert.match(book,/renderer\.setAttribute\('footnote', ''\)/);
+});
+test('vertical sizer measures the horizontal flow and preserves end padding for both directions', () => {
+  const { JSDOM } = createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`)('jsdom');
+  for (const mode of ['vertical-rl','vertical-lr']) {
+    const dom = new JSDOM('<div id="note" style="box-sizing:border-box;padding:8px;border:1px solid"></div>');
+    const content = new JSDOM(`<body style="writing-mode:${mode};font-size:24px;margin:0;padding-left:24px"><p>竖排注释</p></body>`);
+    const win = dom.window;
+    win.ResizeObserver = class {observe() {} disconnect() {}};
+    win.requestAnimationFrame = () => 1;
+    win.cancelAnimationFrame = () => {};
+    content.window.document.createRange = () => ({selectNodeContents() {},
+      getBoundingClientRect: () => ({width:36,height:99999})});
+    const dialog = win.document.querySelector('#note');
+    const sizing = attachFootnoteSizing(dialog,content.window.document);
+    assert.equal(dialog.style.width,'78px', '36px text + 24px end space + 18px outer chrome');
+    assert.ok(parseFloat(dialog.style.height)>78, 'vertical note is taller than it is wide');
+    sizing.destroy(); win.close(); content.window.close();
+  }
 });
 test('sizer measures text rather than the previous oversized iframe body', () => {
   const { JSDOM } = createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`)('jsdom');

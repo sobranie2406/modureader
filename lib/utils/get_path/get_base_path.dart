@@ -5,6 +5,7 @@ import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'android_storage.dart';
 
 String documentPath = '';
 
@@ -46,6 +47,7 @@ Future<String> getAnxDocumentsPath() async {
   final directory = await getApplicationDocumentsDirectory();
   switch (AnxPlatform.type) {
     case AnxPlatformEnum.android:
+      return (await androidDataDirectory()).path;
     case AnxPlatformEnum.ohos:
       return directory.path;
     case AnxPlatformEnum.linux:

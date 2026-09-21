@@ -26,6 +26,7 @@ import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
+import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -253,6 +254,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           );
         } else {
+          final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
           if (navBarItems[currentIndex]['identifier'] == 'ai') {
             currentIndex = 0;
           }
@@ -260,8 +262,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             extendBody: true,
             body: BottomBar(
               width: 330,
-              body: (_, controller) =>
-                  pages(currentIndex, constraints, controller),
+              offset: HomeNavigationMetrics.barOffset,
+              body: (_, controller) => HomeNavigationBody(
+                hasBottomBar: !keyboardOpen,
+                child: pages(currentIndex, constraints, controller),
+              ),
+              showIcon: !keyboardOpen,
               hideOnScroll: Prefs().autoHideBottomBar,
               scrollOpposite: false,
               curve: Curves.easeIn,
@@ -272,35 +278,38 @@ class _HomePageState extends ConsumerState<HomePage> {
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(500),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(32),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainer
-                          .withAlpha(123),
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline,
-                        width: 0.5,
+              child: Visibility(
+                visible: !keyboardOpen,
+                maintainState: true,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(32),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                    child: Container(
+                      height: HomeNavigationMetrics.barHeightFor(context),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainer
+                            .withAlpha(123),
+                        borderRadius: BorderRadius.circular(32),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                          width: 0.5,
+                        ),
                       ),
-                    ),
-                    child: BottomNavigationBar(
-                      selectedFontSize: 12,
-                      enableFeedback: false,
-                      type: BottomNavigationBarType.fixed,
-                      landscapeLayout:
-                          BottomNavigationBarLandscapeLayout.linear,
-                      currentIndex: currentIndex,
-                      onTap: (int index) => onBottomTap(index, false),
-                      items: bottomBarItems,
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      // height: 64,
+                      child: BottomNavigationBar(
+                        selectedFontSize: 12,
+                        enableFeedback: false,
+                        type: BottomNavigationBarType.fixed,
+                        landscapeLayout:
+                            BottomNavigationBarLandscapeLayout.linear,
+                        currentIndex: currentIndex,
+                        onTap: (int index) => onBottomTap(index, false),
+                        items: bottomBarItems,
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                      ),
                     ),
                   ),
                 ),

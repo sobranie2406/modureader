@@ -18,6 +18,8 @@ String generateUrl(
   String? backgroundColor,
   bool? importing,
   bool isDarkMode = false,
+  Map<String, double>? verticalPageInsets,
+  Map<String, dynamic>? verticalPageChrome,
 }) {
   String indexHtmlPath =
       "http://127.0.0.1:${Server().port}/foliate-js/index.html";
@@ -94,6 +96,10 @@ String generateUrl(
     'maxColumnCount': bookStyle.maxColumnCount,
     'columnThreshold': bookStyle.columnThreshold,
     'writingMode': Prefs().writingMode.code,
+    // Only the visible reader supplies chrome; headless import/search does not.
+    'verticalPageInsets': verticalPageInsets,
+    'verticalPageChrome': verticalPageChrome,
+    'verticalRedFrame': Prefs().verticalRedFrame,
     'textAlign': Prefs().textAlignment.code,
     'backgroundImage': bgimgUrl,
     'bgimgBlur': Prefs().bgimg.blur,

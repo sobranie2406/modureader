@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8">
+<style>
+html,body{margin:0;height:100%;background:#faf8f2}
+#note{position:fixed;width:400px;height:200px;box-sizing:border-box;padding:8px;border:1px solid #888;border-radius:12px;transform:translate(-50%,-50%)}
+#note main{width:100%;height:100%;overflow:hidden}foliate-view{display:block;width:100%;height:100%}
+</style>
+<div id="note"><main></main></div>
+<script type="module">
+const query=new URLSearchParams(location.search);
+const vertical=query.get('vertical')!=='0',long=query.get('long')!=='0',desktop=query.get('desktop')!=='0';
+query.set('style',JSON.stringify({allowScript:false,readerScriptEvents:true}));
+history.replaceState(null,'','?'+query);
+await import('../../assets/foliate-js/src/view.js');
+const {attachFootnoteSizing,footnoteLayoutCSS}=await import('../../assets/foliate-js/src/footnote-size.js');
+const text=long?'这是一条较长的测试注释。竖排按列左右滚动，横排按行上下滚动。'.repeat(180):'一条短注释。';
+const url=URL.createObjectURL(new Blob([`<!doctype html><meta charset="utf-8"><body><p>${text}</p></body>`],{type:'text/html'}));
+const view=document.createElement('foliate-view');document.querySelector('main').append(view);
+await view.open({sections:[{id:'note',size:text.length,linear:'yes',load:async()=>url,unload(){}}],
+  dir:'ltr',metadata:{language:'zh'},toc:[],splitTOCHref:h=>[h,null],getTOCFragment:doc=>doc.body});
+const r=view.renderer;
+r.setAttribute('footnote','');r.setAttribute('flow','scrolled');r.setAttribute('gap','5%');r.setAttribute('top-margin','0px');r.setAttribute('bottom-margin','0px');
+r.setStyles(`html{writing-mode:${vertical?'vertical-rl':'horizontal-tb'}!important;font:24px/1.5 serif}p{margin:0}`+footnoteLayoutCSS);
+await r.goTo({index:0});
+const doc=r.getContents()[0].doc;
+const sizing=attachFootnoteSizing(document.querySelector('#note'),doc,{desktop});
+window.fixture={r,doc,view,sizing};window.ready=true;
+</script>

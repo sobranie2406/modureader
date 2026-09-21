@@ -5,12 +5,17 @@ import 'package:flutter/material.dart';
 /// directly. The optional controller is kept for compatibility with the home
 /// page's compact navigation layout.
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, this.controller});
+  const SettingsPage({super.key, this.controller, this.bottomContentInset = 0});
 
   final ScrollController? controller;
+  final double bottomContentInset;
 
   @override
   Widget build(BuildContext context) {
-    return const SubMoreSettings(embedded: true);
+    return SubMoreSettings(
+      embedded: true,
+      controller: controller,
+      bottomContentInset: bottomContentInset,
+    );
   }
 }

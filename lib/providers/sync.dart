@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'package:anx_reader/service/sync/knowledge_index_sync.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'dart:io' as io;
 import 'package:anx_reader/service/sync/sync_feedback.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
@@ -280,45 +278,16 @@ class Sync extends _$Sync {
 
       await syncFiles();
 
-      await KnowledgeIndexSync(
-        client: client,
-        cache: await getAnxCacheDir(),
-        isBookCurrent: (book) async {
-          try {
-            final current = await bookDao.selectBookById(book.id);
-            return !current.isDeleted &&
-                current.filePath == book.filePath &&
-                current.md5 == book.md5;
-          } catch (_) {
-            return false;
-          }
-        },
-      ).sync(
-        await bookDao.selectNotDeleteBooks(),
-        enabled: () => Prefs().webdavStatus && Prefs().syncKnowledgeIndexes,
-        upload: direction != SyncDirection.download,
-        download: direction != SyncDirection.upload,
-        onImported: (book, mode, model) async {
-          // Match the query encoder to a synced local index without changing
-          // explicit per-book choices or importing remote endpoint credentials.
-          final choice = 'local:$model';
-          if (mode == 'local' &&
-              BookEmbeddingPreferences.choiceFor(book) == null &&
-              BookEmbeddingPreferences.isValid(choice)) {
-            await BookEmbeddingPreferences.save(book, choice);
-          }
-        },
-      );
-
-      // Never reclaim before publication: syncFiles also runs as beforePublish.
-      // Cleanup is recoverable maintenance; failure must not undo a good sync.
+      // Reclaim only after database publication and book transfer.
+      // This is recoverable maintenance; failure does not undo a good sync.
       try {
-        await ReplacedBookFiles(
+        final reclaimed = await ReplacedBookFiles(
           store: RowSyncStore(await DBHelper().database),
           client: client,
           cache: await getAnxCacheDir(),
           durableDirectory: await getAnxDataBasesDir(),
         ).reclaim();
+        AnxLog.info('Replaced-book cleanup: reclaimed=$reclaimed');
       } catch (error) {
         AnxLog.warning('Replaced-book cleanup deferred: ${error.runtimeType}');
       }

@@ -6,6 +6,8 @@ const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.m
 const chunk = (a,b) => book.slice(book.indexOf(a), book.indexOf(b));
 const gateSource = await readFile(new URL('../assets/foliate-js/src/reading-action-gate.js', import.meta.url), 'utf8');
 const {ReadingActionGate} = await import(`data:text/javascript;base64,${Buffer.from(gateSource).toString('base64')}`);
+const chromeSource = await readFile(new URL('../assets/foliate-js/src/vertical-page-chrome.js', import.meta.url), 'utf8');
+const {applyVerticalPageChrome} = await import(`data:text/javascript;base64,${Buffer.from(chromeSource).toString('base64')}`);
 
 test('wake/resize scroll is passive, real scroll and explicit backward navigation count', () => {
   let now = 0; const gate = new ReadingActionGate(() => now);
@@ -43,6 +45,7 @@ test('Flutter bridge cannot mistake a sync restore or passive layout for a readi
   const messages = [], window = {readerApplyingSync:false};
   const notify = runInNewContext(`${chunk('const onRelocated =', '\nconst onAnnotationClick')}; onRelocated`, {
     window, reader:{view:{renderer:{writingMode:'horizontal-tb'}}},
+    applyVerticalPageChrome, style: {},
     callFlutter: (_, data) => messages.push(data),
   });
   const location = {chapterLocation:{},location:{},readingAction:true};

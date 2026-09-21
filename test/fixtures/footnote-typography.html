@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8">
+<style>
+body{font:16px serif;background:#faf8f2;margin:24px}
+p.source{font-size:30px;line-height:1.7}.source a{font-size:10px;vertical-align:super}
+#note{position:fixed;left:50%;top:50%;width:400px;height:200px;box-sizing:border-box;padding:8px;border:1px solid #888;border-radius:12px;transform:translate(-50%,-50%);background:#f2efe5;display:none}
+#note main{width:100%;height:100%;overflow:hidden}foliate-view{display:block;width:100%;height:100%}
+</style>
+<p class="source">这是三十像素的实际正文，不使用十像素序号作为字号基准。<a id="ref" href="#target" role="doc-noteref">[26]</a></p>
+<p class="source"><span style="font-size:34px">这是三十四像素的正文，覆盖段落和阅读设置的字号。</span><a id="span-ref" href="#target" role="doc-noteref">[27]</a></p>
+<div id="note"><main></main></div>
+<script type="module">
+const params=new URLSearchParams(location.search);
+params.set('style',JSON.stringify({allowScript:false,readerScriptEvents:true}));history.replaceState(null,'','?'+params);
+await import('../../assets/foliate-js/src/view.js');
+const {FootnoteHandler}=await import('../../assets/foliate-js/src/footnotes.js');
+const {applyFootnoteTypography}=await import('../../assets/foliate-js/src/footnote-typography.js');
+const {attachFootnoteSizing,footnoteLayoutCSS}=await import('../../assets/foliate-js/src/footnote-size.js');
+const markup=`<!doctype html><meta charset="utf-8"><style>p{font-size:70%!important}.tiny{font-size:.6em!important}</style><body><aside id="target" role="doc-footnote"><div style="font-size:50%"><p style="font-size:12px!important"><span class="tiny" style="font-size:9px!important">注释正文应是原正文的百分之八十。<i>保留斜体</i>，<b>保留加粗</b>。这里模拟书籍对脚注反复缩小字号的情况。</span></p></div></aside></body>`;
+const url=URL.createObjectURL(new Blob([markup],{type:'text/html'}));
+const book={sections:[{id:'note',size:200,linear:'yes',load:async()=>url,unload(){}}],dir:'ltr',metadata:{language:'zh'},toc:[],
+  resolveHref:()=>({index:0,anchor:doc=>doc.querySelector('#target')}),splitTOCHref:h=>[h,null],getTOCFragment:doc=>doc.body};
+const handler=new FootnoteHandler();let sizing,lastView;
+handler.addEventListener('before-render',({detail:{view,sourceFontSize}})=>{
+  sizing?.destroy();lastView?.close();lastView=view;
+  document.querySelector('main').replaceChildren(view);
+  const r=view.renderer;r.setAttribute('footnote','');r.setAttribute('flow','scrolled');r.setAttribute('gap','5%');r.setAttribute('top-margin','0px');r.setAttribute('bottom-margin','0px');
+  r.setStyles(`html{font-size:${sourceFontSize*.8}px!important;writing-mode:${params.get('vertical')==='1'?'vertical-rl':'horizontal-tb'}!important}p{line-height:1.5}`+footnoteLayoutCSS);
+});
+handler.addEventListener('render',({detail:{view,doc,sourceFontSize}})=>{
+  applyFootnoteTypography(doc,sourceFontSize);
+  sizing=attachFootnoteSizing(document.querySelector('#note'),doc,{desktop:true});
+  window.result={source:sourceFontSize,normal:parseFloat(doc.defaultView.getComputedStyle(doc.querySelector('.tiny')).fontSize),
+    italic:parseFloat(doc.defaultView.getComputedStyle(doc.querySelector('i')).fontSize),bold:parseFloat(doc.defaultView.getComputedStyle(doc.querySelector('b')).fontSize),doc};
+});
+for(const a of document.querySelectorAll('a'))a.addEventListener('click',async e=>{
+  e.preventDefault();await handler.handle(book,{detail:{a,href:a.href},preventDefault(){}});
+});
+window.ready=true;
+</script>

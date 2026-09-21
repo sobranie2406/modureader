@@ -27,7 +27,10 @@ void main() {
     final source =
         File('lib/page/home_page/settings_page.dart').readAsStringSync();
 
-    expect(source, contains('SubMoreSettings(embedded: true)'));
+    expect(source, contains('return SubMoreSettings('));
+    expect(source, contains('embedded: true,'));
+    expect(source, contains('controller: controller,'));
+    expect(source, contains('bottomContentInset: bottomContentInset,'));
     expect(source, isNot(contains('ChangeThemeMode')));
     expect(source, isNot(contains('webdavSwitch')));
     expect(source, isNot(contains('MoreSettings()')));

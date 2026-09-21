@@ -100,7 +100,9 @@ class _StatisticPageState extends State<StatisticPage> {
                         children: [
                           Expanded(
                             child: ListView(
-                                padding: const EdgeInsets.only(bottom: 80),
+                                padding: EdgeInsets.only(
+                                    bottom: 12 +
+                                        MediaQuery.paddingOf(context).bottom),
                                 controller: _scrollController,
                                 children: const [
                                   StatisticsDashboard(),

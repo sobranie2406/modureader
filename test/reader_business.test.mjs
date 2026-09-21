@@ -66,7 +66,7 @@ test('Reader.open navigates once and waits for initialization, for new and resum
       setView() {}
       installDesktopInput() {}
       ${openMethod}
-    })`, {getView: async () => view, importing: false, setStyle() {}, document: {documentElement: {style: {}}}})
+    })`, {getView: async () => view, importing: false, style: {backgroundColor: '#faf8f2'}, setStyle() {}, document: {documentElement: {style: {}}}})
     let completed = false
     const opened = new Reader().open('fixture', cfi).then(() => { completed = true })
     await new Promise(resolve => setImmediate(resolve))

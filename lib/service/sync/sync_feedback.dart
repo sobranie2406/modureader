@@ -80,13 +80,7 @@ String syncFailureMessage(Object error, {required bool chinese}) {
         'Local file access failed. Check free space and file permissions.');
   } else if (error is FormatException) {
     final message = error.message;
-    if (message.contains('向量索引') && message.contains('大小限制')) {
-      reason = text('向量索引超过单本 128 MiB 同步限制；可关闭向量化数据同步后同步其他数据。',
-          'A vector index exceeds the 128 MiB per-book limit. Turn off vector index sync to sync other data.');
-    } else if (message.contains('向量索引') || message.contains('索引书籍')) {
-      reason = text('向量索引校验失败，未导入该索引。请在来源设备重新同步；无需删除书籍或云端数据库。',
-          'Vector index validation failed; the index was not imported. Retry from the source device; do not delete books or the remote database.');
-    } else if (message.contains('阅读位置')) {
+    if (message.contains('阅读位置')) {
       reason = text('阅读位置数据无效，请更新所有设备后重试。',
           'Invalid reading-position data. Update all devices and retry.');
     } else if (message.contains('分页') || message.contains('截断')) {

@@ -4,10 +4,12 @@ console.log('AnxUA', navigator.userAgent)
 import './view.js'
 import { FootnoteHandler } from './footnotes.js'
 import { attachFootnoteSizing, footnoteLayoutCSS, footnoteFontSize } from './footnote-size.js'
+import { applyFootnoteTypography } from './footnote-typography.js'
 import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
 import { readerSelectionCSS } from './selection-style.js'
+import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
@@ -979,7 +981,7 @@ footnoteDialog.addEventListener('click', e => {
   if (e.target === footnoteDialog) closeFootnote()
 })
 
-const replaceFootnote = (view) => {
+const replaceFootnote = (view, sourceFontSize) => {
   footnoteSizing?.destroy()
   footnoteSizing = null
   clearSelection()
@@ -997,6 +999,7 @@ const replaceFootnote = (view) => {
   })
 
   const { renderer } = view
+  renderer.setAttribute('footnote', '')
   renderer.setAttribute('flow', 'scrolled')
   renderer.setAttribute('gap', '5%')
   renderer.setAttribute('top-margin', '0px')
@@ -1019,10 +1022,12 @@ const replaceFootnote = (view) => {
     useBookStyles: style.useBookStyles,
     headingFontSize: style.headingFontSize,
   }
-  // The popup keeps the book's formatting, but its base text size follows the
-  // reader even when "use book styles" would omit getCSS's root font rule.
+  // Use source paragraph CSS pixels when available. Preference em size is
+  // only a fallback for a reference without a measurable source document.
+  const noteSizePx = sourceFontSize > 0
+    ? sourceFontSize * .8 : footNoteStyle.fontSize * 16
   const css = getCSS(footNoteStyle) + `
-    html { font-size: ${footNoteStyle.fontSize}em !important; }
+    html { font-size: ${noteSizePx}px !important; }
   `
   renderer.setStyles(css + footnoteLayoutCSS)
   // set background color of dialog
@@ -1049,12 +1054,14 @@ class Reader {
   #ignoreBookmarkGesture = false
   constructor() {
     this.#footnoteHandler.addEventListener('before-render', e => {
-      const { view } = e.detail
+      const { view, sourceFontSize } = e.detail
       this.setView(view)
-      replaceFootnote(view)
+      replaceFootnote(view, sourceFontSize)
     })
     this.#footnoteHandler.addEventListener('render', e => {
-      const { doc } = e.detail
+      const { doc, sourceFontSize } = e.detail
+      applyFootnoteTypography(doc, sourceFontSize > 0
+        ? sourceFontSize : footnoteFontSize(style.fontSize) * 16 / .8)
       footnoteSizing?.destroy()
       footnoteSizing = attachFootnoteSizing(footnoteDialog, doc, {
         desktop: style.desktopPageInput === true,
@@ -1092,8 +1099,7 @@ class Reader {
     // first spread (and race with the first iframe load) in fixed-layout books.
     await this.view.init({ lastLocation: cfi })
 
-    // set html bg color to grey 
-    document.documentElement.style.backgroundColor = 'grey'
+    document.documentElement.style.backgroundColor = style.backgroundColor
   }
 
   setView(view) {
@@ -1751,6 +1757,7 @@ const callFlutter = (name, data) => {
 }
 
 const setStyle = (oldStyle) => {
+  document.documentElement.style.backgroundColor = style.backgroundColor
   const turn = {
     scroll: false,
     animated: true
@@ -1787,6 +1794,7 @@ const setStyle = (oldStyle) => {
   reader.view.renderer.setAttribute('top-margin', `${style.topMargin}px`)
   reader.view.renderer.setAttribute('bottom-margin', `${style.bottomMargin}px`)
   reader.view.renderer.setAttribute('gap', `${style.sideMargin}%`)
+  applyVerticalPageChrome(reader.view.renderer, style)
   reader.view.renderer.setAttribute('background-color', style.backgroundColor)
   reader.view.renderer.setAttribute('max-column-count', style.maxColumnCount)
   reader.view.renderer.setAttribute('column-threshold', `${style.columnThreshold}px`)
@@ -1847,6 +1855,8 @@ const refreshLayout = () => {
 
 
 const onRelocated = (currentInfo) => {
+  // Auto mode only knows the document's writing direction after loading it.
+  applyVerticalPageChrome(reader.view.renderer, style)
   const chapterTitle = currentInfo.tocItem?.label
   const chapterHref = currentInfo.tocItem?.href
   const chapterTotalPages = currentInfo.chapterLocation.total
@@ -1905,6 +1915,11 @@ const getMetadata = async book => {
 
 window.refreshToc = () => onSetToc()
 window.getIndexToc = () => reader.view.book.indexToc ?? reader.toc
+
+window.updateVerticalPageChrome = chrome => {
+  style.verticalPageChrome = chrome
+  applyVerticalPageChrome(reader?.view?.renderer, style)
+}
 
 window.changeStyle = (newStyle) => {
   const oldStyle = style

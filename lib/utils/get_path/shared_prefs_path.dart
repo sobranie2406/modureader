@@ -36,7 +36,9 @@ String getSharedPrefsFileName() {
 Future<File> getAnxShredPrefsFile() async {
   switch (AnxPlatform.type) {
     case AnxPlatformEnum.android:
-      final docPath = await getAnxDocumentsPath();
+      // SharedPreferences (including credentials) remains in Android's private
+      // storage; moving book data must not redirect settings to external files.
+      final docPath = (await getApplicationDocumentsDirectory()).path;
       final sharedPrefsDirPath =
           '${docPath.split('/app_flutter')[0]}/shared_prefs';
       return File('$sharedPrefsDirPath/${getSharedPrefsFileName()}');

@@ -18,6 +18,11 @@ class ReplacedBookFiles {
   static const maxFilesPerSync = 3;
   static final _md5 = RegExp(r'^[0-9a-fA-F]{32}$');
 
+  static Future<void> _ensureTable(DatabaseExecutor db) => db.execute('''
+    CREATE TABLE IF NOT EXISTS $table (
+      book_id TEXT NOT NULL, old_path TEXT NOT NULL, old_md5 TEXT,
+      PRIMARY KEY(book_id, old_path))''');
+
   static bool _bookPath(Object? path) =>
       path is String &&
       path.startsWith('file/') &&
@@ -39,9 +44,7 @@ class ReplacedBookFiles {
     if (identity.length != 1) {
       throw StateError('Replacement has no sync identity');
     }
-    await txn.execute('''CREATE TABLE IF NOT EXISTS $table (
-      book_id TEXT NOT NULL, old_path TEXT NOT NULL, old_md5 TEXT,
-      PRIMARY KEY(book_id, old_path))''');
+    await _ensureTable(txn);
     await txn.insert(
         table,
         {
@@ -66,16 +69,15 @@ class ReplacedBookFiles {
 
   Future<int> reclaim() async {
     final endpoint = _endpoint;
-    final exists = await store.db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        [table]);
-    if (exists.isEmpty) return 0;
-    final pending = await store.db.query(table);
-    if (pending.isEmpty) return 0;
     final staging = await cache.createTemp('modu-replaced-files-');
     var reclaimed = 0;
     var attempted = 0;
     try {
+      // Another device (or an older release) may have performed the replacement.
+      // Recover explicit old paths from verified records for the SAME stable book
+      // identity, never infer relationships from a title, timestamp or file size.
+      await _rememberHistory(staging);
+      final pending = await store.db.query(table);
       for (final item in pending) {
         if (_endpoint != endpoint) throw StateError('Sync endpoint changed');
         final oldPath = item['old_path'];
@@ -138,9 +140,10 @@ class ReplacedBookFiles {
           continue;
         }
         final freshCloud = await _cloudSnapshot(staging);
-        if (!sameSyncRecords(cloud, freshCloud) ||
-            !sameSyncRecords(local, await store.snapshot()) ||
-            _eligible(item, local, freshCloud) == null) {
+        final freshLocal = await store.snapshot();
+        if (!_sameBookReferences(cloud, freshCloud) ||
+            !_sameBookReferences(local, freshLocal) ||
+            _eligible(item, freshLocal, freshCloud) == null) {
           continue;
         }
         if (_endpoint != endpoint) throw StateError('Sync endpoint changed');
@@ -152,6 +155,57 @@ class ReplacedBookFiles {
       await staging.delete(recursive: true);
     }
   }
+
+  Future<void> _rememberHistory(Directory staging) async {
+    final local = {
+      for (final record in await store.snapshot())
+        if (record.kind == 'book' && !record.deleted) record.id: record,
+    };
+    await _ensureTable(store.db);
+    final evidence = <String, Map<String, Object?>>{};
+    final log = ImmutableSyncLog(client, staging, cache,
+        durableDirectory: durableDirectory);
+    await log.read(onVerifiedBatch: (batch) async {
+      for (final old in batch) {
+        final current = local[old.id];
+        final path = old.data['file_path'];
+        final digest = old.data['file_md5'];
+        if (old.kind != 'book' ||
+            old.deleted ||
+            current == null ||
+            !_bookPath(path) ||
+            !_bookPath(current.data['file_path']) ||
+            path == current.data['file_path'] ||
+            digest is! String ||
+            !_md5.hasMatch(digest)) {
+          continue;
+        }
+        // Require a strictly older clock; equal-clock conflicts and newer
+        // remote records are not assumed to be obsolete.
+        if (old.clock >= current.clock) continue;
+        evidence[jsonEncode([old.id, path])] = {
+          'book_id': old.id,
+          'old_path': path,
+          'old_md5': digest,
+        };
+      }
+    });
+    // Incomplete/invalid scans throw above without installing partial evidence.
+    await store.db.transaction((txn) async {
+      for (final item in evidence.values) {
+        await txn.insert(table, item,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    });
+  }
+
+  /// Notes, reading time and positions cannot introduce a file reference.
+  /// Still compare ALL books (including trash) and deletion/restore operations.
+  bool _sameBookReferences(List<RowSyncRecord> a, List<RowSyncRecord> b) =>
+      sameSyncRecords(
+        a.where((r) => r.kind == 'book' || r.kind == 'life'),
+        b.where((r) => r.kind == 'book' || r.kind == 'life'),
+      );
 
   Future<bool> _downloadBook(String path, File target) async {
     final props = await client.readProps(path);
@@ -167,6 +221,12 @@ class ReplacedBookFiles {
 
   RowSyncRecord? _eligible(Map<String, Object?> item, List<RowSyncRecord> local,
       List<RowSyncRecord> remote) {
+    if ([...local, ...remote].any((r) =>
+        r.kind == 'life' &&
+        r.id == item['book_id'] &&
+        (r.deleted || r.data['is_deleted'] == 1))) {
+      return null;
+    }
     // Protect every reference, including trash/restorable books and duplicates.
     if ([
       ...local,
@@ -210,14 +270,18 @@ class ReplacedBookFiles {
       await client.downloadFile(path, second.path);
       if ((await sha256.bind(first.openRead()).first).toString() !=
           (await sha256.bind(second.openRead()).first).toString()) {
-        throw StateError('Cloud changed during replacement cleanup');
+        final latest = await RowSyncArchive.read(second.path);
+        if (!_sameBookReferences(records, latest)) {
+          throw StateError('Cloud changed during replacement cleanup');
+        }
+        records = latest;
       }
     }
     final afterJournal = await log.read();
-    if (!sameSyncRecords(journal, afterJournal)) {
+    if (!_sameBookReferences(journal, afterJournal)) {
       throw StateError('Cloud log changed during replacement cleanup');
     }
     // No legacy guessing; newly synchronized replacements use v8 or the log.
-    return mergeSyncRecords(records, journal);
+    return mergeSyncRecords(records, afterJournal);
   }
 }

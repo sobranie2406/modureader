@@ -340,7 +340,9 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                   child: Text(t('当前目录没有匹配的文件。',
                                       'No matching files in this folder.')))
                               : ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 96),
+                                  padding: EdgeInsets.only(
+                                      bottom: 12 +
+                                          MediaQuery.paddingOf(context).bottom),
                                   itemCount: visible.length,
                                   itemBuilder: (context, index) {
                                     final entry = visible[index];

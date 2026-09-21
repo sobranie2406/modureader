@@ -61,6 +61,14 @@ The current version provides the following reading, AI and library features.
 | Appearance and tools | System/dark/light themes, cover display, font import/download, network and logging options | Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
+### Vertical layout and storage
+
+Vertical reading offers optional red frames and column rules, with titles on the right and page information on the left. Chinese locales use Chinese numerals. Footnotes use 80% of actual paragraph text size, not the reference marker; popups occupy at most 25% of screen area, with horizontal scrolling for long vertical notes.
+
+Android library data migrates to `Android/data/com.modu.reader/files` with verification before opening the library. The old private copy is retained and conflicts stop migration rather than overwrite data. Credentials and preferences remain private. Back up first and upgrade in place without uninstalling or clearing data. OS restrictions still apply to Android/data; this location is not a backup. See the [migration notes (Chinese)](docs/testing/android-app-storage.md).
+
+Downloaded embedding models can be deleted in settings unless protected by an active task. Large local indexes use streaming reads with a 1 GiB file limit; practical capacity still depends on available RAM.
+
 ### WebDAV remote library
 
 Enter the full book-directory URL, username and password in Settings → Remote library settings, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
@@ -120,7 +128,7 @@ Open a skill to inspect its prompt, edit and save it, or restore the default. Cu
 
 ### Book indexing and local models
 
-AI text search reuses the same keyword/vector hybrid retrieval. Reading skills retain their chapter, selection or reading scope. Optional index sync under Settings → Sync matches actual book bytes by SHA-256; download the identical book on the receiving device first. Indexes contain excerpts and are not encrypted by API-key sync. See the [index sync guide (Chinese)](docs/INDEX_SYNC_AND_READING_CONTROLS.md).
+AI text search reuses the same keyword/vector hybrid retrieval. Reading skills retain their chapter, selection or reading scope. Vector indexes stay on each device and are not uploaded or downloaded through WebDAV. Build indexes on each device as needed; existing local indexes are preserved. See the [local index and reading controls guide (Chinese)](docs/INDEX_SYNC_AND_READING_CONTROLS.md).
 
 Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a background queue, so you can leave the indexing screen. Check task status and error messages to confirm completion. For automatic indexing of new imports, enable both the embedding model and **Automatically index after import** in Settings → Embedding Models. Automatic indexing is off by default.
 
@@ -150,7 +158,7 @@ Read-aloud controls include play, pause, resume, previous/next sentence and chap
 Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10, 15 or 30 minutes, or one hour. It respects automatic-sync and Wi-Fi settings and shows only terminal success/failure feedback.
 
 - WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
-- Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images and local dictionaries are not synced. Vector indexes can be synced with the separate, optional Sync vector data switch. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
+- Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images, local dictionaries and vector indexes are not synced. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
 - **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
 - Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.

@@ -1,3 +1,5 @@
+import { sourceBodyFontSize } from './footnote-typography.js'
+
 const getTypes = el => new Set(el?.getAttributeNS?.('http://www.idpf.org/2007/ops', 'type')?.split(' '))
 const getRoles = el => new Set(el?.getAttribute?.('role')?.split(' '))
 
@@ -48,7 +50,7 @@ const extractFootnote = (doc, anchor) => {
 
 export class FootnoteHandler extends EventTarget {
     detectFootnotes = true
-    #showFragment(book, { index, anchor }, href) {
+    #showFragment(book, { index, anchor }, href, sourceFontSize) {
         const view = document.createElement('foliate-view')
         return new Promise((resolve, reject) => {
             view.addEventListener('load', e => {
@@ -67,7 +69,7 @@ export class FootnoteHandler extends EventTarget {
                         doc.body.replaceChildren()
                         doc.body.appendChild(frag)
                     }
-                    const detail = { view, doc, href, type, hidden, target: el }
+                    const detail = { view, doc, href, type, hidden, target: el, sourceFontSize }
                     this.dispatchEvent(new CustomEvent('render', { detail }))
                     resolve()
                 } catch (e) {
@@ -75,7 +77,7 @@ export class FootnoteHandler extends EventTarget {
                 }
             })
             view.open(book)
-                .then(() => this.dispatchEvent(new CustomEvent('before-render', { detail: { view } })))
+                .then(() => this.dispatchEvent(new CustomEvent('before-render', { detail: { view, sourceFontSize } })))
                 .then(() => view.goTo(index))
                 .catch(reject)
         })
@@ -85,14 +87,16 @@ export class FootnoteHandler extends EventTarget {
         const { yes, maybe } = isFootnoteReference(a)
         if (yes) {
             e.preventDefault()
+            const sourceFontSize = sourceBodyFontSize(a)
             return Promise.resolve(book.resolveHref(href)).then(target =>
-                this.#showFragment(book, target, href))
+                this.#showFragment(book, target, href, sourceFontSize))
         }
         else if (this.detectFootnotes && maybe()) {
             e.preventDefault()
+            const sourceFontSize = sourceBodyFontSize(a)
             return Promise.resolve(book.resolveHref(href)).then(({ index, anchor }) => {
                 const target = { index, anchor: doc => extractFootnote(doc, anchor) }
-                return this.#showFragment(book, target, href)
+                return this.#showFragment(book, target, href, sourceFontSize)
             })
         }
     }

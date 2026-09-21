@@ -54,27 +54,22 @@ const Set<String> _prefsImportSkipKeys = {
   // Enabling sensitive sync requires an explicit risk confirmation on each
   // device. Never restore this switch or its local-only password silently.
   'syncAiSettingsToWebdav',
-  'syncKnowledgeIndexes',
   'syncAiSettingsEncryptionPassword',
+  // Retired feature: importing an old backup must never re-enable index sync.
+  'syncKnowledgeIndexes',
 };
 
 const Set<String> _prefsExportSkipKeys = {
   // The encryption password must remain local and must not be copied into an
   // app backup or uploaded alongside the encrypted payload.
   'syncAiSettingsEncryptionPassword',
+  'syncKnowledgeIndexes',
 };
 
 class Prefs extends ChangeNotifier {
   bool get quickMarkShowMenu => prefs.getBool('quickMarkShowMenu') ?? false;
   set quickMarkShowMenu(bool value) {
     prefs.setBool('quickMarkShowMenu', value);
-    notifyListeners();
-  }
-
-  bool get syncKnowledgeIndexes =>
-      prefs.getBool('syncKnowledgeIndexes') ?? false;
-  set syncKnowledgeIndexes(bool value) {
-    prefs.setBool('syncKnowledgeIndexes', value);
     notifyListeners();
   }
 
@@ -104,6 +99,10 @@ class Prefs extends ChangeNotifier {
 
   Future<void> initPrefs() async {
     prefs = await SharedPreferences.getInstance();
+    // Remove only the retired toggle, never local indexes or remote files.
+    if (prefs.containsKey('syncKnowledgeIndexes')) {
+      await prefs.remove('syncKnowledgeIndexes');
+    }
     saveBeginDate();
     notifyListeners();
   }
@@ -1715,6 +1714,12 @@ class Prefs extends ChangeNotifier {
 
   WritingModeEnum get writingMode {
     return WritingModeEnum.fromCode(prefs.getString('writingMode') ?? 'auto');
+  }
+
+  bool get verticalRedFrame => prefs.getBool('verticalRedFrame') ?? false;
+  set verticalRedFrame(bool value) {
+    prefs.setBool('verticalRedFrame', value);
+    notifyListeners();
   }
 
   set writingMode(WritingModeEnum mode) {

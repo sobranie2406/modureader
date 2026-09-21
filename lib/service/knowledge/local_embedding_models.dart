@@ -109,7 +109,65 @@ class LocalEmbeddingModelStore {
   final Duration downloadTimeout;
   bool _closed = false;
   static final Map<String, Future<void>> _downloads = {};
+  static final Map<String, int> _users = {};
+  static final Set<String> _deleting = {};
   final Map<String, String> _verifiedFiles = {};
+
+  /// Hold from readiness checking through the end of an indexing/query task,
+  /// including the gaps between inference batches. Shared across store instances.
+  Future<void Function()> acquireUse(LocalEmbeddingModel model) async {
+    final key = (await modelDirectory(model)).absolute.path;
+    if (_deleting.contains(key)) throw StateError('模型正在删除，请稍后重试');
+    _users[key] = (_users[key] ?? 0) + 1;
+    var released = false;
+    return () {
+      if (released) return;
+      released = true;
+      final remaining = (_users[key] ?? 1) - 1;
+      if (remaining == 0) {
+        _users.remove(key);
+      } else {
+        _users[key] = remaining;
+      }
+    };
+  }
+
+  /// Delete only catalogue model files, never books or generated indexes.
+  /// Release any cached native session before removing weights (Windows locks
+  /// mapped model files). No download/use can begin until removal settles.
+  Future<void> deleteDownloaded(LocalEmbeddingModel model,
+      {required Future<void> Function() releaseModel}) async {
+    if (!LocalEmbeddingModels.all.any((item) => item.id == model.id)) {
+      throw ArgumentError('Unknown local model');
+    }
+    final directory = await modelDirectory(model);
+    final key = directory.absolute.path;
+    if (_downloads.containsKey(key) ||
+        (_users[key] ?? 0) > 0 ||
+        _deleting.contains(key)) {
+      throw StateError('模型正在下载或使用中，请等待任务完成或停止向量化后再删除');
+    }
+    _deleting.add(key);
+    try {
+      await releaseModel();
+      if (await FileSystemEntity.type(directory.path, followLinks: false) ==
+          FileSystemEntityType.link) {
+        throw StateError('模型目录不可为符号链接');
+      }
+      for (final name in ['model_quantized.onnx', 'tokenizer.json']) {
+        for (final suffix in ['', '.part']) {
+          final file = File(path.join(directory.path, '$name$suffix'));
+          await _deleteIfExists(file);
+          _verifiedFiles.remove(file.path);
+        }
+      }
+      if (await directory.exists() && await directory.list().isEmpty) {
+        await directory.delete();
+      }
+    } finally {
+      _deleting.remove(key);
+    }
+  }
 
   Future<void> ensureAvailable(LocalEmbeddingModel model) async {
     if (await isDownloaded(model)) return;
@@ -188,6 +246,7 @@ class LocalEmbeddingModelStore {
   }) async {
     if (_closed) throw StateError('Model downloader is closed');
     final key = (await modelDirectory(model)).absolute.path;
+    if (_deleting.contains(key)) throw StateError('模型正在删除，请稍后重试');
     final pending = _downloads[key];
     if (pending != null) {
       await pending;

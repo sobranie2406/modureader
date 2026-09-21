@@ -16,6 +16,7 @@ import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/window_info.dart';
 import 'package:anx_reader/page/home_page.dart';
+import 'package:anx_reader/page/android_storage_startup.dart';
 import 'package:anx_reader/page/migration_page.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/network/http_proxy_overrides.dart';
@@ -24,6 +25,7 @@ import 'package:anx_reader/utils/get_path/macos_migration.dart';
 import 'package:anx_reader/utils/color_scheme.dart';
 import 'package:anx_reader/utils/error/common.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:anx_reader/utils/get_path/android_storage.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/window_position_validator.dart';
 import 'package:anx_reader/providers/sync.dart';
@@ -93,6 +95,17 @@ Future<void> main() async {
     _needsMigration = _migrationCheckResult?.needsMigration ?? false;
   }
 
+  if (AnxPlatform.isAndroid) {
+    runApp(AndroidStorageStartup(start: () async {
+      await prepareAndroidStorage();
+      await _startConfiguredApp();
+    }));
+    return;
+  }
+  await _startConfiguredApp();
+}
+
+Future<void> _startConfiguredApp() async {
   // If no migration needed, initialize paths normally
   if (!_needsMigration) {
     await initBasePath();

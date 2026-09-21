@@ -46,11 +46,18 @@ class SubMoreSettings extends StatefulWidget {
   const SubMoreSettings({
     super.key,
     this.embedded = false,
+    this.controller,
+    this.bottomContentInset = 0,
   });
 
   /// When embedded in the home navigation, Settings is already the top-level
   /// destination and must not show a redundant back button.
   final bool embedded;
+  final ScrollController? controller;
+
+  /// Optional extra scroll clearance for other embedding layouts. Home already
+  /// reserves navigation space outside all pages and leaves this at zero.
+  final double bottomContentInset;
 
   @override
   State<SubMoreSettings> createState() => _SubMoreSettingsState();
@@ -286,7 +293,11 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
               ];
 
               return ListView(
-                padding: EdgeInsets.only(bottom: widget.embedded ? 80 : 0),
+                controller: widget.controller,
+                padding: EdgeInsets.only(
+                    bottom: widget.bottomContentInset > 0
+                        ? widget.bottomContentInset
+                        : MediaQuery.paddingOf(context).bottom),
                 children: children,
               );
             }

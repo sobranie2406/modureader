@@ -32,6 +32,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   final Map<String, bool> _bundledModels = {};
   final Map<String, double> _downloadProgress = {};
   final Set<String> _testingModels = {};
+  final Set<String> _deletingModels = {};
   bool _loadingLocalModels = true;
   bool _obscureApiKey = true;
   bool _testing = false;
@@ -179,13 +180,16 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   }
 
   Future<void> _testLocalModel(LocalEmbeddingModel model) async {
-    if (_testingModels.contains(model.id)) return;
+    if (_testingModels.contains(model.id) ||
+        _deletingModels.contains(model.id)) {
+      return;
+    }
     setState(() => _testingModels.add(model.id));
+    final provider = LocalOnnxEmbeddingProvider(
+      model: model,
+      store: _localModelStore,
+    );
     try {
-      final provider = LocalOnnxEmbeddingProvider(
-        model: model,
-        store: _localModelStore,
-      );
       final vector = await provider.embed(
         model.id == 'bge-small-zh-v1.5'
             ? '默读本地向量模型测试'
@@ -202,7 +206,62 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         AnxToast.show(_label('推理失败：$error', 'Inference failed: $error'));
       }
     } finally {
-      if (mounted) setState(() => _testingModels.remove(model.id));
+      try {
+        await provider.release();
+      } catch (error) {
+        if (mounted) {
+          AnxToast.show(
+              _label('模型释放失败：$error', 'Model cleanup failed: $error'));
+        }
+      } finally {
+        if (mounted) setState(() => _testingModels.remove(model.id));
+      }
+    }
+  }
+
+  Future<void> _deleteLocalModel(LocalEmbeddingModel model) async {
+    if (_deletingModels.contains(model.id) ||
+        _testingModels.contains(model.id) ||
+        _downloadProgress.containsKey(model.id)) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_label('删除已下载模型？', 'Delete downloaded model?')),
+        content: Text(_label(
+          '将删除本机的 ${model.name} 模型及分词器，释放存储空间。书籍和已有索引不会删除，模型选择保持不变。使用该模型进行语义检索或向量化前，需要重新下载。',
+          'Remove ${model.name} and its tokenizer from this device to free storage. Books, existing indexes and model selections are preserved. Download it again before semantic search or indexing with this model.',
+        )),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(_label('取消', 'Cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(_label('删除', 'Delete'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deletingModels.add(model.id));
+    try {
+      await _localModelStore.deleteDownloaded(model,
+          releaseModel: () =>
+              LocalOnnxEmbeddingEngine.instance.releaseModel(model.id));
+      if (mounted) {
+        AnxToast.show(_label('模型已删除，可按需重新下载',
+            'Model deleted. You can download it again when needed.'));
+      }
+    } catch (error) {
+      if (mounted) {
+        AnxToast.show(_label('删除失败：$error', 'Delete failed: $error'));
+      }
+    } finally {
+      if (mounted) {
+        await _refreshLocalModels();
+        if (mounted) setState(() => _deletingModels.remove(model.id));
+      }
     }
   }
 
@@ -360,6 +419,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     final bundled = _bundledModels[model.id] ?? false;
     final progress = _downloadProgress[model.id];
     final testing = _testingModels.contains(model.id);
+    final deleting = _deletingModels.contains(model.id);
     final colors = Theme.of(context).colorScheme;
     return Card(
       margin: EdgeInsets.zero,
@@ -426,18 +486,31 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
               ),
             ],
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 if (downloaded) ...[
+                  if (!bundled)
+                    AnxButton.text(
+                      key: ValueKey('delete-model-${model.id}'),
+                      isLoading: deleting,
+                      onPressed: testing || deleting || progress != null
+                          ? null
+                          : () => _deleteLocalModel(model),
+                      child: Text(_label('删除模型', 'Delete model')),
+                    ),
                   AnxButton.text(
                     isLoading: testing,
-                    onPressed: testing ? null : () => _testLocalModel(model),
+                    onPressed: testing || deleting
+                        ? null
+                        : () => _testLocalModel(model),
                     child: Text(_label('测试推理', 'Test inference')),
                   ),
                   const SizedBox(width: 8),
                   AnxButton.outlined(
-                    onPressed: selected
+                    onPressed: selected || deleting
                         ? null
                         : () {
                             Prefs().vectorLocalModelId = model.id;
@@ -454,7 +527,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 ] else
                   AnxButton.outlined(
                     isLoading: progress != null,
-                    onPressed: _downloadProgress.isEmpty
+                    onPressed: _downloadProgress.isEmpty && !deleting
                         ? () => _downloadLocalModel(model)
                         : null,
                     child: Text(_label('下载并使用', 'Download and use')),

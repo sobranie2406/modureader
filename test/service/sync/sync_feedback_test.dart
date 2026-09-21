@@ -62,8 +62,6 @@ void main() {
     SyncNetworkUnavailable(): '网络',
     const FileSystemException(secret, secret): '本地文件',
     const FormatException('阅读位置无效', secret): '阅读位置',
-    const FormatException('向量索引超过安全同步大小限制', secret): '128 MiB',
-    const FormatException('向量索引传输完整性校验失败', secret): '向量索引',
     const FormatException('目录分页异常', secret): '目录列表',
     const FormatException('超过安全限制', secret): '安全限制',
     const FormatException('不支持的数据版本', secret): '不兼容',

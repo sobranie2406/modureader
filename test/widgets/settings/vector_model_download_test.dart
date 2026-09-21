@@ -18,6 +18,16 @@ class ControlledModelStore extends LocalEmbeddingModelStore {
   final done = Completer<void>();
   var calls = 0;
   bool closed = false;
+  int deletes = 0;
+  @override
+  Future<void> deleteDownloaded(LocalEmbeddingModel model,
+      {required Future<void> Function() releaseModel}) async {
+    // This fake has no native session; filesystem/lifetime guards are covered
+    // by local_embedding_models_test.dart outside the widget fake-async zone.
+    deletes++;
+    ready.remove(model.id);
+  }
+
   @override
   Future<bool> isBundled(LocalEmbeddingModel model) async => bundled;
   @override
@@ -129,6 +139,29 @@ void main() {
       expect(find.text('使用中'), findsOneWidget);
       expect(Prefs().vectorLocalModelId, LocalEmbeddingModels.all.first.id);
       expect(find.text('下载并使用'), findsNWidgets(3));
+      final delete = find
+          .byKey(ValueKey('delete-model-${LocalEmbeddingModels.all.first.id}'));
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('书籍和已有索引不会删除'), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(store.deletes, 0);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      expect(store.deletes, 1);
+      expect(find.text('下载并使用'), findsNWidgets(4));
+      expect(find.text('测试推理'), findsNothing);
+      expect(Prefs().vectorLocalModelId, LocalEmbeddingModels.all.first.id,
+          reason: 'Deleting weights must not silently select another model');
+      await tester.ensureVisible(find.text('下载并使用').first);
+      await tester.tap(find.text('下载并使用').first);
+      await tester.pumpAndSettle();
+      expect(store.calls, 2);
+      expect(find.text('测试推理'), findsOneWidget);
       expect(tester.takeException(), isNull);
       AnxToast.fToast.removeCustomToast();
       AnxToast.fToast.removeQueuedCustomToasts();

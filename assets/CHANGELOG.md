@@ -2,18 +2,20 @@
 
 Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.0
+## 1.1.1
 
-- Android media playback controls, background chapter loading and recovery after speech-rate/player errors.
-- Optional WebDAV vector index sync matched by book SHA-256; shared AI retrieval uses existing indexes.
-- Import and manage local MDX/StarDict dictionaries; look up selected text offline.
-- Unified book menus remain actionable during sync; Quick mark can optionally open the selection menu.
-- Restore built-in AI provider defaults, clearing keys and resetting enabled state; delete custom providers from the list or detail page.
-- Stable release, build 10029. Models remain on-demand downloads; app updates prefer Gitee with verified GitHub fallback.
+- Reserve floating navigation space on every home tab, including large text and system safe areas; hide navigation while typing.
+- Vertical reading gains optional red frames, column rules, side headers/footers and Chinese page numbers; fix macOS click handling.
+- Footnotes use 80% of actual paragraph text size, not reference-marker size; vertical notes scroll horizontally within the 25% area limit.
+- Verified Android data migration to Android/data/com.modu.reader/files, retaining private credentials and the original recovery copy.
+- Delete downloaded embedding models and stream larger local indexes; remove WebDAV vector index sync while preserving local indexes.
+- Recoverable cleanup of replaced cloud book files; books, notes and reading progress continue to sync.
+- Stable build 10033. Models remain on-demand; updates prefer Gitee with SHA-256 verification and GitHub fallback.
 
-- Android 媒体播放控制、后台跨章加载，修复调速及播放器异常后的恢复。
-- 可选 WebDAV 向量索引同步，以书籍 SHA-256 配对；AI 检索复用已有索引。
-- 导入与管理本地 MDX/StarDict 字典，支持选中文字离线查询。
-- 统一书籍菜单并修复同步时回调丢失；快速标记可选择立即弹出选中菜单。
-- 内置 AI 供应商可恢复默认并清空密钥、重置启用状态；自定义供应商支持列表和详情删除。
-- 正式版构建 10029；模型继续按需下载，应用更新优先 Gitee 并校验回退 GitHub。
+- 首页各标签统一避让底部悬浮导航，适配大字体和系统安全区；输入时隐藏导航。
+- 竖排新增可选红框、分栏线、左右页眉页脚和中文页码，修复 macOS 点击交互。
+- 注释字号取实际段落正文的 80%，不取注释序号；竖排注释横向滚动，保留屏幕 25% 面积上限。
+- Android 数据校验迁移至 Android/data/com.modu.reader/files，密钥仍保留私有目录，旧数据保留用于恢复。
+- 可删除已下载模型，以流式方式读取更大本地索引；移除 WebDAV 向量索引同步，保留本地索引。
+- 替换后的云端旧书文件采用可恢复清理；书籍、笔记和阅读进度继续同步。
+- 正式版构建 10033；模型继续按需下载，应用更新优先 Gitee，校验 SHA-256 并支持 GitHub 回退。

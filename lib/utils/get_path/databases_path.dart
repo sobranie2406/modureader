@@ -7,10 +7,10 @@ import 'get_base_path.dart';
 
 Future<String> getAnxDataBasesPath() async {
   switch (AnxPlatform.type) {
-    case AnxPlatformEnum.android:
     case AnxPlatformEnum.ohos:
       final path = await getDatabasesPath();
       return path;
+    case AnxPlatformEnum.android:
     case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
     case AnxPlatformEnum.macos:

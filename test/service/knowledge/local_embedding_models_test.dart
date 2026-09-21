@@ -113,6 +113,102 @@ void main() {
     expect(LocalEmbeddingModels.byId('unknown').id,
         LocalEmbeddingModels.defaultModelId);
   });
+  test('deletion removes only selected weights and permits verified redownload',
+      () async {
+    final model = LocalEmbeddingModels.all.first;
+    final other = LocalEmbeddingModels.all.last;
+    await store.download(model);
+    await store.download(other);
+    final index = File('${root.path}/book-index.json');
+    await index.writeAsString('retained index');
+    var released = false;
+    await store.deleteDownloaded(model, releaseModel: () async {
+      expect(await store.isDownloaded(model), isTrue);
+      released = true;
+    });
+    expect(released, isTrue);
+    expect(await store.isDownloaded(model), isFalse);
+    expect(await (await store.modelDirectory(model)).exists(), isFalse);
+    expect(await store.isDownloaded(other), isTrue);
+    expect(await index.readAsString(), 'retained index');
+    await store.download(model);
+    expect(await store.isDownloaded(model), isTrue);
+  });
+  test('a provider reserves weights between batches across store instances',
+      () async {
+    final model = LocalEmbeddingModels.all.first;
+    await store.download(model);
+    final provider = LocalOnnxEmbeddingProvider(model: model, store: store);
+    final second = makeStore();
+    addTearDown(second.close);
+    final otherProvider =
+        LocalOnnxEmbeddingProvider(model: model, store: second);
+    await provider.ensureReady();
+    await provider.ensureReady();
+    await otherProvider.ensureReady();
+    await expectLater(second.deleteDownloaded(model, releaseModel: () async {}),
+        throwsStateError);
+    expect(await store.isDownloaded(model), isTrue);
+    await provider.release();
+    await provider.release();
+    await expectLater(second.deleteDownloaded(model, releaseModel: () async {}),
+        throwsStateError);
+    await otherProvider.release();
+    await second.deleteDownloaded(model, releaseModel: () async {});
+    expect(await store.isDownloaded(model), isFalse);
+  });
+  test('readiness failure leaves no stale model reservation', () async {
+    final model = LocalEmbeddingModels.all.first;
+    final provider = LocalOnnxEmbeddingProvider(model: model, store: store);
+    await expectLater(provider.ensureReady(), throwsStateError);
+    await provider.release();
+    await store.download(model);
+    await store.deleteDownloaded(model, releaseModel: () async {});
+    expect(await store.isDownloaded(model), isFalse);
+  });
+  test(
+      'deletion excludes download/use and unlocks after native release failure',
+      () async {
+    final model = LocalEmbeddingModels.all.first;
+    await store.download(model);
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final operation = store.deleteDownloaded(model, releaseModel: () async {
+      started.complete();
+      await finish.future;
+      throw StateError('fixture release failure');
+    });
+    final failure = expectLater(operation, throwsStateError);
+    await started.future;
+    await expectLater(store.download(model), throwsStateError);
+    await expectLater(store.acquireUse(model), throwsStateError);
+    await expectLater(store.deleteDownloaded(model, releaseModel: () async {}),
+        throwsStateError);
+    finish.complete();
+    await failure;
+    expect(await store.isDownloaded(model), isTrue);
+    await store.deleteDownloaded(model, releaseModel: () async {});
+    expect(await store.isDownloaded(model), isFalse);
+  });
+  test('a pending download cannot be deleted by another store', () async {
+    final model = LocalEmbeddingModels.all.first;
+    final started = Completer<void>();
+    final finish = Completer<void>();
+    final downloader = makeStore(client: MockClient((request) async {
+      if (!started.isCompleted) started.complete();
+      await finish.future;
+      return http.Response.bytes(
+          DownloadManifestBundle.bytes(request.url.path), 200);
+    }));
+    addTearDown(downloader.close);
+    final pending = downloader.download(model);
+    await started.future;
+    await expectLater(store.deleteDownloaded(model, releaseModel: () async {}),
+        throwsStateError);
+    finish.complete();
+    await pending;
+    expect(await store.isDownloaded(model), isTrue);
+  });
   test('manifest alone never marks a model downloaded or starts a request',
       () async {
     for (final model in LocalEmbeddingModels.all) {

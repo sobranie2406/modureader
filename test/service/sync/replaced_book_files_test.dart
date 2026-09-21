@@ -141,6 +141,68 @@ void main() {
         ]));
   });
 
+  test('another device recovers old paths from verified cloud history',
+      () async {
+    client.atomic = false;
+    await publish();
+    // Emulate a release that updated the book but did not record local evidence.
+    await db.update(
+        'tb_books',
+        {
+          'file_path': 'file/middle.epub',
+          'file_md5': md5.convert(utf8.encode('middle')).toString(),
+        },
+        where: 'id=1');
+    client.files[SyncPaths.data('file/middle.epub')] = utf8.encode('middle');
+    await publish();
+    await db.update(
+        'tb_books',
+        {
+          'file_path': newPath,
+          'file_md5': md5.convert(newBytes).toString(),
+        },
+        where: 'id=1');
+    client.files[SyncPaths.data(newPath)] = newBytes;
+    await publish();
+    final other = await fixture(bookId: 77);
+    try {
+      final receiver = RowSyncStore(other);
+      await receiver.merge(await store.snapshot());
+      expect(
+          await ReplacedBookFiles(
+                  store: receiver,
+                  client: client,
+                  cache: temp,
+                  durableDirectory: temp)
+              .reclaim(),
+          2);
+      expect(client.files[SyncPaths.data(newPath)], newBytes);
+      expect(
+          client.files.keys.where((p) => p.startsWith('${SyncPaths.books}/')),
+          [SyncPaths.data(newPath)]);
+      expect((await other.query(ReplacedBookFiles.table)).length, 2);
+    } finally {
+      await other.close();
+    }
+  });
+
+  test(
+      'without replacement evidence an unreferenced same-title file is retained',
+      () async {
+    await db.update(
+        'tb_books',
+        {
+          'file_path': newPath,
+          'file_md5': md5.convert(newBytes).toString(),
+        },
+        where: 'id=1');
+    client.files[SyncPaths.data(newPath)] = newBytes;
+    // The old version was never published in a log and no local evidence exists.
+    await publish();
+    expect(await reclaim(), 0);
+    expect(client.files[SyncPaths.data(oldPath)], oldBytes);
+  });
+
   test('references from another book, even a deleted book, prevent cleanup',
       () async {
     await replace(newPath, newBytes);
@@ -183,16 +245,43 @@ void main() {
     expect(await reclaim(), 1);
   });
 
-  test('local changes during transfer defer cleanup', () async {
+  test('unrelated local notes during transfer do not starve cleanup', () async {
     await replace(newPath, newBytes);
     await publish();
-    client.afterBackup =
-        () => db.insert('tb_notes', noteRow(1, 'new-note')).then((_) {});
+    client.afterBackup = () async {
+      await db.insert('tb_notes', noteRow(1, 'new-note'));
+      await db.update('tb_books',
+          {'last_read_position': 'new-position', 'reading_percentage': .75},
+          where: 'id=1');
+    };
+    expect(await reclaim(), 1);
+    expect((await db.query('tb_notes')).single['content'], 'new-note');
+    expect((await db.query('tb_books')).single['reading_percentage'], .75);
+  });
+
+  test('a new local book reference during transfers still prevents removal',
+      () async {
+    await replace(newPath, newBytes);
+    await publish();
+    client.afterBackup = () async {
+      await db.insert(
+          'tb_books', {...bookRow(2, md5: 'revival'), 'file_path': oldPath});
+    };
     expect(await reclaim(), 0);
     expect(client.removed, isEmpty);
   });
 
-  test('cloud changes during transfer defer cleanup without ETag', () async {
+  test('deleting the replacement during transfers still prevents removal',
+      () async {
+    await replace(newPath, newBytes);
+    await publish();
+    client.afterBackup = () =>
+        db.update('tb_books', {'is_deleted': 1}, where: 'id=1').then((_) {});
+    expect(await reclaim(), 0);
+    expect(client.removed, isEmpty);
+  });
+
+  test('unrelated cloud notes do not starve cleanup without ETag', () async {
     client.atomic = false;
     await replace(newPath, newBytes);
     await publish();
@@ -205,8 +294,36 @@ void main() {
         await RowSyncEngine(store: remoteStore, client: client, cache: temp)
             .synchronize();
       };
+      expect(await reclaim(), 1);
+      expect((await other.query('tb_notes')).single['content'], 'new-note');
+    } finally {
+      await other.close();
+    }
+  });
+
+  test('cloud restores an old file reference during transfers: retain the file',
+      () async {
+    client.atomic = false;
+    await replace(newPath, newBytes);
+    await publish();
+    final other = await fixture(bookId: 77);
+    try {
+      final receiver = RowSyncStore(other);
+      await receiver.merge(await store.snapshot());
+      client.afterBackup = () async {
+        await other.update(
+            'tb_books',
+            {
+              'file_path': oldPath,
+              'file_md5': md5.convert(oldBytes).toString(),
+            },
+            where: 'id=77');
+        await RowSyncEngine(store: receiver, client: client, cache: temp)
+            .synchronize();
+      };
       expect(await reclaim(), 0);
       expect(client.removed, isEmpty);
+      expect(client.files[SyncPaths.data(oldPath)], oldBytes);
     } finally {
       await other.close();
     }
@@ -245,9 +362,11 @@ void main() {
     final publish = source.indexOf('await syncDatabase(direction);');
     final files = source.indexOf('await syncFiles();', publish);
     final cleanup = source.indexOf('await ReplacedBookFiles(', files);
+    final completion = source.indexOf('imageCache.clear();', files);
     expect(publish, greaterThan(0));
     expect(files, greaterThan(publish));
     expect(cleanup, greaterThan(files));
+    expect(cleanup, lessThan(completion));
     expect(
         source.substring(source.indexOf('Future<void> syncFiles()'),
             source.indexOf('Future<void> syncDatabase(')),

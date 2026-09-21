@@ -517,7 +517,8 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                           child: GridView(
                             key: _gridViewKey,
                             controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 80),
+                            padding: EdgeInsets.fromLTRB(20, 12, 20,
+                                12 + MediaQuery.paddingOf(context).bottom),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: constraints.maxWidth ~/

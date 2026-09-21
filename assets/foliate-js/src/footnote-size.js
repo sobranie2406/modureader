@@ -8,14 +8,25 @@ export function footnoteFontSize(readerFontSize) {
 }
 
 export const footnoteLayoutCSS = `
-html, body { min-height: 0 !important; height: auto !important; }
+html, body { min-block-size: 0 !important; block-size: auto !important; }
 body { display: flow-root !important; padding-block-end: 1em !important; }
 `;
 
 // All sizes are outer border-box CSS pixels. The cap is AREA, not 25% of
 // both dimensions (which would leave only 6.25% of the screen).
 export function footnoteBoxSize({ width, height, textLength = 0, fontSize = 16,
-  contentHeight = Infinity, chromeHeight = 18, desktop = false, measureHeight }) {
+  contentHeight = Infinity, chromeHeight = 18, desktop = false, measureHeight,
+  vertical = false, contentWidth = Infinity, chromeWidth = 18, measureWidth }) {
+  // Run the same fitting policy along the text's inline/block axes. A vertical
+  // line's length is height; additional columns consume width, not height.
+  // Transpose the viewport too, so the inverted shape still fits narrow phones.
+  if (vertical) {
+    const size = footnoteBoxSize({width: height, height: width, textLength,
+      fontSize, desktop, contentHeight: contentWidth, chromeHeight: chromeWidth,
+      measureHeight: measureWidth});
+    return {width: size.height, height: size.width,
+      maxWidth: size.maxHeight, maxHeight: size.width};
+  }
   const w = Math.max(1, Number(width) || 1), h = Math.max(1, Number(height) || 1);
   const inset = Math.min(12, w / 10, h / 10);
   const area = w * h * 0.25;
@@ -71,48 +82,59 @@ export function attachFootnoteSizing(dialog, doc, { desktop = false } = {}) {
     const bodyStyle = doc.defaultView.getComputedStyle(doc.body);
     const rootStyle = doc.defaultView.getComputedStyle(doc.documentElement);
     const boxStyle = win.getComputedStyle(dialog);
+    // Follow actual writing mode, including books opened with direction=auto.
+    // A portrait screen alone must not transpose a horizontally written note.
+    const vertical = (bodyStyle.writingMode || rootStyle.writingMode || '')
+      .startsWith('vertical');
+    const blockSize = vertical ? 'width' : 'height';
+    const inlineSize = vertical ? 'height' : 'width';
+    const blockSides = vertical ? ['Left', 'Right'] : ['Top', 'Bottom'];
+    const inlineSides = vertical ? ['Top', 'Bottom'] : ['Left', 'Right'];
+    const sum = (style, prefix, sides, suffix = '') =>
+      sides.reduce((total, side) => total + px(style[prefix + side + suffix]), 0);
     const range = doc.createRange();
     range.selectNodeContents(doc.body);
     // The iframe/body may retain the previous long note's expanded viewport
     // height. Measure the content range, not scrollHeight, so short notes shrink.
-    const contentHeight = range.getBoundingClientRect().height
-      + px(bodyStyle.marginTop) + px(bodyStyle.marginBottom)
-      + px(bodyStyle.paddingTop) + px(bodyStyle.paddingBottom)
-      + px(rootStyle.paddingTop) + px(rootStyle.paddingBottom);
+    const contentBlockSize = range.getBoundingClientRect()[blockSize]
+      + sum(bodyStyle, 'margin', blockSides)
+      + sum(bodyStyle, 'padding', blockSides)
+      + sum(rootStyle, 'padding', blockSides);
     const width = viewport?.width || win.innerWidth;
     const height = viewport?.height || win.innerHeight;
-    let measureHeight;
+    let measureBlockSize;
     if (desktop) {
       // Measure in the same document to retain the book's font and paragraph
       // styles, without resizing the visible note through multiple candidates.
       const clone = doc.body.cloneNode(true);
       clone.setAttribute('aria-hidden', 'true');
-      const paddingRatio = (px(rootStyle.paddingLeft) + px(rootStyle.paddingRight))
-        / Math.max(1, doc.defaultView.innerWidth);
-      const chromeWidth = px(boxStyle.paddingLeft) + px(boxStyle.paddingRight)
-        + px(boxStyle.borderLeftWidth) + px(boxStyle.borderRightWidth);
+      const paddingRatio = sum(rootStyle, 'padding', inlineSides)
+        / Math.max(1, vertical ? doc.defaultView.innerHeight : doc.defaultView.innerWidth);
+      const chromeInlineSize = sum(boxStyle, 'padding', inlineSides)
+        + sum(boxStyle, 'border', inlineSides, 'Width');
       for (const [name,value] of Object.entries({position:'absolute',visibility:'hidden',
-        'pointer-events':'none',left:'0',top:'0',height:'auto','min-height':'0',
+        'pointer-events':'none',left:'0',top:'0',width:'auto',height:'auto','min-height':'0','min-width':'0',
         'max-height':'none','max-width':'none',margin:'0','box-sizing':'border-box'}))
         clone.style.setProperty(name,value,'important');
       doc.documentElement.append(clone);
-      measureHeight = candidate => {
-        clone.style.setProperty('width', `${Math.max(1,(candidate-chromeWidth)*(1-Math.min(.8,paddingRatio)))}px`, 'important');
-        return clone.getBoundingClientRect().height
-          + px(rootStyle.paddingTop) + px(rootStyle.paddingBottom);
+      measureBlockSize = candidate => {
+        clone.style.setProperty(inlineSize, `${Math.max(1,(candidate-chromeInlineSize)*(1-Math.min(.8,paddingRatio)))}px`, 'important');
+        return clone.getBoundingClientRect()[blockSize]
+          + sum(rootStyle, 'padding', blockSides);
       };
-      measureHeight.dispose = () => clone.remove();
+      measureBlockSize.dispose = () => clone.remove();
     }
+    const chromeBlockSize = sum(boxStyle, 'padding', blockSides)
+      + sum(boxStyle, 'border', blockSides, 'Width');
     const size = footnoteBoxSize({ width, height,
       textLength: doc.body.textContent.length,
       fontSize: px(bodyStyle.fontSize) || 16,
-      desktop,
-      measureHeight,
-      chromeHeight: px(boxStyle.paddingTop) + px(boxStyle.paddingBottom)
-        + px(boxStyle.borderTopWidth) + px(boxStyle.borderBottomWidth),
-      contentHeight,
+      desktop, vertical,
+      ...(vertical ? {measureWidth: measureBlockSize, contentWidth: contentBlockSize,
+        chromeWidth: chromeBlockSize} : {measureHeight: measureBlockSize,
+        contentHeight: contentBlockSize, chromeHeight: chromeBlockSize}),
     });
-    measureHeight?.dispose();
+    measureBlockSize?.dispose();
     set('width', size.width);
     set('height', size.height);
     set('left', (viewport?.offsetLeft || 0) + width / 2);

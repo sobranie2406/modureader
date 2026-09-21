@@ -5,6 +5,7 @@ import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
 import { ContinuousSectionWindow } from './continuous-section-window.js'
+import { VerticalColumnRules } from './vertical-column-rules.js'
 
 const lerp = (min, max, x) => x * (max - min) + min
 const easeOutSine = x => Math.sin((x * Math.PI) / 2)
@@ -297,6 +298,14 @@ class View {
       this.#iframe.src = src
     })
   }
+  refreshDirection() {
+    const direction = getDirection(this.document)
+    const changed = direction.writingMode !== this.#writingMode || direction.rtl !== this.#rtl
+    this.#vertical = direction.vertical
+    this.#rtl = direction.rtl
+    this.#writingMode = direction.writingMode
+    return { ...direction, changed }
+  }
   render(layout) {
     if (!layout) return
     this.#column = layout.flow !== 'scrolled'
@@ -316,6 +325,7 @@ class View {
       'width': 'auto',
     })
     setStylesImportant(doc.body, {
+      [vertical ? 'max-width' : 'max-height']: 'none',
       [vertical ? 'max-height' : 'max-width']: `${columnWidth}px`,
       'margin': 'auto',
     })
@@ -474,6 +484,7 @@ export class Paginator extends HTMLElement {
   #observer = new ResizeObserver(() => this.render())
   #top
   #background
+  #columnRules
   #container
   // #header
   // #footer
@@ -526,10 +537,10 @@ export class Paginator extends HTMLElement {
             width: 100%;
             height: 100%;
         }
+        :host { background-color: var(--_background-color); }
         #top {
             height: 100%;
             // --_gap: 7%;
-            background-color: var(--_background-color);
             --_max-inline-size: 720px;
             --_max-block-size: 1440px;
             --_max-column-count: 2;
@@ -564,8 +575,9 @@ export class Paginator extends HTMLElement {
             }
         }
         #background {
-            grid-column: 1 / -1;
-            grid-row: 1 / -1;
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
         }
         #container {
             grid-column: 1 / -1;
@@ -612,8 +624,8 @@ export class Paginator extends HTMLElement {
             opacity: .6;
         }
         </style>
+        <div id="background" part="filter"></div>
         <div id="top">
-            <div id="background" part="filter"></div>
             <div id="container"></div>
         </div>
         `
@@ -621,6 +633,7 @@ export class Paginator extends HTMLElement {
     this.#top = this.#root.getElementById('top')
     this.#background = this.#root.getElementById('background')
     this.#container = this.#root.getElementById('container')
+    this.#columnRules = new VerticalColumnRules(this, this.#top, this.#container)
     for (const event of ['wheel', 'touchstart', 'touchmove']) {
       this.#container.addEventListener(event, e => this.#readingActions.input(e),
         { passive: true, capture: true })
@@ -690,8 +703,10 @@ export class Paginator extends HTMLElement {
         break
       case 'top-margin':
       case 'max-block-size':
-      case 'background-color':
         this.#top.style.setProperty('--_' + name, value)
+        break
+      case 'background-color':
+        this.style.setProperty('--_background-color', value)
         break
       case 'bottom-margin':
       case 'gap':
@@ -782,8 +797,11 @@ export class Paginator extends HTMLElement {
 
     const flow = this.getAttribute('flow')
     if (flow === 'scrolled') {
-      this.#container.style.overflowX = 'auto'
-      this.#container.style.overflowY = 'auto'
+      // Notes scroll along their block axis only: extra vertical-text columns
+      // extend left/right; horizontal text extends down. Leave book flow alone.
+      const footnote = this.hasAttribute('footnote')
+      this.#container.style.overflowX = footnote && !vertical ? 'hidden' : 'auto'
+      this.#container.style.overflowY = footnote && vertical ? 'hidden' : 'auto'
     } else if (this.mobileTouchPaging) {
       // Programmatic page turns still work, but the browser cannot leave the
       // page between columns or impart momentum while the finger is down.
@@ -861,7 +879,7 @@ export class Paginator extends HTMLElement {
         this.#view.onExpand = () => {
           if (!this.#preparingView && !this.#destroyed) this.scrollToAnchor(this.#anchor)
         }
-        this.#view.render(this.#beforeRender({ vertical: false, rtl: this.#rtl }))
+        this.#view.render(this.#beforeRender(this.#view.refreshDirection()))
         this.scrollToAnchor(this.#anchor)
         return
       }
@@ -871,10 +889,7 @@ export class Paginator extends HTMLElement {
       return
     }
     if (!this.#view || this.#preparingView || this.#destroyed) return
-    this.#view.render(this.#beforeRender({
-      vertical: this.#vertical,
-      rtl: this.#rtl,
-    }))
+    this.#view.render(this.#beforeRender(this.#view.refreshDirection()))
     this.scrollToAnchor(this.#anchor)
   }
   get scrolled() {
@@ -1766,6 +1781,9 @@ export class Paginator extends HTMLElement {
 
     // needed because the resize observer doesn't work in Firefox
     const view = this.#view
+    // CSS can change writing direction without loading another chapter. Update
+    // both iframe and paginator axes together, retaining the current anchor.
+    if (!this.#preparingView && view?.refreshDirection().changed) this.render()
     if (!this.#preparingView) view?.document?.fonts?.ready?.then(() => {
       if (this.#view === view && !this.#preparingView) view.expand()
     })
@@ -1776,6 +1794,7 @@ export class Paginator extends HTMLElement {
   get isNavigating() { return this.#locked }
   destroy() {
     this.#destroyed = true
+    this.#columnRules?.destroy()
     this.#continuous?.destroy()
     this.#continuous = null
     this.#observer.disconnect()

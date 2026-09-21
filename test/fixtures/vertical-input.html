@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;}foliate-view{display:block;height:100%}#note{position:fixed;top:30%;left:30%;background:white;border:1px solid red;padding:20px;z-index:10}</style>
+<div id="note" hidden>注释内容<button onclick="this.parentElement.hidden=true">关闭</button></div>
+<output id="status" style="position:fixed;top:0;left:60px;z-index:20;pointer-events:none">Loading</output>
+<script type="module">
+// Mirror the native macOS bridge's reader-event permission, not EPUB scripting.
+history.replaceState(null,'','?'+new URLSearchParams({style:JSON.stringify({allowScript:false,readerScriptEvents:true})}));
+await import('../../assets/foliate-js/src/view.js');
+const {applyVerticalPageChrome}=await import('../../assets/foliate-js/src/vertical-page-chrome.js');
+const events=[];
+const view=document.createElement('foliate-view');document.body.append(view);
+const urls=[0,1].map(i=>URL.createObjectURL(new Blob([`<!doctype html><meta charset="utf-8"><body><p>第${i+1}章。测试注释<a id="noteref" href="#note">[注]</a>。</p>${'<p>这是鼠标点击与竖排分页测试。翻到下一页以后应当仍可点击注释。</p>'.repeat(40)}<aside id="note">注释内容</aside></body>`],{type:'text/html'})));
+await view.open({sections:urls.map((url,i)=>({id:String(i),size:5000,linear:'yes',load:async()=>url,unload(){},resolveHref:h=>h})),
+  dir:'ltr',metadata:{language:'zh'},toc:[],splitTOCHref:h=>[h,null],getTOCFragment:doc=>doc.body});
+const r=view.renderer;
+r.addEventListener('relocate',()=>document.querySelector('#status').textContent=`Page ${r.page}`);
+const style={writingMode:'vertical-rl',verticalRedFrame:true,verticalPageInsets:{left:44,right:44,top:30,bottom:30},topMargin:50,bottomMargin:50};
+style.verticalPageChrome={title:'测试章节',remaining:'本章剩余四十页',progress:'一·一百',chinese:true,headerFontSize:12,footerFontSize:12,color:'#333333',opacity:.7,safe:{}};
+for(const [k,v] of Object.entries({flow:'paginated','continuous-scroll':'false',gap:'6%','max-column-count':'1','background-color':'#faf8f2'}))r.setAttribute(k,v);
+applyVerticalPageChrome(r,style);
+r.setStyles('html{writing-mode:vertical-rl!important;font:24px/1.8 serif}p{margin:0 0 1em}');
+window.isFootNoteOpen=()=>false;
+view.addEventListener('click-view',e=>{events.push(['click',e.detail.x,e.detail.y]);r.next()});
+view.addEventListener('link',e=>{e.preventDefault();events.push(['note']);document.querySelector('#note').hidden=false});
+view.addEventListener('load',({detail:{doc}})=>doc.addEventListener('click',e=>events.push(['doc-click',e.target.tagName]),true));
+await r.goTo({index:0});
+window.fixture={view,r,style,events,apply:()=>applyVerticalPageChrome(r,style)};
+window.ready=true;
+</script>

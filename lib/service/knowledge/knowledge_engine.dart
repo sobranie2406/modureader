@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
 
 class KnowledgeChunk {
   const KnowledgeChunk({
@@ -457,13 +458,58 @@ class FileKnowledgeIndexStore implements KnowledgeIndexStore {
       final path = file.path;
       // Vector files can be large. Parsing them must not block reading frames.
       final snapshot = await Isolate.run(() async {
-        final json = jsonDecode(await File(path).readAsString());
-        return KnowledgeIndexSnapshot.fromJson(
-            Map<String, dynamic>.from(json as Map));
+        final fields = <String, dynamic>{};
+        final chunks = <KnowledgeChunk>[];
+        final byId = <String, KnowledgeChunk>{};
+        final vectors = <VectorEntry>[];
+        await for (final event in KnowledgeJsonReader(File(path)).read()) {
+          if (event.kind == 'field') {
+            fields[event.key] = event.value;
+          } else if (event.kind == 'item' && event.key == 'chunks') {
+            final item = event.value as Map<String, dynamic>;
+            final chunk = KnowledgeChunk(
+                id: item['id'] as String,
+                bookId: item['bookId'] as String,
+                chapterId: item['chapterId'] as String,
+                text: item['text'] as String,
+                startOffset: item['startOffset'] as int? ?? 0);
+            if (byId.containsKey(chunk.id) || chunks.length >= 250000) {
+              throw const FormatException('索引片段重复或过多');
+            }
+            chunks.add(chunk);
+            byId[chunk.id] = chunk;
+          } else if (event.kind == 'item' && event.key == 'vectors') {
+            final item = event.value as Map<String, dynamic>;
+            final chunk = byId[item['chunkId']];
+            final values = item['vector'] as List;
+            if (chunk == null ||
+                values.length > 8192 ||
+                vectors.length >= chunks.length) {
+              throw const FormatException('索引向量无效');
+            }
+            final vector = Float64List(values.length);
+            for (var i = 0; i < values.length; i++) {
+              vector[i] = (values[i] as num).toDouble();
+            }
+            vectors.add(VectorEntry(chunk: chunk, vector: vector));
+          }
+        }
+        return KnowledgeIndexSnapshot(
+            bookId: fields['bookId'] as String,
+            contentHash: fields['contentHash'] as String,
+            sourceFingerprint: fields['sourceFingerprint'] as String?,
+            chunks: chunks,
+            vectors: vectors,
+            embeddingMode: fields['embeddingMode'] as String?,
+            embeddingModelId: fields['embeddingModelId'] as String?,
+            embeddingDimensions:
+                (fields['embeddingDimensions'] as num?)?.toInt());
       });
       if (snapshot.bookId != bookId) return null;
       if (sourceFingerprint != null &&
-          snapshot.sourceFingerprint != sourceFingerprint) return null;
+          snapshot.sourceFingerprint != sourceFingerprint) {
+        return null;
+      }
       validate(snapshot);
       return snapshot;
     } on Object {

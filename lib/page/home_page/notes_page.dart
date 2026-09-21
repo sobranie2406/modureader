@@ -112,7 +112,8 @@ class _NotesPageState extends ConsumerState<NotesPage> {
             ? const Expanded(child: Center(child: NotesTips()))
             : Expanded(
                 child: ListView.builder(
-                    padding: EdgeInsets.only(bottom: 80),
+                    padding: EdgeInsets.only(
+                        bottom: 12 + MediaQuery.paddingOf(context).bottom),
                     controller: _scrollController,
                     itemCount: data.length,
                     itemBuilder: (context, index) {

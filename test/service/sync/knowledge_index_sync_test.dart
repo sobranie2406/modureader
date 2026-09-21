@@ -101,21 +101,34 @@ void main() {
     remote.downloads = 0;
   }
 
-  test('index sync is a local opt-in; marking menu preference is persistent',
+  test('retired index sync setting is removed and cannot be restored',
       () async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'syncKnowledgeIndexes': true});
     await Prefs().initPrefs();
-    expect(Prefs().syncKnowledgeIndexes, isFalse);
+    expect(Prefs().prefs.containsKey('syncKnowledgeIndexes'), isFalse);
     expect(Prefs().quickMarkShowMenu, isFalse);
     await Prefs().applyPrefsBackupMap({
       'syncKnowledgeIndexes': {'type': 'bool', 'value': true},
     });
-    expect(Prefs().syncKnowledgeIndexes, isFalse);
-    Prefs().syncKnowledgeIndexes = true;
+    expect(Prefs().prefs.containsKey('syncKnowledgeIndexes'), isFalse);
+    // Even a stale key introduced after initialization is not exported.
+    await Prefs().prefs.setBool('syncKnowledgeIndexes', true);
+    expect(await Prefs().buildPrefsBackupMap(),
+        isNot(contains('syncKnowledgeIndexes')));
     Prefs().quickMarkShowMenu = true;
     await Prefs().initPrefs();
-    expect(Prefs().syncKnowledgeIndexes, isTrue);
+    expect(Prefs().prefs.containsKey('syncKnowledgeIndexes'), isFalse);
     expect(Prefs().quickMarkShowMenu, isTrue);
+  });
+
+  test('normal WebDAV sync and settings no longer wire index transfer', () {
+    final sync = File('lib/providers/sync.dart').readAsStringSync();
+    expect(sync, isNot(contains('KnowledgeIndexSync')));
+    expect(sync, isNot(contains('knowledge_index_sync.dart')));
+    expect(sync, isNot(contains('syncKnowledgeIndexes')));
+    final settings = File('lib/page/settings_page/sync.dart').readAsStringSync();
+    expect(settings, isNot(contains('syncKnowledgeIndexes')));
+    expect(settings, isNot(contains('Sync book vector indexes')));
   });
 
   test(

@@ -280,6 +280,21 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
         ],
       ),
 
+      if (AnxPlatform.isAndroid)
+        SettingsSection(
+          title: const Text('存储位置'),
+          tiles: [
+            CustomSettingsTile(
+                child: ListTile(
+              title: const Text('应用数据目录'),
+              subtitle: Text('${_currentStoragePath ?? "..."}\n'
+                  '书籍、字体、数据库、模型和索引保存在此目录。'
+                  '卸载应用会删除此目录；部分系统仍限制文件管理器访问 Android/data。'
+                  '账号设置和密钥仍保存在应用私有区域。'),
+            )),
+          ],
+        ),
+
       // Custom storage location (Windows only)
       if (AnxPlatform.isWindows)
         SettingsSection(
