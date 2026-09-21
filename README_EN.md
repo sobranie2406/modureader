@@ -166,7 +166,7 @@ Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10
 
 ## Screenshots
 
-These actual Modu macOS screenshots use the project's original demo book. They come from an earlier build and illustrate the layout; available options and defaults depend on the installed version.
+These screenshots were captured from the **Modu 1.1.1 (10033) macOS release**. Horizontal reading uses the project's original demo book; vertical reading uses a local edition of *Guwen Guanzhi* (《古文观止译注评（全二册）》). Only the interface is shown; that book is not distributed. Themes, fonts, models and switches reflect the capture session, not necessarily the defaults.
 
 ### Reading: text, fonts and themes
 
@@ -174,11 +174,17 @@ The original demo book *Reading: Let Your Thinking Slow Down* (《阅读，让�
 
 ![Modu EPUB reader with the original demo book, single-column layout and a light theme](docs/images/reading-epub-macos.jpg)
 
+### Classical vertical reading: red frame and column rules
+
+The actual *Guwen Guanzhi* reading view shows the optional red frame and rules between text columns. Chapter information appears on the right, reading progress on the left, with Chinese numerals in the Chinese interface.
+
+![Modu 1.1.1 vertical reading of Guwen Guanzhi with a red frame, column rules and side information](docs/images/reading-vertical-border-macos.jpg)
+
 ### In-book AI: read and ask side by side
 
-The AI sidebar keeps the book text visible on the left. The right side provides the ten reading skills listed above, or you can type your own question.
+The AI sidebar keeps the book text visible on the left. A horizontally scrollable skill bar above the input provides enabled skills such as chapter summary, book summary, concept explanation and argument analysis. You can also type your own question. This screenshot shows the controls; no request was sent and no AI response was fabricated.
 
-![Modu in-book AI sidebar with book text on the left and ten reading skills on the right](docs/images/reading-ai-panel-macos.jpg)
+![Modu in-book AI sidebar with book text on the left and reading skills above the input](docs/images/reading-ai-panel-macos.jpg)
 
 ### Home AI: start with a quick question
 
@@ -193,13 +199,15 @@ The screenshots show reading and AI controls. [Download the original demo EPUB](
 
 ### Contents and bookmarks
 
-![Modu chapter navigation, chapter search and reading position](docs/images/reading-toc-macos.jpg)
+![Modu chapter list, bookmarks tab and current reading position](docs/images/reading-toc-macos.jpg)
 
 ### AI reading skills and prompt management
 
 ![Modu AI reading skill settings](docs/images/ai-reading-skills-macos.jpg)
 
-### Local embedding models and automatic indexing
+### Local embedding models: on-demand downloads and management
+
+Embedding models are not bundled in the installer. Choose Hugging Face or Gitee as the download source, then download, switch or delete models as needed.
 
 ![Modu embedding model settings](docs/images/vector-models-macos.jpg)
 
