@@ -49,7 +49,9 @@ Future<void> exportNotes(
       break;
 
     case ExportType.txt:
-      var notes = groups.map(_formatPlainGroup).join('\n\n');
+      final notes = formatNotesText(notesList,
+          mergeChapterHeadings: mergeChapterHeadings,
+          chinese: Localizations.localeOf(context).languageCode == 'zh');
       String? filePath = await saveFileToDownload(
           bytes: convertStringToUint8List(notes),
           fileName: '${book.title}.txt',
@@ -147,7 +149,41 @@ List<_ChapterGroup> _groupNotesByChapter(
   return groups;
 }
 
-String _formatPlainGroup(_ChapterGroup group) {
+/// Pure TXT formatting, shared by all platforms without changing MD/CSV/copy.
+String formatNotesText(List<BookNote> notes,
+    {bool mergeChapterHeadings = false, bool chinese = true}) {
+  return _groupNotesByChapter(notes, mergeChapterHeadings)
+      .map((group) =>
+          _formatPlainGroup(group, annotateReaderNotes: true, chinese: chinese))
+      .join('\n\n');
+}
+
+String _noteTimeLabel(BookNote note, bool chinese) {
+  // Legacy rows without update_time are hydrated with DateTime.now(). Do not
+  // export that synthetic value as though the user just edited the note.
+  final saved = note.persistedValues;
+  final updated = saved != null && saved['update_time'] == null
+      ? null
+      : note.updateTime;
+  final created = note.createTime;
+  final modified =
+      updated != null && (created == null || updated.isAfter(created));
+  final time = (modified ? updated : created ?? updated)?.toLocal();
+  if (time == null) return chinese ? '时间未知' : 'Time unknown';
+  final label = chinese
+      ? (modified ? '最后修改' : '创建时间')
+      : (modified ? 'Last modified' : 'Created');
+  final minute = time.minute.toString().padLeft(2, '0');
+  final date = chinese
+      ? '${time.year}年${time.month}月${time.day}日${time.hour}点$minute分'
+      : '${time.year}-${time.month.toString().padLeft(2, '0')}-'
+          '${time.day.toString().padLeft(2, '0')} '
+          '${time.hour.toString().padLeft(2, '0')}:$minute';
+  return chinese ? '$label：$date' : '$label: $date';
+}
+
+String _formatPlainGroup(_ChapterGroup group,
+    {bool annotateReaderNotes = false, bool chinese = true}) {
   final buffer = StringBuffer();
   if (group.chapter.isNotEmpty) {
     buffer.writeln(group.chapter);
@@ -157,7 +193,16 @@ String _formatPlainGroup(_ChapterGroup group) {
       buffer.writeln('\t${note.content}');
     }
     if (note.readerNote != null && note.readerNote!.isNotEmpty) {
-      buffer.writeln('\t\t${note.readerNote}');
+      if (annotateReaderNotes) {
+        if (note.readerNote!.trim().isNotEmpty) {
+          buffer.writeln();
+          buffer.writeln(chinese ? '--- 笔记 ---' : '--- Note ---');
+          buffer.writeln(note.readerNote);
+          buffer.writeln('--- ${_noteTimeLabel(note, chinese)} ---');
+        }
+      } else {
+        buffer.writeln('\t\t${note.readerNote}');
+      }
     }
     buffer.writeln();
   }

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- audio_service resolves this notification icon by name at runtime. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_read_aloud" />
+    tools:keep="@drawable/ic_stat_read_aloud,@drawable/ic_stat_tts_exit" />

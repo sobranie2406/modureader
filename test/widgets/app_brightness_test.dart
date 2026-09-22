@@ -1,3 +1,4 @@
+import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
@@ -13,6 +14,7 @@ void main() {
       {bool nativeWindow = false,
       Map<String, Object> settings = const {}}) async {
     SharedPreferences.setMockInitialValues(settings);
+    await Prefs().initPrefs();
     final controller = AppBrightness(nativeWindow: nativeWindow);
     await controller.initialize(await SharedPreferences.getInstance());
     addTearDown(controller.dispose);
@@ -98,7 +100,12 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
-      home: Scaffold(body: Center(child: BrightnessWidget(controller: c))),
+      home: Scaffold(
+          body: Center(
+              child: BrightnessWidget(
+        controller: c,
+        onNightModeChanged: () {},
+      ))),
     ));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(Slider), const Offset(-50, 0));
@@ -109,10 +116,54 @@ void main() {
         (await SharedPreferences.getInstance())
             .getDouble(AppBrightness.levelKey),
         c.level);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const ValueKey('brightness-auto')));
     await tester.pumpAndSettle();
     expect(c.followSystem, isTrue);
     expect(c.dimOpacity, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'auto / slider / night stay ordered; night does not change brightness',
+      (tester) async {
+    final c = await create();
+    await tester.binding.setSurfaceSize(const Size(280, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    var refreshes = 0;
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: Scaffold(
+          body: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: BrightnessWidget(
+            controller: c, onNightModeChanged: () => refreshes++),
+      )),
+    ));
+    await tester.pumpAndSettle();
+    final auto = find.byKey(const ValueKey('brightness-auto'));
+    final night = find.byKey(const ValueKey('brightness-night'));
+    expect(tester.getCenter(auto).dx,
+        lessThan(tester.getCenter(find.byType(Slider)).dx));
+    expect(tester.getCenter(night).dx,
+        greaterThan(tester.getCenter(find.byType(Slider)).dx));
+    await tester.tap(night);
+    await tester.pumpAndSettle();
+    expect(Prefs().readingNightMode, isTrue);
+    expect(tester.widget<IconButton>(night).isSelected, isTrue);
+    expect(c.followSystem, isTrue);
+    expect(c.level, 0.6);
+    expect(refreshes, 1);
+    await tester.tap(auto);
+    await tester.pumpAndSettle();
+    expect(c.followSystem, isFalse);
+    expect(Prefs().readingNightMode, isTrue);
+    await tester.tap(night);
+    await tester.pumpAndSettle();
+    expect(Prefs().readingNightMode, isFalse);
+    expect(c.followSystem, isFalse);
+    expect(c.level, 0.6);
+    expect(refreshes, 2);
     expect(tester.takeException(), isNull);
   });
 

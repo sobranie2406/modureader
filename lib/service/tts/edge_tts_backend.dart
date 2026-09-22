@@ -436,6 +436,11 @@ class EdgeTtsProvider extends TtsServiceProvider {
 
   EdgeTtsProvider._();
 
+  // Reading must not time out after 11 seconds while the same preview request
+  // is allowed to wait for the Edge stream's 60-second response timeout.
+  @override
+  Duration get synthesisTimeout => const Duration(seconds: 60);
+
   final EdgeTtsClient _client = EdgeTtsClient();
 
   @override

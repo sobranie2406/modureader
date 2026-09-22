@@ -3,6 +3,7 @@ import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_media_state.dart';
+import 'package:anx_reader/service/tts/notification_permission.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,43 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Function? _getPrevText;
   BaseTts? _observedTts;
 
+  bool get _chinese =>
+      (Prefs().locale ?? WidgetsBinding.instance.platformDispatcher.locale)
+          .languageCode ==
+      'zh';
+
+  void _publishMetadata(MediaItem item) {
+    final previous = mediaItem.value;
+    if (previous?.id == item.id &&
+        previous?.displayTitle == item.displayTitle &&
+        previous?.displaySubtitle == item.displaySubtitle &&
+        previous?.artUri == item.artUri) return;
+    queue.add([item]);
+    mediaItem.add(item);
+  }
+
+  void _refreshMetadata({String? chapter}) {
+    final current = mediaItem.value;
+    if (current == null) return;
+    _publishMetadata(ttsMediaItem(
+      bookId: current.id,
+      title: current.title,
+      author: current.extras?['bookAuthor'] as String? ?? '',
+      chapter: chapter ?? current.extras?['ttsChapter'] as String? ?? '',
+      coverPath: current.extras?['ttsCoverPath'] as String? ?? '',
+      state: tts.ttsStateNotifier.value,
+      chinese: _chinese,
+    ));
+  }
+
+  /// Called from the speech cursor, including detached/background chapters.
+  /// Ignore a late callback from a stopped or different book.
+  void updateChapter({required int bookId, required String chapter}) {
+    if (mediaItem.value?.id != bookId.toString() ||
+        tts.ttsStateNotifier.value == TtsStateEnum.stopped) return;
+    _refreshMetadata(chapter: chapter);
+  }
+
   void _observePlayback() {
     _observedTts?.ttsStateNotifier.removeListener(_syncPlaybackState);
     _observedTts = tts;
@@ -34,8 +72,10 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   void _syncPlaybackState() {
-    playbackState
-        .add(ttsMediaState(playbackState.value, tts.ttsStateNotifier.value));
+    playbackState.add(ttsMediaState(
+        playbackState.value, tts.ttsStateNotifier.value,
+        chinese: _chinese));
+    if (tts.ttsStateNotifier.value != TtsStateEnum.stopped) _refreshMetadata();
   }
 
   Future<void> init(Function getCurrentText, Function getNextText,
@@ -100,24 +140,31 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> play() async {
     final reader = epubPlayerKey.currentState;
     if (reader == null) return;
+    await prepareTtsNotificationPermission();
+    if (!reader.mounted || epubPlayerKey.currentState != reader) return;
     final session = await AudioSession.instance;
     if (!await session.setActive(true)) return;
 
-    final item = MediaItem(
-      id: reader.book.id.toString(),
+    final previous = mediaItem.value;
+    final resuming = tts.ttsStateNotifier.value == TtsStateEnum.paused &&
+        previous?.id == reader.book.id.toString();
+    final item = ttsMediaItem(
+      bookId: reader.book.id.toString(),
       title: reader.book.title,
-      album: reader.chapterTitle,
-      artist: reader.book.author,
-      // Use -1 to tell system not to render a progress bar.
-      duration: const Duration(milliseconds: -1),
-      artUri: Uri.file(reader.book.coverFullPath),
+      chapter: resuming
+          ? (previous?.extras?['ttsChapter'] as String? ?? reader.chapterTitle)
+          : reader.chapterTitle,
+      author: reader.book.author,
+      coverPath: reader.book.coverFullPath,
+      state: TtsStateEnum.playing,
+      chinese: _chinese,
     );
 
     // Ensure system receives queue + active index for control center metadata.
-    queue.add([item]);
-    mediaItem.add(item);
-    playbackState
-        .add(ttsMediaState(playbackState.value, TtsStateEnum.playing).copyWith(
+    _publishMetadata(item);
+    playbackState.add(ttsMediaState(playbackState.value, TtsStateEnum.playing,
+            chinese: _chinese)
+        .copyWith(
       queueIndex: 0,
       updatePosition: Duration.zero,
       bufferedPosition: Duration.zero,
@@ -133,12 +180,10 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> pause() async {
-    playbackState.add(playbackState.value.copyWith(
-      controls: [MediaControl.play, MediaControl.stop],
-      androidCompactActionIndices: [0, 1],
+    playbackState.add(ttsMediaState(playbackState.value, TtsStateEnum.paused,
+            chinese: _chinese)
+        .copyWith(
       queueIndex: queue.value.isNotEmpty ? 0 : null,
-      processingState: AudioProcessingState.ready,
-      playing: false,
     ));
 
     await tts.pause();
@@ -162,6 +207,8 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       try {
         await epubPlayerKey.currentState?.ttsStop();
       } finally {
+        queue.add([]);
+        mediaItem.add(null);
         await (await AudioSession.instance).setActive(false);
       }
     }

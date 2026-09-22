@@ -654,6 +654,10 @@ export class View extends HTMLElement {
       (range) => {
         const value = this.getCFI(index, range)
         this.#ttsPresentation = { cfi: value, tts: this.tts }
+        // Metadata follows the speech document, not the visible page. This is
+        // synchronous and must not wait for a suspended background renderer.
+        const chapterTitle = this.getProgressOf(index, range)?.tocItem?.label ?? ''
+        this.#emit('tts-chapter', { index, chapterTitle })
         // Persist the speech cursor even when no visible page is being laid
         // out. Percent is text-based here; the CFI remains the exact position.
         if (this.ttsBackground || document.hidden || detached) {

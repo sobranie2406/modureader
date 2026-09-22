@@ -36,6 +36,7 @@ import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/providers/sync_database_revision.dart';
 import 'package:anx_reader/service/book_player/reader_progress_session.dart';
+import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
 import 'package:anx_reader/service/book_player/tts_text_result.dart';
@@ -300,10 +301,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     styleTimer?.cancel();
     styleTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      final bgimgUrl = Prefs().bgimg.getEffectiveUrl(
-            isDarkMode: isDarkMode,
-            autoAdjust: Prefs().autoAdjustReadingTheme,
-          );
+      final bgimgUrl =
+          readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
       BookStyle style = bookStyle ?? Prefs().bookStyle;
       webViewController.evaluateJavascript(source: '''
       changeStyle({
@@ -345,10 +344,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void changeBgimgEffect() {
     if (!mounted) return;
     final bgimg = Prefs().bgimg;
-    final bgimgUrl = bgimg.getEffectiveUrl(
-      isDarkMode: isDarkMode,
-      autoAdjust: Prefs().autoAdjustReadingTheme,
-    );
+    final bgimgUrl = readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
     webViewController.evaluateJavascript(source: '''
       changeStyle({
         backgroundImage: ${jsonEncode(bgimgUrl)},
@@ -951,17 +947,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   void getThemeColor() {
-    if (Prefs().autoAdjustReadingTheme) {
-      List<ReadTheme> themes = widget.initialThemes;
-      final isDayMode =
-          Theme.of(navigatorKey.currentContext!).brightness == Brightness.light;
-      backgroundColor =
-          isDayMode ? themes[0].backgroundColor : themes[1].backgroundColor;
-      textColor = isDayMode ? themes[0].textColor : themes[1].textColor;
-    } else {
-      backgroundColor = Prefs().readTheme.backgroundColor;
-      textColor = Prefs().readTheme.textColor;
-    }
+    final theme = readingThemeForDisplay(Prefs(),
+        themes: widget.initialThemes, isDarkMode: isDarkMode);
+    backgroundColor = theme.backgroundColor;
+    textColor = theme.textColor;
   }
 
   void refreshReadingTheme() {
@@ -1047,6 +1036,15 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             unawaited(_recordReadingAction(cfi, percentage));
           }
           readingPageKey.currentState?.resetAwakeTimer();
+        });
+    controller.addJavaScriptHandler(
+        handlerName: 'onTtsChapter',
+        callback: (args) {
+          if (!mounted || args.isEmpty || args.first is! Map) return;
+          final title = (args.first as Map)['chapterTitle'];
+          if (title is String) {
+            TtsHandler().updateChapter(bookId: book.id, chapter: title);
+          }
         });
     controller.addJavaScriptHandler(
         handlerName: 'onTtsProgress',

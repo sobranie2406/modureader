@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/config/service_provider.dart';
@@ -25,6 +26,10 @@ abstract class _TtsService {}
 ///   - [getConfig] / [saveConfig]: Configuration management.
 abstract class TtsServiceProvider extends ServiceProvider<dynamic> {
   Duration get synthesisTimeout => const Duration(seconds: 10);
+
+  /// Cache metadata must never mutate provider-owned (possibly const) config.
+  String cacheConfiguration() =>
+      jsonEncode(Map<String, dynamic>.from(getConfig())..remove('key'));
 
   String get serviceId => service.toString().split('.').last;
 

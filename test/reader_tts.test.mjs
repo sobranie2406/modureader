@@ -155,7 +155,12 @@ const SpeechView = vm.runInNewContext(`(class {
   #index = 0;
   #sectionProgress = { getProgress: (index, fraction) => ({fraction: (index + fraction) / 4}) };
   progressEvents = [];
-  #emit(name, detail) { if (name === 'tts-progress') this.progressEvents.push(detail) }
+  chapterEvents = [];
+  getProgressOf(index) { return {tocItem: {label: 'Chapter ' + index}} }
+  #emit(name, detail) {
+    if (name === 'tts-progress') this.progressEvents.push(detail);
+    if (name === 'tts-chapter') this.chapterEvents.push(detail);
+  }
   overlays = [];
   #getOverlayer(index) { return this.overlays[index] }
   getCFI(index, range) { return index + ':' + range.toString() }
@@ -196,6 +201,8 @@ test('locked-screen speech crosses empty and title-only chapters without loading
   assert.ok(view.progressEvents.some(event => event.cfi.startsWith('2:')))
   assert.ok(view.progressEvents.some(event => event.cfi.startsWith('3:')))
   assert.ok(view.progressEvents.every(event => Number.isFinite(event.fraction)))
+  assert.ok(view.chapterEvents.some(event => event.chapterTitle === 'Chapter 2'))
+  assert.ok(view.chapterEvents.some(event => event.chapterTitle === 'Chapter 3'))
 })
 test('foreground presentation blocked in goTo does not block speech or reset its cursor', async () => {
   const fixture = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1><p>正文。</p>', '<h1>最后章</h1>'])

@@ -4,6 +4,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/utils/js/convert_dart_color_to_js.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 
@@ -25,7 +26,7 @@ String generateUrl(
   String indexHtmlPath =
       "http://127.0.0.1:${Server().port}/foliate-js/index.html";
 
-  ReadTheme readTheme = Prefs().readTheme;
+  ReadTheme readTheme = readingThemeForDisplay(Prefs());
   bookStyle ??= Prefs().bookStyle;
   textColor ??= readTheme.textColor;
   fontName ??= Prefs().font.name;
@@ -37,10 +38,7 @@ String generateUrl(
   backgroundColor = convertDartColorToJs(backgroundColor);
 
   // Get effective background image URL using the new method
-  String bgimgUrl = Prefs().bgimg.getEffectiveUrl(
-        isDarkMode: isDarkMode,
-        autoAdjust: Prefs().autoAdjustReadingTheme,
-      );
+  String bgimgUrl = readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
   // const importing = $importing
   // const url = '${replaceSingleQuote(url)}'
   // let initialCfi = '${replaceSingleQuote(cfi)}'

@@ -50,6 +50,45 @@ void main() {
   });
 
   test(
+      'night override persists but never overwrites the saved reading appearance',
+      () async {
+    final prefs = Prefs();
+    final original = prefs.readTheme.toJson();
+    prefs.readingNightMode = true;
+    await prefs.initPrefs();
+    expect(prefs.readingNightMode, isTrue);
+    for (final dark in [false, true]) {
+      final visible = readingThemeForDisplay(prefs,
+          themes: [theme(), theme()], isDarkMode: dark);
+      expect(visible.backgroundColor, 'FF1C1C1E');
+      expect(visible.textColor, 'FFD8D8D8');
+      expect(readingBackgroundForDisplay(prefs, isDarkMode: dark), 'none');
+    }
+    expect(prefs.readTheme.toJson(), original);
+    expect(prefs.bgimg, image);
+    expect(prefs.autoAdjustReadingTheme, isTrue);
+    prefs.readingNightMode = false;
+    final day = theme();
+    final night = theme()..backgroundColor = 'ff222222';
+    expect(readingThemeForDisplay(prefs, themes: [day, night]), same(day));
+    expect(
+        readingThemeForDisplay(prefs, themes: [day, night], isDarkMode: true),
+        same(night));
+    prefs.autoAdjustReadingTheme = false;
+    expect(readingThemeForDisplay(prefs).toJson(), original);
+    expect(prefs.bgimg, image);
+  });
+
+  test('explicit colour or image selection exits the night override', () {
+    Prefs().readingNightMode = true;
+    selectReadingColorTheme(theme(), prefs: Prefs(), apply: (_) {});
+    expect(Prefs().readingNightMode, isFalse);
+    Prefs().readingNightMode = true;
+    selectReadingBackground(image, prefs: Prefs(), apply: () {});
+    expect(Prefs().readingNightMode, isFalse);
+  });
+
+  test(
       'explicit night background persists without being overridden by auto mode',
       () async {
     var applied = false;

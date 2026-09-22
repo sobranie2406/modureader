@@ -1059,6 +1059,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                         setState(() {
                                           _currentPage = BrightnessWidget(
                                             controller: AppBrightness.instance,
+                                            onNightModeChanged: () => epubPlayerKey
+                                                .currentState
+                                                ?.refreshReadingTheme(),
                                           );
                                         });
                                       },

@@ -1084,6 +1084,14 @@ class Reader {
       this.#saveOriginalContent()
     })
     this.view.addEventListener('relocate', this.#onRelocate.bind(this))
+    let lastTtsChapter = null
+    this.view.addEventListener('tts-chapter', ({ detail }) => {
+      const key = JSON.stringify([detail.index, detail.chapterTitle])
+      if (lastTtsChapter === key) return
+      lastTtsChapter = key
+      void callFlutter('onTtsChapter', { chapterTitle: detail.chapterTitle })
+        .catch(() => {})
+    })
     this.view.addEventListener('tts-progress', ({ detail }) => {
       if (Number.isFinite(detail.fraction))
         void callFlutter('onTtsProgress', { cfi: detail.cfi, percentage: detail.fraction })

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:flutter/material.dart';
@@ -36,30 +37,38 @@ class AppBrightnessLayer extends StatelessWidget {
 }
 
 class BrightnessWidget extends StatelessWidget {
-  const BrightnessWidget({super.key, required this.controller});
+  const BrightnessWidget({
+    super.key,
+    required this.controller,
+    required this.onNightModeChanged,
+  });
 
   final AppBrightness controller;
+  final VoidCallback onNightModeChanged;
 
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, Prefs()]),
       builder: (context, _) => SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.readingBrightness),
-              subtitle: Text(l10n.readingBrightnessFollowSystem),
-              value: controller.followSystem,
-              onChanged: controller.setFollowSystem,
-            ),
             Row(
               children: [
-                const Icon(Icons.brightness_low),
+                IconButton.filledTonal(
+                  key: const ValueKey('brightness-auto'),
+                  tooltip: l10n.readingBrightnessFollowSystem,
+                  isSelected: controller.followSystem,
+                  constraints:
+                      const BoxConstraints(minWidth: 48, minHeight: 48),
+                  icon: const Icon(Icons.brightness_auto_outlined),
+                  selectedIcon: const Icon(Icons.brightness_auto),
+                  onPressed: () =>
+                      controller.setFollowSystem(!controller.followSystem),
+                ),
                 Expanded(
                   child: Slider(
                     min: AppBrightness.minimum,
@@ -71,8 +80,26 @@ class BrightnessWidget extends StatelessWidget {
                     onChangeEnd: (_) => unawaited(controller.save()),
                   ),
                 ),
-                Text('${(controller.level * 100).round()}%'),
+                IconButton.filledTonal(
+                  key: const ValueKey('brightness-night'),
+                  tooltip: l10n.readingPageStyleNightMode,
+                  isSelected: Prefs().readingNightMode,
+                  constraints:
+                      const BoxConstraints(minWidth: 48, minHeight: 48),
+                  icon: const Icon(Icons.dark_mode_outlined),
+                  selectedIcon: const Icon(Icons.dark_mode),
+                  onPressed: () {
+                    Prefs().readingNightMode = !Prefs().readingNightMode;
+                    onNightModeChanged();
+                  },
+                ),
               ],
+            ),
+            Text(
+              controller.followSystem
+                  ? l10n.readingBrightnessFollowSystem
+                  : '${(controller.level * 100).round()}%',
+              style: Theme.of(context).textTheme.labelSmall,
             ),
             Text(
               controller.usesWindowBrightness

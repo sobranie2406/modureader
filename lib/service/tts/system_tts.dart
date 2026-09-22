@@ -4,6 +4,7 @@ import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
+import 'package:anx_reader/service/tts/system_voice_identity.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
@@ -147,16 +148,18 @@ class SystemTts extends BaseTts {
       // Get all voices to find the matching one
       final voices = await flutterTts.getVoices;
       if (voices is List) {
-        for (var voice in voices) {
-          final map = Map<String, dynamic>.from(voice);
-          if (map['name'] == voiceShortName) {
-            // flutter_tts setVoice expects a Map with 'name' and 'locale'
-            await flutterTts.setVoice({
-              'name': map['name'],
-              'locale': map['locale'],
-            });
-            return;
+        final map = findSystemVoice(voices, voiceShortName);
+        if (map != null) {
+          // flutter_tts setVoice expects a Map with 'name' and 'locale'
+          await flutterTts.setVoice({
+            'name': map['name'],
+            'locale': map['locale'],
+          });
+          if (Prefs().getTtsVoiceModel('system') == voiceShortName &&
+              voiceShortName != systemVoiceId(map)) {
+            Prefs().setTtsVoiceModel('system', systemVoiceId(map));
           }
+          return;
         }
       }
     } catch (e) {
@@ -319,15 +322,27 @@ class SystemTts extends BaseTts {
     try {
       dynamic voices = await flutterTts.getVoices;
       if (voices is List) {
-        return voices.map((e) {
-          final map = Map<String, dynamic>.from(e);
-          return TtsVoice(
-              shortName: map['name'] ?? '',
-              name: map['name'] ?? '',
-              locale: map['locale']?.replaceAll('_', '-') ?? '',
-              gender: map['gender']?.toString().toLowerCase() ?? '',
-              rawData: map);
-        }).toList();
+        final saved = Prefs().getTtsVoiceModel('system');
+        final selected = findSystemVoice(voices, saved);
+        if (saved.isNotEmpty &&
+            selected != null &&
+            saved != systemVoiceId(selected)) {
+          Prefs().setTtsVoiceModel('system', systemVoiceId(selected));
+        }
+        final seen = <String>{};
+        return voices
+            .whereType<Map>()
+            .map((e) {
+              final map = Map<String, dynamic>.from(e);
+              return TtsVoice(
+                  shortName: systemVoiceId(map),
+                  name: map['name'] ?? '',
+                  locale: map['locale']?.replaceAll('_', '-') ?? '',
+                  gender: map['gender']?.toString().toLowerCase() ?? '',
+                  rawData: map);
+            })
+            .where((voice) => seen.add(voice.shortName))
+            .toList();
       }
       return [];
     } catch (e) {

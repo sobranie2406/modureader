@@ -58,7 +58,7 @@ The current version provides the following reading, AI and library features.
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
 | Configuration transfer | Import/export AI, sync WebDAV and separate library WebDAV configurations using codes and QR images | Corresponding settings page → Import and Export |
-| Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control, network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
+| Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
 ### Vertical layout and storage

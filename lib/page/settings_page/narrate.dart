@@ -1,4 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/providers/tts_providers.dart';
@@ -155,6 +156,11 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   }
 
   void _updateCurrentModelDetails(List<TtsVoice> voices) {
+    if (Prefs().ttsService == 'system') {
+      selectedVoiceModel = Prefs().getTtsVoiceModel('system');
+    }
+    _currentModelDetails = null;
+    _currentModelLanguageGroup = null;
     if (selectedVoiceModel != null) {
       for (var voice in voices) {
         if (voice.shortName == selectedVoiceModel) {
@@ -348,6 +354,17 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 50.0), // Add padding for bottom
       children: [
+        if (AnxPlatform.isAndroid)
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: Text(Localizations.localeOf(context).languageCode == 'zh'
+                ? '朗读通知' : 'Reading notifications'),
+            subtitle: Text(Localizations.localeOf(context).languageCode == 'zh'
+                ? '在系统设置中管理通知栏与锁屏播放控制'
+                : 'Manage notification and lock-screen controls in system settings'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () async { await openAppSettings(); },
+          ),
         if (AnxPlatform.isIOS)
           SettingsSection(
             title: Text(L10n.of(context).settingsNarrateTtsService),

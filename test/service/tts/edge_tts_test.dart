@@ -1,10 +1,18 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:anx_reader/service/tts/edge_tts_backend.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Edge reading cache accepts const config without mutating it', () {
+    final provider = EdgeTtsProvider();
+    final before = Map<String, dynamic>.from(provider.getConfig());
+    expect(jsonDecode(provider.cacheConfiguration()), before);
+    expect(provider.getConfig(), before);
+    expect(provider.synthesisTimeout, const Duration(seconds: 60));
+  });
   test('generates the current Edge time-bound token format', () {
     expect(
       EdgeTtsClient.generateSecMsGec(

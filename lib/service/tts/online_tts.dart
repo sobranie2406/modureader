@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -28,11 +27,14 @@ class OnlineTts extends BaseTts {
   @visibleForTesting
   OnlineTts.forTesting({
     required Future<List<TtsSentence>> Function(int) collect,
-    required Future<Uint8List> Function(String) synthesize,
+    Future<Uint8List> Function(String)? synthesize,
+    TtsServiceProvider? backend,
     Future<void> Function(TtsSegment)? play,
     AudioPlayer? player,
     AudioPlayer Function()? createPlayer,
-  })  : _collectOverride = collect,
+  })  : assert(synthesize != null || backend != null),
+        _backendOverride = backend,
+        _collectOverride = collect,
         _synthesizeOverride = synthesize,
         _playOverride = play,
         _player = player,
@@ -85,8 +87,10 @@ class OnlineTts extends BaseTts {
 
   // ============ Backend ============
   TtsServiceProvider? _currentBackend;
+  TtsServiceProvider? _backendOverride;
 
   TtsServiceProvider get backend {
+    if (_backendOverride != null) return _backendOverride!;
     TtsService service = getTtsService(Prefs().ttsService);
     if (_currentBackend?.service != service) {
       _currentBackend = service.provider;
@@ -366,8 +370,7 @@ class OnlineTts extends BaseTts {
                 parameters: {
                   'rate': rate.toStringAsFixed(4),
                   'pitch': pitch.toStringAsFixed(4),
-                  'config':
-                      jsonEncode(currentBackend.getConfig()..remove('key')),
+                  'config': currentBackend.cacheConfiguration(),
                 },
               ),
             )

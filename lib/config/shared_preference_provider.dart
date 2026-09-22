@@ -50,6 +50,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',
   // Brightness is a device-local preference, not transferable configuration.
   'appBrightnessLevel',
@@ -65,6 +66,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',
   'appBrightnessLevel',
   'appBrightnessFollowSystem',
@@ -1152,6 +1154,15 @@ class Prefs extends ChangeNotifier {
 
   bool get autoAdjustReadingTheme {
     return prefs.getBool('autoAdjustReadingTheme') ?? false;
+  }
+
+  // A non-destructive reading-only override. Keep the saved day colours,
+  // background image and automatic-theme preference intact for restoration.
+  bool get readingNightMode => prefs.getBool('readingNightMode') ?? false;
+
+  set readingNightMode(bool value) {
+    prefs.setBool('readingNightMode', value);
+    notifyListeners();
   }
 
   // User prompts - simple read/write methods

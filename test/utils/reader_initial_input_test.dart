@@ -19,6 +19,27 @@ void main() {
   });
   tearDown(() => Server().stop());
 
+  test('night palette is present on first load and saved palette is restored',
+      () {
+    final original = Prefs().readTheme;
+    for (final night in [true, false]) {
+      Prefs().readingNightMode = night;
+      final uri = Uri.parse(generateUrl('https://example.test/book.epub', '',
+          fontName: 'serif', fontPath: ''));
+      final style = jsonDecode(uri.queryParameters['style']!);
+      expect(
+          style['backgroundColor'],
+          night
+              ? '#1C1C1EFF'
+              : '#${original.backgroundColor.substring(2)}${original.backgroundColor.substring(0, 2)}');
+      if (night) {
+        expect(style['fontColor'], '#D8D8D8FF');
+        expect(style['backgroundImage'], 'none');
+      }
+      expect(Prefs().readTheme.toJson(), original.toJson());
+    }
+  });
+
   test('fresh reader URL uses the selected book profile, not another book',
       () async {
     const css = r'p::after { content: "${value}`\\中文"; }';

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/read_theme.dart';
+import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/utils/js/convert_dart_color_to_js.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -19,7 +20,7 @@ Future<void> webviewInitialVariable(
   String? backgroundColor,
   bool? importing,
 }) async {
-  ReadTheme readTheme = Prefs().readTheme;
+  ReadTheme readTheme = readingThemeForDisplay(Prefs());
   bookStyle ??= Prefs().bookStyle;
   textColor ??= readTheme.textColor;
   fontName ??= Prefs().font.name;
