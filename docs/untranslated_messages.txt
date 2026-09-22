@@ -1,5 +1,11 @@
 {
   "ar": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -23,6 +29,12 @@
   ],
 
   "de": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -46,6 +58,12 @@
   ],
 
   "es": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -69,6 +87,12 @@
   ],
 
   "fr": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -92,6 +116,12 @@
   ],
 
   "it": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -115,6 +145,12 @@
   ],
 
   "ja": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -138,6 +174,12 @@
   ],
 
   "ko": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -161,6 +203,12 @@
   ],
 
   "pt": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -184,6 +232,12 @@
   ],
 
   "ro": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -207,6 +261,12 @@
   ],
 
   "ru": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",
@@ -230,6 +290,12 @@
   ],
 
   "tr": [
+    "fontImportedAndApplied",
+    "fontImportFailedCount",
+    "readingBrightness",
+    "readingBrightnessFollowSystem",
+    "readingBrightnessWindowHint",
+    "readingBrightnessDimHint",
     "settingsAiProviderReasoningEffort",
     "settingsAiProviderReasoningEffortHelp",
     "settingsAiProviderReasoningEffortAuto",

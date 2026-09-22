@@ -204,8 +204,8 @@ class AppUpdateDialog extends StatelessWidget {
                     Text(
                         _text(
                             context,
-                            '优先从 Gitee 镜像检查和下载更新，不可用时回退 GitHub；下载后必须通过 SHA-256 校验。不发送书籍、笔记或账号密钥。',
-                            'Checks and downloads from the Gitee mirror first, with GitHub fallback. SHA-256 verification is required. No books, notes or account keys are sent.'),
+                            '优先通过 GitHub 检查更新和下载安装包，仅在连接失败、超时或服务不可用时改用 Gitee。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
+                            'Checks GitHub first and downloads from GitHub first; uses Gitee only if the connection fails, times out or the service is unavailable. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
                         style: Theme.of(context).textTheme.bodySmall),
                     if (phase == UpdatePhase.downloading)
                       Text(_text(context, '关闭此窗口后下载继续，可从“关于默读”返回查看或取消。',

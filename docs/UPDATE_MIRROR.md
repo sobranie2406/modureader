@@ -1,6 +1,6 @@
 # 自动更新镜像发布
 
-客户端优先读取以下固定 HTTPS 清单，再核对 GitHub 最新正式版：
+客户端优先检查 GitHub 最新正式版；仅连接失败、超时或服务不可用时读取以下固定 HTTPS 备用清单：
 
 `https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json`
 
@@ -13,15 +13,18 @@
 3. 逐一验证公开、无需登录的 Gitee 下载入口、重定向、长度和 SHA-256；与 GitHub 已发布资产的 `digest` 对比。镜像 URL 为 `https://gitee.com/sobranie2406/modureader/releases/download/v版本号/安装包名称`。
 4. 使用 GitHub Release API 返回的 JSON 生成清单：`python3 scripts/release/update_manifest.py github-release.json`。脚本输出 JSON 到标准输出，不上传、不修改仓库。
 5. 最后才把生成结果发布到镜像仓库 `master` 分支的 `updates/latest.json`。客户端只接受 `modu_update_schema: 1`、正式版本、匹配系统/架构的有效文件大小和 SHA-256。
+6. Gitee 仅保留最新正式版：新版九包及校验文件全部验证、更新清单生效后，删除此前的应用 Release 及附件，不删除源码、分支、Git 标签或独立模型镜像。若容量限制无法同时容纳两版，先确认旧附件在 GitHub 可下载，再清理旧镜像；新清单未就绪前不得指向未验证的附件。
+
+GitHub 的历史清理范围为 1.0.9 及更早的 Release 和附件，保留标签与对应源码；1.1.0 起的发行版继续保留。此规则不等于 GitHub 每次只保留最新版。
 
 清单保留 GitHub 的 `tag_name`、`draft`、`prerelease`、`body`、`assets` 字段及原始 GitHub 下载 URL；客户端自行推导 Gitee 镜像 URL，清单不能指定任意下载网站。生成脚本只接收九个平台安装包，不把令牌、上传地址等其他 API 字段复制进去。
 
 ## 回退与安全
 
-- Gitee 清单请求限时 8 秒，GitHub 核对限时 12 秒。GitHub 不可用时可以继续使用有效镜像；两端都不可用时显示检查失败，不能误报“最新”。
-- 镜像版本滞后时使用较新的 GitHub 版本；相同版本大小或摘要不一致时以 GitHub 信息为准。当前安装版本不会被降级。
-- 下载首先使用镜像；请求失败、大小或摘要不符则清除部分文件，从头下载同版本 GitHub 资产。镜像和备用源使用同一 SHA-256，备用源再次校验失败即终止。
-- 用户取消或磁盘写入失败不会开始备用下载。已有完整文件重新校验通过才复用，安装前再次校验。
+- 检查首先请求 GitHub，完整检查限时 12 秒；成功后不请求镜像。仅连接失败、超时或服务不可用（HTTP 408、429、5xx）时请求 Gitee 清单，限时 8 秒。两端都不可用时显示检查失败，不能误报“最新”。
+- GitHub 可用时始终以其版本和校验信息为准；不会因镜像的新旧或摘要差异改变结果。当前安装版本不会被降级。
+- 下载也首先使用 GitHub；仅连接失败、超时或服务不可用时清除部分文件，从头下载同版本 Gitee 资产。两源使用同一大小与 SHA-256，校验失败即终止。
+- 无效清单、不安全跳转、证书错误、用户取消、文件校验失败或磁盘写入失败不会开始备用请求。已有完整文件重新校验通过才复用，安装前再次校验。
 - 仅允许 HTTPS；Gitee 跳转限制在 `gitee.com/sobranie2406/modureader/`、已核实的附件 CDN `foruda.gitee.com/attach_file/`，以及 `raw.giteeusercontent.com` 上与清单完全相同的 `/sobranie2406/modureader/raw/master/updates/latest.json` 路径。拒绝其他账号、文件路径、端口和相似域名。GitHub 跳转限制在代码列出的官方资源域名。不能改成允许任意跳转。
 - 镜像清单通过固定官方账号地址及 HTTPS 建立信任，SHA-256 用于完整性校验，不等于数字签名。需保护两个发布账号；不能把不受信任的第三方镜像当作官方更新源。
 - Gitee 单文件容量、总附件容量或审核限制若无法承载现有完整安装包，应报告限制并确认方案；不要用分卷或 HTML 下载页冒充可安装文件。

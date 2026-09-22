@@ -22,7 +22,7 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee package mirror](https://gitee.com/sobranie2406/modureader/releases) · [Build status](https://github.com/sobranie2406/modureader/actions) · [Report an issue](https://github.com/sobranie2406/modureader/issues)
 
-Modu checks for updates at launch. Settings → About Modu → App updates supports checking, downloading, cancelling and opening installers. Updates prefer Gitee and fall back to GitHub; identical packages are verified by size and SHA-256 before installation. Installation requires your action. Gitee hosts release packages, documentation and update metadata only; each release links to its corresponding GitHub source.
+Modu checks for updates at launch. Settings → About Modu → App updates supports checking, downloading, cancelling and opening installers. Both update checks and package downloads prefer GitHub, falling back to Gitee only on connection failures, timeouts or service unavailability; identical packages are verified by size and SHA-256 before installation. Installation requires your action. Gitee hosts release packages, documentation and update metadata only; each release links to its corresponding GitHub source.
 
 | Platform | Published architectures | Package and limitations |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ The current version provides the following reading, AI and library features.
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
 | Configuration transfer | Import/export AI, sync WebDAV and separate library WebDAV configurations using codes and QR images | Corresponding settings page → Import and Export |
-| Appearance and tools | System/dark/light themes, cover display, font import/download, network and logging options | Settings → Appearance / Reading / Advanced |
+| Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control, network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
 ### Vertical layout and storage

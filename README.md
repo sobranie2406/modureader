@@ -23,7 +23,7 @@ This is an independently modified derivative, not an official release of either 
 
 [GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee 安装包镜像](https://gitee.com/sobranie2406/modureader/releases) · [构建状态](https://github.com/sobranie2406/modureader/actions) · [问题反馈](https://github.com/sobranie2406/modureader/issues)
 
-应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」检查、下载、取消并打开安装器。应用更新优先 Gitee，失败后回退 GitHub；两站使用相同安装包及 SHA-256，安装前再次校验，不静默安装。Gitee 仅托管安装包、说明与更新清单，同版本完整源码链接保留在各 Release。
+应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」检查、下载、取消并打开安装器。更新检查和安装包下载均优先 GitHub，仅在连接失败、超时或服务不可用时改用 Gitee；两站使用相同安装包及 SHA-256，安装前再次校验，不静默安装。Gitee 仅托管安装包、说明与更新清单，同版本完整源码链接保留在各 Release。
 
 | 平台 | 已发布架构 | 分发形式与限制 |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ This is an independently modified derivative, not an official release of either 
 | 朗读 | 系统语音、Edge TTS、Xiaomi MiMo 和兼容在线服务；声音选择、试听、语速等参数 | 设置 → 朗读；阅读页朗读入口 |
 | 同步与备份 | WebDAV 书籍、笔记、阅读进度同步；本地备份；独立加密的 API Key 同步 | 设置 → 同步 |
 | 配置迁移 | AI、同步 WebDAV 和独立书库 WebDAV 的配置代码与二维码导入/导出 | 对应设置页 → 配置导入导出 |
-| 外观与工具 | 系统/深色/浅色主题、封面显示、字体导入/下载、网络与日志选项 | 设置 → 外观 / 阅读 / 高级 |
+| 外观与工具 | 系统/深色/浅色主题、封面显示、字体导入后自动应用、字体下载、应用亮度调节、网络与日志选项 | 阅读页亮度按钮；设置 → 外观 / 阅读 / 高级 |
 | 问题反馈 | 填写问题与复现步骤，预览后前往 GitHub 提交 | 设置 → 提交 Bug |
 
 ### 竖排与存储

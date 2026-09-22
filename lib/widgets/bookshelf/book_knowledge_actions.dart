@@ -6,6 +6,7 @@ import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
+import 'package:anx_reader/service/knowledge/embedding_provider.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
@@ -19,8 +20,15 @@ Future<void> queueBookForVectorization(
   final notify = showMessage ?? (message) => AnxToast.show(message);
   try {
     await requireLocalBookForIndexing(book);
+    await EmbeddingProviderFactory.validateForBook(book);
   } on LocalBookRequiredException {
     notify('《${book.title}》${LocalBookRequiredException.message}');
+    return;
+  } on StateError catch (error) {
+    notify(error.message);
+    return;
+  } on FormatException {
+    notify('向量模型配置无效，请前往「设置 → 向量模型」检查接口和模型配置');
     return;
   }
   final added = (queue ?? bookKnowledgeIndexQueue).enqueue(book);
@@ -38,24 +46,52 @@ Future<void> queueBooksForVectorization(
   // Count each book once, even when a selection contains duplicate records.
   final list = {for (final book in books) book.id: book}.values.toList();
   if (list.isEmpty) return;
+  try {
+    EmbeddingProviderFactory.requireEnabled();
+  } on StateError catch (error) {
+    notify(error.message);
+    return;
+  }
   final localBooks = <Book>[];
+  var missing = 0;
+  var unavailable = 0;
+  final modelErrors = <String>{};
   for (final book in list) {
     try {
       await requireLocalBookForIndexing(book);
+      await EmbeddingProviderFactory.validateForBook(book);
       localBooks.add(book);
     } on LocalBookRequiredException {
       // Continue with local books; missing files must not become failed jobs.
+      missing++;
+    } on StateError catch (error) {
+      unavailable++;
+      modelErrors.add(error.message);
+    } on FormatException {
+      unavailable++;
+      modelErrors.add('向量模型配置无效，请前往「设置 → 向量模型」检查接口和模型配置');
     }
   }
+  // Batch validation can take time; do not enqueue if switched off meanwhile.
+  try {
+    EmbeddingProviderFactory.requireEnabled();
+  } on StateError catch (error) {
+    notify(error.message);
+    return;
+  }
   final added = (queue ?? bookKnowledgeIndexQueue).enqueueAll(localBooks);
-  final missing = list.length - localBooks.length;
-  if (missing > 0) {
+  if (missing > 0 || unavailable > 0) {
     final queued = added > 0
         ? '已将 $added 本书加入向量化队列。'
         : localBooks.isNotEmpty
             ? '本地书籍已在队列中或队列暂不可用。'
             : '';
-    notify('$queued已跳过 $missing 本尚未下载或本地文件不可用的书籍，请先下载后再向量化。');
+    notify([
+      queued,
+      if (missing > 0) '已跳过 $missing 本尚未下载或本地文件不可用的书籍，请先下载后再向量化。',
+      if (unavailable > 0)
+        '已跳过 $unavailable 本向量模型不可用的书籍。${modelErrors.join('；')}',
+    ].where((text) => text.isNotEmpty).join());
     return;
   }
   if (added == 0) {

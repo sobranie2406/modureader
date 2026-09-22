@@ -1,4 +1,12 @@
 {
+  "fontImportedAndApplied": "已匯入並用：{font}",
+  "@fontImportedAndApplied": {"placeholders": {"font": {"type": "String"}}},
+  "fontImportFailedCount": "{count} 字體未能匯入。",
+  "@fontImportFailedCount": {"placeholders": {"count": {"type": "int"}}},
+  "readingBrightness": "應用亮度",
+  "readingBrightnessFollowSystem": "隨系統",
+  "readingBrightnessWindowHint": "僅調此應用之亮度，不改系統。",
+  "readingBrightnessDimHint": "僅調暗此應用。百分之百為系統亮度，不可超出。",
   "@@locale": "zh_LZH",
   "appName": "安讀",
   "appAbout": "安讀序略",

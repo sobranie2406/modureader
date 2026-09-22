@@ -8,7 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 // downloads metadata only, and never installs anything.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('public Gitee update manifest works without GitHub availability', () async {
+  test('public Gitee update manifest works without GitHub availability',
+      () async {
     final original = HttpOverrides.current;
     HttpOverrides.global = null;
     final transport = UpdateTransport();
@@ -16,7 +17,10 @@ void main() {
     transport.dio.interceptors.add(InterceptorsWrapper(onRequest: (r, h) {
       hosts.add(r.uri.host);
       if (r.uri.host == 'api.github.com') {
-        h.reject(DioException(requestOptions: r, error: 'Simulated unavailable upstream'));
+        h.reject(DioException(
+            requestOptions: r,
+            type: DioExceptionType.connectionError,
+            error: 'Simulated unavailable upstream'));
       } else {
         h.next(r);
       }
@@ -26,12 +30,14 @@ void main() {
       expect(release.fromMirror, isTrue);
       expect(release.asset, isNotNull);
       expect(release.asset!.mirrorUrl, startsWith(moduMirrorReleasePage));
-      expect(hosts.first, 'gitee.com');
+      expect(hosts.first, 'api.github.com');
+      expect(hosts, contains('gitee.com'));
       expect(hosts, contains('raw.giteeusercontent.com'));
     } finally {
       transport.dio.close(force: true);
       HttpOverrides.global = original;
     }
-  }, skip: !const bool.fromEnvironment('MODU_VERIFY_UPDATE_MIRROR'),
+  },
+      skip: !const bool.fromEnvironment('MODU_VERIFY_UPDATE_MIRROR'),
       timeout: const Timeout(Duration(minutes: 1)));
 }

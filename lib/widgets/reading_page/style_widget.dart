@@ -189,8 +189,13 @@ class StyleWidgetState extends State<StyleWidget> {
           onSelected: (FontModel? font) async {
             if (font == null) return;
             if (font.name == 'newFont') {
+              // Hiding the toolbar disposes this StyleWidget. Keep the reader
+              // key, and apply even when this settings panel is no longer mounted.
+              final readerKey = widget.epubPlayerKey;
               widget.hideAppBarAndBottomBar(false);
-              await importFont();
+              await importFont(onApplied: (imported) {
+                readerKey.currentState?.changeFont(imported);
+              });
               if (mounted) setState(() {});
               return;
             } else if (font.name == 'download') {

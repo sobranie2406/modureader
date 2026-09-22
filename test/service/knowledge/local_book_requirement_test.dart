@@ -1,5 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
+import 'package:anx_reader/service/knowledge/embedding_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
@@ -11,7 +16,18 @@ import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _ModelPaths extends PathProviderPlatform {
+  _ModelPaths(this.path);
+  final String path;
+  @override
+  Future<String> getApplicationDocumentsPath() async => path;
+  @override
+  Future<String> getApplicationSupportPath() async => path;
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late PathProviderPlatform previousPaths;
   late Directory directory;
   late String previousPath;
   late Book local, remote;
@@ -20,6 +36,15 @@ void main() {
   late List<String> messages;
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('modu-local-index-');
+    previousPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _ModelPaths(directory.path);
+    SharedPreferences.setMockInitialValues({
+      'vectorModelEnabled': true,
+      'vectorModelMode': 'remote',
+      'vectorModelConfig':
+          '{"modelId":"fixture","endpoint":"http://localhost:11434/v1/embeddings"}',
+    });
+    await Prefs().initPrefs();
     previousPath = documentPath;
     documentPath = directory.path;
     local = Book.mock().copyWith(id: 1, filePath: 'local.txt');
@@ -37,6 +62,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     queue.dispose();
     documentPath = previousPath;
+    PathProviderPlatform.instance = previousPaths;
     await directory.delete(recursive: true);
   });
 
@@ -155,5 +181,110 @@ void main() {
     final result = await BookKnowledgeIndexService()
         .build(remote, isCancelled: () => true);
     expect(result.status, IndexBuildStatus.cancelled);
+  });
+
+  test('disabled model blocks single and batch menu actions before enqueueing',
+      () async {
+    Prefs().vectorModelEnabled = false;
+    await queueBookForVectorization(local,
+        queue: queue, showMessage: messages.add);
+    await queueBooksForVectorization([local, local],
+        queue: queue, showMessage: messages.add);
+    expect(queue.items, isEmpty);
+    expect(started, isEmpty);
+    expect(messages, hasLength(2));
+    expect(messages.every((message) => message.contains('未启用')), isTrue);
+  });
+
+  test('per-book override cannot bypass the disabled global switch', () async {
+    await BookEmbeddingPreferences.save(local, 'local:multilingual-e5-small');
+    Prefs().vectorModelEnabled = false;
+    await queueBookForVectorization(local,
+        queue: queue, showMessage: messages.add);
+    expect(queue.items, isEmpty);
+    expect(messages.single, contains('未启用'));
+  });
+
+  test('missing local model does not start extraction or download files',
+      () async {
+    Prefs().vectorModelMode = 'builtin';
+    await queueBookForVectorization(local,
+        queue: queue, showMessage: messages.add);
+    expect(queue.items, isEmpty);
+    expect(started, isEmpty);
+    expect(messages.single, contains('尚未下载或文件损坏'));
+    expect(await Directory('${directory.path}/models').exists(), isFalse);
+    expect(await Directory('${directory.path}/knowledge').exists(), isFalse);
+  });
+
+  test(
+      'batch skips unavailable book override but permits configured remote model without local models',
+      () async {
+    await File(remote.fileFullPath).writeAsString('Now local');
+    await BookEmbeddingPreferences.save(remote, 'local:multilingual-e5-small');
+    await queueBooksForVectorization([remote, local],
+        queue: queue, showMessage: messages.add);
+    expect(started, [local.id]);
+    expect(queue.itemFor(remote.id), isNull);
+    expect(messages.single, contains('已将 1 本书'));
+    expect(messages.single, contains('已跳过 1 本向量模型不可用'));
+    expect(messages.single, contains('Multilingual E5'));
+  });
+
+  test(
+      'configured remote model needs no local model, but invalid credentials never enqueue',
+      () async {
+    await Prefs().saveVectorModelConfig({
+      'modelId': 'remote',
+      'endpoint': 'https://example.com/v1',
+      'apiKey': ''
+    });
+    await queueBookForVectorization(local,
+        queue: queue, showMessage: messages.add);
+    expect(queue.items, isEmpty);
+    expect(messages.single, contains('API 密钥'));
+  });
+
+  test('invalid remote endpoint is presented as a configuration error',
+      () async {
+    await Prefs()
+        .saveVectorModelConfig({'modelId': 'remote', 'endpoint': 'not-a-url'});
+    await queueBookForVectorization(local,
+        queue: queue, showMessage: messages.add);
+    expect(queue.items, isEmpty);
+    expect(messages.single, contains('配置无效'));
+  });
+
+  test('execution rechecks switch and preserves old index and marker',
+      () async {
+    // Admission succeeds, then settings change before the worker runs.
+    await EmbeddingProviderFactory.validateForBook(local);
+    Prefs().vectorModelEnabled = false;
+    final service = BookKnowledgeIndexService();
+    final index = service.indexFile(local.id);
+    await index.parent.create(recursive: true);
+    await index.writeAsString('preserved-index');
+    final marker = indexBuildMarker(index);
+    await marker.writeAsString('preserved-marker');
+    var events = 0;
+    await expectLater(
+        service.build(local, onProgress: (_, __, ___) => events++),
+        throwsStateError);
+    expect(events, 0);
+    expect(await index.readAsString(), 'preserved-index');
+    expect(await marker.readAsString(), 'preserved-marker');
+  });
+
+  test(
+      'worker rejects missing model before diagnostics, extraction or marker creation',
+      () async {
+    Prefs().vectorModelMode = 'builtin';
+    final service = BookKnowledgeIndexService();
+    var events = 0;
+    await expectLater(
+        service.build(local, onProgress: (_, __, ___) => events++),
+        throwsStateError);
+    expect(events, 0);
+    expect(await service.indexFile(local.id).parent.exists(), isFalse);
   });
 }

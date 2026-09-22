@@ -1,4 +1,12 @@
 {
+  "fontImportedAndApplied": "Imported and applied: {font}",
+  "@fontImportedAndApplied": {"placeholders": {"font": {"type": "String"}}},
+  "fontImportFailedCount": "{count} font(s) could not be imported.",
+  "@fontImportFailedCount": {"placeholders": {"count": {"type": "int"}}},
+  "readingBrightness": "App brightness",
+  "readingBrightnessFollowSystem": "Follow system",
+  "readingBrightnessWindowHint": "Adjusts only this app window; system brightness is unchanged.",
+  "readingBrightnessDimHint": "Dims this app only. 100% keeps system brightness; it cannot brighten the display beyond the system setting.",
   "@@locale": "en",
   "appName": "默读",
   "appAbout": "About 默读",

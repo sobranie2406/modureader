@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:anx_reader/service/app_brightness.dart';
+import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
 import 'package:anx_reader/enums/translation_mode.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
 import 'package:anx_reader/utils/reader_route_observer.dart';
@@ -1048,6 +1050,17 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       icon: const Icon(Icons.color_lens),
                                       onPressed: () {
                                         styleHandler(setState);
+                                      },
+                                    ),
+                                    IconButton(
+                                      tooltip: L10n.of(context).readingBrightness,
+                                      icon: const Icon(Icons.brightness_6_outlined),
+                                      onPressed: () {
+                                        setState(() {
+                                          _currentPage = BrightnessWidget(
+                                            controller: AppBrightness.instance,
+                                          );
+                                        });
                                       },
                                     ),
                                     IconButton(

@@ -51,6 +51,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
 4. 各包保留 LICENSE、NOTICE，桌面包附 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包及各自 SHA-256，不再上传独立许可 ZIP，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
+6. 按 `docs/UPDATE_MIRROR.md` 将同一批原始安装包发布到 Gitee，逐包核对 SHA-256 后更新清单。Gitee 每次完成新正式版发布后清理旧应用 Release 和附件，只保留最新版；不清理独立模型仓库，不删除 Git 标签。GitHub 只清理 1.0.9 及更早的 Release，保留 1.1.0 起的历史发行版及所有对应源码标签。
 
 当前使用 `.github/workflows/build.yaml`、`pr-check.yml` 及 `scripts/release/`。旧上游独立打包和商店发布工作流已移除；Fastlane 文件仅为历史开发模板，不是默读现行分发入口，不表示已上架或获得签名服务。
 

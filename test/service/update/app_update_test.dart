@@ -159,16 +159,16 @@ void main() {
         : ResponseBody.fromString(jsonEncode(releaseJson()), 200));
     final release = await transport(adapter).latest('android', 'android_arm64');
     expect(release.version, '1.0.9');
-    expect(adapter.requests.map((r) => r.uri.toString()),
-        [moduMirrorManifest, moduReleaseApi]);
+    expect(adapter.requests.map((r) => r.uri.toString()), [moduReleaseApi]);
     expect(adapter.requests.every((r) => !r.followRedirects), isTrue);
     final oversized = Adapter(
         (o) => ResponseBody.fromBytes(List.filled(1024 * 1024 + 1, 32), 200));
     await expectLater(transport(oversized).latest('android', 'android_arm64'),
         throwsFormatException);
+    expect(oversized.requests.length, 1);
   });
 
-  test('checks mirror first and uses it when GitHub is unavailable', () async {
+  test('checks GitHub first and uses mirror only when unavailable', () async {
     final adapter = Adapter((o) => o.uri.host == 'gitee.com'
         ? ResponseBody.fromString(jsonEncode(mirrorJson()), 200)
         : ResponseBody.fromString('unavailable', 503));
@@ -178,10 +178,12 @@ void main() {
     expect(r.asset!.mirrorUrl,
         '$moduMirrorReleasePage/download/v1.0.9/${asset.name}');
     expect(r.asset!.digest, asset.digest);
-    expect(adapter.requests.first.uri.toString(), moduMirrorManifest);
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduReleaseApi, moduMirrorManifest]);
   });
 
-  test('Gitee raw CDN serves the exact official manifest without GitHub', () async {
+  test('Gitee raw CDN serves the exact official manifest without GitHub',
+      () async {
     final adapter = Adapter((o) {
       if (o.uri.host == 'gitee.com') {
         return ResponseBody.fromString('', 302, headers: {
@@ -199,10 +201,11 @@ void main() {
     expect(r.fromMirror, isTrue);
     expect(r.asset!.digest, asset.digest);
     expect(adapter.requests.map((r) => r.uri.host),
-        ['gitee.com', 'raw.giteeusercontent.com', 'api.github.com']);
+        ['api.github.com', 'gitee.com', 'raw.giteeusercontent.com']);
   });
 
-  test('raw CDN rejects other repositories, paths, ports and lookalikes', () async {
+  test('raw CDN rejects other repositories, paths, ports and lookalikes',
+      () async {
     for (final url in [
       'https://raw.giteeusercontent.com/other/modureader/raw/master/updates/latest.json',
       'https://raw.giteeusercontent.com/sobranie2406/modureader/raw/master/evil.json',
@@ -211,22 +214,24 @@ void main() {
       'https://raw.giteeusercontent.com:444/sobranie2406/modureader/raw/master/updates/latest.json',
     ]) {
       final adapter = Adapter((o) => o.uri.host == 'gitee.com'
-          ? ResponseBody.fromString('', 302, headers: {'location': [url]})
-          : ResponseBody.fromString(jsonEncode(releaseJson()), 200));
-      final r = await transport(adapter).latest('android', 'android_arm64');
-      expect(r.fromMirror, isFalse);
+          ? ResponseBody.fromString('', 302, headers: {
+              'location': [url]
+            })
+          : ResponseBody.fromString('unavailable', 503));
+      await expectLater(transport(adapter).latest('android', 'android_arm64'),
+          throwsFormatException);
       expect(adapter.requests.map((r) => r.uri.host),
-          ['gitee.com', 'api.github.com']);
+          ['api.github.com', 'gitee.com']);
     }
   });
 
-  test('healthy mirror has priority when both release records agree', () async {
+  test('healthy GitHub does not contact mirror when records agree', () async {
     final adapter = Adapter((o) => ResponseBody.fromString(
         jsonEncode(o.uri.host == 'gitee.com' ? mirrorJson() : releaseJson()),
         200));
     final r = await transport(adapter).latest('android', 'android_arm64');
-    expect(r.fromMirror, isTrue);
-    expect(adapter.requests.length, 2);
+    expect(r.fromMirror, isFalse);
+    expect(adapter.requests.single.uri.toString(), moduReleaseApi);
   });
 
   test('stale mirror does not hide a newer upstream release', () async {
@@ -237,6 +242,7 @@ void main() {
     final r = await transport(adapter).latest('android', 'android_arm64');
     expect(r.version, '1.0.9');
     expect(r.fromMirror, isFalse);
+    expect(adapter.requests.single.uri.toString(), moduReleaseApi);
   });
 
   test('same-version mirror digest disagreement uses upstream digest',
@@ -250,7 +256,8 @@ void main() {
     expect(r.asset!.digest, asset.digest);
   });
 
-  test('malformed, missing or incomplete mirror metadata falls back', () async {
+  test('fallback still rejects malformed or incomplete mirror metadata',
+      () async {
     for (final body in [
       '<html>Login required</html>',
       '[]',
@@ -260,46 +267,184 @@ void main() {
       jsonEncode({...mirrorJson(), 'draft': true}),
     ]) {
       final adapter = Adapter((o) => ResponseBody.fromString(
-          o.uri.host == 'gitee.com' ? body : jsonEncode(releaseJson()), 200));
-      final r = await transport(adapter).latest('android', 'android_arm64');
-      expect(r.fromMirror, isFalse);
-      expect(r.asset!.digest, asset.digest);
+          o.uri.host == 'gitee.com' ? body : 'unavailable',
+          o.uri.host == 'gitee.com' ? 200 : 503));
+      await expectLater(transport(adapter).latest('android', 'android_arm64'),
+          throwsFormatException);
+      expect(adapter.requests.length, 2);
     }
   });
 
-  test('slow mirror check is cancelled before checking GitHub', () async {
+  test('slow GitHub check times out before checking mirror', () async {
     final never = Completer<ResponseBody>();
-    final adapter = Adapter((o) => o.uri.host == 'gitee.com'
+    final adapter = Adapter((o) => o.uri.host == 'api.github.com'
         ? never.future
-        : ResponseBody.fromString(jsonEncode(releaseJson()), 200));
+        : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
     final t = UpdateTransport(
         dio: Dio()..httpClientAdapter = adapter,
-        mirrorCheckTimeout: const Duration(milliseconds: 20));
+        githubCheckTimeout: const Duration(milliseconds: 20));
     final r = await t.latest('android', 'android_arm64');
-    expect(r.fromMirror, isFalse);
+    expect(r.fromMirror, isTrue);
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduReleaseApi, moduMirrorManifest]);
+  });
+
+  test('stalled GitHub response body also falls back within deadline',
+      () async {
+    final stream = StreamController<Uint8List>();
+    final adapter = Adapter((o) => o.uri.host == 'api.github.com'
+        ? ResponseBody(stream.stream, 200)
+        : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
+    final t = UpdateTransport(
+        dio: Dio()..httpClientAdapter = adapter,
+        githubCheckTimeout: const Duration(milliseconds: 20));
+    expect((await t.latest('android', 'android_arm64')).fromMirror, isTrue);
+    await stream.close();
     expect(adapter.requests.length, 2);
   });
 
-  test('mirror package is preferred without contacting GitHub', () async {
+  test('network errors and service unavailability allow fallback', () async {
+    for (final type in [
+      DioExceptionType.connectionError,
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.sendTimeout,
+      DioExceptionType.receiveTimeout,
+      DioExceptionType.unknown,
+    ]) {
+      final adapter = Adapter((o) {
+        if (o.uri.host == 'api.github.com') {
+          throw DioException(
+              requestOptions: o,
+              type: type,
+              error: const SocketException('offline'));
+        }
+        return ResponseBody.fromString(jsonEncode(mirrorJson()), 200);
+      });
+      expect(
+          (await transport(adapter).latest('android', 'android_arm64'))
+              .fromMirror,
+          isTrue);
+      expect(adapter.requests.first.uri.toString(), moduReleaseApi);
+    }
+    for (final status in [408, 429, 500, 502, 503, 504]) {
+      final adapter = Adapter((o) => o.uri.host == 'api.github.com'
+          ? ResponseBody.fromString('unavailable', status)
+          : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
+      expect(
+          (await transport(adapter).latest('android', 'android_arm64'))
+              .fromMirror,
+          isTrue);
+    }
+  });
+
+  test('invalid GitHub metadata and unsafe redirects never switch sources',
+      () async {
+    for (final body in [
+      '<html>invalid</html>',
+      '[]',
+      jsonEncode({...releaseJson(), 'draft': true}),
+      jsonEncode({...releaseJson(), 'assets': {}}),
+    ]) {
+      final adapter = Adapter((o) => ResponseBody.fromString(body, 200));
+      await expectLater(transport(adapter).latest('android', 'android_arm64'),
+          throwsFormatException);
+      expect(adapter.requests.length, 1);
+    }
+    final adapter = Adapter((o) => ResponseBody.fromString('', 302, headers: {
+          'location': ['https://evil.test/manifest']
+        }));
+    await expectLater(transport(adapter).latest('android', 'android_arm64'),
+        throwsFormatException);
+    expect(adapter.requests.length, 1);
+  });
+
+  test(
+      'certificate failures, cancellation and HTTP client errors do not fall back',
+      () async {
+    for (final type in [
+      DioExceptionType.badCertificate,
+      DioExceptionType.cancel,
+      DioExceptionType.unknown
+    ]) {
+      final adapter =
+          Adapter((o) => throw DioException(requestOptions: o, type: type));
+      await expectLater(transport(adapter).latest('android', 'android_arm64'),
+          throwsA(isA<DioException>()));
+      expect(adapter.requests.length, 1);
+    }
+    for (final status in [401, 403, 404]) {
+      final adapter = Adapter((o) => ResponseBody.fromString('error', status));
+      await expectLater(transport(adapter).latest('android', 'android_arm64'),
+          throwsA(isA<DioException>()));
+      expect(adapter.requests.length, 1);
+    }
+  });
+
+  test('unsupported or missing upstream package does not trigger mirror lookup',
+      () async {
+    for (final abi in ['android_arm64', 'android_arm']) {
+      final adapter = Adapter((o) => ResponseBody.fromString(
+          jsonEncode({...releaseJson(), 'assets': []}), 200));
+      final r = await transport(adapter).latest('android', abi);
+      expect(r.asset, isNull);
+      expect(r.fromMirror, isFalse);
+      expect(adapter.requests.length, 1);
+    }
+  });
+
+  test('failure of both sources reports failure rather than latest version',
+      () async {
+    final adapter = Adapter((o) => ResponseBody.fromString('unavailable', 503));
+    await expectLater(transport(adapter).latest('android', 'android_arm64'),
+        throwsA(isA<DioException>()));
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduReleaseApi, moduMirrorManifest]);
+  });
+
+  test('GitHub package is preferred without contacting mirror', () async {
     final adapter = Adapter((o) => ResponseBody.fromBytes(payload, 200));
     final a = parse(releaseJson()).asset!;
     final file = await transport(adapter)
         .download(a, directory, CancelToken(), (_, __) {});
     expect(await file.readAsBytes(), payload);
-    expect(adapter.requests.single.uri.toString(), a.mirrorUrl);
+    expect(adapter.requests.single.uri.toString(), a.url);
   });
 
-  test('missing or corrupted mirror retries the same verified upstream asset',
+  test('mirror metadata does not change GitHub-first download order', () async {
+    final release = UpdateRelease.parse(mirrorJson(),
+        platform: 'android', abi: 'android_arm64', fromMirror: true);
+    final adapter = Adapter((o) => ResponseBody.fromBytes(payload, 200));
+    final file = await transport(adapter)
+        .download(release.asset!, directory, CancelToken(), (_, __) {});
+    expect(await file.readAsBytes(), payload);
+    expect(adapter.requests.single.uri.toString(), release.asset!.url);
+  });
+
+  test('download security and local storage errors never start fallback',
       () async {
+    for (final error in [
+      const FileSystemException('write failed'),
+      const FormatException('invalid asset'),
+      const HandshakeException('untrusted certificate'),
+    ]) {
+      final adapter = Adapter((o) => throw error);
+      await expectLater(
+          transport(adapter).download(parse(releaseJson()).asset!, directory,
+              CancelToken(), (_, __) {}),
+          throwsA(isA<Exception>()));
+      expect(adapter.requests.single.uri.toString(), asset.url);
+      expect(await directory.list().toList(), isEmpty);
+    }
+  });
+
+  test('unavailable GitHub retries the same verified mirror asset', () async {
     for (final response in [
-      ResponseBody.fromString('Not found', 404),
+      ResponseBody.fromString('Timeout', 408),
+      ResponseBody.fromString('Rate limited', 429),
       ResponseBody.fromString('Unavailable', 503),
-      ResponseBody.fromBytes(payload.sublist(1), 200),
-      ResponseBody.fromBytes([...payload, 0], 200),
-      ResponseBody.fromBytes(List.filled(payload.length, 42), 200),
     ]) {
       final a = parse(releaseJson()).asset!;
-      final adapter = Adapter((o) => o.uri.host == 'gitee.com'
+      final adapter = Adapter((o) => o.uri.host == 'github.com'
           ? response
           : ResponseBody.fromBytes(payload, 200));
       final progress = <int>[];
@@ -307,14 +452,14 @@ void main() {
           .download(a, directory, CancelToken(), (n, _) => progress.add(n));
       expect(await file.readAsBytes(), payload);
       expect(
-          adapter.requests.map((r) => r.uri.toString()), [a.mirrorUrl, a.url]);
+          adapter.requests.map((r) => r.uri.toString()), [a.url, a.mirrorUrl]);
       expect(progress, contains(0));
       expect(await File('${file.path}.part').exists(), isFalse);
       await file.delete();
     }
   });
 
-  test('cancelling mirror download never starts fallback', () async {
+  test('cancelling GitHub download never starts fallback', () async {
     final a = parse(releaseJson()).asset!;
     final adapter = Adapter((o) => ResponseBody.fromBytes(payload, 200));
     final cancel = CancelToken();
@@ -342,42 +487,50 @@ void main() {
           ? ResponseBody.fromString('', 302, headers: {
               'location': [url]
             })
-          : ResponseBody.fromBytes(payload, 200));
-      final file = await transport(adapter)
-          .download(a, directory, CancelToken(), (_, __) {});
+          : ResponseBody.fromString('unavailable', 503));
+      await expectLater(
+          transport(adapter).download(a, directory, CancelToken(), (_, __) {}),
+          throwsFormatException);
       expect(
-          adapter.requests.map((r) => r.uri.toString()), [a.mirrorUrl, a.url]);
-      await file.delete();
+          adapter.requests.map((r) => r.uri.toString()), [a.url, a.mirrorUrl]);
+      expect(await directory.list().toList(), isEmpty);
     }
   });
 
   test('supports same-repository Gitee attachment redirect', () async {
     final a = parse(releaseJson()).asset!;
-    final adapter = Adapter((o) => o.uri.path.contains('/releases/download/')
-        ? ResponseBody.fromString('', 302, headers: {
-            'location': ['/sobranie2406/modureader/attach_files/123/download']
-          })
-        : ResponseBody.fromBytes(payload, 200));
+    final adapter = Adapter((o) => o.uri.host == 'github.com'
+        ? ResponseBody.fromString('unavailable', 503)
+        : o.uri.path.contains('/releases/download/')
+            ? ResponseBody.fromString('', 302, headers: {
+                'location': [
+                  '/sobranie2406/modureader/attach_files/123/download'
+                ]
+              })
+            : ResponseBody.fromBytes(payload, 200));
     await transport(adapter).download(a, directory, CancelToken(), (_, __) {});
-    expect(adapter.requests.length, 2);
-    expect(adapter.requests.every((o) => o.uri.host == 'gitee.com'), isTrue);
+    expect(adapter.requests.map((o) => o.uri.host),
+        ['github.com', 'gitee.com', 'gitee.com']);
   });
 
-  test('both corrupt sources leave no installable file', () async {
+  test('corrupt GitHub package fails without fallback or installable file',
+      () async {
     final a = parse(releaseJson()).asset!;
     final adapter =
         Adapter((o) => ResponseBody.fromBytes(payload.sublist(1), 200));
     await expectLater(
         transport(adapter).download(a, directory, CancelToken(), (_, __) {}),
         throwsFormatException);
-    expect(adapter.requests.length, 2);
+    expect(adapter.requests.length, 1);
     expect(await directory.list().toList(), isEmpty);
   });
 
-  test('Gitee attachment CDN verifies the same SHA without upstream download',
-      () async {
+  test('fallback Gitee attachment CDN verifies the same SHA', () async {
     final a = parse(releaseJson()).asset!;
     final adapter = Adapter((o) {
+      if (o.uri.host == 'github.com') {
+        return ResponseBody.fromString('unavailable', 503);
+      }
       if (o.uri.path.contains('/releases/download/')) {
         return ResponseBody.fromString('', 302, headers: {
           'location': ['/sobranie2406/modureader/attach_files/123/download']
@@ -396,7 +549,83 @@ void main() {
     final file = await t.download(a, directory, CancelToken(), (_, __) {});
     expect(await t.verify(file, a), isTrue);
     expect(adapter.requests.map((r) => r.uri.host),
-        ['gitee.com', 'gitee.com', 'foruda.gitee.com']);
+        ['github.com', 'gitee.com', 'gitee.com', 'foruda.gitee.com']);
+  });
+
+  test('partial GitHub network failure restarts mirror from zero', () async {
+    final a = parse(releaseJson()).asset!;
+    Stream<Uint8List> interrupted() async* {
+      yield Uint8List.fromList(payload.sublist(0, 5));
+      throw const SocketException('connection reset');
+    }
+
+    final adapter = Adapter((o) => o.uri.host == 'github.com'
+        ? ResponseBody(interrupted(), 200)
+        : ResponseBody.fromBytes(payload, 200));
+    final progress = <int>[];
+    final file = await transport(adapter)
+        .download(a, directory, CancelToken(), (n, _) => progress.add(n));
+    expect(await file.readAsBytes(), payload);
+    expect(progress, containsAllInOrder([5, 0, payload.length]));
+    expect(adapter.requests.map((r) => r.uri.toString()), [a.url, a.mirrorUrl]);
+    expect(await File('${file.path}.part').exists(), isFalse);
+  });
+
+  test('download connection errors and timeouts use mirror', () async {
+    for (final type in [
+      DioExceptionType.connectionError,
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.receiveTimeout
+    ]) {
+      final a = parse(releaseJson()).asset!;
+      final adapter = Adapter((o) {
+        if (o.uri.host == 'github.com') {
+          throw DioException(requestOptions: o, type: type);
+        }
+        return ResponseBody.fromBytes(payload, 200);
+      });
+      final file = await transport(adapter)
+          .download(a, directory, CancelToken(), (_, __) {});
+      expect(await file.readAsBytes(), payload);
+      expect(
+          adapter.requests.map((r) => r.uri.toString()), [a.url, a.mirrorUrl]);
+      await file.delete();
+    }
+  });
+
+  test('corrupt fallback or two unavailable sources leave no installer',
+      () async {
+    for (final response in [
+      ResponseBody.fromBytes(payload.sublist(1), 200),
+      ResponseBody.fromBytes(List.filled(payload.length, 42), 200),
+      ResponseBody.fromString('unavailable', 503),
+    ]) {
+      final a = parse(releaseJson()).asset!;
+      final adapter = Adapter((o) => o.uri.host == 'github.com'
+          ? ResponseBody.fromString('unavailable', 503)
+          : response);
+      await expectLater(
+          transport(adapter).download(a, directory, CancelToken(), (_, __) {}),
+          throwsA(anyOf(isA<FormatException>(), isA<DioException>())));
+      expect(
+          adapter.requests.map((r) => r.uri.toString()), [a.url, a.mirrorUrl]);
+      expect(await directory.list().toList(), isEmpty);
+    }
+  });
+
+  test('cancel during fallback never leaves an installer', () async {
+    final a = parse(releaseJson()).asset!;
+    final adapter = Adapter((o) => o.uri.host == 'github.com'
+        ? ResponseBody.fromString('unavailable', 503)
+        : ResponseBody.fromBytes(payload, 200));
+    final cancel = CancelToken();
+    await expectLater(
+        transport(adapter).download(a, directory, cancel, (n, _) {
+          if (n > 0) cancel.cancel();
+        }),
+        throwsA(isA<DioException>()));
+    expect(adapter.requests.length, 2);
+    expect(await directory.list().toList(), isEmpty);
   });
 
   test('verifies download size and SHA-256 before exposing the installer',

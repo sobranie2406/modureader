@@ -109,6 +109,8 @@ class BookKnowledgeIndexService {
     // Recheck at execution time as well as at the menu entry: a queued file
     // may have been removed. Do this before markers, model loading or extraction.
     await requireLocalBookForIndexing(book);
+    // Revalidate queued work before touching a previous index/build marker.
+    await EmbeddingProviderFactory.validateForBook(book);
     return withIndexBuildMarker(indexFile(book.id), () async {
       try {
         await CrashDiagnostics.recordIndexState(1);
@@ -142,11 +144,11 @@ class BookKnowledgeIndexService {
       onProgress?.call(stage, done, total);
     }
 
-    final embedding = EmbeddingProviderFactory.fromBook(book);
+    final embedding = EmbeddingProviderFactory.requireForBook(book);
     try {
       // Fail before expensive EPUB extraction when the chosen local model is
       // missing. Indexing never silently downloads models or marks partial work complete.
-      await embedding?.ensureReady();
+      await embedding.ensureReady();
       final chapters = await _chapterRepository.extractChaptersForIndex(
         book,
         onProgress: (chapterId, completed, total) {
@@ -162,7 +164,7 @@ class BookKnowledgeIndexService {
             'bge-small-en-v1.5': 2,
             'bge-small-zh-v1.5': 3,
             'multilingual-e5-small': 4
-          }[embedding?.modelId] ??
+          }[embedding.modelId] ??
           0;
       return await KnowledgeIndexer(
         service: KnowledgeSearchService(),
@@ -170,21 +172,19 @@ class BookKnowledgeIndexService {
       ).build(
         bookId: book.id.toString(),
         chapters: chapters,
-        vectorizeBatch: embedding == null
-            ? null
-            : (chunks) => embedding.embedBatchCancellable(
-                  chunks.map((chunk) => chunk.text).toList(growable: false),
-                  isCancelled: isCancelled,
-                ),
-        embeddingMode: embedding?.mode,
-        embeddingModelId: embedding?.modelId,
-        embeddingDimensions: embedding?.configuredDimension,
+        vectorizeBatch: (chunks) => embedding.embedBatchCancellable(
+          chunks.map((chunk) => chunk.text).toList(growable: false),
+          isCancelled: isCancelled,
+        ),
+        embeddingMode: embedding.mode,
+        embeddingModelId: embedding.modelId,
+        embeddingDimensions: embedding.configuredDimension,
         onProgress: progress,
         isCancelled: isCancelled,
-        beforeSave: () async => await embedding?.release(),
+        beforeSave: () async => await embedding.release(),
       );
     } finally {
-      await embedding?.release();
+      await embedding.release();
     }
   }
 

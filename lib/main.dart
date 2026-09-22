@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/service/app_brightness.dart';
+import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
 import 'package:anx_reader/utils/reader_route_observer.dart';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
@@ -81,6 +83,7 @@ Future<void> main() async {
     }
   });
   await Prefs().initPrefs();
+  await AppBrightness.instance.initialize(Prefs().prefs);
   await applyBundledModelDefaults(Prefs().prefs);
   HttpOverrides.global = AnxHttpProxyOverrides();
 
@@ -292,7 +295,10 @@ class _MyAppState extends ConsumerState<MyApp>
               FlutterSmartDialog.observer,
               heroineController
             ],
-            builder: FlutterSmartDialog.init(),
+            builder: (context, child) => AppBrightnessLayer(
+              controller: AppBrightness.instance,
+              child: FlutterSmartDialog.init()(context, child),
+            ),
             navigatorKey: navigatorKey,
             locale: prefsNotifier.locale,
             localeListResolutionCallback: _resolveLocale,

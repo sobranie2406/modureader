@@ -1,4 +1,12 @@
 {
+  "fontImportedAndApplied": "已导入并应用：{font}",
+  "@fontImportedAndApplied": {"placeholders": {"font": {"type": "String"}}},
+  "fontImportFailedCount": "有 {count} 个字体未能导入。",
+  "@fontImportFailedCount": {"placeholders": {"count": {"type": "int"}}},
+  "readingBrightness": "应用亮度",
+  "readingBrightnessFollowSystem": "跟随系统",
+  "readingBrightnessWindowHint": "仅调节当前应用窗口，不修改系统亮度。",
+  "readingBrightnessDimHint": "仅在应用内调暗。100% 为系统亮度，无法超过系统亮度。",
   "@@locale": "zh_CN",
   "appName": "默读",
   "appAbout": "关于 默读",

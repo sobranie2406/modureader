@@ -49,6 +49,9 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  // Brightness is a device-local preference, not transferable configuration.
+  'appBrightnessLevel',
+  'appBrightnessFollowSystem',
   'iapPurchaseStatus',
   'iapLastCheckTime',
   // Enabling sensitive sync requires an explicit risk confirmation on each
@@ -60,6 +63,8 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'appBrightnessLevel',
+  'appBrightnessFollowSystem',
   // The encryption password must remain local and must not be copied into an
   // app backup or uploaded alongside the encrypted payload.
   'syncAiSettingsEncryptionPassword',

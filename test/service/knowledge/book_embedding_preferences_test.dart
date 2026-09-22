@@ -105,12 +105,12 @@ void main() {
 
   test('single queue builder and shared AI retrieval resolve per-book models',
       () {
-    for (final path in [
-      'lib/service/knowledge/book_knowledge_index_service.dart',
-      'lib/service/knowledge/book_knowledge_retriever.dart',
-    ]) {
-      final source = File(path).readAsStringSync();
-      expect(source, contains('EmbeddingProviderFactory.fromBook'));
+    for (final entry in {
+      'lib/service/knowledge/book_knowledge_index_service.dart': 'requireForBook',
+      'lib/service/knowledge/book_knowledge_retriever.dart': 'fromBook',
+    }.entries) {
+      final source = File(entry.key).readAsStringSync();
+      expect(source, contains('EmbeddingProviderFactory.${entry.value}'));
       expect(source, isNot(contains('EmbeddingProviderFactory.fromPrefs()')));
     }
     expect(File('lib/providers/ai_chat.dart').readAsStringSync(),

@@ -121,8 +121,7 @@ class OpenAiCompatibleEmbeddingProvider extends EmbeddingProvider {
   String get modelId => config.modelId;
 
   @override
-  Future<List<List<double>>> embedBatch(List<String> inputs) async {
-    if (inputs.isEmpty) return const [];
+  Future<void> ensureReady() async {
     final endpoint = normalizeEmbeddingEndpoint(config.endpoint);
     if (config.modelId.trim().isEmpty) {
       throw StateError('向量模型 ID 不能为空');
@@ -132,6 +131,13 @@ class OpenAiCompatibleEmbeddingProvider extends EmbeddingProvider {
         endpoint.host != '127.0.0.1') {
       throw StateError('远程向量模型需要 API 密钥');
     }
+  }
+
+  @override
+  Future<List<List<double>>> embedBatch(List<String> inputs) async {
+    if (inputs.isEmpty) return const [];
+    await ensureReady();
+    final endpoint = normalizeEmbeddingEndpoint(config.endpoint);
 
     final response = await _client
         .post(
@@ -248,6 +254,40 @@ bool matchesEmbeddingIndex(
 
 class EmbeddingProviderFactory {
   const EmbeddingProviderFactory._();
+
+  static void requireEnabled() {
+    if (!Prefs().vectorModelEnabled) {
+      throw StateError('向量模型未启用，请前往「设置 → 向量模型」开启后再向量化');
+    }
+  }
+
+  /// Bookshelf vectorization must not silently become a lexical-only index.
+  /// Nullable providers remain supported for ordinary keyword retrieval.
+  static EmbeddingProvider requireForBook(Book book) {
+    requireEnabled();
+    return fromBook(book)!;
+  }
+
+  /// Read-only preflight: no inference, model download, or shared-engine
+  /// release (another queued book may currently be using that engine).
+  static Future<void> validateForBook(Book book) async {
+    final provider = requireForBook(book);
+    try {
+      if (provider is LocalOnnxEmbeddingProvider) {
+        if (!await provider.store.isDownloaded(provider.model)) {
+          throw StateError(
+            '本地模型 ${provider.model.name} 尚未下载或文件损坏，请前往「设置 → 向量模型」下载后重试',
+          );
+        }
+      } else {
+        await provider.ensureReady();
+      }
+      // The user may turn the switch off during an asynchronous file check.
+      requireEnabled();
+    } finally {
+      provider.close();
+    }
+  }
 
   static EmbeddingProvider? fromBook(Book book) {
     final choice = BookEmbeddingPreferences.choiceFor(book);

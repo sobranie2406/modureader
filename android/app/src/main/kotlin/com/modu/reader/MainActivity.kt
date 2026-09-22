@@ -25,6 +25,28 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // A per-window override needs no WRITE_SETTINGS permission and has no
+        // effect on another app or on the system's saved brightness setting.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "com.modu.reader/brightness").setMethodCallHandler { call, result ->
+            if (call.method != "setBrightness") {
+                result.notImplemented()
+            } else {
+                val brightness = call.argument<Number>("brightness")?.toFloat()
+                if (brightness != null && !brightness.isFinite()) {
+                    result.error("INVALID_BRIGHTNESS", "Brightness must be finite", null)
+                } else {
+                    try {
+                        val attributes = window.attributes
+                        attributes.screenBrightness = brightness?.coerceIn(0.2f, 1f) ?: -1f
+                        window.attributes = attributes
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("BRIGHTNESS_FAILED", e.message, null)
+                    }
+                }
+            }
+        }
         if (!flutterEngine.plugins.has(CrashDiagnosticsPlugin::class.java)) {
             flutterEngine.plugins.add(CrashDiagnosticsPlugin())
         }

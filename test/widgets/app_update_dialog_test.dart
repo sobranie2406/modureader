@@ -41,7 +41,8 @@ void main() {
     expect(find.text('Install update'), findsNothing);
     expect(find.text('Update available'), findsOneWidget);
     expect(find.text('Release information source: GitHub'), findsOneWidget);
-    expect(find.textContaining('Gitee mirror first'), findsOneWidget);
+    expect(find.textContaining('Checks GitHub first'), findsOneWidget);
+    expect(find.textContaining('downloads from GitHub first'), findsOneWidget);
   });
 
   testWidgets('displays mirror metadata source without claiming installation',

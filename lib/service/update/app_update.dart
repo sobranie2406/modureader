@@ -15,8 +15,8 @@ const moduReleaseApi =
     'https://api.github.com/repos/sobranie2406/modureader/releases/latest';
 const moduMirrorReleasePage =
     'https://gitee.com/sobranie2406/modureader/releases';
-// Published only after the mirrored installers have been verified. A missing
-// manifest is normal before mirror deployment and must fall back to GitHub.
+// Published only after the mirrored installers have been verified. Used only
+// when the GitHub update check is unavailable or times out.
 const moduMirrorManifest =
     'https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json';
 
@@ -193,35 +193,46 @@ class UpdateTransport {
   }
 
   Future<UpdateRelease> latest(String platform, String abi) async {
-    UpdateRelease? mirrored;
     try {
-      mirrored = await _latestFrom(platform, abi, mirror: true);
-    } on Exception {
-      // Missing, rate-limited, malformed or unreachable mirror: use upstream.
+      // A successful upstream check must not contact the mirror, even when
+      // there is no new version or no installer for the current platform.
+      return await _latestFrom(platform, abi, mirror: false);
+    } on Exception catch (error) {
+      if (!_isUnavailable(error)) rethrow;
     }
-    // Compare upstream when reachable so a lagging mirror cannot hide a release.
-    // A healthy mirror remains usable when GitHub is blocked or unavailable.
-    try {
-      final upstream = await _latestFrom(platform, abi, mirror: false);
-      if (mirrored == null ||
-          isNewerRelease(upstream.version, mirrored.version) ||
-          (upstream.version == mirrored.version &&
-              (upstream.asset?.digest != mirrored.asset?.digest ||
-                  upstream.asset?.size != mirrored.asset?.size))) {
-        return upstream;
-      }
-    } on Exception {
-      if (mirrored == null) rethrow;
+    return _latestFrom(platform, abi, mirror: true);
+  }
+
+  static bool _isUnavailable(Object error) {
+    if (error is TimeoutException ||
+        error is SocketException ||
+        error is HttpException) {
+      return true;
     }
-    return mirrored;
+    if (error is! DioException) return false;
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.connectionError =>
+        true,
+      DioExceptionType.badResponse => error.response?.statusCode == 408 ||
+          error.response?.statusCode == 429 ||
+          ((error.response?.statusCode ?? 0) >= 500 &&
+              (error.response?.statusCode ?? 0) <= 599),
+      DioExceptionType.unknown => error.error is SocketException ||
+          error.error is HttpException ||
+          error.error is TimeoutException,
+      // Do not hide invalid metadata, unsafe redirects, certificate failures,
+      // cancellations or programming errors by switching sources.
+      _ => false,
+    };
   }
 
   Future<UpdateRelease> _latestFrom(String platform, String abi,
       {required bool mirror}) async {
     final cancel = CancelToken();
-    final timer = Timer(mirror ? mirrorCheckTimeout : githubCheckTimeout,
-        () => cancel.cancel('Update check timed out'));
-    try {
+    Future<UpdateRelease> read() async {
       final response = await _get(
           mirror ? moduMirrorManifest : moduReleaseApi, cancel,
           mirror: mirror);
@@ -246,9 +257,14 @@ class UpdateTransport {
         throw const FormatException('Mirror asset not ready');
       }
       return release;
-    } finally {
-      timer.cancel();
     }
+
+    // Bound the whole check, including redirects and a stalled response body.
+    return read().timeout(mirror ? mirrorCheckTimeout : githubCheckTimeout,
+        onTimeout: () {
+      cancel.cancel('Update check timed out');
+      throw TimeoutException('Update check timed out');
+    });
   }
 
   Future<File> download(UpdateAsset asset, Directory directory,
@@ -273,27 +289,18 @@ class UpdateTransport {
       await file.delete();
     }
     // Every attempt starts a fresh file and verifies against the SAME digest.
-    // Never concatenate a partial mirror response with an upstream response.
-    if (asset.mirrorUrl != null) {
-      try {
-        return await _downloadFrom(
-            asset, file, part, asset.mirrorUrl!, cancel, progress,
-            mirror: true);
-      } on Exception catch (e) {
-        _checkCancelled(cancel);
-        if (e is FileSystemException) rethrow;
-        if (e is! DioException &&
-            e is! FormatException &&
-            e is! IOException &&
-            e is! TimeoutException) {
-          rethrow;
-        }
-        progress(0, asset.size);
-      }
+    // Never concatenate partial responses from different sources.
+    try {
+      return await _downloadFrom(asset, file, part, asset.url, cancel, progress,
+          mirror: false);
+    } on Exception catch (e) {
+      _checkCancelled(cancel);
+      if (asset.mirrorUrl == null || !_isUnavailable(e)) rethrow;
+      progress(0, asset.size);
     }
     _checkCancelled(cancel);
-    return _downloadFrom(asset, file, part, asset.url, cancel, progress,
-        mirror: false);
+    return _downloadFrom(asset, file, part, asset.mirrorUrl!, cancel, progress,
+        mirror: true);
   }
 
   Future<File> _downloadFrom(UpdateAsset asset, File file, File part,
