@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/utils/webView/gererate_url.dart';
@@ -16,6 +17,24 @@ void main() {
     await Server().start();
   });
   tearDown(() => Server().stop());
+
+  test('fresh reader URL uses the selected book profile, not another book',
+      () async {
+    const css = r'p::after { content: "${value}`\\中文"; }';
+    await Prefs().saveCustomCssProfile(6, const CustomCssProfile(css: css));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 6, enabled: true),
+        bookKey: 'A');
+    final a = Uri.parse(generateUrl('https://example.test/book.epub', '',
+        fontName: 'serif', fontPath: '', cssBookKey: 'A'));
+    final b = Uri.parse(generateUrl('https://example.test/other.epub', '',
+        fontName: 'serif', fontPath: '', cssBookKey: 'B'));
+    expect(jsonDecode(a.queryParameters['style']!)['customCSS'], css);
+    expect(jsonDecode(a.queryParameters['style']!)['customCSSEnabled'], isTrue);
+    expect(
+        jsonDecode(b.queryParameters['style']!)['customCSSEnabled'], isFalse);
+    expect(jsonDecode(b.queryParameters['style']!)['customCSS'], isEmpty);
+  });
 
   test('fresh book URL enables platform input before any style change', () {
     for (final tapOnly in [false, true]) {

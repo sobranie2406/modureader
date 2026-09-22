@@ -1,9 +1,10 @@
 # 默读 / Modu 1.1.3 正式版
 
-版本：**1.1.3+10035**。基于 Anx Reader 和 ReadAny（Reader Any）的 GPL-3.0-or-later 独立修改版本，保留原作者版权与许可。
+版本：**1.1.3+10036**。基于 Anx Reader 和 ReadAny（Reader Any）的 GPL-3.0-or-later 独立修改版本，保留原作者版权与许可。
 
 ## 本次修复
 
+- **8 套自定义 CSS 方案**：支持独立命名、编辑和切换，可分别保存竖排、横排、精排等样式。每本书在本机记住自己的选择，也可跟随默认或把当前方案设为默认。旧 CSS 自动保留在第一套；切换方案前保存当前编辑。方案共享，修改会影响使用该方案的书籍；选择方案不自动改变阅读方向。
 - **更新检查自动切换镜像**：仍优先 GitHub；DNS/连接失败、连接重置、超时、TLS 握手或证书失败，以及任意 HTTP 请求错误（包括 401、403、404、407、429、5xx）均自动尝试 Gitee。不再因 GitHub 返回普通 403 而停留在“服务器限制请求”。
 - **安装包下载同样回退**：GitHub 下载遇到上述错误时，清理部分文件，从 Gitee 重新下载同版本、同架构安装包。两站使用同一次构建的原始文件。
 - **安全校验保留**：切换来源不会关闭 HTTPS 证书验证。无效更新清单、不安全重定向、SHA-256/大小不符、主动取消、磁盘或程序错误仍停止，不绕过校验安装。
@@ -15,6 +16,8 @@
 ## 升级说明
 
 旧客户端若已经无法检查更新，请手动下载安装包覆盖升级；新的回退逻辑需升级后生效。**不要先卸载或清空应用数据**，升级前建议导出书库备份。
+
+本次替换先前的 1.1.3+10035 安装包。已安装该构建的用户请手动覆盖升级到 10036；同版本构建号更新不会触发现有客户端的版本提示。
 
 ## 下载与完整对应源码
 
@@ -38,7 +41,9 @@ Gitee 仅存放安装包、说明与更新清单，不上传应用源码。每�
 
 ## English
 
-Modu **1.1.3 (build 10035)** fixes GitHub-to-Gitee update fallback. Checks and downloads still prefer GitHub, but any network, timeout, TLS or HTTP request failure now tries the official Gitee mirror, including ordinary HTTP 403/404 responses. Downloads restart cleanly against the same version, architecture, size and SHA-256.
+Modu **1.1.3 (build 10036)** adds eight named, editable CSS profiles with per-book choices on this device, a shared default and automatic preservation of legacy CSS in the first slot. Editing a shared profile affects books using it; choosing a profile does not automatically change reading direction. Users on build 10035 should manually upgrade in place because existing clients do not notify about build-only updates.
+
+This release also fixes GitHub-to-Gitee update fallback. Checks and downloads still prefer GitHub, but any network, timeout, TLS or HTTP request failure now tries the official Gitee mirror, including ordinary HTTP 403/404 responses. Downloads restart cleanly against the same version, architecture, size and SHA-256.
 
 HTTPS verification remains enabled on both sources. Invalid metadata, unsafe redirects, integrity failures, cancellation, storage and programming errors never bypass validation. Rate limits and access denials are distinguished; failure is not reported as “up to date”.
 

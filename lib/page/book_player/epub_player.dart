@@ -19,6 +19,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/book_style.dart';
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/bookmark.dart';
 import 'package:anx_reader/models/font_model.dart';
 import 'package:anx_reader/models/read_theme.dart';
@@ -91,6 +92,7 @@ class EpubPlayer extends ConsumerStatefulWidget {
 
 class EpubPlayerState extends ConsumerState<EpubPlayer>
     with TickerProviderStateMixin {
+  String get cssBookKey => customCssBookKey(widget.book);
   late InAppWebViewController webViewController;
   late ContextMenu contextMenu;
   String cfi = '';
@@ -330,8 +332,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         bgimgBlur: ${Prefs().bgimg.blur},
         bgimgOpacity: ${Prefs().bgimg.opacity},
         bgimgFit: '${Prefs().bgimgFit.code}',
-        customCSS: `${Prefs().customCSS.replaceAll('`', '\\`')}`,
-        customCSSEnabled: ${Prefs().customCSSEnabled},
+        customCSS: ${jsonEncode(Prefs().customCssForBook(cssBookKey))},
+        customCSSEnabled: ${Prefs().customCssSelection(cssBookKey).enabled},
         useBookStyles: ${Prefs().useBookStyles},
         headingFontSize: ${style.headingFontSize},
         codeHighlightTheme: '${Prefs().codeHighlightTheme.code}',
@@ -1686,6 +1688,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           generateUrl(
             url,
             initialCfi,
+            cssBookKey: cssBookKey,
             backgroundColor: backgroundColor,
             textColor: textColor,
             isDarkMode: Theme.of(context).brightness == Brightness.dark,

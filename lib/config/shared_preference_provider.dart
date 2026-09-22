@@ -25,6 +25,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/bgimg.dart';
 import 'package:anx_reader/models/book_style.dart';
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/chapter_split_presets.dart';
 import 'package:anx_reader/models/chapter_split_rule.dart';
 import 'package:anx_reader/models/font_model.dart';
@@ -49,6 +50,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'bookCustomCssSelections',
   // Brightness is a device-local preference, not transferable configuration.
   'appBrightnessLevel',
   'appBrightnessFollowSystem',
@@ -63,6 +65,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'bookCustomCssSelections',
   'appBrightnessLevel',
   'appBrightnessFollowSystem',
   // The encryption password must remain local and must not be copied into an
@@ -1830,6 +1833,86 @@ class Prefs extends ChangeNotifier {
 
   String get customCSS {
     return prefs.getString('customCSS') ?? '';
+  }
+
+  List<CustomCssProfile> get customCssProfiles {
+    final defaults = List.generate(customCssProfileCount,
+        (i) => CustomCssProfile(css: i == 0 ? customCSS : ''));
+    final raw = prefs.getString('customCssProfiles');
+    if (raw == null) return defaults;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return defaults;
+      for (var i = 0; i < decoded.length && i < defaults.length; i++) {
+        if (decoded[i] is Map) {
+          defaults[i] = CustomCssProfile.fromJson(decoded[i]);
+        }
+      }
+    } on FormatException {
+      // Preserve legacy CSS when a settings backup is malformed.
+    }
+    return defaults;
+  }
+
+  Future<void> saveCustomCssProfile(int index, CustomCssProfile profile) async {
+    RangeError.checkValidIndex(index, customCssProfiles);
+    final profiles = customCssProfiles;
+    profiles[index] = profile;
+    await prefs.setString('customCssProfiles',
+        jsonEncode(profiles.map((p) => p.toJson()).toList()));
+    notifyListeners();
+  }
+
+  Map<String, dynamic> get _bookCustomCssSelections {
+    try {
+      final value = jsonDecode(prefs.getString('bookCustomCssSelections') ?? '{}');
+      return value is Map<String, dynamic> ? value : {};
+    } on FormatException {
+      return {};
+    }
+  }
+
+  bool hasBookCustomCssSelection(String bookKey) =>
+      _bookCustomCssSelections[bookKey] is Map;
+
+  CustomCssSelection customCssSelection([String? bookKey]) {
+    final defaultIndex = prefs.getInt('customCssDefaultIndex') ?? 0;
+    var index = defaultIndex >= 0 && defaultIndex < customCssProfileCount
+        ? defaultIndex
+        : 0;
+    var enabled = customCSSEnabled;
+    final local = bookKey == null ? null : _bookCustomCssSelections[bookKey];
+    if (local is Map && local['index'] is int && local['enabled'] is bool) {
+      final candidate = local['index'] as int;
+      if (candidate >= 0 && candidate < customCssProfileCount) {
+        index = candidate;
+        enabled = local['enabled'] as bool;
+      }
+    }
+    return CustomCssSelection(index: index, enabled: enabled);
+  }
+
+  String customCssForBook([String? bookKey]) =>
+      customCssProfiles[customCssSelection(bookKey).index].css;
+
+  Future<void> saveCustomCssSelection(CustomCssSelection selection,
+      {String? bookKey}) async {
+    RangeError.checkValidIndex(selection.index, customCssProfiles);
+    if (bookKey == null) {
+      await prefs.setInt('customCssDefaultIndex', selection.index);
+      await prefs.setBool('customCSSEnabled', selection.enabled);
+    } else {
+      final selections = _bookCustomCssSelections;
+      selections[bookKey] = selection.toJson();
+      await prefs.setString('bookCustomCssSelections', jsonEncode(selections));
+    }
+    notifyListeners();
+  }
+
+  Future<void> clearBookCustomCssSelection(String bookKey) async {
+    final selections = _bookCustomCssSelections..remove(bookKey);
+    await prefs.setString('bookCustomCssSelections', jsonEncode(selections));
+    notifyListeners();
   }
 
   Map<String, TranslationModeEnum> get bookTranslationModes {

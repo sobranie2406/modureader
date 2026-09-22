@@ -69,6 +69,10 @@ Android library data migrates to `Android/data/com.modu.reader/files` with verif
 
 Downloaded embedding models can be deleted in settings unless protected by an active task. Large local indexes use streaming reads with a 1 GiB file limit; practical capacity still depends on available RAM.
 
+### Custom CSS profiles
+
+Reader styles → More settings → Style offers eight named CSS profiles for vertical, horizontal or publisher-specific layouts. Switching saves current edits; enabling applies the selected profile. Each book remembers its profile and enabled state on this device, with Follow default and Set as default controls. Editing a shared profile affects books using it. Existing CSS stays in profile 1; other slots start empty. Profiles do not automatically change the reader's writing direction. For publisher layouts, retain book styles and disable custom CSS for that book. Profiles are included in settings backups; per-book choices remain local.
+
 ### WebDAV remote library
 
 Enter the full book-directory URL, username and password in Settings → Remote library settings, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.

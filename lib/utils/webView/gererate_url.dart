@@ -20,6 +20,7 @@ String generateUrl(
   bool isDarkMode = false,
   Map<String, double>? verticalPageInsets,
   Map<String, dynamic>? verticalPageChrome,
+  String? cssBookKey,
 }) {
   String indexHtmlPath =
       "http://127.0.0.1:${Server().port}/foliate-js/index.html";
@@ -110,8 +111,8 @@ String generateUrl(
     // DOM events. EPUB sanitization/CSP remains controlled solely by allowScript.
     'readerScriptEvents':
         AnxPlatform.isMacOS || AnxPlatform.isIOS || AnxPlatform.isLinux,
-    'customCSS': Prefs().customCSS,
-    'customCSSEnabled': Prefs().customCSSEnabled,
+    'customCSS': Prefs().customCssForBook(cssBookKey),
+    'customCSSEnabled': Prefs().customCssSelection(cssBookKey).enabled,
     'useBookStyles': Prefs().useBookStyles,
     'headingFontSize': bookStyle.headingFontSize,
     'codeHighlightTheme': Prefs().codeHighlightTheme.code,

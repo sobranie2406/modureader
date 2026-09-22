@@ -343,7 +343,10 @@ class _StyleSettingsState extends State<StyleSettings> {
           const SizedBox(height: 16),
           const Divider(),
           textAlignment(),
-          CustomCSSEditor(),
+          CustomCSSEditor(
+            key: ValueKey(epubPlayerKey.currentState?.cssBookKey),
+            bookKey: epubPlayerKey.currentState?.cssBookKey,
+          ),
         ],
       ),
     );
