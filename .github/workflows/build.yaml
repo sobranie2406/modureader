@@ -384,10 +384,19 @@ jobs:
             [[ "$EXPECTED_TAG_COMMIT" =~ ^[0-9a-f]{40}$ ]]
             gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > "$RUNNER_TEMP/modu-release-tag.json"
             python3 -c 'import json,os,sys; ref=json.load(open(sys.argv[1])); assert ref["object"]["type"] == "commit" and ref["object"]["sha"] in (os.environ["EXPECTED_TAG_COMMIT"],os.environ["RELEASE_COMMIT"]), "Existing release changed; refusing overwrite"' "$RUNNER_TEMP/modu-release-tag.json"
-            # Hide the release while replacing its matching source and assets.
+            # List successfully before deciding that a release is absent: API
+            # errors must never be mistaken for a deleted release.
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/modu-releases.json"
+            release_exists=$(python3 -c 'import json,os,sys; pages=json.load(open(sys.argv[1])); print("true" if any(r["tag_name"] == os.environ["RELEASE_TAG"] for page in pages for r in page) else "false")' "$RUNNER_TEMP/modu-releases.json")
+            # Hide an existing release while replacing its source and assets.
             # This workflow token does not dispatch another tag-triggered build.
-            gh release edit "$RELEASE_TAG" --draft
+            if [[ "$release_exists" == "true" ]]; then
+              gh release edit "$RELEASE_TAG" --draft
+            fi
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" -f "sha=$RELEASE_COMMIT" -F force=true
+            if [[ "$release_exists" == "false" ]]; then
+              gh release create "$RELEASE_TAG" --verify-tag --draft --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
+            fi
             gh release upload "$RELEASE_TAG" dist-release/* --clobber
             gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --target "$RELEASE_COMMIT" --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
             exit 0

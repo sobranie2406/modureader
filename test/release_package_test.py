@@ -9,6 +9,9 @@ import sys
 import plistlib
 import json
 import zipfile
+import os
+import subprocess
+import textwrap
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
@@ -17,6 +20,62 @@ from windows_runtime import prepare_windows_runtime, verify_crt, pe_imports
 import bundle_models
 from verify_onnx_jni import CONSTRUCTORS, REQUIRED_CLASSES, definitions, verify_definitions
 from validate_assets import validate as validate_release_assets
+
+
+class ReleaseReplacementTest(unittest.TestCase):
+    def run_replacement(self, existing=False, api_failure=False, tag_changed=False):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    '.github/workflows/build.yaml').read_text()
+        block = workflow.split('          if [[ "$REPLACE_RELEASE" == "true" ]]; then\n', 1)[1]
+        block = textwrap.dedent(block.split('            exit 0\n', 1)[0])
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ, RUNNER_TEMP=tmp, GITHUB_REPOSITORY='test/repo',
+                       RELEASE_TAG='v1.1.3', RELEASE_COMMIT='b' * 40,
+                       EXPECTED_TAG_COMMIT='a' * 40, CREATE_RELEASE_TAG='true')
+            tag = json.dumps({'object': {'type': 'commit',
+                                        'sha': ('c' if tag_changed else 'a') * 40}})
+            releases = json.dumps([[{'tag_name': 'v1.1.3'}] if existing else []])
+            # Run the actual workflow shell with a fake gh, never a network call.
+            prelude = f'''set -euo pipefail
+gh() {{
+  printf '%s\\n' "$*" >> "$RUNNER_TEMP/calls"
+  if [[ "$*" == "api repos/test/repo/git/ref/tags/v1.1.3" ]]; then
+    printf '%s' '{tag}'
+  elif [[ "$*" == "api --paginate --slurp repos/test/repo/releases?per_page=100" ]]; then
+    {'return 1' if api_failure else "printf '%s' '" + releases + "'"}
+  fi
+}}
+'''
+            result = subprocess.run(['bash', '-c', prelude + block], env=env,
+                                    capture_output=True, text=True)
+            calls = (Path(tmp) / 'calls').read_text()
+            return result, calls
+
+    def test_missing_release_is_created_draft_from_new_source(self):
+        result, calls = self.run_replacement()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('sha=' + 'b' * 40, calls)
+        self.assertIn('release create v1.1.3 --verify-tag --draft', calls)
+        self.assertLess(calls.index('api --method PATCH'), calls.index('release create'))
+        self.assertLess(calls.index('release upload'), calls.index('--draft=false'))
+
+    def test_existing_release_is_hidden_and_replaced(self):
+        result, calls = self.run_replacement(existing=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('release edit v1.1.3 --draft\n', calls)
+        self.assertNotIn('release create', calls)
+
+    def test_failed_listing_does_not_modify_tag_or_release(self):
+        result, calls = self.run_replacement(api_failure=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('--method PATCH', calls)
+        self.assertNotIn('release ', calls)
+
+    def test_unexpected_tag_does_not_modify_anything(self):
+        result, calls = self.run_replacement(tag_changed=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('--method PATCH', calls)
+        self.assertNotIn('release ', calls)
 
 
 class ReleaseAssetSetTest(unittest.TestCase):
