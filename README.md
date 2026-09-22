@@ -23,7 +23,7 @@ This is an independently modified derivative, not an official release of either 
 
 [GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee 安装包镜像](https://gitee.com/sobranie2406/modureader/releases) · [构建状态](https://github.com/sobranie2406/modureader/actions) · [问题反馈](https://github.com/sobranie2406/modureader/issues)
 
-应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」检查、下载、取消并打开安装器。更新检查和安装包下载均优先 GitHub，仅在连接失败、超时或服务不可用时改用 Gitee；两站使用相同安装包及 SHA-256，安装前再次校验，不静默安装。Gitee 仅托管安装包、说明与更新清单，同版本完整源码链接保留在各 Release。
+应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」检查、下载、取消并打开安装器。更新检查和安装包下载均优先 GitHub，网络连接、超时、TLS 或任意 HTTP 请求错误时自动改用 Gitee；两站使用相同安装包及 SHA-256，安装前再次校验，不静默安装。主动取消、无效更新信息或安装包校验失败不会通过切换来源绕过。Gitee 仅托管安装包、说明与更新清单，每次先删除旧发行版再发布新版，同版本完整源码链接保留在各 Release。
 
 | 平台 | 已发布架构 | 分发形式与限制 |
 | --- | --- | --- |

@@ -309,6 +309,7 @@ void main() {
       DioExceptionType.connectionTimeout,
       DioExceptionType.sendTimeout,
       DioExceptionType.receiveTimeout,
+      DioExceptionType.badCertificate,
       DioExceptionType.unknown,
     ]) {
       final adapter = Adapter((o) {
@@ -326,7 +327,7 @@ void main() {
           isTrue);
       expect(adapter.requests.first.uri.toString(), moduReleaseApi);
     }
-    for (final status in [408, 429, 500, 502, 503, 504]) {
+    for (final status in [400, 401, 403, 404, 407, 408, 410, 429, 451, 500, 502, 503, 504]) {
       final adapter = Adapter((o) => o.uri.host == 'api.github.com'
           ? ResponseBody.fromString('unavailable', status)
           : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
@@ -335,6 +336,57 @@ void main() {
               .fromMirror,
           isTrue);
     }
+  });
+
+  test('GitHub 403 rate limits fall back to verified mirror metadata', () async {
+    for (final headers in [
+      {'x-ratelimit-remaining': ['0']},
+      {'retry-after': ['60']},
+    ]) {
+      final adapter = Adapter((o) => o.uri.host == 'api.github.com'
+          ? ResponseBody.fromString('rate limited', 403, headers: headers)
+          : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
+      final result = await transport(adapter).latest('android', 'android_arm64');
+      expect(result.fromMirror, isTrue);
+      expect(result.asset!.digest, asset.digest);
+      expect(adapter.requests.map((r) => r.uri.toString()),
+          [moduReleaseApi, moduMirrorManifest]);
+    }
+  });
+
+  test('TLS and unspecified transport failures fall back for check and download', () async {
+    for (final error in [
+      const HandshakeException('TLS handshake failed'),
+      const TlsException('TLS failed'),
+      DioException(requestOptions: RequestOptions()),
+      DioException(requestOptions: RequestOptions(), type: DioExceptionType.badCertificate),
+    ]) {
+      final adapter = Adapter((o) {
+        if (o.uri.host == 'api.github.com' || o.uri.host == 'github.com') throw error;
+        return o.uri.path.endsWith('.json')
+            ? ResponseBody.fromString(jsonEncode(mirrorJson()), 200)
+            : ResponseBody.fromBytes(payload, 200);
+      });
+      final t = transport(adapter);
+      final release = await t.latest('android', 'android_arm64');
+      expect(release.fromMirror, isTrue);
+      final file = await t.download(release.asset!, directory, CancelToken(), (_, __) {});
+      expect(await file.readAsBytes(), payload);
+      expect(adapter.requests.map((r) => r.uri.toString()),
+          [moduReleaseApi, moduMirrorManifest, release.asset!.url, release.asset!.mirrorUrl]);
+      await file.delete();
+    }
+  });
+
+  test('rate-limit fallback still rejects an invalid mirror manifest', () async {
+    final adapter = Adapter((o) => o.uri.host == 'api.github.com'
+        ? ResponseBody.fromString('rate limited', 403, headers: {
+            'x-ratelimit-remaining': ['0']
+          })
+        : ResponseBody.fromString('<html>not a manifest</html>', 200));
+    await expectLater(transport(adapter).latest('android', 'android_arm64'),
+        throwsFormatException);
+    expect(adapter.requests.length, 2);
   });
 
   test('invalid GitHub metadata and unsafe redirects never switch sources',
@@ -359,12 +411,10 @@ void main() {
   });
 
   test(
-      'certificate failures, cancellation and HTTP client errors do not fall back',
+      'cancellation and programming errors do not fall back',
       () async {
     for (final type in [
-      DioExceptionType.badCertificate,
       DioExceptionType.cancel,
-      DioExceptionType.unknown
     ]) {
       final adapter =
           Adapter((o) => throw DioException(requestOptions: o, type: type));
@@ -372,8 +422,9 @@ void main() {
           throwsA(isA<DioException>()));
       expect(adapter.requests.length, 1);
     }
-    for (final status in [401, 403, 404]) {
-      final adapter = Adapter((o) => ResponseBody.fromString('error', status));
+    for (final error in [StateError('bug'), const FormatException('invalid')]) {
+      final adapter = Adapter((o) => throw DioException(requestOptions: o,
+          type: DioExceptionType.unknown, error: error));
       await expectLater(transport(adapter).latest('android', 'android_arm64'),
           throwsA(isA<DioException>()));
       expect(adapter.requests.length, 1);
@@ -425,7 +476,6 @@ void main() {
     for (final error in [
       const FileSystemException('write failed'),
       const FormatException('invalid asset'),
-      const HandshakeException('untrusted certificate'),
     ]) {
       final adapter = Adapter((o) => throw error);
       await expectLater(
@@ -439,6 +489,15 @@ void main() {
 
   test('unavailable GitHub retries the same verified mirror asset', () async {
     for (final response in [
+      ResponseBody.fromString('Forbidden', 403),
+      ResponseBody.fromString('Not found', 404),
+      ResponseBody.fromString('Proxy authentication required', 407),
+      ResponseBody.fromString('Rate limited', 403, headers: {
+        'x-ratelimit-remaining': ['0']
+      }),
+      ResponseBody.fromString('Rate limited', 403, headers: {
+        'retry-after': ['60']
+      }),
       ResponseBody.fromString('Timeout', 408),
       ResponseBody.fromString('Rate limited', 429),
       ResponseBody.fromString('Unavailable', 503),
@@ -728,6 +787,13 @@ void main() {
     t.response = () async => throw DioException(
         requestOptions: RequestOptions(),
         response: Response(requestOptions: RequestOptions(), statusCode: 403));
+    await c.check();
+    expect(c.error, 'access_denied');
+    t.response = () async => throw DioException(
+        requestOptions: RequestOptions(),
+        response: Response(
+            requestOptions: RequestOptions(), statusCode: 403,
+            headers: Headers.fromMap({'x-ratelimit-remaining': ['0']})));
     await c.check();
     expect(c.error, 'rate_limit');
     t.response = () async => parse({...releaseJson(), 'tag_name': 'v1.0.7'});

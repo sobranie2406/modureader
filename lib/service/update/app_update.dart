@@ -24,6 +24,17 @@ void _checkCancelled(CancelToken token) {
   if (token.isCancelled) throw token.cancelError!;
 }
 
+bool _isRateLimited(DioException error) {
+  final response = error.response;
+  if (response?.statusCode == 429) return true;
+  if (response?.statusCode != 403) return false;
+  // GitHub also reports primary/secondary throttling as HTTP 403. Do not
+  // confuse an ordinary permission denial with temporary unavailability.
+  final remaining = response!.headers.value('x-ratelimit-remaining')?.trim();
+  final retryAfter = response.headers.value('retry-after')?.trim();
+  return remaining == '0' || (retryAfter != null && retryAfter.isNotEmpty);
+}
+
 /// Match the running application ABI, never guess from the OS's marketing name.
 String? updateAssetName(String version, String platform, String abi) {
   final arch = abi.endsWith('_arm64')
@@ -206,7 +217,8 @@ class UpdateTransport {
   static bool _isUnavailable(Object error) {
     if (error is TimeoutException ||
         error is SocketException ||
-        error is HttpException) {
+        error is HttpException ||
+        error is TlsException) {
       return true;
     }
     if (error is! DioException) return false;
@@ -214,17 +226,18 @@ class UpdateTransport {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
       DioExceptionType.receiveTimeout ||
-      DioExceptionType.connectionError =>
+      DioExceptionType.connectionError ||
+      DioExceptionType.badCertificate ||
+      DioExceptionType.badResponse =>
         true,
-      DioExceptionType.badResponse => error.response?.statusCode == 408 ||
-          error.response?.statusCode == 429 ||
-          ((error.response?.statusCode ?? 0) >= 500 &&
-              (error.response?.statusCode ?? 0) <= 599),
-      DioExceptionType.unknown => error.error is SocketException ||
+      DioExceptionType.unknown => error.error == null ||
+          error.error is SocketException ||
           error.error is HttpException ||
+          error.error is TlsException ||
           error.error is TimeoutException,
-      // Do not hide invalid metadata, unsafe redirects, certificate failures,
-      // cancellations or programming errors by switching sources.
+      // A failed TLS connection switches to the independently verified HTTPS
+      // mirror; it never disables certificate checking. Integrity failures,
+      // unsafe redirects, cancellation and local errors still fail closed.
       _ => false,
     };
   }
@@ -473,15 +486,18 @@ class AppUpdateController extends ChangeNotifier {
     phase = UpdatePhase.error;
     error = e is FormatException
         ? 'integrity'
-        : e is DioException &&
-                (e.response?.statusCode == 403 || e.response?.statusCode == 429)
+        : e is DioException && _isRateLimited(e)
             ? 'rate_limit'
-            : e is DioException && e.response?.statusCode == 404
-                ? 'not_found'
-                : e is FileSystemException
-                    ? 'storage'
-                    : e is PlatformException || e is ProcessException
-                        ? 'installer'
-                        : 'network';
+            : e is DioException &&
+                    (e.response?.statusCode == 401 ||
+                        e.response?.statusCode == 403)
+                ? 'access_denied'
+                : e is DioException && e.response?.statusCode == 404
+                    ? 'not_found'
+                    : e is FileSystemException
+                        ? 'storage'
+                        : e is PlatformException || e is ProcessException
+                            ? 'installer'
+                            : 'network';
   }
 }

@@ -24,6 +24,8 @@ class AppUpdateDialog extends StatelessWidget {
             'Release or installer verification failed. Installation blocked; check and download again.'),
         'rate_limit' => _text(c, '更新服务器暂时限制请求，请稍后重试。',
             'Update server rate limit reached. Please retry later.'),
+        'access_denied' => _text(c, '更新服务器拒绝访问，请检查网络或代理，或从官方发布页下载。',
+            'Update server denied access. Check your network or proxy, or download from the official release page.'),
         'not_found' => _text(c, '暂时没有可用的正式发布，请稍后重试。',
             'No stable release is currently available.'),
         'storage' => _text(c, '无法保存安装包，请检查剩余空间和文件权限。',
