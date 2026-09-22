@@ -7,6 +7,7 @@ class IconAndText extends StatelessWidget {
   final VoidCallback? onTap;
   final double? fontSize;
   final bool compact;
+  final bool flexibleHeight;
 
   const IconAndText({
     super.key,
@@ -15,6 +16,7 @@ class IconAndText extends StatelessWidget {
     this.onTap,
     this.fontSize,
     this.compact = false,
+    this.flexibleHeight = false,
   });
 
   @override
@@ -45,8 +47,9 @@ class IconAndText extends StatelessWidget {
 
     Widget content = SizedBox(
       width: width,
-      height: height,
+      height: flexibleHeight ? null : height,
       child: Column(
+        mainAxisSize: flexibleHeight ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

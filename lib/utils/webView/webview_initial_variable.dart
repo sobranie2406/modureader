@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/read_theme.dart';
@@ -46,6 +48,8 @@ Future<void> webviewInitialVariable(
           fontSize: ${bookStyle.fontSize},
           fontName: '${replaceSingleQuote(fontName)}',
           fontPath: '${replaceSingleQuote(fontPath)}',
+          englishFontName: ${jsonEncode(Prefs().englishFont?.name)},
+          englishFontPath: ${jsonEncode(Prefs().englishFont?.path)},
           fontWeight: ${bookStyle.fontWeight},
           letterSpacing: ${bookStyle.letterSpacing},
           spacing: ${bookStyle.lineHeight},

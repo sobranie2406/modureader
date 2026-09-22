@@ -1,6 +1,7 @@
 import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
 import { waitForReaderFonts } from './reader-font-ready.js'
+import { captureBookFontFamilies } from './reader-fonts.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
@@ -1553,6 +1554,7 @@ export class Paginator extends HTMLElement {
       this.#styleMap.set(doc, pair)
     }
     if (pair) {
+      captureBookFontFamilies(doc, this.#styles, pair)
       pair[0].textContent = Array.isArray(this.#styles) ? this.#styles[0] : ''
       pair[1].textContent = Array.isArray(this.#styles) ? this.#styles[1] : this.#styles ?? ''
     }
@@ -1771,6 +1773,7 @@ export class Paginator extends HTMLElement {
     const $$styles = this.#styleMap.get(this.#view?.document)
     if (!$$styles) return
     const [$beforeStyle, $style] = $$styles
+    captureBookFontFamilies(this.#view.document, styles, $$styles)
     if (Array.isArray(styles)) {
       const [beforeStyle, style] = styles
       $beforeStyle.textContent = beforeStyle

@@ -594,6 +594,28 @@ class Prefs extends ChangeNotifier {
     return FontModel.fromJson(fontJson);
   }
 
+  /// Null keeps the legacy single-font behavior. Font files remain local.
+  FontModel? get englishFont {
+    final raw = prefs.getString('englishFont');
+    if (raw == null) return null;
+    try {
+      return FontModel.fromJson(raw);
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
+  set englishFont(FontModel? value) {
+    if (value == null) {
+      prefs.remove('englishFont');
+    } else {
+      prefs.setString('englishFont', value.toJson());
+    }
+    notifyListeners();
+  }
+
   set trueDarkMode(bool status) {
     prefs.setBool('trueDarkMode', status);
     notifyListeners();

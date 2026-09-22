@@ -81,6 +81,8 @@ String generateUrl(
     'fontSize': bookStyle.fontSize,
     'fontName': fontName,
     'fontPath': fontPath,
+    'englishFontName': Prefs().englishFont?.name,
+    'englishFontPath': Prefs().englishFont?.path,
     'fontWeight': bookStyle.fontWeight,
     'letterSpacing': bookStyle.letterSpacing,
     'spacing': bookStyle.lineHeight,

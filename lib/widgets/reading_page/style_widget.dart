@@ -65,12 +65,15 @@ class StyleWidgetState extends State<StyleWidget> {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
+      child: SingleChildScrollView(
+          child: Column(
         children: [
           widgetTitle(L10n.of(context).readingPageStyle, ReadingSettings.theme),
           sliders(),
           const SizedBox(height: 10),
           fontAndPageTurn(),
+          const SizedBox(height: 10),
+          englishFontSelector(),
           const Divider(),
           Row(
             children: [
@@ -89,7 +92,7 @@ class StyleWidgetState extends State<StyleWidget> {
             ],
           ),
         ],
-      ),
+      )),
     );
   }
 
@@ -178,7 +181,9 @@ class StyleWidgetState extends State<StyleWidget> {
       ),
       Expanded(
         child: DropdownMenu<FontModel>(
-          label: Text(L10n.of(context).font),
+          label: Text(Localizations.localeOf(context).languageCode == 'zh'
+              ? '中文／正文字体'
+              : 'Chinese / body font'),
           expandedInsets: const EdgeInsets.only(left: 5),
           initialSelection: font,
           inputDecorationTheme: InputDecorationTheme(
@@ -223,6 +228,51 @@ class StyleWidgetState extends State<StyleWidget> {
     ]);
   }
 
+  Widget englishFontSelector() {
+    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final follow = FontModel(
+        label: zh ? '跟随正文字体' : 'Follow body font',
+        name: 'follow',
+        path: 'follow');
+    final choices = [follow, ...fonts().where((font) => font.name != 'book')];
+    final selected = Prefs().englishFont;
+    final current = choices.firstWhere(
+        (font) => selected != null && font.litePath == selected.litePath,
+        orElse: () => follow);
+    return DropdownMenu<FontModel>(
+      key: ValueKey('english-font-${current.litePath}'),
+      label: Text(zh ? '英文字体（字母、数字）' : 'English font (letters, numbers)'),
+      expandedInsets: EdgeInsets.zero,
+      initialSelection: current,
+      inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(50))),
+      dropdownMenuEntries: choices
+          .map((font) => DropdownMenuEntry(value: font, label: font.label))
+          .toList(),
+      onSelected: (font) async {
+        if (font == null) return;
+        final readerKey = widget.epubPlayerKey;
+        if (font.name == 'newFont') {
+          widget.hideAppBarAndBottomBar(false);
+          await importFont(
+              target: FontTarget.english,
+              onApplied: (imported) {
+                readerKey.currentState?.changeEnglishFont(imported);
+              });
+        } else if (font.name == 'download') {
+          widget.hideAppBarAndBottomBar(false);
+          await Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const FontsSettingPage()));
+        } else {
+          final selected = font.name == 'follow' ? null : font;
+          Prefs().englishFont = selected;
+          readerKey.currentState?.changeEnglishFont(selected);
+        }
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
   Padding sliders() {
     return Padding(
       padding: const EdgeInsets.all(3.0),
@@ -240,6 +290,7 @@ class StyleWidgetState extends State<StyleWidget> {
     return Row(
       children: [
         IconAndText(
+          flexibleHeight: true,
           icon: const Icon(Icons.line_weight),
           text: L10n.of(context).readingPageLineSpacing,
         ),
@@ -263,6 +314,7 @@ class StyleWidgetState extends State<StyleWidget> {
               label: (bookStyle.lineHeight / 3 * 10).round().toString()),
         ),
         IconAndText(
+          flexibleHeight: true,
           icon: const Icon(Icons.height),
           text: L10n.of(context).readingPageParagraphSpacing,
         ),
@@ -294,6 +346,7 @@ class StyleWidgetState extends State<StyleWidget> {
     return Row(
       children: [
         IconAndText(
+          flexibleHeight: true,
           icon: const Icon(Icons.format_size),
           text: L10n.of(context).readingPageFontSize,
         ),

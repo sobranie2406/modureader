@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/font_model.dart';
 import 'package:anx_reader/service/font.dart';
+import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,6 +106,48 @@ void main() {
           onApplied: (_) => applied = true);
       expect(result.font, isNull);
       expect(applied, isFalse);
+      expect(Prefs().prefs.getString('font'), previousFont);
+    }
+  });
+
+  test('English import applies independently and survives reopening', () async {
+    await Server().start();
+    addTearDown(() => Server().stop());
+    final item = await source('English.ttf', 'English Serif');
+    final applied = <FontModel>[];
+    final result = await importFontFiles([item],
+        directory: destination,
+        serverPort: 12345,
+        target: FontTarget.english,
+        onApplied: applied.add);
+    expect(result.failed, 0);
+    expect(applied.single.label, 'English Serif');
+    expect(Prefs().prefs.getString('font'), previousFont);
+    expect(Prefs().englishFont!.litePath, 'English.ttf');
+    await Prefs().initPrefs();
+    expect(Prefs().englishFont!.litePath, 'English.ttf');
+    await importFontFiles([await source('中文.ttf', '中文')],
+        directory: destination, serverPort: 12345);
+    expect(Prefs().englishFont!.litePath, 'English.ttf');
+    Prefs().englishFont = null;
+    expect(Prefs().englishFont, isNull);
+    expect(jsonDecode(Prefs().prefs.getString('font')!)['label'], '中文');
+  });
+
+  test('cancelled or failed English imports preserve both choices', () async {
+    final previousEnglish =
+        FontModel(label: 'English', name: 'system', path: 'system');
+    Prefs().englishFont = previousEnglish;
+    for (final files in <List<PlatformFile>>[
+      [],
+      [PlatformFile(name: 'missing.ttf', size: 0)],
+    ]) {
+      final result = await importFontFiles(files,
+          directory: destination,
+          serverPort: 12345,
+          target: FontTarget.english);
+      expect(result.font, isNull);
+      expect(Prefs().englishFont!.name, 'system');
       expect(Prefs().prefs.getString('font'), previousFont);
     }
   });

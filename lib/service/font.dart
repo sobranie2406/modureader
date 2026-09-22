@@ -12,7 +12,12 @@ import 'package:anx_reader/utils/toast/common.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:crypto/crypto.dart';
 
-Future<void> importFont({void Function(FontModel)? onApplied}) async {
+enum FontTarget { body, english }
+
+Future<void> importFont({
+  void Function(FontModel)? onApplied,
+  FontTarget target = FontTarget.body,
+}) async {
   FilePickerResult? result = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['ttf', 'otf'],
@@ -24,7 +29,10 @@ Future<void> importFont({void Function(FontModel)? onApplied}) async {
   }
 
   final imported = await importFontFiles(result.files,
-      directory: getFontDir(), serverPort: Server().port, onApplied: onApplied);
+      directory: getFontDir(),
+      serverPort: Server().port,
+      onApplied: onApplied,
+      target: target);
   final context = navigatorKey.currentContext;
   if (context != null && context.mounted) {
     final l10n = L10n.of(context);
@@ -50,6 +58,7 @@ Future<FontImportResult> importFontFiles(
   required Directory directory,
   required int serverPort,
   void Function(FontModel)? onApplied,
+  FontTarget target = FontTarget.body,
 }) async {
   FontModel? selected;
   var failed = 0;
@@ -92,7 +101,8 @@ Future<FontImportResult> importFontFiles(
   }
   if (selected != null) {
     final prefs = Prefs();
-    if (await prefs.prefs.setString('font', selected.toJson())) {
+    final key = target == FontTarget.english ? 'englishFont' : 'font';
+    if (await prefs.prefs.setString(key, selected.toJson())) {
       prefs.notifyExternalChange();
       onApplied?.call(selected);
     } else {

@@ -9,6 +9,7 @@ import { TtsNavigator } from './tts-navigation.js'
 import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
 import { readerSelectionCSS } from './selection-style.js'
+import { readerFontCSS } from './reader-fonts.js'
 import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
 import { Overlayer } from './overlayer.js'
@@ -640,6 +641,8 @@ const getView = async file => {
 const getCSS = ({ fontSize,
   fontName,
   fontPath,
+  englishFontName,
+  englishFontPath,
   fontWeight,
   letterSpacing,
   spacing,
@@ -660,9 +663,9 @@ const getCSS = ({ fontSize,
   codeHighlightTheme
 }) => {
 
-  const fontFamily = fontName === 'book' ? '' :
-    fontName === 'system' ? 'font-family: system-ui !important;' :
-      `font-family: ${fontName} !important;`
+  const { faces: fontFaces, family: fontFamily } = readerFontCSS({
+    fontName, fontPath, englishFontName, englishFontPath,
+  })
 
   const writingModeCSS = writingMode === 'auto' ? '' : `writing-mode: ${writingMode} !important;`
 
@@ -674,11 +677,7 @@ const getCSS = ({ fontSize,
   // Some CSS selectors are inspired by https://github.com/readest/foliate-js
   return `
     @namespace epub "http://www.idpf.org/2007/ops";
-    @font-face {
-      font-family: ${fontName};
-      src: url('${fontPath}');
-      font-display: block;
-    }
+    ${fontFaces}
 
     ${readerSelectionCSS({ pdf: isPdf })}
 
@@ -1008,6 +1007,8 @@ const replaceFootnote = (view, sourceFontSize) => {
     fontSize: footnoteFontSize(style.fontSize),
     fontName: style.fontName,
     fontPath: style.fontPath,
+    englishFontName: style.englishFontName,
+    englishFontPath: style.englishFontPath,
     letterSpacing: style.letterSpacing,
     spacing: style.spacing,
     textIndent: style.textIndent,
@@ -1810,6 +1811,8 @@ const setStyle = (oldStyle) => {
     fontSize: style.fontSize,
     fontName: style.fontName,
     fontPath: style.fontPath,
+    englishFontName: style.englishFontName,
+    englishFontPath: style.englishFontPath,
     fontWeight: style.fontWeight,
     letterSpacing: style.letterSpacing,
     spacing: style.spacing,

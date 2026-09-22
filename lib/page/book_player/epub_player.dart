@@ -377,6 +377,15 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     ''');
   }
 
+  void changeEnglishFont(FontModel? font) {
+    webViewController.evaluateJavascript(source: '''
+      changeStyle({
+        englishFontName: ${jsonEncode(font?.name)},
+        englishFontPath: ${jsonEncode(font?.path)},
+      })
+    ''');
+  }
+
   void changePageTurnStyle(PageTurn pageTurnStyle) {
     webViewController.evaluateJavascript(source: '''
       changeStyle({

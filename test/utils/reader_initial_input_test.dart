@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:anx_reader/models/font_model.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/utils/webView/gererate_url.dart';
@@ -60,5 +61,21 @@ void main() {
       expect(style['pageTurnStyle'], savedStyle.name);
       expect(Prefs().pageTurnStyle, savedStyle);
     }
+  });
+
+  test('independent English face is included on first open and can follow body',
+      () {
+    Map<String, dynamic> style() =>
+        jsonDecode(Uri.parse(generateUrl('https://example.test/book.epub', '',
+                fontName: 'body', fontPath: '/body.ttf'))
+            .queryParameters['style']!);
+    expect(style()['englishFontName'], isNull);
+    Prefs().englishFont =
+        FontModel(label: 'Latin', name: 'latin', path: 'latin.ttf');
+    expect(style()['englishFontName'], 'latin');
+    expect(style()['englishFontPath'], contains('latin.ttf'));
+    expect(style()['fontName'], 'body');
+    Prefs().englishFont = null;
+    expect(style()['englishFontName'], isNull);
   });
 }

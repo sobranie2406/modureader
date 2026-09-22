@@ -4,6 +4,7 @@
 
 ## 本次修复
 
+- **中英文独立字体**：阅读样式新增英文字体选择，默认跟随正文；可单独导入并应用 TTF/OTF。使用字符范围区分拉丁字母、数字与汉字、中文标点，兼容横排、竖排和注释。仅覆盖英文时保留书籍自身的中文字体，不拆分文字节点，不改变批注定位。固定版式 PDF 不重排字体。
 - **8 套自定义 CSS 方案**：支持独立命名、编辑和切换，可分别保存竖排、横排、精排等样式。每本书在本机记住自己的选择，也可跟随默认或把当前方案设为默认。旧 CSS 自动保留在第一套；切换方案前保存当前编辑。方案共享，修改会影响使用该方案的书籍；选择方案不自动改变阅读方向。
 - **更新检查自动切换镜像**：仍优先 GitHub；DNS/连接失败、连接重置、超时、TLS 握手或证书失败，以及任意 HTTP 请求错误（包括 401、403、404、407、429、5xx）均自动尝试 Gitee。不再因 GitHub 返回普通 403 而停留在“服务器限制请求”。
 - **安装包下载同样回退**：GitHub 下载遇到上述错误时，清理部分文件，从 Gitee 重新下载同版本、同架构安装包。两站使用同一次构建的原始文件。
@@ -42,6 +43,8 @@ Gitee 仅存放安装包、说明与更新清单，不上传应用源码。每�
 ## English
 
 Modu **1.1.3 (build 10036)** adds eight named, editable CSS profiles with per-book choices on this device, a shared default and automatic preservation of legacy CSS in the first slot. Editing a shared profile affects books using it; choosing a profile does not automatically change reading direction. Users on build 10035 should manually upgrade in place because existing clients do not notify about build-only updates.
+
+Chinese/body and English fonts can now be selected separately. English follows the body face by default; independent imports affect only English. Unicode ranges retain Chinese glyphs and punctuation, including publisher faces, in horizontal/vertical reflowable text and footnotes. No text-node splitting is used, preserving selection and annotation anchors. Fixed-layout PDFs are not re-typeset.
 
 This release also fixes GitHub-to-Gitee update fallback. Checks and downloads still prefer GitHub, but any network, timeout, TLS or HTTP request failure now tries the official Gitee mirror, including ordinary HTTP 403/404 responses. Downloads restart cleanly against the same version, architecture, size and SHA-256.
 

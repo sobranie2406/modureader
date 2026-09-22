@@ -69,6 +69,10 @@ Android library data migrates to `Android/data/com.modu.reader/files` with verif
 
 Downloaded embedding models can be deleted in settings unless protected by an active task. Large local indexes use streaming reads with a 1 GiB file limit; practical capacity still depends on available RAM.
 
+### Separate Chinese and English fonts
+
+Reader styles offer separate Chinese/body and English (letters/numbers) fonts. English follows the body font by default; an independent face covers Latin letters, digits and western punctuation while Chinese text and punctuation retain the body face. This works in reflowable horizontal/vertical text and footnotes. Importing TTF/OTF from the English selector applies it only to English. Fixed-layout books such as PDFs are not re-typeset.
+
 ### Custom CSS profiles
 
 Reader styles → More settings → Style offers eight named CSS profiles for vertical, horizontal or publisher-specific layouts. Switching saves current edits; enabling applies the selected profile. Each book remembers its profile and enabled state on this device, with Follow default and Set as default controls. Editing a shared profile affects books using it. Existing CSS stays in profile 1; other slots start empty. Profiles do not automatically change the reader's writing direction. For publisher layouts, retain book styles and disable custom CSS for that book. Profiles are included in settings backups; per-book choices remain local.
