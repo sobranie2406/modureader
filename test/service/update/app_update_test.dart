@@ -327,7 +327,21 @@ void main() {
           isTrue);
       expect(adapter.requests.first.uri.toString(), moduReleaseApi);
     }
-    for (final status in [400, 401, 403, 404, 407, 408, 410, 429, 451, 500, 502, 503, 504]) {
+    for (final status in [
+      400,
+      401,
+      403,
+      404,
+      407,
+      408,
+      410,
+      429,
+      451,
+      500,
+      502,
+      503,
+      504
+    ]) {
       final adapter = Adapter((o) => o.uri.host == 'api.github.com'
           ? ResponseBody.fromString('unavailable', status)
           : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
@@ -338,15 +352,21 @@ void main() {
     }
   });
 
-  test('GitHub 403 rate limits fall back to verified mirror metadata', () async {
+  test('GitHub 403 rate limits fall back to verified mirror metadata',
+      () async {
     for (final headers in [
-      {'x-ratelimit-remaining': ['0']},
-      {'retry-after': ['60']},
+      {
+        'x-ratelimit-remaining': ['0']
+      },
+      {
+        'retry-after': ['60']
+      },
     ]) {
       final adapter = Adapter((o) => o.uri.host == 'api.github.com'
           ? ResponseBody.fromString('rate limited', 403, headers: headers)
           : ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
-      final result = await transport(adapter).latest('android', 'android_arm64');
+      final result =
+          await transport(adapter).latest('android', 'android_arm64');
       expect(result.fromMirror, isTrue);
       expect(result.asset!.digest, asset.digest);
       expect(adapter.requests.map((r) => r.uri.toString()),
@@ -354,15 +374,21 @@ void main() {
     }
   });
 
-  test('TLS and unspecified transport failures fall back for check and download', () async {
+  test(
+      'TLS and unspecified transport failures fall back for check and download',
+      () async {
     for (final error in [
       const HandshakeException('TLS handshake failed'),
       const TlsException('TLS failed'),
       DioException(requestOptions: RequestOptions()),
-      DioException(requestOptions: RequestOptions(), type: DioExceptionType.badCertificate),
+      DioException(
+          requestOptions: RequestOptions(),
+          type: DioExceptionType.badCertificate),
     ]) {
       final adapter = Adapter((o) {
-        if (o.uri.host == 'api.github.com' || o.uri.host == 'github.com') throw error;
+        if (o.uri.host == 'api.github.com' || o.uri.host == 'github.com') {
+          throw error;
+        }
         return o.uri.path.endsWith('.json')
             ? ResponseBody.fromString(jsonEncode(mirrorJson()), 200)
             : ResponseBody.fromBytes(payload, 200);
@@ -370,15 +396,21 @@ void main() {
       final t = transport(adapter);
       final release = await t.latest('android', 'android_arm64');
       expect(release.fromMirror, isTrue);
-      final file = await t.download(release.asset!, directory, CancelToken(), (_, __) {});
+      final file = await t.download(
+          release.asset!, directory, CancelToken(), (_, __) {});
       expect(await file.readAsBytes(), payload);
-      expect(adapter.requests.map((r) => r.uri.toString()),
-          [moduReleaseApi, moduMirrorManifest, release.asset!.url, release.asset!.mirrorUrl]);
+      expect(adapter.requests.map((r) => r.uri.toString()), [
+        moduReleaseApi,
+        moduMirrorManifest,
+        release.asset!.url,
+        release.asset!.mirrorUrl
+      ]);
       await file.delete();
     }
   });
 
-  test('rate-limit fallback still rejects an invalid mirror manifest', () async {
+  test('rate-limit fallback still rejects an invalid mirror manifest',
+      () async {
     final adapter = Adapter((o) => o.uri.host == 'api.github.com'
         ? ResponseBody.fromString('rate limited', 403, headers: {
             'x-ratelimit-remaining': ['0']
@@ -410,9 +442,7 @@ void main() {
     expect(adapter.requests.length, 1);
   });
 
-  test(
-      'cancellation and programming errors do not fall back',
-      () async {
+  test('cancellation and programming errors do not fall back', () async {
     for (final type in [
       DioExceptionType.cancel,
     ]) {
@@ -423,8 +453,8 @@ void main() {
       expect(adapter.requests.length, 1);
     }
     for (final error in [StateError('bug'), const FormatException('invalid')]) {
-      final adapter = Adapter((o) => throw DioException(requestOptions: o,
-          type: DioExceptionType.unknown, error: error));
+      final adapter = Adapter((o) => throw DioException(
+          requestOptions: o, type: DioExceptionType.unknown, error: error));
       await expectLater(transport(adapter).latest('android', 'android_arm64'),
           throwsA(isA<DioException>()));
       expect(adapter.requests.length, 1);
@@ -792,8 +822,11 @@ void main() {
     t.response = () async => throw DioException(
         requestOptions: RequestOptions(),
         response: Response(
-            requestOptions: RequestOptions(), statusCode: 403,
-            headers: Headers.fromMap({'x-ratelimit-remaining': ['0']})));
+            requestOptions: RequestOptions(),
+            statusCode: 403,
+            headers: Headers.fromMap({
+              'x-ratelimit-remaining': ['0']
+            })));
     await c.check();
     expect(c.error, 'rate_limit');
     t.response = () async => parse({...releaseJson(), 'tag_name': 'v1.0.7'});
@@ -807,6 +840,7 @@ void main() {
     final t = ControlledTransport();
     final c = AppUpdateController(
         transport: t,
+        platform: 'android',
         installedVersion: () async => '1.0.8',
         directory: () async => directory);
     await c.check();
@@ -829,5 +863,129 @@ void main() {
     expect(c.phase, UpdatePhase.error);
     expect(c.error, 'integrity');
     expect(c.downloaded, isNull);
+  });
+
+  final macAsset = UpdateAsset(
+      'Modu-1.1.3-macos-arm64.dmg',
+      '$moduReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg',
+      payload.length,
+      sha256.convert(payload).toString(),
+      mirrorUrl:
+          '$moduMirrorReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg');
+
+  test('browser handoff probes CDN, cancels body and returns stable GitHub URL',
+      () async {
+    var cancelled = false;
+    final body = StreamController<Uint8List>(onCancel: () => cancelled = true);
+    addTearDown(body.close);
+    final adapter = Adapter((o) => o.uri.host == 'github.com'
+        ? ResponseBody.fromString('', 302, headers: {
+            'location': ['https://release-assets.githubusercontent.com/signed']
+          })
+        : ResponseBody(body.stream, 200));
+    expect(await transport(adapter).browserDownloadUrl(macAsset),
+        Uri.parse(macAsset.url));
+    // Dio forwards cancellation to the adapter's body asynchronously.
+    await Future<void>.delayed(Duration.zero);
+    expect(cancelled, isTrue);
+    expect(adapter.requests.length, 2);
+    expect(await directory.list().toList(), isEmpty);
+  });
+
+  for (final status in [401, 403, 404, 429, 500, 503]) {
+    test('browser download falls back on HTTP $status without saving a file',
+        () async {
+      final adapter = Adapter((o) => o.uri.host == 'github.com'
+          ? ResponseBody.fromString('unavailable', status)
+          : ResponseBody.fromBytes(payload, 200));
+      expect(await transport(adapter).browserDownloadUrl(macAsset),
+          Uri.parse(macAsset.mirrorUrl!));
+      expect(adapter.requests.map((o) => o.uri.toString()),
+          [macAsset.url, macAsset.mirrorUrl]);
+      expect(await directory.list().toList(), isEmpty);
+    });
+  }
+
+  test('browser download bounds probe time and falls back to Gitee', () async {
+    final gate = Completer<ResponseBody>();
+    final adapter = Adapter((o) => o.uri.host == 'github.com'
+        ? gate.future
+        : ResponseBody.fromBytes(payload, 200));
+    final t = UpdateTransport(
+        dio: Dio()..httpClientAdapter = adapter,
+        githubCheckTimeout: const Duration(milliseconds: 20));
+    expect(
+        await t.browserDownloadUrl(macAsset), Uri.parse(macAsset.mirrorUrl!));
+    gate.complete(ResponseBody.fromString('', 200));
+    expect(adapter.requests.length, 2);
+  });
+
+  test('browser handoff rejects unsafe redirects instead of masking them',
+      () async {
+    final adapter = Adapter((o) => ResponseBody.fromString('', 302, headers: {
+          'location': ['https://evil.test/installer.dmg']
+        }));
+    await expectLater(
+        transport(adapter).browserDownloadUrl(macAsset), throwsFormatException);
+    expect(adapter.requests.length, 1);
+  });
+
+  test('explicit mirror retry skips GitHub, including its timeout', () async {
+    final adapter = Adapter((o) => ResponseBody.fromBytes(payload, 200));
+    expect(
+        await transport(adapter).browserDownloadUrl(macAsset, mirrorOnly: true),
+        Uri.parse(macAsset.mirrorUrl!));
+    expect(adapter.requests.single.uri.toString(), macAsset.mirrorUrl);
+  });
+
+  test('macOS cannot download or install old sandbox cache via controller',
+      () async {
+    final t = ControlledTransport()
+      ..response = () async => UpdateRelease('1.1.3', '', macAsset);
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'macos',
+        installedVersion: () async => '1.1.2',
+        directory: () async => throw StateError('must not access disk'));
+    addTearDown(c.dispose);
+    await c.check();
+    await c.download();
+    expect(t.downloads, 0);
+    expect(c.error, 'browser_required');
+    c.downloaded = File('/synthetic/quarantined.dmg');
+    await c.install((_) async => throw StateError('must not open old cache'));
+    expect(c.error, 'browser_required');
+    await c.check();
+    expect(c.downloaded, isNull);
+    expect(c.phase, UpdatePhase.available);
+  });
+
+  test('browser open failure is retryable; success never means downloaded',
+      () async {
+    final adapter = Adapter((o) => ResponseBody.fromBytes(payload, 200));
+    final c =
+        AppUpdateController(platform: 'macos', transport: transport(adapter))
+          ..currentVersion = '1.1.2'
+          ..release = UpdateRelease('1.1.3', '', macAsset);
+    addTearDown(c.dispose);
+    await c.openBrowserDownload((_) async => false);
+    expect(c.error, 'browser_open_failed');
+    expect(c.phase, UpdatePhase.error);
+    final gate = Completer<bool>();
+    final opened = <Uri>[];
+    final pending = c.openBrowserDownload((url) {
+      opened.add(url);
+      return gate.future;
+    });
+    await c.openBrowserDownload((_) async => throw StateError('duplicate'));
+    expect(c.busy, isTrue);
+    gate.complete(true);
+    await pending;
+    expect(opened, [Uri.parse(macAsset.url)]);
+    expect(c.phase, UpdatePhase.available);
+    expect(c.error, 'browser_github_opened');
+    expect(c.downloaded, isNull);
+    await c.openBrowserDownload((_) async => true, mirrorOnly: true);
+    expect(c.error, 'browser_gitee_opened');
   });
 }

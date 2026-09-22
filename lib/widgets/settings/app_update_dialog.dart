@@ -14,12 +14,27 @@ Future<void> showAppUpdateDialog(BuildContext context,
             controller: controller ?? AppUpdateController.instance));
 
 class AppUpdateDialog extends StatelessWidget {
-  const AppUpdateDialog({super.key, required this.controller});
+  const AppUpdateDialog(
+      {super.key, required this.controller, this.openBrowser});
   final AppUpdateController controller;
+  final Future<bool> Function(Uri)? openBrowser;
+  Future<bool> _launchBrowser(Uri url) => openBrowser != null
+      ? openBrowser!(url)
+      : launchUrl(url, mode: LaunchMode.externalApplication);
   String _text(BuildContext c, String zh, String en) =>
       Localizations.localeOf(c).languageCode == 'zh' ? zh : en;
 
   String _message(BuildContext c, String code) => switch (code) {
+        'browser_required' => _text(c, '请通过浏览器重新下载 DMG，不要使用旧的应用内下载缓存。',
+            'Download the DMG again in your browser; do not reuse an old in-app download.'),
+        'browser_open_failed' => _text(c, '无法打开默认浏览器，请重试或手动访问官方发布页。',
+            'Could not open the default browser. Retry or visit the official release page.'),
+        'browser_github_opened' => _text(
+            c,
+            '已将 GitHub 下载链接交给浏览器，请在浏览器中查看下载；若失败，可点击“改用 Gitee 下载”。',
+            'GitHub download opened in your browser. Check the download there; if it fails, use Download from Gitee.'),
+        'browser_gitee_opened' => _text(c, '已将 Gitee 下载链接交给浏览器，请在浏览器中查看下载。',
+            'Gitee download opened in your browser. Check the download there.'),
         'integrity' => _text(c, '发布信息或安装包校验失败，已阻止安装。请重新检查并下载。',
             'Release or installer verification failed. Installation blocked; check and download again.'),
         'rate_limit' => _text(c, '更新服务器暂时限制请求，请稍后重试。',
@@ -45,8 +60,10 @@ class AppUpdateDialog extends StatelessWidget {
   String _instructions(BuildContext c) => switch (controller.platform) {
         'android' => _text(c, '安装需要系统确认；首次使用可能需要允许安装此来源的应用。不会卸载旧版或删除书库。',
             'Installation requires system confirmation and possibly permission for this source. Your existing app and library will not be uninstalled.'),
-        'macos' => _text(c, '打开 DMG 后，退出默读，再将新应用拖入“应用程序”替换旧版。当前发行包未经 Apple 公证。',
-            'Open the DMG, quit Modu, and drag the new app into Applications to replace it. Current packages are not Apple-notarized.'),
+        'macos' => _text(
+            c,
+            '使用默认浏览器下载 DMG，避免应用内下载触发 macOS 沙盒隔离。不要使用旧的应用内下载缓存。下载后打开 DMG，退出默读，再将新应用拖入“应用程序”替换旧版，书库数据不变。当前发行包未经 Apple 公证。',
+            'Download the DMG using your default browser to avoid macOS sandbox quarantine. Do not reuse an old in-app download. Open the DMG, quit Modu, and drag the new app into Applications to replace it; your library is preserved. Current packages are not Apple-notarized.'),
         'windows' => _text(c, '打开安装程序后按系统提示覆盖安装；如提示应用正在运行，请先完成同步并退出默读。',
             'Follow the installer to update. If prompted, finish syncing and quit Modu first.'),
         'linux' => _text(
@@ -92,11 +109,6 @@ class AppUpdateDialog extends StatelessWidget {
               .invokeMethod<String>('install', {'path': file.path});
         case 'windows':
           await Process.start(file.path, [], mode: ProcessStartMode.detached);
-        case 'macos':
-          if (!await launchUrl(Uri.file(file.path),
-              mode: LaunchMode.externalApplication)) {
-            throw PlatformException(code: 'OPEN_FAILED');
-          }
         case 'linux':
           final result = await Process.run('xdg-open', [file.path]);
           if (result.exitCode != 0) {
@@ -118,7 +130,10 @@ class AppUpdateDialog extends StatelessWidget {
         animation: controller,
         builder: (context, _) {
           final c = controller;
-          final phase = c.phase;
+          final browserDownload = c.usesBrowserDownload;
+          final phase = browserDownload && c.phase == UpdatePhase.ready
+              ? UpdatePhase.available
+              : c.phase;
           final storeBuild =
               EnvVar.isStoreBuild || EnvVar.isFdroid || EnvVar.isOhosStore;
           final status = switch (phase) {
@@ -138,6 +153,8 @@ class AppUpdateDialog extends StatelessWidget {
                 context, '下载完成，SHA-256 校验通过', 'Downloaded; SHA-256 verified'),
             UpdatePhase.installing =>
               _text(context, '正在复核并打开安装包…', 'Verifying and opening installer…'),
+            UpdatePhase.openingBrowser => _text(context, '正在检查下载地址并打开浏览器…',
+                'Checking download availability and opening browser…'),
             UpdatePhase.error =>
               _text(context, '更新未完成', 'Update could not complete'),
           };
@@ -192,7 +209,7 @@ class AppUpdateDialog extends StatelessWidget {
                         ? _text(context, '商店版本请通过原应用商店更新，不进行侧载安装。',
                             'Update store builds through their original store, not sideloading.')
                         : _instructions(context)),
-                    if (c.downloaded != null)
+                    if (!browserDownload && c.downloaded != null)
                       Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: SelectableText(c.downloaded!.path,
@@ -204,10 +221,15 @@ class AppUpdateDialog extends StatelessWidget {
                       ),
                     const SizedBox(height: 8),
                     Text(
-                        _text(
-                            context,
-                            '优先通过 GitHub 检查更新和下载安装包，仅在连接失败、超时或服务不可用时改用 Gitee。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
-                            'Checks GitHub first and downloads from GitHub first; uses Gitee only if the connection fails, times out or the service is unavailable. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
+                        browserDownload
+                            ? _text(
+                                context,
+                                '优先检查 GitHub 下载地址，连接失败、超时或服务不可用时改用 Gitee。下载由浏览器完成，默读无法监测其后续进度，也不会显示下载完成或 SHA-256 校验通过。浏览器下载失败时可手动改用 Gitee。不发送书籍、笔记或账号密钥。',
+                                'Checks the GitHub download first; falls back to Gitee if unavailable or timed out. Your browser handles the download; Modu cannot monitor its progress or verify the downloaded file. If the browser download fails, you can switch to Gitee. No books, notes or account keys are sent.')
+                            : _text(
+                                context,
+                                '优先通过 GitHub 检查更新和下载安装包，仅在连接失败、超时或服务不可用时改用 Gitee。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
+                                'Checks GitHub first and downloads from GitHub first; uses Gitee only if the connection fails, times out or the service is unavailable. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
                         style: Theme.of(context).textTheme.bodySmall),
                     if (phase == UpdatePhase.downloading)
                       Text(_text(context, '关闭此窗口后下载继续，可从“关于默读”返回查看或取消。',
@@ -242,12 +264,35 @@ class AppUpdateDialog extends StatelessWidget {
                       if (!storeBuild &&
                           c.newer &&
                           c.release?.asset != null &&
+                          browserDownload) ...[
+                        FilledButton(
+                            onPressed: c.busy
+                                ? null
+                                : () => c.openBrowserDownload(_launchBrowser),
+                            child: Text(_text(
+                                context, '浏览器下载更新', 'Download in browser'))),
+                        if (c.release!.asset!.mirrorUrl != null)
+                          OutlinedButton(
+                              onPressed: c.busy
+                                  ? null
+                                  : () => c.openBrowserDownload(_launchBrowser,
+                                      mirrorOnly: true),
+                              child: Text(_text(context, '改用 Gitee 下载',
+                                  'Download from Gitee'))),
+                      ],
+                      if (!storeBuild &&
+                          !browserDownload &&
+                          c.newer &&
+                          c.release?.asset != null &&
                           c.downloaded == null)
                         FilledButton(
                             onPressed: c.busy ? null : c.download,
                             child: Text(
                                 _text(context, '下载更新', 'Download update'))),
-                      if (!storeBuild && c.newer && c.downloaded != null)
+                      if (!storeBuild &&
+                          !browserDownload &&
+                          c.newer &&
+                          c.downloaded != null)
                         FilledButton(
                             onPressed: c.busy ? null : () => _install(context),
                             child: Text(c.platform == 'ios'

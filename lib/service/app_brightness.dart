@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Device-local brightness. Android uses a window override; other platforms
-/// dim only the app's rendered content, never the system display setting.
+/// Device-local brightness. Android uses a window override; macOS uses an
+/// input-transparent native dimmer so Flutter does not obscure WKWebView input.
 class AppBrightness extends ChangeNotifier {
-  AppBrightness({bool? nativeWindow})
+  AppBrightness({bool? nativeWindow, bool? nativeDimming})
       : _nativeWindow = nativeWindow ??
-            (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.android),
+        _nativeDimming = nativeDimming ??
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS);
 
   static final instance = AppBrightness();
   static const levelKey = 'appBrightnessLevel';
@@ -18,6 +20,7 @@ class AppBrightness extends ChangeNotifier {
   static const minimum = 0.2;
 
   final bool _nativeWindow;
+  final bool _nativeDimming;
   SharedPreferences? _prefs;
   bool _nativeFailed = false;
   bool _followSystem = true;
@@ -27,8 +30,11 @@ class AppBrightness extends ChangeNotifier {
   bool get followSystem => _followSystem;
   double get level => _level;
   bool get usesWindowBrightness => _nativeWindow && !_nativeFailed;
+  // Never fall back to Flutter painting on macOS: that blocks native input.
+  bool get paintsFlutterDimming => !_nativeDimming;
+  bool get nativeDimmingUnavailable => _nativeDimming && _nativeFailed;
   double get dimOpacity =>
-      _followSystem || usesWindowBrightness ? 0 : 1 - _level;
+      _followSystem || usesWindowBrightness || _nativeDimming ? 0 : 1 - _level;
 
   Future<void> initialize(SharedPreferences prefs) async {
     _prefs = prefs;
@@ -68,7 +74,7 @@ class AppBrightness extends ChangeNotifier {
   }
 
   Future<void> _apply() async {
-    if (!_nativeWindow) return;
+    if (!_nativeWindow && !_nativeDimming) return;
     final revision = ++_revision;
     try {
       await channel.invokeMethod<void>('setBrightness', {

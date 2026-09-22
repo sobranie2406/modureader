@@ -4,6 +4,8 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var configTransferChannel: FlutterMethodChannel?
+  private var brightnessChannel: FlutterMethodChannel?
+  private var brightness: WindowBrightness?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -13,8 +15,40 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerConfigTransferChannel(flutterViewController)
+    registerBrightnessChannel(flutterViewController)
 
     super.awakeFromNib()
+  }
+
+  private func registerBrightnessChannel(_ controller: FlutterViewController) {
+    brightness = WindowBrightness(window: self)
+    let channel = FlutterMethodChannel(
+      name: "com.modu.reader/brightness",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "setBrightness" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let self, let brightness = self.brightness else {
+        result(FlutterError(code: "UNAVAILABLE", message: "Window is unavailable", details: nil))
+        return
+      }
+      guard let args = call.arguments as? [String: Any] else {
+        result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing brightness", details: nil))
+        return
+      }
+      let raw = args["brightness"]
+      let value = raw as? Double
+      if raw != nil && !(raw is NSNull) && (value == nil || !value!.isFinite) {
+        result(FlutterError(code: "INVALID_ARGUMENT", message: "Invalid brightness", details: nil))
+        return
+      }
+      brightness.setBrightness(value)
+      result(nil)
+    }
+    brightnessChannel = channel
   }
 
   private func registerConfigTransferChannel(_ controller: FlutterViewController) {

@@ -5,8 +5,9 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:flutter/material.dart';
 
-/// Wraps the navigator and dialogs, but never intercepts their input. Keeping
-/// [child] outside the listener avoids rebuilding the reader while dragging.
+/// macOS must not paint over native WebViews, even with IgnorePointer: Flutter's
+/// platform-view compositor excludes painted regions from native hit testing.
+/// Other platforms keep [child] outside the listener while dragging.
 class AppBrightnessLayer extends StatelessWidget {
   const AppBrightnessLayer(
       {super.key, required this.child, required this.controller});
@@ -15,25 +16,28 @@ class AppBrightnessLayer extends StatelessWidget {
   final AppBrightness controller;
 
   @override
-  Widget build(BuildContext context) => Stack(
-        fit: StackFit.expand,
-        children: [
-          child,
-          Positioned.fill(
-            child: IgnorePointer(
-              child: ExcludeSemantics(
-                child: ListenableBuilder(
-                  listenable: controller,
-                  builder: (_, __) => ColoredBox(
-                    color:
-                        Colors.black.withValues(alpha: controller.dimOpacity),
+  Widget build(BuildContext context) => !controller.paintsFlutterDimming
+      ? child
+      : Stack(
+          fit: StackFit.expand,
+          children: [
+            child,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: ListenableBuilder(
+                    listenable: controller,
+                    builder: (_, __) => ColoredBox(
+                      key: const ValueKey('app-flutter-brightness-dimmer'),
+                      color:
+                          Colors.black.withValues(alpha: controller.dimOpacity),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      );
+          ],
+        );
 }
 
 class BrightnessWidget extends StatelessWidget {
@@ -102,9 +106,13 @@ class BrightnessWidget extends StatelessWidget {
               style: Theme.of(context).textTheme.labelSmall,
             ),
             Text(
-              controller.usesWindowBrightness
-                  ? l10n.readingBrightnessWindowHint
-                  : l10n.readingBrightnessDimHint,
+              controller.nativeDimmingUnavailable
+                  ? (Localizations.localeOf(context).languageCode == 'zh'
+                      ? '亮度调节暂不可用，已保留系统亮度以确保阅读操作正常。'
+                      : 'Brightness adjustment is unavailable. System brightness is preserved so reader input remains usable.')
+                  : controller.usesWindowBrightness
+                      ? l10n.readingBrightnessWindowHint
+                      : l10n.readingBrightnessDimHint,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

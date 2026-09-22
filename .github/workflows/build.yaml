@@ -166,6 +166,11 @@ jobs:
         run: |
           swiftc third_party/modu_native_crash/darwin/Classes/NativeCrashSummary.swift test/native/AppleCrashSummaryTest.swift -o "$RUNNER_TEMP/modu-crash-summary-test"
           "$RUNNER_TEMP/modu-crash-summary-test"
+      - name: Verify macOS brightness preserves native input
+        if: matrix.platform == 'macos'
+        run: |
+          swiftc macos/Runner/WindowBrightness.swift test/native/WindowBrightnessTest.swift -o "$RUNNER_TEMP/modu-brightness-test"
+          "$RUNNER_TEMP/modu-brightness-test"
       - name: Verify Windows native crash capture in isolated CI account
         if: matrix.platform == 'windows'
         shell: pwsh

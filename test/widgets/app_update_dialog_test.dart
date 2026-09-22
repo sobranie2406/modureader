@@ -8,6 +8,14 @@ class FakeTransport extends UpdateTransport {
   UpdateRelease value = const UpdateRelease('1.0.9', 'Changes',
       UpdateAsset('Modu-1.0.9-android-arm64.apk', '', 200, 'test'));
   bool offline = false;
+  final browserRequests = <bool>[];
+  @override
+  Future<Uri> browserDownloadUrl(UpdateAsset asset,
+      {bool mirrorOnly = false}) async {
+    browserRequests.add(mirrorOnly);
+    return Uri.parse(mirrorOnly ? asset.mirrorUrl! : asset.url);
+  }
+
   @override
   Future<UpdateRelease> latest(String platform, String abi) async {
     if (offline) throw const SocketException('offline');
@@ -16,11 +24,13 @@ class FakeTransport extends UpdateTransport {
 }
 
 void main() {
-  Future<void> show(WidgetTester tester, AppUpdateController c) async {
+  Future<void> show(WidgetTester tester, AppUpdateController c,
+      {Future<bool> Function(Uri)? openBrowser}) async {
     await tester.binding.setSurfaceSize(const Size(600, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: AppUpdateDialog(controller: c))));
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: AppUpdateDialog(controller: c, openBrowser: openBrowser))));
     await tester.pumpAndSettle();
   }
 
@@ -51,7 +61,9 @@ void main() {
     t.value = UpdateRelease(t.value.version, t.value.notes, t.value.asset,
         fromMirror: true);
     final c = AppUpdateController(
-        transport: t, installedVersion: () async => '1.0.8');
+        transport: t,
+        platform: 'android',
+        installedVersion: () async => '1.0.8');
     await c.check();
     await show(tester, c);
     expect(find.text('Release information source: Gitee'), findsOneWidget);
@@ -120,5 +132,50 @@ void main() {
     expect(find.text('Export IPA'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
     expect(find.textContaining('iOS cannot install'), findsOneWidget);
+  });
+
+  testWidgets(
+      'macOS uses browser and offers manual mirror, never cached install',
+      (tester) async {
+    final t = FakeTransport()
+      ..value = const UpdateRelease(
+          '1.1.3',
+          '',
+          UpdateAsset(
+              'Modu-1.1.3-macos-arm64.dmg',
+              '$moduReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg',
+              200,
+              'test',
+              mirrorUrl:
+                  '$moduMirrorReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg'));
+    final c = AppUpdateController(
+        transport: t, platform: 'macos', installedVersion: () async => '1.1.2');
+    addTearDown(c.dispose);
+    await c.check();
+    c.downloaded = File('/synthetic/quarantined.dmg');
+    c.phase = UpdatePhase.ready;
+    final opened = <Uri>[];
+    await show(tester, c, openBrowser: (uri) async {
+      opened.add(uri);
+      return true;
+    });
+    expect(find.text('Download update'), findsNothing);
+    expect(find.text('Install update'), findsNothing);
+    expect(find.text('/synthetic/quarantined.dmg'), findsNothing);
+    expect(find.text('Downloaded; SHA-256 verified'), findsNothing);
+    expect(find.textContaining('cannot monitor its progress'), findsOneWidget);
+    await tester.ensureVisible(find.text('Download in browser'));
+    await tester.tap(find.text('Download in browser'));
+    await tester.pumpAndSettle();
+    expect(opened.single.toString(), t.value.asset!.url);
+    expect(find.textContaining('GitHub download opened'), findsOneWidget);
+    expect(c.downloaded, isNull);
+    await tester.ensureVisible(find.text('Download from Gitee'));
+    await tester.tap(find.text('Download from Gitee'));
+    await tester.pumpAndSettle();
+    expect(opened.last.toString(), t.value.asset!.mirrorUrl);
+    expect(t.browserRequests, [false, true]);
+    expect(find.textContaining('Gitee download opened'), findsOneWidget);
+    expect(find.text('Install update'), findsNothing);
   });
 }

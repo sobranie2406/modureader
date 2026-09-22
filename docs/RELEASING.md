@@ -25,6 +25,10 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 - Android：安装对应 ABI 的 `.apk`，更新时沿用同一专用签名。
 - iOS：下载 `.ipa`，需自行合法签名后安装，详见下节。文件名不含签名状态后缀，实际签名状态仍以 Release 说明为准。
 
+macOS 应用内仍自动检查新版本，但安装包交由默认浏览器下载，不再写入应用沙盒缓存。下载按钮先检查 GitHub 安装包地址及重定向，连接失败、超时或服务不可用时改用 Gitee；浏览器接手后的下载状态无法由应用监测，因此另提供“改用 Gitee 下载”按钮，不显示“下载完成”或“SHA-256 校验通过”。其他平台维持原有应用内下载与校验流程。
+
+若旧版应用内更新后出现“应用程序 Modu 无法打开”，且系统日志指出文件由 Modu 创建并缺少用户同意，请通过浏览器从官方发布页重新下载 DMG，再覆盖安装；不要复用旧的应用内缓存。无需清除书库，不应关闭系统安全保护或在更新代码中删除隔离标记。这项修复不等于 Apple Developer ID 签名或公证。
+
 桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。Release 仅上传 9 个程序包及各自 SHA-256；许可证通过内嵌资源与对应版本的仓库链接提供。macOS / iOS 文件名省略 `unnotarized` / `unsigned`，不代表获得签名或公证。
 
 ## 签名

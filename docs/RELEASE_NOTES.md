@@ -1,6 +1,14 @@
 # 默读 / Modu 1.1.3 正式版
 
-版本：**1.1.3+10036**。基于 Anx Reader 和 ReadAny（Reader Any）的 GPL-3.0-or-later 独立修改版本，保留原作者版权与许可。
+版本：**macOS 1.1.3+10037；其他平台 1.1.3+10036**。基于 Anx Reader 和 ReadAny（Reader Any）的 GPL-3.0-or-later 独立修改版本，保留原作者版权与许可。
+
+## macOS 修订包（10037）
+
+- 修复调节应用亮度后无法鼠标选字、点击、翻页或使用方向键的问题。改为不接收鼠标事件、不改变焦点的原生调光层。
+- Mac 更新包改用外部浏览器下载，避免应用沙盒下载引发“应用程序无法打开”。仍优先 GitHub，连接失败尝试 Gitee，并提供手动镜像入口。浏览器下载交由浏览器处理，应用不声称已验证或安装该文件。
+- 仅替换 macOS ARM64、Intel DMG 及校验文件；其他平台保持原包。**已安装 1.1.3 的 Mac 用户请使用浏览器重新下载并覆盖安装**，不要使用旧版应用内缓存的 DMG；同版本构建号更新不会触发现有客户端的版本提示。不要卸载或清空数据。
+- 仍为 ad-hoc 签名，未经 Apple 公证；此修改不等同于 Developer ID 签名或公证。
+- macOS 完整对应源码使用独立标签 [macos-1.1.3-10037](https://github.com/sobranie2406/modureader/tree/macos-1.1.3-10037)（[源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/macos-1.1.3-10037.zip)）；原 v1.1.3 标签保留给其他平台，不移动。
 
 ## 本次修复
 

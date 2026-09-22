@@ -12,10 +12,12 @@ void main() {
 
   Future<AppBrightness> create(
       {bool nativeWindow = false,
+      bool nativeDimming = false,
       Map<String, Object> settings = const {}}) async {
     SharedPreferences.setMockInitialValues(settings);
     await Prefs().initPrefs();
-    final controller = AppBrightness(nativeWindow: nativeWindow);
+    final controller =
+        AppBrightness(nativeWindow: nativeWindow, nativeDimming: nativeDimming);
     await controller.initialize(await SharedPreferences.getInstance());
     addTearDown(controller.dispose);
     return controller;
@@ -190,5 +192,85 @@ void main() {
     expect(taps, 1);
     expect(builds, initialBuilds);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('macOS dimming never paints Flutter over the native reader',
+      (tester) async {
+    final calls = <MethodCall>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(AppBrightness.channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+    addTearDown(
+        () => messenger.setMockMethodCallHandler(AppBrightness.channel, null));
+    final c = await create(nativeDimming: true, settings: {
+      AppBrightness.levelKey: 0.35,
+      AppBrightness.followSystemKey: false,
+    });
+    expect(calls.single.arguments['brightness'], 0.35);
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    var taps = 0, keys = 0, builds = 0;
+    await tester.pumpWidget(MaterialApp(
+      builder: (_, child) => AppBrightnessLayer(controller: c, child: child!),
+      home: Builder(builder: (_) {
+        builds++;
+        return Focus(
+          focusNode: focus,
+          autofocus: true,
+          onKeyEvent: (_, event) {
+            if (event is KeyDownEvent) keys++;
+            return KeyEventResult.handled;
+          },
+          child:
+              GestureDetector(onTap: () => taps++, child: const Text('Reader')),
+        );
+      }),
+    ));
+    await tester.pump();
+    final initialBuilds = builds;
+    for (final value in [0.2, 0.6, 1.0]) {
+      c.setLevel(value);
+      await tester.pump();
+      expect(calls.last.arguments['brightness'], value);
+      expect(c.dimOpacity, 0);
+      expect(find.byKey(const ValueKey('app-flutter-brightness-dimmer')),
+          findsNothing);
+      final layer =
+          tester.widget<AppBrightnessLayer>(find.byType(AppBrightnessLayer));
+      expect(layer.build(tester.element(find.byType(AppBrightnessLayer))),
+          same(layer.child));
+      await tester.tap(find.text('Reader'));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      expect(focus.hasPrimaryFocus, isTrue);
+    }
+    expect(taps, 3);
+    expect(keys, 3);
+    expect(builds, initialBuilds);
+    c.setFollowSystem(true);
+    await tester.pump();
+    expect(calls.last.arguments['brightness'], isNull);
+    expect(c.nativeDimmingUnavailable, isFalse);
+  });
+
+  test('macOS bridge failure never restores an input-blocking Flutter overlay',
+      () async {
+    final c = await create(nativeDimming: true);
+    c.setLevel(0.2);
+    await Future<void>.delayed(Duration.zero);
+    expect(c.nativeDimmingUnavailable, isTrue);
+    expect(c.paintsFlutterDimming, isFalse);
+    expect(c.dimOpacity, 0);
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+        AppBrightness.channel, (_) async => null);
+    addTearDown(
+        () => messenger.setMockMethodCallHandler(AppBrightness.channel, null));
+    c.setLevel(0.5);
+    await Future<void>.delayed(Duration.zero);
+    expect(c.nativeDimmingUnavailable, isFalse);
+    expect(c.dimOpacity, 0);
   });
 }

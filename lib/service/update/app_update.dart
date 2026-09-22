@@ -214,6 +214,41 @@ class UpdateTransport {
     return _latestFrom(platform, abi, mirror: true);
   }
 
+  /// Probe the download endpoint, not just the release API. Never save the DMG
+  /// from the sandbox: macOS can mark it as created without user consent.
+  /// The browser gets the stable official URL, not an expiring CDN redirect.
+  Future<Uri> browserDownloadUrl(UpdateAsset asset,
+      {bool mirrorOnly = false}) async {
+    Future<Uri> probe(String url, {required bool mirror}) async {
+      final cancel = CancelToken();
+      try {
+        await (() async {
+          final body = await _get(url, cancel, mirror: mirror);
+          await body.stream.listen(null).cancel();
+        })()
+            .timeout(mirror ? mirrorCheckTimeout : githubCheckTimeout,
+                onTimeout: () {
+          cancel.cancel('Download endpoint check timed out');
+          throw TimeoutException('Download endpoint check timed out');
+        });
+        return Uri.parse(url);
+      } finally {
+        cancel.cancel();
+      }
+    }
+
+    if (!mirrorOnly) {
+      try {
+        return await probe(asset.url, mirror: false);
+      } on Exception catch (error) {
+        if (asset.mirrorUrl == null || !_isUnavailable(error)) rethrow;
+      }
+    }
+    final mirror = asset.mirrorUrl;
+    if (mirror == null) throw const FormatException('Mirror asset not ready');
+    return probe(mirror, mirror: true);
+  }
+
   static bool _isUnavailable(Object error) {
     if (error is TimeoutException ||
         error is SocketException ||
@@ -367,6 +402,7 @@ enum UpdatePhase {
   downloading,
   ready,
   installing,
+  openingBrowser,
   error
 }
 
@@ -396,10 +432,12 @@ class AppUpdateController extends ChangeNotifier {
   DateTime? checkedAt;
   double progress = 0;
   CancelToken? _cancel;
+  bool get usesBrowserDownload => platform == 'macos';
   bool get busy => {
         UpdatePhase.checking,
         UpdatePhase.downloading,
-        UpdatePhase.installing
+        UpdatePhase.installing,
+        UpdatePhase.openingBrowser
       }.contains(phase);
   bool get newer =>
       release != null &&
@@ -414,7 +452,10 @@ class AppUpdateController extends ChangeNotifier {
     try {
       currentVersion = await installedVersion();
       final latest = await transport.latest(platform, abi);
-      if (release?.asset?.digest != latest.asset?.digest) downloaded = null;
+      if (usesBrowserDownload ||
+          release?.asset?.digest != latest.asset?.digest) {
+        downloaded = null;
+      }
       release = latest;
       checkedAt = DateTime.now();
       phase = !newer
@@ -430,6 +471,11 @@ class AppUpdateController extends ChangeNotifier {
 
   Future<void> download() async {
     if (busy || !newer || release?.asset == null) return;
+    if (usesBrowserDownload) {
+      error = 'browser_required';
+      notifyListeners();
+      return;
+    }
     phase = UpdatePhase.downloading;
     error = '';
     progress = 0;
@@ -462,9 +508,44 @@ class AppUpdateController extends ChangeNotifier {
 
   void cancelDownload() => _cancel?.cancel();
 
+  Future<void> openBrowserDownload(Future<bool> Function(Uri) open,
+      {bool mirrorOnly = false}) async {
+    if (!usesBrowserDownload || busy || !newer || release?.asset == null) {
+      return;
+    }
+    phase = UpdatePhase.openingBrowser;
+    error = '';
+    downloaded = null; // Never reuse an old sandbox-downloaded DMG.
+    notifyListeners();
+    try {
+      final url = await transport.browserDownloadUrl(release!.asset!,
+          mirrorOnly: mirrorOnly);
+      if (!await open(url)) {
+        throw PlatformException(code: 'BROWSER_OPEN_FAILED');
+      }
+      phase = UpdatePhase.available;
+      error = url.host == 'gitee.com'
+          ? 'browser_gitee_opened'
+          : 'browser_github_opened';
+    } catch (e) {
+      if (e is PlatformException) {
+        phase = UpdatePhase.error;
+        error = 'browser_open_failed';
+      } else {
+        _fail(e);
+      }
+    }
+    notifyListeners();
+  }
+
   /// Recheck integrity immediately before handing executable bytes to the OS.
   Future<void> install(Future<String?> Function(File) open) async {
     if (busy || downloaded == null || release?.asset == null || !newer) return;
+    if (usesBrowserDownload) {
+      error = 'browser_required';
+      notifyListeners();
+      return;
+    }
     phase = UpdatePhase.installing;
     error = '';
     notifyListeners();
