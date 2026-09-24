@@ -1,4 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
+import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -46,6 +48,163 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
 
   final Map<String, bool> _modelLoadingStates = {};
   bool _mainTestLoading = false;
+  final Map<String, Map<String, dynamic>> _configDrafts = {};
+  bool _savingSettings = false;
+  int _configRevision = 0;
+
+  String _text(String zh, String en) =>
+      Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
+
+  Future<void> _applySettings(Map<String, dynamic> data) async {
+    // Reject invalid imports before interrupting speech or changing anything.
+    final valid = TtsConfigTransfer.validate(data);
+    if (_savingSettings) throw StateError('TTS settings are being saved');
+    final hadVoiceList = _showVoiceList;
+    setState(() {
+      _savingSettings = true;
+      _showVoiceList = false;
+      _configRevision++;
+    });
+    final factory = TtsFactory();
+    final hadPlayer = factory.hasCurrent;
+    try {
+      // Detach voice-list listeners before invalidating providers, otherwise
+      // an import can unexpectedly fetch remote voices with the new API key.
+      if (hadVoiceList) await WidgetsBinding.instance.endOfFrame;
+      if (hadPlayer) {
+        await TtsHandler().stop();
+        await factory.dispose();
+      }
+      await TtsConfigTransfer.apply(Prefs(), valid);
+      if (mounted) {
+        setState(() {
+          _configDrafts.clear();
+          _showVoiceList = false;
+          _currentModelDetails = null;
+          _currentModelLanguageGroup = null;
+          selectedVoiceModel = tts_svc
+              .getTtsService(Prefs().ttsService)
+              .provider
+              .getSelectedVoice();
+        });
+        for (final id in TtsConfigTransfer.services) {
+          ref.invalidate(onlineTtsConfigProvider(id));
+        }
+        ref.invalidate(ttsServiceProvider);
+        ref.invalidate(ttsVoicesProvider);
+      }
+    } finally {
+      // Rebind reading callbacks even if persistence failed and was rolled back.
+      // No speech starts here; the user must explicitly press play again.
+      try {
+        if (hadPlayer) await TtsHandler().switchTtsType(Prefs().ttsService);
+      } finally {
+        if (mounted) setState(() => _savingSettings = false);
+      }
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    final data = TtsConfigTransfer.snapshot(Prefs());
+    for (final entry in _configDrafts.entries) {
+      data['providers'][entry.key]['config'] =
+          Map<String, dynamic>.from(entry.value);
+    }
+    try {
+      await _applySettings(data);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_text('朗读设置已保存', 'Speech settings saved')),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_text('保存失败，请检查接口地址和朗读参数后重试',
+              'Could not save. Check the service URL and speech parameters.')),
+        ));
+      }
+    }
+  }
+
+  Future<void> _clearSettings() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_text('清除朗读设置？', 'Clear speech settings?')),
+        content: Text(_text(
+            '将停止朗读，清除所有朗读服务的 API Key、接口配置、声音选择和未保存修改，并恢复默认语速、音调、音量及系统朗读。不影响 AI、书籍、笔记或同步设置。',
+            'Stop speech, remove all TTS keys, service configurations, voice selections and drafts, and restore default rate, pitch, volume and system speech. AI, books, notes and sync settings are unchanged.')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(_text('取消', 'Cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(_text('清除', 'Clear'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _applySettings(TtsConfigTransfer.defaults());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_text('朗读设置已清除', 'Speech settings cleared')),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              _text('清除失败，请重试', 'Could not clear settings. Please retry.')),
+        ));
+      }
+    }
+  }
+
+  Widget _buildSettingsTransfer() => SettingsSection(
+        title: Text(_text('朗读设置管理', 'Speech settings management')),
+        tiles: [
+          CustomSettingsTile(
+              child: Padding(
+            padding: const EdgeInsets.all(16),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_text(
+                  '接口修改请先保存，再获取声音或试听。导出仅包含已保存设置，可通过二维码图片或默读配置链接（modu:）导入；跨设备系统声音可能需要重新选择。',
+                  'Save service edits before loading voices or previewing. Export saved settings via QR images or Modu configuration links (modu:). System voices may need reselection on another device.')),
+              const SizedBox(height: 12),
+              Wrap(spacing: 10, runSpacing: 10, children: [
+                FilledButton.icon(
+                    onPressed: _savingSettings ? null : _saveSettings,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(_text('保存设置', 'Save settings'))),
+                OutlinedButton.icon(
+                    onPressed: _savingSettings ? null : _clearSettings,
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(_text('清除设置', 'Clear settings'))),
+              ]),
+              if (_configDrafts.isNotEmpty)
+                Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_text('有未保存的接口修改，保存后可导出、导入。',
+                        'Unsaved service edits. Save before exporting or importing.'))),
+            ]),
+          )),
+          ConfigTransferTile(
+            kind: 'tts',
+            label: _text('朗读配置', 'speech settings'),
+            enabled: !_savingSettings && _configDrafts.isEmpty,
+            allowReadAny: false,
+            importNotice: _text(
+                '导入将停止当前朗读，并替换全部朗读配置（包括 API Key、声音、语速、音调和音量），不会自动播放。',
+                'Import stops speech and replaces all TTS settings, including keys, voices, rate, pitch and volume. Playback will not start automatically.'),
+            getData: () => TtsConfigTransfer.snapshot(Prefs()),
+            applyData: _applySettings,
+          ),
+        ],
+      );
 
   Future<void> _testSpeak(String text, String? voiceShortName,
       {bool isMainButton = false}) async {
@@ -350,106 +509,129 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       }
     });
 
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: 50.0), // Add padding for bottom
-      children: [
-        if (AnxPlatform.isAndroid)
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: Text(Localizations.localeOf(context).languageCode == 'zh'
-                ? '朗读通知' : 'Reading notifications'),
-            subtitle: Text(Localizations.localeOf(context).languageCode == 'zh'
-                ? '在系统设置中管理通知栏与锁屏播放控制'
-                : 'Manage notification and lock-screen controls in system settings'),
-            trailing: const Icon(Icons.open_in_new),
-            onTap: () async { await openAppSettings(); },
-          ),
-        if (AnxPlatform.isIOS)
-          SettingsSection(
-            title: Text(L10n.of(context).settingsNarrateTtsService),
-            tiles: [
-              SettingsTile.switchTile(
-                  title: Text(L10n.of(context).allowMixing),
-                  description: Text(L10n.of(context).enableMixTip),
-                  initialValue: Prefs().allowMixWithOtherAudio,
-                  onToggle: (value) {
-                    Prefs().allowMixWithOtherAudio = value;
-                    setState(() {});
-                  }),
-            ],
-          ),
-        SettingsSection(
-          title: Text(L10n.of(context).ttsType),
-          tiles: [
-            CustomSettingsTile(child: _buildServiceSelection(ttsServiceId)),
-            if (unsupportedSystem)
-              CustomSettingsTile(
-                  child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(systemTtsUnsupportedMessage(
-                  chinese: Localizations.localeOf(context).languageCode == 'zh',
-                )),
-              )),
-            if (ttsServiceId != 'system')
-              CustomSettingsTile(child: _buildConfigSection(ttsServiceId)),
-          ],
-        ),
+    return AbsorbPointer(
+        absorbing: _savingSettings,
+        child: ListView(
+          controller: _scrollController,
+          padding:
+              const EdgeInsets.only(bottom: 50.0), // Add padding for bottom
+          children: [
+            if (AnxPlatform.isAndroid)
+              ListTile(
+                leading: const Icon(Icons.notifications_outlined),
+                title: Text(Localizations.localeOf(context).languageCode == 'zh'
+                    ? '朗读通知'
+                    : 'Reading notifications'),
+                subtitle: Text(Localizations.localeOf(context).languageCode ==
+                        'zh'
+                    ? '在系统设置中管理通知栏与锁屏播放控制'
+                    : 'Manage notification and lock-screen controls in system settings'),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () async {
+                  await openAppSettings();
+                },
+              ),
+            if (AnxPlatform.isIOS)
+              SettingsSection(
+                title: Text(L10n.of(context).settingsNarrateTtsService),
+                tiles: [
+                  SettingsTile.switchTile(
+                      title: Text(L10n.of(context).allowMixing),
+                      description: Text(L10n.of(context).enableMixTip),
+                      initialValue: Prefs().allowMixWithOtherAudio,
+                      onToggle: (value) {
+                        Prefs().allowMixWithOtherAudio = value;
+                        setState(() {});
+                      }),
+                ],
+              ),
+            SettingsSection(
+              title: Text(L10n.of(context).ttsType),
+              tiles: [
+                CustomSettingsTile(child: _buildServiceSelection(ttsServiceId)),
+                if (unsupportedSystem)
+                  CustomSettingsTile(
+                      child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(systemTtsUnsupportedMessage(
+                      chinese:
+                          Localizations.localeOf(context).languageCode == 'zh',
+                    )),
+                  )),
+                if (ttsServiceId != 'system')
+                  CustomSettingsTile(child: _buildConfigSection(ttsServiceId)),
+              ],
+            ),
 
-        // Voice List Section - Inlined
-        if (!unsupportedSystem)
-          SettingsSection(
-            title: Text(L10n.of(context).settingsNarrateTtsVoiceModels),
-            tiles: [
-              CustomSettingsTile(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: _showVoiceList
-                      ? Column(
-                          children: [..._buildVoiceListContent()],
-                        )
-                      : Center(
-                          child: AnxButton(
-                            onPressed: () async {
-                              setState(() {
-                                _showVoiceList = true;
-                              });
-                              final voices =
-                                  await ref.refresh(ttsVoicesProvider.future);
-                              if (!mounted || !context.mounted) return;
-                              if ((selectedVoiceModel?.isEmpty ?? true) &&
-                                  voices.isNotEmpty) {
-                                final currentLocale =
-                                    Localizations.localeOf(context);
-                                final currentLangCode =
-                                    currentLocale.languageCode;
+            _buildSettingsTransfer(),
 
-                                // Try to find a voice matching current language
-                                TtsVoice? match = voices.firstWhere(
-                                  (v) => v.locale.toLowerCase().startsWith(
-                                      currentLangCode.toLowerCase()),
-                                  orElse: () => voices.firstWhere(
-                                    // Fallback to English
-                                    (v) =>
-                                        v.locale.toLowerCase().startsWith('en'),
-                                    // Fallback to first available
-                                    orElse: () => voices.first,
-                                  ),
-                                );
+            // Do not preview stale credentials while service edits are pending.
+            if (!unsupportedSystem && !_configDrafts.containsKey(ttsServiceId))
+              SettingsSection(
+                title: Text(L10n.of(context).settingsNarrateTtsVoiceModels),
+                tiles: [
+                  CustomSettingsTile(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: _showVoiceList
+                          ? Column(
+                              children: [..._buildVoiceListContent()],
+                            )
+                          : Center(
+                              child: AnxButton(
+                                onPressed: () async {
+                                  final revision = _configRevision;
+                                  setState(() {
+                                    _showVoiceList = true;
+                                  });
+                                  late final List<TtsVoice> voices;
+                                  try {
+                                    voices = await ref
+                                        .refresh(ttsVoicesProvider.future);
+                                  } catch (_) {
+                                    // The voice list already renders the provider error.
+                                    return;
+                                  }
+                                  if (!mounted ||
+                                      !context.mounted ||
+                                      revision != _configRevision ||
+                                      _savingSettings ||
+                                      Prefs().ttsService != ttsServiceId)
+                                    return;
+                                  if ((selectedVoiceModel?.isEmpty ?? true) &&
+                                      voices.isNotEmpty) {
+                                    final currentLocale =
+                                        Localizations.localeOf(context);
+                                    final currentLangCode =
+                                        currentLocale.languageCode;
 
-                                _selectVoiceModel(match.shortName);
-                              }
-                            },
-                            child: Text(
-                                L10n.of(context).settingsNarrateGetVoiceList),
-                          ),
-                        ),
-                ),
+                                    // Try to find a voice matching current language
+                                    TtsVoice? match = voices.firstWhere(
+                                      (v) => v.locale.toLowerCase().startsWith(
+                                          currentLangCode.toLowerCase()),
+                                      orElse: () => voices.firstWhere(
+                                        // Fallback to English
+                                        (v) => v.locale
+                                            .toLowerCase()
+                                            .startsWith('en'),
+                                        // Fallback to first available
+                                        orElse: () => voices.first,
+                                      ),
+                                    );
+
+                                    _selectVoiceModel(match.shortName);
+                                  }
+                                },
+                                child: Text(L10n.of(context)
+                                    .settingsNarrateGetVoiceList),
+                              ),
+                            ),
+                    ),
+                  )
+                ],
               )
-            ],
-          )
-      ],
-    );
+          ],
+        ));
   }
 
   Widget _buildServiceSelection(String currentServiceId) {
@@ -457,6 +639,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: DropdownButtonFormField<String>(
+        key: ValueKey('tts-service-$currentServiceId'),
         initialValue: currentServiceId,
         decoration: InputDecoration(
           labelText: L10n.of(context).settingsNarrateTtsService,
@@ -505,21 +688,17 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     final configItems = provider.getConfigItems(context);
     if (configItems.isEmpty) return const SizedBox.shrink();
 
-    final savedConfig = ref.watch(onlineTtsConfigProvider(serviceId));
-    final config = serviceId == 'xiaomi' ? provider.getConfig() : savedConfig;
+    ref.watch(onlineTtsConfigProvider(serviceId));
+    final config = _configDrafts[serviceId] ?? provider.getConfig();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
       child: ServiceConfigForm(
+        key: ValueKey('tts-config-$serviceId-$_configRevision'),
         configItems: configItems,
         initialConfig: config,
         onConfigChanged: (newConfig) {
-          // Update config for each changed field
-          for (var entry in newConfig.entries) {
-            ref
-                .read(onlineTtsConfigProvider(serviceId).notifier)
-                .updateConfig(entry.key, entry.value);
-          }
+          setState(() => _configDrafts[serviceId] = Map.from(newConfig));
         },
       ),
     );

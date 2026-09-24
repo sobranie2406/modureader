@@ -125,10 +125,16 @@ class ReplacedBookFiles {
         final pathId = sha256.convert(utf8.encode(oldPath)).toString();
         final folder = '$recycleRoot/$pathId/$digest';
         final backup = '$folder/${oldPath.substring(5)}';
-        await client.mkdirAll(folder);
-        await client.uploadFile(old.path, backup);
         final verify = File('${staging.path}/verify');
-        await client.downloadFile(backup, verify.path);
+        // A previously denied DELETE must not re-upload the same recovery
+        // copy on every sync. Reuse it only after verifying its actual bytes.
+        final backupExists = await _downloadBook(backup, verify);
+        if (!backupExists ||
+            (await sha256.bind(verify.openRead()).first).toString() != digest) {
+          await client.mkdirAll(folder);
+          await client.uploadFile(old.path, backup);
+          await client.downloadFile(backup, verify.path);
+        }
         if ((await sha256.bind(verify.openRead()).first).toString() != digest) {
           throw StateError('Replaced book backup verification failed');
         }

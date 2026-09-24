@@ -30,6 +30,7 @@ class CleanupClient extends MemorySyncClient {
   }
 
   final removed = <String>[];
+  final uploaded = <String>[];
   bool corruptBackup = false;
   bool failRemove = false;
   Future<void> Function()? afterBackup;
@@ -45,6 +46,7 @@ class CleanupClient extends MemorySyncClient {
       {bool replace = true,
       void Function(int, int)? onProgress,
       CancelToken? cancelToken}) async {
+    uploaded.add(remotePath);
     await super.uploadFile(localPath, remotePath);
     if (remotePath.startsWith('${ReplacedBookFiles.recycleRoot}/')) {
       if (corruptBackup) files[remotePath] = [0];
@@ -242,7 +244,9 @@ void main() {
     await expectLater(reclaim(), throwsStateError);
     expect(client.files[SyncPaths.data(oldPath)], oldBytes);
     client.failRemove = false;
+    final uploadsBeforeRetry = client.uploaded.length;
     expect(await reclaim(), 1);
+    expect(client.uploaded.length, uploadsBeforeRetry);
   });
 
   test('unrelated local notes during transfer do not starve cleanup', () async {

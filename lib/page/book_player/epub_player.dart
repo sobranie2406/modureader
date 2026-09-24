@@ -43,6 +43,7 @@ import 'package:anx_reader/service/book_player/tts_text_result.dart';
 import 'package:anx_reader/service/battery_level.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/widgets/reading_page/search_navigation_bar.dart';
+import 'package:anx_reader/widgets/reading_page/reader_loading_status.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
@@ -105,6 +106,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   int bookCurrentPage = 0;
   int bookTotalPages = 0;
   Map<String, double>? _lastVerticalInsets;
+  bool _verticalInsetsPending = false;
 
   bool get _verticalPage =>
       Prefs().writingMode.isVertical ||
@@ -152,6 +154,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool _selectionClearLocked = false;
   bool _selectionClearPending = false;
   bool _readerReady = false;
+  bool _readerLoadFailed = false;
+  Timer? _readerLoadTimer;
   final translationMode = ValueNotifier(TranslationModeEnum.off);
   final _translationSession = ReaderTranslationSession();
   bool quickMarkEnabled = false;
@@ -344,7 +348,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void changeBgimgEffect() {
     if (!mounted) return;
     final bgimg = Prefs().bgimg;
-    final bgimgUrl = readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
+    final bgimgUrl =
+        readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
     webViewController.evaluateJavascript(source: '''
       changeStyle({
         backgroundImage: ${jsonEncode(bgimgUrl)},
@@ -966,10 +971,24 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   Future<void> setHandler(InAppWebViewController controller) async {
     controller.addJavaScriptHandler(
+        handlerName: 'onReaderLoadError',
+        callback: (_) => _showReaderLoadFailure());
+    controller.addJavaScriptHandler(
         handlerName: 'onLoadEnd',
         callback: (args) async {
           if (!mounted) return;
-          _readerReady = true;
+          _readerLoadTimer?.cancel();
+          setState(() {
+            _readerReady = true;
+            _readerLoadFailed = false;
+          });
+          // Android can hide system bars while the chapter is still loading.
+          // The Flutter frame already uses the new safe area; replay the DOM
+          // gutters that could not be applied before the renderer was ready.
+          if (_verticalInsetsPending) {
+            _verticalInsetsPending = false;
+            changeStyle(null);
+          }
           await refreshReadingAfterSync();
           if (!mounted) return;
           if (quickMarkEnabled) await setQuickMarkEnabled(true);
@@ -1400,8 +1419,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     // Keep the DOM gutters in sync with rotation/safe areas and UI text scaling.
     final insets = _verticalGeometry.toJson();
     if (!mapEquals(_lastVerticalInsets, insets)) {
+      final hadInsets = _lastVerticalInsets != null;
       _lastVerticalInsets = insets;
-      if (_readerReady) changeStyle(null);
+      if (_readerReady) {
+        changeStyle(null);
+      } else if (hadInsets) {
+        _verticalInsetsPending = true;
+      }
     }
   }
 
@@ -1410,6 +1434,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     _progress = ReaderProgressSession(bookDao, widget.book.id);
     book = widget.book;
     getThemeColor();
+    _readerLoadTimer =
+        Timer(const Duration(seconds: 30), _showReaderLoadFailure);
 
     contextMenu = ContextMenu(
       settings: ContextMenuSettings(hideDefaultSystemContextMenuItems: true),
@@ -1439,11 +1465,19 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     await _progress.flush();
   }
 
+  void _showReaderLoadFailure() {
+    if (!mounted || _readerReady || _readerLoadFailed) return;
+    _readerLoadTimer?.cancel();
+    setState(() => _readerLoadFailed = true);
+    AnxLog.warning('Reader initial load failed or timed out');
+  }
+
   @override
   void dispose() {
     _translationSession.stop();
     translationMode.dispose();
     _syncRefreshRetry?.cancel();
+    _readerLoadTimer?.cancel();
     _scrollDebounceTimer?.cancel();
     _animationController?.dispose();
     saveReadingProgress();
@@ -1707,6 +1741,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       initialSettings: initialSettings,
       contextMenu: contextMenu,
       onLoadStop: (controller, uri) => onWebViewCreated(controller),
+      onReceivedError: (_, request, __) {
+        if (request.isForMainFrame == true) _showReaderLoadFailure();
+      },
+      onReceivedHttpError: (_, request, __) {
+        if (request.isForMainFrame == true) _showReaderLoadFailure();
+      },
       onConsoleMessage: webviewConsoleMessage,
     );
 
@@ -1783,6 +1823,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
                 child: FadeTransition(
                     opacity: _animation!, child: BookCover(book: widget.book)),
               )),
+            if (!_readerReady) ReaderLoadingStatus(failed: _readerLoadFailed),
           ],
         ),
       ),

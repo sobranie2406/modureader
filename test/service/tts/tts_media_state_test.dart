@@ -17,12 +17,17 @@ void main() {
     ]);
     expect(state.controls.last.androidIcon, 'drawable/ic_stat_tts_exit');
     expect(state.androidCompactActionIndices, [0, 1, 2]);
+    expect(
+        state.systemActions,
+        containsAll(
+            [MediaAction.playPause, MediaAction.play, MediaAction.pause]));
   });
   test('paused notification remains resumable and stop removes controls', () {
     final paused = ttsMediaState(PlaybackState(), TtsStateEnum.paused);
     expect(paused.playing, isFalse);
     expect(paused.processingState, AudioProcessingState.ready);
     expect(paused.controls[1].action, MediaAction.play);
+    expect(paused.systemActions, contains(MediaAction.playPause));
     expect(paused.controls.map((control) => control.action), [
       MediaAction.skipToPrevious,
       MediaAction.play,
@@ -34,6 +39,7 @@ void main() {
     expect(stopped.processingState, AudioProcessingState.idle);
     expect(stopped.controls, isEmpty);
     expect(stopped.androidCompactActionIndices, isEmpty);
+    expect(stopped.systemActions, isEmpty);
   });
 
   test('Chinese transport labels expose passage navigation and stop reading',

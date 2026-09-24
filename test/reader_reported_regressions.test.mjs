@@ -60,7 +60,7 @@ test('actual chapter loader stays hidden until custom font metrics are ready, on
     get document() {return this.doc} get frame() {return this.#iframe}
     render(layout) {this.renders.push(this.doc.loaded)} expand() {} setImageSize() {}
     ${method}
-  }; Harness`, {EventTarget, waitForReaderFonts, getDirection: () => ({}), console});
+  }; Harness`, {EventTarget, waitForReaderFonts, getDirection: () => ({}), console, setTimeout, clearTimeout});
   for (let chapter = 0; chapter < 2; chapter++) {
     const doc = new EventTarget(); let release;
     doc.body = {getBoundingClientRect(){}};

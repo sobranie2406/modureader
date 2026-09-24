@@ -18,6 +18,12 @@ class NativePlayer extends Fake implements AudioPlayer {
   final bool failInit, failPlay;
   final completed = StreamController<void>.broadcast(sync: true);
   int disposals = 0;
+  AudioContext? context;
+  @override
+  Future<void> setAudioContext(AudioContext value) async {
+    context = value;
+  }
+
   @override
   Stream<void> get onPlayerComplete => completed.stream;
   @override
@@ -98,6 +104,9 @@ void main() {
       await tts.resume();
       expect(created, 2);
       expect(bad.disposals, 1);
+      expect(good.context?.android.stayAwake, isTrue);
+      expect(good.context?.android.audioFocus, AndroidAudioFocus.none);
+      expect(good.context?.android.contentType, AndroidContentType.speech);
       expect(advances, 1);
       expect(tts.playbackError, isNull);
       await tts.stop();

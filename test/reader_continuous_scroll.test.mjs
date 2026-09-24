@@ -28,6 +28,124 @@ function fixture(chapterHeight = 120) {
   return {window,container,loaded,unloaded,activated,go,setFail:i=>fail=i,
     block:promise=>releases=promise};
 }
+
+const deferred = () => {
+  let resolve;
+  const promise = new Promise(r => resolve = r);
+  return { promise, resolve };
+};
+async function promptly(promise) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error('Foreground blocked by prefetch')), 500);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+test('cached and uncached foreground jumps do not wait for background iframe fonts', async () => {
+  const f = fixture(3000), gate = deferred(), started = deferred();
+  const create = f.window.create;
+  f.window.create = async (index, src) => {
+    if (index === 3) { started.resolve(); await gate.promise; }
+    return create(index, src);
+  };
+  let background;
+  try {
+    await f.go(2); clearTimeout(f.window.timer); f.window.timer = null;
+    background = f.window.ensure(3);
+    await started.promise;
+    await promptly(f.go(2));
+    await promptly(f.go(25));
+    assert.equal(f.window.current.index, 25);
+    gate.resolve(); await background;
+    assert.equal(f.window.entries.has(3), false, 'discard a late, now unrelated chapter');
+    assert.equal(f.window.current.index, 25, 'prefetch cannot move the reader or TTS cursor');
+    assert.equal(f.unloaded.filter(i => i === 3).length, 1);
+  } finally { gate.resolve(); await background; f.window.destroy(); }
+});
+
+test('foreground promotes a pending preload and never duplicates resource loads', async () => {
+  const f = fixture(3000), gate = deferred(), started = deferred();
+  const create = f.window.create;
+  f.window.create = async (index, src) => {
+    if (index === 3) { started.resolve(); await gate.promise; }
+    return create(index, src);
+  };
+  try {
+    await f.go(2); clearTimeout(f.window.timer); f.window.timer = null;
+    const background = f.window.ensure(3);
+    await started.promise;
+    const foreground = f.window.ensure(3, true);
+    assert.equal(background, foreground);
+    gate.resolve(); await foreground;
+    assert.equal(f.loaded.filter(i => i === 3).length, 1);
+  } finally { gate.resolve(); f.window.destroy(); }
+});
+
+test('jump during a slow warm-up starts preloading around the new chapter', async () => {
+  const f = fixture(3000), gate = deferred(), started = deferred();
+  const create = f.window.create;
+  f.window.create = async (index, src) => {
+    if (index === 3) { started.resolve(); await gate.promise; }
+    return create(index, src);
+  };
+  try {
+    await f.go(2);
+    await started.promise;
+    assert.equal(f.window.warming, true);
+    await promptly(f.go(25));
+    gate.resolve(); await pause();
+    assert.equal(f.window.current.index, 25);
+    assert.ok(f.window.entries.has(24));
+    assert.ok(f.window.entries.has(26));
+    assert.equal(f.window.entries.has(3), false);
+  } finally { gate.resolve(); f.window.destroy(); }
+});
+
+test('resource acquisition stays serial and queued foreground precedes speculation', async () => {
+  const f = fixture(3000), gate = deferred(), started = deferred();
+  let active = 0, peak = 0;
+  const order = [];
+  for (const [index, section] of f.window.sections.entries()) {
+    const load = section.load;
+    section.load = async () => {
+      active++; peak = Math.max(peak, active); order.push(index);
+      try {
+        if (index === 3) { started.resolve(); await gate.promise; }
+        return await load();
+      } finally { active--; }
+    };
+  }
+  try {
+    await f.go(2); clearTimeout(f.window.timer); f.window.timer = null;
+    const background = f.window.ensure(3);
+    await started.promise;
+    const previous = f.window.ensure(1);
+    const foreground = f.window.ensure(25, true);
+    gate.resolve();
+    await Promise.all([background, previous, foreground]);
+    assert.deepEqual(order, [2, 3, 25, 1]);
+    assert.equal(peak, 1);
+  } finally { gate.resolve(); f.window.destroy(); }
+});
+
+test('closing drops queued loads and releases a late iframe exactly once', async () => {
+  const f = fixture(3000), gate = deferred(), started = deferred();
+  const load = f.window.sections[3].load;
+  f.window.sections[3].load = async () => {
+    started.resolve(); await gate.promise; return load();
+  };
+  await f.go(2); clearTimeout(f.window.timer); f.window.timer = null;
+  const background = f.window.ensure(3);
+  await started.promise;
+  const queued = f.window.ensure(1);
+  f.window.destroy(); gate.resolve();
+  await Promise.all([background, queued]);
+  assert.deepEqual(f.loaded, [2, 3]);
+  assert.deepEqual(f.unloaded, [2, 3]);
+  assert.equal(f.window.pending.size, 0);
+});
 test('short chapters warm a bounded contiguous window, preserve anchor, then stop',async()=>{
   const f=fixture();try {
     await f.go(2);await pause();

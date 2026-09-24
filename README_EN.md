@@ -190,7 +190,7 @@ The actual *Guwen Guanzhi* reading view shows the optional red frame and rules b
 
 ### In-book AI: read and ask side by side
 
-The AI sidebar keeps the book text visible on the left. A horizontally scrollable skill bar above the input provides enabled skills such as chapter summary, book summary, concept explanation and argument analysis. You can also type your own question. This screenshot shows the controls; no request was sent and no AI response was fabricated.
+The AI sidebar keeps the book text visible on the left. Skills stay hidden until the sparkle button opens a vertical in-chat picker, including chapter summary, book summary, concept explanation and argument analysis; selection closes the picker. You can also type your own question. The screenshot shows the earlier controls, before the vertical picker update; no request was sent and no AI response was fabricated.
 
 ![Modu in-book AI sidebar with book text on the left and reading skills above the input](docs/images/reading-ai-panel-macos.jpg)
 

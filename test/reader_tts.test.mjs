@@ -41,6 +41,53 @@ test('starting from a visible range preserves the first heading and does not con
   assert.equal(tts.currentDetail().text, '第一章')
   assert.equal(tts.next(), '正文一句。')
 })
+test('popup bodies, reference codes and endnotes are excluded without editing the document', () => {
+  const doc = documentFor(`<h1>第一章</h1>
+    <p>正文<a epub:type="noteref" href="#fn1"><sup>[1]</sup></a>继续。</p>
+    <aside id="fn1" epub:type="footnote"><p>弹出注释一。</p><p>弹出注释二。</p></aside>
+    <section role="doc-endnotes"><h2>章末注释</h2><ol><li role="doc-endnote">注释内容。</li></ol></section>
+    <p>余下正文。</p>`)
+  const before = doc.body.innerHTML
+  assert.deepEqual(all(speech(doc)), ['第一章', '正文继续。', '余下正文。'])
+  assert.equal(doc.body.innerHTML, before)
+})
+test('legacy numbered note links and their target paragraphs are skipped, ordinary numbers stay', () => {
+  const doc = documentFor(`<p>正文<a href="#note_1">[1]</a>继续，2026年与x<sup>2</sup>。</p>
+    <p><a id="note_1"></a>老式章末注释。</p><p>后续正文。</p>`)
+  assert.deepEqual(all(speech(doc)), ['正文继续，2026年与x2。', '后续正文。'])
+})
+test('CSS-hidden spans inside a sentence are filtered using original ancestors', () => {
+  const doc = documentFor(`<style>.popup { display:none }</style>
+    <p>开始<span class="popup">隐藏注释。</span>结束。</p>
+    <div style="display:none"><p>隐藏段落。</p></div>
+    <p>最后一句。</p>`)
+  assert.deepEqual(all(speech(doc)), ['开始结束。', '最后一句。'])
+})
+test('footnote backlinks never suppress the referenced body paragraph', () => {
+  const doc = documentFor(`<p>保留正文<a id="ref1" href="#fn1" epub:type="noteref">1</a>结尾。</p>
+    <aside id="fn1" epub:type="footnote"><p>注释<a epub:type="backlink" href="#ref1">返回</a></p></aside>
+    <p>后续正文。</p>`)
+  assert.deepEqual(all(speech(doc)), ['保留正文结尾。', '后续正文。'])
+})
+test('detached XML EPUB namespace and multi-token roles exclude chapter notes', () => {
+  const base = documentFor('')
+  const doc = new base.defaultView.DOMParser().parseFromString(`<html xmlns="http://www.w3.org/1999/xhtml" xmlns:e="http://www.idpf.org/2007/ops"><body>
+    <p>正文<sup e:type="noteref">1</sup>结束。</p>
+    <aside e:type="footnote"><p>隐藏注释。</p></aside>
+    <section role="region doc-endnotes"><p>章后注释。</p></section>
+    </body></html>`, 'application/xhtml+xml')
+  assert.deepEqual(all(speech(doc)), ['正文结束。'])
+})
+test('a late asynchronous highlight cannot rewind the speech cursor', () => {
+  const doc = documentFor('<p>第一句。</p><p>第二句。</p><p>第三句。</p>')
+  const tts = new TTS(doc, null, () => null, range => range.toString())
+  tts.start()
+  tts.next()
+  assert.equal(tts.highlightCfi('第一句。'), null)
+  assert.equal(tts.currentDetail().text, '第二句。')
+  assert.equal(tts.highlightCfi('第二句。').text, '第二句。')
+  assert.equal(tts.next(), '第三句。')
+})
 function reader(chapters) {
   const docs = chapters.map(documentFor)
   let index = 0
@@ -203,6 +250,14 @@ test('locked-screen speech crosses empty and title-only chapters without loading
   assert.ok(view.progressEvents.every(event => Number.isFinite(event.fraction)))
   assert.ok(view.chapterEvents.some(event => event.chapterTitle === 'Chapter 2'))
   assert.ok(view.chapterEvents.some(event => event.chapterTitle === 'Chapter 3'))
+})
+test('background chapter navigation skips a notes-only chapter and continues body text', async () => {
+  const {nav} = backgroundReader(['<p>第一章正文。</p>',
+    '<section epub:type="endnotes"><h1>注释</h1><p>不朗读的内容。</p></section>',
+    '<p>第二章正文。</p>'])
+  assert.equal(await nav.start(), '第一章正文。')
+  assert.equal(await nav.move(1), '第二章正文。')
+  assert.equal(await nav.move(1), '')
 })
 test('foreground presentation blocked in goTo does not block speech or reset its cursor', async () => {
   const fixture = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1><p>正文。</p>', '<h1>最后章</h1>'])

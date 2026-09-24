@@ -7,6 +7,7 @@ import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -46,6 +47,45 @@ void main() {
     await Prefs().initPrefs();
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+  for (final background in [false, true]) {
+    test(
+        'speech and stop do not wait for page highlighting (background=$background)',
+        () async {
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      binding.handleAppLifecycleStateChanged(
+          background ? AppLifecycleState.paused : AppLifecycleState.resumed);
+      final blocked = Completer<void>();
+      var highlights = 0;
+      var cursor = 0;
+      final spoken = <String>[];
+      final sentences = ['本章末句', '下一章正文'];
+      final tts = OnlineTts.forTesting(
+        collect: (_) async => cursor < sentences.length
+            ? [TtsSentence(text: sentences[cursor])]
+            : [],
+        synthesize: (_) async => Uint8List.fromList([1]),
+        play: (segment) async => spoken.add(segment.sentence.text),
+        highlight: (_) {
+          highlights++;
+          return blocked.future;
+        },
+      );
+      try {
+        await tts.init(() async => sentences.first, () async {
+          cursor++;
+          return cursor < sentences.length ? sentences[cursor] : '';
+        }, () async => '');
+        await tts.speak().timeout(const Duration(seconds: 2));
+        expect(spoken, sentences);
+        expect(highlights, background ? 0 : 1);
+        await tts.stop().timeout(const Duration(seconds: 2));
+      } finally {
+        blocked.complete();
+        binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      }
+    });
+  }
 
   test(
       'overlapping stop cleans up once even if native release fails, then restarts',

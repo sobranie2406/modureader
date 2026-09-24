@@ -9,7 +9,9 @@ export class ContinuousSectionWindow {
   busy = false
   timer = null
   warming = false
-  tail = Promise.resolve()
+  pending = new Map()
+  loadQueue = []
+  loading = false
   anchor = null
   constructor({ container, sections, create, activate, changed,
     maxViews = 9, maxBytes = 8 * 1024 * 1024 }) {
@@ -68,46 +70,99 @@ export class ContinuousSectionWindow {
     return true
   }
   ensure(index, foreground = false) {
-    const operation = async () => {
-      if (this.closed) return
-      if (this.entries.has(index)) {
-        const entry = this.entries.get(index)
-        const list = this.ordered
-        if (entry.detached && list.length &&
-          (this.adjacent(list[0].index, -1) === index || this.adjacent(list.at(-1).index, 1) === index)) {
-          this.remember()
-          entry.detached = false
-          entry.view.element.style.display = 'flex'
-          this.compensate()
-          this.updateTail()
-          if (!this.busy) this.changed?.()
-        }
-        return entry
-      }
-      if (!this.sections[index]?.load || !this.makeRoom(index, foreground)) return
-      if (!foreground && this.sections[index].size > 2 * 1024 * 1024) return
-      const src = await this.sections[index].load()
-      let view
-      try {
-        if (this.closed) return
-        view = await this.create(index, src)
-        if (this.closed) { view.destroy(); view.element.remove(); return }
+    if (this.closed) return Promise.resolve()
+    if (this.entries.has(index)) {
+      const entry = this.entries.get(index)
+      const list = this.ordered
+      if (entry.detached && list.length &&
+        (this.adjacent(list[0].index, -1) === index || this.adjacent(list.at(-1).index, 1) === index)) {
         this.remember()
-        const entry = { index, src, view, ready: true, activated: false }
-        this.entries.set(index, entry)
-        Object.assign(view.element.style, { position: 'relative', order: String(index),
-          visibility: '', pointerEvents: '', left: '', top: '', contentVisibility: 'visible' })
+        entry.detached = false
+        entry.view.element.style.display = 'flex'
         this.compensate()
         this.updateTail()
         if (!this.busy) this.changed?.()
-        return entry
-      } finally {
-        if (!view || this.closed) this.sections[index].unload?.()
+      }
+      return Promise.resolve(entry)
+    }
+    const existing = this.pending.get(index)
+    if (existing) {
+      existing.foreground ||= foreground
+      return existing.promise
+    }
+    if (!this.sections[index]?.load) return Promise.resolve()
+    const job = { index, foreground }
+    job.promise = new Promise((resolve, reject) => Object.assign(job, { resolve, reject }))
+    this.pending.set(index, job)
+    this.loadQueue.push(job)
+    void this.pumpLoads()
+    return job.promise
+  }
+  finish(job, entry, error) {
+    this.pending.delete(job.index)
+    if (error) job.reject(error)
+    else job.resolve(entry)
+  }
+  backgroundRelevant(job) {
+    if (job.foreground || !this.current) return true
+    const list = this.ordered
+    return this.adjacent(list[0]?.index, -1) === job.index ||
+      this.adjacent(list.at(-1)?.index, 1) === job.index
+  }
+  async pumpLoads() {
+    if (this.loading) return
+    this.loading = true
+    try {
+      while (this.loadQueue.length) {
+        const priority = this.loadQueue.findIndex(job => job.foreground)
+        const [job] = this.loadQueue.splice(Math.max(0, priority), 1)
+        const { index } = job
+        if (this.closed || !this.backgroundRelevant(job) ||
+          (!job.foreground && this.sections[index].size > 2 * 1024 * 1024) ||
+          !this.makeRoom(index, job.foreground)) {
+          this.finish(job)
+          continue
+        }
+        try {
+          // Only EPUB resource acquisition must be serialized for shared
+          // CSS/font reference counts. A hidden iframe's fonts/layout must not
+          // hold that queue or block an unrelated foreground chapter.
+          const src = await this.sections[index].load()
+          void this.prepare(job, src).then(entry => this.finish(job, entry),
+            error => this.finish(job, undefined, error))
+        } catch (error) { this.finish(job, undefined, error) }
+      }
+    } finally { this.loading = false }
+  }
+  async prepare(job, src) {
+    const { index } = job
+    let view, retained = false
+    try {
+      // Give pending input/foreground navigation a turn before speculative
+      // parsing and layout. Warm-up itself remains one chapter at a time.
+      if (!job.foreground) await new Promise(resolve => setTimeout(resolve, 0))
+      if (this.closed || !this.backgroundRelevant(job)) return
+      view = await this.create(index, src)
+      // The user may have jumped elsewhere while fonts/images were loading.
+      // Recheck capacity and adjacency before inserting any late document.
+      if (this.closed || !this.backgroundRelevant(job) ||
+        !this.makeRoom(index, job.foreground)) return
+      this.remember()
+      const entry = { index, src, view, ready: true, activated: false }
+      this.entries.set(index, entry)
+      retained = true
+      Object.assign(view.element.style, { position: 'relative', order: String(index),
+        visibility: '', pointerEvents: '', left: '', top: '', contentVisibility: 'visible' })
+      this.compensate()
+      this.updateTail()
+      if (!this.busy) this.changed?.()
+      return entry
+    } finally {
+      if (!retained) {
+        view?.destroy(); view?.element.remove()
+        this.sections[index].unload?.()
       }
     }
-    const result = this.tail.then(operation)
-    this.tail = result.catch(() => {})
-    return result
   }
   select(entry) {
     if (!entry || this.current === entry) return
@@ -143,6 +198,7 @@ export class ContinuousSectionWindow {
       this.timer = null
       if (this.closed || this.busy) return
       this.warming = true
+      const origin = this.current
       try {
       // Warm in both directions to a viewport beyond the visible region. A
       // short-chapter book may require more than the adjacent two documents.
@@ -169,7 +225,12 @@ export class ContinuousSectionWindow {
         }
         if (!added) break
       }
-      } finally { this.warming = false }
+      } finally {
+        this.warming = false
+        // A foreground jump can finish while this old warm-up is waiting.
+        // Its warm() call was suppressed; now prepare the new neighborhood.
+        if (!this.closed && this.current !== origin) this.warm()
+      }
     }, 100)
   }
   resize() {
@@ -250,6 +311,7 @@ export class ContinuousSectionWindow {
   destroy() {
     this.closed = true
     clearTimeout(this.timer)
+    for (const job of this.loadQueue.splice(0)) this.finish(job)
     for (const entry of [...this.entries.values()]) this.drop(entry)
     this.current = null
     this.tailSpace.remove()

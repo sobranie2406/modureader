@@ -1,5 +1,29 @@
 import Cocoa
 
+/// Own the overlay host instead of inserting views into AppKit's theme frame.
+/// Flutter can freely compose platform views inside its child controller.
+final class BrightnessContentViewController: NSViewController {
+  private let contentController: NSViewController
+
+  init(contentController: NSViewController) {
+    self.contentController = contentController
+    super.init(nibName: nil, bundle: nil)
+    addChild(contentController)
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+  override func loadView() {
+    let content = contentController.view
+    let container = NSView(frame: content.frame)
+    container.wantsLayer = true
+    content.frame = container.bounds
+    content.autoresizingMask = [.width, .height]
+    container.addSubview(content)
+    view = container
+  }
+}
+
 /// Lives outside Flutter's platform-view composition. It only paints: neither
 /// hit testing nor the first-responder chain may ever select this view.
 final class BrightnessDimView: NSView {
@@ -45,14 +69,16 @@ final class WindowBrightness {
   }
 
   private func layout() {
-    guard let content = window?.contentView else { return }
-    // Flutter manages the content view's children. Place the dimmer alongside
-    // it so subsequent platform-view composition cannot reorder the dimmer.
-    let host = content.superview ?? content
+    guard let controller = window?.contentViewController as? BrightnessContentViewController
+    else { return }
+    let host = controller.view
+    // This is our own container, never the private AppKit title/frame view.
+    // The dimmer remains a sibling of Flutter's root, outside its composition.
     if dimmer.superview !== host {
       dimmer.removeFromSuperview()
-      host.addSubview(dimmer, positioned: .above, relativeTo: content === host ? nil : content)
+      dimmer.autoresizingMask = [.width, .height]
+      host.addSubview(dimmer, positioned: .above, relativeTo: nil)
     }
-    dimmer.frame = content.convert(content.bounds, to: host)
+    dimmer.frame = host.bounds
   }
 }

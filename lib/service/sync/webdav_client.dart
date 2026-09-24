@@ -43,6 +43,7 @@ class WebdavClient extends SyncClientBase {
     )
       ..setHeaders({
         'accept-charset': 'utf-8',
+        'cache-control': 'no-cache',
         'Content-Type': 'application/octet-stream'
       })
       ..setConnectTimeout(8000);
@@ -204,6 +205,12 @@ class WebdavClient extends SyncClientBase {
 
   @override
   Future<List<RemoteFile>> readDir(String path) async {
+    // File synchronization needs decoded literal names and every page too,
+    // not only the immutable record log. The upstream directory parser keeps
+    // reserved characters encoded and reads only the first response page.
+    if (path == SyncPaths.books || path == SyncPaths.covers) {
+      return _readCompleteSyncDirectory(path);
+    }
     return (await _client.readDir(path))
         .map((file) => file.toRemoteFile())
         .toList();
@@ -258,8 +265,9 @@ class WebdavClient extends SyncClientBase {
       final modified = value('getlastmodified');
       final isDirectory = props.any((prop) =>
           prop.findAllElements('collection', namespace: 'DAV:').isNotEmpty);
-      final name = Uri.decodeComponent(
-          path.replaceFirst(RegExp(r'/$'), '').split('/').last);
+      // Callers pass literal filesystem paths, not URI-encoded paths. Decoding
+      // again breaks titles containing '%' (and changes a literal '%2F').
+      final name = path.replaceFirst(RegExp(r'/$'), '').split('/').last;
       var eTag = value('getetag')?.trim();
       if (!isDirectory &&
           RegExp(r'^database\d+\.db$').hasMatch(name) &&

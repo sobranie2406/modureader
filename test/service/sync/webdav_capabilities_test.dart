@@ -142,6 +142,33 @@ void main() {
     expect(files['/library/modu/data/file/中文 '], [4, 5, 6]);
   });
 
+  test('book listing and exact properties preserve literal filename characters',
+      () async {
+    const name = '中文 #100% %2F.epub';
+    const relative = 'modu/data/file/$name';
+    directories.add('/library/modu/data/file');
+    final target = Uri.parse('http://localhost/library/'
+            '${Uri.encodeComponent(relative).replaceAll('%2F', '/')}')
+        .path;
+    files[target] = [1, 2, 3];
+    final entries = await client.readDir('modu/data/file');
+    expect(entries.single.name, name);
+    expect(entries.single.path, relative);
+    final props = await client.readProps(relative);
+    expect(props?.name, name);
+    expect(props?.size, 3);
+  });
+
+  test('ordinary book listing includes replacement on second page', () async {
+    directories.add('/library/modu/data/file');
+    files['/library/modu/data/file/old.epub'] = [1];
+    files['/library/modu/data/file/replacement.epub'] = [2];
+    pageLink = '</library/modu/data/file/?page=2>; rel="next"';
+    final entries = await client.safeReadDir('modu/data/file');
+    expect(entries.map((e) => e.name), ['old.epub', 'replacement.epub']);
+    expect(calls.length, 2);
+  });
+
   for (final value in [
     'strong',
     'none',

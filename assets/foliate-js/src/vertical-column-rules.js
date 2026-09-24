@@ -49,7 +49,13 @@ export class VerticalColumnRules {
     this.svg.style.display = enabled ? 'block' : 'none';
     if (!enabled) { this.svg.replaceChildren(); return; }
     const viewport = this.layer.getBoundingClientRect();
-    if (viewport.width <= 0 || viewport.height <= 0) return;
+    const width = this.layer.clientWidth;
+    const height = this.layer.clientHeight;
+    if (viewport.width <= 0 || viewport.height <= 0 || width <= 0 || height <= 0) return;
+    // DOM rectangles are screen-scaled; SVG coordinates are local CSS pixels.
+    // Opening animations must not bake their temporary scale into the lines.
+    const toLocalX = width / viewport.width;
+    const toLocalY = height / viewport.height;
     const glyphs = [], media = [];
     for (const { doc } of this.renderer.getContents()) {
       const frame = doc.defaultView?.frameElement;
@@ -57,12 +63,12 @@ export class VerticalColumnRules {
       const origin = frame.getBoundingClientRect();
       const sx = origin.width / frame.clientWidth || 1;
       const sy = origin.height / frame.clientHeight || 1;
-      const project = r => ({ left: origin.left + r.left * sx - viewport.left,
-        right: origin.left + r.right * sx - viewport.left,
-        top: origin.top + r.top * sy - viewport.top,
-        bottom: origin.top + r.bottom * sy - viewport.top });
-      const visible = r => r.right > 0 && r.left < viewport.width &&
-        r.bottom > 0 && r.top < viewport.height;
+      const project = r => ({ left: (origin.left + r.left * sx - viewport.left) * toLocalX,
+        right: (origin.left + r.right * sx - viewport.left) * toLocalX,
+        top: (origin.top + r.top * sy - viewport.top) * toLocalY,
+        bottom: (origin.top + r.bottom * sy - viewport.top) * toLocalY });
+      const visible = r => r.right > 0 && r.left < width &&
+        r.bottom > 0 && r.top < height;
       const range = doc.createRange();
       // Prune offscreen blocks before measuring their text. Work is restricted
       // to the visible page, not all paragraphs of a long chapter.
@@ -88,12 +94,13 @@ export class VerticalColumnRules {
         if (visible(rect)) media.push(rect);
       }
     }
-    const lines = columnSeparators(glyphs, viewport.width)
+    const lines = columnSeparators(glyphs, width)
       .filter(x => !media.some(r => x >= r.left && x <= r.right))
       .map(x => {
         const line = this.svg.ownerDocument.createElementNS(this.svg.namespaceURI, 'line');
         for (const [key, value] of Object.entries({ x1: x, x2: x, y1: 0,
-          y2: viewport.height, stroke: '#c91c24', 'stroke-width': 0.7, 'stroke-opacity': 0.65 }))
+          // Follow the live SVG viewport even before a resize redraw runs.
+          y2: '100%', stroke: '#c91c24', 'stroke-width': 0.7, 'stroke-opacity': 0.65 }))
           line.setAttribute(key, String(value));
         return line;
       });

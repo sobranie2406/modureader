@@ -22,6 +22,8 @@ import 'package:anx_reader/service/sync/sync_preflight.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/replaced_book_files.dart';
+import 'package:anx_reader/service/sync/local_book_download.dart';
+import 'package:anx_reader/service/sync/book_file_sync.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/database_sync_manager.dart';
@@ -53,6 +55,8 @@ class Sync extends _$Sync {
   Sync._internal();
 
   bool _syncRunning = false;
+  final _localDownloads = LocalBookDownload();
+  int _activeDownloads = 0;
   bool _pendingAutomatic = false;
   SyncDirection? _pendingManualDirection;
   final _autoStart = AutoSyncStartGate();
@@ -88,6 +92,17 @@ class Sync extends _$Sync {
 
   void changeState(SyncStateModel s) {
     state = s;
+  }
+
+  void _finishTransfer() {
+    if (_activeDownloads > 0) return;
+    changeState(state.copyWith(
+      isSyncing: _syncRunning,
+      direction: SyncDirection.both,
+      fileName: '',
+      count: 0,
+      total: 0,
+    ));
   }
 
   SyncClientBase? get _syncClient {
@@ -333,12 +348,6 @@ class Sync extends _$Sync {
     remoteCoversName = List.generate(
         remoteCovers.length, (index) => 'cover/${remoteCovers[index].name!}');
 
-    final localBooks = io.Directory(getBasePath('file'))
-        .listSync()
-        .whereType<io.File>()
-        .map((e) => 'file/${basename(e.path)}')
-        .toList();
-
     // Sync cover files
     for (var file in currentCover) {
       if (!remoteCoversName.contains(file) &&
@@ -352,11 +361,13 @@ class Sync extends _$Sync {
     }
 
     // Sync book files
-    for (var file in currentBooks) {
-      if (!remoteBooksName.contains(file) && localBooks.contains(file)) {
-        await uploadFile(getBasePath(file), SyncPaths.data(file));
-      }
-    }
+    await syncBookFiles(
+      client: client,
+      currentPaths: currentBooks,
+      listedPaths: remoteBooksName.toSet(),
+      localFile: (path) => io.File(getBasePath(path)),
+      upload: (local, remote) => uploadFile(local, remote),
+    );
 
     // Do not garbage-collect by absence: an offline/concurrent device can
     // still reference these files. Deletions are synchronized as tombstones;
@@ -425,6 +436,8 @@ class Sync extends _$Sync {
     changeState(state.copyWith(
       direction: SyncDirection.upload,
       fileName: localPath.split('/').last,
+      count: 0,
+      total: 0,
     ));
 
     final client = _syncClient;
@@ -447,29 +460,38 @@ class Sync extends _$Sync {
         );
         completed = true;
       } finally {
-        changeState(state.copyWith(isSyncing: false));
+        _finishTransfer();
         await status.removeUploading(remotePath, completed: completed);
       }
     }
 
-    changeState(state.copyWith(isSyncing: false));
+    _finishTransfer();
   }
 
-  Future<void> downloadFile(String remotePath, String localPath) async {
-    changeState(state.copyWith(
-      direction: SyncDirection.download,
-      fileName: remotePath.split('/').last,
-    ));
-
+  Future<void> downloadFile(String remotePath, String localPath,
+      {String? expectedMd5}) async {
     final client = _syncClient;
-    if (client != null) {
-      final status = ref.read(syncStatusProvider.notifier);
-      var completed = false;
-      await status.addDownloading(remotePath);
-      try {
+    if (client == null) {
+      throw const SyncFeedbackFailure(SyncFailureCode.notConfigured);
+    }
+    _activeDownloads++;
+    changeState(state.copyWith(isSyncing: true));
+    var completed = false;
+    try {
+      await _localDownloads.ensure(io.File(localPath), expectedMd5: expectedMd5,
+          download: (temporary) async {
+        changeState(state.copyWith(
+          isSyncing: true,
+          direction: SyncDirection.download,
+          fileName: remotePath.split('/').last,
+          count: 0,
+          total: 0,
+        ));
+        final status = ref.read(syncStatusProvider.notifier);
+        await status.addDownloading(remotePath);
         await client.downloadFile(
           remotePath,
-          localPath,
+          temporary.path,
           onProgress: (received, total) {
             changeState(state.copyWith(
               isSyncing: true,
@@ -478,14 +500,16 @@ class Sync extends _$Sync {
             ));
           },
         );
-        completed = true;
-      } finally {
-        changeState(state.copyWith(isSyncing: false));
-        await status.removeDownloading(remotePath, completed: completed);
-      }
+      });
+      completed = true;
+    } finally {
+      // Publish completion only after checksum verification and atomic rename.
+      _activeDownloads--;
+      _finishTransfer();
+      await ref
+          .read(syncStatusProvider.notifier)
+          .removeDownloading(remotePath, completed: completed);
     }
-
-    changeState(state.copyWith(isSyncing: false));
   }
 
   Future<List<String>> listRemoteBookFiles() async {
@@ -497,14 +521,6 @@ class Sync extends _$Sync {
   }
 
   Future<void> downloadBook(Book book) async {
-    final syncStatus = await ref.read(syncStatusProvider.future);
-
-    if (!syncStatus.remoteOnly.contains(book.id)) {
-      AnxToast.show(L10n.of(navigatorKey.currentContext!)
-          .bookSyncStatusBookNotFoundRemote);
-      return;
-    }
-
     try {
       await _downloadBook(book);
     } catch (e) {
@@ -589,11 +605,13 @@ class Sync extends _$Sync {
 
   Future<void> _downloadBook(Book book) async {
     try {
-      AnxToast.show(L10n.of(navigatorKey.currentContext!)
-          .bookSyncStatusDownloadingBook(book.filePath));
+      // A shelf widget can still hold the pre-replacement filename.
+      book = await bookDao.selectBookById(book.id);
+      if (book.isDeleted) return;
       final remotePath = SyncPaths.data(book.filePath);
       final localPath = getBasePath(book.filePath);
-      await downloadFile(remotePath, localPath);
+      await downloadFile(remotePath, localPath, expectedMd5: book.md5);
+      await ref.read(bookListProvider.notifier).refresh();
     } catch (e) {
       AnxToast.show(
           L10n.of(navigatorKey.currentContext!).bookSyncStatusDownloadFailed);

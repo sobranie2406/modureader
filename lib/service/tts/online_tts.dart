@@ -7,6 +7,7 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:anx_reader/service/tts/tts_provider.dart';
+import 'package:anx_reader/service/tts/tts_text_filter.dart';
 import 'package:anx_reader/service/tts/audio_mime_type.dart';
 import 'package:anx_reader/service/tts/models/tts_segment.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
@@ -32,17 +33,21 @@ class OnlineTts extends BaseTts {
     Future<void> Function(TtsSegment)? play,
     AudioPlayer? player,
     AudioPlayer Function()? createPlayer,
+    Future<void> Function(TtsSegment)? highlight,
   })  : assert(synthesize != null || backend != null),
         _backendOverride = backend,
         _collectOverride = collect,
         _synthesizeOverride = synthesize,
         _playOverride = play,
+        _highlightOverride = highlight,
         _player = player,
         _createPlayer = createPlayer;
 
   Future<List<TtsSentence>> Function(int)? _collectOverride;
   Future<Uint8List> Function(String)? _synthesizeOverride;
   Future<void> Function(TtsSegment)? _playOverride;
+  Future<void> Function(TtsSegment)? _highlightOverride;
+  bool _isHighlighting = false;
   String? _playbackError;
   @override
   String? get playbackError => _playbackError;
@@ -168,13 +173,30 @@ class OnlineTts extends BaseTts {
   }
 
   // ============ Audio Player Management ============
-  Future<AudioPlayer> _ensurePlayer() async {
-    if (_player != null) return _player!;
+  AudioContext _audioContext({required bool preview}) => AudioContext(
+        android: AudioContextAndroid(
+          contentType: AndroidContentType.speech,
+          usageType: AndroidUsageType.media,
+          stayAwake: true,
+          // The reading session owns focus; a settings preview has no session.
+          audioFocus: preview ? AndroidAudioFocus.gain : AndroidAudioFocus.none,
+        ),
+        iOS: AudioContextIOS(options: {
+          if (Prefs().allowMixWithOtherAudio)
+            AVAudioSessionOptions.mixWithOthers,
+        }),
+      );
 
+  Future<AudioPlayer> _ensurePlayer({bool preview = false}) async {
+    if (_player != null) {
+      await _player!.setAudioContext(_audioContext(preview: preview));
+      return _player!;
+    }
     final player = _createPlayer?.call() ?? AudioPlayer();
     try {
       await player.setReleaseMode(ReleaseMode.stop);
       await player.setPlayerMode(PlayerMode.mediaPlayer);
+      await player.setAudioContext(_audioContext(preview: preview));
       await player.setVolume(volume);
       _playerCompleteSubscription = player.onPlayerComplete.listen((_) {
         if (identical(_player, player) &&
@@ -338,6 +360,14 @@ class OnlineTts extends BaseTts {
     if (_shouldStop) return;
     if (segment.isReady) return;
 
+    // Punctuation-only paragraphs (such as "……") produce no speech. Keep a
+    // silent segment in the ordered buffer so only the consumer advances the
+    // reader cursor, including when this separator ends a chapter.
+    if (isTtsSeparator(segment.sentence.text)) {
+      segment.isSilent = true;
+      return;
+    }
+
     // Capture the version at the start of fetching
     final targetVersion = segment.fetchVersion;
 
@@ -444,7 +474,7 @@ class OnlineTts extends BaseTts {
         }
         if (_shouldStop) break;
         if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
-        if (segment.error != null || segment.isSilent) {
+        if (segment.error != null) {
           _playbackError =
               '语音生成失败，已保留当前位置，请重试 / Speech synthesis failed; retry this sentence.';
           _shouldStop = true;
@@ -457,30 +487,33 @@ class OnlineTts extends BaseTts {
         _currentSegment = segment;
         _currentVoiceText = segment.sentence.text;
 
-        // Highlight current sentence
-        await _highlightSegment(segment);
+        // Presentation must never gate audio on a suspended/background WebView.
+        unawaited(_highlightSegment(segment));
         if (_shouldStop) break;
 
-        // Play audio
-        _playbackCompleter = Completer<void>();
-        final source = BytesSource(segment.audio!,
-            mimeType: ttsAudioMimeType(segment.audio!));
+        // Silent separators still pass through the normal pause/stop and
+        // cursor-advance path below, but never reach the audio player.
+        if (!segment.isSilent) {
+          _playbackCompleter = Completer<void>();
+          final source = BytesSource(segment.audio!,
+              mimeType: ttsAudioMimeType(segment.audio!));
 
-        try {
-          if (_playOverride != null) {
-            await _playOverride!(segment);
-          } else {
-            await audioPlayer!.play(source);
-            await _playbackCompleter!.future;
-          }
-        } catch (e) {
-          AnxLog.severe('Playback error: $e');
-          if (!_shouldStop) {
-            _buffer.insert(0, segment);
-            _playbackError =
-                '音频播放失败，请重试 / Audio playback failed; retry this sentence.';
-            _shouldStop = true;
-            updateTtsState(TtsStateEnum.paused);
+          try {
+            if (_playOverride != null) {
+              await _playOverride!(segment);
+            } else {
+              await audioPlayer!.play(source);
+              await _playbackCompleter!.future;
+            }
+          } catch (e) {
+            AnxLog.severe('Playback error: $e');
+            if (!_shouldStop) {
+              _buffer.insert(0, segment);
+              _playbackError =
+                  '音频播放失败，请重试 / Audio playback failed; retry this sentence.';
+              _shouldStop = true;
+              updateTtsState(TtsStateEnum.paused);
+            }
           }
         }
 
@@ -516,12 +549,24 @@ class OnlineTts extends BaseTts {
   }
 
   Future<void> _highlightSegment(TtsSegment segment) async {
-    final state = epubPlayerKey.currentState;
-    final cfi = segment.sentence.cfi;
-    if (state == null || cfi == null || cfi.isEmpty) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+    if (_isHighlighting) return;
+    _isHighlighting = true;
     try {
-      await state.ttsHighlightByCfi(cfi);
-    } catch (_) {}
+      if (_highlightOverride != null) {
+        await _highlightOverride!(segment);
+      } else {
+        final state = epubPlayerKey.currentState;
+        final cfi = segment.sentence.cfi;
+        if (state == null || cfi == null || cfi.isEmpty) return;
+        await state.ttsHighlightByCfi(cfi);
+      }
+    } catch (_) {
+      // Visual feedback is optional; speech/navigation owns the cursor.
+    } finally {
+      _isHighlighting = false;
+    }
   }
 
   // ============ Public API ============
@@ -697,7 +742,7 @@ class OnlineTts extends BaseTts {
   /// For testing a specific voice in settings
   Future<void> speakWithVoice(String content, String voice) async {
     await stop();
-    final audioPlayer = await _ensurePlayer();
+    final audioPlayer = await _ensurePlayer(preview: true);
 
     final bytes = await backend.speak(content, voice, rate, pitch);
     if (bytes.isNotEmpty) {

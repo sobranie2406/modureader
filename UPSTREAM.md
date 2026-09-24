@@ -65,6 +65,10 @@ staging step; packaging rejects missing or corrupt weights and tokenizers.
   mobile/ARM cross-compilation in the build hook. Original license is included.
 - `third_party/icons_plus`: icons_plus 5.0.0, MIT; existing compatibility override.
   Icon brands remain the property of their respective owners.
+- `third_party/audioplayers_android`: audioplayers_android 5.2.0, MIT, Blue Fire.
+  Explicit Android MediaPlayer.start() after setting the rate restores system
+  playback tracking/media-key routing and wake-lock activation. See its
+  MODU_PATCHES.md and LICENSE; upstream https://github.com/bluefireteam/audioplayers.
 - `assets/foliate-js`: Foliate-js, MIT; PDF.js and other embedded components retain
   their license notices. Modified renderer code is included in the source release.
 - ONNX Runtime: Microsoft, MIT. Windows/Linux use 1.22.0; Apple uses 1.23.0.

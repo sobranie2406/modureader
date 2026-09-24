@@ -2,28 +2,22 @@
 
 Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.3
+## 1.1.4
 
-- Fix Edge reading cache preparation on immutable configuration, distinguish system voices by name and locale, and add contextual Android notification permission requests plus a settings entry.
-- TXT note exports separate reader notes from excerpts with labelled rules and local creation/last-modified timestamps; legacy unknown times are not fabricated.
-- Reading notifications show book/chapter and previous, play/pause, next and exit controls; paused controls remain available and speech-driven chapter metadata follows background playback.
-- Compact reader brightness controls: follow-system toggle, slider and night mode; night mode preserves and restores the original palette and background.
-- Separate Chinese/body and English fonts, with independent import/application and legacy-compatible defaults; supports reflowable text and footnotes.
-- Eight named, editable CSS profiles; per-book choices on this device, shared defaults and legacy CSS preservation.
-- Update checks and downloads prefer GitHub and fall back to Gitee for all network, timeout, TLS and HTTP request failures, including 403 and 404.
-- Preserve HTTPS verification, matching version/architecture, size and SHA-256 checks; cancellation, invalid metadata and local errors still stop safely.
-- Distinguish rate limiting from access denial instead of labelling every 403 as throttling.
-- Remove old Gitee application releases before publishing each new release; preserve GitHub history from 1.1.0, source tags and the model mirror.
-- Stable build 10036 replaces 10035; build-only updates require a manual download. Models remain on demand; upgrade in place without uninstalling or clearing library data.
+- Save or clear speech settings and transfer saved providers, keys, voices and playback parameters through private QR images or Modu configuration links.
+- Skills stay hidden until the sparkle button opens a vertical in-chat picker; selection closes it without discarding your draft.
+- Fix Android native playback state and media-key routing; apply wake locks when the player is created lazily.
+- Skip recognizable footnotes, note references and punctuation-only speech segments; genuine synthesis failures still preserve the reading position.
+- Refresh replaced-book identities and transfer state to avoid duplicate uploads/downloads and stale completion indicators; safely clean confirmed obsolete files.
+- Improve chapter loading and continuous scrolling without using substitute fonts; reader menus overlay text without reflowing it.
+- Refresh vertical column rules on initial layout, raise the mobile reader toolbar, and isolate macOS dimming from title-bar and input handling.
+- GitHub remains the primary update source and Gitee the verified fallback. Models remain on demand. Upgrade in place without uninstalling or clearing data.
 
-- 修复 Edge 能试听却不能读书的只读配置异常；系统语音用名称＋语言区域区分并迁移旧选择；补充安卓通知权限声明、首次前台朗读申请和设置入口。
-- TXT 导出用横线和“笔记”标签区分摘录与笔记，标注本地时区的创建或最后修改时间；旧数据无时间时不伪造日期。
-- 朗读通知显示书名和章节，提供上一段、播放/暂停、下一段、停止退出；暂停仍保留完整控制，章节信息跟随后台朗读更新。
-- 阅读亮度改为左侧自动、中间滑杆、右侧夜间模式；夜间配色不覆盖原有配色和背景图，关闭后恢复。
-- 中英文独立字体：英文默认跟随正文，也可单独选择或导入，兼容横排、竖排与注释，不拆分文字节点。
-- 新增 8 套可命名、编辑的 CSS 方案；每本书在本机记住选择，可跟随默认，并保留旧 CSS。
-- 检查更新和安装包下载优先 GitHub，全部网络、超时、TLS 和 HTTP 请求错误均回退 Gitee，包括 403 和 404。
-- 保留 HTTPS、版本与架构、大小及 SHA-256 校验；主动取消、无效清单和本地错误仍安全停止。
-- 区分限流和拒绝访问，不再把所有 403 统一提示为请求频率限制。
-- Gitee 每次先删除旧应用发行版再发布新版；保留 GitHub 1.1.0 起历史、源码标签及独立模型镜像。
-- 正式版构建 10036 替换 10035，同版本构建更新需手动下载；模型继续按需下载，请直接覆盖升级，不卸载或清空书库数据。
+- 新增朗读设置保存、清除，以及私密二维码图片和默读配置链接迁移，包含服务、密钥、声音及语音参数。
+- 技能默认隐藏，点击星光按钮后在对话框内纵向展开；选择后收起并保留输入草稿。
+- 修复 Android 原生播放状态与媒体按键控制，补齐播放器延迟创建时的唤醒锁。
+- 跳过可识别脚注、注释编号与纯标点段落；真正的合成失败仍保留阅读位置。
+- 刷新替换书籍的文件身份与传输状态，避免重复上传、下载和完成状态卡住；安全清理已确认过期文件。
+- 优化章节加载与连续滚动，不使用替代字体；阅读菜单覆盖显示，不再引发正文重排。
+- 修复首次竖排分栏线布局，抬高移动端阅读底部菜单，并隔离 macOS 调光层与标题栏、输入事件。
+- 更新继续优先 GitHub，失败后使用经过校验的 Gitee 镜像；模型按需下载，请覆盖升级，不卸载或清空数据。

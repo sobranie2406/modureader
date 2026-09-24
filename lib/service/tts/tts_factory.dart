@@ -31,6 +31,8 @@ class TtsFactory {
 
   BaseTts? _currentTts;
 
+  bool get hasCurrent => _currentTts != null;
+
   BaseTts get current {
     _currentTts ??= createTts();
     return _currentTts!;

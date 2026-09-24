@@ -7,6 +7,7 @@ class TtsSegment {
 
   final TtsSentence sentence;
   Uint8List? audio;
+  // Intentionally non-spoken punctuation, never a synthesis failure.
   bool isSilent = false;
   Object? error;
   int fetchVersion =

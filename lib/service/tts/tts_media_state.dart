@@ -10,6 +10,11 @@ PlaybackState ttsMediaState(PlaybackState previous, TtsStateEnum state,
     playing: playing,
     processingState:
         stopped ? AudioProcessingState.idle : AudioProcessingState.ready,
+    // Bluetooth remotes may send a toggle, explicit play, or explicit pause.
+    // Advertise all supported commands, not only the currently visible icon.
+    systemActions: stopped
+        ? const {}
+        : const {MediaAction.play, MediaAction.pause, MediaAction.playPause},
     controls: stopped
         ? []
         : [

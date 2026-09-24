@@ -501,7 +501,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void showBottomBar() {
     setState(() {
-      showStatusBarWithoutResize();
+      // The bars are painted over the reader in the body Stack. Changing the
+      // system UI mode here changes WebView viewport metrics and repaginates
+      // the book even though the reader itself has not moved.
       bottomBarOffstage = false;
       _releaseReaderFocus();
     });
@@ -511,9 +513,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     setState(() {
       _currentPage = empty;
       bottomBarOffstage = true;
-      if (Prefs().hideStatusBar) {
-        hideStatusBar();
-      }
       _requestReaderFocus();
     });
   }
@@ -1019,6 +1018,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     top: false,
                     child: Container(
                       constraints: const BoxConstraints(maxWidth: 600),
+                      padding: EdgeInsets.only(
+                        bottom: AnxPlatform.isMobile ? 16 : 0,
+                      ),
                       child: StatefulBuilder(
                         builder: (BuildContext context, StateSetter setState) {
                           final hasContent = !identical(_currentPage, empty);

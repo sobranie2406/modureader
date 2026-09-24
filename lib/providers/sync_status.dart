@@ -20,16 +20,38 @@ List<int> syncingBookIds(Iterable<Book> books, String fileName) {
       .toList();
 }
 
+SyncStatusModel completeBookTransfer(SyncStatusModel current, int id,
+        {required bool download, required bool completed}) =>
+    current.copyWith(
+      localOnly: completed
+          ? current.localOnly.where((e) => e != id).toList()
+          : current.localOnly,
+      remoteOnly: completed
+          ? current.remoteOnly.where((e) => e != id).toList()
+          : current.remoteOnly,
+      nonExistent: completed
+          ? current.nonExistent.where((e) => e != id).toList()
+          : current.nonExistent,
+      both: completed ? {...current.both, id}.toList() : current.both,
+      downloading: download
+          ? current.downloading.where((e) => e != id).toList()
+          : current.downloading,
+      uploading: !download
+          ? current.uploading.where((e) => e != id).toList()
+          : current.uploading,
+    );
+
 @Riverpod(keepAlive: true)
 class SyncStatus extends _$SyncStatus {
+  int _refreshGeneration = 0;
   List<Book> allBooksInBookShelf = [];
   @override
   Future<SyncStatusModel> build() async {
-    allBooksInBookShelf = await _listAllBooksInBookShelf();
-    final allBooksInBookShelfIds =
-        allBooksInBookShelf.map((e) => e.id).toList();
-    final remoteFiles = await _listRemoteFiles(allBooksInBookShelf);
-    final localFiles = await _listLocalFiles(allBooksInBookShelf);
+    final books = await _listAllBooksInBookShelf();
+    allBooksInBookShelf = books;
+    final allBooksInBookShelfIds = books.map((e) => e.id).toList();
+    final remoteFiles = await _listRemoteFiles(books);
+    final localFiles = await _listLocalFiles(books);
 
     final localOnly =
         localFiles.where((e) => !remoteFiles.contains(e)).toList();
@@ -43,7 +65,7 @@ class SyncStatus extends _$SyncStatus {
 
     final isSyncing = ref.read(syncProvider.select((value) => value.isSyncing));
 
-    final matches = syncingBookIds(allBooksInBookShelf, webdavInfo.fileName);
+    final matches = syncingBookIds(books, webdavInfo.fileName);
     final downloading =
         isSyncing && webdavInfo.direction == SyncDirection.download
             ? matches
@@ -62,7 +84,9 @@ class SyncStatus extends _$SyncStatus {
   }
 
   Future<void> refresh() async {
-    state = await AsyncValue.guard(build);
+    final generation = ++_refreshGeneration;
+    final next = await AsyncValue.guard(build);
+    if (generation == _refreshGeneration) state = next;
   }
 
   Future<List<int>> _listRemoteFiles(List<Book> books) async {
@@ -120,11 +144,8 @@ class SyncStatus extends _$SyncStatus {
   Future<int?> pathToBookId(String filePath) async {
     final name = filePath.split('/').last;
     if (name.isEmpty || name.endsWith('.db')) return null;
-    var matches = syncingBookIds(allBooksInBookShelf, name);
-    if (matches.isEmpty) {
-      allBooksInBookShelf = await _listAllBooksInBookShelf();
-      matches = syncingBookIds(allBooksInBookShelf, name);
-    }
+    allBooksInBookShelf = await _listAllBooksInBookShelf();
+    final matches = syncingBookIds(allBooksInBookShelf, name);
     return matches.isEmpty ? null : matches.first;
   }
 
@@ -181,20 +202,9 @@ class SyncStatus extends _$SyncStatus {
     if (bookId == null || state.value == null) {
       return;
     }
-    state = AsyncData(
-      SyncStatusModel(
-        localOnly: state.value!.localOnly,
-        remoteOnly: state.value!.remoteOnly,
-        both: completed
-            ? {...state.value!.both, bookId}.toList()
-            : state.value!.both,
-        nonExistent: state.value!.nonExistent,
-        downloading:
-            state.value!.downloading.where((e) => e != bookId).toList(),
-        uploading: state.value!.uploading,
-      ),
-    );
-    ref.invalidateSelf();
+    _refreshGeneration++;
+    state = AsyncData(completeBookTransfer(state.value!, bookId,
+        download: true, completed: completed));
   }
 
   Future<void> removeUploading(String filePath, {bool completed = true}) async {
@@ -205,18 +215,8 @@ class SyncStatus extends _$SyncStatus {
     if (bookId == null || state.value == null) {
       return;
     }
-    state = AsyncData(
-      SyncStatusModel(
-        localOnly: state.value!.localOnly,
-        remoteOnly: state.value!.remoteOnly,
-        both: completed
-            ? {...state.value!.both, bookId}.toList()
-            : state.value!.both,
-        nonExistent: state.value!.nonExistent,
-        downloading: state.value!.downloading,
-        uploading: state.value!.uploading.where((e) => e != bookId).toList(),
-      ),
-    );
-    ref.invalidateSelf();
+    _refreshGeneration++;
+    state = AsyncData(completeBookTransfer(state.value!, bookId,
+        download: false, completed: completed));
   }
 }

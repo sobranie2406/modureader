@@ -236,8 +236,20 @@ class View {
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
     return new Promise((resolve, reject) => {
+      let settled = false
+      const finish = error => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        this.#iframe.removeEventListener('load', loaded)
+        this.#cancelLoad = null
+        if (error) reject(error)
+        else resolve()
+      }
+      const timer = setTimeout(() => finish(new Error('Reader chapter loading timed out')), 15000)
       const loaded = async () => {
         try {
+          if (settled) return
           if (this.#destroyed) throw new Error('Reader view closed')
           const doc = this.document
           afterLoad?.(doc)
@@ -257,8 +269,9 @@ class View {
           // Trigger font discovery without paginating/anchoring with fallback
           // metrics. Keep the outgoing chapter visible during this wait.
           const ready = await waitForReaderFonts(doc)
+          if (settled) return
           if (this.#destroyed) throw new Error('Reader view closed')
-          if (!ready) console.warn('Reader font loading timed out or failed; using fallback')
+          if (!ready) throw new Error('Reader font loading timed out or failed')
           // Measure the latest viewport, including resizes during font loading.
           const layout = beforeRender?.({ vertical, rtl })
           this.render(layout)
@@ -279,22 +292,17 @@ class View {
           // (see https://bugzilla.mozilla.org/show_bug.cgi?id=1832939)
           // until the bug is fixed we can at least account for font load
           // Do not expand again for the ready promise we just awaited. Only
-          // account for genuinely later fonts (including a timed-out font).
+          // account for genuinely later fonts, e.g. after a style change.
           const fontsChanged = () => { if (!this.#destroyed) this.expand() }
           doc.fonts?.addEventListener?.('loadingdone', fontsChanged)
           this.#cleanup.push(() => doc.fonts?.removeEventListener?.('loadingdone', fontsChanged))
 
-          this.#cancelLoad = null
-          resolve()
+          finish()
         } catch (error) {
-          this.#cancelLoad = null
-          reject(error)
+          finish(error)
         }
       }
-      this.#cancelLoad = () => {
-        this.#iframe.removeEventListener('load', loaded)
-        reject(new Error('Reader view closed'))
-      }
+      this.#cancelLoad = () => finish(new Error('Reader view closed'))
       this.#iframe.addEventListener('load', loaded, { once: true })
       this.#iframe.src = src
     })

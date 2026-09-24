@@ -2537,5 +2537,6 @@ fetch(url)
   .then(blob => open(new File([blob], new URL(url, window.location.origin).pathname), initialCfi))
   .catch(async e => {
     if (importing) await callFlutter('onImportError', { name: e.name, message: e.message })
+    else await callFlutter('onReaderLoadError', { name: e.name })
     console.error(e)
   })

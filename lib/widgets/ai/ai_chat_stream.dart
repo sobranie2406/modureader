@@ -70,7 +70,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   final AiChatScrollController _scrollController = AiChatScrollController();
   final FocusNode _inputFocusNode = FocusNode();
   bool _isStreaming = false;
-  bool _showSkillPrompts = true;
+  bool _showSkillPrompts = false;
   double _fontSize = 14.0;
   String? _readerSourceText;
   String? _lastSubmittedSkillId;
@@ -365,6 +365,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _lastSubmittedSourceText = null;
       _lastSubmittedHomePromptId = entry.homePromptId;
       _messageStream = null;
+      _showSkillPrompts = false;
       // reset state when switching service
     });
 
@@ -402,7 +403,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _lastSubmittedSourceText = null;
       _lastSubmittedHomePromptId = null;
       _messageStream = null;
-      _showSkillPrompts = true;
+      _showSkillPrompts = false;
     });
   }
 
@@ -444,6 +445,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _messageController = controller;
       _messageStream = controller.stream;
       _isStreaming = true;
+      _showSkillPrompts = false;
     });
     _scrollToBottom();
 
@@ -486,6 +488,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   void _useQuickPrompt(String prompt) {
+    setState(() => _showSkillPrompts = false);
     final subject = inputController.text.trim();
     if (subject.isEmpty) {
       inputController
@@ -508,7 +511,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _messageController = null;
     setState(() {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
-      _showSkillPrompts = true;
+      _showSkillPrompts = false;
       _readerSourceText = null;
       _lastSubmittedSkillId = null;
       _lastSubmittedSourceText = null;
@@ -639,9 +642,80 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     return null;
   }
 
+  Widget _buildSkillPicker(BuildContext context) {
+    Widget option({
+      required Key key,
+      required String label,
+      required VoidCallback onPressed,
+      IconData icon = Icons.auto_awesome_outlined,
+    }) =>
+        TextButton.icon(
+          key: key,
+          style: TextButton.styleFrom(
+            alignment: Alignment.centerLeft,
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+          onPressed: _isStreaming ? null : onPressed,
+        );
+
+    final hasReaderSkills = widget.quickPromptChips.isNotEmpty;
+    return Material(
+      key: const ValueKey('ai-skill-picker'),
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        key: ValueKey(
+            hasReaderSkills ? 'reader-skill-chips' : 'home-quick-prompts'),
+        primary: false,
+        padding: const EdgeInsets.all(8),
+        // Use the conversation viewport, not a growing row above the input.
+        // Normal reader skills fit vertically; small windows/large text still
+        // allow overflow to scroll without clipping or shrinking tap targets.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (hasReaderSkills)
+              for (final (index, chip) in widget.quickPromptChips.indexed)
+                option(
+                  key: ValueKey('reader-skill-$index'),
+                  label: chip.label,
+                  icon: chip.icon,
+                  onPressed: () {
+                    inputController.text = chip.prompt;
+                    _sendMessage(
+                        skillId: chip.skillId, sourceText: _readerSourceText);
+                  },
+                )
+            else ...[
+              for (final (index, prompt) in _getQuickPrompts(context).indexed)
+                option(
+                  key: ValueKey('ai-quick-prompt-$index'),
+                  label: prompt['label']!,
+                  onPressed: () => _useQuickPrompt(prompt['prompt']!),
+                ),
+              const Divider(),
+              for (final prompt in _getStarterPrompts(context))
+                option(
+                  key: ValueKey('home-prompt-${prompt.id}'),
+                  label: prompt.text,
+                  onPressed: () {
+                    inputController.text = prompt.text;
+                    _sendMessage(homePromptId: prompt.id);
+                  },
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final quickPrompts = _getQuickPrompts(context);
     final allProviders = ref.watch(aiProvidersProvider);
     final enabledProviders = allProviders.where((p) => p.enabled).toList();
     final currentProvider = _currentProvider(enabledProviders);
@@ -706,52 +780,6 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       child: SafeArea(
         child: Column(
           children: [
-            if (_showSkillPrompts && widget.quickPromptChips.isNotEmpty)
-              SingleChildScrollView(
-                key: const ValueKey('reader-skill-chips'),
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  spacing: 8,
-                  children: widget.quickPromptChips
-                      .map((chip) => ActionChip(
-                            avatar: Icon(chip.icon, size: 18),
-                            label: Text(chip.label),
-                            onPressed: _isStreaming
-                                ? null
-                                : () {
-                                    inputController.text = chip.prompt;
-                                    _sendMessage(
-                                        skillId: chip.skillId,
-                                        sourceText: _readerSourceText);
-                                  },
-                          ))
-                      .toList(),
-                ),
-              ),
-            if (_showSkillPrompts && widget.quickPromptChips.isEmpty) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox.shrink(),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      child: Row(
-                        spacing: 8,
-                        children: quickPrompts.map((prompt) {
-                          return ActionChip(
-                            label: Text(prompt['label']!),
-                            onPressed: () => _useQuickPrompt(prompt['prompt']!),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-            ],
             TextField(
               controller: inputController,
               focusNode: _inputFocusNode,
@@ -808,8 +836,10 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                   isSelected: _showSkillPrompts,
                   icon: const Icon(Icons.auto_awesome_outlined, size: 18),
                   selectedIcon: const Icon(Icons.auto_awesome, size: 18),
-                  onPressed: () =>
-                      setState(() => _showSkillPrompts = !_showSkillPrompts),
+                  onPressed: () {
+                    if (!_showSkillPrompts) _inputFocusNode.unfocus();
+                    setState(() => _showSkillPrompts = !_showSkillPrompts);
+                  },
                 ),
                 IconButton(
                   icon: Icon(_isStreaming ? Icons.stop : Icons.send, size: 18),
@@ -821,54 +851,6 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         ),
       ),
     );
-
-    Widget buildEmptyState() {
-      if (!_showSkillPrompts) return const SizedBox.expand();
-      final theme = Theme.of(context);
-
-      return Stack(
-        children: [
-          if (widget.quickPromptChips.isEmpty)
-            Center(
-              child: SingleChildScrollView(
-                key: const ValueKey('home-quick-prompts'),
-                primary: false,
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 840),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        L10n.of(context).tryAQuickPrompt,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _getStarterPrompts(context)
-                            .map(
-                              (prompt) => ActionChip(
-                                key: ValueKey('home-prompt-${prompt.id}'),
-                                label: Text(prompt.text),
-                                onPressed: () {
-                                  inputController.text = prompt.text;
-                                  _sendMessage(homePromptId: prompt.id);
-                                },
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      );
-    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -903,53 +885,60 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           : Column(
               children: [
                 Expanded(
-                  child: _messageStream != null
-                      ? StreamBuilder<List<ChatMessage>>(
-                          stream: _messageStream,
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return SingleChildScrollView(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                    snapshot.error
-                                        .toString()
-                                        .replaceFirst('Bad state: ', ''),
-                                    key: const ValueKey('ai-request-error'),
-                                    style: TextStyle(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .error)),
-                              );
-                            }
-                            if (!snapshot.hasData) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.done) {
-                                return buildEmptyState();
-                              }
-                              return Skeletonizer.zone(child: Bone.multiText());
-                            }
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _messageStream != null
+                          ? StreamBuilder<List<ChatMessage>>(
+                              stream: _messageStream,
+                              builder: (context, snapshot) {
+                                if (snapshot.hasError) {
+                                  return SingleChildScrollView(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                        snapshot.error
+                                            .toString()
+                                            .replaceFirst('Bad state: ', ''),
+                                        key: const ValueKey('ai-request-error'),
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error)),
+                                  );
+                                }
+                                if (!snapshot.hasData) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.done) {
+                                    return const SizedBox.expand();
+                                  }
+                                  return Skeletonizer.zone(
+                                      child: Bone.multiText());
+                                }
 
-                            final messages = snapshot.data!;
-                            if (messages.isEmpty) {
-                              return buildEmptyState();
-                            }
+                                final messages = snapshot.data!;
+                                if (messages.isEmpty) {
+                                  return const SizedBox.expand();
+                                }
 
-                            return _buildMessageList(messages);
-                          },
-                        )
-                      : ref.watch(aiChatProvider(widget.scope)).when(
-                            data: (messages) {
-                              if (messages.isEmpty) {
-                                return buildEmptyState();
-                              }
+                                return _buildMessageList(messages);
+                              },
+                            )
+                          : ref.watch(aiChatProvider(widget.scope)).when(
+                                data: (messages) {
+                                  if (messages.isEmpty) {
+                                    return const SizedBox.expand();
+                                  }
 
-                              return _buildMessageList(messages);
-                            },
-                            loading: () =>
-                                Skeletonizer.zone(child: Bone.multiText()),
-                            error: (error, stack) =>
-                                Center(child: Text('error: $error')),
-                          ),
+                                  return _buildMessageList(messages);
+                                },
+                                loading: () =>
+                                    Skeletonizer.zone(child: Bone.multiText()),
+                                error: (error, stack) =>
+                                    Center(child: Text('error: $error')),
+                              ),
+                      if (_showSkillPrompts) _buildSkillPicker(context),
+                    ],
+                  ),
                 ),
                 inputBox,
               ],
