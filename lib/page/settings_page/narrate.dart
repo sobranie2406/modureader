@@ -1,6 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -17,6 +16,7 @@ import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/widgets/common/anx_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/settings/service_config_form.dart';
+import 'package:anx_reader/widgets/settings/mimo_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
@@ -172,8 +172,8 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_text(
-                  '接口修改请先保存，再获取声音或试听。导出仅包含已保存设置，可通过二维码图片或默读配置链接（modu:）导入；跨设备系统声音可能需要重新选择。',
-                  'Save service edits before loading voices or previewing. Export saved settings via QR images or Modu configuration links (modu:). System voices may need reselection on another device.')),
+                  '接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用二维码或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。',
+                  'Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via QR images or modu links. System voices may need reselection on another device.')),
               const SizedBox(height: 12),
               Wrap(spacing: 10, runSpacing: 10, children: [
                 FilledButton.icon(
@@ -188,21 +188,10 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               if (_configDrafts.isNotEmpty)
                 Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(_text('有未保存的接口修改，保存后可导出、导入。',
-                        'Unsaved service edits. Save before exporting or importing.'))),
+                    child: Text(_text('有未保存的接口修改。保存后可在“全局设置备份”中导出。',
+                        'Unsaved edits. Save before exporting in Global settings backup.'))),
             ]),
           )),
-          ConfigTransferTile(
-            kind: 'tts',
-            label: _text('朗读配置', 'speech settings'),
-            enabled: !_savingSettings && _configDrafts.isEmpty,
-            allowReadAny: false,
-            importNotice: _text(
-                '导入将停止当前朗读，并替换全部朗读配置（包括 API Key、声音、语速、音调和音量），不会自动播放。',
-                'Import stops speech and replaces all TTS settings, including keys, voices, rate, pitch and volume. Playback will not start automatically.'),
-            getData: () => TtsConfigTransfer.snapshot(Prefs()),
-            applyData: _applySettings,
-          ),
         ],
       );
 
@@ -690,16 +679,33 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
 
     ref.watch(onlineTtsConfigProvider(serviceId));
     final config = _configDrafts[serviceId] ?? provider.getConfig();
+    final isMimo = service == tts_svc.TtsService.xiaomi;
+    void updateDraft(Map<String, dynamic> newConfig) {
+      setState(() => _configDrafts[serviceId] = Map.from(newConfig));
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
-      child: ServiceConfigForm(
-        key: ValueKey('tts-config-$serviceId-$_configRevision'),
-        configItems: configItems,
-        initialConfig: config,
-        onConfigChanged: (newConfig) {
-          setState(() => _configDrafts[serviceId] = Map.from(newConfig));
-        },
+      child: Column(
+        children: [
+          ServiceConfigForm(
+            key: ValueKey('tts-config-$serviceId-$_configRevision'),
+            configItems: isMimo
+                ? configItems
+                    .where((item) => !const {'model', 'voice', 'stylePrompt'}
+                        .contains(item.key))
+                    .toList()
+                : configItems,
+            initialConfig: config,
+            onConfigChanged: updateDraft,
+          ),
+          if (isMimo)
+            MimoVoiceSettings(
+              key: ValueKey('mimo-config-$_configRevision'),
+              config: config,
+              onChanged: updateDraft,
+            ),
+        ],
       ),
     );
   }
@@ -740,9 +746,13 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               ),
             ),
           ),
-          _buildCurrentModelSection(),
-          Divider(thickness: 4, color: Theme.of(context).colorScheme.surface),
-          ..._buildVoiceModelList(),
+          if (!(Prefs().ttsService == 'xiaomi' &&
+              tts_svc.TtsService.xiaomi.provider.getConfig()['model'] ==
+                  'mimo-v2.5-tts-voicedesign')) ...[
+            _buildCurrentModelSection(),
+            Divider(thickness: 4, color: Theme.of(context).colorScheme.surface),
+            ..._buildVoiceModelList(),
+          ],
         ];
       },
       loading: () => [const Center(child: CircularProgressIndicator())],

@@ -1,9 +1,9 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/narrate.dart';
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
 import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
+import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,15 +49,43 @@ void main() {
     await tester.enterText(keyField, 'new-test-key');
     await tester.pumpAndSettle();
     expect(Prefs().getOnlineTtsConfig('openai')['key'], 'old-test-key');
-    var tile =
-        tester.widget<ConfigTransferTile>(find.byType(ConfigTransferTile));
-    expect(tile.enabled, isFalse);
-    expect(
-        tile.getData()['providers']['openai']['config']['key'], 'old-test-key');
+    expect(find.byType(ConfigTransferTile), findsNothing);
     await tap(tester, 'Save settings');
     expect(Prefs().getOnlineTtsConfig('openai')['key'], 'new-test-key');
-    tile = tester.widget<ConfigTransferTile>(find.byType(ConfigTransferTile));
-    expect(tile.enabled, isTrue);
+    expect(find.byType(ConfigTransferTile), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'MiMo description and connection fields save together and transfer',
+      (tester) async {
+    Prefs().ttsService = 'xiaomi';
+    await Prefs().saveOnlineTtsConfig('xiaomi', {
+      'key': 'mimo-fixture-key',
+      'voice': '茉莉',
+      'model': MimoVoicePresets.designModel,
+      'stylePrompt': '原描述',
+    });
+    await open(tester);
+    final field = find.byKey(const ValueKey('mimo-description'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, MimoVoicePresets.designs['温柔女声']!);
+    await tester.pumpAndSettle();
+    final keyField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'API key');
+    await tester.ensureVisible(keyField);
+    await tester.enterText(keyField, 'edited-mimo-fixture-key');
+    await tester.pumpAndSettle();
+    expect(Prefs().getOnlineTtsConfig('xiaomi')['stylePrompt'], '原描述');
+    await tap(tester, 'Save settings');
+    final saved = Prefs().getOnlineTtsConfig('xiaomi');
+    expect(saved['stylePrompt'], MimoVoicePresets.designs['温柔女声']);
+    expect(saved['key'], 'edited-mimo-fixture-key');
+    expect(saved['voice'], '茉莉');
+    final snapshot = TtsConfigTransfer.snapshot(Prefs());
+    await Prefs().saveOnlineTtsConfig('xiaomi', {});
+    await TtsConfigTransfer.apply(Prefs(), snapshot);
+    expect(Prefs().getOnlineTtsConfig('xiaomi'), saved);
     expect(tester.takeException(), isNull);
   });
 
@@ -71,29 +99,6 @@ void main() {
     await tap(tester, 'Clear');
     expect(TtsConfigTransfer.snapshot(Prefs()), TtsConfigTransfer.defaults());
     expect(Prefs().prefs.getString('unrelated'), 'unchanged');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets(
-      'import Modu link refreshes form without fetching voices or playing',
-      (tester) async {
-    await open(tester);
-    await tap(tester, 'Import speech settings');
-    expect(find.text('Read from QR image'), findsOneWidget);
-    final data = TtsConfigTransfer.defaults();
-    data['service'] = 'openai';
-    data['providers']['openai']['config'] = {'key': 'imported-test-key'};
-    await tester.enterText(
-        find.descendant(
-            of: find.byType(AlertDialog), matching: find.byType(TextField)),
-        ConfigTransferCodec.encode(kind: 'tts', data: data));
-    await tap(tester, 'Import configuration');
-    expect(Prefs().getOnlineTtsConfig('openai')['key'], 'imported-test-key');
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(
-        find.byWidgetPredicate(
-            (w) => w is TextField && w.controller?.text == 'imported-test-key'),
-        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

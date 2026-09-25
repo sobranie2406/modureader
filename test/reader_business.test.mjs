@@ -56,7 +56,7 @@ test('Reader.open navigates once and waits for initialization, for new and resum
     const ready = new Promise(resolve => { releaseInit = resolve })
     const view = {
       addEventListener: () => {},
-      renderer: {next: () => { events.push('next') }},
+      renderer: {addEventListener() {}, next: () => { events.push('next') }},
       init: async args => { events.push(['init', args.lastLocation]); await ready; events.push('ready') },
     }
     const Reader = runInNewContext(`(class {

@@ -232,14 +232,14 @@ class SystemTts extends BaseTts {
   }
 
   @override
-  Future<dynamic> stop() async {
+  Future<dynamic> stop({bool forNavigation = false}) async {
     ++_generation;
     _running = null;
     _pendingAdvance = null;
     _resumeAfterAdvance = null;
     _currentVoiceText = null;
     _playbackError = null;
-    updateTtsState(TtsStateEnum.stopped);
+    updateTtsState(forNavigation ? TtsStateEnum.paused : TtsStateEnum.stopped);
     return isSupported ? await flutterTts.stop() : 1;
   }
 
@@ -276,17 +276,35 @@ class SystemTts extends BaseTts {
   Future<void> _navigate(Function move, {bool forward = false}) async {
     if (restarting) return;
     restarting = true;
+    final wasPlaying = isPlaying;
+    final previousText = _currentVoiceText;
+    int? navigationGeneration;
     try {
       final advancing = _pendingAdvance;
-      await stop();
+      final stopping = stop(forNavigation: true);
       final generation = _generation;
+      navigationGeneration = generation;
+      await stopping;
+      if (generation != _generation) return;
       if (advancing != null && !forward) await advancing;
       final text =
           forward && advancing != null ? await advancing : await move();
       if (generation != _generation) return;
-      if (text is! String || text.trim().isEmpty) return;
-      updateTtsState(TtsStateEnum.playing);
-      unawaited(speak(content: text));
+      if (text is! String || text.trim().isEmpty) {
+        _currentVoiceText = previousText;
+        return;
+      }
+      _currentVoiceText = text;
+      if (wasPlaying) {
+        updateTtsState(TtsStateEnum.playing);
+        unawaited(speak(content: text));
+      }
+    } catch (_) {
+      if (navigationGeneration != null && navigationGeneration != _generation) {
+        return;
+      }
+      _playbackError = '朗读定位失败，请重试 / Reader navigation failed; retry.';
+      updateTtsState(TtsStateEnum.paused);
     } finally {
       restarting = false;
     }

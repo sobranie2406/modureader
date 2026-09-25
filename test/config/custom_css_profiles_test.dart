@@ -132,4 +132,43 @@ void main() {
     expect(prefs.customCssForBook(), code);
     expect(jsonDecode(jsonEncode(prefs.customCssForBook())), code);
   });
+
+  test('multiple profiles cascade by slot; highlights are separate from CSS',
+      () async {
+    await init();
+    await prefs.saveCustomCssProfile(
+        0, const CustomCssProfile(css: 'p {color:red}'));
+    await prefs.saveCustomCssProfile(
+        1,
+        const CustomCssProfile(
+            css: 'color:blue;', pattern: '对白', scope: 'body'));
+    await prefs.saveCustomCssProfile(
+        2, const CustomCssProfile(css: 'p {color:green}'));
+    await prefs.saveCustomCssSelection(
+        const CustomCssSelection(
+            index: 7, enabled: true, indices: [2, 0, 1, 2]),
+        bookKey: 'A');
+    expect(prefs.customCssSelection('A').activeIndices, [0, 1, 2]);
+    expect(prefs.customCssForBook('A'), 'p {color:red}\n\np {color:green}');
+    expect(prefs.customHighlightRulesForBook('A').single['pattern'], '对白');
+    await prefs.saveCustomCssSelection(
+        const CustomCssSelection(index: 7, enabled: false, indices: [0, 1]),
+        bookKey: 'A');
+    expect(prefs.customHighlightRulesForBook('A'), isEmpty);
+    expect(prefs.customCssSelection('A').activeIndices, [0, 1]);
+  });
+
+  test('deleted/reused slots are disabled in defaults and every book',
+      () async {
+    await init();
+    await prefs.saveCustomCssSelection(
+        const CustomCssSelection(index: 1, enabled: true, indices: [1, 3]));
+    await prefs.saveCustomCssSelection(
+        const CustomCssSelection(index: 1, enabled: true),
+        bookKey: 'A');
+    await prefs.disableCustomCssSlots({1});
+    expect(prefs.customCssSelection().activeIndices, [3]);
+    expect(prefs.customCssSelection('A').activeIndices, isEmpty);
+    expect(prefs.customCssSelection('B').activeIndices, [3]);
+  });
 }

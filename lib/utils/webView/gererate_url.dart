@@ -38,7 +38,8 @@ String generateUrl(
   backgroundColor = convertDartColorToJs(backgroundColor);
 
   // Get effective background image URL using the new method
-  String bgimgUrl = readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
+  String bgimgUrl =
+      readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
   // const importing = $importing
   // const url = '${replaceSingleQuote(url)}'
   // let initialCfi = '${replaceSingleQuote(cfi)}'
@@ -112,6 +113,7 @@ String generateUrl(
     'readerScriptEvents':
         AnxPlatform.isMacOS || AnxPlatform.isIOS || AnxPlatform.isLinux,
     'customCSS': Prefs().customCssForBook(cssBookKey),
+    'customHighlightRules': Prefs().customHighlightRulesForBook(cssBookKey),
     'customCSSEnabled': Prefs().customCssSelection(cssBookKey).enabled,
     'useBookStyles': Prefs().useBookStyles,
     'headingFontSize': bookStyle.headingFontSize,

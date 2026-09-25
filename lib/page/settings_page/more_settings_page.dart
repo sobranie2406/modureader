@@ -11,6 +11,7 @@ import 'package:anx_reader/page/settings_page/reading.dart';
 import 'package:anx_reader/page/settings_page/settings_page.dart';
 import 'package:anx_reader/page/settings_page/storege.dart';
 import 'package:anx_reader/page/settings_page/sync.dart';
+import 'package:anx_reader/page/settings_page/global_settings.dart';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
 import 'package:anx_reader/page/settings_page/dictionaries.dart';
@@ -186,6 +187,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "subtitles": [
                   L10n.of(context).settingsSyncWebdav,
                   L10n.of(context).exportAndImport,
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '全局设置备份'
+                    : 'Global settings backup',
+                "icon": Icons.settings_backup_restore,
+                "sections": const GlobalSettingsPage(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '文件、二维码与 modu 链接 · 可选迁移账号密钥'
+                      : 'Files, QR and modu links · Optional credentials'
                 ],
               },
               {

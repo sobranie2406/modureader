@@ -142,11 +142,14 @@ test('paginator uses the cache, schedules after display and disposes it', async 
   assert.match(paginator, /this.#sectionCache\?\.destroy\(\)/);
 });
 
-test('real EPUB loader keeps shared CSS, images and fonts alive, then revokes them', async () => {
+for (const kindleFont of [false, true]) test(`real EPUB loader keeps shared CSS, images and ${kindleFont ? 'Kindle' : 'standard'} fonts alive, then revokes them`, async () => {
   const { JSDOM } = createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`)('jsdom');
   const dom = new JSDOM('', { url: 'https://reader.invalid/' });
   const policySource = await readFile(new URL('../assets/foliate-js/src/script_policy.js', import.meta.url), 'utf8');
   const { sanitizeBookDocument } = await import(`data:text/javascript;base64,${Buffer.from(policySource).toString('base64')}`);
+  const kindleSource = await readFile(new URL('../assets/foliate-js/src/epub-kindle-fonts.js', import.meta.url), 'utf8');
+  const { createKindleFontResolver } = await import(`data:text/javascript;base64,${Buffer.from(kindleSource).toString('base64')}`);
+  const fontPath = kindleFont ? 'FONT00000.ttf' : 'font.woff';
   const urls = new Map(), revoked = [], reads = [];
   let urlId = 0;
   class BlobURL extends URL {
@@ -158,18 +161,18 @@ test('real EPUB loader keeps shared CSS, images and fonts alive, then revokes th
     URL: BlobURL, URLSearchParams, Blob, EventTarget, CustomEvent, console,
     window: dom.window, document: dom.window.document,
     DOMParser: dom.window.DOMParser, XMLSerializer: dom.window.XMLSerializer,
-    ProcessingInstruction: dom.window.ProcessingInstruction, sanitizeBookDocument,
+    ProcessingInstruction: dom.window.ProcessingInstruction, sanitizeBookDocument, createKindleFontResolver,
   });
   const manifest = [
     ...Array.from({length: 5}, (_, i) => ({href: `${i}.xhtml`, mediaType: 'application/xhtml+xml'})),
     {href: 'shared.css', mediaType: 'text/css'},
-    {href: 'font.woff', mediaType: 'font/woff'},
+    {href: fontPath, mediaType: kindleFont ? 'font/ttf' : 'font/woff'},
     {href: 'image.png', mediaType: 'image/png'},
   ];
   const loader = new Loader({ resources: {manifest},
     async loadText(href) {
       reads.push(href);
-      if (href.endsWith('.css')) return '@font-face { font-family: Reader; src: url("font.woff"); }';
+      if (href.endsWith('.css')) return `@font-face { font-family: Reader; src: url("${kindleFont ? 'kindle:embed:0001' : fontPath}"); }`;
       return `<html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" href="shared.css"/></head><body><p>${href}</p><img src="image.png"/></body></html>`;
     },
     async loadBlob(href) { reads.push(href); return new Blob(['synthetic binary']); },
@@ -192,7 +195,7 @@ test('real EPUB loader keeps shared CSS, images and fonts alive, then revokes th
     await display(2);
     assert.equal(await display(1), original);
     assert.equal(reads.filter(href => href === '1.xhtml').length, 1);
-    for (const href of ['shared.css', 'font.woff', 'image.png'])
+    for (const href of ['shared.css', fontPath, 'image.png'])
       assert.equal(reads.filter(value => value === href).length, 1, href);
     assert.equal(urls.size, 6, 'three chapters plus three shared assets');
   } finally {

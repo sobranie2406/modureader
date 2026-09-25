@@ -344,16 +344,21 @@ class ExcerptMenuState extends State<ExcerptMenu> {
           IconAndText(
             compact: true,
             onTap: () async {
+              final startCfi = widget.annoCfi;
               widget.onClose();
               final playerState = epubPlayerKey.currentState;
               if (playerState == null) return;
 
               // Stop existing TTS playback if any
               await audioHandler.stop();
+              if (!playerState.mounted ||
+                  epubPlayerKey.currentState != playerState) {
+                return;
+              }
 
               // Now initialize TTS - it will use the current (updated) position
               await TtsHandler().init(
-                () => playerState.initTts(fromCfi: widget.annoCfi),
+                () => playerState.initTts(fromCfi: startCfi),
                 playerState.ttsNext,
                 playerState.ttsPrev,
               );
@@ -362,7 +367,9 @@ class ExcerptMenuState extends State<ExcerptMenu> {
               await audioHandler.play();
             },
             icon: const Icon(Icons.headphones),
-            text: L10n.of(context).contextMenuNarrate,
+            text: Localizations.localeOf(context).languageCode == 'zh'
+                ? '朗读'
+                : 'Read from here',
           ),
           // edit note
           if (!widget.footnote)

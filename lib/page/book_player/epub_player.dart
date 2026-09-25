@@ -155,7 +155,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool _selectionClearPending = false;
   bool _readerReady = false;
   bool _readerLoadFailed = false;
-  Timer? _readerLoadTimer;
+  bool _chapterLoading = false;
+  bool _chapterLoadFailed = false;
+  bool _chapterFontFailed = false;
   final translationMode = ValueNotifier(TranslationModeEnum.off);
   final _translationSession = ReaderTranslationSession();
   bool quickMarkEnabled = false;
@@ -336,6 +338,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         bgimgOpacity: ${Prefs().bgimg.opacity},
         bgimgFit: '${Prefs().bgimgFit.code}',
         customCSS: ${jsonEncode(Prefs().customCssForBook(cssBookKey))},
+        customHighlightRules: ${jsonEncode(Prefs().customHighlightRulesForBook(cssBookKey))},
         customCSSEnabled: ${Prefs().customCssSelection(cssBookKey).enabled},
         useBookStyles: ${Prefs().useBookStyles},
         headingFontSize: ${style.headingFontSize},
@@ -971,13 +974,24 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   Future<void> setHandler(InAppWebViewController controller) async {
     controller.addJavaScriptHandler(
+        handlerName: 'onReaderChapterState',
+        callback: (args) {
+          if (!mounted || args.isEmpty || args.first is! Map) return;
+          final data = args.first as Map;
+          setState(() {
+            _chapterLoading = data['state'] == 'loading';
+            _chapterLoadFailed = data['state'] == 'failed';
+            _chapterFontFailed = _chapterLoadFailed && data['reason'] == 'font';
+            if (data['state'] == 'ready') _readerLoadFailed = false;
+          });
+        });
+    controller.addJavaScriptHandler(
         handlerName: 'onReaderLoadError',
         callback: (_) => _showReaderLoadFailure());
     controller.addJavaScriptHandler(
         handlerName: 'onLoadEnd',
         callback: (args) async {
           if (!mounted) return;
-          _readerLoadTimer?.cancel();
           setState(() {
             _readerReady = true;
             _readerLoadFailed = false;
@@ -1125,6 +1139,31 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             _quickMarkError();
             return null;
           }
+        });
+    controller.addJavaScriptHandler(
+        handlerName: 'onCustomHighlightStatus',
+        callback: (args) {
+          if (!mounted || args.isEmpty) return;
+          final zh = Localizations.localeOf(context).languageCode == 'zh';
+          final messages = {
+            'unsupported': zh
+                ? '当前阅读内核不支持正则高亮，请更新系统 WebView；普通 CSS 仍可使用。'
+                : 'This web engine does not support regex highlights. Update WebView; layout CSS still works.',
+            'timeout': zh
+                ? '高亮规则匹配超时，已停止，请简化正则表达式。'
+                : 'Highlight matching timed out. Please simplify the regex.',
+            'invalid': zh
+                ? '部分高亮正则有误，已跳过无效规则。'
+                : 'Invalid highlight expressions were skipped.',
+            'limited': zh
+                ? '本章高亮达到安全上限，仅显示部分匹配。'
+                : 'Chapter highlight limit reached; showing partial matches.',
+            'error': zh
+                ? '高亮规则暂时无法应用，正文阅读不受影响。'
+                : 'Could not apply highlights; reading is unaffected.',
+          };
+          final message = messages[args.first];
+          if (message != null) AnxToast.show(message);
         });
     controller.addJavaScriptHandler(
         handlerName: 'onQuickMarkError',
@@ -1434,8 +1473,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     _progress = ReaderProgressSession(bookDao, widget.book.id);
     book = widget.book;
     getThemeColor();
-    _readerLoadTimer =
-        Timer(const Duration(seconds: 30), _showReaderLoadFailure);
 
     contextMenu = ContextMenu(
       settings: ContextMenuSettings(hideDefaultSystemContextMenuItems: true),
@@ -1467,9 +1504,22 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   void _showReaderLoadFailure() {
     if (!mounted || _readerReady || _readerLoadFailed) return;
-    _readerLoadTimer?.cancel();
     setState(() => _readerLoadFailed = true);
-    AnxLog.warning('Reader initial load failed or timed out');
+    AnxLog.warning('Reader initial load failed');
+  }
+
+  Future<void> _retryReaderChapter() async {
+    setState(() {
+      _readerLoadFailed = false;
+      _chapterLoadFailed = false;
+      _chapterFontFailed = false;
+    });
+    if (_readerReady || _chapterLoading) {
+      await webViewController.evaluateJavascript(
+          source: 'window.retryReaderChapter?.()');
+    } else {
+      await webViewController.reload();
+    }
   }
 
   @override
@@ -1477,7 +1527,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     _translationSession.stop();
     translationMode.dispose();
     _syncRefreshRetry?.cancel();
-    _readerLoadTimer?.cancel();
     _scrollDebounceTimer?.cancel();
     _animationController?.dispose();
     saveReadingProgress();
@@ -1823,7 +1872,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
                 child: FadeTransition(
                     opacity: _animation!, child: BookCover(book: widget.book)),
               )),
-            if (!_readerReady) ReaderLoadingStatus(failed: _readerLoadFailed),
+            if (_readerLoadFailed || _chapterLoadFailed)
+              ReaderLoadingStatus(
+                failed: _readerLoadFailed || _chapterLoadFailed,
+                fontFailed: _chapterFontFailed,
+                onRetry: _retryReaderChapter,
+              ),
           ],
         ),
       ),

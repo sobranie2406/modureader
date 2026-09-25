@@ -40,11 +40,13 @@ void main() {
       'all eight slots are available and switching saves independent drafts',
       (tester) async {
     await show(tester);
-    expect(find.byType(ChoiceChip), findsNWidgets(8));
+    expect(find.byType(ChoiceChip), findsNWidgets(10));
     await tester.enterText(
         find.byKey(const ValueKey('custom-css-name')), 'Vertical');
     await tester.enterText(
         find.byKey(const ValueKey('custom-css-code')), 'p { color: blue; }');
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-profile-7')));
     await tester.tap(find.byKey(const ValueKey('custom-css-profile-7')));
     await tester.pumpAndSettle();
     expect(Prefs().customCssProfiles[0].name, 'Vertical');
@@ -56,6 +58,8 @@ void main() {
             .controller!
             .text,
         isEmpty);
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-profile-0')));
     await tester.tap(find.byKey(const ValueKey('custom-css-profile-0')));
     await tester.pumpAndSettle();
     expect(
@@ -75,10 +79,14 @@ void main() {
     await show(tester);
     await tester.enterText(
         find.byKey(const ValueKey('custom-css-code')), 'p {');
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-profile-1')));
     await tester.tap(find.byKey(const ValueKey('custom-css-profile-1')));
     await tester.pumpAndSettle();
     expect(Prefs().customCssSelection('A').index, 0);
     expect(Prefs().customCssProfiles[0].css, isEmpty);
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-enabled')));
     await tester.tap(find.byKey(const ValueKey('custom-css-enabled')));
     await tester.pumpAndSettle();
     expect(Prefs().customCssSelection('A').enabled, isFalse);
@@ -107,6 +115,12 @@ void main() {
         find.byKey(const ValueKey('custom-css-name')), 'Publisher');
     await tester.enterText(
         find.byKey(const ValueKey('custom-css-code')), 'p { margin: 0; }');
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.tap(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.pumpAndSettle();
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-enabled')));
     await tester.tap(find.byKey(const ValueKey('custom-css-enabled')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(ElevatedButton));
@@ -128,6 +142,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(Prefs().hasBookCustomCssSelection('A'), isFalse);
     expect(Prefs().customCssForBook('A'), 'p { margin: 0; }');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'templates copy into free slots disabled and can be toggled independently',
+      (tester) async {
+    await Prefs().saveCustomCssProfile(
+        0, const CustomCssProfile(name: 'Existing', css: 'p {color:red}'));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 0, enabled: true));
+    await show(tester);
+    await tester.ensureVisible(find.text('Templates'));
+    await tester.tap(find.text('Templates'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('对白 · 变色'));
+    await tester.tap(find.text('对白 · 变色'));
+    await tester.pumpAndSettle();
+    expect(Prefs().customCssProfiles[0].name, 'Existing');
+    expect(Prefs().customCssProfiles[1].isHighlight, true);
+    expect(Prefs().customCssSelection('A').activeIndices, [0]);
+    expect(Prefs().customCssSelection('A').index, 1);
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.tap(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.pumpAndSettle();
+    expect(Prefs().customCssSelection('A').activeIndices, [0, 1]);
+    expect(Prefs().customHighlightRulesForBook('A'), hasLength(1));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-profile-0')));
+    await tester.tap(find.byKey(const ValueKey('custom-css-profile-0')));
+    await tester.pumpAndSettle();
+    expect(Prefs().customCssSelection('A').activeIndices, [0, 1]);
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.tap(find.byKey(const ValueKey('custom-css-slot-enabled')));
+    await tester.pumpAndSettle();
+    expect(Prefs().customCssSelection('A').activeIndices, [1]);
+    expect(Prefs().customCssSelection('other').activeIndices, [0]);
     expect(tester.takeException(), isNull);
   });
 }

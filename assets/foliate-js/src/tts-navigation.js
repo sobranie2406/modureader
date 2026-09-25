@@ -10,6 +10,10 @@ export class TtsNavigator {
     }
     stop() { this.#generation++ }
     start(range) { return this.move(1, { start: true, range }) }
+    startFromCfi(cfi) {
+        this.stop() // invalidate queued speech from the old selection/session
+        return this.move(1, { start: true, cfi })
+    }
     async #loadSection(view, index, before, generation) {
         // Speech must not wait for an iframe load/font/layout while the screen
         // is off. Parse the chapter offscreen; presentation follows separately.
@@ -30,7 +34,7 @@ export class TtsNavigator {
         }
         return false
     }
-    move(direction, { section = false, last = direction < 0, start = false, range } = {}) {
+    move(direction, { section = false, last = direction < 0, start = false, range, cfi } = {}) {
         const generation = this.#generation
         const operation = async () => {
             if (generation !== this.#generation) return ''
@@ -38,9 +42,20 @@ export class TtsNavigator {
             // Reading ahead in a continuous viewport must not reset speech to
             // the new visible chapter. Only an explicit start/section change
             // rebinds the TTS document; its CFI closure owns a stable index.
-            if (start || !view.tts) view.initTTS(false, { force: start })
+            if (cfi) {
+                const resolved = await view.resolveNavigation(cfi)
+                if (generation !== this.#generation) return ''
+                if (!resolved?.anchor || !view.book.sections[resolved.index])
+                    throw new Error('Cannot locate the selected reading position')
+                const content = view.renderer.getContents().find(c => c.index === resolved.index)
+                if (content?.doc) view.initTTS(false, { force: true, content })
+                else if (!await view.loadTTSSection(resolved.index, () => generation === this.#generation)) return ''
+                if (generation !== this.#generation) return ''
+                range = resolved.anchor(view.tts.doc)
+                if (!range) throw new Error('Cannot resolve the selected reading range')
+            } else if (start || !view.tts) view.initTTS(false, { force: start })
             if (start) {
-                const text = range ? view.tts.from(range) : view.tts.start()
+                const text = range ? view.tts.from(range, { exactStart: !!cfi }) : view.tts.start()
                 if (text?.trim()) return text
             } else if (!section) {
                 const text = direction > 0 ? view.tts.next(true) : view.tts.prev(true)

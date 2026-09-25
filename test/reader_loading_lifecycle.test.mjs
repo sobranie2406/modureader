@@ -8,6 +8,16 @@ const {waitForReaderFonts} = await import(`data:text/javascript;base64,${Buffer.
 const source = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8');
 const method = source.slice(source.indexOf('  async load(src,'), source.indexOf('\n  render(layout) {'));
 
+function inlineStyle() {
+  const values = new Map(), priorities = new Map();
+  return {
+    setProperty(k,v,p) { values.set(k,v); priorities.set(k,p); },
+    getPropertyValue: k => values.get(k) ?? '',
+    getPropertyPriority: k => priorities.get(k) ?? '',
+    removeProperty(k) {values.delete(k); priorities.delete(k);},
+  };
+}
+
 function fixture(ready = Promise.resolve(), waitForFonts = waitForReaderFonts) {
   const timers = new Map(); let id = 0;
   const Harness = runInNewContext(`class Harness {
@@ -23,12 +33,12 @@ function fixture(ready = Promise.resolve(), waitForFonts = waitForReaderFonts) {
     close() {this.#destroyed = true; this.#cancelLoad?.(); this.#cleanup.forEach(f => f());}
     ${method}
   }; Harness`, {
-    EventTarget, waitForReaderFonts: waitForFonts, getDirection: () => ({}),
+    EventTarget, AbortController, waitForReaderFonts: waitForFonts, getDirection: () => ({}),
     console: {warn(){}},
     setTimeout: (fn, ms) => {timers.set(++id, {fn, ms}); return id;},
     clearTimeout: id => timers.delete(id),
   });
-  const doc = new EventTarget(); doc.body = {getBoundingClientRect(){}};
+  const doc = new EventTarget(); doc.body = {getBoundingClientRect(){}, style:inlineStyle()};
   doc.fonts = new EventTarget(); doc.fonts.ready = ready;
   return {reader: new Harness(doc), doc, timers};
 }
@@ -53,28 +63,90 @@ test('slow fonts remain hidden beyond 250ms and reveal only after readiness', as
   assert.equal(reader.expansions, 1, 'closed views must not resize');
 });
 
-for (const failure of ['timeout', 'rejection', 'failed face']) {
-  test(`font ${failure} fails loading without revealing substitute text`, async () => {
+test('a real font rejection displays generic text and completes chapter loading', async () => {
     let fail;
-    const ready = failure === 'failed face' ? Promise.resolve()
-      : new Promise((_, reject) => fail = reject);
-    const {reader, doc, timers} = fixture(ready, doc => waitForReaderFonts(doc, 10));
-    if (failure === 'failed face') {
-      doc.fonts[Symbol.iterator] = function* () { yield {status: 'error'}; };
-    }
+    const ready = new Promise((_, reject) => fail = reject);
+    const {reader, doc, timers} = fixture(ready);
     const pending = reader.load('blob:chapter', () => {}, () => ({}));
-    const rejected = assert.rejects(pending, /font loading timed out or failed/);
     reader.frame.dispatchEvent(new Event('load'));
-    if (failure === 'rejection') fail(Error('bad font'));
-    await rejected;
-    assert.equal(reader.frame.style.visibility, 'hidden');
-    assert.equal(reader.renders, 0);
+    fail(Error('bad font'));
+    await pending;
+    assert.equal(doc.body.style.getPropertyValue('font-family'), 'serif');
+    assert.equal(reader.frame.style.visibility, '');
+    assert.equal(reader.renders, 1);
     assert.equal(timers.size, 0);
     doc.fonts.dispatchEvent(new Event('loadingdone'));
-    assert.equal(reader.expansions, 0, 'a failed view cannot revive later');
+    assert.equal(reader.expansions, 1, 'the recovered view stays interactive');
     reader.close();
-  });
+});
+
+test('fonts can complete after 8, 15 and 30 seconds without fallback or failure', async t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  let release;
+  const {reader, doc, timers} = fixture(new Promise(r => release = r));
+  let done = false;
+  const pending = reader.load('blob:slow-font', () => {}, () => ({})).then(() => done = true);
+  reader.frame.dispatchEvent(new Event('load'));
+  t.mock.timers.tick(31000);
+  await Promise.resolve();
+  assert.equal(done, false);
+  assert.equal(reader.renders, 0);
+  assert.equal(reader.frame.style.visibility, 'hidden');
+  assert.equal(timers.size, 0);
+  release(); await pending;
+  assert.equal(reader.renders, 1);
+  assert.equal(reader.frame.style.visibility, '');
+  reader.close();
+});
+
+function textDocument({reject = false, hidden = false} = {}) {
+  const requests = [];
+  const el = {closest: () => null, getClientRects: () => hidden ? [] : [{}], style:inlineStyle()};
+  const nodes = [{parentElement: el, textContent: '正文 中文 ABC'},
+    {parentElement: el, textContent: '正文 DEF'}];
+  const fonts = [{family: 'UnusedBrokenFace', status: 'error'}];
+  fonts.ready = new Promise(() => {}); // An unrelated font must not block text.
+  fonts.load = async (font, text) => {
+    requests.push({font, text});
+    if (reject) throw Error('used font broken');
+    return [{status:'loaded'}];
+  };
+  const doc = {fonts, body:{getBoundingClientRect(){}},
+    createTreeWalker: () => {let i=0; return {nextNode:()=>nodes[i++]};},
+    defaultView:{getComputedStyle:()=>({fontStyle:'normal',fontWeight:'400',fontSize:'24px',
+      fontFamily:'"Body", "English"',display:'block',visibility:'visible'})}};
+  return {doc,requests,el};
 }
+
+test('only actual text faces are requested, with Chinese and Latin coverage', async () => {
+  const {doc,requests} = textDocument();
+  assert.equal(await waitForReaderFonts(doc), true);
+  assert.equal(requests.length, 1, 'one request per font, not per text node');
+  assert.equal(requests[0].font, 'normal 400 24px "Body", "English"');
+  for (const char of '正文中ABCDEF') assert.ok(requests[0].text.includes(char));
+});
+
+test('a genuinely used broken font falls back; hidden text fonts do not block', async () => {
+  const broken = textDocument({reject:true});
+  assert.equal(await waitForReaderFonts(broken.doc), true);
+  assert.equal(broken.el.style.getPropertyValue('font-family'), 'serif');
+  const {doc,requests} = textDocument({hidden:true,reject:true});
+  assert.equal(await waitForReaderFonts(doc), true);
+  assert.equal(requests.length, 0);
+});
+
+test('font failure arriving after cancellation cannot alter the old page', async () => {
+  const {doc,el} = textDocument();
+  let fail;
+  doc.fonts.load = () => new Promise((_, reject) => fail = reject);
+  const controller = new AbortController();
+  const pending = waitForReaderFonts(doc, controller.signal);
+  controller.abort();
+  assert.equal(await pending, false);
+  fail(Error('late error'));
+  await Promise.resolve();
+  assert.equal(el.style.getPropertyValue('font-family'), '');
+});
 
 test('unused faces do not block successfully loaded requested fonts', async () => {
   const fonts = [{status: 'loaded'}, {status: 'unloaded'}];
@@ -82,12 +154,12 @@ test('unused faces do not block successfully loaded requested fonts', async () =
   assert.equal(await waitForReaderFonts({fonts}), true);
 });
 
-test('iframe timeout rejects navigation and ignores a late load event', async () => {
+test('a slow iframe has no fatal deadline; cancellation ignores a late load event', async () => {
   const {reader, timers} = fixture();
   const pending = reader.load('blob:chapter', () => {}, () => ({}));
-  const rejected = assert.rejects(pending, /chapter loading timed out/);
-  const timer = [...timers.values()][0];
-  assert.equal(timer.ms, 15000); timer.fn();
+  const rejected = assert.rejects(pending, /closed/);
+  assert.equal(timers.size, 0, 'publisher fonts may delay the native load event');
+  reader.close();
   await rejected;
   reader.frame.dispatchEvent(new Event('load'));
   await Promise.resolve();

@@ -12,7 +12,9 @@ import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 
 class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
-  final TtsFactory _ttsFactory = TtsFactory();
+  final TtsFactory _ttsFactory;
+  final Future<bool> Function()? _activateSessionOverride;
+  final Future<void> Function()? _deactivateSessionOverride;
 
   static final TtsHandler _instance = TtsHandler._internal();
 
@@ -20,9 +22,21 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     return _instance;
   }
 
-  TtsHandler._internal() {
+  TtsHandler._internal()
+      : _ttsFactory = TtsFactory(),
+        _activateSessionOverride = null,
+        _deactivateSessionOverride = null {
     _initAudioSession();
   }
+
+  @visibleForTesting
+  TtsHandler.forTesting({
+    required TtsFactory factory,
+    required Future<bool> Function() activateSession,
+    Future<void> Function()? deactivateSession,
+  })  : _ttsFactory = factory,
+        _activateSessionOverride = activateSession,
+        _deactivateSessionOverride = deactivateSession;
 
   BaseTts get tts => _ttsFactory.current;
 
@@ -32,6 +46,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   BaseTts? _observedTts;
   int _transportCommand = 0;
   bool _resumeAfterInterruption = false;
+  Future<void>? _pendingPause;
 
   bool get _chinese =>
       (Prefs().locale ?? WidgetsBinding.instance.platformDispatcher.locale)
@@ -140,33 +155,71 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> play() async {
     _resumeAfterInterruption = false;
-    if (tts.isPlaying) return;
+    final backend = tts;
+    if (backend.isPlaying) return;
     final command = ++_transportCommand;
     final reader = epubPlayerKey.currentState;
-    if (reader == null) return;
-    await prepareTtsNotificationPermission();
-    if (command != _transportCommand ||
-        !reader.mounted ||
-        epubPlayerKey.currentState != reader) return;
-    final session = await AudioSession.instance;
-    if (command != _transportCommand) return;
-    if (!await session.setActive(true)) return;
-    if (command != _transportCommand) return;
-
     final previous = mediaItem.value;
-    final resuming = tts.ttsStateNotifier.value == TtsStateEnum.paused &&
-        previous?.id == reader.book.id.toString();
-    final item = ttsMediaItem(
-      bookId: reader.book.id.toString(),
-      title: reader.book.title,
-      chapter: resuming
-          ? (previous?.extras?['ttsChapter'] as String? ?? reader.chapterTitle)
-          : reader.chapterTitle,
-      author: reader.book.author,
-      coverPath: reader.book.coverFullPath,
-      state: TtsStateEnum.playing,
-      chinese: _chinese,
-    );
+    final resuming = backend.ttsStateNotifier.value == TtsStateEnum.paused &&
+        previous != null &&
+        (reader == null || previous.id == reader.book.id.toString());
+    AnxLog.info('TTS transport play: resume=$resuming, '
+        'lifecycle=${WidgetsBinding.instance.lifecycleState?.name}');
+    // A notification resumes the retained audio session, not a new reading
+    // operation. Never require foreground UI or permission dialogs for it.
+    if (!resuming) {
+      if (reader == null) return;
+      await prepareTtsNotificationPermission();
+      if (!reader.mounted || epubPlayerKey.currentState != reader) return;
+    }
+    // Native pause can finish after the notification has already shown Play.
+    // Dispatch resume only after that pause completes, otherwise a late pause
+    // can silence a player whose Dart/notification state already says playing.
+    try {
+      await _pendingPause;
+      if (command != _transportCommand || !identical(tts, backend)) return;
+      final active = await (_activateSessionOverride?.call() ??
+          AudioSession.instance.then((session) => session.setActive(true)));
+      if (!active) {
+        AnxLog.warning('TTS transport play rejected: audio focus denied');
+        return;
+      }
+    } catch (error) {
+      AnxLog.warning('TTS transport preparation failed: ${error.runtimeType}');
+      return;
+    }
+    if (command != _transportCommand || !identical(tts, backend)) return;
+    if (resuming &&
+        epubPlayerKey.currentState != null &&
+        epubPlayerKey.currentState != reader) {
+      return; // A newly opened book must not inherit this resume command.
+    }
+    if (!resuming &&
+        (reader == null ||
+            !reader.mounted ||
+            epubPlayerKey.currentState != reader)) {
+      return;
+    }
+
+    final item = resuming
+        ? ttsMediaItem(
+            bookId: previous.id,
+            title: previous.title,
+            author: previous.extras?['bookAuthor'] as String? ?? '',
+            chapter: previous.extras?['ttsChapter'] as String? ?? '',
+            coverPath: previous.extras?['ttsCoverPath'] as String? ?? '',
+            state: TtsStateEnum.playing,
+            chinese: _chinese,
+          )
+        : ttsMediaItem(
+            bookId: reader!.book.id.toString(),
+            title: reader.book.title,
+            chapter: reader.chapterTitle,
+            author: reader.book.author,
+            coverPath: reader.book.coverFullPath,
+            state: TtsStateEnum.playing,
+            chinese: _chinese,
+          );
 
     // Ensure system receives queue + active index for control center metadata.
     _publishMetadata(item);
@@ -177,7 +230,6 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       updatePosition: Duration.zero,
       bufferedPosition: Duration.zero,
     ));
-    final backend = tts;
     final resume = backend.ttsStateNotifier.value == TtsStateEnum.paused;
     backend.updateTtsState(TtsStateEnum.playing);
     // A media command must finish promptly, not hold its response open until
@@ -202,8 +254,28 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       queueIndex: queue.value.isNotEmpty ? 0 : null,
     ));
 
-    await tts.pause();
-    if (command == _transportCommand) tts.updateTtsState(TtsStateEnum.paused);
+    final backend = tts;
+    AnxLog.info('TTS transport pause');
+    backend.updateTtsState(TtsStateEnum.paused);
+    final previousPause = _pendingPause;
+    final pausing = Future<void>.sync(() async {
+      await previousPause;
+      if (!identical(tts, backend)) return;
+      if (command != _transportCommand &&
+          backend.ttsStateNotifier.value == TtsStateEnum.stopped) {
+        return;
+      }
+      await backend.pause();
+    });
+    _pendingPause = pausing;
+    try {
+      await pausing;
+      if (command == _transportCommand && identical(tts, backend)) {
+        backend.updateTtsState(TtsStateEnum.paused);
+      }
+    } finally {
+      if (identical(_pendingPause, pausing)) _pendingPause = null;
+    }
   }
 
   @override
@@ -228,7 +300,11 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       } finally {
         queue.add([]);
         mediaItem.add(null);
-        await (await AudioSession.instance).setActive(false);
+        if (_deactivateSessionOverride != null) {
+          await _deactivateSessionOverride();
+        } else {
+          await (await AudioSession.instance).setActive(false);
+        }
       }
     }
   }

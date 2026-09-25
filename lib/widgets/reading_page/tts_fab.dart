@@ -1,4 +1,3 @@
-import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
@@ -7,7 +6,9 @@ import 'package:icons_plus/icons_plus.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 class TtsFab extends StatefulWidget {
-  const TtsFab({super.key});
+  const TtsFab({super.key, this.handler});
+
+  final TtsHandler? handler;
 
   @override
   State<TtsFab> createState() => _TtsFabState();
@@ -15,6 +16,7 @@ class TtsFab extends StatefulWidget {
 
 class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
+  TtsHandler get _handler => widget.handler ?? TtsHandler();
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
 
@@ -61,7 +63,7 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<TtsStateEnum>(
-      valueListenable: TtsHandler().ttsStateNotifier,
+      valueListenable: _handler.ttsStateNotifier,
       builder: (context, ttsState, _) {
         final isPlaying = ttsState == TtsStateEnum.playing;
         final ttsActive =
@@ -70,7 +72,12 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
         // Collapse when TTS stops, but keep widget alive so State is preserved
         // during brief stopped transitions (e.g. between sentences).
         if (ttsState == TtsStateEnum.stopped) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _collapse());
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                _handler.ttsStateNotifier.value == TtsStateEnum.stopped) {
+              _collapse();
+            }
+          });
         }
 
         return AnimatedOpacity(
@@ -109,7 +116,7 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                               _ActionButton(
                                 icon: EvaIcons.chevron_left,
                                 onPressed: () {
-                                  TtsHandler().playPrevious();
+                                  _handler.playPrevious();
                                 },
                               ),
                               _ActionButton(
@@ -118,22 +125,22 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                                     : EvaIcons.play_circle_outline,
                                 onPressed: () {
                                   if (isPlaying) {
-                                    audioHandler.pause();
+                                    _handler.pause();
                                   } else {
-                                    audioHandler.play();
+                                    _handler.play();
                                   }
                                 },
                               ),
                               _ActionButton(
                                 icon: EvaIcons.chevron_right,
                                 onPressed: () {
-                                  TtsHandler().playNext();
+                                  _handler.playNext();
                                 },
                               ),
                               _ActionButton(
                                 icon: EvaIcons.stop_circle_outline,
                                 onPressed: () {
-                                  audioHandler.stop();
+                                  _handler.stop();
                                   _collapse();
                                 },
                               ),

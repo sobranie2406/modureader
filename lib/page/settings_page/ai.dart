@@ -5,10 +5,8 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/ai_provider_list_page.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
-import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
@@ -122,52 +120,7 @@ class _AISettingsState extends ConsumerState<AISettings> {
           ),
         ],
       ),
-      SettingsSection(
-        tiles: [
-          ConfigTransferTile(
-            kind: 'ai',
-            label: _readAnyLabel('AI 配置', 'AI configuration'),
-            getData: _buildAiTransferData,
-            applyData: _applyAiTransferData,
-          ),
-        ],
-      ),
     ]);
-  }
-
-  Map<String, dynamic> _buildAiTransferData() {
-    final prefs = Prefs();
-    return AiConfigTransfer.createPayload(
-      providers: ref.read(aiProvidersProvider),
-      selectedProviderId: prefs.selectedAiService,
-      temperature: prefs.aiTemperature,
-      maxTokens: prefs.aiMaxTokens,
-      contextTurns: prefs.aiContextTurns,
-      rpm: prefs.aiRpm,
-      translationProviderId: prefs.translationAiService,
-    );
-  }
-
-  Future<void> _applyAiTransferData(Map<String, dynamic> data) async {
-    final imported = AiConfigTransfer.parse(data);
-    final prefs = Prefs();
-    prefs.saveAiProviders(imported.providers);
-    prefs.selectedAiService = imported.selectedProviderId;
-    prefs.aiTemperature = imported.temperature;
-    prefs.aiMaxTokens = imported.maxTokens;
-    prefs.aiContextTurns = imported.contextTurns;
-    if (imported.rpm != null) prefs.aiRpm = imported.rpm!;
-    final translationId = imported.translationProviderId;
-    if (translationId != null &&
-        imported.providers.any((provider) => provider.id == translationId)) {
-      prefs.translationAiService = translationId;
-    }
-    ref.read(aiProvidersProvider.notifier).refresh();
-    if (mounted) setState(() {});
-  }
-
-  String _readAnyLabel(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 
   // Build description showing current selected provider

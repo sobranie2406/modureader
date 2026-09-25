@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/page/reading_page.dart';
+import 'package:anx_reader/service/config_transfer/custom_css_transfer.dart';
+import 'package:anx_reader/utils/save_file_to_download.dart';
 import 'package:anx_reader/utils/toast/common.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 class CustomCSSEditor extends StatefulWidget {
@@ -17,6 +23,10 @@ class CustomCSSEditor extends StatefulWidget {
 class _CustomCSSEditorState extends State<CustomCSSEditor> {
   final _cssController = TextEditingController();
   final _nameController = TextEditingController();
+  final _patternController = TextEditingController();
+  Set<int> _active = {};
+  bool _highlight = false;
+  String _scope = 'all';
   late int _index;
   late bool _enabled;
   bool _busy = false;
@@ -35,6 +45,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     final selection = Prefs().customCssSelection(widget.bookKey);
     _index = selection.index;
     _enabled = selection.enabled;
+    _active = selection.activeIndices.toSet();
     _loadProfile();
   }
 
@@ -42,6 +53,9 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     final profile = Prefs().customCssProfiles[_index];
     _cssController.text = profile.css;
     _nameController.text = profile.name;
+    _patternController.text = profile.pattern;
+    _highlight = profile.isHighlight;
+    _scope = profile.scope;
     _error = null;
   }
 
@@ -49,10 +63,18 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
   void dispose() {
     _cssController.dispose();
     _nameController.dispose();
+    _patternController.dispose();
     super.dispose();
   }
 
   bool _validate() {
+    if (_highlight &&
+        (_patternController.text.trim().isEmpty ||
+            _patternController.text.length > 512)) {
+      setState(() => _error =
+          _text('请输入 1–512 个字符的正则表达式', 'Enter a regex of 1–512 characters'));
+      return false;
+    }
     final css = _cssController.text;
     // Lightweight editing aid, not a security boundary or full CSS parser.
     final balanced = '{'.allMatches(css).length == '}'.allMatches(css).length;
@@ -64,10 +86,13 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
   Future<void> _persistDraft() => Prefs().saveCustomCssProfile(
       _index,
       CustomCssProfile(
-          name: _nameController.text.trim(), css: _cssController.text));
+          name: _nameController.text.trim(),
+          css: _cssController.text,
+          pattern: _highlight ? _patternController.text : '',
+          scope: _scope));
 
-  CustomCssSelection get _selection =>
-      CustomCssSelection(index: _index, enabled: _enabled);
+  CustomCssSelection get _selection => CustomCssSelection(
+      index: _index, enabled: _enabled, indices: _active.toList());
 
   void _apply() {
     if (widget.onApply != null) {
@@ -82,6 +107,19 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     setState(() => _busy = true);
     try {
       await action();
+    } on FormatException catch (e) {
+      if (mounted) {
+        setState(() => _error = _text(
+            switch (e.message) {
+              'Not enough empty CSS slots' => '空位不足，请先导出并删除不再使用的方案。',
+              'No profiles to export' => '没有可导出的方案。',
+              'CSS file too large' ||
+              'CSS file too large (1 MiB maximum)' =>
+                '文件过大，请选择不超过 1 MiB 的文件。',
+              _ => '导入导出失败：请检查文件格式，支持 CSS 文件和默读方案 JSON。',
+            },
+            e.message));
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -97,7 +135,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         // Switching saves the current slot, so edits are not silently discarded.
         await _persistDraft();
         await Prefs().saveCustomCssSelection(
-            CustomCssSelection(index: index, enabled: _enabled),
+            CustomCssSelection(
+                index: index, enabled: _enabled, indices: _active.toList()),
             bookKey: widget.bookKey);
         if (!mounted) return;
         setState(() {
@@ -114,11 +153,144 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         }
         // Disabling always works, even while the draft contains invalid CSS.
         await Prefs().saveCustomCssSelection(
-            CustomCssSelection(index: _index, enabled: value),
+            CustomCssSelection(
+                index: _index, enabled: value, indices: _active.toList()),
             bookKey: widget.bookKey);
         if (!mounted) return;
         setState(() => _enabled = value);
         _apply();
+      });
+
+  Future<void> _toggleSlot(bool value) => _run(() async {
+        if (value && !_validate()) return;
+        if (value) await _persistDraft();
+        final next = {..._active};
+        value ? next.add(_index) : next.remove(_index);
+        await Prefs().saveCustomCssSelection(
+            CustomCssSelection(
+                index: _index, enabled: _enabled, indices: next.toList()),
+            bookKey: widget.bookKey);
+        if (!mounted) return;
+        setState(() => _active = next);
+        _apply();
+      });
+
+  Future<bool> _confirm(String title, String message) async =>
+      await showDialog<bool>(
+          context: context,
+          builder: (context) =>
+              AlertDialog(title: Text(title), content: Text(message), actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(_text('取消', 'Cancel'))),
+                TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text(_text('确认', 'Confirm'))),
+              ])) ??
+      false;
+
+  Future<void> _append(List<CustomCssProfile> additions) async {
+    final existing = Prefs().customCssProfiles;
+    final result = CustomCssTransfer.append(existing, additions);
+    final slots = [
+      for (var i = 0; i < existing.length; i++)
+        if (existing[i].isEmpty) i
+    ].take(additions.length).toSet();
+    await Prefs().disableCustomCssSlots(slots);
+    await Prefs().saveCustomCssProfiles(result);
+    final selection = Prefs().customCssSelection(widget.bookKey);
+    await Prefs().saveCustomCssSelection(
+        CustomCssSelection(
+            index: slots.first,
+            enabled: selection.enabled,
+            indices: selection.activeIndices),
+        bookKey: widget.bookKey);
+    if (!mounted) return;
+    setState(_loadSelection);
+    _apply();
+  }
+
+  Future<void> _template() => _run(() async {
+        if (!_validate()) return;
+        await _persistDraft();
+        if (!mounted) return;
+        final template = await showDialog<CustomCssProfile>(
+            context: context,
+            builder: (context) => SimpleDialog(
+                  title: Text(_text('添加预设模板', 'Add a preset template')),
+                  children: [
+                    for (final p in customCssTemplates)
+                      SimpleDialogOption(
+                        onPressed: () => Navigator.pop(context, p),
+                        child: Text(p.name),
+                      )
+                  ],
+                ));
+        if (template != null) await _append([template]);
+      });
+
+  Future<void> _copy() => _run(() async {
+        if (!_validate()) return;
+        await _persistDraft();
+        final p = Prefs().customCssProfiles[_index];
+        await _append([
+          CustomCssProfile(
+              name: '${p.name} ${_text('副本', 'copy')}',
+              css: p.css,
+              pattern: p.pattern,
+              scope: p.scope)
+        ]);
+      });
+
+  Future<void> _delete() => _run(() async {
+        if (!await _confirm(
+            _text('删除当前方案？', 'Delete this profile?'),
+            _text('将清空此方案，并在使用它的所有书籍中停用。',
+                'This clears the profile and disables it in all books.'))) {
+          return;
+        }
+        await Prefs().disableCustomCssSlots({_index});
+        await Prefs().saveCustomCssProfile(_index, const CustomCssProfile());
+        if (!mounted) return;
+        setState(_loadSelection);
+        _apply();
+      });
+
+  Future<void> _import() => _run(() async {
+        if (!_validate()) return;
+        await _persistDraft();
+        final picked = await FilePicker.platform.pickFiles(
+            type: FileType.custom, allowedExtensions: ['css', 'json']);
+        if (picked == null) return;
+        final path = picked.files.single.path;
+        if (path == null) throw const FormatException('Could not read file');
+        final file = File(path);
+        if (await file.length() > CustomCssTransfer.maxBytes) {
+          throw const FormatException('CSS file too large (1 MiB maximum)');
+        }
+        final additions = CustomCssTransfer.decode(await file.readAsString(),
+            fileName: picked.files.single.name);
+        if (!mounted) return;
+        if (!await _confirm(
+            _text('导入 ${additions.length} 套方案？',
+                'Import ${additions.length} profiles?'),
+            _text('仅填入空位，默认停用，不覆盖已有方案。请仅导入可信 CSS；启用后其中的图片或字体网址可能发起网络请求。',
+                'Only empty slots are used; imported profiles stay disabled. Import trusted CSS only: enabled styles may request remote images or fonts.'))) {
+          return;
+        }
+        await _append(additions);
+      });
+
+  Future<void> _export(bool all) => _run(() async {
+        if (!_validate()) return;
+        await _persistDraft();
+        final text = CustomCssTransfer.encode(all
+            ? Prefs().customCssProfiles
+            : [Prefs().customCssProfiles[_index]]);
+        await saveFileToDownload(
+            bytes: Uint8List.fromList(utf8.encode(text)),
+            fileName: 'modu-css-${DateTime.now().millisecondsSinceEpoch}.json',
+            mimeType: 'application/json');
       });
 
   Future<void> _save({bool asDefault = false}) => _run(() async {
@@ -167,7 +339,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
             label: Text(
                 profiles[i].name.isEmpty
                     ? _text('方案 ${i + 1}', 'Profile ${i + 1}')
-                    : profiles[i].name,
+                    : '${_active.contains(i) ? '✓ ' : ''}${profiles[i].name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
             selected: i == _index,
@@ -176,9 +348,48 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       ]),
       const SizedBox(height: 8),
       Text(
-          _text('共 8 套，可分别用于竖排、横排、精排等。切换会保存当前方案；修改方案会影响使用它的书籍。',
-              'Eight reusable profiles for vertical, horizontal or publisher layouts. Switching saves edits; editing a profile affects books using it.'),
+          _text('8 个自定义位置，可同时启用多套，按位置顺序叠加。点击方案仅切换编辑；修改会影响使用它的书籍。预设和导入的方案默认停用。',
+              'Eight slots; enabled profiles cascade in slot order. Selecting a slot only edits it. Shared edits affect all books using it. Templates and imports start disabled.'),
           style: Theme.of(context).textTheme.bodySmall),
+      Wrap(spacing: 8, children: [
+        TextButton.icon(
+            onPressed: _busy ? null : _template,
+            icon: const Icon(Icons.auto_awesome),
+            label: Text(_text('预设模板', 'Templates'))),
+        TextButton(
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      if (!_validate()) return;
+                      await _persistDraft();
+                      await _append([
+                        CustomCssProfile(name: _text('新方案', 'New profile'))
+                      ]);
+                    }),
+            child: Text(_text('新建', 'New'))),
+        TextButton(
+            onPressed: _busy ? null : _copy,
+            child: Text(_text('复制', 'Duplicate'))),
+        TextButton(
+            onPressed: _busy ? null : _import,
+            child: Text(_text('导入', 'Import'))),
+        PopupMenuButton<bool>(
+            enabled: !_busy,
+            onSelected: _export,
+            itemBuilder: (_) => [
+                  PopupMenuItem(
+                      value: false,
+                      child: Text(_text('导出当前方案', 'Export current'))),
+                  PopupMenuItem(
+                      value: true, child: Text(_text('导出全部方案', 'Export all'))),
+                ],
+            child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(_text('导出', 'Export')))),
+        TextButton(
+            onPressed: _busy ? null : _delete,
+            child: Text(_text('删除', 'Delete'))),
+      ]),
       if (widget.bookKey != null)
         Wrap(spacing: 8, children: [
           TextButton(
@@ -189,6 +400,28 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               child: Text(_text('设为默认方案', 'Set as default'))),
         ]),
       const SizedBox(height: 12),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        key: const ValueKey('custom-css-slot-enabled'),
+        title: Text(_text('启用当前方案', 'Enable this profile')),
+        subtitle: !_enabled
+            ? Text(_text('总开关关闭时，所有方案均不生效', 'The master switch is off'))
+            : null,
+        value: _active.contains(_index),
+        onChanged: _busy ? null : _toggleSlot,
+      ),
+      Wrap(spacing: 8, children: [
+        ChoiceChip(
+            label: Text(_text('排版 CSS', 'Layout CSS')),
+            selected: !_highlight,
+            onSelected:
+                _busy ? null : (_) => setState(() => _highlight = false)),
+        ChoiceChip(
+            label: Text(_text('正则高亮', 'Regex highlight')),
+            selected: _highlight,
+            onSelected:
+                _busy ? null : (_) => setState(() => _highlight = true)),
+      ]),
       TextField(
           key: const ValueKey('custom-css-name'),
           controller: _nameController,
@@ -198,6 +431,35 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               labelText: _text('方案名称', 'Profile name'),
               hintText: _text('例如：竖排古籍、横排小说、精排保留',
                   'e.g. Vertical, Novel, Publisher layout'))),
+      if (_highlight) ...[
+        TextField(
+            key: const ValueKey('custom-css-pattern'),
+            controller: _patternController,
+            enabled: !_busy,
+            maxLength: 512,
+            decoration: InputDecoration(
+                labelText: _text('正则表达式（JavaScript，无需 / /）',
+                    'Regular expression (JavaScript, no / /)'))),
+        DropdownButton<String>(
+            value: _scope,
+            isExpanded: true,
+            items: [
+              DropdownMenuItem(
+                  value: 'all', child: Text(_text('作用范围：全部', 'Scope: All'))),
+              DropdownMenuItem(
+                  value: 'title',
+                  child: Text(_text('作用范围：标题', 'Scope: Headings'))),
+              DropdownMenuItem(
+                  value: 'body', child: Text(_text('作用范围：正文', 'Scope: Body'))),
+            ],
+            onChanged:
+                _busy ? null : (value) => setState(() => _scope = value!)),
+        Text(
+            _text(
+                '填写颜色、背景色或下划线的 CSS 声明，不加选择器和花括号。高亮不改动正文；不支持字体、字号或图片。不匹配隐藏内容及注释。旧版阅读内核可能不支持高亮。',
+                'Use CSS declarations for color, background-color or text-decoration, without selectors/braces. Highlights preserve the text; fonts, sizes and images are not supported. Hidden content and notes are excluded. Older web engines may not support highlights.'),
+            style: Theme.of(context).textTheme.bodySmall),
+      ],
       if (_error != null)
         Padding(
             padding: const EdgeInsets.only(bottom: 8),

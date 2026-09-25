@@ -72,8 +72,15 @@ void main() {
         )));
         await tester.pumpAndSettle();
         expect(controller.hasClients, isTrue);
-        controller.jumpTo(controller.position.maxScrollExtent);
-        await tester.pumpAndSettle();
+        // Lazy variable-height tiles refine maxScrollExtent after layout.
+        // Reach the actual bottom, not the initial estimate (large text can
+        // change it after the first jump). Keep the clearance assertion exact.
+        for (var attempt = 0; attempt < 5; attempt++) {
+          controller.jumpTo(controller.position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          if (controller.position.extentAfter < 0.01) break;
+        }
+        expect(controller.position.extentAfter, lessThan(0.01));
         final about = find.byType(About);
         final aboutRect = tester.getRect(about);
         final barRect =

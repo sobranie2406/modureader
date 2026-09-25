@@ -22,6 +22,83 @@ function all(tts) {
   return values
 }
 
+test('presentation failure at a paragraph boundary must not stop or skip speech', async () => {
+  const doc = documentFor('<p>第一段。</p><p>第二段。</p><p>第三段。</p>')
+  const tts = new TTS(doc, null, range => {
+    if (range.toString() === '第二段。') throw new Error('overlay unavailable')
+  }, range => range.toString())
+  const view = {tts, book: {sections: [{}]}, initTTS() {}}
+  const nav = new TtsNavigator(() => view)
+  assert.equal(await nav.start(), '第一段。')
+  assert.equal(await nav.move(1), '第二段。')
+  assert.deepEqual(tts.collectDetails(2, {includeCurrent: true}).map(x => x.text), ['第二段。', '第三段。'])
+  assert.equal(await nav.move(1), '第三段。')
+  assert.equal(await nav.move(-1), '第二段。')
+})
+
+test('optional CFI failure cannot discard readable text during prefetch or resume', () => {
+  const doc = documentFor('<p>正文一。</p><p>正文二。</p>')
+  const tts = new TTS(doc, null, () => { throw new Error('presentation failed') }, () => { throw new Error('location unavailable') })
+  assert.equal(tts.start(), '正文一。')
+  assert.deepEqual(tts.collectDetails(2, {includeCurrent:true}), [
+    {text:'正文一。', cfi:null}, {text:'正文二。', cfi:null},
+  ])
+  assert.equal(tts.highlightCfi('stale-cfi'), null)
+  assert.equal(tts.resume(), '正文一。')
+  assert.equal(tts.next(true), '正文二。')
+  assert.equal(tts.end(), '正文二。')
+})
+
+test('Previous and Next skip punctuation in both directions, preserving symbols and languages', () => {
+  const tts = speech(documentFor('<p>第一句。</p><p>……</p><p>... —— ⋯⋯</p><p>第二句。</p><p>123 + مرحبا</p>'))
+  assert.equal(tts.start(), '第一句。')
+  assert.equal(tts.next(true), '第二句。')
+  assert.equal(tts.prev(true), '第一句。')
+  assert.equal(tts.prev(true), undefined)
+  assert.equal(tts.next(true), '第二句。')
+  assert.equal(tts.next(true), '123 + مرحبا')
+})
+
+test('read from here trims the first sentence for audio, peek and highlight, then continues', () => {
+  const doc = documentFor('<p>不重读前半，从选中位置开始。下一句。</p>')
+  const range = doc.createRange()
+  range.setStart(doc.querySelector('p').firstChild, 6)
+  range.setEnd(doc.querySelector('p').firstChild, 8)
+  const tts = new TTS(doc, null, () => null, range => range.toString())
+  assert.equal(tts.from(range, {exactStart:true}), '从选中位置开始。')
+  assert.deepEqual(tts.collectDetails(2, {includeCurrent:true}).map(x => x.text), ['从选中位置开始。','下一句。'])
+  assert.equal(tts.highlightCfi('从选中位置开始。').text, '从选中位置开始。')
+  assert.equal(tts.resume(), '从选中位置开始。')
+  assert.equal(tts.next(true), '下一句。')
+  assert.equal(tts.prev(true), '不重读前半，从选中位置开始。')
+})
+
+test('selected start binds the selected continuous chapter, never the first visible iframe', async () => {
+  const wrong = documentFor('<p>旧章节。</p>')
+  const selected = documentFor('<p>前半，从此朗读。</p><p>后续正文。</p>')
+  const view = {
+    book: {sections:[{},{}]},
+    renderer: {getContents:()=>[{index:0, doc:wrong},{index:1,doc:selected}]},
+    initTTS(_stop, {content}) {this.tts = speech(content.doc); this.tts.sectionIndex = content.index},
+    resolveNavigation: async () => ({index:1, anchor: doc => {
+      const range = doc.createRange(); range.setStart(doc.querySelector('p').firstChild,3); range.collapse(true); return range
+    }}),
+  }
+  const nav = new TtsNavigator(() => view)
+  assert.equal(await nav.startFromCfi('selection'), '从此朗读。')
+  assert.equal(view.tts.sectionIndex,1)
+  assert.equal(await nav.move(1),'后续正文。')
+  view.resolveNavigation = async () => null
+  await assert.rejects(nav.startFromCfi('invalid'), /selected reading position/)
+})
+
+test('previous across separator-only chapters reaches real body text', async () => {
+  const {nav} = reader(['<p>前章正文。</p>', '<p>……</p>', '<p>后章正文。</p>'])
+  assert.equal(await nav.start(),'前章正文。')
+  assert.equal(await nav.move(1),'后章正文。')
+  assert.equal(await nav.move(-1),'前章正文。')
+})
+
 test('all heading levels, TOC backlink headings, and inline local links are read', () => {
   const doc = documentFor(Array.from({length: 6}, (_, i) => `<h${i+1}><a href="toc.xhtml#ch${i}">标题${i+1}</a></h${i+1}>`).join('') + '<p>正文<a href="#other">有效文字</a>结束。</p>')
   assert.deepEqual(all(speech(doc)), ['标题1', '标题2', '标题3', '标题4', '标题5', '标题6', '正文有效文字结束。'])
@@ -299,6 +376,8 @@ const paginatorSource = await readFile(new URL('../assets/foliate-js/src/paginat
 const turnPage = paginatorSource.slice(paginatorSource.indexOf('  async #turnPage('), paginatorSource.indexOf('  prev(distance)'))
 const PageTurn = vm.runInNewContext(`(class {
   #locked = false;
+  #navigationWaiters = new Set();
+  ${paginatorSource.slice(paginatorSource.indexOf('  #unlockNavigation()'), paginatorSource.indexOf('  retryNavigation()'))}
   #continuous; #container; #afterScroll() {}
   #view = null;
   adjacent = 1;

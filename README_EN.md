@@ -57,7 +57,7 @@ The current version provides the following reading, AI and library features.
 | Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text results use the same popup sizing as AI chat, with scrolling for long output | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
-| Configuration transfer | Import/export AI, sync WebDAV and separate library WebDAV configurations using codes and QR images | Corresponding settings page → Import and Export |
+| Configuration transfer | Global, AI, speech, sync and remote-library settings via files, QR images and modu links | Settings → Advanced → Global settings backup |
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
@@ -75,15 +75,15 @@ Reader styles offer separate Chinese/body and English (letters/numbers) fonts. E
 
 ### Custom CSS profiles
 
-Reader styles → More settings → Style offers eight named CSS profiles for vertical, horizontal or publisher-specific layouts. Switching saves current edits; enabling applies the selected profile. Each book remembers its profile and enabled state on this device, with Follow default and Set as default controls. Editing a shared profile affects books using it. Existing CSS stays in profile 1; other slots start empty. Profiles do not automatically change the reader's writing direction. For publisher layouts, retain book styles and disable custom CSS for that book. Profiles are included in settings backups; per-book choices remain local.
+Reader styles → More settings → Style offers eight named CSS profiles for vertical, horizontal or publisher-specific layouts. Switching saves current edits; enabling applies the selected profile. Each book remembers its profile and enabled state on this device, with Follow default and Set as default controls. Editing a shared profile affects books using it. Existing CSS stays in profile 1; other slots start empty. Profiles do not automatically change the reader's writing direction. For publisher layouts, retain book styles and disable custom CSS for that book. Profiles support independent switches, combined activation, file import/export, 13 editable templates and bounded regex highlighting. See [CSS presets (Chinese)](docs/CSS_PRESETS.md). Profiles are included in settings backups; per-book choices remain local.
 
 ### WebDAV remote library
 
 Enter the full book-directory URL, username and password in Settings → Remote library settings, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
 
-This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Encrypted service-settings backups also include the connection; ordinary unencrypted backups omit it. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
+This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Global settings backup can explicitly include account credentials; this export is unencrypted and excludes credentials by default. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
 
-Library WebDAV settings support explicit export to a `modu:` configuration code or QR image, and import from a code or QR image. **Password export is on by default and can be turned off. Codes and QR images are not encrypted; do not share them publicly.** Import only fills the form; it does not automatically connect or save. Creation and modification dates come from the server; missing dates remain unknown rather than being replaced with local import times.
+Use Settings → Advanced → Global settings backup to transfer remote-library settings via files, `modu:` links or QR images. **Credentials are excluded by default. When included, exports remain unencrypted; never share them publicly.** Import validates and requests confirmation, without automatically connecting. Creation and modification dates come from the server; missing dates remain unknown rather than being replaced with local import times.
 
 ### Mobile page-turn controls
 
@@ -159,7 +159,7 @@ At a chapter boundary, narration automatically continues with the next chapter's
 
 Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
 
-Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo supports built-in voices, text-based voice design and MP3/WAV audio; style, pace and pitch are controlled through natural-language instructions. Synthesis or playback failures pause at the current position for retry.
+Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo offers official voice selection, editable speech-style and voice-design templates, prompt suggestions and MP3/WAV audio. Descriptions are voice instructions, never part of spoken book text. Synthesis or playback failures pause at the current position for retry.
 
 ### Sync and key security
 

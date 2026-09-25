@@ -25,6 +25,7 @@ function fixture() {
   }
   const Renderer = runInNewContext(`class Renderer {
     #view; #retiringView; #preparingView = false; #destroyed = false;
+    #pendingViews = new Set(); #navigationWaiters = new Set();
     #vertical = false; #rtl = false;
     #index = 0; #anchor = .8; #styleMap = new WeakMap(); #pendingRelocate;
     #container = {append(){}};

@@ -35,7 +35,7 @@ class _TtsWidgetState extends State<TtsWidget> {
   @override
   void initState() {
     if (!_unsupportedSystem &&
-        TtsHandler().ttsStateNotifier.value != TtsStateEnum.playing) {
+        TtsHandler().ttsStateNotifier.value == TtsStateEnum.stopped) {
       TtsHandler()
           .init(
         widget.epubPlayerKey.currentState!.initTts,

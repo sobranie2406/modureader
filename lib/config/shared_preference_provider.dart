@@ -1891,6 +1891,13 @@ class Prefs extends ChangeNotifier {
     RangeError.checkValidIndex(index, customCssProfiles);
     final profiles = customCssProfiles;
     profiles[index] = profile;
+    await saveCustomCssProfiles(profiles);
+  }
+
+  Future<void> saveCustomCssProfiles(List<CustomCssProfile> profiles) async {
+    if (profiles.length != customCssProfileCount) {
+      throw ArgumentError('Expected eight CSS slots');
+    }
     await prefs.setString('customCssProfiles',
         jsonEncode(profiles.map((p) => p.toJson()).toList()));
     notifyListeners();
@@ -1898,7 +1905,8 @@ class Prefs extends ChangeNotifier {
 
   Map<String, dynamic> get _bookCustomCssSelections {
     try {
-      final value = jsonDecode(prefs.getString('bookCustomCssSelections') ?? '{}');
+      final value =
+          jsonDecode(prefs.getString('bookCustomCssSelections') ?? '{}');
       return value is Map<String, dynamic> ? value : {};
     } on FormatException {
       return {};
@@ -1914,29 +1922,90 @@ class Prefs extends ChangeNotifier {
         ? defaultIndex
         : 0;
     var enabled = customCSSEnabled;
+    List<int>? indices;
+    try {
+      final raw = prefs.getString('customCssDefaultIndices');
+      if (raw != null) indices = _validCssIndices(jsonDecode(raw));
+    } on FormatException {/* Use the legacy single selection. */}
     final local = bookKey == null ? null : _bookCustomCssSelections[bookKey];
     if (local is Map && local['index'] is int && local['enabled'] is bool) {
       final candidate = local['index'] as int;
       if (candidate >= 0 && candidate < customCssProfileCount) {
         index = candidate;
         enabled = local['enabled'] as bool;
+        indices = _validCssIndices(local['indices']);
       }
     }
-    return CustomCssSelection(index: index, enabled: enabled);
+    return CustomCssSelection(index: index, enabled: enabled, indices: indices);
   }
 
-  String customCssForBook([String? bookKey]) =>
-      customCssProfiles[customCssSelection(bookKey).index].css;
+  List<int>? _validCssIndices(Object? value) {
+    if (value is! List ||
+        value.any((x) => x is! int || x < 0 || x >= customCssProfileCount)) {
+      return null;
+    }
+    return value.cast<int>().toSet().toList()..sort();
+  }
+
+  String customCssForBook([String? bookKey]) {
+    final profiles = customCssProfiles;
+    return customCssSelection(bookKey)
+        .activeIndices
+        .map((index) => profiles[index])
+        .where((p) => !p.isHighlight && p.css.trim().isNotEmpty)
+        .map((p) => p.css)
+        .join('\n\n');
+  }
+
+  List<Map<String, String>> customHighlightRulesForBook([String? bookKey]) {
+    final selection = customCssSelection(bookKey);
+    if (!selection.enabled) return [];
+    final profiles = customCssProfiles;
+    return selection.activeIndices
+        .map((i) => profiles[i])
+        .where((p) => p.isHighlight)
+        .map((p) => p.toJson())
+        .toList();
+  }
+
+  /// A deleted/reused slot must not activate a new rule in an unrelated book.
+  Future<void> disableCustomCssSlots(Set<int> slots) async {
+    final selection = customCssSelection();
+    await saveCustomCssSelection(CustomCssSelection(
+        index: selection.index,
+        enabled: selection.enabled,
+        indices:
+            selection.activeIndices.where((i) => !slots.contains(i)).toList()));
+    final selections = _bookCustomCssSelections;
+    for (final key in selections.keys.toList()) {
+      final local = customCssSelection(key);
+      selections[key] = CustomCssSelection(
+              index: local.index,
+              enabled: local.enabled,
+              indices:
+                  local.activeIndices.where((i) => !slots.contains(i)).toList())
+          .toJson();
+    }
+    await prefs.setString('bookCustomCssSelections', jsonEncode(selections));
+    notifyListeners();
+  }
 
   Future<void> saveCustomCssSelection(CustomCssSelection selection,
       {String? bookKey}) async {
     RangeError.checkValidIndex(selection.index, customCssProfiles);
+    final indices = _validCssIndices(selection.activeIndices);
+    if (indices == null) throw ArgumentError('Invalid CSS selection');
     if (bookKey == null) {
       await prefs.setInt('customCssDefaultIndex', selection.index);
       await prefs.setBool('customCSSEnabled', selection.enabled);
+      await prefs.setString('customCssDefaultIndices', jsonEncode(indices));
     } else {
       final selections = _bookCustomCssSelections;
-      selections[bookKey] = selection.toJson();
+      selections[bookKey] = CustomCssSelection(
+              index: selection.index,
+              enabled: selection.enabled,
+              indices: indices)
+          .toJson();
       await prefs.setString('bookCustomCssSelections', jsonEncode(selections));
     }
     notifyListeners();

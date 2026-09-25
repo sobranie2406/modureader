@@ -453,7 +453,7 @@ export class View extends HTMLElement {
     if (!resolved) return
     const previous = this.lastLocation?.cfi
     try {
-      await this.renderer.goTo(resolved)
+      if (await this.renderer.goTo(resolved) === false) return
       this.#recordNavigation(target, previous, recordHistory)
       return resolved
     } catch (e) {

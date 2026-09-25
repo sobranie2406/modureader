@@ -88,7 +88,9 @@ class OnlineTts extends BaseTts {
   int _generation = 0;
   int _commandVersion = 0;
   bool _isStarting = false;
-  bool _isResuming = false;
+  int _controlVersion = 0;
+  Future<void> _audioControl = Future<void>.value();
+  bool? _navigationPlaying;
 
   // ============ Backend ============
   TtsServiceProvider? _currentBackend;
@@ -612,11 +614,16 @@ class OnlineTts extends BaseTts {
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop({bool forNavigation = false}) async {
+    if (!forNavigation) {
+      _navigationPlaying = null;
+      // Explicit Stop wins even when navigation is already cleaning up.
+      updateTtsState(TtsStateEnum.stopped);
+    }
     ++_commandVersion;
     final pending = _stopping;
     if (pending != null) return pending;
-    final operation = _stop();
+    final operation = _stop(forNavigation: forNavigation);
     _stopping = operation;
     try {
       await operation;
@@ -625,12 +632,12 @@ class OnlineTts extends BaseTts {
     }
   }
 
-  Future<void> _stop() async {
+  Future<void> _stop({bool forNavigation = false}) async {
     ++_generation;
     _isStarting = false;
     _shouldStop = true;
     _playbackError = null;
-    updateTtsState(TtsStateEnum.stopped);
+    updateTtsState(forNavigation ? TtsStateEnum.paused : TtsStateEnum.stopped);
 
     // Complete any pending playback
     if (_playbackCompleter?.isCompleted == false) {
@@ -648,46 +655,73 @@ class OnlineTts extends BaseTts {
 
   @override
   Future<void> pause() async {
+    if (_navigationPlaying != null) _navigationPlaying = false;
     updateTtsState(TtsStateEnum.paused);
     final command = _commandVersion;
+    final control = ++_controlVersion;
     try {
-      await _player?.pause();
+      await _serializeAudioControl(() async {
+        if (command != _commandVersion || control != _controlVersion) return;
+        await _player?.pause();
+      });
     } catch (error) {
-      if (command == _commandVersion) _controlFailed(error);
+      if (command == _commandVersion && control == _controlVersion) {
+        _controlFailed(error);
+      }
     }
+  }
+
+  // Serialize native controls, not the lifetime of the speech loop. The last
+  // requested state wins even when Android completes pause/resume out of order.
+  Future<void> _serializeAudioControl(Future<void> Function() action) {
+    final operation = _audioControl.then((_) => action());
+    _audioControl =
+        operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return operation;
   }
 
   @override
   Future<void> resume() async {
-    if (_isResuming) return;
-    _isResuming = true;
+    if (_navigationPlaying != null) {
+      _navigationPlaying = true;
+      return;
+    }
     final command = _commandVersion;
+    final control = ++_controlVersion;
     Future<void>? playback;
     try {
-      final stopping = _stopping;
-      if (stopping != null) await stopping;
-      if (command != _commandVersion) return;
-      if (_shouldStop && _playbackError != null) {
-        await _prefetcherCompleter?.future;
-        await _playerCompleter?.future;
-        if (command != _commandVersion) return;
-        await _disposePlayer();
-        if (command != _commandVersion) return;
-        _currentSegment = null;
-        _clearPendingAudio();
-        _playbackError = null;
-        _shouldStop = false;
-        updateTtsState(TtsStateEnum.playing);
-        unawaited(_startPrefetcher());
-        playback = _startPlayer();
-      } else {
-        await _player?.resume();
-        if (command == _commandVersion) updateTtsState(TtsStateEnum.playing);
-      }
+      await _serializeAudioControl(() async {
+        if (command != _commandVersion || control != _controlVersion) return;
+        final stopping = _stopping;
+        if (stopping != null) await stopping;
+        if (command != _commandVersion || control != _controlVersion) return;
+        if (_shouldStop && _playbackError == null && !_isPlayerRunning) {
+          // Manual navigation while paused has a cursor but no active player.
+          playback = speak(content: _currentVoiceText);
+        } else if (_shouldStop && _playbackError != null) {
+          await _prefetcherCompleter?.future;
+          await _playerCompleter?.future;
+          if (command != _commandVersion || control != _controlVersion) return;
+          await _disposePlayer();
+          if (command != _commandVersion || control != _controlVersion) return;
+          _currentSegment = null;
+          _clearPendingAudio();
+          _playbackError = null;
+          _shouldStop = false;
+          updateTtsState(TtsStateEnum.playing);
+          unawaited(_startPrefetcher());
+          playback = _startPlayer();
+        } else {
+          await _player?.resume();
+          if (command == _commandVersion && control == _controlVersion) {
+            updateTtsState(TtsStateEnum.playing);
+          }
+        }
+      });
     } catch (error) {
-      if (command == _commandVersion) _controlFailed(error);
-    } finally {
-      _isResuming = false;
+      if (command == _commandVersion && control == _controlVersion) {
+        _controlFailed(error);
+      }
     }
     // The lock covers recovery only, not the duration of the resumed audio.
     // A later pause must still be resumable while this future is running.
@@ -723,16 +757,30 @@ class OnlineTts extends BaseTts {
   }
 
   Future<void> _navigate(FutureOr<dynamic> Function() locate) async {
-    final stopping = stop();
+    _navigationPlaying ??= isPlaying;
+    final previousText = _currentVoiceText;
+    final stopping = stop(forNavigation: true);
     final command = _commandVersion;
     await stopping;
     if (command != _commandVersion) return;
     try {
       final text = await locate();
       if (command != _commandVersion) return;
-      if (text is String && text.isNotEmpty) await speak(content: text);
+      final wasPlaying = _navigationPlaying == true;
+      _navigationPlaying = null;
+      if (text is String && text.isNotEmpty) {
+        _currentVoiceText = text;
+        if (wasPlaying) {
+          await speak(content: text);
+        } else {
+          updateTtsState(TtsStateEnum.paused);
+        }
+      } else {
+        _currentVoiceText = previousText;
+      }
     } catch (error) {
       if (command != _commandVersion) return;
+      _navigationPlaying = null;
       _playbackError = '朗读定位失败，请重试 / Reader navigation failed; retry.';
       updateTtsState(TtsStateEnum.paused);
       AnxLog.warning('TTS navigation failed: ${error.runtimeType}');

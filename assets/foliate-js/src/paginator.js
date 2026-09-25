@@ -1,6 +1,6 @@
 import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
-import { waitForReaderFonts } from './reader-font-ready.js'
+import { waitForReaderFonts, clearReaderFontFallback } from './reader-font-ready.js'
 import { captureBookFontFamilies } from './reader-fonts.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
@@ -233,23 +233,26 @@ class View {
   get document() {
     return this.#iframe.contentDocument
   }
+  cancelLoad() { this.#cancelLoad?.() }
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
     return new Promise((resolve, reject) => {
       let settled = false
+      const fonts = new AbortController()
       const finish = error => {
         if (settled) return
         settled = true
-        clearTimeout(timer)
+        fonts.abort()
         this.#iframe.removeEventListener('load', loaded)
         this.#cancelLoad = null
         if (error) reject(error)
         else resolve()
       }
-      const timer = setTimeout(() => finish(new Error('Reader chapter loading timed out')), 15000)
       const loaded = async () => {
         try {
           if (settled) return
+          // The native load event can itself wait for publisher fonts. Do not
+          // impose a second deadline that defeats the cancellable font wait.
           if (this.#destroyed) throw new Error('Reader view closed')
           const doc = this.document
           afterLoad?.(doc)
@@ -266,12 +269,12 @@ class View {
 
           this.#contentRange.selectNodeContents(doc.body)
           this.#iframe.style.display = 'block'
-          // Trigger font discovery without paginating/anchoring with fallback
-          // metrics. Keep the outgoing chapter visible during this wait.
-          const ready = await waitForReaderFonts(doc)
+          // Settle original fonts (or generic fallback after a real failure)
+          // before pagination. Keep the outgoing chapter visible during this wait.
+          const ready = await waitForReaderFonts(doc, fonts.signal)
           if (settled) return
           if (this.#destroyed) throw new Error('Reader view closed')
-          if (!ready) throw new Error('Reader font loading timed out or failed')
+          if (!ready) throw new Error('Reader font loading failed')
           // Measure the latest viewport, including resizes during font loading.
           const layout = beforeRender?.({ vertical, rtl })
           this.render(layout)
@@ -302,7 +305,7 @@ class View {
           finish(error)
         }
       }
-      this.#cancelLoad = () => finish(new Error('Reader view closed'))
+      this.#cancelLoad = () => finish(Object.assign(new Error('Reader view closed or navigation cancelled'), { name: 'AbortError' }))
       this.#iframe.addEventListener('load', loaded, { once: true })
       this.#iframe.src = src
     })
@@ -512,6 +515,10 @@ export class Paginator extends HTMLElement {
   #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
   #justAnchored = false
   #locked = false // while true, prevent any further navigation
+  #navigationVersion = 0
+  #navigationWaiters = new Set()
+  #pendingViews = new Set()
+  #lastNavigation
   #styles
   #styleMap = new WeakMap()
   #mediaQuery = matchMedia('(prefers-color-scheme: dark)')
@@ -1510,8 +1517,11 @@ export class Paginator extends HTMLElement {
         onLoad?.({ doc, index })
       }
       const beforeRender = this.#beforeRender.bind(this)
+      this.#pendingViews.add(view)
       try {
-        await view.load(src, afterLoad, beforeRender)
+        const loading = view.load(src, afterLoad, beforeRender)
+        if (this.#navigationWaiters.size) view.cancelLoad()
+        await loading
       } catch (error) {
         view.destroy()
         view.element.remove()
@@ -1529,7 +1539,7 @@ export class Paginator extends HTMLElement {
           }
         }
         throw error
-      }
+      } finally { this.#pendingViews.delete(view) }
       if (this.#destroyed) return
       // Commit synchronously, with no animation through an empty sentinel page.
       oldView?.destroy()
@@ -1562,10 +1572,16 @@ export class Paginator extends HTMLElement {
       this.#styleMap.set(doc, pair)
     }
     if (pair) {
+      const before = Array.isArray(this.#styles) ? this.#styles[0] : ''
+      const after = Array.isArray(this.#styles) ? this.#styles[1] : this.#styles ?? ''
+      if (pair[0].textContent === before && pair[1].textContent === after) return false
+      clearReaderFontFallback(doc)
       captureBookFontFamilies(doc, this.#styles, pair)
-      pair[0].textContent = Array.isArray(this.#styles) ? this.#styles[0] : ''
-      pair[1].textContent = Array.isArray(this.#styles) ? this.#styles[1] : this.#styles ?? ''
+      pair[0].textContent = before
+      pair[1].textContent = after
+      return true
     }
+    return false
   }
   #ensureContinuous() {
     if (this.#continuous) return
@@ -1588,11 +1604,14 @@ export class Paginator extends HTMLElement {
         Object.assign(view.element.style, { position: 'absolute', visibility: 'hidden',
           left: '0', top: '0', pointerEvents: 'none', contentVisibility: 'visible' })
         this.#container.append(view.element)
+        this.#pendingViews.add(view)
         try {
-          await view.load(src, doc => this.#styleDocument(doc), ({ vertical, rtl }) => {
+          const loading = view.load(src, doc => this.#styleDocument(doc), ({ vertical, rtl }) => {
             if (vertical) throw new Error('Continuous scroll requires horizontal writing')
             return this.#beforeRender({ vertical, rtl })
           })
+          if (this.#navigationWaiters.size) view.cancelLoad()
+          await loading
           // Wheel events in a newly visible iframe do not bubble to the host.
           // Record trusted input even before its first chapter activation.
           for (const type of ['wheel', 'touchstart', 'touchmove'])
@@ -1605,6 +1624,7 @@ export class Paginator extends HTMLElement {
             }, { capture: true, passive: true })
           return view
         } catch (error) { view.destroy(); view.element.remove(); throw error }
+        finally { this.#pendingViews.delete(view) }
       },
       activate: entry => {
         this.#view = entry.view
@@ -1634,6 +1654,21 @@ export class Paginator extends HTMLElement {
     this.dispatchEvent(new CustomEvent('continuous-start'))
   }
   async #goTo({ index, anchor, select }) {
+    this.#lastNavigation = { index, anchor, select }
+    this.dispatchEvent(new CustomEvent('chapter-state', { detail: { state: 'loading' } }))
+    try {
+      const result = await this.#loadSection({ index, anchor, select })
+      this.dispatchEvent(new CustomEvent('chapter-state', { detail: { state: 'ready' } }))
+      return result
+    } catch (error) {
+      this.dispatchEvent(new CustomEvent('chapter-state', { detail: {
+        state: error.name === 'AbortError' ? 'cancelled' : 'failed',
+        reason: error.message === 'Reader font loading failed' ? 'font' : 'chapter',
+      } }))
+      throw error
+    }
+  }
+  async #loadSection({ index, anchor, select }) {
     if (!this.#canGoToIndex(index) || !this.sections[index]) return
     if (this.continuousEnabled) {
       this.#ensureContinuous()
@@ -1666,14 +1701,37 @@ export class Paginator extends HTMLElement {
     this.#sectionCache.setCurrent(index)
   }
   async goTo(target) {
-    if (this.#locked) return
+    const version = ++this.#navigationVersion
+    while (this.#locked && !this.#destroyed) {
+      // Wait for rollback before touching the retained view. A directory jump
+      // replaces a pending font wait instead of being silently discarded.
+      const idle = new Promise(resolve => this.#navigationWaiters.add(resolve))
+      for (const view of this.#pendingViews) view.cancelLoad()
+      await idle
+    }
+    if (this.#destroyed || version !== this.#navigationVersion) return false
     this.#locked = true
     try {
       const resolved = await target
-      if (this.#canGoToIndex(resolved.index)) return await this.#goTo(resolved)
+      if (this.#canGoToIndex(resolved.index)) {
+        await this.#goTo(resolved)
+        return true
+      }
+      return false
+    } catch (error) {
+      if (error.name === 'AbortError') return false
+      throw error
     } finally {
-      this.#locked = false
+      this.#unlockNavigation()
     }
+  }
+  #unlockNavigation() {
+    this.#locked = false
+    for (const resolve of this.#navigationWaiters) resolve()
+    this.#navigationWaiters.clear()
+  }
+  retryNavigation() {
+    return this.#lastNavigation ? this.goTo(this.#lastNavigation) : Promise.resolve(false)
   }
   #scrollPrev(distance) {
     if (!this.#view) return true
@@ -1719,7 +1777,9 @@ export class Paginator extends HTMLElement {
       try {
         await this.#continuous.scrollBy(dir * (distance ?? this.size * 0.8))
         this.#afterScroll('page')
-      } finally { this.#locked = false }
+      } catch (error) {
+        if (error.name !== 'AbortError') throw error
+      } finally { this.#unlockNavigation() }
       return
     }
     if (this.#locked) return
@@ -1734,8 +1794,10 @@ export class Paginator extends HTMLElement {
         index: adjacent,
         anchor: prev ? () => 1 : () => 0,
       })
+    } catch (error) {
+      if (error.name !== 'AbortError') throw error
     } finally {
-      this.#locked = false
+      this.#unlockNavigation()
     }
   }
   prev(distance) {
@@ -1774,19 +1836,28 @@ export class Paginator extends HTMLElement {
   setStyles(styles) {
     this.#styles = styles
     if (this.#continuous) {
-      for (const entry of this.#continuous.entries.values()) this.#styleDocument(entry.view.document)
+      for (const entry of this.#continuous.entries.values()) {
+        const view = entry.view
+        if (!this.#styleDocument(view.document)) continue
+        waitForReaderFonts(view.document).then(ready => {
+          if (ready && this.#continuous?.entries.get(entry.index)?.view === view) view.expand()
+        })
+      }
       this.render()
       return
     }
     const $$styles = this.#styleMap.get(this.#view?.document)
     if (!$$styles) return
     const [$beforeStyle, $style] = $$styles
-    captureBookFontFamilies(this.#view.document, styles, $$styles)
-    if (Array.isArray(styles)) {
-      const [beforeStyle, style] = styles
-      $beforeStyle.textContent = beforeStyle
-      $style.textContent = style
-    } else $style.textContent = styles
+    const before = Array.isArray(styles) ? styles[0] : ''
+    const after = Array.isArray(styles) ? styles[1] : styles ?? ''
+    const changed = $beforeStyle.textContent !== before || $style.textContent !== after
+    if (changed) {
+      clearReaderFontFallback(this.#view.document)
+      captureBookFontFamilies(this.#view.document, styles, $$styles)
+      $beforeStyle.textContent = before
+      $style.textContent = after
+    }
 
     this.#applyBackground()
 
@@ -1795,8 +1866,8 @@ export class Paginator extends HTMLElement {
     // CSS can change writing direction without loading another chapter. Update
     // both iframe and paginator axes together, retaining the current anchor.
     if (!this.#preparingView && view?.refreshDirection().changed) this.render()
-    if (!this.#preparingView) view?.document?.fonts?.ready?.then(() => {
-      if (this.#view === view && !this.#preparingView) view.expand()
+    if (changed && !this.#preparingView && view?.document) waitForReaderFonts(view.document).then(ready => {
+      if (ready && this.#view === view && !this.#preparingView) view.expand()
     })
   }
   get writingMode() {
@@ -1805,6 +1876,8 @@ export class Paginator extends HTMLElement {
   get isNavigating() { return this.#locked }
   destroy() {
     this.#destroyed = true
+    for (const view of this.#pendingViews) view.cancelLoad()
+    this.#unlockNavigation()
     this.#columnRules?.destroy()
     this.#continuous?.destroy()
     this.#continuous = null

@@ -7,7 +7,9 @@ const blockTags = new Set([
 ])
 
 function rangeIsEmpty(range, shouldSkipTextNode) {
-    return range.collapsed || getRangeText(range, shouldSkipTextNode).trim() === ''
+    // Separators have no speech. Exclude them from the cursor in BOTH
+    // directions, otherwise Previous lands on one and playback skips forward.
+    return range.collapsed || /^[\p{P}\p{Z}\p{Cc}\p{Cf}\s⋯]*$/u.test(getRangeText(range, shouldSkipTextNode))
 }
 
 const quoteChars = new Set(['"', "'", '“', '”', '‘', '’'])
@@ -289,11 +291,14 @@ export class TTS {
     #list
     #lastMark
     #getCfi
+    #textFilter
+    #partial
     constructor(doc, textWalker, highlight, getCfi) {
         this.doc = doc
         this.highlight = highlight
         this.#getCfi = getCfi
         const shouldSkipTextNode = createTextFilter(doc)
+        this.#textFilter = shouldSkipTextNode
         this.#list = new ListIterator(getBlocks(doc, shouldSkipTextNode), range => {
             return [getRangeText(range, shouldSkipTextNode), range]
         })
@@ -319,22 +324,41 @@ export class TTS {
         return this.#list.first() ?? this.#list.next()
     }
 
+    #locationOf(range) {
+        // CFI is optional presentation metadata, not a prerequisite for speech.
+        // Do not let a detached/relaid-out range discard an otherwise valid
+        // sentence or abort the whole producer batch.
+        try { return this.#getCfi?.(range.cloneRange()) ?? null }
+        catch (_) {
+            console.warn('TTS location unavailable; retaining speech text')
+            return null
+        }
+    }
+
     #resultFrom(entry, { highlight = false } = {}) {
         if (!entry) return null
-        const [text, range] = entry
+        let [text, range] = entry
+        if (range === this.#partial?.original) {
+            range = this.#partial.range
+            text = getRangeText(range, this.#textFilter)
+        }
         if (!text || !range) return null
         const plainText = this.#getText(text)
         let cfi = null
         if (highlight && this.highlight && range.cloneRange) {
-            cfi = this.highlight(range.cloneRange()) ?? null
+            try { cfi = this.highlight(range.cloneRange()) ?? null }
+            catch (_) {
+                console.warn('TTS presentation unavailable; continuing speech')
+            }
         }
         if (!cfi && this.#getCfi && range.cloneRange) {
-            cfi = this.#getCfi(range.cloneRange())
+            cfi = this.#locationOf(range)
         }
         return { text: plainText, cfi }
     }
 
     start() {
+        this.#partial = null
         this.#lastMark = null
         const entry = this.#list.first()
         if (!entry) return this.next(true)
@@ -342,6 +366,7 @@ export class TTS {
     }
 
     end() {
+        this.#partial = null
         this.#lastMark = null
         const entry = this.#list.last()
         if (!entry) return this.next()
@@ -355,17 +380,17 @@ export class TTS {
     }
 
     prev(paused) {
+        this.#partial = null
         this.#lastMark = null
         const entry = this.#list.prev()
-        if (paused && entry?.[1]) this.highlight(entry[1].cloneRange())
-        return this.#resultFrom(entry)?.text
+        return this.#resultFrom(entry, { highlight: paused })?.text
     }
 
     next(paused) {
+        this.#partial = null
         this.#lastMark = null
         const entry = this.#list.next()
-        if (paused && entry?.[1]) this.highlight(entry[1].cloneRange())
-        return this.#resultFrom(entry)?.text
+        return this.#resultFrom(entry, { highlight: paused })?.text
     }
 
     // get next text without moving the iterator
@@ -374,12 +399,19 @@ export class TTS {
         return this.#resultFrom(entry)?.text
     }
 
-    from(range) {
+    from(range, { exactStart = false } = {}) {
         this.#lastMark = null
+        this.#partial = null
+        if (range.startContainer.ownerDocument !== this.doc) return null
         const entry = this.#list.find(range_ =>
             range.compareBoundaryPoints(Range.END_TO_START, range_) <= 0)
-        if (entry?.[1]) this.highlight(entry[1].cloneRange())
-        return this.#resultFrom(entry)?.text
+        if (exactStart && entry?.[1] && range.compareBoundaryPoints(Range.START_TO_START, entry[1]) > 0) {
+            const tail = entry[1].cloneRange()
+            tail.setStart(range.startContainer, range.startOffset)
+            if (rangeIsEmpty(tail, this.#textFilter)) return this.next(true)
+            this.#partial = { original: entry[1], range: tail }
+        }
+        return this.#resultFrom(entry, { highlight: true })?.text
     }
 
     currentDetail() {
@@ -410,7 +442,8 @@ export class TTS {
         // Audio presentation may complete late after resume/chapter navigation.
         // It must never seek the speech iterator backwards (or consume ahead).
         const entry = this.#list.current()
-        if (!entry || this.#getCfi?.(entry[1].cloneRange()) !== cfi) return null
+        const range = this.#partial && entry?.[1] === this.#partial.original ? this.#partial.range : entry?.[1]
+        if (!range || this.#locationOf(range) !== cfi) return null
         return this.#resultFrom(entry, { highlight: true })
     }
 }

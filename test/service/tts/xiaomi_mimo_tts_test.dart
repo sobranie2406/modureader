@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/audio_mime_type.dart';
+import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +87,31 @@ void main() {
       'response_format'
     ]) {
       expect(body.containsKey(key), isFalse);
+    }
+  });
+
+  test('every description template uses instructions and preserves book text',
+      () async {
+    for (final design in [false, true]) {
+      final templates =
+          design ? MimoVoicePresets.designs : MimoVoicePresets.styles;
+      for (final prompt in templates.values) {
+        await config({
+          'model':
+              design ? MimoVoicePresets.designModel : MimoVoicePresets.model,
+          'stylePrompt': prompt,
+          'voice': '茉莉',
+        });
+        await provider.speak('书籍原文，不得改写。', null, 1, 1);
+        final body = jsonDecode(request.body);
+        expect(body['messages'], [
+          {'role': 'user', 'content': prompt},
+          {'role': 'assistant', 'content': '书籍原文，不得改写。'},
+        ]);
+        expect(body['audio'].containsKey('voice'), !design);
+        if (design) expect(body['audio']['optimize_text_preview'], false);
+        expect(provider.cacheConfiguration(), contains(prompt));
+      }
     }
   });
 

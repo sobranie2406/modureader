@@ -10,7 +10,6 @@ import 'package:anx_reader/enums/sync_protocol.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/utils/save_file_to_download.dart';
@@ -33,7 +32,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:path/path.dart' as path;
 import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 
 const String _prefsBackupFileName = 'modu_shared_prefs.json';
@@ -154,16 +152,6 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           ],
         ),
         SettingsSection(
-          tiles: [
-            ConfigTransferTile(
-              kind: 'webdav',
-              label: _label('WebDAV 配置', 'WebDAV configuration'),
-              getData: _buildWebdavTransferData,
-              applyData: _applyWebdavTransferData,
-            ),
-          ],
-        ),
-        SettingsSection(
           title: Text(L10n.of(context).exportAndImport),
           tiles: [
             SettingsTile.navigation(
@@ -264,33 +252,6 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       barrierDismissible: false,
       builder: (_) => _AiSyncPasswordDialog(confirmRisk: confirmRisk),
     );
-  }
-
-  Map<String, dynamic> _buildWebdavTransferData() {
-    return WebdavConfigTransfer.createPayload(
-      syncInfo: Prefs().getSyncInfo(SyncProtocol.webdav),
-      enabled: Prefs().webdavStatus,
-      autoSync: Prefs().autoSync,
-      wifiOnly: Prefs().onlySyncWhenWifi,
-      notifyOnComplete: Prefs().syncCompletedToast,
-    );
-  }
-
-  Future<void> _applyWebdavTransferData(Map<String, dynamic> data) async {
-    final imported = WebdavConfigTransfer.parse(data);
-    Prefs().setSyncInfo(SyncProtocol.webdav, imported.syncInfo);
-    if (imported.enabled != null) {
-      Prefs().saveWebdavStatus(imported.enabled!);
-    }
-    if (imported.autoSync != null) Prefs().autoSync = imported.autoSync!;
-    if (imported.wifiOnly != null) {
-      Prefs().onlySyncWhenWifi = imported.wifiOnly!;
-    }
-    if (imported.notifyOnComplete != null) {
-      Prefs().syncCompletedToast = imported.notifyOnComplete!;
-    }
-    SyncClientFactory.initializeCurrentClient();
-    if (mounted) setState(() {});
   }
 
   void _showDataDialog(String title) {

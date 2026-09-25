@@ -43,11 +43,14 @@ test('selection collapse, quick mark and disposed document cancel pending toolba
     await settle(); assert.equal(calls, 0, mode); stop();
   }
 });
-test('font readiness handles success, failure, timeout and hosts without FontFaceSet', async () => {
+test('font readiness handles success, failure, cancellation and hosts without FontFaceSet', async () => {
   assert.equal(await waitForReaderFonts({}), true);
   assert.equal(await waitForReaderFonts({fonts: {ready: Promise.resolve()}}), true);
   assert.equal(await waitForReaderFonts({fonts: {ready: Promise.reject(Error('font'))}}), false);
-  assert.equal(await waitForReaderFonts({fonts: {ready: new Promise(() => {})}}, 1), false);
+  const controller = new AbortController();
+  const pending = waitForReaderFonts({fonts: {ready: new Promise(() => {})}}, controller.signal);
+  controller.abort();
+  assert.equal(await pending, false);
 });
 test('actual chapter loader stays hidden until custom font metrics are ready, on every chapter', async () => {
   const paginator = await source('paginator.js');
@@ -60,7 +63,7 @@ test('actual chapter loader stays hidden until custom font metrics are ready, on
     get document() {return this.doc} get frame() {return this.#iframe}
     render(layout) {this.renders.push(this.doc.loaded)} expand() {} setImageSize() {}
     ${method}
-  }; Harness`, {EventTarget, waitForReaderFonts, getDirection: () => ({}), console, setTimeout, clearTimeout});
+  }; Harness`, {EventTarget, AbortController, waitForReaderFonts, getDirection: () => ({}), console, setTimeout, clearTimeout});
   for (let chapter = 0; chapter < 2; chapter++) {
     const doc = new EventTarget(); let release;
     doc.body = {getBoundingClientRect(){}};

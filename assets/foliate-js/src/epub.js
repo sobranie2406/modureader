@@ -1,5 +1,6 @@
 import * as CFI from './epubcfi.js'
 import { sanitizeBookDocument } from './script_policy.js'
+import { createKindleFontResolver } from './epub-kindle-fonts.js'
 
 const NS = {
     CONTAINER: 'urn:oasis:names:tc:opendocument:xmlns:container',
@@ -624,6 +625,7 @@ class Loader {
         this.loadBlob = loadBlob
         this.manifest = resources.manifest
         this.assets = resources.manifest
+        this.resolveKindleFont = createKindleFontResolver(this.manifest)
 
         var urlParams = new URLSearchParams(window.location.search)
         this.allowScript = JSON.parse(urlParams.get('style'))?.allowScript === true
@@ -807,8 +809,13 @@ class Loader {
     async replaceCSS(str, href, parents = []) {
         const replacedUrls = await replaceSeries(str,
             /url\(\s*["']?([^'"\n]*?)\s*["']?\s*\)/gi,
-            (_, url) => this.loadHref(url, href, parents)
-                .then(url => `url("${url}")`))
+            async (_, url) => {
+                const font = this.resolveKindleFont(url, href)
+                const resolved = font
+                    ? await this.loadItem(font, parents.concat(href))
+                    : await this.loadHref(url, href, parents)
+                return `url("${resolved}")`
+            })
         // apart from `url()`, strings can be used for `@import` (but why?!)
         const replacedImports = await replaceSeries(replacedUrls,
             /@import\s*["']([^"'\n]*?)["']/gi,

@@ -10,6 +10,7 @@ import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
 import { readerSelectionCSS } from './selection-style.js'
 import { readerFontCSS } from './reader-fonts.js'
+import { applyCustomHighlights } from './custom-highlight.js'
 import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
 import { Overlayer } from './overlayer.js'
@@ -24,6 +25,21 @@ let quickMarkShowMenu = false;
 let quickMarkColor = '#ffd54f';
 const quickMarkDocuments = new WeakMap();
 const desktopInputDocuments = new WeakMap();
+const highlightWarnings = new Set();
+const highlightSignatures = new WeakMap();
+const updateCustomHighlights = (doc, force = false) => {
+  const rules = style.customCSSEnabled ? style.customHighlightRules : [];
+  const signature = JSON.stringify(rules ?? []);
+  if (!force && highlightSignatures.get(doc) === signature) return;
+  highlightSignatures.set(doc, signature);
+  return applyCustomHighlights(doc, rules, {
+    onStatus: status => {
+      if (highlightWarnings.has(status)) return;
+      highlightWarnings.add(status);
+      void callFlutter('onCustomHighlightStatus', status).catch(() => {});
+    }
+  });
+};
 
 const getPosition = (target) => {
   const clamp01 = value => Math.min(Math.max(value, 0), 1);
@@ -1075,6 +1091,12 @@ class Reader {
 
     if (importing) return
 
+    this.view.renderer.addEventListener('chapter-state', ({ detail }) => {
+      void callFlutter('onReaderChapterState', detail).catch(() => {})
+      if (detail.state === 'ready')
+        for (const { doc } of this.view.renderer.getContents?.() ?? []) updateCustomHighlights(doc)
+    })
+
     this.installDesktopInput(document)
 
     this.view.addEventListener('load', this.#onLoad.bind(this))
@@ -1082,6 +1104,7 @@ class Reader {
       this.#doc = doc
       this.#index = index
       this.#saveOriginalContent()
+      updateCustomHighlights(doc)
     })
     this.view.addEventListener('relocate', this.#onRelocate.bind(this))
     let lastTtsChapter = null
@@ -1840,6 +1863,8 @@ const setStyle = (oldStyle) => {
     headingFontSize: style.headingFontSize
   }
   reader.view.renderer.setStyles?.(getCSS(newStyle))
+  highlightWarnings.clear()
+  for (const { doc } of reader.view.renderer.getContents?.() ?? []) updateCustomHighlights(doc, true)
 
   if (!style.useBookStyles && style.fontColor) {
     fixHeadingColor(style.fontColor)
@@ -1946,6 +1971,9 @@ window.changeStyle = (newStyle) => {
 
 window.goToHref = href => reader.view.goTo(href)
 
+window.retryReaderChapter = () => reader.view.renderer.retryNavigation?.()
+  .catch(error => console.error(error))
+
 window.goToCfi = cfi => reader.view.goTo(cfi)
 // Search has its own origin/previous/next controls, not a history entry per hit.
 window.goToSearchResult = async cfi => !!(await reader.view.goTo(cfi, { recordHistory: false }))
@@ -2047,23 +2075,7 @@ window.ttsHere = () => {
   return ttsNavigator.start(reader.view.lastLocation?.range)
 }
 
-window.ttsFromCfi = async (cfi) => {
-  initTts()
-  try {
-    const resolved = await reader.view.resolveNavigation(cfi)
-    if (resolved && resolved.anchor) {
-      const contents = reader.view.renderer.getContents()
-      const content = contents.find(c => c.index === resolved.index) || contents[0]
-      if (content && content.doc) {
-        const range = resolved.anchor(content.doc)
-        return ttsNavigator.start(range)
-      }
-    }
-  } catch (e) {
-    console.error(e)
-  }
-  return window.ttsHere()
-}
+window.ttsFromCfi = cfi => ttsNavigator.startFromCfi(cfi)
 
 window.ttsCurrentDetail = () => {
   initTts()
