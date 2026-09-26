@@ -1,9 +1,10 @@
 # 默读 / Modu 1.1.6 正式版
 
-版本：**1.1.6+10047**。
+版本：**1.1.6+10049**。
 
 ## 本次更新
 
+- **连续朗读与搜索修复**：朗读播放期间持续补充后续段落缓存，减少段落之间的等待；修复选词搜索窗口上下滑动冲突及横屏、键盘展开时的工具栏溢出。版本信息改为读取实际安装包，正确显示构建号。
 - **全局设置导入导出**：统一迁移外观、阅读排版、CSS、AI、技能、向量配置、朗读、翻译、搜索、同步、书库、笔记偏好、统计布局及网络设置，支持文件、二维码和 `modu:` 链接。补齐默认值恢复、书摘背景与书库显示偏好，导入前完整校验，兼容旧版配置链接。账号、密码和 API 接口配置由独立开关控制，默认关闭；关闭时导出不包含、导入不覆盖本机凭据。开启后的主动导出为明文，请妥善保管。同步加密及同步密码保持独立。
 - **在线朗读按段播放**：Edge、MiMo、OpenAI 兼容及 DashScope 合并同一自然段内相邻句子，按播放段准确高亮，支持上一段、下一段和从选中文字开始朗读。首段优先合成，后续预取；跳转后忽略过期音频和错误。系统朗读保留逐句控制。
 - **语音与后台控制**：MiMo 支持通过语速滑块调整实际播放速度；支持描述提示词的接口沿用稳定语速、音色与风格要求。OpenAI 兼容语音增加可编辑提示词与预设。优化暂停恢复、锁屏章节推进和旧任务取消逻辑。
@@ -32,7 +33,7 @@ Gitee 先移除旧应用发行版，再上传同一批 GitHub 原包；校验通
 
 ## English
 
-Modu **1.1.6 (build 10047)** adds paragraph-based online narration with accurate group highlighting and navigation, priority synthesis and prefetching. MiMo playback speed follows the reader slider; compatible speech services gain editable voice instructions and consistent narration guidance. Pause/resume and background chapter transitions are improved.
+Modu **1.1.6 (build 10049)** adds paragraph-based online narration with accurate group highlighting and navigation, priority synthesis and rolling prefetch during playback to reduce pauses between paragraphs. MiMo playback speed follows the reader slider; compatible speech services gain editable voice instructions and consistent narration guidance. Pause/resume and background chapter transitions are improved. Selection-search scrolling and compact toolbar layout are fixed, and version details reflect the installed package.
 
 Manage 32 CSS profiles and 13 presets with visual controls in Settings, search selected text in the built-in browser, and export clearer notes with bracketed source text and timestamps. Update checks and downloads offer GitHub/Gitee selection, preferring GitHub by default. Full-text translation controls no longer cover the text.
 

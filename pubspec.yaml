@@ -2,7 +2,7 @@ name: anx_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 
-version: 1.1.6+10047
+version: 1.1.6+10049
 
 environment:
   sdk: '>=3.5.2 <4.0.0'
@@ -16,6 +16,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   file_picker: ^9.0.2
   path_provider: ^2.1.2
+  package_info_plus: ^8.3.0
   image: ^4.3.0
   zxing2: ^0.2.4
   sqflite: ^2.3.2

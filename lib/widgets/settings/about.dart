@@ -12,7 +12,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pubspec_parse/pubspec_parse.dart';
+import 'package:anx_reader/utils/app_version.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class About extends StatefulWidget {
@@ -90,9 +90,7 @@ void _openDeveloperOptionsPage() {
 }
 
 Future<void> openAboutDialog() async {
-  final pubspecContent = await rootBundle.loadString('pubspec.yaml');
-  final pubspec = Pubspec.parse(pubspecContent);
-  final version = pubspec.version.toString();
+  final version = await getAppVersion();
 
   showDialog(
     context: navigatorKey.currentContext!,

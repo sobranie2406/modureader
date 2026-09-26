@@ -39,7 +39,7 @@ class TtsFactory {
   }
 
   BaseTts createTts() {
-    if (_createOverride != null) return _createOverride!();
+    if (_createOverride != null) return _createOverride();
     TtsService service = getTtsService(Prefs().ttsService);
     return service == TtsService.system ? SystemTts() : OnlineTts();
   }

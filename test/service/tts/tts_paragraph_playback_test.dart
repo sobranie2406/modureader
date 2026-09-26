@@ -65,7 +65,7 @@ void main() {
     await until(() => requests.isNotEmpty);
     expect(requests, [passages.first.text]);
     first.complete(Uint8List.fromList([1]));
-    await until(() => played.isNotEmpty && requests.length == 3);
+    await until(() => played.isNotEmpty && requests.length == 3 && cursor == 1);
     expect(played, ['group-1']);
     expect(cursor, 1);
     later.complete(Uint8List.fromList([2]));

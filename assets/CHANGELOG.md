@@ -4,6 +4,7 @@ Details and downloads: https://github.com/sobranie2406/modureader/releases
 
 ## 1.1.6
 
+- Refill narration audio ahead during playback, fix embedded search scrolling and toolbar overflow, and report the installed build number.
 - Transfer all global settings with explicit defaults, validated restore and an independent credentials switch.
 - Group online narration by paragraph with accurate highlighting, group navigation and priority synthesis.
 - Add MiMo playback-speed control, compatible voice instructions and background narration recovery improvements.
@@ -13,6 +14,7 @@ Details and downloads: https://github.com/sobranie2406/modureader/releases
 - Choose GitHub or Gitee for updates and downloads, preferring GitHub by default.
 - Move full-text translation stop controls to the toolbar so they do not cover reading text.
 
+- 播放期间滚动预取后续语音，修复内置搜索滚动及工具栏溢出，版本信息显示实际安装构建号。
 - 全局设置统一迁移，补齐默认值恢复、导入前校验，并保留独立凭据开关。
 - 在线朗读按自然段分组，准确高亮、前后按段定位，首段优先合成。
 - MiMo 增加实际播放语速调节，兼容语音提示词，并优化后台朗读恢复。

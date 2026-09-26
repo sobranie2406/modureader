@@ -646,8 +646,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> showSelectionSearch(String content) async {
     showOrHideAppBarAndBottomBar(false);
     try {
-      await showReaderPopup(context,
-          builder: (_) => SelectionSearchBrowser(text: content));
+      await showSelectionSearchBrowser(context, text: content);
     } finally {
       _restoreReaderFocusAfterPanel();
     }

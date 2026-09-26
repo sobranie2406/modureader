@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/utils/app_version.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
 import 'package:anx_reader/utils/reader_route_observer.dart';
@@ -53,10 +54,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String diagnosticVersion = 'unknown';
   try {
-    diagnosticVersion = RegExp(r'^version:\s*(\S+)', multiLine: true)
-            .firstMatch(await rootBundle.loadString('pubspec.yaml'))
-            ?.group(1) ??
-        'unknown';
+    diagnosticVersion = await getAppVersion();
   } catch (_) {}
   await CrashJournal.initialize(version: diagnosticVersion);
   // Record startup failures too; AnxError later installs the normal handlers

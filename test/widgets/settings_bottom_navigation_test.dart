@@ -10,10 +10,18 @@ import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Modu',
+      packageName: 'com.modu.reader',
+      version: '1.1.6-test.1',
+      buildNumber: '10048',
+      buildSignature: '',
+    );
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     // Do not reuse a cached Future from a previous test's FakeAsync zone.
@@ -91,6 +99,7 @@ void main() {
         await tester.tap(about);
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.textContaining('1.1.6-test.1+10048'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }

@@ -30,11 +30,12 @@ class ReaderPopup extends StatelessWidget {
 }
 
 Future<void> showReaderPopup(BuildContext context,
-    {required WidgetBuilder builder}) async {
+    {required WidgetBuilder builder, bool enableDrag = true}) async {
   ModalRoute<dynamic>? route;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    enableDrag: enableDrag,
     showDragHandle: false,
     clipBehavior: Clip.hardEdge,
     builder: (context) {

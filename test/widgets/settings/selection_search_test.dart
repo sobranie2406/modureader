@@ -1,6 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/selection_search.dart';
 import 'package:anx_reader/page/settings_page/selection_search.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 import 'package:flutter/material.dart';

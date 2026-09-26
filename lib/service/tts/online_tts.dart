@@ -72,6 +72,8 @@ class OnlineTts extends BaseTts {
   TtsSegment? _currentSegment;
   String? _currentVoiceText;
   int _audioFetchVersion = 0; // Version counter for audio fetches
+  int _cursorRevision = 0;
+  bool _advancingCursor = false;
   final Set<Completer<void>> _fetchCancellations = {};
   // ============ Prefetcher State ============
   bool _isPrefetcherRunning = false;
@@ -312,16 +314,23 @@ class OnlineTts extends BaseTts {
           }
         }
 
-        // Refill only at a stable consumer cursor. In particular, do not peek
-        // while the last sentence is advancing to the next chapter, or that
-        // chapter's current (first) sentence can be excluded from the batch.
-        if (_buffer.isNotEmpty || _currentSegment != null) {
+        // Refill during playback, not only after the whole batch is exhausted.
+        // The current passage and queued passages already belong to this
+        // cursor, so skip them in the non-mutating reader snapshot below.
+        final queued = _buffer.length + (_currentSegment == null ? 0 : 1);
+        if (_advancingCursor || queued >= _bufferCapacity) {
           await Future.delayed(const Duration(milliseconds: 50));
           continue;
         }
 
         // Collect sentences from the reader
-        final sentences = await _collectSentences(_bufferCapacity);
+        final revision = _cursorRevision;
+        final collected = await _collectSentences(_bufferCapacity);
+        // A WebView reply may arrive after the consumer changed chapters.
+        // Never append a snapshot belonging to an older reader position.
+        if (_shouldStop) break;
+        if (_advancingCursor || revision != _cursorRevision) continue;
+        final sentences = collected.skip(queued).toList();
 
         if (sentences.isEmpty) {
           await Future.delayed(const Duration(milliseconds: 100));
@@ -342,7 +351,7 @@ class OnlineTts extends BaseTts {
         for (var i = 0; i < newSegments.length;) {
           if (_shouldStop) break;
           // Get the first passage ready before issuing speculative work.
-          final size = i == 0 ? 1 : _batchSize;
+          final size = i == 0 && queued == 0 ? 1 : _batchSize;
           final batch = newSegments.skip(i).take(size).toList();
           final futures =
               batch.map((segment) => _fetchAudioForSegment(segment));
@@ -578,7 +587,14 @@ class OnlineTts extends BaseTts {
             await Future.delayed(const Duration(milliseconds: 30));
           }
           if (!_shouldStop) {
-            final next = await getNextTextFunction();
+            _advancingCursor = true;
+            dynamic next;
+            try {
+              next = await getNextTextFunction();
+            } finally {
+              _cursorRevision++;
+              _advancingCursor = false;
+            }
             if (next == null || (next is String && next.trim().isEmpty)) {
               _shouldStop = true;
               updateTtsState(TtsStateEnum.stopped);

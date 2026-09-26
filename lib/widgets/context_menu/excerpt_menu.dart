@@ -309,8 +309,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
               if (reader != null) {
                 await reader.showSelectionSearch(text);
               } else {
-                await showReaderPopup(popupContext,
-                    builder: (_) => SelectionSearchBrowser(text: text));
+                await showSelectionSearchBrowser(popupContext, text: text);
               }
             },
             icon: const Icon(EvaIcons.globe),
