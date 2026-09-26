@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:anx_reader/models/css_visual_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,13 +16,52 @@ void main() {
     await prefs.initPrefs();
   }
 
-  test('eight empty slots by default, disabled without surprising CSS',
+  test('named presets available by default without enabling surprising CSS',
       () async {
     await init();
-    expect(prefs.customCssProfiles, hasLength(8));
-    expect(prefs.customCssProfiles.every((p) => p.css.isEmpty), isTrue);
+    expect(prefs.customCssProfiles, hasLength(customCssProfileCount));
+    expect(prefs.customCssProfiles.take(8).every((p) => p.isEmpty), isTrue);
+    expect(prefs.customCssProfiles[8].name, customCssTemplates.first.name);
+    expect(prefs.customCssForBook(), isEmpty);
     expect(prefs.customCssSelection().enabled, isFalse);
     expect(prefs.customCssSelection().index, 0);
+  });
+
+  test('legacy eight slots keep their indexes when named presets are added',
+      () async {
+    final old = List.generate(8,
+        (i) => CustomCssProfile(name: 'old-$i', css: 'p {color:red}').toJson());
+    await init({
+      'customCssProfiles': jsonEncode(old),
+      'customCssDefaultIndex': 7,
+      'customCSSEnabled': true,
+    });
+    expect(
+        prefs.customCssProfiles.take(8).map((p) => p.toJson()).toList(), old);
+    expect(prefs.customCssSelection().index, 7);
+    expect(prefs.customCssForBook(), 'p {color:red}');
+    await prefs.saveCustomCssProfile(7, prefs.customCssProfiles[7]);
+    await prefs.initPrefs();
+    expect(
+        prefs.customCssProfiles.take(8).map((p) => p.toJson()).toList(), old);
+    expect(prefs.customCssSelection().index, 7);
+  });
+
+  test(
+      'local template fonts resolve against current device server, not exported port',
+      () async {
+    await init({'lastServerPort': 12345});
+    await prefs.saveCustomCssProfile(
+        0,
+        const CustomCssProfile(
+            name: 'Font', visual: CssVisualStyle({'fontFile': 'font 中文.ttf'})));
+    expect(prefs.customCssForBook(),
+        contains('http://127.0.0.1:12345/fonts/font%20'));
+    prefs.lastServerPort = 23456;
+    expect(prefs.customCssForBook(),
+        contains('http://127.0.0.1:23456/fonts/font%20'));
+    final portable = jsonEncode(prefs.customCssProfiles[0].toJson());
+    expect(portable, isNot(contains('127.0.0.1')));
   });
 
   test('legacy CSS and enablement survive initial use and subsequent saves',
@@ -88,7 +128,9 @@ void main() {
     expect(prefs.customCssForBook('A'), 'legacy');
     expect(prefs.customCssSelection('A').index, 0);
     expect(prefs.customCssSelection('A').enabled, isFalse);
-    await expectLater(prefs.saveCustomCssProfile(8, const CustomCssProfile()),
+    await expectLater(
+        prefs.saveCustomCssProfile(
+            customCssProfileCount, const CustomCssProfile()),
         throwsRangeError);
     await expectLater(
         prefs.saveCustomCssSelection(

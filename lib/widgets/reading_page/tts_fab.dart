@@ -1,4 +1,6 @@
 import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
@@ -65,6 +67,8 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
     return ValueListenableBuilder<TtsStateEnum>(
       valueListenable: _handler.ttsStateNotifier,
       builder: (context, ttsState, _) {
+        final paragraph = getTtsService(Prefs().ttsService).isOnline;
+        final zh = Localizations.localeOf(context).languageCode == 'zh';
         final isPlaying = ttsState == TtsStateEnum.playing;
         final ttsActive =
             ttsState == TtsStateEnum.playing || ttsState == TtsStateEnum.paused;
@@ -115,6 +119,11 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                             children: [
                               _ActionButton(
                                 icon: EvaIcons.chevron_left,
+                                tooltip: zh
+                                    ? (paragraph ? '上一段' : '上一句')
+                                    : (paragraph
+                                        ? 'Previous passage'
+                                        : 'Previous sentence'),
                                 onPressed: () {
                                   _handler.playPrevious();
                                 },
@@ -133,6 +142,11 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                               ),
                               _ActionButton(
                                 icon: EvaIcons.chevron_right,
+                                tooltip: zh
+                                    ? (paragraph ? '下一段' : '下一句')
+                                    : (paragraph
+                                        ? 'Next passage'
+                                        : 'Next sentence'),
                                 onPressed: () {
                                   _handler.playNext();
                                 },
@@ -188,14 +202,17 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
     required this.onPressed,
+    this.tooltip,
   });
 
   final IconData icon;
   final VoidCallback onPressed;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
+      tooltip: tooltip,
       icon: Icon(icon, size: 22),
       onPressed: onPressed,
       splashRadius: 20,

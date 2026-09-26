@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
+import 'package:anx_reader/service/tts/openai_voice_presets.dart';
+import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:flutter/widgets.dart';
@@ -16,7 +18,13 @@ class OpenAiTtsProvider extends TtsServiceProvider {
     return _instance;
   }
 
-  OpenAiTtsProvider._internal();
+  OpenAiTtsProvider._internal() : _client = null;
+
+  @visibleForTesting
+  OpenAiTtsProvider.forTesting({required http.Client client})
+      : _client = client;
+
+  final http.Client? _client;
 
   static const String _defaultUrl = 'https://api.openai.com/v1/audio/speech';
   static const String _defaultModel = 'gpt-4o-mini-tts';
@@ -87,6 +95,7 @@ class OpenAiTtsProvider extends TtsServiceProvider {
         'model': _defaultModel,
         'voice': _defaultVoice,
         'instructions': '',
+        'instructionsEnabled': 'true',
       };
     }
     return {
@@ -95,6 +104,7 @@ class OpenAiTtsProvider extends TtsServiceProvider {
       'model': config['model'] ?? _defaultModel,
       'voice': config['voice'] ?? _defaultVoice,
       'instructions': config['instructions'] ?? '',
+      'instructionsEnabled': config['instructionsEnabled'] ?? 'true',
     };
   }
 
@@ -116,13 +126,11 @@ class OpenAiTtsProvider extends TtsServiceProvider {
       throw Exception('OpenAI TTS config missing (key)');
     }
 
-    final instructions = _buildInstructions(
-      config['instructions']?.toString(),
-      rate,
-      pitch,
-    );
+    final instructions = OpenAiVoicePresets.sendsInstructions(config)
+        ? _buildInstructions(config['instructions']?.toString(), pitch)
+        : '';
 
-    final response = await http.post(
+    final response = await (_client?.post ?? http.post)(
       Uri.parse(url),
       headers: {
         'Authorization': 'Bearer $key',
@@ -133,6 +141,9 @@ class OpenAiTtsProvider extends TtsServiceProvider {
         'voice': resolvedVoice,
         'input': text,
         if (instructions.isNotEmpty) 'instructions': instructions,
+        // A neutral slider must not override a user's pacing description.
+        // Other values use the API's speed control, including legacy models.
+        if (rate.isFinite && rate != 1) 'speed': rate.clamp(0.25, 4.0),
         'response_format': 'mp3',
       }),
     );
@@ -145,14 +156,17 @@ class OpenAiTtsProvider extends TtsServiceProvider {
         'OpenAI TTS failed: ${response.statusCode} ${response.body}');
   }
 
-  String _buildInstructions(String? base, double rate, double pitch) {
+  String _buildInstructions(String? base, double pitch) {
     final buffer = StringBuffer();
     if (base != null && base.trim().isNotEmpty) {
       buffer.writeln(base.trim());
     }
-    buffer.writeln('Please speak at a speed of ${rate.toStringAsFixed(2)}x.');
-    buffer.writeln('Please use a pitch of ${pitch.toStringAsFixed(2)}x.');
-    return buffer.toString().trim();
+    if (pitch.isFinite && pitch != 1) {
+      buffer.writeln(pitch > 1
+          ? 'Use a slightly higher pitch while keeping the voice natural.'
+          : 'Use a slightly lower pitch while keeping the voice natural.');
+    }
+    return withStableNarration(buffer.toString());
   }
 
   @override

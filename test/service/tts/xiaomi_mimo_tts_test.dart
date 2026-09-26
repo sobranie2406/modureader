@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/audio_mime_type.dart';
 import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
+import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,6 +63,7 @@ void main() {
     expect(jsonDecode(request.body), {
       'model': 'mimo-v2.5-tts',
       'messages': [
+        {'role': 'user', 'content': stableNarrationInstruction},
         {'role': 'assistant', 'content': '第一章\n正文不改写。'}
       ],
       'audio': {'format': 'mp3', 'voice': 'mimo_default'},
@@ -69,14 +71,14 @@ void main() {
     });
   });
 
-  test('style, rate and pitch are user instructions, never spoken input',
+  test('style and pitch are instructions; playback rate is not sent to MiMo',
       () async {
     await config({'stylePrompt': '平稳讲述', 'voice': '冰糖'});
     await provider.speak('原文', null, 1.5, 0.8);
     final body = jsonDecode(request.body);
     expect(body['messages'][0]['role'], 'user');
     expect(body['messages'][0]['content'], contains('平稳讲述'));
-    expect(body['messages'][0]['content'], contains('1.50'));
+    expect(body['messages'][0]['content'], isNot(contains('1.50')));
     expect(body['messages'][0]['content'], contains('降低'));
     expect(body['messages'][1], {'role': 'assistant', 'content': '原文'});
     for (final key in [
@@ -105,12 +107,13 @@ void main() {
         await provider.speak('书籍原文，不得改写。', null, 1, 1);
         final body = jsonDecode(request.body);
         expect(body['messages'], [
-          {'role': 'user', 'content': prompt},
+          {'role': 'user', 'content': '$prompt\n$stableNarrationInstruction'},
           {'role': 'assistant', 'content': '书籍原文，不得改写。'},
         ]);
         expect(body['audio'].containsKey('voice'), !design);
         if (design) expect(body['audio']['optimize_text_preview'], false);
         expect(provider.cacheConfiguration(), contains(prompt));
+        expect(provider.getConfig()['stylePrompt'], prompt);
       }
     }
   });

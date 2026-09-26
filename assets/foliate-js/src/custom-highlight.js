@@ -91,7 +91,7 @@ export function clearCustomHighlights(doc) {
 
 export async function applyCustomHighlights(doc, input, {onStatus = () => {}, timeout = 1200} = {}) {
   clearCustomHighlights(doc);
-  const rules = (Array.isArray(input) ? input : []).slice(0, 8).filter(r =>
+  const rules = (Array.isArray(input) ? input : []).slice(0, 32).filter(r =>
     typeof r.pattern === 'string' && r.pattern.length > 0 && r.pattern.length <= 512);
   if (!rules.length) return;
   const win = doc.defaultView;

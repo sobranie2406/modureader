@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
+import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:flutter/widgets.dart';
@@ -22,6 +23,9 @@ abstract class ReadAnyCompatibleTtsProvider extends TtsServiceProvider {
   String get providerName;
   String get providerDescription;
   List<TtsVoice> get bundledVoices;
+
+  // An OpenAI-shaped endpoint alone does not establish instruction support.
+  bool get supportsStableNarrationInstructions => false;
 
   String _label(BuildContext context, String zh, String en) =>
       Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -128,6 +132,9 @@ abstract class ReadAnyCompatibleTtsProvider extends TtsServiceProvider {
       config['endpoint']?.toString() ?? '',
     );
     final style = config['stylePrompt']?.toString().trim() ?? '';
+    final instructions = supportsStableNarrationInstructions
+        ? withStableNarration(style)
+        : style;
     final response = await _client.post(
       uri,
       headers: {
@@ -141,9 +148,9 @@ abstract class ReadAnyCompatibleTtsProvider extends TtsServiceProvider {
         'input': text,
         'response_format': config['format']?.toString() ?? 'mp3',
         'speed': rate.clamp(0.25, 4.0),
-        if (style.isNotEmpty)
+        if (instructions.isNotEmpty)
           'instructions':
-              '$style\nPitch multiplier: ${pitch.toStringAsFixed(2)}.',
+              '$instructions\nPitch multiplier: ${pitch.toStringAsFixed(2)}.',
       }),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -184,6 +191,15 @@ class DashScopeTtsProvider extends ReadAnyCompatibleTtsProvider {
   factory DashScopeTtsProvider() => _instance;
 
   DashScopeTtsProvider._();
+
+  @visibleForTesting
+  DashScopeTtsProvider.forTesting({required http.Client client})
+      : super(client: client);
+
+  @override
+  bool get supportsStableNarrationInstructions =>
+      RegExp(r'^qwen3-tts-instruct-flash(?:-|$)')
+          .hasMatch(getConfig()['model']?.toString().trim() ?? '');
 
   @override
   TtsService get service => TtsService.dashscope;
@@ -230,7 +246,7 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
 
   @override
   String get providerDescription =>
-      '小米官方聊天语音接口：内置音色或文字设计音色。语速、音高通过风格指令控制，非精确倍率。仅播放 MP3/WAV，旧 AAC/PCM 配置自动改用 MP3。不支持声音克隆。';
+      '小米官方聊天语音接口：内置音色或文字设计音色。语速滑块控制本地播放倍率；音高通过风格指令控制。仅播放 MP3/WAV，旧 AAC/PCM 配置自动改用 MP3。不支持声音克隆。';
 
   @override
   String get defaultBaseUrl => 'https://api.xiaomimimo.com';
@@ -335,12 +351,10 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
     if (!design && !bundledVoices.any((v) => v.shortName == resolved)) {
       throw StateError('Xiaomi MiMo：请选择官方内置音色。');
     }
-    final directions = [
+    final directions = withStableNarration([
       if (style.isNotEmpty) style,
-      if (rate.isFinite && rate != 1)
-        '语速约为正常语速的 ${rate.clamp(0.25, 4).toStringAsFixed(2)} 倍。',
       if (pitch.isFinite && pitch != 1) pitch > 1 ? '音调适当提高。' : '音调适当降低。',
-    ].join('\n');
+    ].join('\n'));
     final uri = resolveMimoEndpoint(
         config['baseUrl'].toString(), config['endpoint'].toString());
     http.Response response;

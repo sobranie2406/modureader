@@ -24,6 +24,36 @@ class AppUpdateDialog extends StatelessWidget {
   String _text(BuildContext c, String zh, String en) =>
       Localizations.localeOf(c).languageCode == 'zh' ? zh : en;
 
+  Widget _sourcePicker(BuildContext context,
+          {required String id,
+          required String label,
+          required UpdateSource value,
+          required ValueChanged<UpdateSource> onChanged}) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          DropdownButton<UpdateSource>(
+            key: ValueKey(id),
+            value: value,
+            isExpanded: true,
+            items: [
+              DropdownMenuItem(
+                  value: UpdateSource.github,
+                  child: Text(_text(context, 'GitHub（默认，优先）',
+                      'GitHub (default, preferred)'))),
+              const DropdownMenuItem(
+                  value: UpdateSource.gitee, child: Text('Gitee')),
+            ],
+            onChanged: controller.busy
+                ? null
+                : (source) {
+                    if (source != null) onChanged(source);
+                  },
+          ),
+        ],
+      );
+
   String _message(BuildContext c, String code) => switch (code) {
         'browser_required' => _text(c, '请通过浏览器重新下载 DMG，不要使用旧的应用内下载缓存。',
             'Download the DMG again in your browser; do not reuse an old in-app download.'),
@@ -77,8 +107,13 @@ class AppUpdateDialog extends StatelessWidget {
       };
 
   Future<void> _openRelease() async {
-    if (!await launchUrl(Uri.parse(controller.release?.url ?? moduReleasePage),
-        mode: LaunchMode.externalApplication)) {
+    final base = controller.checkSource == UpdateSource.gitee ||
+            controller.release?.fromMirror == true
+        ? moduMirrorReleasePage
+        : moduReleasePage;
+    final version = controller.release?.version;
+    if (!await _launchBrowser(
+        Uri.parse(version == null ? base : '$base/tag/v$version'))) {
       throw PlatformException(code: 'OPEN_FAILED');
     }
   }
@@ -167,6 +202,11 @@ class AppUpdateDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _sourcePicker(context,
+                        id: 'update-check-source',
+                        label: _text(context, '检查更新来源', 'Update check source'),
+                        value: c.checkSource,
+                        onChanged: c.selectCheckSource),
                     Text(
                         '${_text(context, '当前版本', 'Installed')}: ${c.currentVersion.isEmpty ? '—' : c.currentVersion}'),
                     if (c.release != null)
@@ -204,6 +244,14 @@ class AppUpdateDialog extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(
                               '${asset.name}\n${(asset.size / 1024 / 1024).toStringAsFixed(1)} MiB')),
+                    if (!storeBuild && c.newer && c.release?.asset != null) ...[
+                      const SizedBox(height: 12),
+                      _sourcePicker(context,
+                          id: 'update-download-source',
+                          label: _text(context, '安装包下载来源', 'Download source'),
+                          value: c.downloadSource,
+                          onChanged: c.selectDownloadSource),
+                    ],
                     const SizedBox(height: 12),
                     Text(storeBuild
                         ? _text(context, '商店版本请通过原应用商店更新，不进行侧载安装。',
@@ -224,12 +272,12 @@ class AppUpdateDialog extends StatelessWidget {
                         browserDownload
                             ? _text(
                                 context,
-                                '优先检查 GitHub 下载地址，连接失败、超时或服务不可用时改用 Gitee。下载由浏览器完成，默读无法监测其后续进度，也不会显示下载完成或 SHA-256 校验通过。浏览器下载失败时可手动改用 Gitee。不发送书籍、笔记或账号密钥。',
-                                'Checks the GitHub download first; falls back to Gitee if unavailable or timed out. Your browser handles the download; Modu cannot monitor its progress or verify the downloaded file. If the browser download fails, you can switch to Gitee. No books, notes or account keys are sent.')
+                                '默认优先 GitHub，连接失败、超时或服务不可用时改用 Gitee；手动选择 Gitee 将直接使用 Gitee。下载由浏览器完成，默读无法监测其后续进度，也不会显示下载完成或 SHA-256 校验通过。不发送书籍、笔记或账号密钥。',
+                                'GitHub is preferred by default, with Gitee fallback if unavailable or timed out. Selecting Gitee uses it directly. Your browser handles the download; Modu cannot monitor its progress or verify the downloaded file. No books, notes or account keys are sent.')
                             : _text(
                                 context,
-                                '优先通过 GitHub 检查更新和下载安装包，仅在连接失败、超时或服务不可用时改用 Gitee。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
-                                'Checks GitHub first and downloads from GitHub first; uses Gitee only if the connection fails, times out or the service is unavailable. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
+                                '默认优先通过 GitHub 检查更新和下载，连接失败、超时或服务不可用时改用 Gitee；手动选择 Gitee 将直接使用 Gitee。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
+                                'Checks GitHub first and downloads from GitHub first by default, with Gitee fallback if unavailable or timed out. Selecting Gitee uses it directly. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
                         style: Theme.of(context).textTheme.bodySmall),
                     if (phase == UpdatePhase.downloading)
                       Text(_text(context, '关闭此窗口后下载继续，可从“关于默读”返回查看或取消。',
@@ -271,12 +319,16 @@ class AppUpdateDialog extends StatelessWidget {
                                 : () => c.openBrowserDownload(_launchBrowser),
                             child: Text(_text(
                                 context, '浏览器下载更新', 'Download in browser'))),
-                        if (c.release!.asset!.mirrorUrl != null)
+                        if (c.release!.asset!.mirrorUrl != null &&
+                            c.downloadSource != UpdateSource.gitee)
                           OutlinedButton(
                               onPressed: c.busy
                                   ? null
-                                  : () => c.openBrowserDownload(_launchBrowser,
-                                      mirrorOnly: true),
+                                  : () {
+                                      c.selectDownloadSource(
+                                          UpdateSource.gitee);
+                                      c.openBrowserDownload(_launchBrowser);
+                                    },
                               child: Text(_text(context, '改用 Gitee 下载',
                                   'Download from Gitee'))),
                       ],

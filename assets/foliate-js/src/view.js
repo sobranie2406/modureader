@@ -672,6 +672,7 @@ export class View extends HTMLElement {
         return value;
       },
       (range) => this.getCFI(index, range),
+      { paragraphMode: this.ttsParagraphMode === true },
     );
     this.tts.sectionIndex = index;
   }

@@ -201,9 +201,11 @@ void main() {
     final actions = source.substring(source.indexOf('actions: ['),
         source.indexOf('const Spacer(),', source.indexOf('actions: [')));
     expect(actions.indexOf('aiButton'),
-        lessThan(actions.indexOf("ValueKey('reader-translation-button')")));
+        lessThan(actions.indexOf('TranslationToolbarAction(')));
     expect(
-        RegExp('onPressed: translationHandler').allMatches(source).length, 1);
+        RegExp('onOpenSettings: translationHandler').allMatches(source).length,
+        1);
+    expect(source, isNot(contains('reader-floating-stop-translation')));
     expect(source, contains('await showReaderPopup'));
   });
 }

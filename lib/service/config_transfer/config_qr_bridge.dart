@@ -95,10 +95,23 @@ class ConfigQrBridge {
           (pixel.r.toInt() << 16) | (pixel.g.toInt() << 8) | pixel.b.toInt();
     }
     final source = RGBLuminanceSource(image.width, image.height, pixels);
+    final bitmap = BinaryBitmap(HybridBinarizer(source));
     try {
-      return QRCodeReader().decode(BinaryBitmap(HybridBinarizer(source))).text;
+      return QRCodeReader()
+          .decode(bitmap, hints: DecodeHints()..put(DecodeHintType.tryHarder))
+          .text;
     } on ReaderException {
-      return null;
+      // An exported PNG is an axis-aligned pure symbol. Dense payloads can
+      // confuse the photographic finder-pattern detector; decode its exact
+      // module grid as a fallback, still with normal QR error correction.
+      try {
+        return QRCodeReader()
+            .decode(bitmap,
+                hints: DecodeHints()..put(DecodeHintType.pureBarcode))
+            .text;
+      } on ReaderException {
+        return null;
+      }
     }
   }
 }

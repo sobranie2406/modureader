@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:anx_reader/models/book_style.dart';
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/read_theme.dart';
+import 'package:anx_reader/models/selection_search.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/local_data/backup_safety.dart';
@@ -9,13 +11,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
 import 'package:anx_reader/service/config_transfer/library_config_transfer.dart';
+import 'package:anx_reader/service/config_transfer/settings_modules.dart';
+import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:anx_reader/enums/ai_prompts.dart';
 
 /// Portable preferences only. Never restore databases, per-book IDs, migration
 /// flags, storage paths, permissions, window geometry or device-local assets.
 class GlobalSettingsTransfer {
   static const maxBytes = 4 * 1024 * 1024;
   static const kind = 'modu-global-settings';
-  static const scopes = ['all', 'ai', 'tts', 'webdav', 'remote-library-webdav'];
+  static final scopes =
+      List<String>.unmodifiable(['all', ...settingsModuleKeys.keys]);
   static final Map<String, String> _types = {
     for (final key
         in '''quickMarkShowMenu clearLogWhenStart useOriginalCoverRatio hideStatusBar readerFullscreen
@@ -30,7 +36,7 @@ httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn'''
       key: 'bool',
     for (final key
         in '''themeColor awakeTime pageTurningType aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
-readingSyncMinutes excerptShareColorIndex httpProxyPort customCssDefaultIndex'''
+readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex'''
             .split(RegExp(r'\s+')))
       key: 'int',
     for (final key
@@ -48,7 +54,7 @@ userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnCo
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl
 customCSS customCssProfiles customCssDefaultIndices textAlignment bgimgFit aiPanelPosition codeHighlightTheme aiChatDisplayMode
-webdavInfo remoteLibraryConnection'''
+webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings bgimg'''
             .split(RegExp(r'\s+')))
       key: 'string',
     'statisticsDashboardTiles': 'stringList',
@@ -75,6 +81,33 @@ webdavInfo remoteLibraryConnection'''
       throw const FormatException('Unknown settings scope');
     }
     var values = await prefs.buildPrefsBackupMap();
+    // Migrate in the snapshot only; do not mutate source preferences.
+    if (prefs.prefs.getInt('fullTextTranslateRpm') case final int rpm) {
+      values['aiRpm'] = {'type': 'int', 'value': rpm};
+    }
+    // Version 2 records explicit defaults as resets, instead of accidentally
+    // retaining the receiving device's old values. Never reset absent secrets.
+    for (final key in _types.keys) {
+      if (!isCredentialPreference(key)) {
+        values.putIfAbsent(key, () => {'type': 'reset', 'value': null});
+      }
+    }
+    // These objects mix portable style with local file references. Materialize
+    // their defaults so applying them can preserve the receiving local assets.
+    values['readStyle'] = {'type': 'string', 'value': prefs.bookStyle.toJson()};
+    values['readTheme'] = {'type': 'string', 'value': prefs.readTheme.toJson()};
+    final background = prefs.bgimg.toJson()
+      ..removeWhere((k, _) =>
+          !['alignment', 'selectedMode', 'blur', 'opacity'].contains(k));
+    values['bgimg'] = {'type': 'string', 'value': jsonEncode(background)};
+    for (final prompt in AiPrompts.values) {
+      values.putIfAbsent(
+          'aiPrompt_${prompt.name}', () => {'type': 'reset', 'value': null});
+    }
+    for (final service in TtsConfigTransfer.services) {
+      values.putIfAbsent(
+          'ttsVoiceModel_$service', () => {'type': 'reset', 'value': null});
+    }
     values.removeWhere(
         (key, _) => key != prefsBackupVersionKey && _type(key) == null);
     values.removeWhere(
@@ -94,10 +127,34 @@ webdavInfo remoteLibraryConnection'''
       values.remove('selectedAiService');
       values.remove('translationAiService');
     }
+    if (values['aiProviders']?['value'] case final String raw) {
+      final providers = jsonDecode(raw) as List;
+      for (final provider in providers) {
+        (provider as Map)['keyIndex'] = 0;
+      }
+      values['aiProviders'] = {
+        'type': 'string',
+        'value': jsonEncode(providers)
+      };
+    }
+    if (values['customCssProfiles']?['value'] case final String raw) {
+      final profiles = jsonDecode(raw) as List;
+      for (final profile in profiles) {
+        if (profile['visual'] case final String visual) {
+          final data = jsonDecode(visual) as Map;
+          data.remove('fontFile'); // Files are not part of settings transfer.
+          profile['visual'] = jsonEncode(data);
+        }
+      }
+      values['customCssProfiles'] = {
+        'type': 'string',
+        'value': jsonEncode(profiles)
+      };
+    }
     validate(values);
     final envelope = {
       'kind': kind,
-      'version': 1,
+      'version': 2,
       'scope': scope,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
       'preferences': values,
@@ -109,31 +166,54 @@ webdavInfo remoteLibraryConnection'''
     return text;
   }
 
-  static bool _inScope(String key, String scope) => switch (scope) {
-        'all' => true,
-        'ai' => key.startsWith('ai') ||
-            key.startsWith('readAnySkill') ||
-            [
-              'selectedAiService',
-              'translationAiService',
-              'userPrompts',
-              'enabledAiTools',
-              'maxAiCacheCount'
-            ].contains(key),
-        'tts' => key.startsWith('tts') ||
-            key.startsWith('onlineTts') ||
-            ['isSystemTts', 'allowMixWithOtherAudio'].contains(key),
-        'webdav' => [
-            'webdavInfo',
-            'autoSync',
-            'onlySyncWhenWifi',
-            'syncCompletedToast',
-            'readingTimedSync',
-            'readingSyncMinutes'
-          ].contains(key),
-        'remote-library-webdav' => key == 'remoteLibraryConnection',
-        _ => false,
-      };
+  static bool _inScope(String key, String scope) =>
+      scope == 'all' || settingsModuleForKey(key) == scope;
+
+  /// Filter actual keys, not the untrusted envelope's descriptive scope.
+  static Map<String, dynamic> selectScope(
+      Map<String, dynamic> values, String scope) {
+    if (!scopes.contains(scope))
+      throw const FormatException('Unknown settings scope');
+    validate(values);
+    return {
+      for (final e in values.entries)
+        if (e.key == prefsBackupVersionKey || _inScope(e.key, scope))
+          e.key: e.value
+    };
+  }
+
+  /// Describe the settings that will actually be applied, not an untrusted
+  /// envelope label or the importing device's selected export scope. This also
+  /// works for legacy links whose payload does not contain scope metadata.
+  static List<String> includedScopes(Map<String, dynamic> values) {
+    final included = <String>{};
+    for (final key in values.keys) {
+      if (key == prefsBackupVersionKey) continue;
+      final module = settingsModuleForKey(key);
+      if (module != null) included.add(module);
+    }
+    return [
+      for (final scope in scopes.skip(1))
+        if (included.contains(scope)) scope,
+    ];
+  }
+
+  static bool disablesSync(Map<String, dynamic> values) =>
+      values.containsKey('webdavInfo') ||
+      values.containsKey('syncProtocol') ||
+      values.containsKey('autoSync') ||
+      values.containsKey('readingTimedSync');
+
+  /// The credential switch applies in both directions. Never erase existing
+  /// endpoint settings just because a sender included secrets in their file.
+  static Map<String, dynamic> forImport(Map<String, dynamic> values,
+      {bool includeSecrets = false}) {
+    validate(values);
+    if (includeSecrets) return Map<String, dynamic>.from(values);
+    return withoutBackupCredentials(values)
+      ..remove('selectedAiService')
+      ..remove('translationAiService');
+  }
 
   /// Old per-page links are still accepted at the single migration entry.
   /// ReadAny has no kind, so the user explicitly selects AI or WebDAV scope.
@@ -144,8 +224,18 @@ webdavInfo remoteLibraryConnection'''
     }
     final decoded = ConfigTransferCodec.decode(text);
     if (decoded.kind == kind) return null;
-    final type = decoded.kind ?? scope;
     final data = decoded.data;
+    final type = decoded.kind ??
+        (scope != 'all'
+            ? scope
+            : data['endpoints'] is List || data['moduProviders'] is List
+                ? 'ai'
+                : data['backendType'] == 'webdav' ||
+                        data['type'] == 'webdav' ||
+                        (data['config'] is Map &&
+                            data['config']['type'] == 'webdav')
+                    ? 'webdav'
+                    : 'unknown');
     final raw = <String, dynamic>{};
     switch (type) {
       case 'ai':
@@ -197,7 +287,7 @@ webdavInfo remoteLibraryConnection'''
         break;
       default:
         throw const FormatException(
-            '未知配置类型；ReadAny 请先选择 AI 或 WebDAV / Select AI or WebDAV for ReadAny');
+            '无法识别旧版配置类型 / Unrecognized legacy configuration');
     }
     return {
       prefsBackupVersionKey: 1,
@@ -220,7 +310,7 @@ webdavInfo remoteLibraryConnection'''
     final value = jsonDecode(text);
     if (value is! Map<String, dynamic> ||
         value['kind'] != kind ||
-        value['version'] != 1 ||
+        ![1, 2].contains(value['version']) ||
         !value.containsKey('preferences') ||
         value.containsKey('encryptedPreferences')) {
       throw const FormatException('不是支持的全局设置备份 / Unsupported settings backup');
@@ -240,20 +330,53 @@ webdavInfo remoteLibraryConnection'''
     final raw = file['preferences'];
     if (raw is! Map) throw const FormatException('设置格式无效 / Invalid settings');
     final values = Map<String, dynamic>.from(raw);
+    if (file['version'] == 1 && values.values.any(_isReset)) {
+      throw const FormatException('Defaults require settings format 2');
+    }
     validate(values);
     return values;
   }
 
   static void validate(Map<String, dynamic> values) {
-    validatePreferencesBackup(values);
+    validatePreferencesBackup({
+      for (final e in values.entries)
+        if (!_isReset(e.value)) e.key: e.value
+    });
     for (final entry in values.entries) {
       if (entry.key == prefsBackupVersionKey) continue;
+      if (_isReset(entry.value)) {
+        if (_type(entry.key) == null ||
+            isCredentialPreference(entry.key) ||
+            ['readStyle', 'readTheme', 'bgimg'].contains(entry.key) ||
+            entry.value['value'] != null) {
+          throw const FormatException('Unsafe default reset');
+        }
+        continue;
+      }
       if (_type(entry.key) != entry.value['type'] || _type(entry.key) == null) {
         throw const FormatException(
             '包含不支持或不安全的设置 / Unsupported or unsafe setting');
       }
       // Validate structured payloads before ANY setting is applied.
       final value = entry.value['value'];
+      validateSettingsValue(entry.key, value);
+      if (entry.key == 'customCssProfiles') {
+        final profiles = jsonDecode(value as String);
+        if (profiles is! List || profiles.length > customCssProfileCount) {
+          throw const FormatException('Invalid CSS profiles');
+        }
+        for (final profile in profiles) {
+          if (profile is! Map ||
+              profile['css'] is! String ||
+              (profile.containsKey('visual') && profile['visual'] is! String)) {
+            throw const FormatException('Invalid CSS profile');
+          }
+          CustomCssProfile.fromJson(profile);
+        }
+      }
+      if (entry.key == 'selectionSearchSettings') {
+        SelectionSearchConfig.decode(value as String);
+      }
       if (entry.key == 'readStyle') {
         final data = Map<String, dynamic>.from(jsonDecode(value) as Map);
         BookStyle.fromJson(jsonEncode({...data, 'fontFamily': 'Arial'}));
@@ -279,47 +402,66 @@ webdavInfo remoteLibraryConnection'''
       if (range != null && (value < range.$1 || value > range.$2)) {
         throw const FormatException('Invalid speech setting');
       }
-      if (value is String &&
-          (value.trimLeft().startsWith('{') ||
-              value.trimLeft().startsWith('['))) {
-        // CSS and prompts are free text, not JSON.
-        if (!['customCSS'].contains(entry.key) &&
-            !entry.key.startsWith('aiPrompt_')) {
-          jsonDecode(value);
-        }
-      }
     }
   }
+
+  static bool _isReset(dynamic entry) =>
+      entry is Map && entry['type'] == 'reset';
 
   /// Restore only fields present in the file; omitted secrets/local preferences
   /// stay untouched. Roll back on a write error. Does not initiate network work.
   static Future<void> apply(Prefs prefs, Map<String, dynamic> values) async {
     validate(values);
-    final pending = <String, Object>{};
+    final pending = <String, Object?>{};
     for (final entry in values.entries) {
       if (entry.key == prefsBackupVersionKey) continue;
+      if (_isReset(entry.value)) {
+        pending[entry.key] = null;
+        continue;
+      }
       if (_type(entry.key) == null || _type(entry.key) != entry.value['type']) {
         throw const FormatException('无效设置 / Invalid setting');
       }
       Object value = entry.value['value'];
+      if (entry.key == 'bgimg') {
+        value = jsonEncode({
+          ...prefs.bgimg.toJson(),
+          ...jsonDecode(value as String) as Map<String, dynamic>
+        });
+      }
       if (entry.key == 'readStyle' || entry.key == 'readTheme') {
-        final data =
+        var data =
             Map<String, dynamic>.from(jsonDecode(value as String) as Map);
         if (entry.key == 'readStyle') {
+          data =
+              BookStyle.fromJson(jsonEncode({...data, 'fontFamily': 'Arial'}))
+                  .toMap();
           data['fontFamily'] = prefs.bookStyle.fontFamily;
         } else {
-          data['backgroundImagePath'] = prefs.readTheme.backgroundImagePath;
-          data['id'] = prefs.readTheme.id;
+          data = {
+            'backgroundColor': data['backgroundColor'],
+            'textColor': data['textColor'],
+            'backgroundImagePath': prefs.readTheme.backgroundImagePath,
+            'id': prefs.readTheme.id,
+          };
         }
         value = jsonEncode(data);
+      }
+      if (entry.key == 'customCssProfiles') {
+        final profiles = jsonDecode(value as String) as List;
+        for (final profile in profiles) {
+          if (profile['visual'] case final String visual) {
+            profile['visual'] =
+                jsonEncode((jsonDecode(visual) as Map)..remove('fontFile'));
+          }
+        }
+        value = jsonEncode(profiles);
       }
       pending[entry.key] =
           entry.value['type'] == 'double' ? (value as num).toDouble() : value;
     }
     // Credentials may move but sync must be re-enabled on this device manually.
-    if (values.containsKey('webdavInfo') ||
-        values.containsKey('autoSync') ||
-        values.containsKey('readingTimedSync')) {
+    if (disablesSync(values)) {
       pending.addAll({
         'webdavStatus': false,
         'autoSync': false,

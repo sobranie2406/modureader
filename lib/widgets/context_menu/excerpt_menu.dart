@@ -16,7 +16,7 @@ import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 
 class ExcerptMenu extends StatefulWidget {
   final String annoCfi;
@@ -301,12 +301,17 @@ class ExcerptMenuState extends State<ExcerptMenu> {
           // Web search
           IconAndText(
             compact: true,
-            onTap: () {
+            onTap: () async {
+              final popupContext = Navigator.of(context).context;
+              final text = widget.annoContent;
+              final reader = readingPageKey.currentState;
               widget.onClose();
-              launchUrl(
-                Uri.https('www.bing.com', '/search', {'q': widget.annoContent}),
-                mode: LaunchMode.externalApplication,
-              );
+              if (reader != null) {
+                await reader.showSelectionSearch(text);
+              } else {
+                await showReaderPopup(popupContext,
+                    builder: (_) => SelectionSearchBrowser(text: text));
+              }
             },
             icon: const Icon(EvaIcons.globe),
             text: L10n.of(context).contextMenuSearch,

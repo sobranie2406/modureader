@@ -1,19 +1,23 @@
 # Modu changelog
 
-Details, installation limits and historical releases: https://github.com/sobranie2406/modureader/releases
+Details and downloads: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.5
+## 1.1.6
 
-- Centralize settings file, QR and modu-link transfer; credentials are opt-in and explicit exports remain unencrypted, separate from encrypted WebDAV sync.
-- Add independently enabled CSS profiles, import/export, 13 editable templates and bounded regex highlighting.
-- Add MiMo preset voices, editable speech/voice-design templates and prompt suggestions.
-- Keep sentence controls open, read from a selection and improve lock-screen pause/resume ordering.
-- Isolate optional speech highlighting/location failures without silently skipping body text.
-- Use generic fonts after font-loading failures, handle Kindle font declarations and remove the intrusive loading notice.
+- Transfer all global settings with explicit defaults, validated restore and an independent credentials switch.
+- Group online narration by paragraph with accurate highlighting, group navigation and priority synthesis.
+- Add MiMo playback-speed control, compatible voice instructions and background narration recovery improvements.
+- Manage 32 CSS profiles and 13 presets with visual controls in Settings; apply profiles from the reader.
+- Search selected text in a built-in browser with selectable and custom search engines.
+- Export bracketed original passages, highlighted Markdown notes and creation/edit timestamps.
+- Choose GitHub or Gitee for updates and downloads, preferring GitHub by default.
+- Move full-text translation stop controls to the toolbar so they do not cover reading text.
 
-- 全局设置统一文件、二维码与 modu 链接迁移，凭据按需包含；主动导出不加密，与 WebDAV 加密同步分开。
-- CSS 多套独立开关、组合启用、导入导出、13 个可编辑预设及正则文字高亮。
-- MiMo 增加官方音色、朗读风格和音色设计模板、常用描述提示词。
-- 保持上一句/下一句控制栏，支持从选中文字朗读，改进锁屏暂停与恢复。
-- 隔离高亮及可选位置异常，不静默跳过正文；特定手机停顿仍需原机验证。
-- 字体失败时使用通用字体，兼容 Kindle 字体声明，优化重复加载并取消遮挡提示。
+- 全局设置统一迁移，补齐默认值恢复、导入前校验，并保留独立凭据开关。
+- 在线朗读按自然段分组，准确高亮、前后按段定位，首段优先合成。
+- MiMo 增加实际播放语速调节，兼容语音提示词，并优化后台朗读恢复。
+- 在设置中图形化管理 32 套 CSS 方案与 13 个预设，阅读界面直接应用。
+- 选中文字后使用内置浏览器搜索，支持切换及自定义搜索引擎。
+- 笔记导出使用原文括号、Markdown 突出显示及创建或修改时间。
+- 更新和下载支持选择 GitHub / Gitee，默认优先 GitHub。
+- 全文翻译停止按钮移至工具栏，不再遮挡阅读正文。

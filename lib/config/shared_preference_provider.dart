@@ -26,6 +26,7 @@ import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/bgimg.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:anx_reader/models/selection_search.dart';
 import 'package:anx_reader/models/chapter_split_presets.dart';
 import 'package:anx_reader/models/chapter_split_rule.dart';
 import 'package:anx_reader/models/font_model.dart';
@@ -77,6 +78,21 @@ const Set<String> _prefsExportSkipKeys = {
 };
 
 class Prefs extends ChangeNotifier {
+  SelectionSearchConfig get selectionSearchSettings {
+    final raw = prefs.getString('selectionSearchSettings');
+    try {
+      if (raw != null) return SelectionSearchConfig.decode(raw);
+    } catch (_) {/* Keep search usable after a malformed local preference. */}
+    return const SelectionSearchConfig();
+  }
+
+  Future<void> saveSelectionSearchSettings(SelectionSearchConfig config) async {
+    if (!await prefs.setString('selectionSearchSettings', config.encode())) {
+      throw StateError('Could not save search settings');
+    }
+    notifyListeners();
+  }
+
   bool get quickMarkShowMenu => prefs.getBool('quickMarkShowMenu') ?? false;
   set quickMarkShowMenu(bool value) {
     prefs.setBool('quickMarkShowMenu', value);
@@ -1871,6 +1887,11 @@ class Prefs extends ChangeNotifier {
   List<CustomCssProfile> get customCssProfiles {
     final defaults = List.generate(customCssProfileCount,
         (i) => CustomCssProfile(css: i == 0 ? customCSS : ''));
+    // Reserve the original eight slots and their book mappings. New templates
+    // occupy later slots and never become active merely by upgrading.
+    for (var i = 0; i < customCssTemplates.length; i++) {
+      defaults[8 + i] = customCssTemplates[i];
+    }
     final raw = prefs.getString('customCssProfiles');
     if (raw == null) return defaults;
     try {
@@ -1896,7 +1917,7 @@ class Prefs extends ChangeNotifier {
 
   Future<void> saveCustomCssProfiles(List<CustomCssProfile> profiles) async {
     if (profiles.length != customCssProfileCount) {
-      throw ArgumentError('Expected eight CSS slots');
+      throw ArgumentError('Expected $customCssProfileCount CSS slots');
     }
     await prefs.setString('customCssProfiles',
         jsonEncode(profiles.map((p) => p.toJson()).toList()));
@@ -1952,8 +1973,12 @@ class Prefs extends ChangeNotifier {
     return customCssSelection(bookKey)
         .activeIndices
         .map((index) => profiles[index])
-        .where((p) => !p.isHighlight && p.css.trim().isNotEmpty)
-        .map((p) => p.css)
+        .where((p) => !p.isHighlight)
+        // EPUB chapters have blob URLs; root-relative fonts cannot resolve
+        // there. Resolve against this device's active local reader server.
+        .map(
+            (p) => p.compileCss(fontOrigin: 'http://127.0.0.1:$lastServerPort'))
+        .where((css) => css.trim().isNotEmpty)
         .join('\n\n');
   }
 
@@ -1964,7 +1989,12 @@ class Prefs extends ChangeNotifier {
     return selection.activeIndices
         .map((i) => profiles[i])
         .where((p) => p.isHighlight)
-        .map((p) => p.toJson())
+        .map((p) => {
+              'name': p.name,
+              'pattern': p.pattern,
+              'scope': p.scope,
+              'css': p.compiledCss
+            })
         .toList();
   }
 

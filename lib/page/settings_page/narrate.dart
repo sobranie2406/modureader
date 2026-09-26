@@ -17,6 +17,7 @@ import 'package:anx_reader/widgets/common/anx_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/settings/service_config_form.dart';
 import 'package:anx_reader/widgets/settings/mimo_voice_settings.dart';
+import 'package:anx_reader/widgets/settings/openai_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
@@ -680,6 +681,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     ref.watch(onlineTtsConfigProvider(serviceId));
     final config = _configDrafts[serviceId] ?? provider.getConfig();
     final isMimo = service == tts_svc.TtsService.xiaomi;
+    final isOpenAi = service == tts_svc.TtsService.openai;
     void updateDraft(Map<String, dynamic> newConfig) {
       setState(() => _configDrafts[serviceId] = Map.from(newConfig));
     }
@@ -695,13 +697,23 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
                     .where((item) => !const {'model', 'voice', 'stylePrompt'}
                         .contains(item.key))
                     .toList()
-                : configItems,
+                : isOpenAi
+                    ? configItems
+                        .where((item) => item.key != 'instructions')
+                        .toList()
+                    : configItems,
             initialConfig: config,
             onConfigChanged: updateDraft,
           ),
           if (isMimo)
             MimoVoiceSettings(
               key: ValueKey('mimo-config-$_configRevision'),
+              config: config,
+              onChanged: updateDraft,
+            ),
+          if (isOpenAi)
+            OpenAiVoiceSettings(
+              key: ValueKey('openai-voice-config-$_configRevision'),
               config: config,
               onChanged: updateDraft,
             ),

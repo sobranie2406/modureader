@@ -89,6 +89,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('OpenAI description, toggle and connection share a saved draft',
+      (tester) async {
+    await open(tester);
+    final field = find.byKey(const ValueKey('openai-description'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, '声音温暖，语速稍慢。');
+    await tester.pumpAndSettle();
+    final toggle =
+        find.widgetWithText(SwitchListTile, 'Enable speech instructions');
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    final keyField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'API Key');
+    await tester.ensureVisible(keyField);
+    await tester.enterText(keyField, 'new-fixture-key');
+    await tester.pumpAndSettle();
+    expect(Prefs().getOnlineTtsConfig('openai')['instructions'], isNull);
+    await tap(tester, 'Save settings');
+    final saved = Prefs().getOnlineTtsConfig('openai');
+    expect(saved['instructions'], '声音温暖，语速稍慢。');
+    expect(saved['instructionsEnabled'], 'false');
+    expect(saved['key'], 'new-fixture-key');
+    final snapshot = TtsConfigTransfer.snapshot(Prefs());
+    await Prefs().saveOnlineTtsConfig('openai', {});
+    await TtsConfigTransfer.apply(Prefs(), snapshot);
+    expect(Prefs().getOnlineTtsConfig('openai'), saved);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('clear requires confirmation and resets only TTS',
       (tester) async {
     await open(tester);

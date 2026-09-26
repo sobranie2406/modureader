@@ -15,10 +15,12 @@ const moduReleaseApi =
     'https://api.github.com/repos/sobranie2406/modureader/releases/latest';
 const moduMirrorReleasePage =
     'https://gitee.com/sobranie2406/modureader/releases';
-// Published only after the mirrored installers have been verified. Used only
-// when the GitHub update check is unavailable or times out.
+// Published only after the mirrored installers have been verified. Used when
+// explicitly selected or when GitHub is unavailable.
 const moduMirrorManifest =
     'https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json';
+
+enum UpdateSource { github, gitee }
 
 void _checkCancelled(CancelToken token) {
   if (token.isCancelled) throw token.cancelError!;
@@ -203,7 +205,11 @@ class UpdateTransport {
     throw const FormatException('Too many update redirects');
   }
 
-  Future<UpdateRelease> latest(String platform, String abi) async {
+  Future<UpdateRelease> latest(String platform, String abi,
+      {UpdateSource source = UpdateSource.github}) async {
+    if (source == UpdateSource.gitee) {
+      return _latestFrom(platform, abi, mirror: true);
+    }
     try {
       // A successful upstream check must not contact the mirror, even when
       // there is no new version or no installer for the current platform.
@@ -316,7 +322,8 @@ class UpdateTransport {
   }
 
   Future<File> download(UpdateAsset asset, Directory directory,
-      CancelToken cancel, void Function(int, int) progress) async {
+      CancelToken cancel, void Function(int, int) progress,
+      {UpdateSource source = UpdateSource.github}) async {
     if (asset.name.contains('/') ||
         asset.name.contains('\\') ||
         !asset.name.startsWith('Modu-') ||
@@ -338,6 +345,12 @@ class UpdateTransport {
     }
     // Every attempt starts a fresh file and verifies against the SAME digest.
     // Never concatenate partial responses from different sources.
+    if (source == UpdateSource.gitee) {
+      final mirror = asset.mirrorUrl;
+      if (mirror == null) throw const FormatException('Mirror asset not ready');
+      return _downloadFrom(asset, file, part, mirror, cancel, progress,
+          mirror: true);
+    }
     try {
       return await _downloadFrom(asset, file, part, asset.url, cancel, progress,
           mirror: false);
@@ -432,6 +445,25 @@ class AppUpdateController extends ChangeNotifier {
   DateTime? checkedAt;
   double progress = 0;
   CancelToken? _cancel;
+  UpdateSource _checkSource = UpdateSource.github;
+  UpdateSource _downloadSource = UpdateSource.github;
+  UpdateSource get checkSource => _checkSource;
+  UpdateSource get downloadSource => _downloadSource;
+
+  // Keep choices for this app session; fresh launches remain GitHub-first.
+  // Never change the source underneath an in-flight check/download/install.
+  void selectCheckSource(UpdateSource source) {
+    if (busy || source == _checkSource) return;
+    _checkSource = source;
+    notifyListeners();
+  }
+
+  void selectDownloadSource(UpdateSource source) {
+    if (busy || source == _downloadSource) return;
+    _downloadSource = source;
+    notifyListeners();
+  }
+
   bool get usesBrowserDownload => platform == 'macos';
   bool get busy => {
         UpdatePhase.checking,
@@ -451,7 +483,7 @@ class AppUpdateController extends ChangeNotifier {
     notifyListeners();
     try {
       currentVersion = await installedVersion();
-      final latest = await transport.latest(platform, abi);
+      final latest = await transport.latest(platform, abi, source: checkSource);
       if (usesBrowserDownload ||
           release?.asset?.digest != latest.asset?.digest) {
         downloaded = null;
@@ -491,7 +523,7 @@ class AppUpdateController extends ChangeNotifier {
           last = DateTime.now();
           notifyListeners();
         }
-      });
+      }, source: downloadSource);
       _checkCancelled(cancel);
       phase = UpdatePhase.ready;
     } catch (e) {
@@ -519,7 +551,7 @@ class AppUpdateController extends ChangeNotifier {
     notifyListeners();
     try {
       final url = await transport.browserDownloadUrl(release!.asset!,
-          mirrorOnly: mirrorOnly);
+          mirrorOnly: mirrorOnly || downloadSource == UpdateSource.gitee);
       if (!await open(url)) {
         throw PlatformException(code: 'BROWSER_OPEN_FAILED');
       }

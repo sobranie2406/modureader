@@ -6,7 +6,7 @@ Only these Chinese and English project homepages are maintained.
 
 <p align="center"><img src="assets/icon/modu-app-icon.png" width="120" alt="Modu app icon"></p>
 
-**Derived from [Anx Reader](https://github.com/anxcye/anx-reader) and [ReadAny (Reader Any)](https://github.com/codedogQBY/ReadAny). Thanks to the authors and contributors of both projects.** This is an independently modified derivative, not an official release of either upstream.
+
 
 Modu is an open-source AI ebook reader built with Flutter. It brings books, notes, reading progress and AI conversations together: read first, then ask questions about the current chapter. For semantic search, index your books using local models or a remote embedding service.
 
@@ -18,13 +18,15 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
+**Latest release: 1.1.6** — paragraph-based online narration, visual CSS presets, built-in selection search, clearer note exports and selectable update sources.
+
 ## Downloads
 
 [GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee package mirror](https://gitee.com/sobranie2406/modureader/releases) · [Build status](https://github.com/sobranie2406/modureader/actions) · [Report an issue](https://github.com/sobranie2406/modureader/issues)
 
-Modu checks for updates at launch. Settings → About Modu → App updates supports checking, downloading, cancelling and opening installers. Both checks and downloads prefer GitHub and fall back to Gitee on network failures, timeouts, TLS failures or any HTTP request error. Size and SHA-256 verification remain mandatory; cancellation, invalid metadata and integrity failures never bypass these protections by switching sources. Installation requires your action. Gitee hosts packages, documentation and update metadata only: old releases are removed before each new release is published. Each release links to its corresponding GitHub source.
+Modu checks for updates at launch. Settings → About Modu → App updates offers separate GitHub/Gitee source selectors for checking and downloading, defaulting to GitHub. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
 
-| Platform | Published architectures | Package and limitations |
+| Platform | Published architectures | Installation |
 | --- | --- | --- |
 | Windows | x64, ARM64 | EXE installer with shortcuts and an uninstaller; no commercial code signature; requires WebView2 Runtime |
 | Linux | x64, ARM64 | DEB for Debian 13 (trixie); install with APT to resolve system dependencies |
@@ -35,7 +37,7 @@ Modu checks for updates at launch. Settings → About Modu → App updates suppo
 Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
 Download the installer and its SHA-256 file from [Releases](https://github.com/sobranie2406/modureader/releases), choosing your system and architecture.
 
-Desktop apps use native installers, not ZIP or tar.gz downloads. Licenses remain in the application packages and source repository; no separate notices ZIP is provided. GitHub's automatically generated `Source code (zip)` downloads contain source code, not an application installer. We do not provide scripts to bypass operating-system security protections. See [Release and installation instructions (Chinese)](docs/RELEASING.md) for details.
+Desktop apps use native installers. Download the installer for your platform, not GitHub's automatically generated source archive. Licenses are included in each package. See [Release and installation instructions (Chinese)](docs/RELEASING.md).
 
 ## Features
 
@@ -46,6 +48,7 @@ The current version provides the following reading, AI and library features.
 | Library and import | Import EPUB, PDF, MOBI, AZW3, FB2 and TXT; filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
 | Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Remote library settings |
 | Reading and layout | Chapter navigation, adjacent chapter preloading and paginated/scrolling modes; continuous chapter scrolling for horizontal reflowable books with book scripts disabled; adaptive footnotes at 80% of the reader font size with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
+| Selection search | Baidu, Bing, Google, Baidu Baike, Wikipedia and custom engines in a built-in browser | Settings → Selection search; text selection menu |
 | In-book search | Floating search dialog, selection-style text highlights, previous/next match and current/total counter; return to the original position or close search at the current position | Reader toolbar, between Translation and Bookmarks |
 | Highlights and notes | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV | Text selection menu; Home → Notes |
 | Mobile quick mark | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page | Pen button in the mobile reader; persistent Exit button restores normal gestures |
@@ -57,7 +60,7 @@ The current version provides the following reading, AI and library features.
 | Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text results use the same popup sizing as AI chat, with scrolling for long output | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
-| Configuration transfer | Global, AI, speech, sync and remote-library settings via files, QR images and modu links | Settings → Advanced → Global settings backup |
+| Configuration transfer | All global settings via files, QR images and modu links, with an independent credentials switch | Settings → Advanced → Global settings backup |
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
@@ -75,7 +78,11 @@ Reader styles offer separate Chinese/body and English (letters/numbers) fonts. E
 
 ### Custom CSS profiles
 
-Reader styles → More settings → Style offers eight named CSS profiles for vertical, horizontal or publisher-specific layouts. Switching saves current edits; enabling applies the selected profile. Each book remembers its profile and enabled state on this device, with Follow default and Set as default controls. Editing a shared profile affects books using it. Existing CSS stays in profile 1; other slots start empty. Profiles do not automatically change the reader's writing direction. For publisher layouts, retain book styles and disable custom CSS for that book. Profiles support independent switches, combined activation, file import/export, 13 editable templates and bounded regex highlighting. See [CSS presets (Chinese)](docs/CSS_PRESETS.md). Profiles are included in settings backups; per-book choices remain local.
+Manage 32 named profiles in Settings → CSS settings, with 13 editable presets and visual controls for colors, fonts, spacing, paragraph layout and underlines. Custom CSS and regex highlights remain available, along with independent switches, combined activation and file import/export. Reader controls apply profiles; detailed editing stays in Settings. Existing slots and per-book choices are preserved. See [CSS presets (Chinese)](docs/CSS_PRESETS.md).
+
+### Notes export
+
+Original passages are labeled `原文：【…】`. Markdown additionally highlights note content, and exports include the creation or last-edit time.
 
 ### WebDAV remote library
 
@@ -83,7 +90,7 @@ Enter the full book-directory URL, username and password in Settings → Remote 
 
 This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Global settings backup can explicitly include account credentials; this export is unencrypted and excludes credentials by default. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
 
-Use Settings → Advanced → Global settings backup to transfer remote-library settings via files, `modu:` links or QR images. **Credentials are excluded by default. When included, exports remain unencrypted; never share them publicly.** Import validates and requests confirmation, without automatically connecting. Creation and modification dates come from the server; missing dates remain unknown rather than being replaced with local import times.
+Use Settings → Advanced → Global settings backup to transfer all preferences through files, modu links or QR images. A separate switch includes accounts, passwords and API configurations and is off by default; when off, import also preserves existing local credentials. Explicit exports containing credentials are unencrypted: keep them private. Import validates before restoring and does not automatically connect to servers.
 
 ### Mobile page-turn controls
 
@@ -149,7 +156,7 @@ Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a backgro
 
 All four models and tokenizers are **downloaded on demand, not bundled in installers**. In Settings → Embedding Models → Model download source, choose [Gitee mirror](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1) or Hugging Face (default), then select Download and use. If the mirror is unavailable, switch to Hugging Face manually; the app never switches sources silently. Downloads are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused; startup and indexing never download missing models automatically. Chinese BGE is selected by default and automatic indexing is off. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
 
-Local embeddings only mean that embedding computation happens on your device. Remote chat, embedding, translation or speech services still receive the relevant text. The whole AI workflow should not be described as completely offline.
+Local embedding computation stays on your device. Remote chat, embedding, translation and speech services receive the text needed for their tasks.
 
 ### Translation and read-aloud
 
@@ -157,9 +164,9 @@ Mobile inline images fit the reading area proportionally. Footnote popups resize
 
 At a chapter boundary, narration automatically continues with the next chapter's heading and body, skipping empty chapters.
 
-Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
+Full-text translation stop controls stay in the toolbar without covering the text. Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
 
-Read-aloud controls include play, pause, resume, previous/next sentence and chapter navigation. System speech uses device voices; online speech offers provider, voice and speech-parameter settings. Xiaomi MiMo offers official voice selection, editable speech-style and voice-design templates, prompt suggestions and MP3/WAV audio. Descriptions are voice instructions, never part of spoken book text. Synthesis or playback failures pause at the current position for retry.
+Online narration groups adjacent sentences within a natural paragraph for Edge, MiMo, OpenAI-compatible and DashScope services. Each playback group has accurate highlighting and previous/next group navigation. System speech retains sentence navigation; select text and choose Read aloud to start there. The first group is prioritized and later groups are prefetched. MiMo playback speed follows the reader slider. MiMo and supported compatible services use voice/style descriptions and stable narration guidance; OpenAI-compatible settings offer editable instructions and presets. Actual synthesis or playback errors retain the position for retry.
 
 ### Sync and key security
 
@@ -174,7 +181,7 @@ Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10
 
 ## Screenshots
 
-These screenshots were captured from the **Modu 1.1.1 (10033) macOS release**. Horizontal reading uses the project's original demo book; vertical reading uses a local edition of *Guwen Guanzhi* (《古文观止译注评（全二册）》). Only the interface is shown; that book is not distributed. Themes, fonts, models and switches reflect the capture session, not necessarily the defaults.
+Screenshots below are from **Modu 1.1.1 (10033) on macOS**. Horizontal reading shows the original demo EPUB; vertical reading shows a local edition of *Guwen Guanzhi*. Only the interface is shown; the book is not distributed.
 
 ### Reading: text, fonts and themes
 
@@ -190,7 +197,7 @@ The actual *Guwen Guanzhi* reading view shows the optional red frame and rules b
 
 ### In-book AI: read and ask side by side
 
-The AI sidebar keeps the book text visible on the left. Skills stay hidden until the sparkle button opens a vertical in-chat picker, including chapter summary, book summary, concept explanation and argument analysis; selection closes the picker. You can also type your own question. The screenshot shows the earlier controls, before the vertical picker update; no request was sent and no AI response was fabricated.
+The AI sidebar keeps the book text visible. Open the sparkle button to choose chapter summary, concept explanation and other reading skills, or type your own question.
 
 ![Modu in-book AI sidebar with book text on the left and reading skills above the input](docs/images/reading-ai-panel-macos.jpg)
 
@@ -223,7 +230,7 @@ Embedding models are not bundled in the installer. Choose Hugging Face or Gitee 
 
 ## Getting started
 
-1. Download the package for your system and architecture from [Releases](https://github.com/sobranie2406/modureader/releases). Read the installation limitations first.
+1. Download the package for your system and architecture from [Releases](https://github.com/sobranie2406/modureader/releases). Follow the installation instructions.
 2. Add an ebook to the library and open it. No API key is required if you do not use AI.
 3. To use AI, configure a model in Settings → AI Settings and test the connection.
 4. For semantic search, download a local model in Settings → Embedding Models (Chinese BGE is the default), then index a downloaded book from its menu. You can also configure a remote embedding endpoint.
@@ -231,7 +238,7 @@ Embedding models are not bundled in the installer. Choose Hugging Face or Gitee 
 
 ## Feedback
 
-Version changes, compatibility notes and caveats are collected in the [release notes](https://github.com/sobranie2406/modureader/releases).
+See [Releases](https://github.com/sobranie2406/modureader/releases) for version changes and downloads.
 
 When reporting an issue in [this repository](https://github.com/sobranie2406/modureader/issues), include your version, system, architecture, reproduction steps and a sample without private information. Never submit API keys, WebDAV passwords or configuration QR codes.
 

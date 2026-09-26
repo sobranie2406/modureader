@@ -32,6 +32,14 @@ class _TtsWidgetState extends State<TtsWidget> {
   bool get _unsupportedSystem =>
       Prefs().ttsService == 'system' && !supportsSystemTts();
 
+  String _unitLabel(BuildContext context, {required bool previous}) {
+    final paragraph = tts_svc.getTtsService(Prefs().ttsService).isOnline;
+    if (Localizations.localeOf(context).languageCode == 'zh') {
+      return '${previous ? '上一' : '下一'}${paragraph ? '段' : '句'}';
+    }
+    return '${previous ? 'Previous' : 'Next'} ${paragraph ? 'passage' : 'sentence'}';
+  }
+
   @override
   void initState() {
     if (!_unsupportedSystem &&
@@ -120,22 +128,24 @@ class _TtsWidgetState extends State<TtsWidget> {
         }
 
         Widget rate() {
+          final isMimo = Prefs().ttsService == 'xiaomi';
           return Row(
             children: [
               Text(L10n.of(context).ttsRate),
               Expanded(
                 child: Slider(
-                  value: this.rate,
+                  value: this.rate.clamp(isMimo ? 0.5 : 0.0, 2.0),
                   onChanged: (newRate) {
                     setState(() => this.rate = newRate);
                   },
                   // Dragging previews the value; commit once on release so
                   // each pointer event does not invalidate all speech requests.
                   onChangeEnd: (value) => TtsHandler().rate = value,
-                  min: 0.0,
+                  min: isMimo ? 0.5 : 0.0,
                   max: 2.0,
-                  divisions: 10,
-                  label: this.rate.toStringAsFixed(1),
+                  divisions: isMimo ? 15 : 10,
+                  label:
+                      '${this.rate.clamp(isMimo ? 0.5 : 0.0, 2.0).toStringAsFixed(1)}${isMimo ? '×' : ''}',
                 ),
               ),
             ],
@@ -150,6 +160,10 @@ class _TtsWidgetState extends State<TtsWidget> {
                 volume(),
                 pitch(),
                 rate(),
+                if (tts_svc.getTtsService(Prefs().ttsService).isOnline)
+                  Text(Localizations.localeOf(context).languageCode == 'zh'
+                      ? '连贯朗读：同段相邻句合成，高亮和前后跳转按小段；长段自动拆分。'
+                      : 'Continuous narration: adjacent sentences are grouped. Highlighting and Previous/Next follow each group; long paragraphs are split.'),
                 Row(
                   children: [
                     Text(L10n.of(context).ttsType),
@@ -212,6 +226,7 @@ class _TtsWidgetState extends State<TtsWidget> {
                 icon: const Icon(EvaIcons.arrowhead_left),
               ),
               IconButton(
+                tooltip: _unitLabel(context, previous: true),
                 onPressed: () {
                   TtsHandler().playPrevious();
                 },
@@ -234,6 +249,7 @@ class _TtsWidgetState extends State<TtsWidget> {
                 icon: const Icon(EvaIcons.stop_circle_outline),
               ),
               IconButton(
+                tooltip: _unitLabel(context, previous: false),
                 onPressed: () {
                   TtsHandler().playNext();
                 },

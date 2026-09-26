@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:anx_reader/service/update/app_update.dart';
 import 'package:anx_reader/widgets/settings/app_update_dialog.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ class FakeTransport extends UpdateTransport {
       UpdateAsset('Modu-1.0.9-android-arm64.apk', '', 200, 'test'));
   bool offline = false;
   final browserRequests = <bool>[];
+  final checkRequests = <UpdateSource>[];
+  Completer<UpdateRelease>? gate;
   @override
   Future<Uri> browserDownloadUrl(UpdateAsset asset,
       {bool mirrorOnly = false}) async {
@@ -17,7 +20,10 @@ class FakeTransport extends UpdateTransport {
   }
 
   @override
-  Future<UpdateRelease> latest(String platform, String abi) async {
+  Future<UpdateRelease> latest(String platform, String abi,
+      {UpdateSource source = UpdateSource.github}) async {
+    checkRequests.add(source);
+    if (gate != null) return gate!.future;
     if (offline) throw const SocketException('offline');
     return value;
   }
@@ -25,14 +31,102 @@ class FakeTransport extends UpdateTransport {
 
 void main() {
   Future<void> show(WidgetTester tester, AppUpdateController c,
-      {Future<bool> Function(Uri)? openBrowser}) async {
-    await tester.binding.setSurfaceSize(const Size(600, 1000));
+      {Future<bool> Function(Uri)? openBrowser,
+      Size size = const Size(600, 1000)}) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
             body: AppUpdateDialog(controller: c, openBrowser: openBrowser))));
     await tester.pumpAndSettle();
   }
+
+  Future<void> choose(WidgetTester tester, String id, String text) async {
+    final picker = find.byKey(ValueKey(id));
+    await tester.ensureVisible(picker);
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text).last);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+      'source selectors default to GitHub, explicit Gitee check is dispatched',
+      (tester) async {
+    final t = FakeTransport();
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'android',
+        installedVersion: () async => '1.0.8');
+    addTearDown(c.dispose);
+    await show(tester, c);
+    expect(
+        tester
+            .widget<DropdownButton<UpdateSource>>(
+                find.byKey(const ValueKey('update-check-source')))
+            .value,
+        UpdateSource.github);
+    await choose(tester, 'update-check-source', 'Gitee');
+    await tester.ensureVisible(find.text('Check for updates'));
+    await tester.tap(find.text('Check for updates'));
+    await tester.pumpAndSettle();
+    expect(t.checkRequests, [UpdateSource.gitee]);
+    expect(
+        tester
+            .widget<DropdownButton<UpdateSource>>(
+                find.byKey(const ValueKey('update-download-source')))
+            .value,
+        UpdateSource.github);
+    await choose(tester, 'update-download-source', 'Gitee');
+    expect(c.downloadSource, UpdateSource.gitee);
+    t.gate = Completer<UpdateRelease>();
+    final pending = c.check();
+    await tester.pump();
+    for (final id in ['update-check-source', 'update-download-source']) {
+      expect(
+          tester
+              .widget<DropdownButton<UpdateSource>>(find.byKey(ValueKey(id)))
+              .onChanged,
+          isNull);
+    }
+    t.gate!.complete(t.value);
+    await pending;
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'macOS dropdown sends chosen Gitee URL to browser on narrow screens',
+      (tester) async {
+    final t = FakeTransport()
+      ..value = const UpdateRelease(
+          '1.1.3',
+          '',
+          UpdateAsset(
+              'Modu-1.1.3-macos-arm64.dmg',
+              '$moduReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg',
+              200,
+              'test',
+              mirrorUrl:
+                  '$moduMirrorReleasePage/download/v1.1.3/Modu-1.1.3-macos-arm64.dmg'));
+    final c = AppUpdateController(
+        transport: t, platform: 'macos', installedVersion: () async => '1.1.2');
+    addTearDown(c.dispose);
+    await c.check();
+    final opened = <Uri>[];
+    await show(tester, c, size: const Size(320, 800), openBrowser: (uri) async {
+      opened.add(uri);
+      return true;
+    });
+    await choose(tester, 'update-download-source', 'Gitee');
+    await tester.ensureVisible(find.text('Download in browser'));
+    await tester.tap(find.text('Download in browser'));
+    await tester.pumpAndSettle();
+    expect(t.browserRequests, [true]);
+    expect(opened.single.toString(), t.value.asset!.mirrorUrl);
+    expect(find.text('Install update'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
       'manual check exposes installed/latest versions and download action',

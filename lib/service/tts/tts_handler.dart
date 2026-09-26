@@ -15,6 +15,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final TtsFactory _ttsFactory;
   final Future<bool> Function()? _activateSessionOverride;
   final Future<void> Function()? _deactivateSessionOverride;
+  final Future<void> Function()? _stopReaderOverride;
 
   static final TtsHandler _instance = TtsHandler._internal();
 
@@ -25,7 +26,8 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   TtsHandler._internal()
       : _ttsFactory = TtsFactory(),
         _activateSessionOverride = null,
-        _deactivateSessionOverride = null {
+        _deactivateSessionOverride = null,
+        _stopReaderOverride = null {
     _initAudioSession();
   }
 
@@ -34,9 +36,11 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     required TtsFactory factory,
     required Future<bool> Function() activateSession,
     Future<void> Function()? deactivateSession,
+    Future<void> Function()? stopReader,
   })  : _ttsFactory = factory,
         _activateSessionOverride = activateSession,
-        _deactivateSessionOverride = deactivateSession;
+        _deactivateSessionOverride = deactivateSession,
+        _stopReaderOverride = stopReader;
 
   BaseTts get tts => _ttsFactory.current;
 
@@ -293,18 +297,28 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
     tts.updateTtsState(TtsStateEnum.stopped);
     try {
-      await tts.stop();
+      // The player loop may be awaiting a chapter from this reader. Dispatch
+      // reader cancellation alongside backend shutdown, not after waiting for
+      // that loop to finish (which would leave both sides waiting forever).
+      await Future.wait<void>([
+        Future<void>.sync(() async {
+          await tts.stop();
+        }),
+        Future<void>.sync(() async {
+          if (_stopReaderOverride != null) {
+            await _stopReaderOverride();
+          } else {
+            await epubPlayerKey.currentState?.ttsStop();
+          }
+        }),
+      ]);
     } finally {
-      try {
-        await epubPlayerKey.currentState?.ttsStop();
-      } finally {
-        queue.add([]);
-        mediaItem.add(null);
-        if (_deactivateSessionOverride != null) {
-          await _deactivateSessionOverride();
-        } else {
-          await (await AudioSession.instance).setActive(false);
-        }
+      queue.add([]);
+      mediaItem.add(null);
+      if (_deactivateSessionOverride != null) {
+        await _deactivateSessionOverride();
+      } else {
+        await (await AudioSession.instance).setActive(false);
       }
     }
   }

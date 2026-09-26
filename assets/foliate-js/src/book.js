@@ -2059,6 +2059,14 @@ window.nextSection = () => reader.view.renderer.nextSection()
 window.initTts = () => reader.view.initTTS()
 
 const ttsNavigator = new TtsNavigator(() => reader.view)
+window.ttsSetParagraphMode = enabled => {
+  const paragraphMode = enabled === true
+  if ((reader.view.ttsParagraphMode === true) === paragraphMode) return
+  // Switching service must not reuse a cursor with the old unit boundaries.
+  ttsNavigator.stop()
+  reader.view.initTTS(true)
+  reader.view.ttsParagraphMode = paragraphMode
+}
 window.ttsSetBackground = background => {
   reader.view.ttsBackground = background === true
   if (!background) void reader.view.syncTTSHighlight()

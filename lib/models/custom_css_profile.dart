@@ -1,25 +1,50 @@
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/models/css_visual_style.dart';
 
-const customCssProfileCount = 8;
+const customCssProfileCount = 32;
 
 class CustomCssProfile {
   const CustomCssProfile(
-      {this.name = '', this.css = '', this.pattern = '', this.scope = 'all'});
+      {this.name = '',
+      this.css = '',
+      this.pattern = '',
+      this.scope = 'all',
+      this.visual});
   final String name;
   final String css;
   final String pattern;
   final String scope;
+  final CssVisualStyle? visual;
+  String get compiledCss => compileCss();
+  String compileCss({String fontOrigin = ''}) => [
+        visual?.css(
+                scope: scope, highlight: isHighlight, fontOrigin: fontOrigin) ??
+            '',
+        css
+      ].where((s) => s.trim().isNotEmpty).join('\n\n');
   bool get isHighlight => pattern.isNotEmpty;
-  bool get isEmpty => name.isEmpty && css.isEmpty && pattern.isEmpty;
+  bool get isEmpty =>
+      name.isEmpty &&
+      css.isEmpty &&
+      pattern.isEmpty &&
+      (visual?.values.isEmpty ?? true);
 
-  Map<String, String> toJson() =>
-      {'name': name, 'css': css, 'pattern': pattern, 'scope': scope};
+  Map<String, String> toJson() => {
+        'name': name,
+        'css': css,
+        'pattern': pattern,
+        'scope': scope,
+        if (visual != null) 'visual': visual!.encode()
+      };
 
   factory CustomCssProfile.fromJson(Object? value) {
     if (value is! Map) return const CustomCssProfile();
     return CustomCssProfile(
       name: value['name'] is String ? value['name'] as String : '',
       css: value['css'] is String ? value['css'] as String : '',
+      visual: value['visual'] is String
+          ? CssVisualStyle.decode(value['visual'] as String)
+          : null,
       pattern: value['pattern'] is String ? value['pattern'] as String : '',
       scope: const ['all', 'title', 'body'].contains(value['scope'])
           ? value['scope'] as String
@@ -29,7 +54,7 @@ class CustomCssProfile {
 }
 
 // Templates are copied into a free slot, never automatically enabled.
-const customCssTemplates = <CustomCssProfile>[
+const _legacyCssTemplates = <CustomCssProfile>[
   CustomCssProfile(
       name: '横排小说 · 段落',
       css:
@@ -83,6 +108,34 @@ const customCssTemplates = <CustomCssProfile>[
       pattern: '.+',
       scope: 'title',
       css: 'text-decoration-line: underline;\ntext-decoration-style: solid;'),
+];
+
+// Existing saved CSS is never parsed or rewritten. Only new built-in templates
+// use structured controls, with custom code retained for specialist selectors.
+final customCssTemplates = [
+  for (var i = 0; i < _legacyCssTemplates.length; i++)
+    CustomCssProfile(
+      name: _legacyCssTemplates[i].name,
+      pattern: _legacyCssTemplates[i].pattern,
+      scope: i < 2 || i == 4
+          ? 'body'
+          : i == 3
+              ? 'title'
+              : _legacyCssTemplates[i].scope,
+      css: const [2, 5, 6, 7].contains(i) ? _legacyCssTemplates[i].css : '',
+      visual: CssVisualStyle(switch (i) {
+        0 => {'indent': 2.0, 'paragraphGap': 0.6},
+        1 => {'lineHeight': 1.8, 'spacing': 0.08},
+        3 => {'align': 'center'},
+        4 => {'lineHeight': 1.8, 'paragraphGap': 0.8},
+        8 => {'color': '#c0392b'},
+        9 => {'decoration': 'wavy', 'decorationColor': '#c0392b'},
+        10 => {'background': '#ffe082', 'color': '#212121'},
+        11 => {'background': '#c8e6c9', 'color': '#1b5e20'},
+        12 => {'decoration': 'solid'},
+        _ => const <String, Object>{},
+      }),
+    ),
 ];
 
 class CustomCssSelection {

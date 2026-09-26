@@ -190,8 +190,12 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
           ],
         ),
         const SizedBox(height: 8),
-        Text(_text('描述不会作为正文朗读。若描述了语速或音高，建议把播放器对应滑块保持默认，避免指令冲突。修改后点击“保存设置”生效。',
-            'Descriptions are instructions, not spoken text. Keep rate/pitch sliders at default when controlling them here to avoid conflicts. Use Save settings to apply.')),
+        Text(_text(
+            '同一自然段内相邻句合成，高亮和前后跳转按小段，长段自动拆分。自动附加匀速听书要求，不改写已保存的描述；实际音色与节奏仍取决于模型。',
+            'Adjacent sentences in one paragraph are synthesized together. Highlighting and navigation follow each passage; long paragraphs are split. Steady narration instructions are added without changing your saved description. Voice and timing still depend on the model.')),
+        Text(_text(
+            '描述不会作为正文朗读。语速滑块在本地调节播放速度（0.5–2.0 倍），松手后生效，无需重新生成语音。1 倍是接口返回音频的原始速度；描述中的快慢节奏仍可能影响原始音频。音高仍由提示词控制。修改描述后点击“保存设置”生效。',
+            'Descriptions are instructions, not spoken text. The rate slider controls local playback (0.5–2.0×) on release without regenerating speech. 1× is the original generated speed; timing instructions can still affect that audio. Pitch remains prompt-controlled. Save settings to apply description changes.')),
       ],
     );
   }

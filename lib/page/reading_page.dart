@@ -43,8 +43,10 @@ import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
+import 'package:anx_reader/widgets/reading_page/translation_toolbar_action.dart';
 import 'package:anx_reader/widgets/reading_page/book_search.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
 import 'package:anx_reader/widgets/reading_page/toc_widget.dart';
@@ -641,6 +643,16 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _restoreReaderFocusAfterPanel();
   }
 
+  Future<void> showSelectionSearch(String content) async {
+    showOrHideAppBarAndBottomBar(false);
+    try {
+      await showReaderPopup(context,
+          builder: (_) => SelectionSearchBrowser(text: content));
+    } finally {
+      _restoreReaderFocusAfterPanel();
+    }
+  }
+
   double _aiChatMaxWidth(BuildContext context) {
     final totalWidth = MediaQuery.of(context).size.width;
     final maxByPercentage = totalWidth * 0.65;
@@ -948,11 +960,17 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                           onPressed:
                               _changingQuickMark ? null : _toggleQuickMark),
                     if (EnvVar.enableAIFeature) aiButton,
-                    IconButton(
-                      key: const ValueKey('reader-translation-button'),
-                      tooltip: L10n.of(context).settingsTranslate,
-                      icon: const Icon(Icons.translate_outlined),
-                      onPressed: translationHandler,
+                    TranslationToolbarAction(
+                      mode: epubPlayerKey.currentState?.translationMode,
+                      onOpenSettings: translationHandler,
+                      onStop: () async {
+                        try {
+                          await epubPlayerKey.currentState
+                              ?.setTranslationMode(TranslationModeEnum.off);
+                        } catch (_) {
+                          // Cancellation occurs before the WebView update.
+                        }
+                      },
                     ),
                     IconButton(
                       key: const ValueKey('reader-search-button'),
@@ -1055,15 +1073,17 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       },
                                     ),
                                     IconButton(
-                                      tooltip: L10n.of(context).readingBrightness,
-                                      icon: const Icon(Icons.brightness_6_outlined),
+                                      tooltip:
+                                          L10n.of(context).readingBrightness,
+                                      icon: const Icon(
+                                          Icons.brightness_6_outlined),
                                       onPressed: () {
                                         setState(() {
                                           _currentPage = BrightnessWidget(
                                             controller: AppBrightness.instance,
-                                            onNightModeChanged: () => epubPlayerKey
-                                                .currentState
-                                                ?.refreshReadingTheme(),
+                                            onNightModeChanged: () =>
+                                                epubPlayerKey.currentState
+                                                    ?.refreshReadingTheme(),
                                           );
                                         });
                                       },
@@ -1175,46 +1195,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                                   onPressed: _changingQuickMark
                                                       ? null
                                                       : _toggleQuickMark)))),
-                                if (epubPlayerKey.currentState != null)
-                                  Positioned(
-                                    bottom: 56,
-                                    right: 12,
-                                    child: ValueListenableBuilder<
-                                        TranslationModeEnum>(
-                                      valueListenable: epubPlayerKey
-                                          .currentState!.translationMode,
-                                      builder: (context, mode, _) => mode ==
-                                              TranslationModeEnum.off
-                                          ? const SizedBox.shrink()
-                                          : PointerInterceptor(
-                                              child: SafeArea(
-                                                  child: ActionChip(
-                                              key: const ValueKey(
-                                                  'reader-floating-stop-translation'),
-                                              avatar: const Icon(
-                                                  Icons.stop_circle_outlined,
-                                                  size: 18),
-                                              label: Text(
-                                                  Localizations.localeOf(
-                                                                  context)
-                                                              .languageCode ==
-                                                          'zh'
-                                                      ? '停止翻译'
-                                                      : 'Stop translation'),
-                                              onPressed: () async {
-                                                try {
-                                                  await epubPlayerKey
-                                                      .currentState
-                                                      ?.setTranslationMode(
-                                                          TranslationModeEnum
-                                                              .off);
-                                                } catch (_) {
-                                                  // The session is already cancelled before touching the WebView.
-                                                }
-                                              },
-                                            ))),
-                                    ),
-                                  ),
                                 if (_isResizingAiChat)
                                   SizedBox.expand(
                                     child: Container(

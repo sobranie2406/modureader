@@ -52,13 +52,13 @@ void main() {
     await tester.tap(find.text('Continue'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Restore global settings?'), findsOneWidget);
+    expect(find.text('Restore Speech settings?'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
     await tester.tap(find.text('Restore'));
     await tester.pumpAndSettle();
     expect(Prefs().ttsRate, 1.2);
     expect(Prefs().getOnlineTtsConfig('openai')['key'], 'fake-key');
-    expect(find.textContaining('Settings restored.'), findsOneWidget);
+    expect(find.textContaining('Speech settings restored.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

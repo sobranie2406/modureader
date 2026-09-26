@@ -371,6 +371,59 @@ test('failed offscreen extraction can retry the same chapter, never skipping it'
   assert.equal(await nav.move(1), '下一章')
 })
 
+test('a stalled locked-screen chapter read retries the same heading and ignores its late result', async () => {
+  const {view} = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1><p>正文。</p>', '<p>最后章。</p>'])
+  const nav = new TtsNavigator(() => view, {chapterTimeoutMs:5})
+  const load = view.book.sections[1].createDocument
+  let completeOldRead
+  let reads = 0
+  view.book.sections[1].createDocument = () => ++reads === 1
+    ? new Promise(resolve => { completeOldRead = resolve }) : load()
+  assert.equal(await nav.start(), '末句。')
+  assert.equal(await nav.move(1), '下一章')
+  assert.equal(reads, 2)
+  assert.equal(await nav.move(1), '正文。')
+  completeOldRead(documentFor('<h1>过期内容</h1>'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(view.tts.currentDetail().text, '正文。')
+  assert.equal(await nav.move(1), '最后章。')
+})
+
+test('repeated chapter timeouts release the queue without reporting end-of-book or skipping text', async () => {
+  const {view} = backgroundReader(['<p>末句。</p>', '<h1>不能跳过</h1>'])
+  const nav = new TtsNavigator(() => view, {chapterTimeoutMs:5})
+  const load = view.book.sections[1].createDocument
+  let reads = 0
+  view.book.sections[1].createDocument = () => { reads++; return new Promise(() => {}) }
+  await nav.start()
+  await assert.rejects(nav.move(1), /chapter text loading timed out/)
+  assert.equal(reads, 2)
+  assert.equal(view.tts.sectionIndex, 0)
+  assert.equal(view.tts.currentDetail().text, '末句。')
+  view.book.sections[1].createDocument = load
+  assert.equal(await nav.move(1), '不能跳过')
+})
+
+test('stop immediately releases a stalled chapter and queued moves so a new session can start', {timeout:1000}, async () => {
+  const {view} = backgroundReader(['<p>末句。</p>', '<h1>下一章</h1>'])
+  // Much longer than the test deadline: only cancellation may unblock this.
+  const nav = new TtsNavigator(() => view, {chapterTimeoutMs:10000})
+  let completeOldRead
+  view.book.sections[1].createDocument = () => new Promise(resolve => { completeOldRead = resolve })
+  await nav.start()
+  const moving = nav.move(1)
+  const queued = nav.move(1)
+  await new Promise(resolve => setImmediate(resolve))
+  nav.stop()
+  view.initTTS(true)
+  assert.deepEqual(await Promise.all([moving, queued]), ['', ''])
+  assert.equal(await nav.start(), '末句。')
+  completeOldRead(documentFor('<h1>迟到章节</h1>'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(view.tts.sectionIndex, 0)
+  assert.equal(view.tts.currentDetail().text, '末句。')
+})
+
 // Exercise the actual private page-turn method with only its renderer IO stubbed.
 const paginatorSource = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8')
 const turnPage = paginatorSource.slice(paginatorSource.indexOf('  async #turnPage('), paginatorSource.indexOf('  prev(distance)'))

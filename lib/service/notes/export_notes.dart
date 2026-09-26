@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book.dart';
@@ -23,20 +25,24 @@ Future<void> exportNotes(
     return;
   }
 
-  final groups = _groupNotesByChapter(notesList, mergeChapterHeadings);
+  final chinese = Localizations.localeOf(context).languageCode == 'zh';
 
   switch (exportType) {
     case ExportType.copy:
       var notes = '${book.title}\n\t${book.author}\n\n';
-      notes += groups.map(_formatPlainGroup).join('\n\n');
+      notes += formatNotesText(notesList,
+          mergeChapterHeadings: mergeChapterHeadings, chinese: chinese);
 
       await Clipboard.setData(ClipboardData(text: notes));
       AnxToast.show(L10n.of(context).notesPageCopied);
       break;
 
     case ExportType.md:
-      var notes = '# ${book.title}\n\n *${book.author}*\n\n';
-      notes += groups.map(_formatMarkdownGroup).join('');
+      final notes = formatNotesMarkdown(notesList,
+          title: book.title,
+          author: book.author,
+          mergeChapterHeadings: mergeChapterHeadings,
+          chinese: Localizations.localeOf(context).languageCode == 'zh');
 
       String? filePath = await saveFileToDownload(
           bytes: convertStringToUint8List(notes),
@@ -62,34 +68,8 @@ Future<void> exportNotes(
       break;
 
     case ExportType.csv:
-      List<List<dynamic>> list = List.from([
-        [
-          'Book',
-          'Author',
-          'Chapter',
-          'Content',
-          'Reader Note',
-          'Type',
-          'Color',
-          'Create Time',
-          'Update Time'
-        ],
-        ...notesList.map((note) {
-          return List.from([
-            book.title,
-            book.author,
-            note.chapter,
-            note.content,
-            note.readerNote,
-            note.type,
-            '#${note.color}',
-            note.createTime!.toIso8601String(),
-            note.updateTime.toIso8601String(),
-          ]);
-        })
-      ]);
-
-      final string = const ListToCsvConverter().convert(list);
+      final string = formatNotesCsv(notesList,
+          title: book.title, author: book.author, chinese: chinese);
 
       String? filePath = await saveFileToDownload(
           bytes: Uint8List.fromList(gbk.encode(string)),
@@ -149,22 +129,18 @@ List<_ChapterGroup> _groupNotesByChapter(
   return groups;
 }
 
-/// Pure TXT formatting, shared by all platforms without changing MD/CSV/copy.
+/// Plain exports and clipboard share explicit excerpt, note and time labels.
 String formatNotesText(List<BookNote> notes,
     {bool mergeChapterHeadings = false, bool chinese = true}) {
   return _groupNotesByChapter(notes, mergeChapterHeadings)
-      .map((group) =>
-          _formatPlainGroup(group, annotateReaderNotes: true, chinese: chinese))
+      .map((group) => _formatPlainGroup(group, chinese: chinese))
       .join('\n\n');
 }
 
 String _noteTimeLabel(BookNote note, bool chinese) {
   // Legacy rows without update_time are hydrated with DateTime.now(). Do not
   // export that synthetic value as though the user just edited the note.
-  final saved = note.persistedValues;
-  final updated = saved != null && saved['update_time'] == null
-      ? null
-      : note.updateTime;
+  final updated = _persistedUpdateTime(note);
   final created = note.createTime;
   final modified =
       updated != null && (created == null || updated.isAfter(created));
@@ -182,44 +158,124 @@ String _noteTimeLabel(BookNote note, bool chinese) {
   return chinese ? '$label：$date' : '$label: $date';
 }
 
-String _formatPlainGroup(_ChapterGroup group,
-    {bool annotateReaderNotes = false, bool chinese = true}) {
+String _formatPlainGroup(_ChapterGroup group, {bool chinese = true}) {
   final buffer = StringBuffer();
   if (group.chapter.isNotEmpty) {
     buffer.writeln(group.chapter);
   }
   for (final note in group.notes) {
-    if (note.content.isNotEmpty) {
-      buffer.writeln('\t${note.content}');
+    if (note.content.trim().isNotEmpty) {
+      buffer.writeln(_labelledExcerpt(note.content, chinese));
     }
-    if (note.readerNote != null && note.readerNote!.isNotEmpty) {
-      if (annotateReaderNotes) {
-        if (note.readerNote!.trim().isNotEmpty) {
-          buffer.writeln();
-          buffer.writeln(chinese ? '--- 笔记 ---' : '--- Note ---');
-          buffer.writeln(note.readerNote);
-          buffer.writeln('--- ${_noteTimeLabel(note, chinese)} ---');
-        }
-      } else {
-        buffer.writeln('\t\t${note.readerNote}');
-      }
+    if (note.readerNote?.trim().isNotEmpty ?? false) {
+      buffer.writeln();
+      buffer.writeln(chinese ? '--- 笔记 ---' : '--- Note ---');
+      buffer.writeln(note.readerNote);
     }
+    buffer.writeln('--- ${_noteTimeLabel(note, chinese)} ---');
     buffer.writeln();
   }
   return buffer.toString().trim();
 }
 
-String _formatMarkdownGroup(_ChapterGroup group) {
+String _labelledExcerpt(String text, bool chinese) =>
+    text.trim().isEmpty ? '' : '${chinese ? '原文：' : 'Excerpt: '}【$text】';
+
+DateTime? _persistedUpdateTime(BookNote note) =>
+    note.persistedValues != null && note.persistedValues!['update_time'] == null
+        ? null
+        : note.updateTime;
+
+String formatNotesCsv(List<BookNote> notes,
+        {String title = '', String author = '', bool chinese = true}) =>
+    const ListToCsvConverter().convert([
+      [
+        'Book',
+        'Author',
+        'Chapter',
+        'Content',
+        'Reader Note',
+        'Type',
+        'Color',
+        'Create Time',
+        'Update Time',
+        'Note Time'
+      ],
+      for (final note in notes)
+        [
+          title,
+          author,
+          note.chapter,
+          _labelledExcerpt(note.content, chinese),
+          note.readerNote,
+          note.type,
+          '#${note.color}',
+          note.createTime?.toIso8601String() ?? '',
+          _persistedUpdateTime(note)?.toIso8601String() ?? '',
+          _noteTimeLabel(note, chinese)
+        ],
+    ]);
+
+/// Export literal excerpts, not executable HTML or source Markdown. Each entry
+/// has its own persisted timestamp, including highlights without reader notes.
+String formatNotesMarkdown(List<BookNote> notes,
+    {String title = '',
+    String author = '',
+    bool mergeChapterHeadings = false,
+    bool chinese = true}) {
+  if (notes.isEmpty) return '';
   final buffer = StringBuffer();
-  buffer.writeln('## ${group.chapter}\n');
-  for (final note in group.notes) {
-    if (note.content.isNotEmpty) {
-      buffer.writeln('> ${note.content}\n');
+  if (title.trim().isNotEmpty) {
+    buffer.writeln(
+        '# ${_escapeMarkdown(title.replaceAll(RegExp(r'[\r\n]+'), ' '))}\n');
+  }
+  if (author.trim().isNotEmpty) {
+    buffer.writeln(
+        '*${_escapeMarkdown(author.replaceAll(RegExp(r'[\r\n]+'), ' '))}*\n');
+  }
+  for (final group in _groupNotesByChapter(notes, mergeChapterHeadings)) {
+    if (group.chapter.trim().isNotEmpty) {
+      buffer.writeln(
+          '## ${_escapeMarkdown(group.chapter.replaceAll(RegExp(r'[\r\n]+'), ' '))}\n');
     }
-    if (note.readerNote != null && note.readerNote!.isNotEmpty) {
-      buffer.writeln('${note.readerNote}\n');
+    for (final note in group.notes) {
+      if (note.content.trim().isNotEmpty) {
+        final text = _escapeMarkdown(_normalizeLines(note.content));
+        // One bracket pair contains every paragraph, matching plain exports.
+        buffer.writeln('${_labelledExcerpt(_markdownLines(text), chinese)}\n');
+      }
+      final comment = note.readerNote;
+      if (comment != null && comment.trim().isNotEmpty) {
+        buffer.writeln(chinese ? '**笔记**\n' : '**Note**\n');
+        // HTML mark has wider support than non-standard ==highlight==.
+        // Encode all user text so it cannot close the tag or inject HTML.
+        final paragraphs =
+            _normalizeLines(comment).split(RegExp(r'\n[ \t]*\n'));
+        buffer.writeln(paragraphs
+            .map((paragraph) =>
+                '<mark>${const HtmlEscape().convert(paragraph).replaceAll('\n', '<br>')}</mark>')
+            .join('\n\n'));
+        buffer.writeln();
+      }
+      buffer.writeln('**${_noteTimeLabel(note, chinese)}**\n');
+      buffer.writeln('---\n');
     }
-    buffer.writeln();
   }
   return buffer.toString();
 }
+
+String _normalizeLines(String text) =>
+    text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+String _markdownLines(String text) => text
+    .split('\n')
+    .map((line) => line.isEmpty ? '' : '$line  ')
+    .join('\n')
+    .trimRight();
+
+String _escapeMarkdown(String text) => text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAllMapped(
+        RegExp(r'[\\`*_{}\[\]()#+.!|~=-]'), (match) => '\\${match[0]}');

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:anx_reader/service/tts/tts_provider.dart';
@@ -53,8 +54,9 @@ class OnlineTts extends BaseTts {
   String? get playbackError => _playbackError;
 
   // ============ Configuration ============
-  static const int _bufferCapacity = 10;
-  static const int _batchSize = 5; // Max concurrent fetches
+  static const int _bufferCapacity =
+      4; // Bounded paragraph groups, not sentences.
+  static const int _batchSize = 2; // Avoid competing with the current passage.
   static const int _maxRetries = 2;
   static final TtsCache _audioCache = TtsCache(maxEntries: 256);
 
@@ -70,6 +72,7 @@ class OnlineTts extends BaseTts {
   TtsSegment? _currentSegment;
   String? _currentVoiceText;
   int _audioFetchVersion = 0; // Version counter for audio fetches
+  final Set<Completer<void>> _fetchCancellations = {};
   // ============ Prefetcher State ============
   bool _isPrefetcherRunning = false;
   Completer<void>? _prefetcherCompleter;
@@ -145,13 +148,35 @@ class OnlineTts extends BaseTts {
   @override
   set rate(double rate) {
     if (!rate.isFinite || rate < 0 || rate > 2 || rate == this.rate) return;
-    Prefs().ttsRate = rate;
+    Prefs().ttsRate = _usesPlaybackRate ? rate.clamp(0.5, 2.0) : rate;
+    if (_usesPlaybackRate) {
+      // Keep synthesized/prefetched audio: MiMo speed is a playback property.
+      final player = _player;
+      final command = _commandVersion;
+      unawaited(_serializeAudioControl(() async {
+        if (command != _commandVersion ||
+            player == null ||
+            !identical(player, _player) ||
+            !isPlaying ||
+            _playbackCompleter?.isCompleted != false) {
+          return;
+        }
+        await player.setPlaybackRate(_playbackRate);
+      }).catchError((Object error) {
+        if (command == _commandVersion) _controlFailed(error);
+      }));
+      return;
+    }
     // Clear pending audio so it will be re-fetched with new rate
     _clearPendingAudio();
   }
 
   @override
   double get rate => Prefs().ttsRate;
+
+  bool get _usesPlaybackRate => backend is XiaomiMimoTtsProvider;
+  double get _playbackRate => rate.isFinite ? rate.clamp(0.5, 2.0) : 1.0;
+  double get _synthesisRate => _usesPlaybackRate ? 1.0 : rate;
 
   @override
   bool get isPlaying => ttsStateNotifier.value == TtsStateEnum.playing;
@@ -314,12 +339,15 @@ class OnlineTts extends BaseTts {
         }
 
         // Now fetch audio in batches to limit concurrency
-        for (var i = 0; i < newSegments.length; i += _batchSize) {
+        for (var i = 0; i < newSegments.length;) {
           if (_shouldStop) break;
-          final batch = newSegments.skip(i).take(_batchSize).toList();
+          // Get the first passage ready before issuing speculative work.
+          final size = i == 0 ? 1 : _batchSize;
+          final batch = newSegments.skip(i).take(size).toList();
           final futures =
               batch.map((segment) => _fetchAudioForSegment(segment));
           await Future.wait(futures);
+          i += size;
         }
       }
     } catch (e) {
@@ -379,7 +407,9 @@ class OnlineTts extends BaseTts {
 
       try {
         if (_synthesizeOverride != null) {
-          final bytes = await _synthesizeOverride!(segment.sentence.text);
+          final bytes =
+              await _untilStopped(_synthesizeOverride!(segment.sentence.text));
+          if (bytes == null) return;
           if (_shouldStop || segment.fetchVersion != targetVersion) return;
           if (bytes.isEmpty) throw StateError('Empty speech audio');
           segment.audio = bytes;
@@ -387,11 +417,11 @@ class OnlineTts extends BaseTts {
         }
         final currentBackend = backend;
         final voice = currentBackend.getSelectedVoice();
-        final audio = await _audioCache
+        final bytes = await _untilStopped(_audioCache
             .synthesize(
               _ProviderAdapter(
                 provider: currentBackend,
-                rate: rate,
+                rate: _synthesisRate,
                 pitch: pitch,
                 voice: voice,
               ),
@@ -400,15 +430,16 @@ class OnlineTts extends BaseTts {
                 voice: voice,
                 model: currentBackend.serviceId,
                 parameters: {
-                  'rate': rate.toStringAsFixed(4),
+                  'rate': _synthesisRate.toStringAsFixed(4),
                   'pitch': pitch.toStringAsFixed(4),
                   'config': currentBackend.cacheConfiguration(),
                 },
               ),
             )
             .timeout(
-                currentBackend.synthesisTimeout + const Duration(seconds: 1));
-        final bytes = audio.bytes;
+                currentBackend.synthesisTimeout + const Duration(seconds: 1))
+            .then((audio) => audio.bytes));
+        if (bytes == null) return;
 
         // Check if version is still valid (settings haven't changed during fetch)
         if (_shouldStop || segment.fetchVersion != targetVersion) {
@@ -448,6 +479,23 @@ class OnlineTts extends BaseTts {
   }
 
   // ============ Consumer: Player Loop ============
+  // A navigation command must not wait for a remote paragraph to finish.
+  // The request may still finish/cache its result, but cannot touch the old
+  // cursor or playback buffer after cancellation (including late errors).
+  Future<T?> _untilStopped<T>(Future<T> request) async {
+    final cancellation = Completer<void>();
+    _fetchCancellations.add(cancellation);
+    try {
+      return await Future.any<T?>([
+        request,
+        cancellation.future.then<T?>((_) => null),
+      ]);
+    } finally {
+      // Do not retain every completed audio result on a session-long future.
+      _fetchCancellations.remove(cancellation);
+    }
+  }
+
   Future<void> _startPlayer() async {
     if (_isPlayerRunning) return;
     _isPlayerRunning = true;
@@ -504,6 +552,9 @@ class OnlineTts extends BaseTts {
             if (_playOverride != null) {
               await _playOverride!(segment);
             } else {
+              if (_usesPlaybackRate) {
+                await audioPlayer!.setPlaybackRate(_playbackRate);
+              }
               await audioPlayer!.play(source);
               await _playbackCompleter!.future;
             }
@@ -637,6 +688,9 @@ class OnlineTts extends BaseTts {
     _isStarting = false;
     _shouldStop = true;
     _playbackError = null;
+    for (final cancellation in _fetchCancellations.toList()) {
+      if (!cancellation.isCompleted) cancellation.complete();
+    }
     updateTtsState(forNavigation ? TtsStateEnum.paused : TtsStateEnum.stopped);
 
     // Complete any pending playback
@@ -712,7 +766,16 @@ class OnlineTts extends BaseTts {
           unawaited(_startPrefetcher());
           playback = _startPlayer();
         } else {
-          await _player?.resume();
+          // A completed source remains loaded in the native player. Resuming
+          // it while the consumer waits for the reader/next audio can replay
+          // the previous sentence. Only resume an unfinished active segment;
+          // otherwise restore the loop state and let it play the next source.
+          if (!_isPlayerRunning || _playbackCompleter?.isCompleted == false) {
+            if (_usesPlaybackRate) {
+              await _player?.setPlaybackRate(_playbackRate);
+            }
+            await _player?.resume();
+          }
           if (command == _commandVersion && control == _controlVersion) {
             updateTtsState(TtsStateEnum.playing);
           }
@@ -792,9 +855,12 @@ class OnlineTts extends BaseTts {
     await stop();
     final audioPlayer = await _ensurePlayer(preview: true);
 
-    final bytes = await backend.speak(content, voice, rate, pitch);
+    final bytes = await backend.speak(content, voice, _synthesisRate, pitch);
     if (bytes.isNotEmpty) {
       final source = BytesSource(bytes, mimeType: ttsAudioMimeType(bytes));
+      if (_usesPlaybackRate) {
+        await audioPlayer.setPlaybackRate(_playbackRate);
+      }
       await audioPlayer.play(source);
     }
   }

@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:anx_reader/models/css_visual_style.dart';
+import 'package:anx_reader/widgets/settings/css_visual_controls.dart';
+import 'package:anx_reader/widgets/reading_page/more_settings/css_profile_application.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/config_transfer/custom_css_transfer.dart';
 import 'package:anx_reader/utils/save_file_to_download.dart';
@@ -12,9 +15,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 class CustomCSSEditor extends StatefulWidget {
-  const CustomCSSEditor({super.key, this.bookKey, this.onApply});
+  const CustomCSSEditor(
+      {super.key, this.bookKey, this.onApply, this.manage = false});
   final String? bookKey;
   final VoidCallback? onApply;
+  final bool manage;
 
   @override
   State<CustomCSSEditor> createState() => _CustomCSSEditorState();
@@ -31,6 +36,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
   late bool _enabled;
   bool _busy = false;
   String? _error;
+  CssVisualStyle _visual = const CssVisualStyle();
 
   String _text(String zh, String en) =>
       Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
@@ -46,6 +52,10 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     _index = selection.index;
     _enabled = selection.enabled;
     _active = selection.activeIndices.toSet();
+    if (widget.manage && Prefs().customCssProfiles[_index].isEmpty) {
+      final first = Prefs().customCssProfiles.indexWhere((p) => !p.isEmpty);
+      if (first >= 0) _index = first;
+    }
     _loadProfile();
   }
 
@@ -56,6 +66,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     _patternController.text = profile.pattern;
     _highlight = profile.isHighlight;
     _scope = profile.scope;
+    _visual = profile.visual ?? const CssVisualStyle();
     _error = null;
   }
 
@@ -89,7 +100,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           name: _nameController.text.trim(),
           css: _cssController.text,
           pattern: _highlight ? _patternController.text : '',
-          scope: _scope));
+          scope: _scope,
+          visual: _visual));
 
   CustomCssSelection get _selection => CustomCssSelection(
       index: _index, enabled: _enabled, indices: _active.toList());
@@ -238,7 +250,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               name: '${p.name} ${_text('副本', 'copy')}',
               css: p.css,
               pattern: p.pattern,
-              scope: p.scope)
+              scope: p.scope,
+              visual: p.visual)
         ]);
       });
 
@@ -316,6 +329,10 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.manage) {
+      return CssProfileApplication(
+          bookKey: widget.bookKey, onApply: widget.onApply);
+    }
     final profiles = Prefs().customCssProfiles;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -332,24 +349,32 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                   '本书 CSS 方案（本机记忆）', 'CSS profile for this book (this device)'),
           style: Theme.of(context).textTheme.titleSmall),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 4, children: [
-        for (var i = 0; i < customCssProfileCount; i++)
-          ChoiceChip(
-            key: ValueKey('custom-css-profile-$i'),
-            label: Text(
-                profiles[i].name.isEmpty
-                    ? _text('方案 ${i + 1}', 'Profile ${i + 1}')
-                    : '${_active.contains(i) ? '✓ ' : ''}${profiles[i].name}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            selected: i == _index,
-            onSelected: _busy ? null : (_) => _select(i),
-          ),
-      ]),
+      DropdownButton<int>(
+        key: const ValueKey('css-profile-picker'),
+        value: _index,
+        isExpanded: true,
+        items: [
+          for (var i = 0; i < profiles.length; i++)
+            if (!profiles[i].isEmpty || i == _index)
+              DropdownMenuItem(
+                  value: i,
+                  child: Text(
+                      profiles[i].name.isEmpty
+                          ? _text('自定义 CSS', 'Custom CSS')
+                          : profiles[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis))
+        ],
+        onChanged: _busy
+            ? null
+            : (i) {
+                if (i != null) _select(i);
+              },
+      ),
       const SizedBox(height: 8),
       Text(
-          _text('8 个自定义位置，可同时启用多套，按位置顺序叠加。点击方案仅切换编辑；修改会影响使用它的书籍。预设和导入的方案默认停用。',
-              'Eight slots; enabled profiles cascade in slot order. Selecting a slot only edits it. Shared edits affect all books using it. Templates and imports start disabled.'),
+          _text('按名称管理模板，可同时启用多套；修改会影响使用它的书籍。内置与导入模板默认停用，最多保存 32 套。',
+              'Manage named templates; multiple templates can be active. Shared edits affect books using them. Built-ins and imports start disabled. Up to 32 templates.'),
           style: Theme.of(context).textTheme.bodySmall),
       Wrap(spacing: 8, children: [
         TextButton.icon(
@@ -400,16 +425,18 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               child: Text(_text('设为默认方案', 'Set as default'))),
         ]),
       const SizedBox(height: 12),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        key: const ValueKey('custom-css-slot-enabled'),
-        title: Text(_text('启用当前方案', 'Enable this profile')),
-        subtitle: !_enabled
-            ? Text(_text('总开关关闭时，所有方案均不生效', 'The master switch is off'))
-            : null,
-        value: _active.contains(_index),
-        onChanged: _busy ? null : _toggleSlot,
-      ),
+      Material(
+          type: MaterialType.transparency,
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            key: const ValueKey('custom-css-slot-enabled'),
+            title: Text(_text('启用当前方案', 'Enable this profile')),
+            subtitle: !_enabled
+                ? Text(_text('总开关关闭时，所有方案均不生效', 'The master switch is off'))
+                : null,
+            value: _active.contains(_index),
+            onChanged: _busy ? null : _toggleSlot,
+          )),
       Wrap(spacing: 8, children: [
         ChoiceChip(
             label: Text(_text('排版 CSS', 'Layout CSS')),
@@ -440,50 +467,63 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
             decoration: InputDecoration(
                 labelText: _text('正则表达式（JavaScript，无需 / /）',
                     'Regular expression (JavaScript, no / /)'))),
-        DropdownButton<String>(
-            value: _scope,
-            isExpanded: true,
-            items: [
-              DropdownMenuItem(
-                  value: 'all', child: Text(_text('作用范围：全部', 'Scope: All'))),
-              DropdownMenuItem(
-                  value: 'title',
-                  child: Text(_text('作用范围：标题', 'Scope: Headings'))),
-              DropdownMenuItem(
-                  value: 'body', child: Text(_text('作用范围：正文', 'Scope: Body'))),
-            ],
-            onChanged:
-                _busy ? null : (value) => setState(() => _scope = value!)),
-        Text(
-            _text(
-                '填写颜色、背景色或下划线的 CSS 声明，不加选择器和花括号。高亮不改动正文；不支持字体、字号或图片。不匹配隐藏内容及注释。旧版阅读内核可能不支持高亮。',
-                'Use CSS declarations for color, background-color or text-decoration, without selectors/braces. Highlights preserve the text; fonts, sizes and images are not supported. Hidden content and notes are excluded. Older web engines may not support highlights.'),
-            style: Theme.of(context).textTheme.bodySmall),
       ],
+      DropdownButton<String>(
+          value: _scope,
+          isExpanded: true,
+          items: [
+            DropdownMenuItem(
+                value: 'all', child: Text(_text('作用范围：全部', 'Scope: All'))),
+            DropdownMenuItem(
+                value: 'title',
+                child: Text(_text('作用范围：标题', 'Scope: Headings'))),
+            DropdownMenuItem(
+                value: 'body', child: Text(_text('作用范围：正文', 'Scope: Body'))),
+          ],
+          onChanged: _busy ? null : (value) => setState(() => _scope = value!)),
+      IgnorePointer(
+          ignoring: _busy,
+          child: CssVisualControls(
+            style: _visual,
+            highlight: _highlight,
+            onChanged: (style) => setState(() => _visual = style),
+          )),
       if (_error != null)
         Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(_error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error))),
-      SizedBox(
-          height: 200,
-          child: TextField(
-            key: const ValueKey('custom-css-code'),
-            controller: _cssController,
-            enabled: !_busy,
-            maxLines: null,
-            expands: true,
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
-            style: const TextStyle(
-                fontFamily: 'Courier New', fontSize: 14, height: 1.4),
-            decoration: InputDecoration(
-                hintText: L10n.of(context).cssEditorHint,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.all(12)),
-            textAlignVertical: TextAlignVertical.top,
-          )),
+      ExpansionTile(
+        key: ValueKey('css-code-editor-$_index'),
+        title: Text(_text('自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
+        initiallyExpanded: _cssController.text.isNotEmpty,
+        children: [
+          Text(_highlight
+              ? _text('局部高亮填写 CSS 声明，不加选择器和花括号。',
+                  'For highlights, enter declarations without selectors or braces.')
+              : _text('保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
+                  'Original code is preserved and follows visual settings. Code selectors determine its scope.')),
+          SizedBox(
+              height: 200,
+              child: TextField(
+                key: const ValueKey('custom-css-code'),
+                controller: _cssController,
+                enabled: !_busy,
+                maxLines: null,
+                expands: true,
+                onChanged: (_) {
+                  if (_error != null) setState(() => _error = null);
+                },
+                style: const TextStyle(
+                    fontFamily: 'Courier New', fontSize: 14, height: 1.4),
+                decoration: InputDecoration(
+                    hintText: L10n.of(context).cssEditorHint,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.all(12)),
+                textAlignVertical: TextAlignVertical.top,
+              )),
+        ],
+      ),
       const SizedBox(height: 12),
       Wrap(spacing: 12, runSpacing: 8, children: [
         TextButton.icon(
@@ -498,7 +538,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         ElevatedButton.icon(
             onPressed: _busy ? null : () => _save(),
             icon: const Icon(Icons.save, size: 16),
-            label: Text(L10n.of(context).cssSaveAndApply)),
+            label: Text(_text('保存模板', 'Save template'))),
       ]),
       const SizedBox(height: 8),
     ]);

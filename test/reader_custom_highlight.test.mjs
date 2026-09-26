@@ -82,6 +82,25 @@ test('applies ranges without changing text nodes, then clears only owned highlig
     assert.ok(workers.every(w=>w.terminated));
   } finally {globalThis.Worker = oldWorker; dom.window.close()}
 });
+test('supports all 32 named rule slots without altering DOM', async () => {
+  const {dom, doc} = fixture();
+  const oldWorker = globalThis.Worker;
+  globalThis.Worker = class {
+    postMessage(data) {queueMicrotask(() => this.onmessage({data: match(data)}))}
+    terminate() {}
+  };
+  try {
+    const original = doc.body.innerHTML;
+    await applyCustomHighlights(doc, Array.from({length:32}, () =>
+      ({pattern:'你好', scope:'body', css:'color:#a05000;text-decoration-style:wavy;'})));
+    assert.equal(doc.defaultView.CSS.highlights.size, 32);
+    assert.equal([...doc.defaultView.CSS.highlights.get('modu-custom-rule-31')][0].toString(), '你好');
+    assert.equal(doc.body.innerHTML, original);
+    clearCustomHighlights(doc);
+    assert.equal(doc.defaultView.CSS.highlights.size, 0);
+  } finally {globalThis.Worker = oldWorker; dom.window.close()}
+});
+
 test('slow matching is terminated, disabling cancels pending work, unsupported is reported', async () => {
   const {dom, doc} = fixture();
   const oldWorker = globalThis.Worker;

@@ -15,6 +15,8 @@ import 'package:anx_reader/page/settings_page/global_settings.dart';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
 import 'package:anx_reader/page/settings_page/dictionaries.dart';
+import 'package:anx_reader/page/settings_page/selection_search.dart';
+import 'package:anx_reader/page/settings_page/css_settings.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/settings/about.dart';
@@ -121,6 +123,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
               },
               {
                 "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? 'CSS 设置'
+                    : 'CSS settings',
+                "icon": Icons.tune,
+                "sections": const CssSettings(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '预设模板 · 图形调节 · 自定义代码'
+                      : 'Templates · Visual controls · Custom code'
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
                     ? '自定义字典'
                     : 'Custom dictionaries',
                 "icon": Icons.menu_book_outlined,
@@ -129,6 +143,18 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   Localizations.localeOf(context).languageCode == 'zh'
                       ? '本地导入 · 离线选词查询'
                       : 'Local import · Offline word lookup'
+                ],
+              },
+              {
+                "title": Localizations.localeOf(context).languageCode == 'zh'
+                    ? '选词搜索'
+                    : 'Selection search',
+                "icon": Icons.travel_explore,
+                "sections": const SelectionSearchSettings(),
+                "subtitles": [
+                  Localizations.localeOf(context).languageCode == 'zh'
+                      ? '内置浏览器 · 自定义搜索引擎'
+                      : 'In-app browser · Custom search engines'
                 ],
               },
               if (EnvVar.enableAIFeature)

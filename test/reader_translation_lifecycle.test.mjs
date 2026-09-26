@@ -98,5 +98,9 @@ test('opening a book does not restore translation consent and stop remains avail
   assert.match(panel,/onPressed: _stopTranslation/);
   assert.doesNotMatch(panel,/setBookTranslationMode\(widget.bookId, _displayMode\)/);
   const page=await readFile(new URL('../lib/page/reading_page.dart',import.meta.url),'utf8');
-  assert.match(page,/reader-floating-stop-translation/);
+  assert.doesNotMatch(page,/reader-floating-stop-translation/);
+  assert.match(page,/TranslationToolbarAction\(/);
+  const toolbar=await readFile(new URL('../lib/widgets/reading_page/translation_toolbar_action.dart',import.meta.url),'utf8');
+  assert.match(toolbar,/reader-toolbar-stop-translation/);
+  assert.match(toolbar,/onStop\(\)/);
 });

@@ -23,11 +23,29 @@ class GlobalSettingsPage extends ConsumerStatefulWidget {
 
 class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
   bool _busy = false;
-  String _scope = 'all';
   bool _includeSecrets = false;
   String? _status;
   String t(String zh, String en) =>
       Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
+
+  String _scopeLabel(String scope) => switch (scope) {
+        'appearance' => t('外观与书架', 'Appearance and bookshelf'),
+        'reading' => t('阅读与排版', 'Reading and layout'),
+        'css' => t('CSS 模板与高亮规则', 'CSS profiles and highlights'),
+        'selection-search' => t('选词搜索', 'Selection search'),
+        'ai' => t('AI 供应商与对话', 'AI providers and chat'),
+        'ai-skills' => t('AI 技能与提示词', 'AI skills and prompts'),
+        'vector' => t('向量模型设置', 'Vector model settings'),
+        'tts' => t('朗读配置', 'Speech settings'),
+        'webdav' => t('同步 WebDAV', 'Sync WebDAV'),
+        'remote-library-webdav' => t('远程书库 WebDAV', 'Library WebDAV'),
+        'translation' => t('翻译设置', 'Translation settings'),
+        'notes' => t('笔记与书摘设置', 'Notes and excerpts'),
+        'statistics' => t('统计布局', 'Statistics layout'),
+        'network' => t('网络代理', 'Network proxy'),
+        'advanced' => t('高级设置', 'Advanced settings'),
+        _ => t('全部全局设置', 'All global settings'),
+      };
 
   Future<void> _run(Future<void> Function() work) async {
     if (_busy) return;
@@ -48,8 +66,9 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
   }
 
   Future<void> _export({bool asLink = false}) => _run(() async {
+        final scopeLabel = _scopeLabel('all');
         final text = await GlobalSettingsTransfer.export(Prefs(),
-            includeSecrets: _includeSecrets, scope: _scope);
+            includeSecrets: _includeSecrets);
         if (asLink) {
           final token = GlobalSettingsTransfer.link(text);
           Uint8List? image;
@@ -60,8 +79,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
           await showDialog<void>(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                    title:
-                        Text(t('全局设置二维码 / modu 链接', 'Settings QR / modu link')),
+                    title: Text(t('$scopeLabel：二维码 / modu 链接',
+                        '$scopeLabel: QR / modu link')),
                     content: SizedBox(
                         width: 420,
                         child: SingleChildScrollView(
@@ -112,8 +131,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
             fileName: 'Modu-settings-$date.json',
             mimeType: 'application/json');
         if (mounted && path != null) {
-          setState(() => _status = t('设置已导出。请妥善保存，不要公开分享。',
-              'Settings exported. Keep the file private.'));
+          setState(() => _status = t('$scopeLabel已导出。请妥善保存，不要公开分享。',
+              '$scopeLabel exported. Keep the file private.'));
         }
       });
 
@@ -162,17 +181,35 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
       });
 
   Future<void> _restore(String text) async {
-    final legacy = GlobalSettingsTransfer.legacy(text, scope: _scope);
-    final values = legacy ?? await GlobalSettingsTransfer.decode(text);
-    GlobalSettingsTransfer.validate(values);
+    final legacy = GlobalSettingsTransfer.legacy(text);
+    final values = GlobalSettingsTransfer.forImport(
+        legacy ?? await GlobalSettingsTransfer.decode(text),
+        includeSecrets: _includeSecrets);
     if (!mounted) return;
+    final scopes = GlobalSettingsTransfer.includedScopes(values);
+    if (scopes.isEmpty) {
+      setState(() => _status = t('内容中没有可导入的设置，未作任何更改。',
+          'No settings to import. Nothing was changed.'));
+      return;
+    }
+    final scopeLabel = scopes.map(_scopeLabel).join(t('、', ', '));
+    final disablesSync = GlobalSettingsTransfer.disablesSync(values);
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-              title: Text(t('恢复全局设置？', 'Restore global settings?')),
-              content: Text(t(
-                  '将覆盖文件中的 ${values.length - 1} 项设置；书籍、笔记、进度、存储路径和本机字体/背景图保持不变。导入后请重启默读，WebDAV 及自动同步需手动重新开启。',
-                  'Replace ${values.length - 1} saved settings. Books, notes, progress, storage paths and local fonts/backgrounds stay unchanged. Restart Modu afterwards. Re-enable WebDAV and automatic sync manually.')),
+              title: Text(scopes.length == 1
+                  ? t('恢复$scopeLabel？', 'Restore $scopeLabel?')
+                  : t('恢复多项设置？', 'Restore multiple settings?')),
+              content: SingleChildScrollView(
+                child: Text(t(
+                      '导入范围：$scopeLabel。\n\n仅覆盖内容中的 ${values.length - 1} 项设置（包括明确记录的默认值），未包含的设置保持不变。书籍、笔记、进度、存储路径和本机字体/背景文件不受影响。文件中包含的账号及密钥也会一并恢复。导入后请重启默读。',
+                      'Import scope: $scopeLabel.\n\nReplace only the ${values.length - 1} included settings (including recorded defaults); settings not included stay unchanged. Books, notes, progress, storage paths and local font/background files are unaffected. Any accounts and keys included in the file will also be restored. Restart Modu afterwards.',
+                    ) +
+                    (disablesSync
+                        ? t('\n\nWebDAV 及自动同步需手动重新开启。',
+                            '\n\nRe-enable WebDAV and automatic sync manually.')
+                        : '')),
+              ),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(dialogContext, false),
@@ -183,7 +220,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
               ],
             ));
     if (!mounted || confirmed != true || !_canImport()) return;
-    final hadPlayer = TtsFactory().hasCurrent;
+    final hadPlayer = scopes.contains('tts') && TtsFactory().hasCurrent;
     try {
       if (hadPlayer) {
         await TtsHandler().stop();
@@ -193,11 +230,12 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
     } finally {
       if (hadPlayer) await TtsHandler().switchTtsType(Prefs().ttsService);
     }
-    SyncClientFactory.resetCurrentClient();
+    if (scopes.contains('webdav')) SyncClientFactory.resetCurrentClient();
     if (!mounted) return;
-    ref.read(aiProvidersProvider.notifier).refresh();
-    setState(() => _status = t('设置已恢复。请完全关闭后重新打开默读；同步需手动重新开启。',
-        'Settings restored. Close and reopen Modu, then manually re-enable sync.'));
+    if (scopes.contains('ai')) ref.read(aiProvidersProvider.notifier).refresh();
+    setState(() => _status = t('$scopeLabel已恢复。请完全关闭后重新打开默读。',
+            '$scopeLabel restored. Close and reopen Modu.') +
+        (disablesSync ? t('同步需手动重新开启。', ' Re-enable sync manually.') : ''));
   }
 
   @override
@@ -206,32 +244,15 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
         children: [
-          DropdownButtonFormField<String>(
-              initialValue: _scope,
-              decoration:
-                  InputDecoration(labelText: t('迁移范围', 'Transfer scope')),
-              items: [
-                for (final scope in GlobalSettingsTransfer.scopes)
-                  DropdownMenuItem(
-                      value: scope,
-                      child: Text(switch (scope) {
-                        'ai' => t('AI 配置与技能', 'AI settings and skills'),
-                        'tts' => t('朗读配置', 'Speech settings'),
-                        'webdav' => t('同步 WebDAV', 'Sync WebDAV'),
-                        'remote-library-webdav' =>
-                          t('远程书库 WebDAV', 'Library WebDAV'),
-                        _ => t('全部全局设置', 'All global settings'),
-                      }))
-              ],
-              onChanged:
-                  _busy ? null : (value) => setState(() => _scope = value!)),
+          Text(t('全局设置导入导出', 'Global settings transfer'),
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           Text(t(
-              '所有二维码和 modu 链接统一在这里迁移。旧版 AI、朗读、同步及书库链接仍可导入；ReadAny 链接请先选择相应范围。',
-              'All QR and modu transfers are here. Older AI, speech, sync and library links are accepted; select a scope for ReadAny links.')),
+              '一次迁移全部全局设置，文件、二维码和 modu 链接统一在这里导入导出。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。',
+              'Transfer all global settings together via files, QR codes or modu links. Older AI, speech, sync and library links remain supported; the actual contents are shown before import.')),
           const SizedBox(height: 12),
           Text(t(
-              '独立导出外观、阅读排版、CSS 方案、AI 技能、朗读、翻译及其他通用设置。不包含书籍、笔记、聊天记录、阅读进度、字体/背景图片文件、字典或向量模型。',
+              '包含外观、阅读排版、CSS 方案、AI 技能、朗读、翻译及其他通用设置。不包含书籍、笔记、聊天记录、阅读进度、字体/背景图片文件、字典或向量模型。',
               'Export appearance, reading layout, CSS profiles, AI skills, speech, translation and general preferences. Books, notes, chats, reading progress, fonts/background files, dictionaries and vector models are not included.')),
           const SizedBox(height: 16),
           SwitchListTile(
@@ -239,8 +260,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
               title: Text(t('包含账号、密码和 API Key',
                   'Include accounts, passwords and API keys')),
               subtitle: Text(t(
-                  '默认关闭，关闭时不导出含凭据的供应商/服务器配置。开启后，文件、二维码和 modu 链接包含明文账号、密码和密钥，请勿公开分享。此开关不改变同步加密设置。',
-                  'Off by default: credential-bearing provider/server configurations are omitted. When enabled, files, QR codes and modu links contain plaintext credentials. Keep them private. Sync encryption is unchanged.')),
+                  '默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件、二维码和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。',
+                  'Off by default: omit credential-bearing API/server configurations on export and skip them on import, preserving local accounts and keys. When enabled, transfers contain plaintext credentials. Keep them private. Sync encryption is unchanged and its password is never exported. Do not place private credentials in custom CSS, prompts or URLs.')),
               value: _includeSecrets,
               onChanged:
                   _busy ? null : (v) => setState(() => _includeSecrets = v)),
@@ -248,7 +269,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
           FilledButton.icon(
               onPressed: _busy ? null : _export,
               icon: const Icon(Icons.upload_file),
-              label: Text(t('导出全局设置', 'Export global settings'))),
+              label: Text(t('导出全局设置文件', 'Export global settings file'))),
           OutlinedButton.icon(
               onPressed: _busy ? null : () => _export(asLink: true),
               icon: const Icon(Icons.qr_code_2),

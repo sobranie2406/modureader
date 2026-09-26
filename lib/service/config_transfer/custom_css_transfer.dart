@@ -11,7 +11,7 @@ class CustomCssTransfer {
       throw const FormatException('No profiles to export');
     }
     if (profiles.where((p) => !p.isEmpty).length > customCssProfileCount) {
-      throw const FormatException('Expected 1–8 profiles');
+      throw const FormatException('Expected 1–32 profiles');
     }
     final text = const JsonEncoder.withIndent('  ').convert({
       'kind': kind,
@@ -48,7 +48,7 @@ class CustomCssTransfer {
     }
     final entries = data['profiles'] as List;
     if (entries.isEmpty || entries.length > customCssProfileCount) {
-      throw const FormatException('Expected 1–8 profiles');
+      throw const FormatException('Expected 1–32 profiles');
     }
     return entries.map((entry) {
       if (entry is! Map ||
@@ -63,6 +63,9 @@ class CustomCssTransfer {
           (entry.containsKey('scope') &&
               !const ['all', 'title', 'body'].contains(entry['scope']))) {
         throw const FormatException('Invalid highlight rule');
+      }
+      if (entry.containsKey('visual') && entry['visual'] is! String) {
+        throw const FormatException('Invalid visual CSS');
       }
       return CustomCssProfile.fromJson(entry);
     }).toList();

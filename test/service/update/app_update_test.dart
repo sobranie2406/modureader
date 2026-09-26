@@ -52,15 +52,20 @@ UpdateRelease parse(Map<String, dynamic> json) =>
 class ControlledTransport extends UpdateTransport {
   Future<UpdateRelease> Function()? response;
   int checks = 0, downloads = 0;
+  UpdateSource? checkedSource, downloadedSource;
   @override
-  Future<UpdateRelease> latest(String platform, String abi) async {
+  Future<UpdateRelease> latest(String platform, String abi,
+      {UpdateSource source = UpdateSource.github}) async {
+    checkedSource = source;
     checks++;
     return response != null ? await response!() : parse(releaseJson());
   }
 
   @override
   Future<File> download(UpdateAsset a, Directory d, CancelToken c,
-      void Function(int, int) progress) async {
+      void Function(int, int) progress,
+      {UpdateSource source = UpdateSource.github}) async {
+    downloadedSource = source;
     downloads++;
     await d.create(recursive: true);
     return File('${d.path}/${a.name}').writeAsBytes(payload);
@@ -152,6 +157,78 @@ void main() {
 
   UpdateTransport transport(Adapter adapter) =>
       UpdateTransport(dio: Dio()..httpClientAdapter = adapter);
+
+  test('explicit Gitee checks skip GitHub, including on mirror failure',
+      () async {
+    final adapter =
+        Adapter((_) => ResponseBody.fromString(jsonEncode(mirrorJson()), 200));
+    final r = await transport(adapter)
+        .latest('android', 'android_arm64', source: UpdateSource.gitee);
+    expect(r.fromMirror, isTrue);
+    expect(adapter.requests.map((r) => r.uri.toString()), [moduMirrorManifest]);
+    final failed = Adapter((_) => ResponseBody.fromString('Unavailable', 503));
+    await expectLater(
+        transport(failed)
+            .latest('android', 'android_arm64', source: UpdateSource.gitee),
+        throwsA(isA<DioException>()));
+    expect(failed.requests.map((r) => r.uri.toString()), [moduMirrorManifest]);
+  });
+
+  test('explicit Gitee downloads directly and still verifies the same digest',
+      () async {
+    final a = parse(releaseJson()).asset!;
+    final adapter = Adapter((_) => ResponseBody.fromBytes(payload, 200));
+    final t = transport(adapter);
+    final file = await t.download(a, directory, CancelToken(), (_, __) {},
+        source: UpdateSource.gitee);
+    expect(adapter.requests.map((r) => r.uri.toString()), [a.mirrorUrl]);
+    expect(await t.verify(file, a), isTrue);
+  });
+
+  test('explicit Gitee cannot bypass checksum errors or silently use GitHub',
+      () async {
+    final a = parse(releaseJson()).asset!;
+    final adapter = Adapter(
+        (_) => ResponseBody.fromBytes(List.filled(payload.length, 0), 200));
+    await expectLater(
+        transport(adapter).download(a, directory, CancelToken(), (_, __) {},
+            source: UpdateSource.gitee),
+        throwsFormatException);
+    expect(adapter.requests.map((r) => r.uri.toString()), [a.mirrorUrl]);
+    expect(await directory.list().toList(), isEmpty);
+  });
+
+  test(
+      'source choices default to GitHub and are independent, locked while busy',
+      () async {
+    final t = ControlledTransport();
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'android',
+        installedVersion: () async => '1.0.8',
+        directory: () async => directory);
+    addTearDown(c.dispose);
+    expect(c.checkSource, UpdateSource.github);
+    expect(c.downloadSource, UpdateSource.github);
+    c.selectCheckSource(UpdateSource.gitee);
+    await c.check();
+    expect(t.checkedSource, UpdateSource.gitee);
+    expect(c.downloadSource, UpdateSource.github);
+    await c.download();
+    expect(t.downloadedSource, UpdateSource.github);
+    c.selectDownloadSource(UpdateSource.gitee);
+    await c.download();
+    expect(t.downloadedSource, UpdateSource.gitee);
+    final gate = Completer<UpdateRelease>();
+    t.response = () => gate.future;
+    final checking = c.check();
+    c.selectCheckSource(UpdateSource.github);
+    c.selectDownloadSource(UpdateSource.github);
+    expect(c.checkSource, UpdateSource.gitee);
+    expect(c.downloadSource, UpdateSource.gitee);
+    gate.complete(parse(releaseJson()));
+    await checking;
+  });
 
   test('fetches fixed official endpoint with bounded metadata', () async {
     final adapter = Adapter((o) => o.uri.host == 'gitee.com'

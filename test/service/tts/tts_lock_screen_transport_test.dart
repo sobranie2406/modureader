@@ -4,10 +4,12 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/online_tts.dart';
+import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/service/tts/tts_media_state.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,6 +67,22 @@ class DelayedControlPlayer extends NativePlayer {
     resumes++;
     await resumeGate?.future;
     audible = true;
+  }
+}
+
+class UnfinishedSourcePlayer extends DelayedControlPlayer {
+  final started = Completer<void>();
+  int plays = 0;
+  @override
+  Future<void> play(Source source,
+      {double? volume,
+      double? balance,
+      AudioContext? ctx,
+      Duration? position,
+      PlayerMode? mode}) async {
+    plays++;
+    started.complete();
+    // The test sends the native completion event after pause/resume.
   }
 }
 
@@ -160,6 +178,115 @@ void main() {
     expect(backend.resumes, 0);
     expect(control.mediaItem.value, isNull);
     expect(control.playbackState.value.playing, false);
+  });
+
+  test('stop cancels a locked-screen chapter before waiting for the audio loop',
+      () async {
+    final chapter = Completer<String>();
+    final waiting = Completer<void>();
+    final spoken = <String>[];
+    var cancellations = 0;
+    final backend = OnlineTts.forTesting(
+      collect: (_) async => [const TtsSentence(text: '本章末句')],
+      synthesize: (_) async => Uint8List.fromList([1]),
+      play: (segment) async => spoken.add(segment.sentence.text),
+    );
+    final control = TtsHandler.forTesting(
+      factory: TtsFactory.forTesting(() => backend),
+      activateSession: () async => true,
+      deactivateSession: () async {},
+      stopReader: () async {
+        cancellations++;
+        chapter.complete('');
+      },
+    );
+    await control.init(() async => '本章末句', () {
+      waiting.complete();
+      return chapter.future;
+    }, () async => '');
+    final playing = backend.speak();
+    try {
+      await waiting.future.timeout(const Duration(seconds: 2));
+      await control.stop().timeout(const Duration(seconds: 2));
+      await playing;
+      expect(cancellations, 1);
+      expect(spoken, ['本章末句']);
+      expect(control.playbackState.value.playing, false);
+      expect(control.mediaItem.value, isNull);
+      expect(backend.ttsStateNotifier.value, TtsStateEnum.stopped);
+    } finally {
+      if (!chapter.isCompleted) chapter.complete('');
+      await backend.stop();
+    }
+  });
+
+  test('resume while awaiting a chapter never restarts the completed source',
+      () async {
+    final chapter = Completer<String>();
+    final waiting = Completer<void>();
+    final player = DelayedControlPlayer();
+    var cursor = 0;
+    const text = ['本章末句', '下一章首句'];
+    final backend = OnlineTts.forTesting(
+      createPlayer: () => player,
+      collect: (_) async =>
+          cursor < text.length ? [TtsSentence(text: text[cursor])] : [],
+      synthesize: (_) async => Uint8List.fromList([1]),
+    );
+    await backend.init(() async => text.first, () async {
+      if (cursor == 0) {
+        waiting.complete();
+        final next = await chapter.future;
+        cursor++;
+        return next;
+      }
+      cursor++;
+      return '';
+    }, () async => '');
+    final playing = backend.speak();
+    try {
+      await waiting.future.timeout(const Duration(seconds: 2));
+      // Models notification controls or a temporary audio-focus interruption
+      // in the gap after native completion and before chapter navigation.
+      for (var i = 0; i < 2; i++) {
+        await backend.pause();
+        await backend.resume();
+      }
+      expect(player.resumes, 0);
+      expect(cursor, 0);
+      expect(backend.isPlaying, true);
+      chapter.complete(text[1]);
+      await playing.timeout(const Duration(seconds: 2));
+      expect(cursor, 2);
+      expect(backend.ttsStateNotifier.value, TtsStateEnum.stopped);
+    } finally {
+      if (!chapter.isCompleted) chapter.complete('');
+      await backend.stop();
+    }
+  });
+
+  test('resume during an unfinished sentence still resumes that native source',
+      () async {
+    final player = UnfinishedSourcePlayer();
+    final backend = OnlineTts.forTesting(
+      createPlayer: () => player,
+      collect: (_) async => [const TtsSentence(text: '尚未读完的句子')],
+      synthesize: (_) async => Uint8List.fromList([1]),
+    );
+    await backend.init(() async => '尚未读完的句子', () async => '', () async => '');
+    final playing = backend.speak();
+    try {
+      await player.started.future.timeout(const Duration(seconds: 2));
+      await backend.pause();
+      await backend.resume();
+      expect(player.resumes, 1);
+      expect(player.plays, 1);
+      expect(backend.isPlaying, true);
+      player.completed.add(null);
+      await playing.timeout(const Duration(seconds: 2));
+    } finally {
+      await backend.stop();
+    }
   });
 
   for (final lastPlaying in [false, true]) {

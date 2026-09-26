@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/enums/page_turn_mode.dart';
@@ -41,6 +42,7 @@ import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
 import 'package:anx_reader/service/book_player/tts_text_result.dart';
 import 'package:anx_reader/service/battery_level.dart';
+import 'package:anx_reader/service/tts/tts_reader_wait.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/widgets/reading_page/search_navigation_bar.dart';
 import 'package:anx_reader/widgets/reading_page/reader_loading_status.dart';
@@ -536,9 +538,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   Future<String> initTts({String? fromCfi}) async {
     final result = await webViewController.callAsyncJavaScript(
-      functionBody: fromCfi != null && fromCfi.isNotEmpty
-          ? 'return await window.ttsFromCfi(${jsonEncode(fromCfi)})'
-          : 'return await window.ttsHere()',
+      functionBody: _ttsModeScript +
+          (fromCfi != null && fromCfi.isNotEmpty
+              ? 'return await window.ttsFromCfi(${jsonEncode(fromCfi)})'
+              : 'return await window.ttsHere()'),
     );
     if (result?.error != null) {
       throw StateError('TTS initialization failed: ${result!.error}');
@@ -560,9 +563,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     }
   }
 
+  String get _ttsModeScript =>
+      'window.ttsSetParagraphMode(${getTtsService(Prefs().ttsService).isOnline});\n';
+
   Future<String> _ttsTextCall(String function) async {
-    final result = await webViewController.callAsyncJavaScript(
-        functionBody: 'return await $function()');
+    final result = await waitForTtsReader(
+        function,
+        () => webViewController.callAsyncJavaScript(
+            functionBody: '${_ttsModeScript}return await $function()'));
     if (result?.error != null) {
       throw StateError('TTS navigation failed: ${result!.error}');
     }
@@ -616,10 +624,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     bool includeCurrent = false,
     int offset = 1,
   }) async {
-    final result = await webViewController.callAsyncJavaScript(
-      functionBody:
-          'return ttsCollectDetails($count, ${includeCurrent ? 'true' : 'false'}, $offset)',
-    );
+    final result = await waitForTtsReader(
+        'collect',
+        () => webViewController.callAsyncJavaScript(
+              functionBody:
+                  'return ttsCollectDetails($count, ${includeCurrent ? 'true' : 'false'}, $offset)',
+            ));
     if (result?.error != null) {
       throw StateError('TTS collection failed: ${result!.error}');
     }

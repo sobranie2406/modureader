@@ -188,6 +188,80 @@ function* getBlocks(doc, shouldSkipTextNode) {
     if (remaining) yield remaining
 }
 
+// Online services synthesize bounded runs of sentences from ONE DOM paragraph.
+// Keep real ranges as the playback units so peeking, highlighting, navigation
+// and selected-text starts all use identical boundaries (no guessed timestamps).
+const speechGroupCharacters = 240
+const speechGroupSentences = 4
+
+function* splitSpeechRange(range, shouldSkipTextNode) {
+    const doc = range.startContainer.ownerDocument
+    const root = range.commonAncestorContainer
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const spans = []
+    let text = ''
+    for (let node = root.nodeType === 3 ? root : walker.nextNode(); node; node = walker.nextNode()) {
+        if (!range.intersectsNode(node) || shouldSkipTextNode(node)) continue
+        const start = node === range.startContainer ? range.startOffset : 0
+        const end = node === range.endContainer ? range.endOffset : node.length
+        if (end <= start) continue
+        spans.push({ node, start, offset: text.length, length: end - start })
+        text += node.textContent.slice(start, end)
+    }
+    if (text.length <= speechGroupCharacters) { yield range; return }
+    const boundary = (offset, end) => {
+        const span = spans.find(s => end
+            ? offset > s.offset && offset <= s.offset + s.length
+            : offset >= s.offset && offset < s.offset + s.length)
+        return [span.node, span.start + offset - span.offset]
+    }
+    for (let start = 0; start < text.length;) {
+        let end = Math.min(start + speechGroupCharacters, text.length)
+        if (end < text.length) {
+            // Prefer a clause/word boundary in the latter half of a long
+            // sentence; otherwise split without breaking a surrogate pair.
+            for (let i = end - 1; i >= start + speechGroupCharacters / 2; i--) {
+                if (/[，,；;：:\s]/u.test(text[i])) { end = i + 1; break }
+            }
+            if (/[\uDC00-\uDFFF]/.test(text[end]) && /[\uD800-\uDBFF]/.test(text[end - 1])) end--
+        }
+        const part = doc.createRange()
+        part.setStart(...boundary(start, false))
+        part.setEnd(...boundary(end, true))
+        if (!rangeIsEmpty(part, shouldSkipTextNode)) yield part
+        start = end
+    }
+}
+
+function* getSpeechGroups(doc, shouldSkipTextNode) {
+    let group = null
+    let block = null
+    let length = 0
+    let count = 0
+    for (const sentence of getBlocks(doc, shouldSkipTextNode)) {
+        for (const part of splitSpeechRange(sentence, shouldSkipTextNode)) {
+            const nextBlock = findBlockAncestor(part.startContainer)
+            const size = getRangeText(part, shouldSkipTextNode).length
+            if (group && (nextBlock !== block || count >= speechGroupSentences
+                || length + size > speechGroupCharacters)) {
+                yield group
+                group = null
+            }
+            if (!group) {
+                group = part.cloneRange()
+                block = nextBlock
+                length = size
+                count = 1
+            } else {
+                group.setEnd(part.endContainer, part.endOffset)
+                length += size
+                count++
+            }
+        }
+    }
+    if (group) yield group
+}
+
 class ListIterator {
     #arr = []
     #iter
@@ -293,13 +367,16 @@ export class TTS {
     #getCfi
     #textFilter
     #partial
-    constructor(doc, textWalker, highlight, getCfi) {
+    constructor(doc, textWalker, highlight, getCfi, { paragraphMode = false } = {}) {
         this.doc = doc
         this.highlight = highlight
         this.#getCfi = getCfi
         const shouldSkipTextNode = createTextFilter(doc)
         this.#textFilter = shouldSkipTextNode
-        this.#list = new ListIterator(getBlocks(doc, shouldSkipTextNode), range => {
+        this.paragraphMode = paragraphMode
+        const ranges = paragraphMode ? getSpeechGroups(doc, shouldSkipTextNode)
+            : getBlocks(doc, shouldSkipTextNode)
+        this.#list = new ListIterator(ranges, range => {
             return [getRangeText(range, shouldSkipTextNode), range]
         })
     }
