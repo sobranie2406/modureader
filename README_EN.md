@@ -92,6 +92,8 @@ This connection is separate from WebDAV sync. It only reads and downloads files;
 
 Use Settings → Advanced → Global settings backup to transfer all preferences through files, modu links or QR images. A separate switch includes accounts, passwords and API configurations and is off by default; when off, import also preserves existing local credentials. Explicit exports containing credentials are unencrypted: keep them private. Import validates before restoring and does not automatically connect to servers.
 
+After saving a settings file or QR image, a confirmation shows its full location with a copy action. Windows saves to the current user's Downloads folder; other platforms use the location selected in the save dialog.
+
 ### Mobile page-turn controls
 
 In scrolling mode, page-turn taps and shortcuts move by 80% of the reading viewport, leaving 20% overlap for text near the screen edges. Free scrolling is unchanged. Desktop arrow keys turn pages when the reader is focused; in the AI input field they move the text cursor.

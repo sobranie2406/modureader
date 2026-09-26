@@ -25,28 +25,71 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
   late Map<String, dynamic> _currentConfig;
   // Track password visibility for each password field
   final Map<String, bool> _passwordVisibility = {};
+  final Map<String, TextEditingController> _controllers = {};
+
+  bool _isText(ConfigItem item) =>
+      item.type == ConfigItemType.text ||
+      item.type == ConfigItemType.password ||
+      item.type == ConfigItemType.number;
+
+  String _text(ConfigItem item, Map<String, dynamic> config) =>
+      (config[item.key] ?? item.defaultValue)?.toString() ?? '';
 
   @override
   void initState() {
     super.initState();
     _currentConfig = Map.from(widget.initialConfig);
+    for (final item in widget.configItems.where(_isText)) {
+      _controllers[item.key] =
+          TextEditingController(text: _text(item, _currentConfig));
+    }
   }
 
   @override
   void didUpdateWidget(ServiceConfigForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialConfig != widget.initialConfig) {
-      setState(() {
-        _currentConfig = Map.from(widget.initialConfig);
-      });
+    final items = widget.configItems.where(_isText).toList();
+    for (final key in _controllers.keys.toList()) {
+      if (!items.any((item) => item.key == key)) {
+        _controllers.remove(key)!.dispose();
+      }
     }
+    for (final item in items) {
+      final text = _text(item, widget.initialConfig);
+      final controller = _controllers[item.key];
+      if (controller == null) {
+        _controllers[item.key] = TextEditingController(text: text);
+        continue;
+      }
+      final oldItem =
+          oldWidget.configItems.where((old) => old.key == item.key).firstOrNull;
+      // Parent draft echoes must not clear IME composition or move selection.
+      // Compare model values, not normalized text: a numeric draft may be empty
+      // or contain leading zeros while its parsed value is still unchanged.
+      if (_text(oldItem ?? item, _currentConfig) != text &&
+          controller.text != text) {
+        controller.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      }
+    }
+    _currentConfig = Map.from(widget.initialConfig);
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   void _updateConfig(String key, dynamic value) {
     setState(() {
       _currentConfig[key] = value;
     });
-    widget.onConfigChanged(_currentConfig);
+    widget.onConfigChanged(Map<String, dynamic>.from(_currentConfig));
   }
 
   void _togglePasswordVisibility(String key) {
@@ -61,6 +104,7 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widget.configItems.map((item) {
         return Padding(
+          key: ValueKey(item.key),
           padding: const EdgeInsets.only(bottom: 12.0),
           child: _buildConfigItem(item),
         );
@@ -77,12 +121,7 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
             helperText: item.description,
             border: const OutlineInputBorder(),
           ),
-          controller: TextEditingController(
-            text: _currentConfig[item.key]?.toString() ??
-                item.defaultValue?.toString() ??
-                '',
-          )..selection = TextSelection.collapsed(
-              offset: _currentConfig[item.key]?.toString().length ?? 0),
+          controller: _controllers[item.key],
           onChanged: (value) => _updateConfig(item.key, value),
         );
 
@@ -101,12 +140,7 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
               onPressed: () => _togglePasswordVisibility(item.key),
             ),
           ),
-          controller: TextEditingController(
-            text: _currentConfig[item.key]?.toString() ??
-                item.defaultValue?.toString() ??
-                '',
-          )..selection = TextSelection.collapsed(
-              offset: _currentConfig[item.key]?.toString().length ?? 0),
+          controller: _controllers[item.key],
           onChanged: (value) => _updateConfig(item.key, value),
         );
 
@@ -118,12 +152,7 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
             border: const OutlineInputBorder(),
           ),
           keyboardType: TextInputType.number,
-          controller: TextEditingController(
-            text: _currentConfig[item.key]?.toString() ??
-                item.defaultValue?.toString() ??
-                '',
-          )..selection = TextSelection.collapsed(
-              offset: _currentConfig[item.key]?.toString().length ?? 0),
+          controller: _controllers[item.key],
           onChanged: (value) =>
               _updateConfig(item.key, int.tryParse(value) ?? 0),
         );

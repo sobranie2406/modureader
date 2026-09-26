@@ -111,10 +111,13 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                       if (image != null)
                         TextButton(
                             onPressed: () async {
-                              await saveFileToDownload(
+                              final path = await saveFileToDownload(
                                   bytes: image,
                                   fileName: 'Modu-settings-qr.png',
                                   mimeType: 'image/png');
+                              if (path != null && mounted) {
+                                await _showExportResult(path);
+                              }
                             },
                             child: Text(t('保存二维码', 'Save QR'))),
                       TextButton(
@@ -131,10 +134,42 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
             fileName: 'Modu-settings-$date.json',
             mimeType: 'application/json');
         if (mounted && path != null) {
-          setState(() => _status = t('$scopeLabel已导出。请妥善保存，不要公开分享。',
-              '$scopeLabel exported. Keep the file private.'));
+          await _showExportResult(path);
         }
       });
+
+  Future<void> _showExportResult(String path) async {
+    setState(() => _status = t('已保存至：\n$path', 'Saved to:\n$path'));
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(t('导出成功', 'Export complete')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t('文件已保存至：', 'File saved to:')),
+              const SizedBox(height: 8),
+              SelectableText(path),
+              const SizedBox(height: 16),
+              Text(t('请妥善保管，不要公开分享。', 'Keep this file private.')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: path)),
+            child: Text(t('复制保存位置', 'Copy location')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(t('完成', 'Done')),
+          ),
+        ],
+      ),
+    );
+  }
 
   bool _canImport() {
     if (ref.read(syncProvider).isSyncing ||
@@ -293,7 +328,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                 child: Center(child: CircularProgressIndicator())),
           if (_status != null)
             Padding(
-                padding: const EdgeInsets.only(top: 16), child: Text(_status!)),
+                padding: const EdgeInsets.only(top: 16),
+                child: SelectableText(_status!)),
         ],
       ));
 }

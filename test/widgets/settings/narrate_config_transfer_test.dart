@@ -41,6 +41,36 @@ void main() {
   }
 
   testWidgets(
+      'model editing preserves desktop IME and Android middle insertion',
+      (tester) async {
+    await open(tester);
+    final model = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Model');
+    await tester.ensureVisible(model);
+    await tester.showKeyboard(model);
+    final controller = tester.widget<TextField>(model).controller!;
+    const value = TextEditingValue(
+      text: 'qwen3-ttsff',
+      selection: TextSelection.collapsed(offset: 11),
+      composing: TextRange(start: 9, end: 11),
+    );
+    tester.testTextInput.updateEditingValue(value);
+    await tester.pump();
+    expect(tester.widget<TextField>(model).controller, same(controller));
+    expect(controller.value, value);
+    const inserted = TextEditingValue(
+      text: 'Xqwen3-ttsff',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    tester.testTextInput.updateEditingValue(inserted);
+    await tester.pump();
+    expect(controller.value, inserted);
+    await tap(tester, 'Save settings');
+    expect(Prefs().getOnlineTtsConfig('openai')['model'], 'Xqwen3-ttsff');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'service edits remain drafts until saved and export uses saved data',
       (tester) async {
     await open(tester);

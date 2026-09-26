@@ -4,6 +4,7 @@ Details and downloads: https://github.com/sobranie2406/modureader/releases
 
 ## 1.1.6
 
+- Preserve IME composition and cursor position in speech settings; show and copy the saved location after settings and QR exports.
 - Refill narration audio ahead during playback, fix embedded search scrolling and toolbar overflow, and report the installed build number.
 - Transfer all global settings with explicit defaults, validated restore and an independent credentials switch.
 - Group online narration by paragraph with accurate highlighting, group navigation and priority synthesis.
@@ -14,6 +15,7 @@ Details and downloads: https://github.com/sobranie2406/modureader/releases
 - Choose GitHub or Gitee for updates and downloads, preferring GitHub by default.
 - Move full-text translation stop controls to the toolbar so they do not cover reading text.
 
+- 修复朗读设置输入法重复上屏和光标跳动；设置文件与二维码导出后显示完整保存位置，支持复制路径。
 - 播放期间滚动预取后续语音，修复内置搜索滚动及工具栏溢出，版本信息显示实际安装构建号。
 - 全局设置统一迁移，补齐默认值恢复、导入前校验，并保留独立凭据开关。
 - 在线朗读按自然段分组，准确高亮、前后按段定位，首段优先合成。
