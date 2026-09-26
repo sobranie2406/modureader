@@ -142,7 +142,7 @@ void validateSettingsValue(String key, dynamic value) {
         ![null, 'day', 'night'].contains(data['selectedMode']) ||
         data['blur'] is! num ||
         data['blur'] < 0 ||
-        data['blur'] > 100 ||
+        data['blur'] > 20 ||
         data['opacity'] is! num ||
         data['opacity'] < 0 ||
         data['opacity'] > 1) {
