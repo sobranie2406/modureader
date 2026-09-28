@@ -10,6 +10,12 @@ class WindowsTtsStartupTest(unittest.TestCase):
     def setUp(self):
         self.source = SOURCE.read_text()
 
+    def test_speech_stream_content_type_has_full_winrt_projection(self):
+        # SpeechSynthesisStream inherits IContentTypeProvider. Its auto-return
+        # method needs the Streams projection definition, not just declarations.
+        self.assertIn('#include <winrt/Windows.Storage.Streams.h>', self.source)
+        self.assertIn('stream.ContentType()', self.source)
+
     def test_build_uses_local_windows_adapter_after_plugin_target_exists(self):
         cmake = (ROOT / 'windows/CMakeLists.txt').read_text()
         self.assertLess(cmake.index('include(flutter/generated_plugins.cmake)'),
