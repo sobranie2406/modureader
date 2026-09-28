@@ -188,9 +188,11 @@ class WebdavClient extends SyncClientBase {
   @override
   Future<bool> supportsAtomicSyncWrites() async {
     final checked = _atomicCheckedAt;
-    if (checked != null &&
-        DateTime.now().difference(checked) <
-            Duration(seconds: _atomicSupport == true ? 900 : 30)) {
+    // A previous success must not authorize later writes after a server or
+    // proxy changed its validator behavior. Only negative results back off.
+    if (_atomicSupport == false &&
+        checked != null &&
+        DateTime.now().difference(checked) < const Duration(seconds: 30)) {
       return _atomicSupport!;
     }
     final supported = await _probeAtomicSyncWrites();

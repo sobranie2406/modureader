@@ -6,6 +6,8 @@ import 'package:anx_reader/enums/sort_order.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/providers/book_filters.dart';
+import 'package:anx_reader/providers/bookshelf_pins.dart';
+import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/providers/tags.dart'
     show kNoTagFilterId, tagSelectionProvider;
 import 'package:lpinyin/lpinyin.dart';
@@ -15,6 +17,7 @@ part 'book_list.g.dart';
 
 @riverpod
 class BookList extends _$BookList {
+  String? _query;
   List<List<Book>> groupBooks(List<Book> books) {
     var groupedBooks = <List<Book>>[];
     for (var book in books) {
@@ -96,6 +99,7 @@ class BookList extends _$BookList {
   }
 
   Future<List<List<Book>>> _buildWithFilters({String? query}) async {
+    ref.watch(bookshelfPinsProvider);
     final status = ref.watch(readingStatusFilterNotifierProvider);
     final selectedTags = ref.watch(tagSelectionProvider);
 
@@ -133,16 +137,27 @@ class BookList extends _$BookList {
     }
 
     final sortedBooks = sortBooks(filteredByTags);
-    return groupBooks(sortedBooks);
+    return applyBookshelfPins(
+        groupBooks(sortedBooks), ref.read(bookshelfPinsProvider));
   }
 
   @override
   Future<List<List<Book>>> build() async {
-    return _buildWithFilters();
+    return _buildWithFilters(query: _query);
   }
 
   Future<void> refresh() async {
-    state = AsyncData(await _buildWithFilters());
+    state = AsyncData(await _buildWithFilters(query: _query));
+  }
+
+  Future<void> moveBooksToFolder(Iterable<int> bookIds,
+      {int? groupId, String? newFolderName}) async {
+    await bookDao.moveBooksToFolder(bookIds,
+        groupId: groupId, newFolderName: newFolderName);
+    ref.invalidate(groupDaoProvider);
+    // The transaction has committed. A separate refresh failure must not offer
+    // to create the same folder again as though the move itself had failed.
+    ref.invalidateSelf();
   }
 
   void moveBook(Book data, int groupId) {
@@ -158,6 +173,13 @@ class BookList extends _$BookList {
   }
 
   void dissolveGroup(List<Book> books) {
+    ref
+        .read(bookshelfPinsProvider.notifier)
+        .setPinned(folderPinKey(books.first.groupId), false)
+        .catchError((Object error) {
+      // Pin cleanup must not prevent the existing folder dissolve operation.
+      AnxLog.log.warning('Could not clear dissolved folder pin: $error');
+    });
     for (var book in books) {
       updateBook(book.copyWith(groupId: 0));
     }
@@ -172,7 +194,8 @@ class BookList extends _$BookList {
   }
 
   void reorder(List<List<Book>> books) {
-    state = AsyncData(books);
+    state =
+        AsyncData(applyBookshelfPins(books, ref.read(bookshelfPinsProvider)));
   }
 
   void moveBookToTop(int bookId) {
@@ -186,13 +209,14 @@ class BookList extends _$BookList {
       return group;
     }).toList();
 
-    state = AsyncData([
+    state = AsyncData(applyBookshelfPins([
       groups.firstWhere((group) => group.any((book) => book.id == bookId)),
       ...groups.where((group) => group.every((book) => book.id != bookId))
-    ]);
+    ], ref.read(bookshelfPinsProvider)));
   }
 
   Future<void> search(String? value) async {
+    _query = value;
     state = AsyncData(await _buildWithFilters(query: value));
   }
 }

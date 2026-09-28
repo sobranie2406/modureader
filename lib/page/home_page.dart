@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:anx_reader/service/notes/reading_link.dart';
+import 'package:anx_reader/service/notes/open_reading_link.dart';
 
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
@@ -104,6 +106,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> initAnx() async {
     AnxToast.init(context);
+    if (AnxPlatform.isWindows) {
+      await _checkWindowsWebview();
+    }
+    if (!mounted) return;
+    // Local note links must not wait for optional remote synchronization.
+    readingLinkInbox.attach((raw) => openReadingLink(raw, context, ref));
     checkUpdate(false);
     InitializationCheck.check();
     if (Prefs().webdavStatus) {
@@ -113,9 +121,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
     loadDefaultFont();
 
-    if (AnxPlatform.isWindows) {
-      await _checkWindowsWebview();
-    }
+    if (!mounted) return;
 
     if (AnxPlatform.isAndroid || AnxPlatform.isIOS || AnxPlatform.isOhos) {
       receiveShareIntent(ref);
@@ -124,6 +130,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (DBHelper.updatedDB) {
       _showDbUpdatedDialog();
     }
+  }
+
+  @override
+  void dispose() {
+    readingLinkInbox.detach();
+    super.dispose();
   }
 
   @override

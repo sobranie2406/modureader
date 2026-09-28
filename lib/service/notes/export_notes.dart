@@ -4,6 +4,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/book_note.dart';
+import 'package:anx_reader/service/notes/reading_link.dart';
 import 'package:anx_reader/utils/convert_string_to_uint8list.dart';
 import 'package:anx_reader/utils/save_file_to_download.dart';
 import 'package:csv/csv.dart';
@@ -31,7 +32,9 @@ Future<void> exportNotes(
     case ExportType.copy:
       var notes = '${book.title}\n\t${book.author}\n\n';
       notes += formatNotesText(notesList,
-          mergeChapterHeadings: mergeChapterHeadings, chinese: chinese);
+          book: book,
+          mergeChapterHeadings: mergeChapterHeadings,
+          chinese: chinese);
 
       await Clipboard.setData(ClipboardData(text: notes));
       AnxToast.show(L10n.of(context).notesPageCopied);
@@ -39,6 +42,7 @@ Future<void> exportNotes(
 
     case ExportType.md:
       final notes = formatNotesMarkdown(notesList,
+          book: book,
           title: book.title,
           author: book.author,
           mergeChapterHeadings: mergeChapterHeadings,
@@ -56,6 +60,7 @@ Future<void> exportNotes(
 
     case ExportType.txt:
       final notes = formatNotesText(notesList,
+          book: book,
           mergeChapterHeadings: mergeChapterHeadings,
           chinese: Localizations.localeOf(context).languageCode == 'zh');
       String? filePath = await saveFileToDownload(
@@ -69,7 +74,7 @@ Future<void> exportNotes(
 
     case ExportType.csv:
       final string = formatNotesCsv(notesList,
-          title: book.title, author: book.author, chinese: chinese);
+          book: book, title: book.title, author: book.author, chinese: chinese);
 
       String? filePath = await saveFileToDownload(
           bytes: Uint8List.fromList(gbk.encode(string)),
@@ -131,9 +136,9 @@ List<_ChapterGroup> _groupNotesByChapter(
 
 /// Plain exports and clipboard share explicit excerpt, note and time labels.
 String formatNotesText(List<BookNote> notes,
-    {bool mergeChapterHeadings = false, bool chinese = true}) {
+    {Book? book, bool mergeChapterHeadings = false, bool chinese = true}) {
   return _groupNotesByChapter(notes, mergeChapterHeadings)
-      .map((group) => _formatPlainGroup(group, chinese: chinese))
+      .map((group) => _formatPlainGroup(group, book: book, chinese: chinese))
       .join('\n\n');
 }
 
@@ -158,7 +163,8 @@ String _noteTimeLabel(BookNote note, bool chinese) {
   return chinese ? '$label：$date' : '$label: $date';
 }
 
-String _formatPlainGroup(_ChapterGroup group, {bool chinese = true}) {
+String _formatPlainGroup(_ChapterGroup group,
+    {Book? book, bool chinese = true}) {
   final buffer = StringBuffer();
   if (group.chapter.isNotEmpty) {
     buffer.writeln(group.chapter);
@@ -166,6 +172,10 @@ String _formatPlainGroup(_ChapterGroup group, {bool chinese = true}) {
   for (final note in group.notes) {
     if (note.content.trim().isNotEmpty) {
       buffer.writeln(_labelledExcerpt(note.content, chinese));
+    }
+    final link = book == null ? null : ReadingLink.forBook(book, note.cfi);
+    if (link != null) {
+      buffer.writeln('${chinese ? '返回原文' : 'Open in Modu'}: $link');
     }
     if (note.readerNote?.trim().isNotEmpty ?? false) {
       buffer.writeln();
@@ -187,7 +197,10 @@ DateTime? _persistedUpdateTime(BookNote note) =>
         : note.updateTime;
 
 String formatNotesCsv(List<BookNote> notes,
-        {String title = '', String author = '', bool chinese = true}) =>
+        {Book? book,
+        String title = '',
+        String author = '',
+        bool chinese = true}) =>
     const ListToCsvConverter().convert([
       [
         'Book',
@@ -199,7 +212,8 @@ String formatNotesCsv(List<BookNote> notes,
         'Color',
         'Create Time',
         'Update Time',
-        'Note Time'
+        'Note Time',
+        if (book != null) 'Open in Modu',
       ],
       for (final note in notes)
         [
@@ -212,14 +226,16 @@ String formatNotesCsv(List<BookNote> notes,
           '#${note.color}',
           note.createTime?.toIso8601String() ?? '',
           _persistedUpdateTime(note)?.toIso8601String() ?? '',
-          _noteTimeLabel(note, chinese)
+          _noteTimeLabel(note, chinese),
+          if (book != null) ReadingLink.forBook(book, note.cfi) ?? '',
         ],
     ]);
 
 /// Export literal excerpts, not executable HTML or source Markdown. Each entry
 /// has its own persisted timestamp, including highlights without reader notes.
 String formatNotesMarkdown(List<BookNote> notes,
-    {String title = '',
+    {Book? book,
+    String title = '',
     String author = '',
     bool mergeChapterHeadings = false,
     bool chinese = true}) {
@@ -239,10 +255,21 @@ String formatNotesMarkdown(List<BookNote> notes,
           '## ${_escapeMarkdown(group.chapter.replaceAll(RegExp(r'[\r\n]+'), ' '))}\n');
     }
     for (final note in group.notes) {
+      final link = book == null ? null : ReadingLink.forBook(book, note.cfi);
       if (note.content.trim().isNotEmpty) {
         final text = _escapeMarkdown(_normalizeLines(note.content));
         // One bracket pair contains every paragraph, matching plain exports.
-        buffer.writeln('${_labelledExcerpt(_markdownLines(text), chinese)}\n');
+        // Link each paragraph separately: Markdown links cannot span blank lines.
+        final excerpt = link == null
+            ? _markdownLines(text)
+            : text
+                .split(RegExp(r'\n[ \t]*\n'))
+                .map((paragraph) => '[${_markdownLines(paragraph)}](<$link>)')
+                .join('\n\n');
+        buffer.writeln('${_labelledExcerpt(excerpt, chinese)}\n');
+      }
+      if (link != null) {
+        buffer.writeln('[${chinese ? '返回默读原文' : 'Open in Modu'}](<$link>)\n');
       }
       final comment = note.readerNote;
       if (comment != null && comment.trim().isNotEmpty) {

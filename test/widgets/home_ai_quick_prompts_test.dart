@@ -266,7 +266,9 @@ void main() {
       () async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
-    final prompt = readAnySkills.first.defaultPrompt;
+    final prompt = readAnySkills
+        .singleWhere((skill) => skill.id == 'smart_summary')
+        .defaultPrompt;
     final entry = AiChatHistoryEntry(
         id: 'test',
         scope: 'reader',

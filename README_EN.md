@@ -18,7 +18,7 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
-**Latest release: 1.1.6** — paragraph-based online narration, visual CSS presets, built-in selection search, clearer note exports and selectable update sources.
+**Latest release: 1.1.7** — Markdown books, pinned books and batch folders, AI dictionary, ANX backup import, and WebDAV/narration improvements.
 
 ## Downloads
 
@@ -45,7 +45,7 @@ The current version provides the following reading, AI and library features.
 
 | Area | What it does | Where to find it |
 | --- | --- | --- |
-| Library and import | Import EPUB, PDF, MOBI, AZW3, FB2 and TXT; filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
+| Library and import | Import EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown (MD); filter by reading status, search, group books and manage tags | Home → Library; add button or book menu |
 | Remote library | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books | Home → Remote library; Settings → Remote library settings |
 | Reading and layout | Chapter navigation, adjacent chapter preloading and paginated/scrolling modes; continuous chapter scrolling for horizontal reflowable books with book scripts disabled; adaptive footnotes at 80% of the reader font size with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading |
 | Selection search | Baidu, Bing, Google, Baidu Baike, Wikipedia and custom engines in a built-in browser | Settings → Selection search; text selection menu |
@@ -61,6 +61,7 @@ The current version provides the following reading, AI and library features.
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
 | Configuration transfer | All global settings via files, QR images and modu links, with an independent credentials switch | Settings → Advanced → Global settings backup |
+| ANX library migration | Validate and merge ANX ZIP backups, retaining existing Modu records and creating a pre-import database snapshot | Settings → Advanced → Import ANX Reader backup |
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
@@ -82,7 +83,13 @@ Manage 32 named profiles in Settings → CSS settings, with 13 editable presets 
 
 ### Notes export
 
-Original passages are labeled `原文：【…】`. Markdown additionally highlights note content, and exports include the creation or last-edit time.
+Original passages are labeled `原文：【…】`. Markdown additionally highlights note content, and exports include the creation or last-edit time. Reading-position links open the corresponding location in Modu when the book is available on that device.
+
+### Reading and AI tools
+
+Pin books and folders, create folders from selected books or move a selection into an existing folder. Scrolling page steps are adjustable from 80% to 100%. Selection search includes page zoom, and mind maps offer fullscreen zoom/pan and collapsible nodes.
+
+The AI dictionary explains selected words using the current model's knowledge, with optional Wiktionary, Wikipedia and Baidu Baike lookup. English results include pronunciation, translation and bilingual explanations; Chinese results include pinyin and meanings. It does not send book contents and requires no additional search API key.
 
 ### WebDAV remote library
 
@@ -96,7 +103,7 @@ After saving a settings file or QR image, a confirmation shows its full location
 
 ### Mobile page-turn controls
 
-In scrolling mode, page-turn taps and shortcuts move by 80% of the reading viewport, leaving 20% overlap for text near the screen edges. Free scrolling is unchanged. Desktop arrow keys turn pages when the reader is focused; in the AI input field they move the text cursor.
+In scrolling mode, page-turn taps and shortcuts move by an adjustable 80–100% of the reading viewport (80% by default, leaving 20% overlap). Free scrolling is unchanged. Desktop arrow keys turn pages when the reader is focused; in the AI input field they move the text cursor.
 
 Reader styles → More settings → Other includes **Tap-only page turning**, off by default. When enabled in paginated mode, swipes and drags neither turn pages nor trigger pull gestures; taps still work. Turn it off to restore swipe navigation. Text selection, Quick mark and scrolling mode remain available. This mobile-only switch is not shown on desktop.
 

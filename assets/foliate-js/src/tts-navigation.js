@@ -58,6 +58,8 @@ export class TtsNavigator {
                 ])
             } catch (error) {
                 if (generation !== this.#generation) return false
+                // Do not retry the same permanently pending cached extraction.
+                if (error instanceof SpeechChapterTimeout) view.discardTTSSection?.(index)
                 if (!(error instanceof SpeechChapterTimeout) || attempt === 1) throw error
                 console.warn('TTS chapter text loading timed out; retrying the same chapter', index)
             } finally {

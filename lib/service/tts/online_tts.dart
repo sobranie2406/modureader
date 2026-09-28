@@ -118,6 +118,7 @@ class OnlineTts extends BaseTts {
   @override
   void updateTtsState(TtsStateEnum newState) {
     ttsStateNotifier.value = newState;
+    if (newState == TtsStateEnum.stopped) clearBuffering();
   }
 
   // ============ Properties ============
@@ -517,19 +518,25 @@ class OnlineTts extends BaseTts {
           await Future.delayed(const Duration(milliseconds: 30));
           continue;
         }
-        // Wait for buffer to have a segment
-        while (_buffer.isEmpty && !_shouldStop) {
-          await Future.delayed(const Duration(milliseconds: 50));
-        }
-        if (_shouldStop) break;
-        if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
+        final finishBuffering = beginBuffering();
+        late TtsSegment segment;
+        try {
+          // Wait for buffer to have a segment
+          while (_buffer.isEmpty && !_shouldStop) {
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
+          if (_shouldStop) break;
+          if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
 
-        // Get the FIRST segment (preserving order)
-        final segment = _buffer.first;
+          // Get the FIRST segment (preserving order)
+          segment = _buffer.first;
 
-        // Wait for this segment's audio to be ready
-        while (!segment.isReady && !_shouldStop) {
-          await Future.delayed(const Duration(milliseconds: 30));
+          // Wait for this segment's audio to be ready
+          while (!segment.isReady && !_shouldStop) {
+            await Future.delayed(const Duration(milliseconds: 30));
+          }
+        } finally {
+          finishBuffering();
         }
         if (_shouldStop) break;
         if (ttsStateNotifier.value == TtsStateEnum.paused) continue;
@@ -590,7 +597,8 @@ class OnlineTts extends BaseTts {
             _advancingCursor = true;
             dynamic next;
             try {
-              next = await getNextTextFunction();
+              next = await waitForSpeechInput<dynamic>(
+                  () => getNextTextFunction());
             } finally {
               _cursorRevision++;
               _advancingCursor = false;
@@ -657,7 +665,8 @@ class OnlineTts extends BaseTts {
     // Sync to current location first
     dynamic here;
     try {
-      here = content ?? await getHereFunction();
+      here =
+          content ?? await waitForSpeechInput<dynamic>(() => getHereFunction());
     } catch (_) {
       if (generation == _generation) {
         _shouldStop = true;
@@ -704,6 +713,7 @@ class OnlineTts extends BaseTts {
     _isStarting = false;
     _shouldStop = true;
     _playbackError = null;
+    clearBuffering();
     for (final cancellation in _fetchCancellations.toList()) {
       if (!cancellation.isCompleted) cancellation.complete();
     }

@@ -9,14 +9,14 @@ bottomNavigatorShowStatistics bottomNavigatorShowAI sortField sortOrder''',
       '''readStyle readTheme hideStatusBar readerFullscreen autoHideBottomBar
 awakeTime pageTurningType pageTurnStyle readingRules chapterSplitCustomRules
 chapterSplitSelectedRuleId autoAdjustReadingTheme readingNightMode volumeKeyTurnPage
-keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn showMenuOnHover showActionLabels
+keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn scrollPagePercent showMenuOnHover showActionLabels
 useBookStyles pageTurnMode customPageTurnConfig readingInfo showTextUnderIconButton
 pageHeaderMargin pageHeaderLeftMargin pageHeaderRightMargin pageHeaderFontSize
 pageFooterMargin pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize
 writingMode verticalRedFrame textAlignment bgimgFit bgimg''',
   'css':
       '''customCSSEnabled customCSS customCssProfiles customCssDefaultIndex customCssDefaultIndices''',
-  'selection-search': 'selectionSearchSettings',
+  'selection-search': 'selectionSearchSettings selectionSearchZoomPercent',
   'ai':
       '''aiProviders selectedAiService aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
 aiTemperature aiChatFontSize aiPanelWidth aiPanelHeight aiPanelPosition aiChatDisplayMode

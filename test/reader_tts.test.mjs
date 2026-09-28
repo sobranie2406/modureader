@@ -309,6 +309,106 @@ function backgroundReader(chapters) {
   const nav = new TtsNavigator(() => view)
   return {view, nav, get loads() { return loads }}
 }
+test('chapter text is warmed before the boundary; a suspended new ZIP read is unnecessary', async () => {
+  const {view, nav} = backgroundReader(['<p>当前段。</p><p>末段。</p>', '<h1>第二章</h1><p>正文。</p>'])
+  let reads = 0
+  const load = view.book.sections[1].createDocument
+  view.book.sections[1].createDocument = () => { reads++; return load() }
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(reads, 1)
+  view.book.sections[1].createDocument = () => { throw new Error('screen-off extraction blocked') }
+  assert.deepEqual(Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => x.text),
+    ['当前段。', '末段。', '第二章', '正文。'])
+  assert.equal(view.tts.currentDetail().text, '当前段。')
+  assert.equal(view.chapterEvents.length, 1) // lookahead must not publish progress
+  assert.equal(await nav.move(1), '末段。')
+  assert.equal(await nav.move(1), '第二章')
+  assert.equal(await nav.move(1), '正文。')
+  assert.equal(reads, 1)
+})
+test('a pending lookahead never withholds current text or jumps past the missing chapter', async () => {
+  const {view, nav} = backgroundReader(['<p>末段。</p>', '<h1>第二章</h1>', '<h1>第三章</h1>'])
+  let release
+  view.book.sections[1].createDocument = () => new Promise(resolve => { release = resolve })
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => x.text), ['末段。'])
+  release(documentFor('<h1>第二章</h1>'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => x.text), ['末段。','第二章','第三章'])
+  assert.equal(view.tts.sectionIndex, 0)
+})
+test('lookahead respects linear=no and filters note-only sections just like navigation', async () => {
+  const {view, nav} = backgroundReader(['<p>本章。</p>', '<p>附录。</p>',
+    '<aside epub:type="footnote"><p>注释。</p></aside>', '<h1>下一章</h1><p>正文。</p>'])
+  view.book.sections[1].linear = 'no'
+  view.book.sections[1].createDocument = () => { throw new Error('must not read appendix') }
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => x.text), ['本章。','下一章','正文。'])
+  assert.equal(await nav.move(1), '下一章')
+})
+test('failed speculative chapter reads are not retried on every producer poll', async () => {
+  const {view, nav} = backgroundReader(['<p>当前。</p>', '<p>后续。</p>'])
+  let reads = 0
+  const load = view.book.sections[1].createDocument
+  view.book.sections[1].createDocument = async () => { reads++; throw new Error('broken ZIP') }
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  for (let i = 0; i < 5; i++) {
+    assert.equal(view.collectTTSDetails(4, {includeCurrent:true}).length, 1)
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  assert.equal(reads, 1)
+  await assert.rejects(nav.move(1), /broken ZIP/)
+  assert.equal(reads, 2)
+  view.book.sections[1].createDocument = load
+  assert.equal(await nav.move(1), '后续。')
+})
+test('lookahead keeps paragraph grouping, CFI ownership and consumer position across chapters', async () => {
+  const {view, nav} = backgroundReader(['<p>当前段。</p>', '<h1>标题</h1><p>第一句。第二句。</p>'])
+  view.ttsParagraphMode = true
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  const collect = () => Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => ({...x}))
+  const ahead = collect()
+  assert.deepEqual(ahead, [
+    {text:'当前段。', cfi:'0:当前段。'}, {text:'标题', cfi:'1:标题'},
+    {text:'第一句。第二句。', cfi:'1:第一句。第二句。'},
+  ])
+  assert.deepEqual(collect(), ahead)
+  assert.equal(await nav.move(1), '标题')
+  assert.deepEqual(collect(), ahead.slice(1))
+  assert.equal(await nav.move(1), '第一句。第二句。')
+  assert.equal(await nav.move(-1), '标题')
+})
+test('lookahead reads at most three upcoming chapters and rolls forward with the cursor', async () => {
+  const {view, nav} = backgroundReader(Array.from({length:12}, (_, i) => `<h1>章${i}</h1>`))
+  const reads = []
+  view.book.sections.forEach((section, index) => {
+    const load = section.createDocument
+    section.createDocument = () => { reads.push(index); return load() }
+  })
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(reads, [1,2,3])
+  await nav.move(1)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(reads, [1,2,3,4])
+})
+test('stop clears warmed documents and service-mode changes rebuild lookahead boundaries', async () => {
+  const {view, nav} = backgroundReader(['<p>当前。</p>', '<p>一句。二句。</p>'])
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(view.collectTTSDetails(4, {includeCurrent:true}).length, 3)
+  nav.stop()
+  view.initTTS(true)
+  view.ttsParagraphMode = true
+  await nav.start()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => x.text), ['当前。','一句。二句。'])
+})
 test('locked-screen speech crosses empty and title-only chapters without loading any iframe', async () => {
   const fixture = backgroundReader(['<p>末句。</p>', '', '<h1>下一章</h1>', '<h1>第三章</h1><p>完。</p>'])
   const {view, nav} = fixture

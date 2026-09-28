@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:anx_reader/utils/reading_progress.dart';
 
+part 'book_sync_identity.dart';
+
 /// Portable identity and operation clock; never a device-local integer row ID.
 class RowSyncRecord {
   const RowSyncRecord(
@@ -65,9 +67,12 @@ bool _hasReadingPosition(RowSyncRecord record) =>
 /// deletion state) have independent records, so unrelated edits cannot move
 /// the reading cursor or undo deletion.
 List<RowSyncRecord> mergeSyncRecords(
-    Iterable<RowSyncRecord> local, Iterable<RowSyncRecord> remote) {
+    Iterable<RowSyncRecord> local, Iterable<RowSyncRecord> remote,
+    {bool reconcileBookIdentities = true}) {
   final result = <String, RowSyncRecord>{};
-  for (final raw in [...local, ...remote]) {
+  final input = [...local, ...remote];
+  for (final raw
+      in reconcileBookIdentities ? _normalizeBookIdentities(input) : input) {
     final record = normalizeSyncReadingPosition(raw);
     final previous = result[record.key];
     result[record.key] = previous == null ? record : _winner(previous, record);

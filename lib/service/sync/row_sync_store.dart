@@ -290,19 +290,31 @@ class RowSyncStore {
 
   /// Merge into live rows in one transaction, including changes made while
   /// the network request was in flight. No closing/replacing the live DB.
-  Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote) async {
+  Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote,
+      {bool importOnlyMissingRecords = false}) async {
     remote = remote.map(normalizeSyncReadingPosition).toList();
     for (final record in remote) {
       validate(record);
     }
     return db.transaction((txn) async {
       final local = await _snapshot(txn);
-      final merged = mergeSyncRecords(local, remote);
+      var merged = mergeSyncRecords(local, remote);
+      if (importOnlyMissingRecords) {
+        // A one-off external library import is not a remote editing device.
+        // Resolve aliases first, then preserve the latest local records inside
+        // this same transaction (including edits made during file copying).
+        final protected = mergeSyncRecords(
+            local, merged.where((r) => bookSyncAliasTarget(r) != null));
+        final keys = protected.map((r) => r.key).toSet();
+        merged = mergeSyncRecords(
+            merged.where((r) => !keys.contains(r.key)), protected);
+      }
       for (final record in merged) {
         validate(record);
       }
       final old = {for (final r in local) r.key: jsonEncode(r.toMap())};
       await txn.update(_control, {'applying': 1});
+      if (await _rebindBookAliases(txn, merged)) old.clear();
       final ids = <String, Map<String, int>>{};
       final allocated = <String>{};
       for (final row in await txn.query(syncRecordsTable)) {
@@ -318,6 +330,7 @@ class RowSyncStore {
         final map = ids.putIfAbsent(kind, () => {});
         for (final r in merged.where((r) =>
             r.kind == kind &&
+            bookSyncAliasTarget(r) == null &&
             (!r.deleted || kind == 'group' || kind == 'book'))) {
           if (map.containsKey(r.id)) continue;
           final table = _tables[kind]!;
@@ -388,7 +401,102 @@ class RowSyncStore {
     });
   }
 
+  // Repair only identity/index rows inside the same merge transaction. Keep
+  // the oldest existing local book row (and its local reader settings), move
+  // references to it, and soft-hide redundant rows; never delete book files.
+  static Future<bool> _rebindBookAliases(
+      Transaction txn, List<RowSyncRecord> merged) async {
+    final groups = <String, List<String>>{};
+    for (final r in merged.where((r) => r.kind == 'book')) {
+      final target = bookSyncAliasTarget(r);
+      if (target != null) groups.putIfAbsent(target, () => []).add(r.id);
+    }
+    if (groups.isEmpty) return false;
+    final metadata = await txn.query(syncRecordsTable);
+    final visibleBooks =
+        (await txn.query('tb_books', columns: ['id'], where: 'is_deleted=0'))
+            .map((r) => r['id'])
+            .toSet();
+    final byKey = {for (final r in merged) r.key: r};
+    var changed = false;
+    for (final entry in groups.entries) {
+      final canonical = entry.key;
+      final aliases = entry.value..sort();
+      final members = {canonical, ...aliases};
+      final related = metadata
+          .where((r) =>
+              const ['book', 'position', 'life'].contains(r['kind']) &&
+              members.contains(r['sync_id']))
+          .toList();
+      final needsRepair = related.any((r) =>
+          aliases.contains(r['sync_id']) &&
+          (bookSyncAliasTarget(RowSyncRecord.fromMap(r)) == null ||
+              (r['kind'] == 'book' && visibleBooks.contains(r['local_id']))));
+      if (!needsRepair) continue;
+      final book = byKey['book/$canonical'];
+      if (book == null || bookSyncAliasTarget(book) != null) {
+        throw const FormatException('书籍同步关联缺少目标');
+      }
+      final localBooks = related
+          .where((r) => r['kind'] == 'book' && r['local_id'] != null)
+          .map((r) => r['local_id'] as int)
+          .toSet()
+          .toList()
+        ..sort();
+      if (localBooks.isEmpty) continue;
+      final keep = localBooks.first;
+      for (final id in localBooks.skip(1)) {
+        for (final table in ['tb_notes', 'tb_reading_time']) {
+          await txn.update(table, {'book_id': keep},
+              where: 'book_id=?', whereArgs: [id]);
+        }
+        await txn.update('tb_styles', {'line_height': keep.toDouble()},
+            where: 'font_size=2 AND line_height=?', whereArgs: [id]);
+        await txn.update('tb_books', {'is_deleted': 1},
+            where: 'id=?', whereArgs: [id]);
+      }
+      // Release the UNIQUE(kind, local_id) bindings before installing the
+      // canonical identity. Local row IDs themselves are never rewritten.
+      for (final row in related) {
+        await txn.delete(syncRecordsTable,
+            where: 'kind=? AND sync_id=?',
+            whereArgs: [row['kind'], row['sync_id']]);
+      }
+      await txn.insert(syncRecordsTable, {
+        ...book.toMap(),
+        'local_id': keep,
+        'dirty': 0,
+      });
+      final spare = localBooks.skip(1).toList();
+      for (var i = 0; i < aliases.length; i++) {
+        final marker = byKey['book/${aliases[i]}']!;
+        await txn.insert(syncRecordsTable, {
+          ...marker.toMap(),
+          'local_id': i < spare.length ? spare[i] : null,
+          'dirty': 0,
+        });
+      }
+      changed = true;
+    }
+    // Tag-link IDs include the book identity. Remove only the superseded link
+    // records/rows; the normalized link is materialized by the ordinary merge.
+    for (final row in metadata.where((r) =>
+        r['kind'] == 'tag_link' &&
+        !byKey.containsKey('tag_link/${r['sync_id']}'))) {
+      if (row['local_id'] != null) {
+        await txn.delete('tb_styles',
+            where: 'id=? AND font_size=2', whereArgs: [row['local_id']]);
+      }
+      await txn.delete(syncRecordsTable,
+          where: 'kind=? AND sync_id=?',
+          whereArgs: ['tag_link', row['sync_id']]);
+      changed = true;
+    }
+    return changed;
+  }
+
   static void validate(RowSyncRecord r) {
+    bookSyncAliasTarget(r); // Validate reserved redirects before materializing.
     final fields = _fields[r.kind];
     if (fields == null ||
         r.id.isEmpty ||
@@ -434,6 +542,9 @@ class RowSyncStore {
       }
     }
     if (r.kind == 'book') {
+      if (r.data['file_md5'] != null && r.data['file_md5'] is! String) {
+        throw const FormatException('书籍内容校验值无效');
+      }
       final file = r.data['file_path'];
       final cover = r.data['cover_path'];
       if (file is! String || !file.startsWith('file/')) {

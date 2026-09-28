@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum LibrarySortField { name, createdAt, modifiedAt, size }
 
-enum LibraryFileFilter { all, books, epub, pdf, txt, mobi, azw3, fb2 }
+enum LibraryFileFilter { all, books, epub, pdf, txt, mobi, azw3, fb2, md }
 
 class LibraryViewOptions {
   const LibraryViewOptions({
@@ -34,6 +34,10 @@ class LibraryViewOptions {
       // Keep folders navigable even when only EPUB/PDF/etc. is selected.
       if (entry.isDirectory || filter == LibraryFileFilter.all) return true;
       if (filter == LibraryFileFilter.books) return entry.isBook;
+      if (filter == LibraryFileFilter.md) {
+        return const ['md', 'markdown']
+            .contains(entry.name.split('.').last.toLowerCase());
+      }
       return entry.name.split('.').last.toLowerCase() == filter.name;
     }).toList();
     result.sort((a, b) {

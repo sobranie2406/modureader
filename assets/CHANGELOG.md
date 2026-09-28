@@ -2,26 +2,18 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.6
+## 1.1.7
 
-- Preserve IME composition and cursor position in speech settings; show and copy the saved location after settings and QR exports.
-- Refill narration audio ahead during playback, fix embedded search scrolling and toolbar overflow, and report the installed build number.
-- Transfer all global settings with explicit defaults, validated restore and an independent credentials switch.
-- Group online narration by paragraph with accurate highlighting, group navigation and priority synthesis.
-- Add MiMo playback-speed control, compatible voice instructions and background narration recovery improvements.
-- Manage 32 CSS profiles and 13 presets with visual controls in Settings; apply profiles from the reader.
-- Search selected text in a built-in browser with selectable and custom search engines.
-- Export bracketed original passages, highlighted Markdown notes and creation/edit timestamps.
-- Choose GitHub or Gitee for updates and downloads, preferring GitHub by default.
-- Move full-text translation stop controls to the toolbar so they do not cover reading text.
+- Add Markdown books, bookshelf pinning and batch folder management.
+- Add configurable scroll-page distance, wider annotation palettes, search zoom and fullscreen interactive mind maps; fix landscape and desktop side margins.
+- Add reading-position links to exported notes and an AI dictionary with optional Wikipedia, Wiktionary and Baidu Baike lookup.
+- Improve WebDAV capability checks, duplicate-book reconciliation and safe log compaction for compatible servers.
+- Import ANX Reader ZIP backups from Advanced settings with validation, deduplication and a pre-import database snapshot.
+- Improve Windows system voice startup compatibility and background narration buffering; make Android player notifications silent and stabilize transient interruption recovery.
 
-- 修复朗读设置输入法重复上屏和光标跳动；设置文件与二维码导出后显示完整保存位置，支持复制路径。
-- 播放期间滚动预取后续语音，修复内置搜索滚动及工具栏溢出，版本信息显示实际安装构建号。
-- 全局设置统一迁移，补齐默认值恢复、导入前校验，并保留独立凭据开关。
-- 在线朗读按自然段分组，准确高亮、前后按段定位，首段优先合成。
-- MiMo 增加实际播放语速调节，兼容语音提示词，并优化后台朗读恢复。
-- 在设置中图形化管理 32 套 CSS 方案与 13 个预设，阅读界面直接应用。
-- 选中文字后使用内置浏览器搜索，支持切换及自定义搜索引擎。
-- 笔记导出使用原文括号、Markdown 突出显示及创建或修改时间。
-- 更新和下载支持选择 GitHub / Gitee，默认优先 GitHub。
-- 全文翻译停止按钮移至工具栏，不再遮挡阅读正文。
+- 支持 Markdown 书籍，书籍和文件夹置顶，批量建文件夹和移入文件夹。
+- 新增滚动翻页比例、标注颜色、搜索窗口缩放、思维导图全屏缩放移动与节点折叠；修复横屏及桌面侧边距调节。
+- 导出笔记附带返回书中原位置的链接；新增 AI 词典，按需检索维基词典、维基百科和百度百科后整理词义。
+- 改进 WebDAV 条件写入能力检测、重复书籍合并与兼容模式日志整理。
+- 高级设置新增 ANX Reader ZIP 备份导入，提供操作步骤、校验、去重及导入前数据库备份。
+- 改进 Windows 系统语音启动兼容性与后台朗读预取；安卓播放器通知明确静音，优化短暂音频打断后的单次恢复。

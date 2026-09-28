@@ -310,8 +310,12 @@ class BookNotesList extends ConsumerWidget {
             onPressed: () => notifier.toggleTypeColors(type.type),
             icon: Icon(type.icon),
           ),
-          const Spacer(),
-          for (final color in notesColors) colorButton(color),
+          Expanded(
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              children: [for (final color in notesColors) colorButton(color)],
+            ),
+          ),
         ],
       ),
     );

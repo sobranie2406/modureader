@@ -276,6 +276,52 @@ native_spec.loader.exec_module(native)
 
 
 class NativeInstallerTest(unittest.TestCase):
+    def test_reading_link_registry_quotes_executable_and_argument(self):
+        for arch in ('x64', 'arm64'):
+            script = native.windows_script(Path('payload'), arch, '1.1.6', Path('out'))
+            self.assertIn('[Registry]', script)
+            self.assertIn('ValueName: "URL Protocol"', script)
+            self.assertIn('ValueData: """{app}\\modu.exe"" ""%1"""', script)
+            self.assertNotIn('Root: HKLM', script)
+
+    def test_apple_reading_scheme_preserves_share_scheme(self):
+        root = Path(__file__).resolve().parents[1]
+        for platform in ('ios', 'macos'):
+            with (root / platform / 'Runner/Info.plist').open('rb') as source:
+                info = plistlib.load(source)
+            schemes = [scheme for entry in info['CFBundleURLTypes']
+                       for scheme in entry['CFBundleURLSchemes']]
+            self.assertIn('modu', schemes)
+            self.assertNotIn('https', schemes)
+            if platform == 'ios':
+                self.assertIn('ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)', schemes)
+                self.assertFalse(info['FlutterDeepLinkingEnabled'])
+
+    def test_android_reading_filter_does_not_claim_web_links(self):
+        import xml.etree.ElementTree as ET
+        root = Path(__file__).resolve().parents[1]
+        manifest = ET.parse(root / 'android/app/src/main/AndroidManifest.xml')
+        ns = '{http://schemas.android.com/apk/res/android}'
+        filters = [f for f in manifest.findall('.//activity/intent-filter')
+                   if any(d.get(ns + 'scheme') == 'modu' for d in f.findall('data'))]
+        self.assertEqual(len(filters), 1)
+        data = filters[0].findall('data')
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].get(ns + 'host'), 'read')
+        self.assertIsNone(data[0].get(ns + 'mimeType'))
+        self.assertTrue(any(c.get(ns + 'name') == 'android.intent.category.BROWSABLE'
+                            for c in filters[0].findall('category')))
+
+    def test_linux_link_entry_preserves_single_instance_delivery(self):
+        root = Path(__file__).resolve().parents[1]
+        installer = (root / 'scripts/release/native_installers.py').read_text()
+        runner = (root / 'linux/my_application.cc').read_text()
+        self.assertIn('Exec=modureader %u', installer)
+        self.assertIn('MimeType=x-scheme-handler/modu;', installer)
+        self.assertIn('G_APPLICATION_HANDLES_COMMAND_LINE', runner)
+        self.assertNotIn('G_APPLICATION_NON_UNIQUE', runner)
+        self.assertIn('gtk_window_present', runner)
+
     def test_debian_prerelease_sorts_before_final(self):
         self.assertEqual(native.deb_version('0.1.0-beta.1'), '0.1.0~beta.1')
         self.assertEqual(native.deb_version('1.0.0'), '1.0.0')

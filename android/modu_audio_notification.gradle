@@ -1,0 +1,40 @@
+// Compile a narrowly patched copy, NEVER modify the shared Pub cache.
+// audio_service has no Dart option for silent notification updates. Keep the
+// upstream implementation/resources and fail closed when these anchors change.
+project(':audio_service').afterEvaluate { audioProject ->
+        def upstream = audioProject.file('src/main/java')
+        def service = new File(upstream, 'com/ryanheise/audioservice/AudioService.java')
+        def builderAnchor = '.setShowWhen(false)'
+        def channelAnchor = 'channel.setShowBadge(config.androidShowNotificationBadge);'
+        def generated = audioProject.layout.buildDirectory.dir('generated/moduAudioService/java')
+        def patchTask = audioProject.tasks.register('prepareModuSilentAudioService', Sync) {
+            inputs.property('moduSilentNotificationPolicy', 1)
+            from(upstream) {
+                filesMatching('**/AudioService.java') {
+                    filter { String line ->
+                        if (line.trim() == builderAnchor) {
+                            return line + '\n                    .setSilent(true)' +
+                                '\n                    .setOnlyAlertOnce(true)' +
+                                '\n                    .setDefaults(0)' +
+                                '\n                    .setSound(null)' +
+                                '\n                    .setVibrate(null)'
+                        }
+                        if (line.trim() == channelAnchor) {
+                            return line + '\n            channel.setSound(null, null);' +
+                                '\n            channel.enableVibration(false);'
+                        }
+                        return line
+                    }
+                }
+            }
+            into(generated)
+            doFirst {
+                def lines = service.readLines('UTF-8').collect { it.trim() }
+                if (lines.count(builderAnchor) != 1 || lines.count(channelAnchor) != 1) {
+                    throw new GradleException('audio_service notification code changed; review Modu silent policy before building')
+                }
+            }
+        }
+        audioProject.android.sourceSets.main.java.setSrcDirs([generated])
+        audioProject.tasks.named('preBuild').configure { dependsOn(patchTask) }
+}

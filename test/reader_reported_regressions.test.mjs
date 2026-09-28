@@ -85,6 +85,7 @@ test('actual scrolled next/previous retain 20 percent overlap; explicit distance
   const methods = paginator.slice(paginator.indexOf('  #scrollPrev(distance)'), paginator.indexOf('  get atStart()'));
   const Harness = runInNewContext(`class Harness {
     #view = {}; scrolled = true; start = 0; size = 801; viewSize = 10000;
+    getAttribute() { return null }
     get end() {return this.start + this.size}
     #scrollTo(offset) {this.start = offset; return Promise.resolve()}
     #scrollToPage() {} next(distance) {return this.#scrollNext(distance)}
@@ -103,4 +104,54 @@ test('actual scrolled next/previous retain 20 percent overlap; explicit distance
   const current = reader.start; await reader.next(10); assert.equal(reader.start, current + 10);
   reader.start = 1; await reader.prev(); assert.equal(reader.start, 0);
   assert.equal(await reader.prev(), true, 'chapter boundary still navigates');
+});
+
+test('scroll step is configurable in both renderers without changing explicit distances or pagination', async () => {
+  const paginator = await source('paginator.js');
+  const methods = paginator.slice(paginator.indexOf('  #scrollPrev(distance)'), paginator.indexOf('  get atStart()'));
+  const turn = paginator.slice(paginator.indexOf('  async #turnPage('), paginator.indexOf('  prevSection()'));
+  const Harness = runInNewContext(`class Harness {
+    #view = {}; #locked = false; #continuous = null;
+    scrolled = true; start = 2000; size = 800; viewSize = 10000;
+    percent = null; page = 3; pages = 12; lastPage = null;
+    getAttribute() { return this.percent }
+    get end() { return this.start + this.size }
+    #scrollTo(offset) { this.start = offset; return Promise.resolve() }
+    #scrollToPage(page) { this.lastPage = page; return Promise.resolve() }
+    #adjacentIndex() { return null }
+    #goTo() { throw new Error('unexpected chapter jump') }
+    #afterScroll() {} #unlockNavigation() { this.#locked = false }
+    continuous(enabled) { this.#continuous = enabled ? {scrollBy: async amount => { this.start += amount }} : null }
+    ${methods}
+    ${turn}
+  }; Harness`);
+  for (const continuous of [false, true]) {
+    for (const [percent, expected] of [[null,80], ['80',80], ['81',81], ['90',90], ['99',99], ['100',100], ['101',100], ['0',80], ['bad',80], ['Infinity',80]]) {
+      const reader = new Harness(); reader.continuous(continuous); reader.percent = percent;
+      await reader.next(); assert.equal(reader.start, 2000 + 800 * expected / 100);
+      await reader.prev(); assert.ok(Math.abs(reader.start - 2000) < 1e-8);
+      await reader.next(37); assert.equal(reader.start, 2037);
+      await reader.prev(37); assert.equal(reader.start, 2000);
+    }
+  }
+  const reader = new Harness(); reader.scrolled = false; reader.percent = '100';
+  await reader.next(); assert.equal(reader.lastPage, 4);
+  await reader.prev(); assert.equal(reader.lastPage, 2);
+  reader.scrolled = true; reader.start = 8900;
+  await reader.next(); assert.equal(reader.start, 9200, 'last screen clamped to content');
+  reader.start = 10; await reader.prev(); assert.equal(reader.start, 0);
+});
+
+test('live scroll percentage update does not restyle, reload or navigate the chapter', async () => {
+  const book = await source('book.js');
+  const start = book.indexOf('window.setScrollPagePercent =');
+  const end = book.indexOf('\nwindow.nextSection', start);
+  const calls = [];
+  const style = {};
+  const window = {};
+  runInNewContext(book.slice(start, end), {window, style, reader:{view:{renderer:{setAttribute:(...args)=>calls.push(args)}}}});
+  window.setScrollPagePercent(93);
+  assert.equal(style.scrollPagePercent, 93);
+  assert.deepEqual(calls, [['scroll-page-percent','93']]);
+  assert.doesNotMatch(book.slice(start,end), /changeStyle|setStyle|goTo|reload/);
 });

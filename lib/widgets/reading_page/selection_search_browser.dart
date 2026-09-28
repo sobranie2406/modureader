@@ -1,8 +1,11 @@
+import 'dart:collection';
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/selection_search.dart';
 import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:anx_reader/page/settings_page/selection_search.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:anx_reader/widgets/reading_page/selection_search_zoom.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +37,51 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
   bool _back = false, _forward = false;
   int _progress = 0;
   String? _message;
+  late int _zoomPercent = Prefs().selectionSearchZoomPercent;
+  Future<void> _zoomQueue = Future<void>.value();
+  static const _zoomGroup = 'modu-selection-search-zoom';
+  UserScript get _zoomScript => UserScript(
+        groupName: _zoomGroup,
+        source: selectionSearchZoomScript(_zoomPercent),
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_END,
+        forMainFrameOnly: true,
+      );
+
+  // Serialize native script updates so rapid changes cannot restore an older
+  // percentage after a newer one. Navigation always reapplies the latest value.
+  Future<void> _applyZoom({bool persist = false}) {
+    _zoomQueue = _zoomQueue.then((_) async {
+      if (!mounted) return;
+      try {
+        if (persist) {
+          await Prefs().saveSelectionSearchZoomPercent(_zoomPercent);
+        }
+        if (!mounted) return;
+        final controller = _controller;
+        if (controller == null) return;
+        await controller.removeUserScriptsByGroupName(groupName: _zoomGroup);
+        if (!mounted || controller != _controller) return;
+        await controller.addUserScript(userScript: _zoomScript);
+        await controller.evaluateJavascript(
+            source: selectionSearchZoomScript(_zoomPercent));
+      } catch (_) {
+        if (mounted) {
+          setState(() => _message =
+              t('网页缩放失败，请重试。', 'Could not apply page zoom. Please retry.'));
+        }
+      }
+    });
+    return _zoomQueue;
+  }
+
+  void _changeZoom(int percent) {
+    setState(() {
+      _zoomPercent = percent.clamp(50, 200);
+      _message = null;
+    });
+    _applyZoom(persist: true);
+  }
+
   String t(String zh, String en) =>
       Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
 
@@ -225,6 +273,44 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                   child: Text(_uri.host,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis)),
+                              PopupMenuButton<int>(
+                                key: const ValueKey('search-page-zoom'),
+                                tooltip: t('网页缩放', 'Page zoom'),
+                                initialValue: _zoomPercent,
+                                onSelected: _changeZoom,
+                                itemBuilder: (_) => [
+                                  for (final percent in const [
+                                    50,
+                                    60,
+                                    70,
+                                    80,
+                                    90,
+                                    100,
+                                    110,
+                                    120,
+                                    130,
+                                    140,
+                                    150,
+                                    160,
+                                    170,
+                                    180,
+                                    190,
+                                    200,
+                                  ])
+                                    CheckedPopupMenuItem<int>(
+                                      value: percent,
+                                      checked: percent == _zoomPercent,
+                                      child: Text(percent == 100
+                                          ? t('100%（恢复默认）', '100% (Reset)')
+                                          : '$percent%'),
+                                    ),
+                                ],
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 12),
+                                  child: Text('$_zoomPercent%'),
+                                ),
+                              ),
                               const SizedBox(width: 12),
                             ]),
                             if (_message != null)
@@ -256,6 +342,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                 webViewEnvironment: webViewEnvironment,
                                 initialUrlRequest:
                                     URLRequest(url: WebUri(_uri.toString())),
+                                initialUserScripts:
+                                    UnmodifiableListView([_zoomScript]),
                                 initialSettings: InAppWebViewSettings(
                                   useShouldOverrideUrlLoading: true,
                                   supportMultipleWindows: true,
@@ -299,6 +387,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                 },
                                 onLoadStop: (controller, url) async {
                                   if (mounted) setState(() => _progress = 100);
+                                  await _applyZoom();
                                   await _history(controller, url);
                                 },
                                 onUpdateVisitedHistory: (controller, url, _) =>

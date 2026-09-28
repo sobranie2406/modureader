@@ -8,6 +8,7 @@ import 'package:anx_reader/service/tts/system_voice_identity.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 class SystemTts extends BaseTts {
@@ -57,6 +58,7 @@ class SystemTts extends BaseTts {
   @override
   void updateTtsState(TtsStateEnum newState) {
     ttsStateNotifier.value = newState;
+    if (newState == TtsStateEnum.stopped) clearBuffering();
   }
 
   bool get isIOS => AnxPlatform.isIOS;
@@ -199,7 +201,9 @@ class SystemTts extends BaseTts {
     try {
       await setAwaitOptions();
       if (!active()) return;
-      final initial = content ?? _currentVoiceText ?? await getHereFunction();
+      final initial = content ??
+          _currentVoiceText ??
+          await waitForSpeechInput<dynamic>(() => getHereFunction());
       if (!active()) return;
       _currentVoiceText = initial as String?;
       while (active() && (_currentVoiceText?.trim().isNotEmpty ?? false)) {
@@ -212,7 +216,8 @@ class SystemTts extends BaseTts {
         if (!active()) return;
         if (result == 0) throw StateError('System speech failed');
         if (!continuous) return;
-        final advancing = Future<dynamic>.sync(() => getNextTextFunction());
+        final advancing =
+            waitForSpeechInput<dynamic>(() => getNextTextFunction());
         _pendingAdvance = advancing;
         final next = await advancing;
         if (identical(_pendingAdvance, advancing)) _pendingAdvance = null;
@@ -223,8 +228,10 @@ class SystemTts extends BaseTts {
     } catch (error) {
       if (active()) {
         _pendingAdvance = null;
-        _playbackError =
-            '朗读失败，已保留当前位置，请重试 / Speech failed; retry from this sentence.';
+        _playbackError = error is PlatformException &&
+                error.code == 'windows_tts_unavailable'
+            ? 'Windows 系统朗读不可用，请检查或安装系统语音包，或切换在线朗读。已保留当前位置。'
+            : '朗读失败，已保留当前位置，请重试 / Speech failed; retry from this sentence.';
         updateTtsState(TtsStateEnum.paused);
       }
       if (!continuous) rethrow;
@@ -233,6 +240,7 @@ class SystemTts extends BaseTts {
 
   @override
   Future<dynamic> stop({bool forNavigation = false}) async {
+    clearBuffering();
     ++_generation;
     _running = null;
     _pendingAdvance = null;

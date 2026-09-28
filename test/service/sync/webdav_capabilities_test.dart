@@ -19,12 +19,14 @@ void main() {
   var mode = 'strong';
   int? error;
   String? pageLink;
+  String etag(String path) =>
+      '"${mode == 'constant' ? 1 : mode == 'second-resolution' ? ((revisions[path] ?? 1) == 1 ? 100 : 101) : revisions[path] ?? 1}"';
   String props(String path, bool dir) =>
       '<d:response><d:href>$path${dir ? '/' : ''}</d:href>'
       '<d:propstat><d:prop><d:resourcetype>${dir ? '<d:collection/>' : ''}</d:resourcetype>'
       '<d:getcontentlength>${files[path]?.length ?? 0}</d:getcontentlength>'
       '<d:getlastmodified>Sat, 12 Sep 2026 00:00:00 GMT</d:getlastmodified>'
-      '${mode == 'none' ? '' : '<d:getetag>${mode == 'weak' ? 'W/' : ''}"${mode == 'constant' ? 1 : revisions[path] ?? 1}"</d:getetag>'}'
+      '${mode == 'none' ? '' : '<d:getetag>${mode == 'weak' ? 'W/' : ''}${etag(path)}</d:getetag>'}'
       '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>';
   setUp(() async {
     files.clear();
@@ -62,7 +64,7 @@ void main() {
           final stale = request.headers.value('if-match');
           final duplicate = request.headers.value('if-none-match') == '*' &&
               files.containsKey(path);
-          final expected = '"${mode == 'constant' ? 1 : revisions[path] ?? 1}"';
+          final expected = etag(path);
           if (mode == 'reject-all' && stale != null) {
             response.statusCode = 412;
           } else if (mode == 'false-rejection' &&
@@ -81,10 +83,13 @@ void main() {
         case 'HEAD':
           response.statusCode = files.containsKey(path) ? 200 : 404;
           if (mode != 'none') {
-            response.headers.set('etag',
-                '${mode == 'weak' ? 'W/' : ''}"${revisions[path] ?? 1}"');
+            response.headers
+                .set('etag', '${mode == 'weak' ? 'W/' : ''}${etag(path)}');
           }
         case 'GET':
+          if (mode == 'slow') {
+            await Future<void>.delayed(const Duration(milliseconds: 550));
+          }
           response.statusCode = files.containsKey(path) ? 200 : 404;
           if (files.containsKey(path)) response.add(files[path]!);
         case 'DELETE':
@@ -174,6 +179,7 @@ void main() {
     'none',
     'weak',
     'constant',
+    'second-resolution',
     'ignored',
     'false-rejection',
     'reject-all'
@@ -187,9 +193,21 @@ void main() {
       expect(calls.every((c) => !c.endsWith('/modu/database8.db')), isTrue);
       final count = calls.length;
       expect(await client.supportsAtomicSyncWrites(), value == 'strong');
-      expect(calls.length, count);
+      expect(calls.length, value == 'strong' ? greaterThan(count) : count);
     });
   }
+  test('slow probes conservatively select journal mode', () async {
+    mode = 'slow';
+    expect(await client.supportsAtomicSyncWrites(), isFalse);
+    expect(files, isEmpty);
+  });
+  test('positive capability is rechecked when server behavior changes',
+      () async {
+    expect(await client.supportsAtomicSyncWrites(), isTrue);
+    mode = 'constant';
+    expect(await client.supportsAtomicSyncWrites(), isFalse);
+    expect(files, isEmpty);
+  });
   for (final code in [401, 403, 503]) {
     test('HTTP $code cannot trigger capability downgrade', () async {
       error = code;
@@ -239,6 +257,45 @@ void main() {
       } finally {
         await a.close();
         await b.close();
+        await temp.delete(recursive: true);
+      }
+    });
+  }
+
+  for (final oldMode in ['none', 'weak', 'ignored']) {
+    test('unchanged migrated data moves from $oldMode to verified strong ETag',
+        () async {
+      mode = oldMode;
+      final temp = await Directory.systemTemp.createTemp('modu-migration-');
+      final oldDevice = await fixture();
+      final newDevice = await fixture(bookId: 77);
+      try {
+        await oldDevice.insert('tb_notes', noteRow(1, 'migration-note'));
+        await RowSyncEngine(
+                store: RowSyncStore(oldDevice), client: client, cache: temp)
+            .synchronize();
+        expect(files.keys.any((p) => p.contains('/record-log-v1/')), true);
+        expect(files.containsKey('/library/modu/database8.db'), false);
+        // Preserve every file byte and path. Only change the server's ETag
+        // behavior and use a new connection, as when changing the endpoint.
+        mode = 'strong';
+        final migratedClient = WebdavClient(
+            url: 'http://127.0.0.1:${server.port}/library',
+            username: 'test',
+            password: 'test');
+        final freshCache = await Directory('${temp.path}/new-device').create();
+        await RowSyncEngine(
+                store: RowSyncStore(newDevice),
+                client: migratedClient,
+                cache: freshCache)
+            .synchronize();
+        expect((await newDevice.query('tb_notes')).single['content'],
+            'migration-note');
+        expect(files.containsKey('/library/modu/database8.db'), true);
+        expect(files.keys.any((p) => p.contains('/record-log-v1/')), false);
+      } finally {
+        await oldDevice.close();
+        await newDevice.close();
         await temp.delete(recursive: true);
       }
     });

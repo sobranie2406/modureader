@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:anx_reader/service/book_formats.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
@@ -102,8 +103,7 @@ class LibraryEntry {
   final DateTime? createdAt, modifiedAt;
   bool get isBook =>
       !isDirectory &&
-      const ['epub', 'mobi', 'azw3', 'fb2', 'txt', 'pdf']
-          .contains(name.split('.').last.toLowerCase());
+      allowBookExtensions.contains(name.split('.').last.toLowerCase());
 }
 
 class WebdavLibrary {

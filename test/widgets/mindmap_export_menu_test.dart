@@ -60,6 +60,9 @@ void main() {
     }));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('mindmap-collapse-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('唯一子节点'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('mindmap-export')));
     await tester.pumpAndSettle();
     for (final text in [
@@ -107,5 +110,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('mindmap-export')), findsNothing);
+  });
+
+  testWidgets(
+      'leaf and blank canvas taps do not close the surrounding tool tile',
+      (tester) async {
+    await tester.pumpWidget(app((_, __, ___) async => null));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('唯一子节点'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mindmap-canvas')), findsOneWidget);
+    await tester.tapAt(
+        tester.getTopLeft(find.byKey(const ValueKey('mindmap-canvas'))) +
+            const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mindmap-canvas')), findsOneWidget);
   });
 }

@@ -816,6 +816,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       'reading_guide' => Icons.explore_outlined,
       'smart_translator' => Icons.translate_outlined,
       'vocabulary_helper' => Icons.spellcheck_outlined,
+      'ai_dictionary' => Icons.menu_book_outlined,
       'mindmap' => Icons.account_tree_outlined,
       _ => Icons.extension_outlined,
     };

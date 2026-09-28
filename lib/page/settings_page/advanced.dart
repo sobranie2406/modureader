@@ -3,6 +3,7 @@ import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/md5_statistics.dart';
 import 'package:anx_reader/page/settings_page/subpage/chapter_split_rules_page.dart';
+import 'package:anx_reader/page/settings_page/subpage/anx_backup_import_page.dart';
 import 'package:anx_reader/page/settings_page/subpage/log_page.dart';
 import 'package:anx_reader/page/changelog_screen.dart';
 import 'package:anx_reader/page/onboarding_screen.dart';
@@ -48,6 +49,25 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
   Widget build(BuildContext context) {
     return settingsSections(
       sections: [
+        SettingsSection(
+          title: Text(Localizations.localeOf(context).languageCode == 'zh'
+              ? '数据迁移'
+              : 'Data migration'),
+          tiles: [
+            SettingsTile.navigation(
+              leading: const Icon(Icons.move_to_inbox_outlined),
+              title: Text(Localizations.localeOf(context).languageCode == 'zh'
+                  ? '导入 ANX Reader 的备份文件'
+                  : 'Import ANX Reader backup'),
+              description: Text(Localizations.localeOf(context).languageCode ==
+                      'zh'
+                  ? '选择 ANX 导出的 ZIP，查看步骤和限制后合并书库'
+                  : 'Import a ZIP exported by ANX; review steps and limitations first'),
+              onPressed: (_) => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const AnxBackupImportPage())),
+            ),
+          ],
+        ),
         SettingsSection(
           title: Text(L10n.of(context).eBookProcess),
           tiles: [

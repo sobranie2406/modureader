@@ -13,6 +13,22 @@ LibraryEntry entry(String name,
         createdAt: created, modifiedAt: modified);
 
 void main() {
+  test('Markdown files are books and share one MD filter', () {
+    final files = [
+      entry('a.MD'),
+      entry('b.markdown'),
+      entry('c.epub'),
+      entry('folder', folder: true)
+    ];
+    expect(files.take(3).every((e) => e.isBook), isTrue);
+    expect(
+        const LibraryViewOptions(filter: LibraryFileFilter.md)
+            .apply(files)
+            .map((e) => e.name),
+        ['folder', 'a.MD', 'b.markdown']);
+    expect(LibraryViewOptions.fromJson({'filter': 'md'}).filter,
+        LibraryFileFilter.md);
+  });
   final older = DateTime.utc(2026, 9, 1);
   final newer = DateTime.utc(2026, 9, 10);
   final entries = [

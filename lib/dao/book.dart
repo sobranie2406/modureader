@@ -11,6 +11,56 @@ class BookDao extends BaseDao {
 
   static const String table = 'tb_books';
 
+  /// Create a folder and move its books atomically, or move into a live folder.
+  /// Only membership changes: never write a stale Book snapshot over sync data.
+  Future<int> moveBooksToFolder(Iterable<int> bookIds,
+      {int? groupId, String? newFolderName}) async {
+    final ids = bookIds.toSet();
+    final name = newFolderName?.trim();
+    if (ids.isEmpty || ids.any((id) => id <= 0)) {
+      throw ArgumentError('Select at least one book');
+    }
+    if ((groupId == null) == (newFolderName == null) ||
+        (groupId != null && groupId <= 0) ||
+        (name != null && (name.isEmpty || name.length > 100))) {
+      throw ArgumentError('Invalid folder destination');
+    }
+    return transaction((txn) async {
+      // Per-ID checks avoid SQLite parameter limits on large selections.
+      for (final id in ids) {
+        final rows = await txn.query(table,
+            columns: ['id'],
+            where: 'id = ? AND is_deleted = 0',
+            whereArgs: [id]);
+        if (rows.isEmpty) throw StateError('Selected book no longer exists');
+      }
+      final now = DateTime.now().toIso8601String();
+      final int target;
+      if (groupId != null) {
+        final groups = await txn.query('tb_groups',
+            columns: ['id'],
+            where: 'id = ? AND is_deleted = 0',
+            whereArgs: [groupId]);
+        if (groups.isEmpty) throw StateError('Folder no longer exists');
+        target = groupId;
+      } else {
+        target = await txn.insert('tb_groups', {
+          'name': name,
+          'parent_id': 0,
+          'is_deleted': 0,
+          'create_time': now,
+          'update_time': now,
+        });
+      }
+      for (final id in ids) {
+        await txn.update(table, {'group_id': target, 'update_time': now},
+            where: 'id = ? AND (group_id IS NULL OR group_id != ?)',
+            whereArgs: [id, target]);
+      }
+      return target;
+    });
+  }
+
   Future<int> save(Book book) async {
     if (book.id != -1) {
       await updateBook(book);

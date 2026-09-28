@@ -11,7 +11,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('contains the complete ReadAny built-in skill catalog', () {
-    expect(readAnySkills, hasLength(10));
+    expect(readAnySkills, hasLength(11));
     expect(
       readAnySkills.map((skill) => skill.id).toSet(),
       {
@@ -25,6 +25,7 @@ void main() {
         'smart_translator',
         'vocabulary_helper',
         'mindmap',
+        'ai_dictionary',
       },
     );
   });
@@ -33,7 +34,7 @@ void main() {
     for (final skill in readAnySkills) {
       expect(skill.name.trim(), isNotEmpty);
       expect(
-        RegExp(r'[A-Za-z]').hasMatch(skill.name),
+        RegExp(r'[A-Za-z]').hasMatch(skill.name.replaceFirst('AI ', '')),
         isFalse,
         reason: '${skill.id} 的界面名称应全部使用中文',
       );
@@ -107,7 +108,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(Switch), findsNWidgets(10));
+    expect(find.byType(Switch), findsNWidgets(11));
+    expect(find.text('AI 词典解释'), findsOneWidget);
     expect(find.text('本章总结'), findsOneWidget);
     expect(find.text('全书总结'), findsOneWidget);
     expect(find.text('词汇助手'), findsOneWidget);

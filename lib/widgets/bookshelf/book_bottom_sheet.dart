@@ -9,9 +9,12 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/page/book_detail.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/providers/book_list.dart';
+import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
+import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:anx_reader/service/book_formats.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
@@ -33,6 +36,7 @@ import 'package:path/path.dart' as p;
 
 enum BookAction {
   details,
+  pin,
   vectorize,
   vectorModel,
   share,
@@ -210,9 +214,12 @@ class BookBottomSheet extends ConsumerWidget {
         String extension = p.extension(newFile.name);
         File fileToProcess = newFileObj;
 
-        // Convert TXT to EPUB if needed
-        if (extension.toLowerCase() == '.txt') {
-          fileToProcess = await convertFromTxt(newFileObj);
+        // Text books use the same EPUB reader and sync pipeline.
+        if (extension.toLowerCase() == '.txt' ||
+            isMarkdownExtension(extension.substring(1))) {
+          fileToProcess = isMarkdownExtension(extension.substring(1))
+              ? await convertFromMarkdown(newFileObj)
+              : await convertFromTxt(newFileObj);
           extension = '.epub';
         }
 
@@ -256,7 +263,7 @@ class BookBottomSheet extends ConsumerWidget {
           }
         }
 
-        // Clean up temporary file if TXT conversion happened
+        // Clean up temporary file if text conversion happened
         if (fileToProcess != newFileObj) {
           if (await fileToProcess.exists()) {
             await fileToProcess.delete();
@@ -276,6 +283,7 @@ class BookBottomSheet extends ConsumerWidget {
     }
 
     final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final pinned = ref.watch(bookshelfPinsProvider).contains(bookPinKey(book));
     final menu = AnimatedBuilder(
       animation: bookKnowledgeIndexQueue,
       builder: (context, _) => FutureBuilder<bool>(
@@ -312,6 +320,17 @@ class BookBottomSheet extends ConsumerWidget {
                 case BookAction.details:
                   handleDetail(context);
                   break;
+                case BookAction.pin:
+                  try {
+                    await ref
+                        .read(bookshelfPinsProvider.notifier)
+                        .setPinned(bookPinKey(book), !pinned);
+                  } catch (_) {
+                    AnxToast.show(zh
+                        ? '置顶设置保存失败，请重试'
+                        : 'Could not save pin. Please retry.');
+                  }
+                  break;
                 case BookAction.vectorize:
                   await queueBookForVectorization(book);
                   break;
@@ -335,6 +354,12 @@ class BookBottomSheet extends ConsumerWidget {
             itemBuilder: (context) => [
               entry(BookAction.details, Icons.info_outline,
                   zh ? '书籍详情' : 'Book details'),
+              entry(
+                  BookAction.pin,
+                  pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  zh
+                      ? (pinned ? '取消置顶' : '置顶')
+                      : (pinned ? 'Unpin' : 'Pin to top')),
               entry(
                   BookAction.vectorize,
                   active

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/toc_item.dart';
 import 'package:anx_reader/providers/ai_history.dart';
@@ -7,6 +9,8 @@ import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
+import 'package:anx_reader/service/ai/dictionary_lookup.dart';
+import 'package:anx_reader/service/ai/dictionary_web_search.dart';
 import 'package:anx_reader/service/ai/index.dart';
 import 'package:anx_reader/service/ai/coalesced_stream.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
@@ -203,15 +207,52 @@ class AiChat extends _$AiChat {
 
     String assistantResponse = "";
     try {
-      await for (final chunk in coalesceSnapshots(aiGenerateStream(
-        requestMessages,
-        regenerate: isRegenerate,
-        useAgent: skillRequest?.useAgent ?? homeRequest?.useAgent ?? true,
-        allowedToolIds:
-            skillRequest?.allowedToolIds ?? homeRequest?.allowedToolIds,
-        ref: widgetRef,
-        requestRunner: requestRunner,
-      ))) {
+      // Each AI stream closes its runner on completion. Use a child per stage
+      // so completing the knowledge answer cannot cancel the subsequent search.
+      Stream<String> dictionaryGenerate(List<ChatMessage> input) async* {
+        final child = CancelableLangchainRunner();
+        final finished = Completer<void>();
+        if (requestRunner != null) {
+          unawaited(Future.any([requestRunner.whenCancelled, finished.future])
+              .then((_) async {
+            if (requestRunner.isCancelled) await child.cancel();
+          }));
+        }
+        try {
+          if (requestRunner?.isCancelled == true) return;
+          yield* aiGenerateStream(
+            input,
+            identifier: serviceId,
+            providerOverride: selectedProvider,
+            regenerate: isRegenerate,
+            useAgent: false,
+            ref: widgetRef,
+            requestRunner: child,
+          );
+        } finally {
+          finished.complete();
+          await child.cancel();
+        }
+      }
+
+      final responseStream = readingRequest?.skillId == aiDictionarySkillId
+          ? dictionaryLookup(
+              messages: requestMessages,
+              generate: dictionaryGenerate,
+              search: (term) => DictionaryWebSearch()
+                  .search(term, cancelled: requestRunner?.whenCancelled),
+              isCancelled: () => requestRunner?.isCancelled == true,
+            )
+          : aiGenerateStream(
+              requestMessages,
+              regenerate: isRegenerate,
+              useAgent: skillRequest?.useAgent ?? homeRequest?.useAgent ?? true,
+              allowedToolIds:
+                  skillRequest?.allowedToolIds ?? homeRequest?.allowedToolIds,
+              ref: widgetRef,
+              requestRunner: requestRunner,
+            );
+      await for (final chunk in coalesceSnapshots(responseStream)) {
         assistantResponse = chunk;
 
         final updatedMessagesWithResponse =
@@ -253,6 +294,15 @@ class AiChat extends _$AiChat {
     late final _ReadingSkillSource source;
 
     switch (policy.scope) {
+      case ReadingSkillSourceScope.dictionarySelection:
+        if (normalizedSelection == null || normalizedSelection.isEmpty) {
+          throw StateError('请先选择需要查询的词语，再使用“AI 词典解释”。');
+        }
+        source = _ReadingSkillSource(
+          description: '待解释的选中词语（不使用本书知识库）',
+          content: normalizedSelection,
+        );
+        break;
       case ReadingSkillSourceScope.currentChapter:
         source = _ReadingSkillSource(
           description: '当前章节正文',

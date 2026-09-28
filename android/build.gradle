@@ -20,6 +20,7 @@ allprojects {
 }
 
 rootProject.buildDir = '../build'
+apply from: 'modu_audio_notification.gradle'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }

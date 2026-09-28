@@ -1,5 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
+import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/system_voice_identity.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
@@ -140,5 +141,77 @@ void main() {
   test('online provider default and explicit voices are unchanged', () {
     expect(TtsService.openai.provider.resolveVoice(null), 'alloy');
     expect(TtsService.openai.provider.resolveVoice('nova'), 'nova');
+  });
+
+  test('missing Windows speech resources do not block opening or stopping',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      calls.add(call);
+      if (call.method == 'speak' || call.method == 'getVoices') {
+        throw PlatformException(
+            code: 'windows_tts_unavailable', message: 'HRESULT=0x80070002');
+      }
+      return 1;
+    });
+    await tts.init(() async => '保留的正文', () async => '下一段', () async => '上一段');
+    expect(calls.map((c) => c.method), isNot(contains('speak')));
+    expect(await tts.getVoices(), isEmpty);
+    tts.updateTtsState(TtsStateEnum.playing);
+    await tts.speak();
+    expect(tts.ttsStateNotifier.value, TtsStateEnum.paused);
+    expect(tts.currentVoiceText, '保留的正文');
+    expect(tts.playbackError, contains('系统语音包'));
+    expect(tts.playbackError, contains('切换在线朗读'));
+    expect(Prefs().ttsService, 'system'); // No unrequested online upload.
+    await tts.stop();
+    await tts.dispose();
+  });
+
+  test('Windows native failure can be retried without restarting the app',
+      () async {
+    var available = false;
+    var advances = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      calls.add(call);
+      if (call.method == 'speak' && !available) {
+        throw PlatformException(code: 'windows_tts_unavailable');
+      }
+      return 1;
+    });
+    await tts.init(() async => '原段落', () async {
+      advances++;
+      return '';
+    }, () async => '');
+    tts.updateTtsState(TtsStateEnum.playing);
+    await tts.speak();
+    expect(advances, 0);
+    expect(tts.currentVoiceText, '原段落');
+    available = true;
+    await tts.resume();
+    expect(advances, 1);
+    expect(tts.playbackError, isNull);
+    expect(tts.ttsStateNotifier.value, TtsStateEnum.stopped);
+  });
+
+  test('settings preview receives actionable Windows error, not silent success',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      if (call.method == 'speak') {
+        throw PlatformException(
+            code: 'windows_tts_unavailable',
+            message: 'Windows 系统朗读不可用，请安装系统语音包');
+      }
+      return call.method == 'getVoices' ? [] : 1;
+    });
+    await expectLater(
+        tts.speakWithVoice('试听', ''),
+        throwsA(isA<PlatformException>().having(
+            (e) => e.message, 'actionable message', contains('系统语音包'))));
   });
 }

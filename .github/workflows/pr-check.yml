@@ -81,7 +81,7 @@ jobs:
           python3 -m unittest discover -s test -p 'model_mirror_test.py' -v
 
       - name: Project documentation and identity checks
-        run: python3 -m unittest discover -s test -p 'project_identity_test.py' -v
+        run: python3 -m unittest discover -s test -p '*_test.py' -v
 
       - uses: actions/setup-node@v4
         with:
@@ -90,4 +90,4 @@ jobs:
       - name: Reader JavaScript regression tests
         run: |
           npm install --prefix "$RUNNER_TEMP/modu-js-tests" jsdom@26.1.0
-          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_*.test.mjs test/vertical_*.test.mjs
+          MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_*.test.mjs test/vertical_*.test.mjs test/android_tts*.test.mjs

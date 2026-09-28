@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/service/ai/answer_presentation.dart';
 
 import 'package:anx_reader/enums/ai_reasoning_effort.dart';
 import 'package:anx_reader/service/ai/reasoning_control_client.dart';
@@ -215,7 +216,7 @@ $readingStateContext
 1. **Gather context first** - Use tools to understand the situation before responding
 2. **Combine tools efficiently** - Use multiple tools in parallel or sequence when needed
 3. **Prioritize specific tools** - When user is reading, prefer current_* series tools over general search
-4. **Be transparent** - Briefly explain your reasoning when using complex tool combinations
+4. **Keep context gathering silent** - Do not narrate routine reading metadata/chapter lookups. Report actionable failures and ask for confirmation before consequential actions.
 
 ## Available Tools & Usage Scenarios
 ${_formatToolCatalog(enabledTools)}
@@ -229,6 +230,7 @@ ${_formatToolCatalog(enabledTools)}
 4. **Deliver value** - Provide actionable suggestions or clear answers
 
 ### Communication Style:
+$conciseAnswerGuidance
 - **Concise yet complete** - No unnecessary elaboration
 - **Evidence-based** - Reference specific content from tool results
 - **Context-adaptive** - Adjust tone based on reading state

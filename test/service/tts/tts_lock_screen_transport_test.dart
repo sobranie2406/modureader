@@ -9,6 +9,7 @@ import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/service/tts/tts_media_state.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,10 +19,13 @@ import 'tts_rate_recovery_test.dart' show NativePlayer;
 
 class PausableBackend extends Fake implements BaseTts {
   @override
+  final bufferingNotifier = ValueNotifier(false);
+  @override
   final ttsStateNotifier = ValueNotifier(TtsStateEnum.paused);
   final reading = Completer<void>();
   Completer<void>? pauseGate;
   int resumes = 0;
+  int pauses = 0;
   bool audible = false;
   @override
   bool get isPlaying => ttsStateNotifier.value == TtsStateEnum.playing;
@@ -31,6 +35,7 @@ class PausableBackend extends Fake implements BaseTts {
   Future<void> init(Function a, Function b, Function c) async {}
   @override
   Future<void> pause() async {
+    pauses++;
     updateTtsState(TtsStateEnum.paused);
     await pauseGate?.future;
     audible = false;
@@ -93,6 +98,36 @@ void main() {
     await Prefs().initPrefs();
     binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
   });
+
+  test('lock screen updates buffering without requiring a playing-state change',
+      () async {
+    final backend = PausableBackend();
+    final factory = TtsFactory.forTesting(() => backend);
+    final handler = TtsHandler.forTesting(
+        factory: factory, activateSession: () async => true);
+    await handler.init(() async => '', () async => '', () async => '');
+    handler.mediaItem.add(ttsMediaItem(
+        bookId: '1',
+        title: 'Book',
+        author: '',
+        chapter: 'Chapter',
+        coverPath: '',
+        state: TtsStateEnum.playing));
+    backend.updateTtsState(TtsStateEnum.playing);
+    backend.bufferingNotifier.value = true;
+    expect(handler.playbackState.value.processingState,
+        AudioProcessingState.buffering);
+    expect(handler.playbackState.value.playing, isTrue);
+    expect(handler.mediaItem.value?.displayTitle, contains('Loading speech'));
+    backend.updateTtsState(TtsStateEnum.paused);
+    expect(handler.playbackState.value.controls[1].action, MediaAction.play);
+    expect(handler.mediaItem.value?.displayTitle, contains('Paused'));
+    backend.bufferingNotifier.value = false;
+    backend.updateTtsState(TtsStateEnum.playing);
+    expect(handler.playbackState.value.processingState,
+        AudioProcessingState.ready);
+    expect(handler.mediaItem.value?.displayTitle, contains('Reading'));
+  });
   tearDown(
       () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed));
 
@@ -119,6 +154,91 @@ void main() {
     });
     return result;
   }
+
+  test('repeated SMS focus callbacks pause and resume only once', () async {
+    final backend = PausableBackend();
+    var focusRequests = 0;
+    final control = await handler(backend, focus: () async {
+      focusRequests++;
+      return true;
+    });
+    await control.play();
+    for (var i = 0; i < 5; i++) {
+      await control.handleAudioInterruption(
+          AudioInterruptionEvent(true, AudioInterruptionType.duck));
+    }
+    expect(backend.pauses, 1);
+    for (var i = 0; i < 5; i++) {
+      await control.handleAudioInterruption(
+          AudioInterruptionEvent(false, AudioInterruptionType.duck));
+    }
+    expect(backend.resumes, 2); // Initial play + a single automatic resume.
+    expect(focusRequests, 1); // GAIN already restored focus.
+    expect(backend.audible, true);
+  });
+
+  test('manual pause during SMS cancels automatic resume', () async {
+    final backend = PausableBackend();
+    final control = await handler(backend);
+    await control.play();
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause));
+    await control.pause();
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause));
+    expect(backend.resumes, 1);
+    expect(backend.pauses, 1);
+    expect(backend.audible, false);
+  });
+
+  test('permanent loss supersedes transient loss without automatic resume',
+      () async {
+    final backend = PausableBackend();
+    final control = await handler(backend);
+    await control.play();
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause));
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.unknown));
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause));
+    expect(backend.resumes, 1);
+    expect(backend.audible, false);
+  });
+
+  test(
+      'second interruption during delayed resume resumes only after final gain',
+      () async {
+    final backend = PausableBackend();
+    final control = await handler(backend);
+    await control.play();
+    backend.pauseGate = Completer<void>();
+    final pause1 = control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause));
+    final resume1 = control.handleAudioInterruption(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause));
+    final pause2 = control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause));
+    backend.pauseGate!.complete();
+    await Future.wait([pause1, resume1, pause2]);
+    expect(backend.resumes, 1);
+    expect(backend.audible, false);
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause));
+    expect(backend.resumes, 2);
+    expect(backend.audible, true);
+  });
+
+  test('SMS does not start user-paused speech', () async {
+    final backend = PausableBackend();
+    final control = await handler(backend);
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(true, AudioInterruptionType.pause));
+    await control.handleAudioInterruption(
+        AudioInterruptionEvent(false, AudioInterruptionType.pause));
+    expect(backend.resumes, 0);
+    expect(backend.pauses, 0);
+  });
 
   test(
       'paused notification resumes retained audio without a mounted reader or frame',

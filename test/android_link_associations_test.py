@@ -17,12 +17,20 @@ class AndroidLinkAssociationsTest(unittest.TestCase):
             a.get(ANDROID + 'name') == 'android.intent.action.' + action
             for a in f.findall('action'))]
 
-    def test_view_accepts_only_local_uris_not_web_links(self):
+    def test_view_accepts_only_local_files_and_explicit_reading_links(self):
         views = self.filters('VIEW')
         self.assertTrue(views)
         for f in views:
             schemes = {d.get(ANDROID + 'scheme') for d in f.findall('data')
                        if d.get(ANDROID + 'scheme')}
+            if schemes == {'modu'}:
+                self.assertEqual(len(f.findall('data')), 1)
+                data = f.find('data')
+                self.assertEqual(data.get(ANDROID + 'host'), 'read')
+                self.assertIsNone(data.get(ANDROID + 'mimeType'))
+                self.assertIn('android.intent.category.BROWSABLE',
+                              {c.get(ANDROID + 'name') for c in f.findall('category')})
+                continue
             # Explicit schemes also prevent a MIME-only wildcard from
             # accidentally claiming nonlocal links with a supplied MIME type.
             self.assertEqual(schemes, {'file', 'content'})

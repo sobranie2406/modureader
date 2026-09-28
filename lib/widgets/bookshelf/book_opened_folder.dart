@@ -2,8 +2,10 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/book_list.dart';
+import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/widgets/bookshelf/book_item.dart';
+import 'package:anx_reader/widgets/bookshelf/folder_pin_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,7 +33,7 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
   @override
   void initState() {
     super.initState();
-    books = widget.books;
+    books = List.of(widget.books);
     currentGroupName = widget.groupName;
     _nameController = TextEditingController(text: currentGroupName);
   }
@@ -68,6 +70,14 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
 
   @override
   Widget build(BuildContext context) {
+    // Re-sort the original folder order so unpinning restores that order.
+    final pins = ref.watch(bookshelfPinsProvider);
+    final ids = books.map((book) => book.id).toSet();
+    final original =
+        widget.books.where((book) => ids.contains(book.id)).toList();
+    if (original.isNotEmpty) {
+      books = applyBookshelfPins([BookList().sortBooks(original)], pins).single;
+    }
     return AlertDialog(
       title: isEditingName
           ? Row(
@@ -151,6 +161,7 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
                 )),
       ),
       actions: [
+        if (books.isNotEmpty) FolderPinMenu(groupId: books.first.groupId),
         TextButton(
             onPressed: () {
               ref.read(bookListProvider.notifier).dissolveGroup(books);

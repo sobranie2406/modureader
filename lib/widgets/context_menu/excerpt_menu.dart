@@ -10,6 +10,7 @@ import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/book_share/excerpt_share_service.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
+import 'package:anx_reader/widgets/context_menu/annotation_color_palette.dart';
 import 'package:anx_reader/widgets/icon_and_text.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
@@ -239,18 +240,6 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     );
   }
 
-  Widget colorButton(String color) {
-    return iconButton(
-      icon: Icon(
-        Icons.circle,
-        color: Color(int.parse('0x88$color')),
-      ),
-      onPressed: () {
-        onColorSelected(color);
-      },
-    );
-  }
-
   Widget typeButton(String type, IconData icon) {
     return iconButton(
       icon: Icon(icon,
@@ -275,7 +264,11 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             icon: deleteIcon(),
           ),
           for (final type in notesType) typeButton(type.type, type.icon),
-          for (String color in notesColors) colorButton(color),
+          AnnotationColorPalette(
+            axis: widget.axis,
+            selectedColor: annoColor,
+            onSelected: (color) => onColorSelected(color),
+          ),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/book_sync_status.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/sync_status.dart';
+import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
@@ -51,6 +52,7 @@ class _BookItemState extends ConsumerState<BookItem> {
 
   @override
   Widget build(BuildContext context) {
+    final pinned = ref.watch(bookshelfPinsProvider).contains(bookPinKey(book));
     void toggleSelection() {
       onSelectionChanged?.call(book, !selected);
     }
@@ -209,6 +211,7 @@ class _BookItemState extends ConsumerState<BookItem> {
                               syncStatus: bookSyncStatus,
                             ),
                           ),
+                        if (pinned) const Icon(Icons.push_pin, size: 16),
                       ],
                     ),
                     Row(

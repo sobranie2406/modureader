@@ -12,30 +12,40 @@ extension _WebdavSyncSupport on WebdavClient {
     try {
       await mkdirAll(folder);
       created = true;
-      await source.writeAsString('modu-probe-a');
-      await uploadFile(source.path, target);
-      final first = await readProps(target);
-      if (!WebdavClient.isStrongETag(first?.eTag)) return false;
-      await source.writeAsString('modu-probe-b');
-      await uploadFileConditionally(source.path, target,
-          expectedETag: first!.eTag);
-      final second = await readProps(target);
-      if (!WebdavClient.isStrongETag(second?.eTag) ||
-          first.eTag == second!.eTag) {
-        return false;
+      // Two writes can straddle a second boundary and falsely approve a
+      // size+integer-mtime validator. Four distinct equal-size representations
+      // within two seconds necessarily include writes in the same second.
+      // A slow connection cannot provide that evidence: use the safe journal,
+      // rather than waiting a second (which would hide the server defect).
+      final elapsed = Stopwatch()..start();
+      final validators = <String>[];
+      for (final value in ['a', 'b', 'c', 'd']) {
+        await source.writeAsString('modu-probe-$value');
+        await uploadFileConditionally(source.path, target,
+            expectedETag: validators.isEmpty ? null : validators.last,
+            createOnly: validators.isEmpty);
+        final props = await readProps(target);
+        if (!WebdavClient.isStrongETag(props?.eTag) ||
+            validators.contains(props!.eTag)) {
+          return false;
+        }
+        validators.add(props.eTag!);
+        await downloadFile(target, received.path);
+        if (await received.readAsString() != 'modu-probe-$value') return false;
       }
+      if (elapsed.elapsed >= const Duration(seconds: 2)) return false;
       await source.writeAsString('modu-probe-must-not-overwrite');
       for (final createOnly in [false, true]) {
         try {
           await uploadFileConditionally(source.path, target,
-              expectedETag: first.eTag, createOnly: createOnly);
+              expectedETag: validators.first, createOnly: createOnly);
           // A successful stale/duplicate write proves the validator unreliable.
           return false;
         } on DioException catch (e) {
           if (e.response?.statusCode != 412) rethrow;
         }
         await downloadFile(target, received.path);
-        if (await received.readAsString() != 'modu-probe-b') return false;
+        if (await received.readAsString() != 'modu-probe-d') return false;
       }
       return true;
     } on DioException catch (e) {

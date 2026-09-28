@@ -17,6 +17,12 @@ const List<String> notesColors = [
   '00FF00',
   'EB3BFF',
   'FFD700',
+  // Saturated mid-tones stay distinct from common pale reading backgrounds.
+  'FF8C00', // Orange
+  'E85D91', // Rose
+  '00897B', // Deep teal
+  '6C63D9', // Indigo
+  'A66C3D', // Brown
 ];
 
 const List<NoteTypeOption> notesType = [

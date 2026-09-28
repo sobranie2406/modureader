@@ -26,6 +26,8 @@ const Renderer = runInNewContext(`class Renderer {
   get locked() {return this.#locked}
   get signedOffset() {return this.#container[this.scrollProp]}
   hasAttribute() {return false}
+  percent = null;
+  getAttribute() {return this.percent}
   #afterScroll() {this.relocations++}
   setStyles() {} dispatchEvent() {}
   async #display(target) {
@@ -78,8 +80,9 @@ test('normal chapter transitions remain available; trailing non-linear sections 
 });
 
 test('scroll mode clamps to the last screen, short chapters and vertical writing included', async () => {
-  for (const length of [300, 600, 1901]) for (const vertical of [false, true]) {
+  for (const percent of [80, 90, 100]) for (const length of [300, 600, 1901]) for (const vertical of [false, true]) {
     const r = new Renderer(); r.scrolled = true; r.vertical = vertical; r.viewSize = length; r.start = 0;
+    r.percent = String(percent);
     for (let i = 0; i < 10; i++) await r.next();
     assert.equal(r.start, Math.max(0, length - r.size));
     const count = r.relocations;

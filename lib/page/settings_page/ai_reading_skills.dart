@@ -511,6 +511,7 @@ class _AiReadingSkillsSettingsState
       'reading_guide' => Icons.explore_outlined,
       'smart_translator' => Icons.translate_outlined,
       'vocabulary_helper' => Icons.spellcheck_outlined,
+      'ai_dictionary' => Icons.menu_book_outlined,
       'mindmap' => Icons.hub_outlined,
       _ => Icons.extension_outlined,
     };

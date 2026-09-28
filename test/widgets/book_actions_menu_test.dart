@@ -3,8 +3,21 @@ import 'dart:io';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/models/tb_group.dart';
+import 'package:anx_reader/models/tag.dart';
+import 'package:anx_reader/providers/tags.dart';
+import 'package:anx_reader/providers/book_list.dart';
+import 'package:anx_reader/providers/sync.dart';
+import 'package:anx_reader/models/sync_state_model.dart';
+import 'package:anx_reader/enums/sync_direction.dart';
+import 'package:anx_reader/page/home_page/bookshelf_page.dart';
+import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/models/sync_status.dart';
 import 'package:anx_reader/providers/sync_status.dart';
+import 'package:anx_reader/providers/bookshelf_pins.dart';
+import 'package:anx_reader/widgets/bookshelf/folder_pin_menu.dart';
+import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
+import 'package:anx_reader/widgets/bookshelf/book_opened_folder.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -17,6 +30,52 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart' as legacy;
+
+class _Groups extends GroupDao {
+  @override
+  Future<List<TbGroup>> build() async => [const TbGroup(id: 42, name: '测试文件夹')];
+}
+
+class _IdleSync extends Notifier<SyncStateModel> implements Sync {
+  @override
+  SyncStateModel build() => const SyncStateModel(
+      direction: SyncDirection.both,
+      isSyncing: false,
+      total: 0,
+      count: 0,
+      fileName: '');
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ShelfTags extends TagList {
+  @override
+  Future<List<Tag>> build() async => [];
+}
+
+class _ShelfBooks extends BookList {
+  _ShelfBooks(this.books);
+  final List<Book> books;
+  List<int>? moved;
+  String? createdName;
+  int? destination;
+  @override
+  Future<List<List<Book>>> build() async =>
+      books.map((book) => [book]).toList();
+  @override
+  Future<void> moveBooksToFolder(Iterable<int> ids,
+      {int? groupId, String? newFolderName}) async {
+    moved = ids.toList();
+    createdName = newFolderName;
+    destination = groupId;
+    state = AsyncData(groupBooks(books
+        .map((book) => moved!.contains(book.id)
+            ? book.copyWith(groupId: groupId ?? 42)
+            : book)
+        .toList()));
+  }
+}
 
 class _SyncStatus extends SyncStatus {
   void syncing(bool active) {
@@ -63,32 +122,59 @@ void main() {
 
   Future<void> mount(WidgetTester tester,
       {bool bottom = false,
+      bool folder = false,
+      bool singleInFolder = false,
+      bool shelf = false,
       bool selection = false,
       void Function(Book, bool)? select}) async {
     await tester.runAsync(() async {
       await tester.pumpWidget(ProviderScope(
-        overrides: [syncStatusProvider.overrideWith(_SyncStatus.new)],
-        child: MaterialApp(
-          locale: const Locale('zh'),
-          supportedLocales: L10n.supportedLocales,
-          localizationsDelegates: const [
-            L10n.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate
-          ],
-          home: Scaffold(
-              body: Center(
-                  child: bottom
-                      ? BookBottomSheet(book: book)
-                      : SizedBox(
-                          width: 160,
-                          height: 340,
-                          child: BookItem(
-                              book: book,
-                              selectionMode: selection,
-                              onSelectionChanged: select)))),
-        ),
+        overrides: [
+          syncProvider.overrideWith(_IdleSync.new),
+          syncStatusProvider.overrideWith(_SyncStatus.new),
+          groupDaoProvider.overrideWith(_Groups.new),
+          tagListProvider.overrideWith(_ShelfTags.new),
+          bookListProvider.overrideWith(() => _ShelfBooks([
+                book,
+                book.copyWith(id: 790, coverPath: 'cover/second.png'),
+              ])),
+        ],
+        child: legacy.ChangeNotifierProvider<Prefs>.value(
+            value: Prefs(),
+            child: MaterialApp(
+              locale: const Locale('zh'),
+              supportedLocales: L10n.supportedLocales,
+              localizationsDelegates: const [
+                L10n.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate
+              ],
+              home: shelf
+                  ? const BookshelfPage()
+                  : Scaffold(
+                      body: Center(
+                          child: bottom
+                              ? BookBottomSheet(book: book)
+                              : SizedBox(
+                                  width: 160,
+                                  height: 340,
+                                  child: folder
+                                      ? BookFolder(
+                                          books: [
+                                            book.copyWith(groupId: 42),
+                                            if (!singleInFolder)
+                                              book.copyWith(
+                                                  id: 790, groupId: 42)
+                                          ],
+                                          selectionMode: selection,
+                                          onSelectionChanged: select,
+                                        )
+                                      : BookItem(
+                                          book: book,
+                                          selectionMode: selection,
+                                          onSelectionChanged: select)))),
+            )),
       ));
       // Index badges read real file metadata; let that I/O complete outside the
       // widget test's fake clock before taking a menu snapshot.
@@ -106,6 +192,81 @@ void main() {
           find.byType(PopupMenuItem<BookAction>))
       .map((w) => w.value!)
       .toList();
+
+  for (final createNew in [true, false]) {
+    testWidgets('narrow bookshelf batch folder action create=$createNew',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await mount(tester, shelf: true);
+      await tester.tap(find.text('选择'));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<TextButton>(find.widgetWithText(TextButton, '新建文件夹'))
+              .onPressed,
+          isNull);
+      await tester.tap(find.text('全选'));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 2 本'), findsOneWidget);
+      await tester.tap(find.text(createNew ? '新建文件夹' : '移入文件夹'));
+      await tester.pumpAndSettle();
+      if (createNew) {
+        await tester.enterText(find.byType(TextField), '批量新建');
+      } else {
+        await tester.tap(find.text('测试文件夹'));
+        await tester.pump();
+      }
+      await tester.tap(find.text(createNew ? '创建并移入' : '移入'));
+      await tester.pumpAndSettle();
+      final container =
+          ProviderScope.containerOf(tester.element(find.byType(BookshelfPage)));
+      final books = container.read(bookListProvider.notifier) as _ShelfBooks;
+      expect(books.moved, [789, 790]);
+      expect(createNew ? books.createdName : books.destination,
+          createNew ? '批量新建' : 42);
+      expect(find.text('选择'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('one-book folder still opens as folder and exposes folder menu',
+      (tester) async {
+    await mount(tester, folder: true, singleInFolder: true);
+    expect(find.text('测试文件夹'), findsOneWidget);
+    expect(find.byTooltip('文件夹操作'), findsOneWidget);
+    expect(find.byType(BookItem), findsNothing);
+    await tester.tap(find.byType(BookFolder));
+    await tester.pumpAndSettle();
+    expect(find.byType(BookOpenedFolder), findsOneWidget);
+    expect(find.byType(BookItem), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('folder tile long press offers pin, selection mode hides menu',
+      (tester) async {
+    await mount(tester, folder: true);
+    await tester.longPress(find.byType(BookFolder));
+    await tester.pumpAndSettle();
+    expect(find.text('置顶'), findsOneWidget);
+    await tester.tap(find.text('置顶'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.push_pin), findsOneWidget);
+    await tester.tap(find.byTooltip('文件夹操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('取消置顶'), findsOneWidget);
+    await tester.tap(find.text('取消置顶'));
+    await tester.pumpAndSettle();
+    var selected = 0;
+    await mount(tester, folder: true, selection: true, select: (_, value) {
+      if (value) selected++;
+    });
+    expect(find.byTooltip('文件夹操作'), findsNothing);
+    await tester.tap(find.byType(BookFolder));
+    await tester.pumpAndSettle();
+    expect(selected, 2);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final platform in [
     TargetPlatform.android,
@@ -141,8 +302,7 @@ void main() {
     });
   }
 
-  testWidgets(
-      'cover dots, long press and drag bottom bar share all seven actions',
+  testWidgets('cover dots, long press and drag bottom bar share all actions',
       (tester) async {
     await mount(tester);
     await tester.tap(find.byTooltip('书籍操作'));
@@ -172,6 +332,61 @@ void main() {
             .toList(),
         labels);
     expect(find.textContaining('更多操作（'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('book menu toggles persistent pin without changing reading data',
+      (tester) async {
+    await mount(tester);
+    final position = book.lastReadPosition;
+    final time = book.updateTime;
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(BookItem)));
+    await tester.tap(find.byTooltip('书籍操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('置顶'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('book-action-pin')));
+    await tester.pumpAndSettle();
+    expect(container.read(bookshelfPinsProvider), contains(bookPinKey(book)));
+    expect(book.lastReadPosition, position);
+    expect(book.updateTime, time);
+    await tester.tap(find.byTooltip('书籍操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('取消置顶'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('book-action-pin')));
+    await tester.pumpAndSettle();
+    expect(container.read(bookshelfPinsProvider),
+        isNot(contains(bookPinKey(book))));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('folder menu can pin and unpin independently of a book',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: L10n.supportedLocales,
+      localizationsDelegates: const [
+        L10n.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate
+      ],
+      home: const Scaffold(body: FolderPinMenu(groupId: 789)),
+    )));
+    await tester.pumpAndSettle();
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(FolderPinMenu)));
+    await tester.tap(find.byTooltip('文件夹操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('置顶'));
+    await tester.pumpAndSettle();
+    expect(container.read(bookshelfPinsProvider), {folderPinKey(789)});
+    await tester.tap(find.byTooltip('文件夹操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消置顶'));
+    await tester.pumpAndSettle();
+    expect(container.read(bookshelfPinsProvider), isEmpty);
     expect(tester.takeException(), isNull);
   });
 

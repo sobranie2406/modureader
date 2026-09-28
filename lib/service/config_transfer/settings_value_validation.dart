@@ -35,6 +35,12 @@ void validateSettingsValue(String key, dynamic value) {
   if (choices.containsKey(key) && !choices[key]!.contains(value)) {
     throw const FormatException('Unknown setting choice');
   }
+  if (key == 'scrollPagePercent' && (value < 80 || value > 100)) {
+    throw const FormatException('Invalid scroll page percentage');
+  }
+  if (key == 'selectionSearchZoomPercent' && (value < 50 || value > 200)) {
+    throw const FormatException('Invalid search zoom percentage');
+  }
   if (key == 'customPageTurnConfig') {
     final cells = (value as String).split(',').map(int.tryParse).toList();
     if (cells.length != 9 || cells.any((n) => n == null || n < 0 || n > 3)) {
@@ -128,7 +134,7 @@ void validateSettingsValue(String key, dynamic value) {
     final data = object();
     if (!['name', 'createdAt', 'modifiedAt', 'size'].contains(data['sort']) ||
         data['ascending'] is! bool ||
-        !['all', 'books', 'epub', 'pdf', 'txt', 'mobi', 'azw3', 'fb2']
+        !['all', 'books', 'epub', 'pdf', 'txt', 'mobi', 'azw3', 'fb2', 'md']
             .contains(data['filter'])) {
       throw const FormatException('Invalid library view');
     }

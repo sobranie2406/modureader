@@ -320,6 +320,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         desktopPageInput: ${AnxPlatform.isDesktop},
         keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
+        scrollPagePercent: ${Prefs().scrollPagePercent},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
         paragraphSpacing: ${style.paragraphSpacing},
@@ -401,6 +402,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     ''');
   }
 
+  void changeScrollPagePercent(int percent) {
+    // Input distance only: do not restyle/reflow the chapter or move its CFI.
+    webViewController.evaluateJavascript(
+        source: 'window.setScrollPagePercent(${percent.clamp(80, 100)});');
+  }
+
   void goToHref(String href) =>
       webViewController.evaluateJavascript(source: "goToHref('$href')");
 
@@ -410,8 +417,18 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         source: 'window.turnPageFromKeyboard($direction)');
   }
 
-  void goToCfi(String cfi) =>
-      webViewController.evaluateJavascript(source: "goToCfi('$cfi')");
+  String? _pendingLinkedCfi;
+
+  void goToLinkedCfi(String cfi) {
+    if (!_readerReady) {
+      _pendingLinkedCfi = cfi;
+      return;
+    }
+    goToCfi(cfi);
+  }
+
+  void goToCfi(String cfi) => webViewController.evaluateJavascript(
+      source: 'goToCfi(${jsonEncode(cfi)});');
 
   void addAnnotation(BookNote bookNote) {
     // JSON also safely handles quotes, backslashes and multiline excerpts.
@@ -1023,6 +1040,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
               .setBookTranslationMode(widget.book.id, TranslationModeEnum.off);
           if (!mounted) return;
           widget.onLoadEnd();
+          final linkedCfi = _pendingLinkedCfi;
+          _pendingLinkedCfi = null;
+          if (linkedCfi != null) goToCfi(linkedCfi);
         });
 
     controller.addJavaScriptHandler(

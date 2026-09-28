@@ -592,8 +592,66 @@ export class View extends HTMLElement {
   #ttsPresentation = null
   #ttsPresenting = false
   ttsBackground = false
+  #ttsDocuments = new Map()
+  #ttsDocument(index) {
+    let entry = this.#ttsDocuments.get(index)
+    if (entry) return entry
+    entry = { doc: null, peek: null }
+    this.#ttsDocuments.set(index, entry)
+    entry.promise = Promise.resolve().then(() => this.book.sections[index].createDocument())
+      .then(doc => {
+        if (!doc?.body) throw new Error('Speech chapter has no text document')
+        entry.doc = doc
+        return doc
+      }).catch(error => {
+        // Keep a failed speculative read until the consumer reaches it. The
+        // producer polls frequently; retrying here would hammer a corrupt ZIP.
+        entry.error = error
+        throw error
+      })
+    // Lookahead errors are retried by navigation, never unhandled rejections
+    // and never a reason to stop the chapter that is currently audible.
+    void entry.promise.catch(() => {})
+    return entry
+  }
+  discardTTSSection(index) { this.#ttsDocuments.delete(index) }
+  #warmTTSSections() {
+    const current = this.tts?.sectionIndex
+    if (!Number.isInteger(current)) return
+    const keep = new Set([current])
+    const sections = this.book.sections
+    // Bounded text-only lookahead. No iframe, fonts, images or page animation.
+    for (let index = current + 1; index < sections.length && keep.size < 4; index++) {
+      if (sections[index].linear === 'no') continue
+      if (!sections[index].createDocument) break
+      keep.add(index)
+      this.#ttsDocument(index)
+    }
+    for (const index of this.#ttsDocuments.keys())
+      if (!keep.has(index)) this.#ttsDocuments.delete(index)
+  }
+  collectTTSDetails(count, options = {}) {
+    const details = this.tts.collectDetails(count, options)
+    // Only the normal sequential producer looks across chapters. Other peek
+    // offsets retain their existing, chapter-local semantics.
+    if (!options.includeCurrent || (options.offset ?? 1) !== 1) return details
+    this.#warmTTSSections()
+    for (let index = this.tts.sectionIndex + 1;
+      details.length < count && index < this.book.sections.length; index++) {
+      if (this.book.sections[index].linear === 'no') continue
+      const entry = this.#ttsDocuments.get(index)
+      // Never hold this chapter's ready text behind a slow next-chapter read.
+      if (!entry?.doc) break
+      entry.peek ??= new TTS(entry.doc, textWalker, null,
+        range => this.getCFI(index, range),
+        { paragraphMode: this.ttsParagraphMode === true })
+      details.push(...entry.peek.collectDetails(count - details.length, { includeCurrent: true }))
+    }
+    return details
+  }
   async loadTTSSection(index, isCurrent = () => true) {
-    const doc = await this.book.sections[index].createDocument()
+    if (this.#ttsDocuments.get(index)?.error) this.discardTTSSection(index)
+    const doc = await this.#ttsDocument(index).promise
     if (!isCurrent()) return false
     if (!doc?.body) throw new Error('Speech chapter has no text document')
     this.initTTS(false, { force: true, content: { doc, index }, detached: true })
@@ -633,6 +691,7 @@ export class View extends HTMLElement {
   }
   initTTS(stop, { force = false, content, detached = false } = {}) {
     if (stop) {
+      this.#ttsDocuments.clear()
       this.#ttsPresentation = null
       this.renderer.pinTtsSection?.(null)
       this.#getOverlayer(this.tts?.sectionIndex ?? this.#index)?.overlayer.remove(this.oldValue)
@@ -675,6 +734,7 @@ export class View extends HTMLElement {
       { paragraphMode: this.ttsParagraphMode === true },
     );
     this.tts.sectionIndex = index;
+    this.#warmTTSSections()
   }
   startMediaOverlay() {
     const { index } = this.renderer.getContents()[0]

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:anx_reader/service/ai/answer_presentation.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_scroll_controller.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -1205,6 +1206,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     List<ParsedReasoningEntry> timeline, {
     required double fontSize,
   }) {
+    timeline = visibleAnswerTimeline(timeline);
     final widgets = <Widget>[];
     for (var i = 0; i < timeline.length; i++) {
       final entry = timeline[i];

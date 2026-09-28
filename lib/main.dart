@@ -41,6 +41,8 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:heroine/heroine.dart';
 import 'package:provider/provider.dart' as provider;
 import 'package:window_manager/window_manager.dart';
+import 'package:app_links/app_links.dart';
+import 'package:anx_reader/service/notes/reading_link.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 late AudioHandler audioHandler;
@@ -52,6 +54,11 @@ MigrationCheckResult? _migrationCheckResult;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Listen before storage prompts/migration. The inbox waits for a usable home
+  // navigator, and keeps only the latest request rather than dropping cold links.
+  if (!AnxPlatform.isOhos) {
+    AppLinks().stringLinkStream.listen(readingLinkInbox.add, onError: (_) {});
+  }
   String diagnosticVersion = 'unknown';
   try {
     diagnosticVersion = await getAppVersion();

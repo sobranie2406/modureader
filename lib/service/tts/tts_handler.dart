@@ -50,6 +50,8 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   BaseTts? _observedTts;
   int _transportCommand = 0;
   bool _resumeAfterInterruption = false;
+  bool _interruptionActive = false;
+  Object? _interruptionResume;
   Future<void>? _pendingPause;
 
   bool get _chinese =>
@@ -77,6 +79,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       chapter: chapter ?? current.extras?['ttsChapter'] as String? ?? '',
       coverPath: current.extras?['ttsCoverPath'] as String? ?? '',
       state: tts.ttsStateNotifier.value,
+      buffering: tts.bufferingNotifier.value,
       chinese: _chinese,
     ));
   }
@@ -91,14 +94,16 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   void _observePlayback() {
     _observedTts?.ttsStateNotifier.removeListener(_syncPlaybackState);
+    _observedTts?.bufferingNotifier.removeListener(_syncPlaybackState);
     _observedTts = tts;
     tts.ttsStateNotifier.addListener(_syncPlaybackState);
+    tts.bufferingNotifier.addListener(_syncPlaybackState);
   }
 
   void _syncPlaybackState() {
     playbackState.add(ttsMediaState(
         playbackState.value, tts.ttsStateNotifier.value,
-        chinese: _chinese));
+        chinese: _chinese, buffering: tts.bufferingNotifier.value));
     if (tts.ttsStateNotifier.value != TtsStateEnum.stopped) _refreshMetadata();
   }
 
@@ -112,6 +117,10 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   Future<void> switchTtsType(String serviceId) async {
+    ++_transportCommand;
+    _interruptionActive = false;
+    _interruptionResume = null;
+    _resumeAfterInterruption = false;
     await _ttsFactory.switchTtsType(serviceId);
     if (_getCurrentText != null &&
         _getNextText != null &&
@@ -136,28 +145,72 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         contentType: AndroidAudioContentType.speech,
         usage: AndroidAudioUsage.media,
       ),
+      // Spoken text must not be lost under a message sound. Pause once and
+      // resume on focus gain; do not duck speech or re-request gained focus.
+      androidWillPauseWhenDucked: true,
     ));
     session.interruptionEventStream.listen((event) {
-      if (event.begin) {
-        final wasPlaying = tts.isPlaying;
-        if (wasPlaying) unawaited(pause());
-        _resumeAfterInterruption =
-            wasPlaying && event.type != AudioInterruptionType.unknown;
-      } else {
-        final resume = _resumeAfterInterruption;
-        _resumeAfterInterruption = false;
-        if (resume && tts.ttsStateNotifier.value == TtsStateEnum.paused) {
-          unawaited(play());
-        }
-      }
+      unawaited(handleAudioInterruption(event).catchError((Object error) {
+        AnxLog.warning('TTS interruption failed: ${error.runtimeType}');
+      }));
     });
     session.becomingNoisyEventStream.listen((_) {
-      if (tts.isPlaying) pause();
+      // Unplugging headphones during an interruption must cancel auto-resume.
+      if (tts.isPlaying ||
+          _resumeAfterInterruption ||
+          _interruptionResume != null) {
+        unawaited(pause());
+      }
     });
+  }
+
+  @visibleForTesting
+  Future<void> handleAudioInterruption(AudioInterruptionEvent event) async {
+    AnxLog.info('TTS audio interruption: begin=${event.begin}, '
+        'type=${event.type.name}, state=${tts.ttsStateNotifier.value.name}');
+    if (event.begin) {
+      if (_interruptionActive) {
+        // A transient loss can become permanent (e.g. another media app).
+        if (event.type == AudioInterruptionType.unknown) {
+          _resumeAfterInterruption = false;
+        }
+        return;
+      }
+      _interruptionActive = true;
+      final wasPlaying = tts.isPlaying || _interruptionResume != null;
+      _interruptionResume = null;
+      ++_transportCommand; // Cancel any auto-resume waiting on native pause.
+      if (!wasPlaying) return;
+      final pausing = pause();
+      _resumeAfterInterruption = event.type != AudioInterruptionType.unknown;
+      await pausing;
+    } else {
+      if (!_interruptionActive) return;
+      _interruptionActive = false;
+      final resume = _resumeAfterInterruption;
+      _resumeAfterInterruption = false;
+      if (resume &&
+          event.type != AudioInterruptionType.unknown &&
+          tts.ttsStateNotifier.value == TtsStateEnum.paused) {
+        final token = Object();
+        _interruptionResume = token;
+        try {
+          await _play(focusAlreadyGained: true);
+        } finally {
+          if (identical(_interruptionResume, token)) _interruptionResume = null;
+        }
+      }
+    }
   }
 
   @override
   Future<void> play() async {
+    _interruptionResume = null;
+    _interruptionActive = false;
+    await _play();
+  }
+
+  Future<void> _play({bool focusAlreadyGained = false}) async {
     _resumeAfterInterruption = false;
     final backend = tts;
     if (backend.isPlaying) return;
@@ -182,8 +235,9 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     try {
       await _pendingPause;
       if (command != _transportCommand || !identical(tts, backend)) return;
-      final active = await (_activateSessionOverride?.call() ??
-          AudioSession.instance.then((session) => session.setActive(true)));
+      final active = focusAlreadyGained ||
+          await (_activateSessionOverride?.call() ??
+              AudioSession.instance.then((session) => session.setActive(true)));
       if (!active) {
         AnxLog.warning('TTS transport play rejected: audio focus denied');
         return;
@@ -250,8 +304,13 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> pause() async {
+    _interruptionResume = null;
     final command = ++_transportCommand;
     _resumeAfterInterruption = false;
+    if (tts.ttsStateNotifier.value == TtsStateEnum.paused) {
+      await _pendingPause;
+      return;
+    }
     playbackState.add(ttsMediaState(playbackState.value, TtsStateEnum.paused,
             chinese: _chinese)
         .copyWith(
@@ -284,7 +343,9 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> stop() async {
+    _interruptionResume = null;
     ++_transportCommand;
+    _interruptionActive = false;
     _resumeAfterInterruption = false;
     playbackState.add(playbackState.value.copyWith(
       controls: [],

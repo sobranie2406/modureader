@@ -1818,6 +1818,7 @@ const setStyle = (oldStyle) => {
   reader.view.renderer.setAttribute('mobile-touch-paging', style.mobileTouchPaging === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('desktop-page-input', style.desktopPageInput === true ? 'true' : 'false')
   reader.view.renderer.setAttribute('tap-only-page-turn', style.tapOnlyPageTurn === true ? 'true' : 'false')
+  reader.view.renderer.setAttribute('scroll-page-percent', String(style.scrollPagePercent ?? 80))
   reader.view.renderer.setAttribute('flow', turn.scroll ? 'scrolled' : 'paginated')
   // Keep script-enabled / vertical books and note popups on the single-view
   // renderer: speculative documents must never execute author scripts.
@@ -2054,6 +2055,11 @@ window.removeAnnotation = (cfi) => reader.removeAnnotation(cfi)
 
 window.prevSection = () => reader.view.renderer.prevSection()
 
+window.setScrollPagePercent = percent => {
+  style.scrollPagePercent = Number.isFinite(percent) ? Math.max(80, Math.min(100, percent)) : 80
+  reader.view.renderer.setAttribute('scroll-page-percent', String(style.scrollPagePercent))
+}
+
 window.nextSection = () => reader.view.renderer.nextSection()
 
 window.initTts = () => reader.view.initTTS()
@@ -2092,7 +2098,7 @@ window.ttsCurrentDetail = () => {
 
 window.ttsCollectDetails = (count = 1, includeCurrent = false, offset = 1) => {
   initTts()
-  return reader.view.tts.collectDetails(count, { includeCurrent, offset })
+  return reader.view.collectTTSDetails(count, { includeCurrent, offset })
 }
 
 window.ttsHighlightByCfi = cfi => {

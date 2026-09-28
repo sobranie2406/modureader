@@ -19,6 +19,8 @@ import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
+import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:anx_reader/service/book_formats.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
@@ -37,7 +39,7 @@ import 'package:path/path.dart' as path;
 
 import 'book_player/book_player_server.dart';
 
-final allowBookExtensions = ["epub", "mobi", "azw3", "fb2", "txt", "pdf"];
+export 'package:anx_reader/service/book_formats.dart' show allowBookExtensions;
 
 /// import book list and **delete file**
 void importBookList(List<File> fileList, BuildContext context, WidgetRef ref) {
@@ -435,8 +437,12 @@ Future<void> importBook(File file, WidgetRef ref,
     {void Function()? onImported}) async {
   String? md5 = await MD5Service.calculateFileMd5(file.path);
 
-  if (file.path.split('.').last.toLowerCase() == 'txt') {
-    final tempFile = await convertFromTxt(file);
+  final extension =
+      path.extension(file.path).replaceFirst('.', '').toLowerCase();
+  if (extension == 'txt' || isMarkdownExtension(extension)) {
+    final tempFile = isMarkdownExtension(extension)
+        ? await convertFromMarkdown(file)
+        : await convertFromTxt(file);
     file.deleteSync();
     file = tempFile;
   }
@@ -456,6 +462,7 @@ Future<void> pushToReadingPage(
   Book book, {
   String? cfi,
   String? heroTag,
+  bool waitForClose = true,
 }) async {
   if (book.isDeleted) {
     AnxToast.show(L10n.of(context).bookDeleted);
@@ -480,7 +487,7 @@ Future<void> pushToReadingPage(
   final chapterContentBridge = ref.read(chapterContentBridgeProvider.notifier);
   final tocSearch = ref.read(tocSearchProvider.notifier);
 
-  await Navigator.push(
+  final closed = Navigator.push(
     navigatorKey.currentContext!,
     readingRoute<void>(
       animate: Prefs().openBookAnimation,
@@ -499,6 +506,11 @@ Future<void> pushToReadingPage(
     tocSearch.clear();
     AnxLog.info('Pop successfully ReadingPage: ${book.title}');
   });
+  if (waitForClose) {
+    await closed;
+  } else {
+    unawaited(closed);
+  }
 }
 
 void updateBookRating(Book book, double rating) {

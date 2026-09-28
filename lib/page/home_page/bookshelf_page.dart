@@ -24,6 +24,7 @@ import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
+import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:anx_reader/widgets/bookshelf/sync_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
@@ -168,6 +169,18 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         _selectionMode = false;
         _selectedBookIds.clear();
       });
+    }
+
+    Future<void> organizeSelectedBooks(bool createNew) async {
+      final moved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BookFolderDialog(
+          bookIds: selectedBooks.map((book) => book.id).toList(),
+          createNew: createNew,
+        ),
+      );
+      if (moved == true && mounted) exitSelectionMode();
     }
 
     Widget buildFilterBar() {
@@ -442,7 +455,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
       data: (books) {
         for (int i = 0; i < books.length; i++) {
           // folder can't be dragged
-          if (books[i].length != 1) {
+          if (books[i].first.groupId != 0) {
             lockedIndices.add(i);
           }
         }
@@ -456,7 +469,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                 onReorder: (ReorderedListFunction reorderedListFunction) {},
                 scrollController: _scrollController,
                 onDragStarted: (index) {
-                  if (books[index].length == 1) {
+                  if (books[index].first.groupId == 0) {
                     handleBottomSheet(context, books[index].first);
                     // add other books to lockedIndices
                     for (int i = 0; i < books.length; i++) {
@@ -470,7 +483,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                   // remove all books from lockedIndices
                   lockedIndices = [];
                   for (int i = 0; i < books.length; i++) {
-                    if (books[i].length != 1) {
+                    if (books[i].first.groupId != 0) {
                       lockedIndices.add(i);
                     }
                   }
@@ -480,9 +493,11 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                   ...books.map(
                     (book) {
                       final topLevelKey = ValueKey<String>(
-                        book.first.id.toString(),
+                        book.first.groupId == 0
+                            ? 'book:${book.first.id}'
+                            : 'folder:${book.first.groupId}',
                       );
-                      return book.length == 1
+                      return book.first.groupId == 0
                           ? CustomDraggable(
                               key: topLevelKey,
                               data: book.first,
@@ -542,6 +557,53 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     Widget body = Column(
       children: [
         if (!_selectionMode) buildFilterBar(),
+        if (_selectionMode)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: selectedBooks.isEmpty
+                      ? null
+                      : () => organizeSelectedBooks(true),
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                  label: const Text('新建文件夹'),
+                ),
+                TextButton.icon(
+                  onPressed: selectedBooks.isEmpty
+                      ? null
+                      : () => organizeSelectedBooks(false),
+                  icon: const Icon(Icons.drive_file_move_outline),
+                  label: const Text('移入文件夹'),
+                ),
+                TextButton.icon(
+                  onPressed: selectedBooks.isEmpty
+                      ? null
+                      : () {
+                          queueBooksForVectorization(selectedBooks);
+                          exitSelectionMode();
+                        },
+                  icon: const Icon(Icons.hub_outlined),
+                  label: const Text('向量化'),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  onPressed: selectedBooks.isEmpty
+                      ? null
+                      : () async {
+                          final deleted =
+                              await confirmAndDeleteBooksFromBookshelf(
+                                  context, ref, selectedBooks);
+                          if (deleted && mounted) exitSelectionMode();
+                        },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('删除'),
+                ),
+              ],
+            ),
+          ),
         const _KnowledgeQueueBanner(),
         Expanded(
           child: DropTarget(
@@ -658,32 +720,6 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                       ? '取消全选'
                       : '全选',
                 ),
-              ),
-              TextButton.icon(
-                onPressed: selectedBooks.isEmpty
-                    ? null
-                    : () {
-                        queueBooksForVectorization(selectedBooks);
-                        exitSelectionMode();
-                      },
-                icon: const Icon(Icons.hub_outlined),
-                label: const Text('向量化'),
-              ),
-              TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: selectedBooks.isEmpty
-                    ? null
-                    : () async {
-                        final deleted =
-                            await confirmAndDeleteBooksFromBookshelf(
-                          context,
-                          ref,
-                          selectedBooks,
-                        );
-                        if (deleted && mounted) exitSelectionMode();
-                      },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('删除'),
               ),
               IconButton(
                 tooltip: '退出选择',

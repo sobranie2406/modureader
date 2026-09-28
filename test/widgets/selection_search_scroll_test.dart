@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
+import 'package:anx_reader/widgets/reading_page/selection_search_zoom.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -41,6 +42,46 @@ class _BrowserPage extends PlatformInAppWebViewWidget {
 
   @override
   void dispose() {}
+}
+
+class _ZoomController extends PlatformInAppWebViewController {
+  _ZoomController()
+      : super.implementation(
+            const PlatformInAppWebViewControllerCreationParams(id: 'zoom'));
+  final scripts = <UserScript>[];
+  final evaluated = <String>[];
+  bool failNext = false;
+
+  @override
+  Future<void> removeUserScriptsByGroupName({required String groupName}) async {
+    scripts.removeWhere((script) => script.groupName == groupName);
+  }
+
+  @override
+  Future<void> addUserScript({required UserScript userScript}) async {
+    scripts.add(userScript);
+  }
+
+  @override
+  Future<dynamic> evaluateJavascript(
+      {required String source, ContentWorld? contentWorld}) async {
+    if (failNext) {
+      failNext = false;
+      throw StateError('Test page navigated during zoom');
+    }
+    evaluated.add(source);
+    return null;
+  }
+
+  @override
+  Future<bool> canGoBack() async => false;
+  @override
+  Future<bool> canGoForward() async => false;
+  @override
+  Future<void> loadUrl(
+      {required URLRequest urlRequest,
+      Uri? iosAllowingReadAccessTo,
+      WebUri? allowingReadAccessTo}) async {}
 }
 
 void main() {
@@ -145,6 +186,87 @@ void main() {
     await tester.pumpAndSettle();
     expect(platform.scroll.offset, greaterThan(0));
     expect(tester.getRect(body), before);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('zoom shrinks page, survives navigation and reopen, and resets',
+      (tester) async {
+    await open(tester);
+    final native = _ZoomController();
+    final controller = InAppWebViewController.fromPlatform(platform: native);
+    platform.latestParams!.onWebViewCreated!(controller);
+    expect(platform.latestParams!.initialUserScripts!.single.source,
+        selectionSearchZoomScript(100));
+    final before = tester.getRect(find.byKey(const ValueKey('web-results')));
+    await tester.tap(find.byTooltip('网页缩放'));
+    await tester.pumpAndSettle();
+    final eighty = find.widgetWithText(CheckedPopupMenuItem<int>, '80%');
+    await tester.ensureVisible(eighty);
+    await tester.pumpAndSettle();
+    await tester.tap(eighty);
+    await tester.pumpAndSettle();
+    expect(Prefs().selectionSearchZoomPercent, 80);
+    expect(native.evaluated.last, selectionSearchZoomScript(80));
+    expect(native.scripts.single.forMainFrameOnly, true);
+    expect(native.scripts.single.source, selectionSearchZoomScript(80));
+    expect(tester.getRect(find.byKey(const ValueKey('web-results'))), before);
+
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('百度').last);
+    await tester.pumpAndSettle();
+    platform.latestParams!.onLoadStop!(
+        controller, WebUri('https://www.baidu.com/'));
+    await tester.pumpAndSettle();
+    expect(native.evaluated.last, selectionSearchZoomScript(80));
+    expect(native.scripts, hasLength(1));
+    await tester.drag(
+        find.byKey(const ValueKey('web-results')), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(platform.scroll.offset, greaterThan(0));
+
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    expect(platform.latestParams!.initialUserScripts!.single.source,
+        selectionSearchZoomScript(80));
+    platform.latestParams!.onWebViewCreated!(controller);
+    await tester.tap(find.byTooltip('网页缩放'));
+    await tester.pumpAndSettle();
+    final reset = find.widgetWithText(CheckedPopupMenuItem<int>, '100%（恢复默认）');
+    await tester.ensureVisible(reset);
+    await tester.pumpAndSettle();
+    await tester.tap(reset);
+    await tester.pumpAndSettle();
+    expect(Prefs().selectionSearchZoomPercent, 100);
+    expect(native.evaluated.last, selectionSearchZoomScript(100));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rapid zoom choices keep latest value and errors allow retry',
+      (tester) async {
+    await open(tester);
+    final native = _ZoomController();
+    platform.latestParams!.onWebViewCreated!(
+        InAppWebViewController.fromPlatform(platform: native));
+    final menu = tester.widget<PopupMenuButton<int>>(
+        find.byKey(const ValueKey('search-page-zoom')));
+    for (final percent in [50, 200, 70]) {
+      menu.onSelected!(percent);
+    }
+    await tester.pumpAndSettle();
+    expect(Prefs().selectionSearchZoomPercent, 70);
+    expect(native.evaluated.last, selectionSearchZoomScript(70));
+    expect(native.scripts, hasLength(1));
+    native.failNext = true;
+    menu.onSelected!(80);
+    await tester.pumpAndSettle();
+    expect(find.text('网页缩放失败，请重试。'), findsOneWidget);
+    menu.onSelected!(90);
+    await tester.pumpAndSettle();
+    expect(native.evaluated.last, selectionSearchZoomScript(90));
+    expect(find.text('网页缩放失败，请重试。'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

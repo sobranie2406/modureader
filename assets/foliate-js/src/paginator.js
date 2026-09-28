@@ -839,7 +839,14 @@ export class Paginator extends HTMLElement {
       // FIXME: vertical-rl only, not -lr
       this.setAttribute('dir', vertical ? 'rtl' : 'ltr')
       this.#top.style.padding = '0'
-      const columnWidth = maxInlineSize
+      // The column threshold controls pagination, not the width of a scrolling
+      // page. Capping this at 720px makes small side-margin changes disappear
+      // into auto margins on landscape tablets. Use the available inline space
+      // after the padding applied by View.scrolled(). Notes and vertical books
+      // retain their separate sizing policies.
+      const columnWidth = !vertical && !this.hasAttribute('footnote')
+        ? Math.max(1, size - 2 * gap)
+        : maxInlineSize
 
       this.heads = null
       this.feet = null
@@ -1737,7 +1744,7 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.start > 0) return this.#scrollTo(
-        Math.max(0, this.start - (distance ?? this.size * 0.8)), 'page', { animate: true })
+        Math.max(0, this.start - (distance ?? this.scrollPageStep)), 'page', { animate: true })
       return true
     }
     if (this.atStart) return
@@ -1749,7 +1756,7 @@ export class Paginator extends HTMLElement {
     if (!this.#view) return true
     if (this.scrolled) {
       if (this.viewSize - this.end > 2) return this.#scrollTo(
-        Math.min(Math.max(0, this.viewSize - this.size), this.start + (distance ?? this.size * 0.8)), 'page', { animate: true })
+        Math.min(Math.max(0, this.viewSize - this.size), this.start + (distance ?? this.scrollPageStep)), 'page', { animate: true })
       return true
     }
     if (this.atEnd) return
@@ -1757,6 +1764,10 @@ export class Paginator extends HTMLElement {
     const pages = this.pages
     if (page >= pages - 1) return true
     return this.#scrollToPage(page, 'page', { animate: true }).then(() => page >= pages - 1)
+  }
+  get scrollPageStep() {
+    const percent = Number(this.getAttribute('scroll-page-percent') ?? 80)
+    return this.size * (Number.isFinite(percent) ? Math.max(80, Math.min(100, percent)) : 80) / 100
   }
   get atStart() {
     return this.#adjacentIndex(-1) == null &&
@@ -1775,7 +1786,7 @@ export class Paginator extends HTMLElement {
       if (this.#locked) return
       this.#locked = true
       try {
-        await this.#continuous.scrollBy(dir * (distance ?? this.size * 0.8))
+        await this.#continuous.scrollBy(dir * (distance ?? this.scrollPageStep))
         this.#afterScroll('page')
       } catch (error) {
         if (error.name !== 'AbortError') throw error

@@ -51,6 +51,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'bookshelfPins',
   'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',
   // Brightness is a device-local preference, not transferable configuration.
@@ -67,6 +68,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'bookshelfPins',
   'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',
   'appBrightnessLevel',
@@ -78,6 +80,18 @@ const Set<String> _prefsExportSkipKeys = {
 };
 
 class Prefs extends ChangeNotifier {
+  int get selectionSearchZoomPercent {
+    final value = prefs.get('selectionSearchZoomPercent');
+    return value is int ? value.clamp(50, 200) : 100;
+  }
+
+  Future<void> saveSelectionSearchZoomPercent(int value) async {
+    if (!await prefs.setInt('selectionSearchZoomPercent', value.clamp(50, 200))) {
+      throw StateError('Could not save search zoom');
+    }
+    notifyListeners();
+  }
+
   SelectionSearchConfig get selectionSearchSettings {
     final raw = prefs.getString('selectionSearchSettings');
     try {
@@ -585,6 +599,16 @@ class Prefs extends ChangeNotifier {
   }
 
   bool get tapOnlyPageTurn => prefs.getBool('tapOnlyPageTurn') ?? false;
+
+  int get scrollPagePercent {
+    final value = prefs.get('scrollPagePercent');
+    return value is int ? value.clamp(80, 100).toInt() : 80;
+  }
+
+  set scrollPagePercent(int value) {
+    prefs.setInt('scrollPagePercent', value.clamp(80, 100).toInt());
+    notifyListeners();
+  }
 
   set tapOnlyPageTurn(bool value) {
     prefs.setBool('tapOnlyPageTurn', value);

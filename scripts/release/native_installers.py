@@ -143,6 +143,10 @@ Source: "{bundle}\\*"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs c
 [Icons]
 Name: "{{group}}\\Modu"; Filename: "{{app}}\\modu.exe"; WorkingDir: "{{app}}"
 Name: "{{userdesktop}}\\Modu"; Filename: "{{app}}\\modu.exe"; WorkingDir: "{{app}}"; Tasks: desktopicon
+[Registry]
+Root: HKCU; Subkey: "Software\\Classes\\modu"; ValueType: string; ValueData: "URL:Modu Reading Link"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\\Classes\\modu"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\\Classes\\modu\\shell\\open\\command"; ValueType: string; ValueData: """{{app}}\\modu.exe"" ""%1"""
 [Run]
 Filename: "{{app}}\\modu.exe"; Description: "Launch Modu (requires Microsoft WebView2 Runtime)"; Flags: nowait postinstall skipifsilent
 '''
@@ -238,7 +242,8 @@ def build_deb(bundle, arch, version, output, work, build_number=None):
     desktop.mkdir(parents=True)
     (desktop / 'modureader.desktop').write_text(
         '[Desktop Entry]\nType=Application\nName=Modu Reader\nName[zh_CN]=默读\n'
-        'Comment=Read ebooks with AI tools\nExec=modureader\nIcon=modureader\n'
+        'Comment=Read ebooks with AI tools\nExec=modureader %u\nIcon=modureader\n'
+        'MimeType=x-scheme-handler/modu;\n'
         'Terminal=false\nCategories=Office;Viewer;\nStartupWMClass=com.modu.reader\n', encoding='utf-8')
     icons = root / 'usr/share/pixmaps'
     icons.mkdir(parents=True)

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:anx_reader/service/sync/immutable_sync_log.dart';
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,6 +8,7 @@ import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:anx_reader/utils/log/common.dart';
 
 /// A clean SQLite transport: only portable records and opaque encrypted AI
 /// settings. Never ships local paths, fonts, indexes, or the entire app DB.
@@ -117,6 +119,38 @@ class RowSyncEngine {
     try {
       final log = ImmutableSyncLog(client, staging, cache,
           durableDirectory: durableDirectory ?? cache);
+      Future<RowSyncOutcome> finish(RowSyncOutcome outcome,
+          {String? checkpoint}) async {
+        // Maintenance is best-effort AFTER data synchronization. Upload/read-
+        // back failure leaves every old input intact; DELETE failure leaves a
+        // valid successor plus redundant inputs, never missing records.
+        try {
+          var removed = 0;
+          if (checkpoint != null && log.hasReadBatches) {
+            final verified = File('${staging.path}/verified-checkpoint.db');
+            await client.downloadFile(remotePath, verified.path);
+            final expected =
+                await sha256.bind(File(checkpoint).openRead()).first;
+            if (await verified.length() > ImmutableSyncLog.maxBatchBytes ||
+                (await sha256.bind(verified.openRead()).first).toString() !=
+                    expected.toString()) {
+              throw StateError(
+                  'Cloud checkpoint changed; journal cleanup deferred');
+            }
+            removed = await log.reclaimReadBatches();
+          } else if (atomicSupport == false) {
+            removed = await log.compactIfNeeded();
+          }
+          if (removed > 0) {
+            AnxLog.info(
+                'Sync journal compacted: removed $removed covered batches');
+          }
+        } catch (e) {
+          AnxLog.warning('Sync journal maintenance deferred: $e');
+        }
+        return outcome;
+      }
+
       published = await log.resumePending();
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         // Both transports always consume the immutable log, including after
@@ -146,7 +180,14 @@ class RowSyncEngine {
           remoteRecords =
               await RowSyncArchive.read(download, legacy: remote == null);
         }
-        remoteRecords = mergeSyncRecords(remoteRecords, journal);
+        // Keep the actual remote baseline: normalization can retire duplicate
+        // identities even when there are no user edits. That repair must be
+        // published, not mistaken for an unchanged already-normalized cloud.
+        final remoteBaseline = mergeSyncRecords(remoteRecords, journal,
+            reconcileBookIdentities: false);
+        remoteRecords = mergeSyncRecords(remoteBaseline, []);
+        final repairsRemoteIdentity =
+            !sameSyncRecords(remoteBaseline, remoteRecords);
         final local = await store.snapshot();
         if (!backedUp &&
             remoteRecords.isNotEmpty &&
@@ -156,10 +197,18 @@ class RowSyncEngine {
         }
         final merged = await store.merge(remoteRecords);
         if ((remote != null || journal.isNotEmpty) &&
+            !repairsRemoteIdentity &&
             sameSyncRecords(merged, remoteRecords)) {
-          return published
-              ? RowSyncOutcome.published
-              : RowSyncOutcome.unchanged;
+          if (log.hasReadBatches) {
+            atomicSupport ??= await client.supportsAtomicSyncWrites();
+          }
+          if (!log.hasReadBatches || atomicSupport != true) {
+            return await finish(published
+                ? RowSyncOutcome.published
+                : RowSyncOutcome.unchanged);
+          }
+          // Even with no local edits, fold outstanding journal records into
+          // database8 using CAS before reclaiming their source batches.
         }
         // An empty new device may read a real empty/tombstone archive, but may
         // not create the first cloud library merely by opening the app.
@@ -173,9 +222,10 @@ class RowSyncEngine {
         await beforePublish?.call();
         atomicSupport ??= await client.supportsAtomicSyncWrites();
         Future<void> publishLog() async {
+          atomicSupport = false;
           // On first legacy migration, seed all legacy records as well. Once
           // the log exists, database7 must not be re-imported repeatedly.
-          final baseline = remote == null ? journal : remoteRecords;
+          final baseline = remote == null ? journal : remoteBaseline;
           final known = {
             for (final r in baseline) r.key: jsonEncode(r.toMap())
           };
@@ -186,10 +236,10 @@ class RowSyncEngine {
           published = true;
         }
 
-        if (!atomicSupport) {
+        if (atomicSupport != true) {
           await publishLog();
           if (sameSyncRecords(await store.snapshot(), merged)) {
-            return RowSyncOutcome.published;
+            return await finish(RowSyncOutcome.published);
           }
           continue;
         }
@@ -200,7 +250,7 @@ class RowSyncEngine {
               expectedETag: remote?.eTag, createOnly: remote == null);
           published = true;
           if (sameSyncRecords(await store.snapshot(), merged)) {
-            return RowSyncOutcome.published;
+            return await finish(RowSyncOutcome.published, checkpoint: upload);
           }
           // Reading/import can continue during upload. If it produced another
           // operation, include it in the next bounded pass instead of marking
@@ -209,7 +259,7 @@ class RowSyncEngine {
           if (attempt + 1 >= maxAttempts) {
             await publishLog();
             if (sameSyncRecords(await store.snapshot(), merged)) {
-              return RowSyncOutcome.published;
+              return await finish(RowSyncOutcome.published);
             }
             break;
           }
@@ -223,7 +273,7 @@ class RowSyncEngine {
             atomicSupport = false;
             await publishLog();
             if (sameSyncRecords(await store.snapshot(), merged)) {
-              return RowSyncOutcome.published;
+              return await finish(RowSyncOutcome.published);
             }
             continue;
           }

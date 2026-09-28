@@ -76,6 +76,7 @@ String generateUrl(
     'mobileTouchPaging': AnxPlatform.isMobile,
     'mobileImageFit': AnxPlatform.isMobile,
     'tapOnlyPageTurn': Prefs().tapOnlyPageTurn,
+    'scrollPagePercent': Prefs().scrollPagePercent,
     'eInkMode': Prefs().eInkMode,
     'fontSize': bookStyle.fontSize,
     'fontName': fontName,

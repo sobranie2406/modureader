@@ -71,6 +71,16 @@ void main() {
     }
   });
 
+  test('scroll page percentage is applied on first open', () {
+    for (final percent in [80, 91, 100]) {
+      Prefs().scrollPagePercent = percent;
+      final uri = Uri.parse(generateUrl('https://example.test/book.epub', '',
+          fontName: 'serif', fontPath: ''));
+      expect(jsonDecode(uri.queryParameters['style']!)['scrollPagePercent'],
+          percent);
+    }
+  });
+
   test('reader receives e-ink mode without changing the saved page style', () {
     final savedStyle = Prefs().pageTurnStyle;
     for (final eInk in [true, false]) {

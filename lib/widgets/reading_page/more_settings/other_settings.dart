@@ -10,6 +10,7 @@ import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagr
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/page_turn_dropdown.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/tap_only_page_turn_tile.dart';
+import 'package:anx_reader/widgets/reading_page/more_settings/scroll_page_percent_tile.dart';
 import 'package:flutter/material.dart';
 
 class OtherSettings extends StatefulWidget {
@@ -344,6 +345,9 @@ class _OtherSettingsState extends State<OtherSettings> {
           autoSummaryPreviousContent(),
           screenTimeout(),
           pageTurningControl(),
+          ScrollPagePercentTile(onChanged: (value) {
+            epubPlayerKey.currentState?.changeScrollPagePercent(value);
+          }),
           TapOnlyPageTurnTile(
             value: Prefs().tapOnlyPageTurn,
             onChanged: (value) {

@@ -3,13 +3,16 @@ import 'package:audio_service/audio_service.dart';
 
 /// One policy for the expanded notification, lock screen and compact controls.
 PlaybackState ttsMediaState(PlaybackState previous, TtsStateEnum state,
-    {bool chinese = false}) {
+    {bool chinese = false, bool buffering = false}) {
   final stopped = state == TtsStateEnum.stopped;
   final playing = state == TtsStateEnum.playing;
   return previous.copyWith(
     playing: playing,
-    processingState:
-        stopped ? AudioProcessingState.idle : AudioProcessingState.ready,
+    processingState: stopped
+        ? AudioProcessingState.idle
+        : playing && buffering
+            ? AudioProcessingState.buffering
+            : AudioProcessingState.ready,
     // Bluetooth remotes may send a toggle, explicit play, or explicit pause.
     // Advertise all supported commands, not only the currently visible icon.
     systemActions: stopped
@@ -44,10 +47,21 @@ MediaItem ttsMediaItem({
   required String coverPath,
   required TtsStateEnum state,
   bool chinese = false,
+  bool buffering = false,
 }) {
   final paused = state == TtsStateEnum.paused;
-  final status =
-      chinese ? (paused ? '已暂停' : '正在朗读') : (paused ? 'Paused' : 'Reading');
+  final loading = buffering && state == TtsStateEnum.playing;
+  final status = chinese
+      ? (paused
+          ? '已暂停'
+          : loading
+              ? '正在加载语音'
+              : '正在朗读')
+      : (paused
+          ? 'Paused'
+          : loading
+              ? 'Loading speech'
+              : 'Reading');
   return MediaItem(
     id: bookId,
     title: title,

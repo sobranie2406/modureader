@@ -4,6 +4,38 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('buffering keeps the session active and pause/stop retain precedence',
+      () {
+    final waiting =
+        ttsMediaState(PlaybackState(), TtsStateEnum.playing, buffering: true);
+    expect(waiting.playing, isTrue);
+    expect(waiting.processingState, AudioProcessingState.buffering);
+    expect(waiting.controls[1].action, MediaAction.pause);
+    final paused = ttsMediaState(waiting, TtsStateEnum.paused, buffering: true);
+    expect(paused.playing, isFalse);
+    expect(paused.processingState, AudioProcessingState.ready);
+    expect(paused.controls[1].action, MediaAction.play);
+    expect(
+        ttsMediaState(waiting, TtsStateEnum.stopped, buffering: true)
+            .processingState,
+        AudioProcessingState.idle);
+    expect(ttsMediaState(waiting, TtsStateEnum.playing).processingState,
+        AudioProcessingState.ready);
+    for (final chinese in [true, false]) {
+      final item = ttsMediaItem(
+          bookId: '1',
+          title: 'Book',
+          author: '',
+          chapter: 'Chapter',
+          coverPath: '',
+          state: TtsStateEnum.playing,
+          buffering: true,
+          chinese: chinese);
+      expect(
+          item.displayTitle, '${chinese ? '正在加载语音' : 'Loading speech'}: Book');
+      expect(item.displaySubtitle, 'Chapter');
+    }
+  });
   test('playing exposes transport controls including pause in compact view',
       () {
     final state = ttsMediaState(PlaybackState(), TtsStateEnum.playing);

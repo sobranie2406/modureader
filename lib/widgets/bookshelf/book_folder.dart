@@ -7,6 +7,8 @@ import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/bookshelf/book_item.dart';
 import 'package:anx_reader/widgets/bookshelf/book_opened_folder.dart';
+import 'package:anx_reader/widgets/bookshelf/folder_pin_menu.dart';
+import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/common/container/outlined_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,21 +34,23 @@ class BookFolder extends ConsumerStatefulWidget {
 
 class _BookFolderState extends ConsumerState<BookFolder> {
   bool willAcceptBook = false;
+  final _menuKey = GlobalKey<PopupMenuButtonState<bool>>();
 
   @override
   Widget build(BuildContext context) {
     final folderStyle = context.watch<Prefs>().bookshelfFolderStyle;
 
-    void onAcceptBook(DragTargetDetails<Book> details) {
-      int targetGroupId;
-      if (widget.books.first.groupId == 0) {
-        ref.read(bookListProvider.notifier).updateBook(
-            widget.books.first.copyWith(groupId: widget.books.first.id));
-        targetGroupId = widget.books.first.id;
-      } else {
-        targetGroupId = widget.books.first.groupId;
+    Future<void> onAcceptBook(DragTargetDetails<Book> details) async {
+      try {
+        final target = widget.books.first;
+        await ref.read(bookListProvider.notifier).moveBooksToFolder(
+          [details.data.id, if (target.groupId == 0) target.id],
+          groupId: target.groupId == 0 ? null : target.groupId,
+          newFolderName: target.groupId == 0 ? '...' : null,
+        );
+      } catch (_) {
+        AnxToast.show('移入文件夹失败，请刷新书架后重试');
       }
-      ref.read(bookListProvider.notifier).moveBook(details.data, targetGroupId);
     }
 
     Widget scaleTransition(Widget child) {
@@ -188,6 +192,12 @@ class _BookFolderState extends ConsumerState<BookFolder> {
             children: [
               Expanded(
                 child: InkWell(
+                  onLongPress: widget.selectionMode
+                      ? null
+                      : () => _menuKey.currentState?.showButtonMenu(),
+                  onSecondaryTap: widget.selectionMode
+                      ? null
+                      : () => _menuKey.currentState?.showButtonMenu(),
                   onTap: () {
                     if (!widget.selectionMode) {
                       openFolder(groupName);
@@ -201,6 +211,20 @@ class _BookFolderState extends ConsumerState<BookFolder> {
                     fit: StackFit.expand,
                     children: [
                       folderPreview,
+                      if (!widget.selectionMode)
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Material(
+                            color:
+                                Theme.of(context).colorScheme.surfaceContainer,
+                            shape: const CircleBorder(),
+                            child: FolderPinMenu(
+                              groupId: widget.books.first.groupId,
+                              menuKey: _menuKey,
+                            ),
+                          ),
+                        ),
                       if (widget.selectionMode)
                         Positioned(
                           right: 7,
@@ -259,7 +283,7 @@ class _BookFolderState extends ConsumerState<BookFolder> {
     );
 
     return RepaintBoundary(
-      child: widget.books.length == 1 ? singleBookTarget : groupTarget,
+      child: widget.books.first.groupId == 0 ? singleBookTarget : groupTarget,
     );
   }
 }

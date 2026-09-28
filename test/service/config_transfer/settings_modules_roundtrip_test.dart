@@ -15,6 +15,7 @@ void main() {
     'themeColor': 12,
     'trueDarkMode': true,
     'pageTurnStyle': 'scroll',
+    'scrollPagePercent': 93,
     'readStyle': BookStyle(fontSize: 1.8, fontFamily: 'source-only').toJson(),
     'readingRules': '{"convertChineseMode":"none","bionicReading":true}',
     'customPageTurnConfig': '2,3,1,2,3,1,2,3,1',
@@ -26,6 +27,7 @@ void main() {
     'customCssProfiles':
         '[{"name":"test","css":"p{color:red}","scope":"body","visual":"{\\"size\\":18}"}]',
     'selectionSearchSettings': '{"selectedId":"google","custom":[]}',
+    'selectionSearchZoomPercent': 80,
     'aiProviders':
         '[{"id":"test","title":"Test","url":"https://example.test","protocol":"openai","keyIndex":5,"apiKeys":[{"id":"key","key":"test-only-secret"}]}]',
     'aiTemperature': 0.3,
@@ -47,7 +49,7 @@ void main() {
     'remoteLibraryConnection':
         '{"url":"https://example.test/books","password":"test-only-secret"}',
     'remoteLibraryViewOptions':
-        '{"sort":"size","ascending":false,"filter":"epub"}',
+        '{"sort":"size","ascending":false,"filter":"md"}',
     'excerptShareBgimgIndex': 3,
     'notesExportMergeChapters': false,
     'statisticsDashboardTiles': <String>['heatmap'],
