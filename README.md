@@ -195,50 +195,54 @@ MiMo 提供官方音色、风格与音色设计模板、常用提示词，语速
 
 ## 界面预览
 
-以下为默读 **1.1.1 macOS 版**界面截图。横排阅读使用项目原创示例书，古籍竖排展示《古文观止译注评（全二册）》的阅读效果。
+以下截图实拍自 **1.1.9（10063）Android 手机和 Mac 版**。所有阅读画面只使用项目原创示例书《阅读，让思考慢下来》，不展示个人书架、私人笔记或对话。[下载原创示例 EPUB](docs/examples/modu-reading-demo.epub) · [截图来源](docs/images/README.md)
 
-### 书籍阅读：正文、字体与阅读主题
+### 手机阅读：横排、竖排与章节导航
 
-原创示例书《阅读，让思考慢下来》的实际 EPUB 阅读界面，展示单列排版、中文字体、浅色阅读主题和底部进度信息。字号、行间距、分栏等可在阅读设置中调整。
+| 横排阅读 | 竖排阅读 | 章节与页数导航 |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/reading-horizontal-android.png" width="260" alt="Android 原创示例书横排阅读"> | <img src="docs/images/v1.1.9/reading-vertical-android.png" width="260" alt="Android 原创示例书竖排阅读"> | <img src="docs/images/v1.1.9/reading-controls-android.png" width="260" alt="章节标题、进度滑块与前后翻页按钮"> |
 
-![默读 EPUB 正文阅读：原创示例书、单列排版与浅色主题](docs/images/reading-epub-macos.jpg)
+### Mac 阅读：双列正文
 
-### 古籍竖排：红色边框与分栏线
+同一本原创示例书的桌面阅读界面；可在阅读设置中调整字体、字号、页边距和列数。
 
-《古文观止》的实际竖排阅读界面，可选红色边框与正文列间分隔线；章节名位于右侧，阅读进度位于左侧，中文界面使用中文数字。
+![Mac 1.1.9 原创示例书双列阅读](docs/images/v1.1.9/reading-horizontal-macos.jpg)
 
-![默读 1.1.1 古文观止竖排阅读：红色边框、正文分栏线与侧边阅读信息](docs/images/reading-vertical-border-macos.jpg)
+### 划词工具栏与自定义 AI 提示词
 
-### 书内 AI：一边阅读，一边提问
+内置工具可以开关、拖动排序；划词 AI 模板独立管理，可编辑名称、图标和提示词。常用模板默认关闭，截图展示当前设备的配置。
 
-阅读页可展开 AI 侧栏，保留左侧正文。点击星光按钮可在对话框内纵向展开本章总结、全书总结、概念解析、论证分析等技能，选中后收起，也可以直接输入问题。
+| 工具开关与排序 | 划词 AI 模板 | 编辑提示词 |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/selection-toolbar-android.png" width="260" alt="划词工具栏开关与排序设置"> | <img src="docs/images/v1.1.9/selection-ai-templates-android.png" width="260" alt="AI 词典、通俗解释、翻译和润色模板"> | <img src="docs/images/v1.1.9/selection-prompt-editor-android.png" width="260" alt="自定义 AI 模板名称、图标与 selection 提示词"> |
 
-![默读书内 AI 侧栏：左侧正文与输入框上方的阅读技能栏](docs/images/reading-ai-panel-macos.jpg)
+### AI 阅读技能：查看、修改与恢复提示词
 
-### 首页 AI：从快捷问题开始
+| 阅读技能管理 | 本章总结提示词 |
+| --- | --- |
+| <img src="docs/images/v1.1.9/ai-reading-skills-android.png" width="300" alt="AI 阅读技能及独立开关"> | <img src="docs/images/v1.1.9/reading-prompt-editor-android.png" width="300" alt="内置阅读提示词编辑和恢复默认"> |
 
-首页集中展示十二个书库与阅读记录快捷问题，涉及最近阅读、笔记、未读书籍、阅读时长和书架整理；输入区另有解释、总结、分析等通用提问入口。
+### CSS 方案：预设模板与图形调节
 
-![默读首页 AI：十二个快捷问题和通用提问入口](docs/images/ai-home-prompts-macos.jpg)
-
-截图展示阅读和 AI 操作入口；可[下载原创示例 EPUB](docs/examples/modu-reading-demo.epub)自行体验。
+| 多套方案管理 | 常用预设模板 | 下划线与字体参数 |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/css-profiles-android.png" width="260" alt="CSS 方案命名、启用、导入导出"> | <img src="docs/images/v1.1.9/css-presets-android.png" width="260" alt="排版、对白、关键词和标题预设模板"> | <img src="docs/images/v1.1.9/css-visual-controls-android.png" width="260" alt="可视化下划线、字体和排版控制"> |
 
 <details>
-<summary>更多界面：章节目录、AI 技能管理与本地向量模型</summary>
+<summary>更多设置截图：外观、语言、翻译、阅读样式与全局备份</summary>
 
-### 章节目录与书签
+竖排可选红色边框与正文列间分隔线，章节标题、剩余页数和全书位置显示在两侧。
 
-![默读目录导航：章节列表、书签入口与当前阅读位置](docs/images/reading-toc-macos.jpg)
+<p align="center"><img src="docs/images/v1.1.9/reading-vertical-frame-android.png" width="300" alt="原创示例书竖排红色边框和分栏线"></p>
 
-### AI 阅读技能与提示词管理
+| 设置入口 | 外观与主题 | 应用语言 |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/settings-android.png" width="260" alt="设置分类入口"> | <img src="docs/images/v1.1.9/appearance-android.png" width="260" alt="主题、OLED、电子墨水和语言设置"> | <img src="docs/images/v1.1.9/languages-android.png" width="260" alt="手动选择语言或跟随系统"> |
 
-![默读 AI 阅读技能设置](docs/images/ai-reading-skills-macos.jpg)
-
-### 本地向量模型：按需下载与管理
-
-安装包不内嵌向量模型，可选择 Hugging Face 或 Gitee 下载源，按需下载、切换或删除模型。
-
-![默读向量模型设置](docs/images/vector-models-macos.jpg)
+| 阅读样式 | 翻译引擎 | 全局设置备份 |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/reader-style-android.png" width="260" alt="阅读字体、间距和背景设置"> | <img src="docs/images/v1.1.9/translation-engines-android.png" width="260" alt="Google、AI、DeepL 和网页翻译选择"> | <img src="docs/images/v1.1.9/settings-transfer-android.png" width="260" alt="全局导入导出及独立凭据开关"> |
 
 </details>
 

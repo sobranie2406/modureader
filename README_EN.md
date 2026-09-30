@@ -69,7 +69,7 @@ The current version provides the following reading, AI and library features.
 
 Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
 
-Tap the reading area to show the progress slider and previous/next chapter and page controls. Dragging previews the chapter title. Chapter progress shows the chapter ordinal; current-chapter progress shows the current and total pages within that chapter. Confirming the annotation toolbar's trash action removes a highlight or underline without restoring it on chapter changes. Common image-marker footnotes are also supported.
+Tap the reading area to show the progress slider and previous/next chapter and page controls. Dragging previews the chapter title. Chapter progress shows the chapter ordinal; current-chapter progress shows the current and total pages within that chapter. Select part or all of an existing highlight or underline and choose the trash action to delete the entire overlapping annotation and its comment after confirmation. The confirmation stays above the selection tools and color palette. Common image-marker footnotes are also supported.
 
 ### Vertical layout and storage
 
@@ -139,10 +139,11 @@ Enable AI tools as needed, including finding books and notes, searching text, re
 
 Quick skills in AI chat are collapsed by default; expand them with the skill button beside the input. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
 
-The built-in names are displayed in Chinese; their English meanings are provided below.
+Built-in skill names and prompts follow your selected application language. The Chinese names and their English meanings are provided below.
 
 | Skill | Purpose |
 | --- | --- |
+| AI 词典解释 — AI Dictionary | Explain selected words from model knowledge, with pronunciation and bilingual meanings; verify online only when explicitly requested |
 | 本章总结 — Chapter Summary | Outline the current chapter's content, plot and themes |
 | 全书总结 — Book Summary | Summarize available book content and structure |
 | 概念解析 — Concept Explainer | Explain concepts, terminology and abstract ideas |
@@ -196,50 +197,54 @@ Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10
 
 ## Screenshots
 
-Screenshots below are from **Modu 1.1.1 (10033) on macOS**. Horizontal reading shows the original demo EPUB; vertical reading shows a local edition of *Guwen Guanzhi*. Only the interface is shown; the book is not distributed.
+Captured from **Modu 1.1.9 (10063) on an Android phone and Mac**. Every reading view uses the project's original demo book, *Reading: Let Your Thinking Slow Down* (《阅读，让思考慢下来》), never a personal library, private notes or conversations. [Download the demo EPUB](docs/examples/modu-reading-demo.epub) · [Screenshot provenance](docs/images/README.md)
 
-### Reading: text, fonts and themes
+### Phone reading: horizontal, vertical and chapter navigation
 
-The original demo book *Reading: Let Your Thinking Slow Down* (《阅读，让思考慢下来》) is shown in the EPUB reader with a single-column layout, Chinese font, light theme and progress information. Font size, line spacing and columns can be adjusted in reading settings.
+| Horizontal reading | Vertical reading | Chapter and page navigation |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/reading-horizontal-android.png" width="260" alt="Original demo EPUB in Android horizontal layout"> | <img src="docs/images/v1.1.9/reading-vertical-android.png" width="260" alt="Original demo EPUB in Android vertical layout"> | <img src="docs/images/v1.1.9/reading-controls-android.png" width="260" alt="Chapter title, progress slider and navigation controls"> |
 
-![Modu EPUB reader with the original demo book, single-column layout and a light theme](docs/images/reading-epub-macos.jpg)
+### Mac reading: two-column layout
 
-### Classical vertical reading: red frame and column rules
+The same original demo book on desktop. Adjust fonts, text size, margins and columns in reading settings.
 
-The actual *Guwen Guanzhi* reading view shows the optional red frame and rules between text columns. Chapter information appears on the right, reading progress on the left, with Chinese numerals in the Chinese interface.
+![Mac 1.1.9 reading the original demo EPUB in two columns](docs/images/v1.1.9/reading-horizontal-macos.jpg)
 
-![Modu 1.1.1 vertical reading of Guwen Guanzhi with a red frame, column rules and side information](docs/images/reading-vertical-border-macos.jpg)
+### Selection toolbar and custom AI prompts
 
-### In-book AI: read and ask side by side
+Enable, disable and reorder built-in tools. Selection AI templates are managed separately, with editable labels, icons and prompts. Common templates start disabled; screenshots show this device's current configuration.
 
-The AI sidebar keeps the book text visible. Open the sparkle button to choose chapter summary, concept explanation and other reading skills, or type your own question.
+| Tool switches and ordering | Selection AI templates | Prompt editor |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/selection-toolbar-android.png" width="260" alt="Selection toolbar switches and ordering"> | <img src="docs/images/v1.1.9/selection-ai-templates-android.png" width="260" alt="Dictionary, explanation, translation and writing templates"> | <img src="docs/images/v1.1.9/selection-prompt-editor-android.png" width="260" alt="Custom AI label, icon and selection prompt"> |
 
-![Modu in-book AI sidebar with book text on the left and reading skills above the input](docs/images/reading-ai-panel-macos.jpg)
+### AI reading skills: inspect, edit and restore prompts
 
-### Home AI: start with a quick question
+| Reading skill management | Chapter summary prompt |
+| --- | --- |
+| <img src="docs/images/v1.1.9/ai-reading-skills-android.png" width="300" alt="AI reading skills and individual switches"> | <img src="docs/images/v1.1.9/reading-prompt-editor-android.png" width="300" alt="Reading prompt editor and restore-default action"> |
 
-Home offers twelve quick questions about your library and reading records, covering recent reading, notes, unread books, reading time and library organization. The input area also provides general explanation, summary and analysis prompts.
+### CSS profiles: presets and visual controls
 
-![Modu home AI with twelve quick questions and general prompt entry points](docs/images/ai-home-prompts-macos.jpg)
-
-The screenshots show reading and AI controls. [Download the original demo EPUB](docs/examples/modu-reading-demo.epub) to try them yourself.
+| Multiple profiles | Preset templates | Underline and font parameters |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/css-profiles-android.png" width="260" alt="CSS profile names, switches, import and export"> | <img src="docs/images/v1.1.9/css-presets-android.png" width="260" alt="Layout, dialogue, keyword and heading presets"> | <img src="docs/images/v1.1.9/css-visual-controls-android.png" width="260" alt="Visual underline, font and layout controls"> |
 
 <details>
-<summary>More screenshots: chapter navigation, AI skills and local embedding models</summary>
+<summary>More settings: appearance, languages, translation, reader styles and global backup</summary>
 
-### Contents and bookmarks
+Vertical reading offers optional red frames and column rules, with the chapter title, remaining pages and book position along the sides.
 
-![Modu chapter list, bookmarks tab and current reading position](docs/images/reading-toc-macos.jpg)
+<p align="center"><img src="docs/images/v1.1.9/reading-vertical-frame-android.png" width="300" alt="Original demo EPUB with vertical red frames and column rules"></p>
 
-### AI reading skills and prompt management
+| Settings overview | Appearance and themes | Application language |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/settings-android.png" width="260" alt="Settings categories"> | <img src="docs/images/v1.1.9/appearance-android.png" width="260" alt="Theme, OLED, e-ink and language settings"> | <img src="docs/images/v1.1.9/languages-android.png" width="260" alt="Manual language selection and system language"> |
 
-![Modu AI reading skill settings](docs/images/ai-reading-skills-macos.jpg)
-
-### Local embedding models: on-demand downloads and management
-
-Embedding models are not bundled in the installer. Choose Hugging Face or Gitee as the download source, then download, switch or delete models as needed.
-
-![Modu embedding model settings](docs/images/vector-models-macos.jpg)
+| Reader styles | Translation engines | Global settings backup |
+| --- | --- | --- |
+| <img src="docs/images/v1.1.9/reader-style-android.png" width="260" alt="Reader fonts, spacing and background"> | <img src="docs/images/v1.1.9/translation-engines-android.png" width="260" alt="Google, AI, DeepL and webpage translation choices"> | <img src="docs/images/v1.1.9/settings-transfer-android.png" width="260" alt="Global settings transfer with a separate credentials switch"> |
 
 </details>
 
