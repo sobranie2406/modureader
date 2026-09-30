@@ -1,6 +1,7 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book_note.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
@@ -18,12 +19,16 @@ import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 
 class ExcerptMenu extends StatefulWidget {
   final String annoCfi;
   final String annoContent;
   final int? id;
+  final int? bookId;
+  final List<int> annotationIds;
+  final ValueChanged<bool>? onDeletionVisibilityChanged;
   final BookNoteDao? dao;
   final Future<void> Function(String cfi)? removeAnnotation;
   final Function() onClose;
@@ -42,6 +47,9 @@ class ExcerptMenu extends StatefulWidget {
     required this.annoCfi,
     required this.annoContent,
     this.id,
+    this.bookId,
+    this.annotationIds = const [],
+    this.onDeletionVisibilityChanged,
     this.dao,
     this.removeAnnotation,
     required this.onClose,
@@ -65,9 +73,14 @@ class ExcerptMenuState extends State<ExcerptMenu> {
   bool _saving = false;
   int? noteId;
   BookNote? _currentNote;
+  final Map<int, BookNote> _pendingDeletion = {};
   late String annoType;
   late String annoColor;
   BookNoteDao get _dao => widget.dao ?? bookNoteDao;
+  int? get _bookId =>
+      widget.bookId ?? epubPlayerKey.currentState?.widget.book.id;
+  bool get _hasDeletionTarget =>
+      noteId != null || widget.annotationIds.isNotEmpty;
 
   @override
   initState() {
@@ -108,7 +121,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
   Future<BookNote?> _fetchLatestNote() async {
     final existingId = noteId ?? widget.id;
     if (existingId == null) {
-      final bookId = epubPlayerKey.currentState?.widget.book.id;
+      final bookId = _bookId;
       if (bookId == null) return null;
       final notes =
           await _dao.selectBookNoteByCfiAndBookId(widget.annoCfi, bookId);
@@ -172,17 +185,78 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     return bookNote;
   }
 
+  Future<List<BookNote>> _deletionTargets() async {
+    // Keep removed DB rows until their overlays have also been cleared, so a
+    // renderer failure can be retried without losing the original targets.
+    if (_pendingDeletion.isNotEmpty) return _pendingDeletion.values.toList();
+    final targets = <int, BookNote>{};
+    final current = await _fetchLatestNote() ?? _currentNote;
+    final ids = {
+      ...widget.annotationIds,
+      if (current?.id != null) current!.id!
+    };
+    for (final id in ids) {
+      BookNote note;
+      try {
+        note = await _dao.selectBookNoteById(id);
+      } on StateError {
+        continue; // A remotely deleted or merged mark is no longer a target.
+      }
+      if (_bookId != null && note.bookId != _bookId) continue;
+      if (note.type != 'highlight' && note.type != 'underline') continue;
+      targets[id] = note;
+      // Old imports/syncs may contain multiple records for the same range.
+      // Include them in the confirmation instead of leaving a hidden copy
+      // that reappears after the chapter is loaded again.
+      for (final duplicate
+          in await _dao.selectBookNoteByCfiAndBookId(note.cfi, note.bookId)) {
+        if (duplicate.id != null &&
+            (duplicate.type == 'highlight' || duplicate.type == 'underline')) {
+          targets[duplicate.id!] = duplicate;
+        }
+      }
+    }
+    return targets.values.toList();
+  }
+
   Future<void> deleteHandler() async {
     if (_deleting || _saving) return;
     setState(() => _deleting = true);
+    widget.onDeletionVisibilityChanged?.call(true);
     try {
       final l10n = L10n.of(context);
+      final targets = await _deletionTargets();
+      if (!mounted) return;
+      if (targets.isEmpty) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Text(ModuStrings.text(context, '所选文字没有可删除的标记。',
+                'There are no saved marks in this selection.'))));
+        return;
+      }
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => PointerInterceptor(
+            child: AlertDialog(
           title: Text(l10n.contextMenuDelete),
-          content: Text(widget.annoContent,
-              maxLines: 5, overflow: TextOverflow.ellipsis),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(ModuStrings.format(context, '删除选区涉及的 {count} 条完整标记及其批注？',
+                    'Delete all {count} matching marks and their notes?',
+                    values: {'count': targets.length})),
+                for (final note in targets) ...[
+                  const SizedBox(height: 12),
+                  Text(note.content,
+                      maxLines: 5, overflow: TextOverflow.ellipsis),
+                  if (note.readerNote?.isNotEmpty ?? false)
+                    Text(note.readerNote!,
+                        maxLines: 3, overflow: TextOverflow.ellipsis),
+                ],
+              ],
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -194,23 +268,23 @@ class ExcerptMenuState extends State<ExcerptMenu> {
               child: Text(l10n.commonDelete),
             ),
           ],
-        ),
+        )),
       );
       if (confirmed != true || !mounted) return;
 
-      final note = await _fetchLatestNote() ?? _currentNote;
-      if (note != null) _currentNote = note;
-      final id = noteId ?? note?.id ?? widget.id;
-      if (id != null) {
-        // New marks can be saved while this same toolbar remains open. The
-        // original widget.id is then null, but noteId holds the persisted ID.
-        await _dao.deleteBookNoteById(id);
-        final cfi = note?.cfi ?? widget.annoCfi;
+      _pendingDeletion.addEntries(targets.map((n) => MapEntry(n.id!, n)));
+      for (final note in targets) {
+        await _dao.deleteBookNoteById(note.id!);
+      }
+      for (final cfi in targets.map((note) => note.cfi).toSet()) {
         if (widget.removeAnnotation != null) {
           await widget.removeAnnotation!(cfi);
         } else {
-          await epubPlayerKey.currentState?.removeAnnotation(cfi);
+          final player = epubPlayerKey.currentState;
+          if (player == null) throw StateError('Reader no longer available');
+          await player.removeAnnotation(cfi);
         }
+        _pendingDeletion.removeWhere((_, note) => note.cfi == cfi);
       }
       if (mounted) widget.onClose();
     } catch (_) {
@@ -221,6 +295,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
       }
     } finally {
       if (mounted) setState(() => _deleting = false);
+      widget.onDeletionVisibilityChanged?.call(false);
     }
   }
 
@@ -424,8 +499,10 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             builder: (context, _) {
               final config = Prefs().selectionToolbar;
               if (!config.enabled) return const SizedBox.shrink();
-              final annotationItems =
-                  config.annotations.where((i) => i.enabled).toList();
+              final annotationItems = config.annotations
+                  .where((i) =>
+                      i.enabled && (i.action != 'delete' || _hasDeletionTarget))
+                  .toList();
               return LayoutBuilder(builder: (context, constraints) {
                 final extent = widget.axis == Axis.horizontal
                     ? constraints.maxWidth

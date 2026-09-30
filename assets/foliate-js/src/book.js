@@ -13,6 +13,7 @@ import { readerFontCSS } from './reader-fonts.js'
 import { applyCustomHighlights } from './custom-highlight.js'
 import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
+import { selectionAnnotationIds } from './selection-annotations.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
 const { configure, ZipReader, BlobReader, TextWriter, BlobWriter } =
@@ -198,7 +199,8 @@ const handleSelection = (view, doc, index) => {
     cfi,
     pos: position,
     text,
-    contextText
+    contextText,
+    annotationIds: view.getSelectionAnnotationIds?.(cfi) ?? [],
   });
 };
 
@@ -1138,6 +1140,10 @@ class Reader {
   }
 
   setView(view) {
+    // Footnote selections belong to another document and must not target the
+    // main book's annotations, even when their local CFI paths look alike.
+    view.getSelectionAnnotationIds = cfi => view === this.view
+      ? selectionAnnotationIds(cfi, this.annotationsByValue.values()) : []
     view.addEventListener('create-overlay', e => {
       const { index } = e.detail
       const list = this.annotations.get(index)

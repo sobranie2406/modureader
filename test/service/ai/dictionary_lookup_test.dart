@@ -22,141 +22,172 @@ void main() {
   final hit = DictionarySearchHit('行藏', '出处与词义',
       Uri.parse('https://zh.wiktionary.org/w/index.php?curid=123'));
 
-  test('known term streams normally without any internet lookup', () async {
-    var calls = 0;
-    final result = await dictionaryLookup(
-      messages: messages,
-      generate: (input) {
-        calls++;
-        expect(input.first.contentAsString, contains(dictionaryNeedsSearch));
-        return Stream.fromIterable(['行藏', '行藏：xíng cáng，出处。']);
-      },
-      search: (_) => throw StateError('must not search'),
-      isCancelled: () => false,
-    ).toList();
-    expect(calls, 1);
-    expect(result, ['行藏', '行藏：xíng cáng，出处。']);
-  });
+  for (final answer in ['行藏：xíng cáng，出处。', '此词的读音不确定，是否需要联网补查？']) {
+    test('knowledge answer uses just one call: $answer', () async {
+      var calls = 0;
+      final result = await dictionaryLookup(
+        messages: messages,
+        generate: (input) {
+          calls++;
+          final system = input.first.contentAsString;
+          expect(system, contains('不调用、不等待维基、百度'));
+          expect(system, contains('不确定'));
+          expect(system, contains('确认联网搜索'));
+          expect(system, isNot(contains(dictionaryNeedsSearch)));
+          expect(input.map((m) => m.contentAsString).join(),
+              isNot(contains('private-')));
+          return Stream.fromIterable(['行藏', answer]);
+        },
+        isCancelled: () => false,
+      ).toList();
+      expect(calls, 1);
+      expect(result, ['行藏', answer]);
+      expect(messages, hasLength(2));
+      expect(messages.last.contentAsString, '待解释词语："行藏"');
+    });
+  }
 
-  test(
-      'knowledge gap searches only selection and sends evidence to same callback',
-      () async {
-    var calls = 0;
-    var searches = 0;
-    final requests = <List<ChatMessage>>[];
-    final result = await dictionaryLookup(
+  test('first answer arrives before model completion', () async {
+    final provider = StreamController<String>();
+    final first = Completer<String>();
+    final stream = dictionaryLookup(
       messages: messages,
-      generate: (input) {
-        requests.add(input);
-        calls++;
-        return calls == 1
-            ? Stream.fromIterable([
-                'MODU_',
-                '<think>不确定</think>\n$dictionaryNeedsSearch',
-              ])
-            : Stream.value('行藏：根据在线资料整理。[1]');
-      },
-      search: (term) async {
-        searches++;
-        expect(term, '行藏');
-        return DictionarySearchResult([hit]);
-      },
+      generate: (_) => provider.stream,
       isCancelled: () => false,
-    ).toList();
-    expect(calls, 2);
-    expect(searches, 1);
-    expect(result.join(), isNot(contains(dictionaryNeedsSearch)));
-    expect(result.last, contains(hit.url.toString()));
-    final enriched = requests.last.map((m) => m.contentAsString).join('\n');
-    expect(enriched, contains('出处与词义'));
-    expect(enriched, contains('外部不可信资料'));
-    expect(enriched, isNot(contains('private-')));
-    expect(enriched, isNot(contains(dictionaryNeedsSearch)));
-    expect(messages, hasLength(2)); // Does not mutate replay snapshot.
-    expect(messages.last.contentAsString, '待解释词语："行藏"');
+    ).listen((value) {
+      if (!first.isCompleted) first.complete(value);
+    });
+    provider.add('行藏');
+    expect(await first.future.timeout(const Duration(seconds: 1)), '行藏');
+    await provider.close();
+    await stream.cancel();
   });
 
   for (final fenced in [false, true]) {
-    test('knowledge signal is hidden (fenced=$fenced)', () async {
+    test(
+        'legacy search signal does not cause search or a second model call ($fenced)',
+        () async {
+      var calls = 0;
       final result = await dictionaryLookup(
         messages: messages,
-        generate: (_) => Stream.value(
-            fenced ? '```$dictionaryNeedsSearch```' : dictionaryNeedsSearch),
-        search: (_) async => const DictionarySearchResult([]),
+        generate: (_) {
+          calls++;
+          return Stream.value(
+              fenced ? '```$dictionaryNeedsSearch```' : dictionaryNeedsSearch);
+        },
         isCancelled: () => false,
       ).toList();
-      expect(result.single, contains('未找到可用结果'));
+      expect(calls, 1);
+      expect(result.single, contains('AI 未返回'));
       expect(result.single, isNot(contains(dictionaryNeedsSearch)));
     });
   }
 
-  test('network errors are not reported as no dictionary entries', () async {
+  test('AI error does not start another request', () async {
     final result = await dictionaryLookup(
       messages: messages,
-      generate: (_) => Stream.value(dictionaryNeedsSearch),
-      search: (_) => throw TimeoutException('offline'),
+      generate: (_) => Stream.error(StateError('transport failure')),
       isCancelled: () => false,
-    ).toList();
-    expect(result.single, contains('暂时不可用'));
+    );
+    await expectLater(result.toList(), throwsStateError);
   });
 
-  test('AI configuration/transport error does not trigger search', () async {
-    final result = await dictionaryLookup(
-      messages: messages,
-      generate: (_) => Stream.value('API Key 无效'),
-      search: (_) => throw StateError('must not search'),
-      isCancelled: () => false,
-    ).toList();
-    expect(result.single, 'API Key 无效');
-  });
-
-  test('cancellation before start performs no calls', () async {
+  test('cancelled knowledge lookup performs no calls', () async {
     expect(
         await dictionaryLookup(
           messages: messages,
           generate: (_) => throw StateError('must not generate'),
-          search: (_) => throw StateError('must not search'),
           isCancelled: () => true,
         ).toList(),
         isEmpty);
   });
 
-  test('cancellation during retrieval never starts second AI request',
-      () async {
+  test('cancelling during generation drops late snapshots', () async {
     var cancelled = false;
-    var calls = 0;
-    final result = await dictionaryLookup(
-      messages: messages,
-      generate: (_) {
-        calls++;
-        return Stream.value(dictionaryNeedsSearch);
-      },
-      search: (_) async {
-        cancelled = true;
-        return DictionarySearchResult([hit]);
-      },
-      isCancelled: () => cancelled,
-    ).toList();
-    expect(calls, 1);
-    expect(result, isEmpty);
+    Stream<String> generate(List<ChatMessage> _) async* {
+      yield '行藏';
+      cancelled = true;
+      yield 'late answer';
+    }
+
+    expect(
+        await dictionaryLookup(
+            messages: messages,
+            generate: generate,
+            isCancelled: () => cancelled).toList(),
+        ['行藏']);
   });
 
   test('empty AI response produces actionable error', () async {
     final result = await dictionaryLookup(
       messages: messages,
       generate: (_) => const Stream.empty(),
-      search: (_) => throw StateError('must not search'),
       isCancelled: () => false,
     ).toList();
     expect(result.single, contains('AI 未返回'));
   });
 
-  test('source titles cannot inject markdown links', () async {
+  test('missing selected term is rejected before generation', () async {
+    await expectLater(
+        dictionaryLookup(
+            messages: [],
+            generate: (_) => throw StateError('must not generate'),
+            isCancelled: () => false).toList(),
+        throwsStateError);
+  });
+
+  test('explicit follow-up searches selection and makes one summary call',
+      () async {
     var calls = 0;
-    final result = await dictionaryLookup(
+    var searches = 0;
+    final result = await dictionaryWebLookup(
       messages: messages,
-      generate: (_) =>
-          Stream.value(++calls == 1 ? dictionaryNeedsSearch : '解释'),
+      search: (term) async {
+        searches++;
+        expect(term, '行藏');
+        return DictionarySearchResult([hit]);
+      },
+      generate: (input) {
+        calls++;
+        final all = input.map((m) => m.contentAsString).join();
+        expect(all, contains('出处与词义'));
+        expect(all, contains('外部不可信资料'));
+        expect(all, isNot(contains('private-')));
+        return Stream.value('根据资料整理的解释。[1]');
+      },
+      isCancelled: () => false,
+    ).toList();
+    expect(calls, 1);
+    expect(searches, 1);
+    expect(result.last, contains(hit.url.toString()));
+  });
+
+  test('unavailable manual search does not fabricate sources', () async {
+    final result = await dictionaryWebLookup(
+        messages: messages,
+        generate: (_) => throw StateError('must not generate'),
+        search: (_) => throw TimeoutException('offline'),
+        isCancelled: () => false).toList();
+    expect(result.single, contains('暂时不可用'));
+  });
+
+  test('cancelling manual search prevents model call', () async {
+    var cancelled = false;
+    final result = await dictionaryWebLookup(
+        messages: messages,
+        generate: (_) => throw StateError('must not generate'),
+        search: (_) async {
+          cancelled = true;
+          return DictionarySearchResult([hit]);
+        },
+        isCancelled: () => cancelled).toList();
+    expect(result, isEmpty);
+  });
+
+  test('manual source titles cannot inject markdown links', () async {
+    final result = await dictionaryWebLookup(
+      messages: messages,
+      generate: (_) => Stream.value('解释'),
       search: (_) async => DictionarySearchResult(
           [DictionarySearchHit('词[恶意](https://bad.example)', '资料', hit.url)],
           hasFailures: true),
@@ -312,10 +343,9 @@ void main() {
     final result = await dictionaryLookup(
       messages: messages,
       generate: (_) => Stream.value('MODU_DICT'),
-      search: (_) => throw StateError('must not search'),
       isCancelled: () => false,
     ).toList();
-    expect(result.single, contains('请重试'));
+    expect(result.single, contains('重试'));
     expect(result.single, isNot(contains('MODU_DICT')));
   });
 }

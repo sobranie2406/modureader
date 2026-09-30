@@ -2,20 +2,18 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.8
+## 1.1.9
 
-- Add configurable selection tools and annotation controls, drag ordering, editable AI templates and independent template management.
-- Start selection AI requests in new conversations and return completed output to the first paragraph; back up only user changes to bundled prompts.
-- Add manual or system-following app language selection and localized bundled AI and voice prompts.
-- Show chapter/page navigation directly, preview chapter titles while dragging progress, and separate chapter ordinals from current-chapter page counts.
-- Improve native MDX headword lookup and add embedded Baidu/Youdao translation webpages with mobile prefilling and scrolling.
-- Support common image-marker footnotes and fix persistent highlight/underline deletion with explicit confirmation and duplicate-cache cleanup.
-- Use one GitHub/Gitee source selector for update checking and downloading.
+- Select part or all of an existing highlight or underline to delete the matching complete annotations and duplicate marks.
+- Keep deletion confirmation above the selection toolbar and color controls; restore the tools when cancelling.
+- Answer AI dictionary requests directly from model knowledge, without automatic web lookup or book-content upload.
+- Type the displayed confirmation phrase in the same chat to request Wiktionary, Wikipedia and Baidu Baike lookup with sources.
+- Preserve dictionary context after reopening a conversation; update unchanged bundled prompts while retaining custom edits.
+- Refresh the Chinese and English feature guides with screenshots from version 1.1.9.
 
-- 新增可开关和拖动排序的划词工具栏、标注工具及自定义 AI 命令；常用 AI 模板默认关闭，独立管理。
-- 划词 AI 每次新建对话，生成结束回到首段；内置提示词仅备份用户修改。
-- 新增手动选择或跟随系统的应用语言，界面、内置 AI 提示词与语音描述模板同步切换。
-- 点击正文直接显示章节和翻页控制，拖动预览章节标题；区分章节序号与本章当前页/总页数。
-- 改进 MDX 原生词目查询，增加百度、有道网页翻译及移动端自动填词、滚动支持。
-- 适配常见图片式注释引用；修复高亮、划线删除，增加明确确认并清理重复标注缓存。
-- 检查更新与下载安装共用 GitHub/Gitee 来源选择。
+- 选中已有高亮或下划线的局部或全部，即可删除相交的完整标注，并清理重复标记。
+- 删除确认不再被工具条和颜色栏遮挡，取消后恢复工具栏。
+- AI 词典优先根据模型已有知识直接回答，不自动联网，不发送书籍正文。
+- 在原对话输入“确认联网搜索”后，才检索维基词典、维基百科和百度百科，并整理来源。
+- 重新打开对话仍保留词典查询上下文；更新未改动的内置提示词，保留用户自定义内容。
+- 更新中英文功能介绍与 1.1.9 界面截图。

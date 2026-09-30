@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:anx_reader/l10n/legacy_dictionary_prompts.dart';
 import 'package:flutter/widgets.dart';
 import 'package:anx_reader/l10n/app_language.dart';
 import 'package:anx_reader/l10n/modu_catalogs.g.dart';
@@ -38,6 +41,9 @@ abstract final class ModuStrings {
 
   static bool isDefault(String key, String value, String legacy) =>
       value.trim() == legacy.trim() ||
+      (legacyDictionaryPromptHashes[key]?.contains(
+              sha256.convert(utf8.encode(value.trim())).toString()) ??
+          false) ||
       moduCatalogs.values
           .any((catalog) => catalog[key]?.trim() == value.trim());
 

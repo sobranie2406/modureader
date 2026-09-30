@@ -6,6 +6,9 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
+import 'package:anx_reader/service/ai/reading_skill_execution.dart';
+import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
+import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
@@ -72,6 +75,25 @@ class _Chat extends AiChat {
     ];
     state = AsyncData(messages);
     streams.last.add(messages);
+  }
+
+  void restoreDictionary() {
+    loadHistoryEntry(AiChatHistoryEntry(
+        id: 'restored-dictionary',
+        scope: 'reader',
+        serviceId: 'fake',
+        model: 'fake',
+        createdAt: 1,
+        updatedAt: 1,
+        completed: true,
+        messages: [ChatMessage.humanText('解释词语'), ChatMessage.ai('行藏：读音不确定。')],
+        readingRequest: ReadingRequestSnapshot(
+            skillId: aiDictionarySkillId,
+            request: buildReadingSkillRequest(
+                policy: readingSkillPolicyFor(aiDictionarySkillId)!,
+                prompt: '解释词语',
+                sourceContent: '行藏',
+                sourceDescription: 'selection'))));
   }
 }
 
@@ -149,6 +171,37 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     unawaited(chat.streams.single.close());
+  });
+
+  testWidgets(
+      'restored dictionary accepts typed confirmation without clearing context',
+      (tester) async {
+    await mount(tester);
+    chat.restoreDictionary();
+    await tester.pumpAndSettle();
+    expect(chat.currentDictionarySelection, '行藏');
+    expect(
+        find.byKey(const ValueKey('dictionary-web-follow-up')), findsNothing);
+    expect(find.text('如需联网补查，请在下方输入“确认联网搜索”并发送。'), findsOneWidget);
+    expect(chat.requests, isEmpty);
+    final clears = chat.clears;
+    await tester.enterText(find.byType(TextField), '确认联网搜索');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+    expect(chat.clears, clears);
+    expect(chat.currentDictionarySelection, '行藏');
+    expect(chat.requests, hasLength(1));
+    expect(chat.requests.single.message, '确认联网搜索');
+    expect(
+        chat.requests.single.skill, isNull); // Provider resolves saved request.
+    expect(chat.requests.single.source,
+        isNull); // Never use current book selection.
+    expect(chat.requests.single.previousCount, 2);
+    chat.emit('根据检索资料整理的释义。');
+    await chat.streams.last.close();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets(

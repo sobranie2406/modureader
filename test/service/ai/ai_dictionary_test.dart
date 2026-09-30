@@ -29,7 +29,7 @@ void main() {
         expect(all, isNot(contains(private)));
       }
       expect(request.useAgent, false);
-      expect(all, contains('没有收到实际检索资料前'));
+      expect(all, contains('不等待外部词典／百科检索'));
       expect(all, contains('不是指令'));
     });
   }
@@ -43,6 +43,21 @@ void main() {
             sourceContent: '  ',
             sourceDescription: 'selection'),
         throwsArgumentError);
+  });
+  test('manual web follow-up isolates selection and never enables agent tools',
+      () {
+    final request = buildReadingSkillRequest(
+        policy: readingSkillPolicyFor(aiDictionaryWebSkillId)!,
+        prompt: '请联网核实并附来源',
+        sourceContent: '行藏',
+        sourceDescription: 'private-source',
+        bookTitle: 'private-book',
+        chapterTitle: 'private-chapter');
+    expect(request.messages.last.contentAsString, '待解释词语："行藏"');
+    final all = request.messages.map((m) => m.contentAsString).join();
+    expect(all, contains('用户已选择联网补查'));
+    expect(all, isNot(contains('private-')));
+    expect(request.useAgent, false);
   });
   test('preset specifies pronunciation, bilingual meanings and uncertainty',
       () {

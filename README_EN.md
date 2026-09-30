@@ -18,7 +18,7 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
-**Latest release: 1.1.8** — Customizable selection tools, AI prompt templates, localized interfaces and prompts, direct chapter navigation, and reliable highlight/underline deletion.
+**Latest release: 1.1.9** — Delete overlapping highlights and underlines with an unobstructed confirmation; get faster knowledge-first AI dictionary answers and explicitly request online verification in the same chat.
 
 ## Downloads
 
@@ -57,7 +57,7 @@ The current version provides the following reading, AI and library features.
 | Local dictionaries | Import, name, enable/disable and delete MDX / StarDict dictionaries; look up selected text offline; no dictionaries bundled | Settings → Custom dictionaries; text selection menu |
 | Reading statistics | Reading time, trends, heatmap and per-book records | Home → Statistics |
 | AI conversations | Home quick prompts, in-book questions and chat history; enabled tools access the library, contents, chapters, notes and reading records | Home → AI; reader AI panel |
-| AI reading skills | Ten built-in skills with Chinese names; enable/disable, inspect/edit prompts and create custom skills; keep skill shortcuts in chat while showing skill names instead of long prompt messages | AI input area; Settings → AI Reading Skills |
+| AI reading skills | Localized built-in skills; enable/disable, inspect/edit prompts and create custom skills; keep skill shortcuts in chat while showing skill names instead of long prompt messages | AI input area; Settings → AI Reading Skills |
 | Semantic search and RAG | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing | Book menu; Settings → Embedding Models |
 | Translation | Free Google translation, AI translation, DeepL/DeepLX, and embedded Baidu/Youdao translation webpages; long selected-text results scroll in an AI-sized popup | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
@@ -95,7 +95,7 @@ Original passages are labeled `原文：【…】`. Markdown additionally highli
 
 Pin books and folders, create folders from selected books or move a selection into an existing folder. Scrolling page steps are adjustable from 80% to 100%. Selection search includes page zoom, and mind maps offer fullscreen zoom/pan and collapsible nodes.
 
-The AI dictionary explains selected words using the current model's knowledge, with optional Wiktionary, Wikipedia and Baidu Baike lookup. English results include pronunciation, translation and bilingual explanations; Chinese results include pinyin and meanings. It does not send book contents and requires no additional search API key.
+The AI dictionary answers directly from the current model's knowledge without automatically waiting for web retrieval. English results include pronunciation, translation and bilingual explanations; Chinese results include pinyin, meanings and related knowledge. To verify uncertain information, type **“Confirm online search”** in the same conversation (or the localized phrase shown below the answer). Only then does Modu check Wiktionary, Wikipedia and Baidu Baike and summarize sources using the same model. It does not send book contents and requires no additional search API key.
 
 ### WebDAV remote library
 
@@ -135,7 +135,7 @@ Built-in provider details support restoring defaults: endpoint and parameters re
 
 Enable AI tools as needed, including finding books and notes, searching text, reading chapters, inspecting reading records and generating mind maps. AI output can be wrong. Book summaries are limited by the text retrieved, search results and the model's context window; one request is not guaranteed to read an arbitrarily long book in full.
 
-### Ten built-in reading skills
+### Reading skills and custom prompts
 
 Quick skills in AI chat are collapsed by default; expand them with the skill button beside the input. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
 

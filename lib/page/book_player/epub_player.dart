@@ -279,8 +279,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       ''');
   }
 
-  void setSelectionClearLocked(bool locked) {
+  void setSelectionClearLocked(bool locked, {bool preserveOverlay = false}) {
     _selectionClearLocked = locked;
+    // Opening a Flutter confirmation may clear the WebView's native selection.
+    // The toolbar still owns a valid snapshot, including after cancellation.
+    if (!locked && preserveOverlay) _selectionClearPending = false;
     if (!locked && _selectionClearPending) {
       _selectionClearPending = false;
       _lastSelectionContextText = null;
@@ -1233,6 +1236,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     controller.addJavaScriptHandler(
         handlerName: 'onSelectionEnd',
         callback: (args) {
+          if (_selectionClearLocked) return;
           Map<String, dynamic> location = args[0];
           if (AnxPlatform.isMobile &&
               quickMarkEnabled &&
@@ -1260,6 +1264,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             footnote,
             writingMode.isVertical ? Axis.vertical : Axis.horizontal,
             contextText: _lastSelectionContextText,
+            annotationIds: footnote
+                ? const []
+                : (location['annotationIds'] as List? ?? const [])
+                    .whereType<int>()
+                    .where((id) => id > 0)
+                    .toSet()
+                    .toList(),
           );
         });
     controller.addJavaScriptHandler(
@@ -1275,6 +1286,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     controller.addJavaScriptHandler(
         handlerName: 'onAnnotationClick',
         callback: (args) {
+          if (_selectionClearLocked) return;
           Map<String, dynamic> annotation = args[0];
           if (annotation['quickMark'] == true &&
               (!AnxPlatform.isMobile ||

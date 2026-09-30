@@ -10,6 +10,7 @@ import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/dictionary_lookup.dart';
+import 'package:anx_reader/service/ai/dictionary_confirmation.dart';
 import 'package:anx_reader/service/ai/dictionary_web_search.dart';
 import 'package:anx_reader/service/ai/index.dart';
 import 'package:anx_reader/service/ai/coalesced_stream.dart';
@@ -93,6 +94,19 @@ class AiChat extends _$AiChat {
     }
     final now = DateTime.now().millisecondsSinceEpoch;
     if (isRegenerate) homePromptId ??= entry?.homePromptId;
+
+    if (_scope == AiChatScope.reader &&
+        !isRegenerate &&
+        skillId == null &&
+        isDictionaryWebConfirmation(message)) {
+      final original = dictionarySelectionFromRequest(
+          _lastReadingRequest ?? entry?.readingRequest);
+      if (original == null) {
+        throw StateError('无法找到这段对话原先查询的词语，请重新选词使用 AI 词典后，再输入“确认联网搜索”。');
+      }
+      skillId = aiDictionaryWebSkillId;
+      sourceText = original;
+    }
 
     final previousMessages = List<ChatMessage>.from(state.value ?? const []);
     if (isRegenerate) {
@@ -212,8 +226,8 @@ class AiChat extends _$AiChat {
     String assistantResponse = "";
     var latestMessages = updatedMessages;
     try {
-      // Each AI stream closes its runner on completion. Use a child per stage
-      // so completing the knowledge answer cannot cancel the subsequent search.
+      // The provider closes its runner on completion. Keep that separate from
+      // user cancellation so the final dictionary answer can still be saved.
       Stream<String> dictionaryGenerate(List<ChatMessage> input) async* {
         final child = CancelableLangchainRunner();
         final finished = Completer<void>();
@@ -240,23 +254,30 @@ class AiChat extends _$AiChat {
         }
       }
 
-      final responseStream = readingRequest?.skillId == aiDictionarySkillId
-          ? dictionaryLookup(
+      final responseStream = readingRequest?.skillId == aiDictionaryWebSkillId
+          ? dictionaryWebLookup(
               messages: requestMessages,
               generate: dictionaryGenerate,
               search: (term) => DictionaryWebSearch()
                   .search(term, cancelled: requestRunner?.whenCancelled),
               isCancelled: () => requestRunner?.isCancelled == true,
             )
-          : aiGenerateStream(
-              requestMessages,
-              regenerate: isRegenerate,
-              useAgent: skillRequest?.useAgent ?? homeRequest?.useAgent ?? true,
-              allowedToolIds:
-                  skillRequest?.allowedToolIds ?? homeRequest?.allowedToolIds,
-              ref: widgetRef,
-              requestRunner: requestRunner,
-            );
+          : readingRequest?.skillId == aiDictionarySkillId
+              ? dictionaryLookup(
+                  messages: requestMessages,
+                  generate: dictionaryGenerate,
+                  isCancelled: () => requestRunner?.isCancelled == true,
+                )
+              : aiGenerateStream(
+                  requestMessages,
+                  regenerate: isRegenerate,
+                  useAgent:
+                      skillRequest?.useAgent ?? homeRequest?.useAgent ?? true,
+                  allowedToolIds: skillRequest?.allowedToolIds ??
+                      homeRequest?.allowedToolIds,
+                  ref: widgetRef,
+                  requestRunner: requestRunner,
+                );
       await for (final chunk in coalesceSnapshots(responseStream)) {
         // A fresh selection may start while an old provider is still closing.
         // Its late output must not replace the new conversation or its history.
@@ -579,6 +600,8 @@ class AiChat extends _$AiChat {
   }
 
   String? get currentSessionId => _currentSessionId;
+  String? get currentDictionarySelection =>
+      dictionarySelectionFromRequest(_lastReadingRequest);
 
   String _ensureSessionId() {
     return _currentSessionId ??= _generateSessionId();

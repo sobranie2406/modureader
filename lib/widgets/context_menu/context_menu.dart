@@ -22,13 +22,14 @@ Future<void> showContextMenu(
     int? annoId,
     bool footnote,
     Axis axis,
-    {String? contextText}) async {
+    {String? contextText,
+    List<int> annotationIds = const []}) async {
   final playerKey = epubPlayerKey.currentState;
   if (playerKey == null) return;
   final parentRoute = ModalRoute.of(context);
   bool isNewNote = false;
 
-  if (Prefs().autoMarkSelection && annoId == null) {
+  if (Prefs().autoMarkSelection && annoId == null && annotationIds.isEmpty) {
     // Auto-highlight logic
     final String type = Prefs().annotationType;
     final String color = Prefs().annotationColor;
@@ -152,6 +153,8 @@ Future<void> showContextMenu(
       annoContent: annoContent,
       annoCfi: annoCfi,
       annoId: annoId,
+      annotationIds: annotationIds,
+      bookId: playerKey.book.id,
       footnote: footnote,
       contextText: contextText,
       decoration: decoration,
@@ -255,6 +258,8 @@ class _ContextMenuOverlay extends StatefulWidget {
     required this.annoContent,
     required this.annoCfi,
     required this.annoId,
+    required this.annotationIds,
+    required this.bookId,
     required this.footnote,
     this.contextText,
     required this.decoration,
@@ -275,6 +280,8 @@ class _ContextMenuOverlay extends StatefulWidget {
   final String annoContent;
   final String annoCfi;
   final int? annoId;
+  final List<int> annotationIds;
+  final int bookId;
   final bool footnote;
   final String? contextText;
   final BoxDecoration decoration;
@@ -301,6 +308,7 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
   late Offset _position;
   late bool _reverse;
   bool _showReaderNoteMenu = false;
+  bool _deletingAnnotation = false;
   bool _waitingForFirstMeasurement = true;
   late BoxConstraints _menuConstraints;
   late double _bottomInset;
@@ -474,7 +482,8 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
   }
 
   void _handleReaderNoteVisibilityChange(bool visible) {
-    epubPlayerKey.currentState?.setSelectionClearLocked(visible);
+    epubPlayerKey.currentState
+        ?.setSelectionClearLocked(visible || _deletingAnnotation);
     if (_showReaderNoteMenu == visible) {
       return;
     }
@@ -490,79 +499,95 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
     _scheduleRecalculate();
   }
 
+  void _handleDeletionVisibility(bool deleting) {
+    if (!mounted) return;
+    setState(() => _deletingAnnotation = deleting);
+    epubPlayerKey.currentState?.setSelectionClearLocked(
+        deleting || _showReaderNoteMenu,
+        preserveOverlay: !deleting);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Positioned(
       left: _position.dx,
       top: _position.dy,
-      child: PointerInterceptor(
-        child: Stack(
-          children: [
-            GestureDetector(
-              onTap: widget.onClose,
-              child: IgnorePointer(
-                ignoring: _waitingForFirstMeasurement,
-                child: Opacity(
-                  opacity: _waitingForFirstMeasurement ? 0 : 1,
-                  child: Container(
-                    key: _menuKey,
-                    color: Colors.transparent,
-                    constraints: _menuConstraints,
-                    child: AxisFlex(
-                      axis: flipAxis(widget.axis),
-                      reverse: _reverse,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AxisFlex(
-                          axis: flipAxis(widget.axis),
-                          reverse: _reverse,
-                          children: [
+      child: Offstage(
+        offstage: _deletingAnnotation,
+        child: PointerInterceptor(
+          child: Stack(
+            children: [
+              GestureDetector(
+                onTap: widget.onClose,
+                child: IgnorePointer(
+                  ignoring: _waitingForFirstMeasurement,
+                  child: Opacity(
+                    opacity: _waitingForFirstMeasurement ? 0 : 1,
+                    child: Container(
+                      key: _menuKey,
+                      color: Colors.transparent,
+                      constraints: _menuConstraints,
+                      child: AxisFlex(
+                        axis: flipAxis(widget.axis),
+                        reverse: _reverse,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AxisFlex(
+                            axis: flipAxis(widget.axis),
+                            reverse: _reverse,
+                            children: [
+                              AxisFlex(
+                                axis: widget.axis,
+                                children: [
+                                  ExcerptMenu(
+                                    annoCfi: widget.annoCfi,
+                                    annoContent: widget.annoContent,
+                                    id: _noteId,
+                                    bookId: widget.bookId,
+                                    annotationIds: widget.annotationIds,
+                                    onDeletionVisibilityChanged:
+                                        _handleDeletionVisibility,
+                                    onClose: widget.onClose,
+                                    footnote: widget.footnote,
+                                    decoration: widget.decoration,
+                                    toggleTranslationMenu:
+                                        _toggleTranslationMenu,
+                                    toggleReaderNoteMenu: _toggleReaderNoteMenu,
+                                    openReaderNoteMenu: _openReaderNoteMenu,
+                                    onNoteCreated: _handleNoteCreated,
+                                    axis: widget.axis,
+                                    reverse: _reverse,
+                                    parentRoute: widget.parentRoute,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (_showReaderNoteMenu) ...[
+                            const SizedBox.square(dimension: 10),
                             AxisFlex(
                               axis: widget.axis,
                               children: [
-                                ExcerptMenu(
-                                  annoCfi: widget.annoCfi,
-                                  annoContent: widget.annoContent,
-                                  id: _noteId,
-                                  onClose: widget.onClose,
-                                  footnote: widget.footnote,
+                                ReaderNoteMenu(
+                                  key: _readerNoteMenuKey,
+                                  noteId: _noteId,
                                   decoration: widget.decoration,
-                                  toggleTranslationMenu: _toggleTranslationMenu,
-                                  toggleReaderNoteMenu: _toggleReaderNoteMenu,
-                                  openReaderNoteMenu: _openReaderNoteMenu,
-                                  onNoteCreated: _handleNoteCreated,
                                   axis: widget.axis,
-                                  reverse: _reverse,
-                                  parentRoute: widget.parentRoute,
+                                  onVisibilityChange:
+                                      _handleReaderNoteVisibilityChange,
+                                  onSizeChanged: _handleReaderNoteSizeChanged,
                                 ),
                               ],
                             ),
                           ],
-                        ),
-                        if (_showReaderNoteMenu) ...[
-                          const SizedBox.square(dimension: 10),
-                          AxisFlex(
-                            axis: widget.axis,
-                            children: [
-                              ReaderNoteMenu(
-                                key: _readerNoteMenuKey,
-                                noteId: _noteId,
-                                decoration: widget.decoration,
-                                axis: widget.axis,
-                                onVisibilityChange:
-                                    _handleReaderNoteVisibilityChange,
-                                onSizeChanged: _handleReaderNoteSizeChanged,
-                              ),
-                            ],
-                          ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

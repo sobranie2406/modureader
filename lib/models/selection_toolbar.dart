@@ -125,7 +125,7 @@ class SelectionToolbarConfig {
         icon: 'dictionary',
         skillId: 'ai_dictionary',
         prompt:
-            '解释所选词语 {selection}。英文给出 IPA 音标、词性、中文翻译、中英文释义、例句与常用搭配；中文给出带声调的拼音、含义、用法和相关词语。优先用模型已有知识，不足时根据应用返回的词典／百科资料整理并注明来源。不使用本书知识库，不编造读音或词源。'),
+            '解释所选词语 {selection}。英文给出 IPA 音标、词性、中文翻译、中英文释义、例句与常用搭配；中文给出带声调的拼音、含义、用法和相关词语。仅使用模型已有知识简明解释，不等待外部词典或百科。不确定的读音、释义或词源明确说明，不能编造读音、释义、词源或来源。如需核实，提示用户在对话框输入“确认联网搜索”并发送；不提示点击按钮，不自动搜索。不使用本书知识库。'),
     SelectionToolbarItem('custom-preset-explain', 'aiCommand',
         enabled: false,
         name: '通俗解释',

@@ -137,14 +137,13 @@ void main() {
       () async {
     final evidence = await search((_) async => page(entry));
     var calls = 0;
-    final result = await dictionaryLookup(
+    final result = await dictionaryWebLookup(
       messages: [
         ChatMessage.system('解释词语'),
         ChatMessage.humanText('待解释词语："行藏"')
       ],
       generate: (messages) {
         calls++;
-        if (calls == 1) return Stream.value(dictionaryNeedsSearch);
         expect(messages.last.contentAsString, contains('百度百科'));
         expect(messages.last.contentAsString, contains('xíng cáng'));
         return Stream.value('整理后的解释。[1]');
@@ -152,7 +151,7 @@ void main() {
       search: (term) async => evidence,
       isCancelled: () => false,
     ).toList();
-    expect(calls, 2);
+    expect(calls, 1);
     expect(result.last, contains('（百度百科）'));
     expect(result.last, contains('https://baike.baidu.com/item/'));
     expect(result.last, isNot(contains('维基词典')));

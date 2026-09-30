@@ -38,6 +38,11 @@ class _Notes extends BookNoteDao {
       rows[id] ?? (throw StateError('Missing note'));
 
   @override
+  Future<List<BookNote>> selectBookNoteByCfiAndBookId(
+          String cfi, int bookId) async =>
+      rows.values.where((n) => n.cfi == cfi && n.bookId == bookId).toList();
+
+  @override
   Future<void> deleteBookNoteById(int id) async {
     deleted.add(id);
     await deletion?.future;
@@ -55,6 +60,8 @@ void main() {
   Future<ExcerptMenuState> mount(WidgetTester tester,
       {required _Notes dao,
       int? id,
+      List<int> annotationIds = const [],
+      ValueChanged<bool>? onDeletionVisibilityChanged,
       required Future<void> Function(String) remove,
       required VoidCallback close}) async {
     final key = GlobalKey<ExcerptMenuState>();
@@ -70,6 +77,9 @@ void main() {
           ExcerptMenu(
             key: key,
             id: id,
+            bookId: 7,
+            annotationIds: annotationIds,
+            onDeletionVisibilityChanged: onDeletionVisibilityChanged,
             dao: dao,
             removeAnnotation: remove,
             annoCfi: cfi,
@@ -131,12 +141,155 @@ void main() {
     // This is the same runtime ID assigned by _persistNote; widget.id stays
     // null until the parent rebuilds. Deletion must not use that original ID.
     state.noteId = 52;
+    tester.element(find.byType(ExcerptMenu)).markNeedsBuild();
+    await tester.pump();
     await confirm(tester);
     expect(dao.deleted, [52]);
     expect(dao.rows, isEmpty);
     expect(removed, [cfi]);
     expect(closed, 1);
   });
+
+  testWidgets(
+      'partial selection deletes intersecting marks and retains neighbors',
+      (tester) async {
+    final dao = _Notes(note(value: 'epubcfi(/6/4!/4/2,/1:0,/1:30)'));
+    dao.rows[42] =
+        note(id: 42, type: 'underline', value: 'epubcfi(/6/4!/4/4,/1:0,/1:15)');
+    dao.rows[43] = note(id: 43, value: 'epubcfi(/6/4!/4/6,/1:0,/1:15)');
+    final removed = <String>[];
+    final visibility = <bool>[];
+    await mount(tester,
+        dao: dao,
+        annotationIds: [41, 42],
+        onDeletionVisibilityChanged: visibility.add,
+        remove: (cfi) async => removed.add(cfi),
+        close: () {});
+    await tester.tap(find.byKey(const ValueKey('annotation-action-delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除选区涉及的 2 条完整标记及其批注？'), findsOneWidget);
+    expect(visibility, [true]);
+    await tester.tap(find.byKey(const ValueKey('annotation-confirm-delete')));
+    await tester.pumpAndSettle();
+    expect(dao.deleted, [41, 42]);
+    expect(dao.rows.keys, [43]);
+    expect(removed, hasLength(2));
+    expect(visibility, [true, false]);
+  });
+
+  testWidgets(
+      'same-range duplicate records are deleted, bookmarks are retained',
+      (tester) async {
+    final dao = _Notes(note());
+    dao.rows[42] = note(id: 42, type: 'underline');
+    dao.rows[43] = note(id: 43, type: 'bookmark');
+    final removed = <String>[];
+    await mount(tester,
+        dao: dao,
+        annotationIds: [41],
+        remove: (cfi) async => removed.add(cfi),
+        close: () {});
+    await confirm(tester);
+    expect(dao.deleted, [41, 42]);
+    expect(dao.rows.keys, [43]);
+    expect(removed, [cfi]);
+  });
+
+  testWidgets('unmarked selection does not offer an ineffective trash button',
+      (tester) async {
+    await mount(tester,
+        dao: _Notes(note()), remove: (_) async {}, close: () {});
+    expect(
+        find.byKey(const ValueKey('annotation-action-delete')), findsNothing);
+  });
+
+  for (final size in [const Size(390, 844), const Size(844, 390)]) {
+    testWidgets(
+        'confirmation remains clickable above a reader overlay at $size',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final navigator = GlobalKey<NavigatorState>();
+      final dao = _Notes(note());
+      var hidden = false;
+      var closed = 0;
+      final removed = <String>[];
+      late OverlayEntry entry;
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: navigator,
+        locale: const Locale('zh'),
+        supportedLocales: L10n.supportedLocales,
+        localizationsDelegates: const [
+          L10n.delegate,
+          ...GlobalMaterialLocalizations.delegates
+        ],
+        home: const Scaffold(body: Text('正文')),
+      ));
+      entry = OverlayEntry(
+          builder: (_) => Positioned.fill(
+                child: Offstage(
+                  offstage: hidden,
+                  child: Material(
+                    color: Colors.blue,
+                    child: Center(
+                        child: SizedBox(
+                      width: 350,
+                      child: AxisFlex(axis: Axis.horizontal, children: [
+                        ExcerptMenu(
+                          id: 41,
+                          bookId: 7,
+                          dao: dao,
+                          annoCfi: cfi,
+                          annoContent: '用于测试的正文',
+                          removeAnnotation: (value) async => removed.add(value),
+                          onDeletionVisibilityChanged: (value) {
+                            hidden = value;
+                            entry.markNeedsBuild();
+                          },
+                          onClose: () => closed++,
+                          footnote: false,
+                          decoration: const BoxDecoration(),
+                          toggleTranslationMenu: () {},
+                          toggleReaderNoteMenu: ({bool? show}) {},
+                          openReaderNoteMenu: (_) async {},
+                          onNoteCreated: (_) {},
+                          axis: Axis.horizontal,
+                          reverse: false,
+                        )
+                      ]),
+                    )),
+                  ),
+                ),
+              ));
+      await tester.pumpAndSettle();
+      navigator.currentState!.overlay!.insert(entry);
+      await tester.pumpAndSettle();
+      final trash = find.byKey(const ValueKey('annotation-action-delete'));
+      await tester.tap(trash);
+      await tester.pumpAndSettle();
+      expect(hidden, isTrue);
+      expect(trash, findsNothing);
+      expect(find.text('取消').hitTestable(), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('annotation-confirm-delete')).hitTestable(),
+          findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(hidden, isFalse);
+      expect(trash.hitTestable(), findsOneWidget);
+      expect(dao.deleted, isEmpty);
+      await confirm(tester);
+      expect(dao.rows, isEmpty);
+      expect(removed, [cfi]);
+      expect(closed, 1);
+      entry.remove();
+      await tester.pumpAndSettle();
+      entry.dispose();
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('cancel preserves the mark and its written comment',
       (tester) async {

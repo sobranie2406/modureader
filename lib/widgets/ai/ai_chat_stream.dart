@@ -13,6 +13,7 @@ import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/ai_services.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/service/ai/skill_message_label.dart';
+import 'package:anx_reader/service/ai/dictionary_confirmation.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -469,7 +470,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final message = inputController.text.trim();
     // Reader requests are independent tasks. Clearing starts a fresh session
     // without deleting saved history; regenerate still replays the same task.
-    if (widget.scope == AiChatScope.reader && !isRegenerate) {
+    final confirmingDictionarySearch =
+        skillId == null && isDictionaryWebConfirmation(message);
+    if (widget.scope == AiChatScope.reader &&
+        !isRegenerate &&
+        !confirmingDictionarySearch) {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
     }
     inputController.clear();
@@ -1162,6 +1167,22 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                       ? _buildCollapsibleText(content, isLongMessage)
                       : _buildAssistantTimeline(parsed, isStreaming,
                           replyStartKey: replyStartKey),
+                  if (!isUser &&
+                      identical(message, lastAssistantMessage) &&
+                      !_isStreaming &&
+                      content.trim().isNotEmpty &&
+                      ref
+                              .read(aiChatProvider(widget.scope).notifier)
+                              .currentDictionarySelection !=
+                          null)
+                    Padding(
+                      key: const ValueKey('dictionary-web-confirmation-hint'),
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(ModuStrings.text(
+                          context,
+                          '如需联网补查，请在下方输入“确认联网搜索”并发送。',
+                          'To check online, type “Confirm online search” below and send.')),
+                    ),
                   if (!isUser)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
