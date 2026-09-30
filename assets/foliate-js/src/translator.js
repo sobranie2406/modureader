@@ -399,6 +399,8 @@ export class Translator {
   }
 
   destroy() {
+    // A popup closed during renderer import may be disposed again afterwards.
+    if (this.#destroyed) return
     this.#destroyed = true
     this.#translationMode = TranslationMode.OFF
     this.clearTranslations()

@@ -1430,6 +1430,7 @@ export class Paginator extends HTMLElement {
       this.#anchor = range
       this.dispatchEvent(new CustomEvent('relocate', { detail: { reason, range,
         index: entry.index, fraction: Math.max(0, Math.min(1, start / Math.max(1, height))),
+        size: this.size / Math.max(1, height),
         readingAction: this.#readingActions.isAction(reason) } }))
       return
     }
@@ -1441,7 +1442,10 @@ export class Paginator extends HTMLElement {
     const index = this.#index
     const detail = { reason, range, index,
       readingAction: this.#readingActions.isAction(reason) }
-    if (this.scrolled) detail.fraction = this.start / this.viewSize
+    if (this.scrolled) {
+      detail.fraction = this.start / this.viewSize
+      detail.size = this.size / this.viewSize
+    }
     else if (this.pages > 0) {
       const { page, pages } = this
       // this.#header.style.visibility = page > 1 ? 'visible' : 'hidden'

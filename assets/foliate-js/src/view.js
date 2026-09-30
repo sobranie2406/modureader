@@ -3,6 +3,7 @@ import { TOCProgress, SectionProgress, getChapterLocation } from './progress.js'
 import { Overlayer } from './overlayer.js'
 import { textWalker } from './text-walker.js'
 import { Translator, TranslationMode } from './translator.js'
+import { imageFootnoteText } from './image-footnotes.js'
 const { TTS } = await import('./tts.js')
 
 const SEARCH_PREFIX = 'foliate-search:'
@@ -78,6 +79,7 @@ export class View extends HTMLElement {
   lastLocation
   history = new History()
   #lastCfi = null
+  #lastChapterLocation = null
   #translator = new Translator()
   constructor() {
     super()
@@ -151,7 +153,8 @@ export class View extends HTMLElement {
     }
   }
   close() {
-    this.initTTS(true)
+    // A superseded popup can close while open() is still importing its renderer.
+    if (this.renderer) this.initTTS(true)
     this.clearSearch()
     this.renderer?.destroy()
     this.renderer?.remove()
@@ -160,6 +163,8 @@ export class View extends HTMLElement {
     this.#pageProgress = null
     this.#searchResults = new Map()
     this.lastLocation = null
+    this.#lastCfi = null
+    this.#lastChapterLocation = null
     this.history.clear()
     this.tts = null
     this.mediaOverlay = null
@@ -192,15 +197,19 @@ export class View extends HTMLElement {
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
     const cfi = this.getCFI(index, range)
-    const chapterLocation = getChapterLocation(this.renderer, progress.section)
+    const chapterLocation = getChapterLocation(this.renderer, progress.section, { fraction, size })
 
-    this.lastLocation = { ...progress, tocItem, pageItem, cfi, range, chapterLocation, reason,
+    const section = progress.section ?? { current: index, total: this.book.sections.length }
+    this.lastLocation = { ...progress, section, tocItem, pageItem, cfi, range, chapterLocation, reason,
       readingAction: readingAction ?? (reason === 'page' || reason === 'navigation') }
     if (reason === 'snap' || reason === 'page' || reason === 'scroll')
       this.history.replaceState(cfi)
 
-    if (cfi && (!this.#lastCfi || cfi !== this.#lastCfi)) {
+    if (cfi && (!this.#lastCfi || cfi !== this.#lastCfi ||
+      chapterLocation.current !== this.#lastChapterLocation?.current ||
+      chapterLocation.total !== this.#lastChapterLocation?.total)) {
       this.#lastCfi = cfi
+      this.#lastChapterLocation = chapterLocation
       this.#emit('relocate', this.lastLocation)
     }
   }
@@ -241,6 +250,23 @@ export class View extends HTMLElement {
 
   #handleImage(doc) {
     for (const img of doc.querySelectorAll('img')) {
+      if (imageFootnoteText(img) !== null) {
+        // A short tap opens the annotation on touch devices as well as desktop.
+        // Do not start image-preview long press or bubble into page/menu actions.
+        img.draggable = false
+        img.style.webkitTouchCallout = 'none'
+        img.style.cursor = 'pointer'
+        img.addEventListener('contextmenu', e => {
+          e.preventDefault()
+          e.stopPropagation()
+        })
+        img.addEventListener('click', e => {
+          e.preventDefault()
+          e.stopPropagation()
+          this.#emit('image-footnote', { img }, true)
+        })
+        continue
+      }
       // disable for a link
       if (img.closest('a[href]')) continue;
 
@@ -497,6 +523,16 @@ export class View extends HTMLElement {
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
     return { tocItem, pageItem }
+  }
+  getProgressChapters() {
+    const fractions = this.#sectionProgress?.sectionFractions ?? []
+    const sections = this.book?.sections ?? []
+    return sections.map((_, index) => ({
+      number: index + 1,
+      title: this.#tocProgress?.getProgress(index)?.label ?? '',
+      start: fractions[index] ?? index / sections.length,
+      end: fractions[index + 1] ?? (index + 1) / sections.length,
+    }))
   }
   async getTOCItemOf(target) {
     try {

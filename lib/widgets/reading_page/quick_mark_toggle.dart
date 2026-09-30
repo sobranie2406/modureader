@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 
@@ -47,7 +48,8 @@ class QuickMarkToggle extends StatelessWidget {
           TextButton.icon(
               onPressed: onPressed,
               icon: const Icon(Icons.close, size: 18),
-              label: Text(zh ? '快速标记中 · 退出' : 'Quick mark · Exit')),
+              label: Text(ModuStrings.text(
+                  context, '快速标记中 · 退出', 'Quick mark · Exit'))),
         ]),
       );
     }

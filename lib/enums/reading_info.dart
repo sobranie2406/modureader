@@ -5,6 +5,7 @@ enum ReadingInfoEnum {
   none,
   chapterTitle,
   chapterProgress,
+  chapterPageProgress,
   bookProgress,
   battery,
   time,
@@ -26,6 +27,8 @@ extension ReadingInfoL10n on ReadingInfoEnum {
         return L10n.of(context).readingPageReadingInfoBatteryAndTime;
       case ReadingInfoEnum.chapterProgress:
         return L10n.of(context).readingPageReadingInfoChapterProgress;
+      case ReadingInfoEnum.chapterPageProgress:
+        return L10n.of(context).readingPageReadingInfoChapterPageProgress;
       case ReadingInfoEnum.bookProgress:
         return L10n.of(context).readingPageReadingInfoBookProgress;
     }

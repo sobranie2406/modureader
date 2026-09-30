@@ -26,7 +26,8 @@ export function desktopDragDirection(dx, dy) {
 }
 
 export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
-  dragEnabled = enabled, focusOnPointerDown = () => false, ctrlBrackets = () => false }) {
+  dragEnabled = enabled, nativeKeysEnabled = enabled,
+  focusOnPointerDown = () => false, ctrlBrackets = () => false }) {
   let pointer = null;
   let turning = false;
   let suppressClickUntil = 0;
@@ -94,7 +95,7 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
     // Windows texture focus can deliver the key to Flutter instead of the DOM.
     // Reuse the DOM selection/editor guards without moving native focus.
     turnFromKeyboard(direction) {
-      if (![1, -1].includes(direction) || !enabled() || selected() ||
+      if (![1, -1].includes(direction) || !nativeKeysEnabled() || selected() ||
           interactive({ target: doc.activeElement })) return false;
       turn(direction);
       return true;

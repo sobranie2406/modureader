@@ -1,10 +1,13 @@
 import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:anx_reader/widgets/settings/mimo_voice_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  String localized(String text) =>
+      ModuStrings.label(const Locale('en'), text, text);
   late Map<String, dynamic> config;
   setUp(() {
     config = {
@@ -58,19 +61,20 @@ void main() {
       'templates remain editable and suggestions append without duplicates',
       (tester) async {
     await open(tester);
-    await choose(
-        tester, find.byType(DropdownButtonFormField<String>).last, '自然听书');
-    expect(config['stylePrompt'], MimoVoicePresets.styles['自然听书']);
+    await choose(tester, find.byType(DropdownButtonFormField<String>).last,
+        localized('自然听书'));
+    expect(config['stylePrompt'], localized(MimoVoicePresets.styles['自然听书']!));
     await tester.enterText(
         find.byKey(const ValueKey('mimo-description')), '自己的描述');
     await tester.pump();
-    final chip = find.widgetWithText(ActionChip, '吐字清晰');
+    final chip = find.widgetWithText(ActionChip, localized('吐字清晰'));
     await tester.ensureVisible(chip);
     await tester.tap(chip);
     await tester.pump();
     await tester.tap(chip);
     await tester.pump();
-    expect(config['stylePrompt'], '自己的描述\n${MimoVoicePresets.phrases['吐字清晰']}');
+    expect(config['stylePrompt'],
+        '自己的描述\n${localized(MimoVoicePresets.phrases['吐字清晰']!)}');
     expect(tester.takeException(), isNull);
   });
 
@@ -83,14 +87,14 @@ void main() {
     expect(find.byKey(const ValueKey('mimo-voice')), findsNothing);
     expect(
         find.text('Enter a description or select a template'), findsOneWidget);
-    await choose(
-        tester, find.byType(DropdownButtonFormField<String>).last, '沉稳男声');
-    expect(config['stylePrompt'], MimoVoicePresets.designs['沉稳男声']);
+    await choose(tester, find.byType(DropdownButtonFormField<String>).last,
+        localized('沉稳男声'));
+    expect(config['stylePrompt'], localized(MimoVoicePresets.designs['沉稳男声']!));
     expect(find.text('Enter a description or select a template'), findsNothing);
     await choose(
         tester, find.byKey(const ValueKey('mimo-model')), 'Preset voices');
     expect(config['voice'], '冰糖');
-    expect(config['stylePrompt'], MimoVoicePresets.designs['沉稳男声']);
+    expect(config['stylePrompt'], localized(MimoVoicePresets.designs['沉稳男声']!));
   });
 
   testWidgets('unknown imported values and narrow layout are safe',

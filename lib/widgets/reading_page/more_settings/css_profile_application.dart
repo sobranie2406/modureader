@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -43,7 +44,6 @@ class _CssProfileApplicationState extends State<CssProfileApplication> {
         final prefs = Prefs();
         final profiles = prefs.customCssProfiles;
         final selection = prefs.customCssSelection(widget.bookKey);
-        final zh = Localizations.localeOf(context).languageCode == 'zh';
         Future<void> change(bool enabled, List<int> indices, int index) =>
             save(() => prefs.saveCustomCssSelection(
                 CustomCssSelection(
@@ -51,7 +51,9 @@ class _CssProfileApplicationState extends State<CssProfileApplication> {
                 bookKey: widget.bookKey));
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Expanded(child: Text(zh ? '应用 CSS 模板' : 'Apply CSS templates')),
+            Expanded(
+                child: Text(ModuStrings.text(
+                    context, '应用 CSS 模板', 'Apply CSS templates'))),
             Switch(
                 key: const ValueKey('custom-css-enabled'),
                 value: selection.enabled,
@@ -60,17 +62,17 @@ class _CssProfileApplicationState extends State<CssProfileApplication> {
                     : (v) =>
                         change(v, selection.activeIndices, selection.index))
           ]),
-          Text(zh
-              ? '选择即应用，可叠加多套。参数与代码请在“设置 → CSS 设置”中调整。'
-              : 'Select to apply multiple templates. Edit parameters and code in Settings → CSS settings.'),
+          Text(ModuStrings.text(context, '选择即应用，可叠加多套。参数与代码请在“设置 → CSS 设置”中调整。',
+              'Select to apply multiple templates. Edit parameters and code in Settings → CSS settings.')),
           Wrap(spacing: 8, runSpacing: 4, children: [
             for (var i = 0; i < profiles.length; i++)
               if (!profiles[i].isEmpty)
                 FilterChip(
                     key: ValueKey('apply-css-$i'),
                     label: Text(profiles[i].name.isEmpty
-                        ? (zh ? '自定义 CSS' : 'Custom CSS')
-                        : profiles[i].name),
+                        ? (ModuStrings.text(context, '自定义 CSS', 'Custom CSS'))
+                        : profiles[i]
+                            .localizedName(Localizations.localeOf(context))),
                     selected: selection.activeIndices.contains(i),
                     onSelected: _busy
                         ? null
@@ -87,7 +89,8 @@ class _CssProfileApplicationState extends State<CssProfileApplication> {
                     ? null
                     : () => save(() =>
                         prefs.clearBookCustomCssSelection(widget.bookKey!)),
-                child: Text(zh ? '跟随默认模板' : 'Follow default templates')),
+                child: Text(ModuStrings.text(
+                    context, '跟随默认模板', 'Follow default templates'))),
           if (_error != null)
             Text(_error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),

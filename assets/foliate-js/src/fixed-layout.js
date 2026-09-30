@@ -285,6 +285,15 @@ export class FixedLayout extends HTMLElement {
         if (s) this.#reportLocation('page')
         else return this.goToSpread(this.#index - 1, this.rtl ? 'left' : 'right', 'page')
     }
+    #adjacentSection(direction) {
+        let index = this.index + direction
+        while (index >= 0 && index < this.book.sections.length) {
+            if (this.book.sections[index].linear !== 'no') return this.goTo({ index })
+            index += direction
+        }
+    }
+    prevSection() { return this.#adjacentSection(-1) }
+    nextSection() { return this.#adjacentSection(1) }
     getContents() {
         return Array.from(this.#root.querySelectorAll('iframe'), frame => ({
             doc: frame.contentDocument,

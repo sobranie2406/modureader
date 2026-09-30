@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/convert_chinese_mode.dart';
 import 'package:anx_reader/enums/reading_info.dart';
@@ -263,13 +264,12 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
             ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: Text(Localizations.localeOf(context).languageCode == 'zh'
-                  ? '竖排红色边框'
-                  : 'Red frame for vertical reading'),
-              subtitle: Text(Localizations.localeOf(context).languageCode ==
-                      'zh'
-                  ? '含正文列间分隔线。章节名在右侧，剩余页数和全书位置在左侧。'
-                  : 'Includes rules between text columns. Chapter on the right; remaining pages and book position on the left.'),
+              title: Text(ModuStrings.text(
+                  context, '竖排红色边框', 'Red frame for vertical reading')),
+              subtitle: Text(ModuStrings.text(
+                  context,
+                  '含正文列间分隔线。章节名在右侧，剩余页数和全书位置在左侧。',
+                  'Includes rules between text columns. Chapter on the right; remaining pages and book position on the left.')),
               value: Prefs().verticalRedFrame,
               onChanged: (value) {
                 setState(() => Prefs().verticalRedFrame = value);

@@ -3,6 +3,7 @@ import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/models/selection_search.dart';
+import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/local_data/backup_safety.dart';
@@ -14,6 +15,7 @@ import 'package:anx_reader/service/config_transfer/library_config_transfer.dart'
 import 'package:anx_reader/service/config_transfer/settings_modules.dart';
 import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
 import 'package:anx_reader/enums/ai_prompts.dart';
+import 'package:anx_reader/service/ai/reading_prompt_overrides.dart';
 
 /// Portable preferences only. Never restore databases, per-book IDs, migration
 /// flags, storage paths, permissions, window geometry or device-local assets.
@@ -54,7 +56,7 @@ userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnCo
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl
 customCSS customCssProfiles customCssDefaultIndices textAlignment bgimgFit aiPanelPosition codeHighlightTheme aiChatDisplayMode
-webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings bgimg'''
+webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings selectionToolbar bgimg'''
             .split(RegExp(r'\s+')))
       key: 'string',
     'statisticsDashboardTiles': 'stringList',
@@ -377,6 +379,9 @@ webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selecti
       if (entry.key == 'selectionSearchSettings') {
         SelectionSearchConfig.decode(value as String);
       }
+      if (entry.key == 'selectionToolbar') {
+        SelectionToolbarConfig.decode(value as String);
+      }
       if (entry.key == 'readStyle') {
         final data = Map<String, dynamic>.from(jsonDecode(value) as Map);
         BookStyle.fromJson(jsonEncode({...data, 'fontFamily': 'Arial'}));
@@ -457,8 +462,9 @@ webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selecti
         }
         value = jsonEncode(profiles);
       }
-      pending[entry.key] =
-          entry.value['type'] == 'double' ? (value as num).toDouble() : value;
+      pending[entry.key] = entry.value['type'] == 'double'
+          ? (value as num).toDouble()
+          : readingPromptOverride(entry.key, value);
     }
     // Credentials may move but sync must be re-enabled on this device manually.
     if (disablesSync(values)) {

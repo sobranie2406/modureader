@@ -1,4 +1,5 @@
 import 'package:anx_reader/enums/lang_list.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/translate/index.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:dio/dio.dart';
@@ -19,9 +20,7 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
 
   @override
   String getLabel(BuildContext context) =>
-      Localizations.localeOf(context).languageCode == 'zh'
-          ? 'Google 翻译（免费）'
-          : 'Google Translate (Free)';
+      ModuStrings.text(context, 'Google 翻译（免费）', 'Google Translate (Free)');
 
   @override
   Widget translate(

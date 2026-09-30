@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_reasoning_effort.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -108,8 +109,8 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               key: ValueKey(
                   provider.isBuiltin ? 'restore-provider' : 'delete-provider'),
               tooltip: provider.isBuiltin
-                  ? _label('恢复默认值', 'Restore defaults')
-                  : _label('删除供应商', 'Delete provider'),
+                  ? ModuStrings.text(context, '恢复默认值', 'Restore defaults')
+                  : ModuStrings.text(context, '删除供应商', 'Delete provider'),
               icon: Icon(
                   provider.isBuiltin ? Icons.restore : Icons.delete_outline),
               onPressed: _isFetchingModels
@@ -301,17 +302,20 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-              title: Text(_label('恢复默认值？', 'Restore defaults?')),
-              content: Text(_label(
+              title: Text(
+                  ModuStrings.text(context, '恢复默认值？', 'Restore defaults?')),
+              content: Text(ModuStrings.text(
+                  context,
                   '恢复此内置供应商的名称、接口地址、协议、默认模型、温度、Token 数、上下文轮数和推理设置。将清空全部已保存的 API Key（包括旧版配置中的密钥），重置密钥轮换位置，并恢复默认的“启用”状态。当前页面未保存的修改将被放弃，之后需要重新填写 API Key。确认后立即保存，不会发起网络请求。',
                   'Restore this built-in provider’s name, endpoint, protocol, default model and model parameters. All saved API keys (including legacy credentials) will be cleared, key rotation reset, and the provider enabled by default. Unsaved edits will be discarded. You will need to enter an API key again. Changes are saved immediately; no network request is sent.')),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: Text(_label('取消', 'Cancel'))),
+                    child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
                 TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: Text(_label('恢复默认值', 'Restore defaults')))
+                    child: Text(
+                        ModuStrings.text(context, '恢复默认值', 'Restore defaults')))
               ],
             ));
     if (confirmed != true || !mounted) return;
@@ -330,8 +334,9 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
       _apiKeys = restored.apiKeys.toList();
       _isModified = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_label('已恢复默认值', 'Defaults restored'))));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text(ModuStrings.text(context, '已恢复默认值', 'Defaults restored'))));
   }
 
   Future<void> _deleteProvider(AiProvider provider) async {
@@ -375,16 +380,22 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _label('模型参数', 'Model parameters'),
+                    ModuStrings.text(context, '模型参数', 'Model parameters'),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _label(
-                      '温度 ${_temperature.toStringAsFixed(1)} · 最大 $_maxTokens Token · $_contextTurns 轮',
-                      'Temperature ${_temperature.toStringAsFixed(1)} · $_maxTokens tokens · $_contextTurns turns',
+                    ModuStrings.format(
+                      context,
+                      '温度 {temperature} · 最大 {tokens} Token · {turns} 轮',
+                      'Temperature {temperature} · {tokens} tokens · {turns} turns',
+                      values: {
+                        'temperature': _temperature.toStringAsFixed(1),
+                        'tokens': _maxTokens,
+                        'turns': _contextTurns
+                      },
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
@@ -397,7 +408,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
         ),
         children: [
           _buildParameterSlider(
-            title: _label('温度', 'Temperature'),
+            title: ModuStrings.text(context, '温度', 'Temperature'),
             value: _temperature.toStringAsFixed(1),
             current: _temperature,
             min: 0,
@@ -411,7 +422,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
             },
           ),
           _buildParameterSlider(
-            title: _label('最大 Token 数', 'Max tokens'),
+            title: ModuStrings.text(context, '最大 Token 数', 'Max tokens'),
             value: _maxTokens.toString(),
             current: _maxTokens.toDouble(),
             min: 1024,
@@ -425,7 +436,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
             },
           ),
           _buildParameterSlider(
-            title: _label('上下文轮数', 'Context turns'),
+            title: ModuStrings.text(context, '上下文轮数', 'Context turns'),
             value: _label('$_contextTurns 轮', '$_contextTurns turns'),
             current: _contextTurns.toDouble(),
             min: 2,
@@ -452,7 +463,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               ),
               DropdownMenuItem(
                 value: AiReasoningEffort.none,
-                child: Text(_label('关闭推理', 'Off')),
+                child: Text(ModuStrings.text(context, '关闭推理', 'Off')),
               ),
               DropdownMenuItem(
                 value: AiReasoningEffort.low,
@@ -487,10 +498,10 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _label(
-                    '自动不发送推理控制参数，不等于关闭。关闭会请求模型停用推理，可用于减少全文翻译等待；翻译会沿用所选模型的此项设置，也影响该模型的其他 AI 请求。低/中/高适用于支持 reasoning_effort 的接口。部分模型强制推理或不支持关闭参数，需改回自动或换用支持的模型；不保证一定提速。',
-                    'Auto omits reasoning controls; it does not turn reasoning off. Off requests non-reasoning output and may reduce full-text translation latency. Translation and other AI requests use the selected model’s setting. Low/medium/high require reasoning_effort support. Some models require reasoning or reject disable parameters: use Auto or a compatible model. Speed gains are not guaranteed.',
-                  ),
+                  ModuStrings.text(
+                      context,
+                      '自动不发送推理控制参数，不等于关闭。关闭会请求模型停用推理，可用于减少全文翻译等待；翻译会沿用所选模型的此项设置，也影响该模型的其他 AI 请求。低/中/高适用于支持 reasoning_effort 的接口。部分模型强制推理或不支持关闭参数，需改回自动或换用支持的模型；不保证一定提速。',
+                      'Auto omits reasoning controls; it does not turn reasoning off. Off requests non-reasoning output and may reduce full-text translation latency. Translation and other AI requests use the selected model’s setting. Low/medium/high require reasoning_effort support. Some models require reasoning or reject disable parameters: use Auto or a compatible model. Speed gains are not guaranteed.'),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     height: 1.35,
@@ -851,18 +862,20 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
     final uri = Uri.tryParse(_urlController.text.trim());
     String? message;
     if (name.isEmpty) {
-      message = _label('请输入服务商名称', 'Enter a provider name');
+      message = ModuStrings.text(context, '请输入服务商名称', 'Enter a provider name');
     } else if (uri == null ||
         !uri.hasScheme ||
         uri.host.isEmpty ||
         (uri.scheme != 'http' && uri.scheme != 'https')) {
-      message =
-          _label('请输入有效的 HTTP 或 HTTPS 地址', 'Enter a valid HTTP or HTTPS URL');
+      message = ModuStrings.text(
+          context, '请输入有效的 HTTP 或 HTTPS 地址', 'Enter a valid HTTP or HTTPS URL');
     } else if (model.isEmpty) {
-      message = _label('请输入或选择模型', 'Enter or select a model');
+      message =
+          ModuStrings.text(context, '请输入或选择模型', 'Enter or select a model');
     } else if (requireApiKey &&
         !_apiKeys.any((key) => key.enabled && key.key.trim().isNotEmpty)) {
-      message = _label('请先添加并启用 API Key', 'Add and enable an API key first');
+      message = ModuStrings.text(
+          context, '请先添加并启用 API Key', 'Add and enable an API key first');
     }
     if (message == null) return true;
     ScaffoldMessenger.of(context)

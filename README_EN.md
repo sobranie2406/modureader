@@ -18,13 +18,15 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
-**Latest release: 1.1.7** — Markdown books, pinned books and batch folders, AI dictionary, ANX backup import, and WebDAV/narration improvements.
+**Latest release: 1.1.8** — Customizable selection tools, AI prompt templates, localized interfaces and prompts, direct chapter navigation, and reliable highlight/underline deletion.
 
 ## Downloads
 
 [GitHub Releases](https://github.com/sobranie2406/modureader/releases) · [Gitee package mirror](https://gitee.com/sobranie2406/modureader/releases) · [Build status](https://github.com/sobranie2406/modureader/actions) · [Report an issue](https://github.com/sobranie2406/modureader/issues)
 
-Modu checks for updates at launch. Settings → About Modu → App updates offers separate GitHub/Gitee source selectors for checking and downloading, defaulting to GitHub. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
+Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
+
+Settings → Appearance lets you choose an app language or follow the system. Bundled AI prompts follow that language; your edited prompts retain their original text.
 
 | Platform | Published architectures | Installation |
 | --- | --- | --- |
@@ -57,13 +59,17 @@ The current version provides the following reading, AI and library features.
 | AI conversations | Home quick prompts, in-book questions and chat history; enabled tools access the library, contents, chapters, notes and reading records | Home → AI; reader AI panel |
 | AI reading skills | Ten built-in skills with Chinese names; enable/disable, inspect/edit prompts and create custom skills; keep skill shortcuts in chat while showing skill names instead of long prompt messages | AI input area; Settings → AI Reading Skills |
 | Semantic search and RAG | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing | Book menu; Settings → Embedding Models |
-| Translation | Free Google translation, AI translation and DeepL/DeepLX; selected-text results use the same popup sizing as AI chat, with scrolling for long output | Settings → Translation; top reader toolbar, next to AI |
+| Translation | Free Google translation, AI translation, DeepL/DeepLX, and embedded Baidu/Youdao translation webpages; long selected-text results scroll in an AI-sized popup | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
 | Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
 | Configuration transfer | All global settings via files, QR images and modu links, with an independent credentials switch | Settings → Advanced → Global settings backup |
 | ANX library migration | Validate and merge ANX ZIP backups, retaining existing Modu records and creating a pre-import database snapshot | Settings → Advanced → Import ANX Reader backup |
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
+
+Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
+
+Tap the reading area to show the progress slider and previous/next chapter and page controls. Dragging previews the chapter title. Chapter progress shows the chapter ordinal; current-chapter progress shows the current and total pages within that chapter. Confirming the annotation toolbar's trash action removes a highlight or underline without restoring it on chapter changes. Common image-marker footnotes are also supported.
 
 ### Vertical layout and storage
 

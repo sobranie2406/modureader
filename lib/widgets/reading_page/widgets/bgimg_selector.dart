@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -451,9 +452,10 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
           if (Prefs().autoAdjustReadingTheme)
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(Localizations.localeOf(context).languageCode == 'zh'
-                  ? '手动选择背景后将关闭跟随系统的阅读主题，可在更多设置中重新开启。'
-                  : 'Selecting a background turns off automatic reading themes. You can enable them again in More settings.'),
+              child: Text(ModuStrings.text(
+                  context,
+                  '手动选择背景后将关闭跟随系统的阅读主题，可在更多设置中重新开启。',
+                  'Selecting a background turns off automatic reading themes. You can enable them again in More settings.')),
             ),
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.5,

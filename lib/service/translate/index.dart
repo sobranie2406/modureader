@@ -22,7 +22,9 @@ enum TranslateService {
   microsoftApi,
   googleApi,
   deepl,
-  ai;
+  ai,
+  baiduWeb,
+  youdaoWeb;
 
   TranslateServiceProvider get provider {
     switch (this) {
@@ -40,6 +42,10 @@ enum TranslateService {
         return DeepLTranslateProvider();
       case TranslateService.ai:
         return AiTranslateProvider();
+      case TranslateService.baiduWeb:
+        return BaiduWebTranslateProvider();
+      case TranslateService.youdaoWeb:
+        return YoudaoWebTranslateProvider();
     }
   }
 
@@ -48,6 +54,10 @@ enum TranslateService {
 
   /// Check if the service is a WebView provider.
   bool get isWebView => provider is WebViewTranslateProvider;
+
+  /// These sites choose language inside their own page, not via URL parameters.
+  bool get usesPageLanguagePicker =>
+      this == TranslateService.baiduWeb || this == TranslateService.youdaoWeb;
 
   static List<TranslateService> get activeValues => values
       .where((e) => e != TranslateService.ai || EnvVar.enableAIFeature)
@@ -59,6 +69,16 @@ enum TranslateService {
         if (EnvVar.enableAIFeature) TranslateService.ai,
         TranslateService.deepl,
       ];
+
+  static const webValues = [
+    TranslateService.googleWeb,
+    TranslateService.bingWeb,
+    TranslateService.baiduWeb,
+    TranslateService.youdaoWeb,
+  ];
+
+  static List<TranslateService> get selectionValues =>
+      [...readAnyValues, ...webValues];
 }
 
 TranslateService getTranslateService(String name) {

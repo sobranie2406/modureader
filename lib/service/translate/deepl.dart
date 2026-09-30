@@ -1,4 +1,5 @@
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/main.dart';
@@ -95,9 +96,7 @@ class DeepLTranslateProvider extends TranslateServiceProvider {
       ),
       ConfigItem(
         key: 'api_url',
-        label: Localizations.localeOf(context).languageCode == 'zh'
-            ? 'DeepL 请求地址'
-            : 'DeepL request URL',
+        label: ModuStrings.text(context, 'DeepL 请求地址', 'DeepL request URL'),
         type: ConfigItemType.text,
         defaultValue: _deeplApiBaseUrl,
       ),

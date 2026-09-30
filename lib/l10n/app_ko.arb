@@ -883,5 +883,58 @@
    "aiModelSwitchTitle": "모델 변경",
    "aiModelEnterManually": "모델 이름 입력",
    "aiModelOrSelectBelow": "또는 목록에서 선택:",
-   "aiChatFontSize": "글꼴 크기"
+   "aiChatFontSize": "글꼴 크기",
+   "fontImportedAndApplied": "가져와 적용했습니다: {font}",
+   "@fontImportedAndApplied": {
+      "placeholders": {
+         "font": {
+            "type": "String"
+         }
+      }
+   },
+   "fontImportFailedCount": "글꼴 {count}개를 가져오지 못했습니다.",
+   "@fontImportFailedCount": {
+      "placeholders": {
+         "count": {
+            "type": "int"
+         }
+      }
+   },
+   "readingBrightness": "앱 밝기",
+   "readingBrightnessFollowSystem": "시스템 따르기",
+   "readingBrightnessWindowHint": "이 앱 창만 조절하며 시스템 밝기는 변경하지 않습니다.",
+   "readingBrightnessDimHint": "이 앱만 어둡게 합니다. 100%는 시스템 밝기를 유지하며 시스템 설정보다 화면을 밝게 할 수는 없습니다.",
+   "readingPageReadingInfoChapterPageProgress": "이 장의 페이지 수",
+   "readingPagePreviousChapter": "이전 장",
+   "readingPagePreviousPage": "이전 페이지",
+   "readingPageNextPage": "다음 페이지",
+   "readingPageNextChapter": "다음 장",
+   "readingPageChapterNumber": "{number}장",
+   "@readingPageChapterNumber": {
+      "placeholders": {
+         "number": {
+            "type": "int"
+         }
+      }
+   },
+   "settingsAiProviderReasoningEffort": "추론 강도",
+   "settingsAiProviderReasoningEffortHelp": "기본값은 '자동'이며 이 매개변수를 보내지 않습니다. reasoning_effort를 지원하지 않는 모델이나 제공업체는 매개변수를 무시하거나 요청을 거부할 수 있습니다.",
+   "settingsAiProviderReasoningEffortAuto": "자동",
+   "settingsAiProviderReasoningEffortLow": "낮음",
+   "settingsAiProviderReasoningEffortMedium": "중간",
+   "settingsAiProviderReasoningEffortHigh": "높음",
+   "settingsAdvancedNetwork": "네트워크",
+   "settingsAdvancedHttpProxyEnabled": "HTTP 프록시 활성화",
+   "settingsAdvancedHttpProxyConfig": "HTTP 프록시 설정",
+   "settingsAdvancedHttpProxyHost": "프록시 호스트",
+   "settingsAdvancedHttpProxyHostHint": "예: 127.0.0.1",
+   "settingsAdvancedHttpProxyPort": "프록시 포트",
+   "settingsAdvancedHttpProxyPortHint": "예: 7890",
+   "settingsAdvancedHttpProxyNotConfigured": "미설정",
+   "settingsAdvancedHttpProxyInvalidInput": "잘못된 프록시 호스트 또는 포트입니다",
+   "settingsAdvancedHttpProxyTestUrl": "테스트 URL",
+   "settingsAdvancedHttpProxyTest": "연결 테스트",
+   "settingsAdvancedHttpProxyTesting": "테스트 중…",
+   "settingsAdvancedHttpProxyTestSuccess": "연결 성공",
+   "settingsAdvancedHttpProxyTestFailed": "연결 실패"
 }

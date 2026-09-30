@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 import 'dart:math';
 
@@ -313,7 +314,7 @@ class BookBottomSheet extends ConsumerWidget {
               );
           return PopupMenuButton<BookAction>(
             key: menuKey,
-            tooltip: zh ? '书籍操作' : 'Book actions',
+            tooltip: ModuStrings.text(context, '书籍操作', 'Book actions'),
             color: Theme.of(context).colorScheme.surfaceContainer,
             onSelected: (action) async {
               switch (action) {
@@ -326,9 +327,8 @@ class BookBottomSheet extends ConsumerWidget {
                         .read(bookshelfPinsProvider.notifier)
                         .setPinned(bookPinKey(book), !pinned);
                   } catch (_) {
-                    AnxToast.show(zh
-                        ? '置顶设置保存失败，请重试'
-                        : 'Could not save pin. Please retry.');
+                    AnxToast.show(ModuStrings.text(context, '置顶设置保存失败，请重试',
+                        'Could not save pin. Please retry.'));
                   }
                   break;
                 case BookAction.vectorize:
@@ -353,7 +353,7 @@ class BookBottomSheet extends ConsumerWidget {
             },
             itemBuilder: (context) => [
               entry(BookAction.details, Icons.info_outline,
-                  zh ? '书籍详情' : 'Book details'),
+                  ModuStrings.text(context, '书籍详情', 'Book details')),
               entry(
                   BookAction.pin,
                   pinned ? Icons.push_pin : Icons.push_pin_outlined,
@@ -367,10 +367,10 @@ class BookBottomSheet extends ConsumerWidget {
                       : indexed
                           ? Icons.refresh
                           : Icons.hub_outlined,
-                  _vectorActionLabel(indexed, item, zh),
+                  _vectorActionLabel(indexed, item, context),
                   enabled: !active),
               entry(BookAction.vectorModel, Icons.tune,
-                  zh ? '向量化模型' : 'Embedding model',
+                  ModuStrings.text(context, '向量化模型', 'Embedding model'),
                   enabled: !active,
                   subtitle: BookEmbeddingPreferences.labelFor(book)),
               const PopupMenuDivider(),
@@ -415,13 +415,18 @@ class BookBottomSheet extends ConsumerWidget {
   }
 }
 
-String _vectorActionLabel(bool indexed, BookKnowledgeQueueItem? item, bool zh) {
+String _vectorActionLabel(
+    bool indexed, BookKnowledgeQueueItem? item, BuildContext context) {
   final status = item?.status;
-  if (status == BookKnowledgeQueueStatus.queued) return zh ? '排队中' : 'Queued';
+  if (status == BookKnowledgeQueueStatus.queued)
+    return ModuStrings.text(context, '排队中', 'Queued');
   if (status == BookKnowledgeQueueStatus.cancelling)
-    return zh ? '正在取消' : 'Cancelling';
-  if (status?.isActive == true) return zh ? '正在向量化' : 'Indexing';
+    return ModuStrings.text(context, '正在取消', 'Cancelling');
+  if (status?.isActive == true)
+    return ModuStrings.text(context, '正在向量化', 'Indexing');
   if (status == BookKnowledgeQueueStatus.failed)
-    return zh ? '重新排队' : 'Retry indexing';
-  return indexed ? (zh ? '重新向量化' : 'Reindex') : (zh ? '向量化' : 'Vectorize');
+    return ModuStrings.text(context, '重新排队', 'Retry indexing');
+  return indexed
+      ? (ModuStrings.text(context, '重新向量化', 'Reindex'))
+      : (ModuStrings.text(context, '向量化', 'Vectorize'));
 }

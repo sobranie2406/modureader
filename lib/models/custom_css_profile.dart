@@ -1,5 +1,7 @@
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/css_visual_style.dart';
+import 'dart:ui';
+import 'package:anx_reader/l10n/modu_strings.dart';
 
 const customCssProfileCount = 32;
 
@@ -11,6 +13,15 @@ class CustomCssProfile {
       this.scope = 'all',
       this.visual});
   final String name;
+  String localizedName(Locale locale) {
+    for (final template in _legacyCssTemplates) {
+      if (ModuStrings.isBundledText(template.name, name)) {
+        return ModuStrings.label(locale, template.name, template.name);
+      }
+    }
+    return name;
+  }
+
   final String css;
   final String pattern;
   final String scope;

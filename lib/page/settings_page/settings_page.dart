@@ -11,6 +11,7 @@ class SettingsPageBuilder extends StatelessWidget {
       required this.setDetail,
       required this.icon,
       required this.title,
+      this.titleBuilder,
       required this.sections,
       required this.subTitles});
 
@@ -20,6 +21,7 @@ class SettingsPageBuilder extends StatelessWidget {
   final void Function(Widget detail, int id) setDetail;
   final Icon icon;
   final String title;
+  final String Function(BuildContext)? titleBuilder;
   final Widget sections;
   final List<String> subTitles;
 
@@ -34,6 +36,7 @@ class SettingsPageBuilder extends StatelessWidget {
       setDetail: setDetail,
       subPage: SettingsPageBody(
         title: title,
+        titleBuilder: titleBuilder,
         isMobile: isMobile,
         sections: sections,
       ),
@@ -46,11 +49,13 @@ class SettingsPageBody extends StatefulWidget {
   const SettingsPageBody({
     super.key,
     required this.title,
+    this.titleBuilder,
     required this.isMobile,
     required this.sections,
   });
 
   final String title;
+  final String Function(BuildContext)? titleBuilder;
   final bool isMobile;
   final Widget sections;
 
@@ -61,13 +66,16 @@ class SettingsPageBody extends StatefulWidget {
 class _SettingsPageBodyState extends State<SettingsPageBody> {
   @override
   Widget build(BuildContext context) {
+    // Register the locale dependency on this page, not on the cached sliver
+    // callback, so an already-open page refreshes its navigation title.
+    final title = widget.titleBuilder?.call(context) ?? widget.title;
     return CupertinoPageScaffold(
       child: NestedScrollView(
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return widget.isMobile
               ? <Widget>[
                   CupertinoSliverNavigationBar(
-                    largeTitle: Text(widget.title),
+                    largeTitle: Text(title),
                     backgroundColor:
                         Theme.of(context).appBarTheme.backgroundColor,
                   )

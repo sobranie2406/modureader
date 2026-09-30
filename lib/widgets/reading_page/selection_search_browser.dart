@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:collection';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -66,8 +67,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
             source: selectionSearchZoomScript(_zoomPercent));
       } catch (_) {
         if (mounted) {
-          setState(() => _message =
-              t('网页缩放失败，请重试。', 'Could not apply page zoom. Please retry.'));
+          setState(() => _message = ModuStrings.text(context, '网页缩放失败，请重试。',
+              'Could not apply page zoom. Please retry.'));
         }
       }
     });
@@ -99,8 +100,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
       await action(controller);
     } catch (_) {
       if (mounted) {
-        setState(
-            () => _message = t('网页操作失败，请重试。', 'Page operation failed. Retry.'));
+        setState(() => _message = ModuStrings.text(
+            context, '网页操作失败，请重试。', 'Page operation failed. Retry.'));
       }
     }
   }
@@ -128,8 +129,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
       await _search();
     } catch (_) {
       if (mounted) {
-        setState(() =>
-            _message = t('无法保存搜索引擎，请重试。', 'Could not save the engine. Retry.'));
+        setState(() => _message = ModuStrings.text(
+            context, '无法保存搜索引擎，请重试。', 'Could not save the engine. Retry.'));
       }
     }
   }
@@ -137,7 +138,9 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
   Future<void> _settings() async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-              appBar: AppBar(title: Text(t('选词搜索', 'Selection search'))),
+              appBar: AppBar(
+                  title: Text(
+                      ModuStrings.text(context, '选词搜索', 'Selection search'))),
               body: const SelectionSearchSettings(),
             )));
     if (!mounted) return;
@@ -170,8 +173,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
       return true;
     }
     if (mounted) {
-      setState(() => _message = t(
-          '已阻止打开外部应用或非网页链接。', 'External apps and non-web links are blocked.'));
+      setState(() => _message = ModuStrings.text(context, '已阻止打开外部应用或非网页链接。',
+          'External apps and non-web links are blocked.'));
     }
     return false;
   }
@@ -223,13 +226,14 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                     },
                                   )),
                                   IconButton(
-                                      tooltip:
-                                          t('搜索引擎设置', 'Search engine settings'),
+                                      tooltip: ModuStrings.text(context,
+                                          '搜索引擎设置', 'Search engine settings'),
                                       onPressed: _settings,
                                       icon:
                                           const Icon(Icons.settings_outlined)),
                                   IconButton(
-                                      tooltip: t('关闭', 'Close'),
+                                      tooltip: ModuStrings.text(
+                                          context, '关闭', 'Close'),
                                       onPressed: () =>
                                           Navigator.of(context).pop(),
                                       icon: const Icon(Icons.close)),
@@ -243,27 +247,32 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                   onSubmitted: (_) => _search(),
                                   decoration: InputDecoration(
                                       isDense: true,
-                                      labelText: t('搜索内容', 'Search text'),
+                                      labelText: ModuStrings.text(
+                                          context, '搜索内容', 'Search text'),
                                       suffixIcon: IconButton(
-                                          tooltip: t('搜索', 'Search'),
+                                          tooltip: ModuStrings.text(
+                                              context, '搜索', 'Search'),
                                           onPressed: _search,
                                           icon: const Icon(Icons.search))),
                                 )),
                             Row(children: [
                               IconButton(
-                                  tooltip: t('后退', 'Back'),
+                                  tooltip:
+                                      ModuStrings.text(context, '后退', 'Back'),
                                   onPressed: _back
                                       ? () => _action((c) => c.goBack())
                                       : null,
                                   icon: const Icon(Icons.arrow_back)),
                               IconButton(
-                                  tooltip: t('前进', 'Forward'),
+                                  tooltip: ModuStrings.text(
+                                      context, '前进', 'Forward'),
                                   onPressed: _forward
                                       ? () => _action((c) => c.goForward())
                                       : null,
                                   icon: const Icon(Icons.arrow_forward)),
                               IconButton(
-                                  tooltip: t('刷新', 'Reload'),
+                                  tooltip:
+                                      ModuStrings.text(context, '刷新', 'Reload'),
                                   onPressed: () {
                                     setState(() => _message = null);
                                     _action((c) => c.reload());
@@ -275,7 +284,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                       overflow: TextOverflow.ellipsis)),
                               PopupMenuButton<int>(
                                 key: const ValueKey('search-page-zoom'),
-                                tooltip: t('网页缩放', 'Page zoom'),
+                                tooltip: ModuStrings.text(
+                                    context, '网页缩放', 'Page zoom'),
                                 initialValue: _zoomPercent,
                                 onSelected: _changeZoom,
                                 itemBuilder: (_) => [
@@ -301,7 +311,8 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                       value: percent,
                                       checked: percent == _zoomPercent,
                                       child: Text(percent == 100
-                                          ? t('100%（恢复默认）', '100% (Reset)')
+                                          ? ModuStrings.text(context,
+                                              '100%（恢复默认）', '100% (Reset)')
                                           : '$percent%'),
                                     ),
                                 ],
@@ -397,7 +408,9 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                       request.isForMainFrame == true) {
                                     setState(() {
                                       _progress = 100;
-                                      _message = t('网页加载失败，请刷新或切换搜索引擎。',
+                                      _message = ModuStrings.text(
+                                          context,
+                                          '网页加载失败，请刷新或切换搜索引擎。',
                                           'Could not load the page. Reload or switch engines.');
                                     });
                                   }
@@ -407,7 +420,9 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                       request.isForMainFrame == true) {
                                     setState(() {
                                       _progress = 100;
-                                      _message = t('网站暂时无法访问，请刷新或切换搜索引擎。',
+                                      _message = ModuStrings.text(
+                                          context,
+                                          '网站暂时无法访问，请刷新或切换搜索引擎。',
                                           'Website unavailable. Reload or switch engines.');
                                     });
                                   }

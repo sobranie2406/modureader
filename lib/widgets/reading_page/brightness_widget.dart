@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -107,9 +108,8 @@ class BrightnessWidget extends StatelessWidget {
             ),
             Text(
               controller.nativeDimmingUnavailable
-                  ? (Localizations.localeOf(context).languageCode == 'zh'
-                      ? '亮度调节暂不可用，已保留系统亮度以确保阅读操作正常。'
-                      : 'Brightness adjustment is unavailable. System brightness is preserved so reader input remains usable.')
+                  ? (ModuStrings.text(context, '亮度调节暂不可用，已保留系统亮度以确保阅读操作正常。',
+                      'Brightness adjustment is unavailable. System brightness is preserved so reader input remains usable.'))
                   : controller.usesWindowBrightness
                       ? l10n.readingBrightnessWindowHint
                       : l10n.readingBrightnessDimHint,

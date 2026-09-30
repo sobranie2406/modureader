@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
@@ -30,6 +31,7 @@ import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
 import 'package:anx_reader/service/reader_focus.dart';
 import 'package:anx_reader/service/reader_keyboard.dart';
+import 'package:anx_reader/service/reader_page_keys.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/utils/ui/status_bar.dart';
@@ -114,6 +116,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void _updateReadingSync() {
     if (!mounted) return;
+    _updatePageKeys();
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     _readingSync.update(
       enabled:
@@ -127,6 +130,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final locale = Localizations.localeOf(context);
+    if (_aiLocale != locale) {
+      _aiLocale = locale;
+      _rebuildAiChat();
+    }
     final route = ModalRoute.of(context);
     if (route is PageRoute && route != _observedRoute) {
       readerRouteObserver.unsubscribe(this);
@@ -158,6 +166,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   bool bottomBarOffstage = true;
   late String heroTag;
   Widget? _aiChat;
+  Locale? _aiLocale;
   final aiChatKey = GlobalKey<AiChatStreamState>();
   static const double _aiChatMinWidth = 240;
   late double _aiChatWidth;
@@ -173,7 +182,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> _toggleQuickMarkMenu() async {
     if (_changingQuickMark) return;
     final previous = Prefs().quickMarkShowMenu;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     setState(() {
       _changingQuickMark = true;
       Prefs().quickMarkShowMenu = !previous;
@@ -185,9 +193,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     } catch (_) {
       Prefs().quickMarkShowMenu = previous;
       if (mounted) {
-        AnxToast.show(zh
-            ? '无法切换标记菜单，请重试。'
-            : 'Could not switch the marking menu. Please retry.');
+        AnxToast.show(ModuStrings.text(context, '无法切换标记菜单，请重试。',
+            'Could not switch the marking menu. Please retry.'));
       }
     } finally {
       if (mounted) setState(() => _changingQuickMark = false);
@@ -198,7 +205,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     if (!AnxPlatform.isMobile || _changingQuickMark) return;
     setState(() => _changingQuickMark = true);
     final requested = !_quickMarkEnabled;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     try {
       final enabled =
           await epubPlayerKey.currentState?.setQuickMarkEnabled(requested) ??
@@ -206,18 +212,16 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       if (!mounted) return;
       setState(() => _quickMarkEnabled = enabled);
       if (requested && !enabled) {
-        AnxToast.show(zh
-            ? '请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。'
-            : 'Wait for the book to load. PDF and fixed-layout books are not supported.');
+        AnxToast.show(ModuStrings.text(context, '请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。',
+            'Wait for the book to load. PDF and fixed-layout books are not supported.'));
       } else if (enabled) {
         showOrHideAppBarAndBottomBar(false);
-        AnxToast.show(zh
-            ? '直接划过文字，松手即高亮；退出后恢复滑动翻页。'
-            : 'Swipe across text to highlight. Exit to resume swipe navigation.');
+        AnxToast.show(ModuStrings.text(context, '直接划过文字，松手即高亮；退出后恢复滑动翻页。',
+            'Swipe across text to highlight. Exit to resume swipe navigation.'));
       }
     } catch (_) {
-      AnxToast.show(
-          zh ? '无法切换快速标记，请重试。' : 'Could not switch quick mark. Please retry.');
+      AnxToast.show(ModuStrings.text(context, '无法切换快速标记，请重试。',
+          'Could not switch quick mark. Please retry.'));
     } finally {
       if (mounted) setState(() => _changingQuickMark = false);
     }
@@ -226,12 +230,42 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   late final FocusNode _readerFocusNode;
   final _readerWebViewFocusScope =
       FocusScopeNode(debugLabel: 'book_webview_focus_scope');
+  late final ReaderPageKeys _pageKeys;
+
+  bool get _canUsePageKeys {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    final editing = focused?.widget is EditableText ||
+        focused?.findAncestorWidgetOfExactType<EditableText>() != null;
+    return mounted &&
+        !widget.book.isDeleted &&
+        _readingRouteVisible &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed) &&
+        bottomBarOffstage &&
+        !_readerDrawerOpen &&
+        !_searchDialogOpen &&
+        _aiChat == null &&
+        !editing;
+  }
+
+  void _updatePageKeys() {
+    if (!mounted) return;
+    _pageKeys.update(
+        active: _canUsePageKeys, volume: Prefs().volumeKeyTurnPage);
+  }
   // late final VolumeKeyBoard _volumeKeyBoard;
   // bool _volumeKeyListenerAttached = false;
 
   @override
   void initState() {
     _readerFocusNode = FocusNode(debugLabel: 'reading_page_focus');
+    _pageKeys = ReaderPageKeys(onDirection: (direction) {
+      if (_canUsePageKeys) {
+        epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
+      }
+    });
+    FocusManager.instance.addListener(_updatePageKeys);
 
     // Initialize AI panel sizes from persistent storage
     _aiChatWidth = Prefs().aiPanelWidth;
@@ -279,6 +313,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_updatePageKeys);
+    _pageKeys.dispose();
     Prefs().removeListener(_updateReadingSync);
     readerRouteObserver.unsubscribe(this);
     _readingSync.dispose();
@@ -509,6 +545,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       bottomBarOffstage = false;
       _releaseReaderFocus();
     });
+    _updatePageKeys();
   }
 
   void hideBottomBar() {
@@ -517,6 +554,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       bottomBarOffstage = true;
       _requestReaderFocus();
     });
+    _updatePageKeys();
   }
 
   void showOrHideAppBarAndBottomBar(bool show) {
@@ -555,15 +593,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   void noteHandler() {
     setState(() {
       _currentPage = ReadingNotes(book: _book);
-    });
-  }
-
-  void progressHandler() {
-    setState(() {
-      _currentPage = ProgressWidget(
-        epubPlayerKey: epubPlayerKey,
-        showOrHideAppBarAndBottomBar: showOrHideAppBarAndBottomBar,
-      );
     });
   }
 
@@ -788,8 +817,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
           .map(
             (skill) => AiQuickPromptChip(
               icon: _readAnySkillIcon(skill.id),
-              label: skill.name,
-              prompt: ReadingSkillPromptStore.promptFor(skill),
+              label: skill.localizedName(Localizations.localeOf(context)),
+              prompt: ReadingSkillPromptStore.promptFor(skill,
+                  locale: Localizations.localeOf(context)),
               skillId: skill.id,
             ),
           ),
@@ -824,7 +854,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   Future<void> showAiChat({
     String? content,
+    String? sourceText,
+    String? skillId,
     bool sendImmediate = false,
+    bool newConversation = false,
+    bool forcePopup = false,
   }) async {
     List<AiQuickPromptChip> quickPrompts = _getAiQuickPromptChips();
 
@@ -849,17 +883,29 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         break;
     }
 
+    shouldShowAsPopup = shouldShowAsPopup || forcePopup;
     if (shouldShowAsPopup) {
+      // A shared GlobalKey must not be mounted in both the split panel and
+      // popup. Dispose the panel (and cancel its stream) before reusing it.
+      if (_aiChat != null) {
+        _closeAiChat();
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+      }
       await showReaderPopup(navigatorKey.currentContext!,
           builder: (context) => AiChatStream(
                 key: aiChatKey,
                 scope: AiChatScope.reader,
                 initialMessage: content,
+                initialSourceText: sourceText,
+                initialSkillId: skillId,
+                newConversation: newConversation,
                 sendImmediate: sendImmediate,
                 quickPromptChips: quickPrompts,
               ));
       _restoreReaderFocusAfterPanel();
     } else {
+      final existingChat = aiChatKey.currentState;
       setState(() {
         final maxWidth = _aiChatMaxWidth(navigatorKey.currentContext!);
         final maxHeight = _aiChatMaxHeight(navigatorKey.currentContext!);
@@ -873,7 +919,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                 key: aiChatKey,
                 scope: AiChatScope.reader,
                 initialMessage: content,
-                sendImmediate: sendImmediate,
+                initialSourceText: sourceText,
+                initialSkillId: skillId,
+                newConversation: newConversation,
+                sendImmediate: existingChat == null && sendImmediate,
                 quickPromptChips: quickPrompts,
                 trailing: _buildAiChatTrailing(navigatorKey.currentContext!),
               ),
@@ -881,6 +930,16 @@ class ReadingPageState extends ConsumerState<ReadingPage>
           ],
         );
       });
+      if (existingChat != null && (newConversation || sendImmediate)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || aiChatKey.currentState != existingChat) return;
+          existingChat.beginSelectionQuestion(
+              message: content ?? '',
+              sourceText: sourceText ?? content ?? '',
+              skillId: skillId,
+              sendImmediate: sendImmediate);
+        });
+      }
     }
   }
 
@@ -894,6 +953,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   Widget build(BuildContext context) {
+    // Route changes (including dialogs), AI panels and settings must release
+    // native keys; none of these depend on the WebView's Flutter focus node.
+    _updatePageKeys();
     final compactToolbar = MediaQuery.sizeOf(context).width < 420;
     var aiButton = IconButton(
       tooltip: L10n.of(context).aiChat,
@@ -1041,15 +1103,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                       ),
                       child: StatefulBuilder(
                         builder: (BuildContext context, StateSetter setState) {
-                          final hasContent = !identical(_currentPage, empty);
+                          final content = identical(_currentPage, empty)
+                              ? ProgressWidget(epubPlayerKey: epubPlayerKey)
+                              : _currentPage;
                           return IntrinsicHeight(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (hasContent)
-                                  Expanded(
-                                    child: _currentPage,
-                                  ),
+                                Expanded(child: content),
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceAround,
@@ -1061,10 +1122,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                     IconButton(
                                       icon: const Icon(EvaIcons.edit),
                                       onPressed: noteHandler,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.data_usage),
-                                      onPressed: progressHandler,
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.color_lens),
@@ -1124,6 +1181,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
               resizeToAvoidBottomInset: false,
               onDrawerChanged: (open) {
                 _readerDrawerOpen = open;
+                _updatePageKeys();
                 if (!open) _requestReaderFocus();
               },
               drawer: PointerInterceptor(

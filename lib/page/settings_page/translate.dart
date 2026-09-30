@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/models/ai_provider.dart';
@@ -20,10 +21,6 @@ class _TranslateSettingState extends State<TranslateSetting> {
   late final TextEditingController _deepLBaseUrlController;
   bool _obscureDeepLKey = true;
 
-  bool get _isChinese => Localizations.localeOf(context).languageCode == 'zh';
-
-  String _label(String zh, String en) => _isChinese ? zh : en;
-
   @override
   void initState() {
     super.initState();
@@ -43,61 +40,77 @@ class _TranslateSettingState extends State<TranslateSetting> {
     super.dispose();
   }
 
-  void _selectService(TranslateService service) {
-    Prefs().translateService = service;
-    Prefs().fullTextTranslateService = service;
+  void _selectService(TranslateService service, {bool fullTextOnly = false}) {
+    if (!fullTextOnly) Prefs().translateService = service;
+    if (!service.isWebView) Prefs().fullTextTranslateService = service;
     setState(() {});
   }
 
-  Future<void> _showServicePicker() async {
+  Future<void> _showServicePicker({bool fullTextOnly = false}) async {
     final selected = await showModalBottomSheet<TranslateService>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  _label('选择翻译引擎', 'Select translation engine'),
-                  style: Theme.of(context).textTheme.titleLarge,
+        child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.7,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      ModuStrings.text(
+                          context, '选择翻译引擎', 'Select translation engine'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            for (final service in TranslateService.readAnyValues)
-              RadioListTile<TranslateService>(
-                value: service,
-                groupValue: Prefs().fullTextTranslateService,
-                title: Text(service.getLabel(context)),
-                subtitle: Text(_serviceDescription(service)),
-                onChanged: (value) => Navigator.pop(context, value),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
+                Expanded(
+                    child: ListView(shrinkWrap: true, children: [
+                  for (final service in fullTextOnly
+                      ? TranslateService.readAnyValues
+                      : TranslateService.selectionValues)
+                    RadioListTile<TranslateService>(
+                      key: ValueKey('translation-engine-${service.name}'),
+                      value: service,
+                      groupValue: fullTextOnly
+                          ? Prefs().fullTextTranslateService
+                          : Prefs().translateService,
+                      title: Text(service.getLabel(context)),
+                      subtitle: service.isWebView
+                          ? null
+                          : Text(_serviceDescription(service)),
+                      onChanged: (value) => Navigator.pop(context, value),
+                    ),
+                ])),
+                const SizedBox(height: 8),
+              ],
+            )),
       ),
     );
-    if (selected != null) _selectService(selected);
+    if (selected != null && mounted) {
+      _selectService(selected, fullTextOnly: fullTextOnly);
+    }
   }
 
   String _serviceDescription(TranslateService service) {
+    if (service.isWebView) {
+      return ModuStrings.text(context, '官方网页翻译，无需 API Key；仅用于选词弹窗，全文翻译使用独立引擎。',
+          'Official translation page, no API key. Selection only; full-text translation uses a separate engine.');
+    }
     return switch (service) {
-      TranslateService.microsoftFree => _label(
-          '无需 API 密钥，开箱即用',
-          'Works without an API key',
-        ),
-      TranslateService.ai => _label(
-          '使用 AI 设置中已配置的服务商和模型',
-          'Uses a provider and model configured in AI settings',
-        ),
-      TranslateService.deepl => _label(
+      TranslateService.microsoftFree =>
+        ModuStrings.text(context, '无需 API 密钥，开箱即用', 'Works without an API key'),
+      TranslateService.ai => ModuStrings.text(context, '使用 AI 设置中已配置的服务商和模型',
+          'Uses a provider and model configured in AI settings'),
+      TranslateService.deepl => ModuStrings.text(
+          context,
           '支持 DeepL 官方接口和 DeepLX 自定义地址',
-          'Supports official DeepL and custom DeepLX endpoints',
-        ),
-      _ => _label('兼容旧版配置', 'Legacy-compatible provider'),
+          'Supports official DeepL and custom DeepLX endpoints'),
+      _ => ModuStrings.text(context, '兼容旧版配置', 'Legacy-compatible provider'),
     };
   }
 
@@ -141,7 +154,8 @@ class _TranslateSettingState extends State<TranslateSetting> {
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: Text(
-                  _label('选择翻译模型', 'Select translation model'),
+                  ModuStrings.text(
+                      context, '选择翻译模型', 'Select translation model'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -190,7 +204,8 @@ class _TranslateSettingState extends State<TranslateSetting> {
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    _label('选择目标语言', 'Select target language'),
+                    ModuStrings.text(
+                        context, '选择目标语言', 'Select target language'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -232,14 +247,16 @@ class _TranslateSettingState extends State<TranslateSetting> {
 
   @override
   Widget build(BuildContext context) {
-    final service = Prefs().fullTextTranslateService;
+    final service = Prefs().translateService;
+    final fullTextService = Prefs().fullTextTranslateService;
     final aiModels = _configuredAiModels;
     final aiModel = _currentTranslationAiModel(aiModels);
 
     return settingsSections(
       sections: [
         SettingsSection(
-          title: Text(_label('翻译设置', 'Translation settings')),
+          title:
+              Text(ModuStrings.text(context, '翻译设置', 'Translation settings')),
           tiles: [
             CustomSettingsTile(
               child: Padding(
@@ -247,33 +264,50 @@ class _TranslateSettingState extends State<TranslateSetting> {
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    _label('配置翻译选项', 'Configure translation options'),
+                    ModuStrings.text(
+                        context, '配置翻译选项', 'Configure translation options'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
               ),
             ),
             SettingsTile.navigation(
+              key: const ValueKey('selection-translation-engine'),
               leading: const Icon(Icons.translate_outlined),
-              title: Text(_label('翻译引擎', 'Translation engine')),
+              title:
+                  Text(ModuStrings.text(context, '翻译引擎', 'Translation engine')),
               value: Text(service.getLabel(context)),
+              description:
+                  service.isWebView ? Text(_serviceDescription(service)) : null,
               onPressed: (_) => _showServicePicker(),
             ),
-            if (service == TranslateService.ai)
+            if (service.isWebView)
+              SettingsTile.navigation(
+                key: const ValueKey('fulltext-translation-engine'),
+                leading: const Icon(Icons.article_outlined),
+                title: Text(ModuStrings.text(
+                    context, '全文翻译引擎', 'Full-text translation engine')),
+                value: Text(fullTextService.getLabel(context)),
+                onPressed: (_) => _showServicePicker(fullTextOnly: true),
+              ),
+            if (service == TranslateService.ai ||
+                (service.isWebView && fullTextService == TranslateService.ai))
               SettingsTile.navigation(
                 leading: const Icon(Icons.smart_toy_outlined),
-                title: Text(_label('翻译模型', 'Translation model')),
+                title: Text(
+                    ModuStrings.text(context, '翻译模型', 'Translation model')),
                 description: aiModel == null
-                    ? Text(_label(
-                        '请先在 AI 设置中配置服务商和模型',
-                        'Configure a provider and model in AI settings first',
-                      ))
+                    ? Text(ModuStrings.text(context, '请先在 AI 设置中配置服务商和模型',
+                        'Configure a provider and model in AI settings first'))
                     : Text(aiModel.title),
-                value: Text(aiModel?.model ?? _label('未配置', 'Not configured')),
+                value: Text(aiModel?.model ??
+                    ModuStrings.text(context, '未配置', 'Not configured')),
                 enabled: aiModels.isNotEmpty,
                 onPressed: (_) => _showAiModelPicker(aiModels),
               ),
-            if (service == TranslateService.deepl)
+            if (service == TranslateService.deepl ||
+                (service.isWebView &&
+                    fullTextService == TranslateService.deepl))
               CustomSettingsTile(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
@@ -285,10 +319,8 @@ class _TranslateSettingState extends State<TranslateSetting> {
                         obscureText: _obscureDeepLKey,
                         decoration: InputDecoration(
                           labelText: 'DeepL API Key',
-                          hintText: _label(
-                            '输入 DeepL API Key',
-                            'Enter DeepL API key',
-                          ),
+                          hintText: ModuStrings.text(context,
+                              '输入 DeepL API Key', 'Enter DeepL API key'),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -307,15 +339,13 @@ class _TranslateSettingState extends State<TranslateSetting> {
                       TextField(
                         controller: _deepLBaseUrlController,
                         decoration: InputDecoration(
-                          labelText: _label(
-                            'DeepL 请求地址',
-                            'DeepL request URL',
-                          ),
+                          labelText: ModuStrings.text(
+                              context, 'DeepL 请求地址', 'DeepL request URL'),
                           hintText: 'https://api-free.deepl.com/v2',
-                          helperText: _label(
-                            '支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址',
-                            'Supports official DeepL, a DeepLX base URL, or a full /translate URL',
-                          ),
+                          helperText: ModuStrings.text(
+                              context,
+                              '支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址',
+                              'Supports official DeepL, a DeepLX base URL, or a full /translate URL'),
                           border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) => _saveDeepLConfig(),
@@ -339,29 +369,23 @@ class _TranslateSettingState extends State<TranslateSetting> {
           ],
         ),
         SettingsSection(
-          title: Text(_label('阅读翻译', 'Reader translation')),
+          title: Text(ModuStrings.text(context, '阅读翻译', 'Reader translation')),
           tiles: [
             SettingsTile.navigation(
               leading: const Icon(Icons.language_outlined),
-              title: Text(_label('目标语言', 'Target language')),
-              description: Text(_label(
-                '阅读器底栏也可以临时切换目标语言',
-                'The target can also be changed from the reader toolbar',
-              )),
+              title: Text(ModuStrings.text(context, '目标语言', 'Target language')),
+              description: Text(ModuStrings.text(context, '阅读器底栏也可以临时切换目标语言',
+                  'The target can also be changed from the reader toolbar')),
               value: Text(Prefs().fullTextTranslateTo.nativeName),
               onPressed: (_) => _showLanguagePicker(),
             ),
             SettingsTile.switchTile(
               leading: const Icon(Icons.auto_awesome_outlined),
               initialValue: Prefs().autoTranslateSelection,
-              title: Text(_label(
-                '选中文本后自动翻译',
-                'Translate selected text automatically',
-              )),
-              description: Text(_label(
-                '选择正文后直接打开翻译结果',
-                'Open translation automatically after selecting text',
-              )),
+              title: Text(ModuStrings.text(context, '选中文本后自动翻译',
+                  'Translate selected text automatically')),
+              description: Text(ModuStrings.text(context, '选择正文后直接打开翻译结果',
+                  'Open translation automatically after selecting text')),
               onToggle: (value) {
                 Prefs().autoTranslateSelection = value;
                 setState(() {});
@@ -381,10 +405,8 @@ class _TranslateSettingState extends State<TranslateSetting> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _label(
-                          '执行翻译时，当前文字会发送到所选翻译服务。',
-                          'When translating, the current text is sent to the selected translation service.',
-                        ),
+                        ModuStrings.text(context, '执行翻译时，当前文字会发送到所选翻译服务。',
+                            'When translating, the current text is sent to the selected translation service.'),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),

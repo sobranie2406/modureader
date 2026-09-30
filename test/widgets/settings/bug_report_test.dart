@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:anx_reader/page/settings_page/bug_report.dart';
 import 'package:anx_reader/page/settings_page/settings_page.dart';
 import 'package:anx_reader/service/feedback/bug_report.dart';
+import 'package:anx_reader/l10n/app_language.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,6 +18,7 @@ Future<void> mount(
   Future<String> Function()? environment,
   bool mobile = false,
   bool chinese = false,
+  Locale? locale,
 }) async {
   tester.view.physicalSize =
       mobile ? const Size(390, 844) : const Size(1100, 1000);
@@ -23,8 +26,8 @@ Future<void> mount(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(MaterialApp(
-    locale: Locale(chinese ? 'zh' : 'en'),
-    supportedLocales: const [Locale('zh'), Locale('en')],
+    locale: locale ?? Locale(chinese ? 'zh' : 'en'),
+    supportedLocales: [...appLocales, const Locale('zh')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     home: Scaffold(
         body: SettingsPageBody(
@@ -66,6 +69,25 @@ Future<void> fill(WidgetTester tester,
 }
 
 void main() {
+  for (final locale in [
+    const Locale('fr'),
+    const Locale('ja'),
+    const Locale('ar')
+  ]) {
+    testWidgets(
+        '$locale feedback labels are localized and privacy remains visible',
+        (tester) async {
+      await mount(tester, locale: locale, mobile: true);
+      final context = tester.element(find.byType(BugReportSettings));
+      expect(
+          find.text(ModuStrings.text(context, '提交 Bug', 'Report a bug')).last,
+          findsOneWidget);
+      expect(find.text('问题描述'), findsNothing);
+      expect(find.text('Description'), findsNothing);
+      expect(find.byType(TextFormField), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
       'checked diagnostics reach clipboard only after preview confirmation, never URL',
       (tester) async {

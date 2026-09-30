@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:anx_reader/models/css_visual_style.dart';
@@ -20,8 +21,6 @@ class CssVisualControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String t(String zh, String en) =>
-        Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
     Widget toggle(String key, String label, Object initial, {Widget? child}) =>
         Column(children: [
           Row(children: [
@@ -58,7 +57,7 @@ class CssVisualControls extends StatelessWidget {
         Expanded(child: Text(label)),
         IconButton(
             key: ValueKey('css-color-$key'),
-            tooltip: t('选择颜色', 'Choose color'),
+            tooltip: ModuStrings.text(context, '选择颜色', 'Choose color'),
             icon: Icon(Icons.circle,
                 color:
                     Color(int.parse(hex.substring(1), radix: 16) | 0xff000000)),
@@ -101,8 +100,8 @@ class CssVisualControls extends StatelessWidget {
     Widget image(String key, bool svg) => Row(children: [
           Expanded(
               child: Text(svg
-                  ? t('自定义 SVG', 'Custom SVG')
-                  : t('规则背景图片', 'Background image'))),
+                  ? ModuStrings.text(context, '自定义 SVG', 'Custom SVG')
+                  : ModuStrings.text(context, '规则背景图片', 'Background image'))),
           TextButton(
               onPressed: () async {
                 try {
@@ -141,14 +140,16 @@ class CssVisualControls extends StatelessWidget {
                 } catch (_) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(t('请选择不超过 256 KiB 的有效图片；SVG 仅支持静态图形。',
+                        content: Text(ModuStrings.text(
+                            context,
+                            '请选择不超过 256 KiB 的有效图片；SVG 仅支持静态图形。',
                             'Use an image up to 256 KiB; SVG must be a static drawing.'))));
                   }
                 }
               },
               child: Text(style.values.containsKey(key)
-                  ? t('更换', 'Replace')
-                  : t('选择', 'Choose'))),
+                  ? ModuStrings.text(context, '更换', 'Replace')
+                  : ModuStrings.text(context, '选择', 'Choose'))),
           if (style.values.containsKey(key))
             IconButton(
                 onPressed: () => change(key, null),
@@ -156,42 +157,52 @@ class CssVisualControls extends StatelessWidget {
         ]);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t('关闭模块即跟随书籍原样式；自定义代码在图形参数之后叠加。',
+      Text(ModuStrings.text(context, '关闭模块即跟随书籍原样式；自定义代码在图形参数之后叠加。',
           'Disabled modules inherit book styles. Custom code follows the visual settings.')),
-      group(t('文字与背景', 'Text and background'), [
-        color('color', t('自定义文字颜色', 'Text color'), '#a05000'),
-        color('background', t('背景颜色', 'Background color'), '#fff4cc'),
+      group(ModuStrings.text(context, '文字与背景', 'Text and background'), [
+        color('color', ModuStrings.text(context, '自定义文字颜色', 'Text color'),
+            '#a05000'),
+        color('background',
+            ModuStrings.text(context, '背景颜色', 'Background color'), '#fff4cc'),
         if (!highlight) image('backgroundImage', false),
       ]),
-      group(t('下划线', 'Underline'), [
+      group(ModuStrings.text(context, '下划线', 'Underline'), [
         choices('decoration', {
-          'none': t('关闭', 'Off'),
-          'solid': t('实线', 'Solid'),
-          'dashed': t('虚线', 'Dashed'),
-          'wavy': t('波浪线', 'Wavy'),
-          'emphasis': t('强调条', 'Emphasis'),
-          if (!highlight) 'svg': t('自定义 SVG', 'Custom SVG')
+          'none': ModuStrings.text(context, '关闭', 'Off'),
+          'solid': ModuStrings.text(context, '实线', 'Solid'),
+          'dashed': ModuStrings.text(context, '虚线', 'Dashed'),
+          'wavy': ModuStrings.text(context, '波浪线', 'Wavy'),
+          'emphasis': ModuStrings.text(context, '强调条', 'Emphasis'),
+          if (!highlight)
+            'svg': ModuStrings.text(context, '自定义 SVG', 'Custom SVG')
         }),
         if (style.values['decoration'] == 'svg' && !highlight) ...[
           image('underlineImage', true),
-          Text(t('SVG 下划线与背景图使用同一背景层；启用时优先显示 SVG。',
+          Text(ModuStrings.text(context, 'SVG 下划线与背景图使用同一背景层；启用时优先显示 SVG。',
               'SVG underline takes precedence over the background image.')),
         ],
-        color('decorationColor', t('自定义下划线颜色', 'Underline color'), '#c0392b'),
-        number('thickness', t('线条宽度', 'Thickness'), 1, 'px'),
-        if (!highlight) number('offset', t('垂直偏移', 'Offset'), 2, 'px'),
+        color(
+            'decorationColor',
+            ModuStrings.text(context, '自定义下划线颜色', 'Underline color'),
+            '#c0392b'),
+        number('thickness', ModuStrings.text(context, '线条宽度', 'Thickness'), 1,
+            'px'),
+        if (!highlight)
+          number(
+              'offset', ModuStrings.text(context, '垂直偏移', 'Offset'), 2, 'px'),
       ]),
       if (!highlight) ...[
-        group(t('字体', 'Font'), [
+        group(ModuStrings.text(context, '字体', 'Font'), [
           choices('font', {
-            'serif': t('衬线字体', 'Serif'),
-            'sans-serif': t('无衬线字体', 'Sans serif'),
-            'monospace': t('等宽字体', 'Monospace')
+            'serif': ModuStrings.text(context, '衬线字体', 'Serif'),
+            'sans-serif': ModuStrings.text(context, '无衬线字体', 'Sans serif'),
+            'monospace': ModuStrings.text(context, '等宽字体', 'Monospace')
           }),
           Row(children: [
             Expanded(
                 child: Text(style.values['fontFile']?.toString() ??
-                    t('自定义字体（未设置）', 'Custom font (not set)'))),
+                    ModuStrings.text(
+                        context, '自定义字体（未设置）', 'Custom font (not set)'))),
             TextButton(
                 onPressed: () async {
                   try {
@@ -209,13 +220,15 @@ class CssVisualControls extends StatelessWidget {
                     final selected = await showDialog<String>(
                         context: context,
                         builder: (c) => SimpleDialog(
-                                title: Text(
-                                    t('选择已导入字体', 'Choose an imported font')),
+                                title: Text(ModuStrings.text(context, '选择已导入字体',
+                                    'Choose an imported font')),
                                 children: [
                                   if (files.isEmpty)
                                     Padding(
                                         padding: const EdgeInsets.all(16),
-                                        child: Text(t('请先在字体设置中导入字体。',
+                                        child: Text(ModuStrings.text(
+                                            context,
+                                            '请先在字体设置中导入字体。',
                                             'Import fonts in font settings first.'))),
                                   for (final f in files)
                                     SimpleDialogOption(
@@ -234,37 +247,45 @@ class CssVisualControls extends StatelessWidget {
                   } catch (_) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content:
-                              Text(t('无法读取字体目录', 'Could not read fonts'))));
+                          content: Text(ModuStrings.text(
+                              context, '无法读取字体目录', 'Could not read fonts'))));
                     }
                   }
                 },
-                child: Text(t('选择', 'Choose'))),
+                child: Text(ModuStrings.text(context, '选择', 'Choose'))),
             if (style.values.containsKey('fontFile'))
               IconButton(
                   onPressed: () => change('fontFile', null),
                   icon: const Icon(Icons.clear)),
           ]),
-          Text(t('自定义字体优先于通用字体。导出仅包含文件名，其他设备需另行导入同名字体。',
+          Text(ModuStrings.text(context, '自定义字体优先于通用字体。导出仅包含文件名，其他设备需另行导入同名字体。',
               'Custom fonts take precedence. Exports include filenames only; import matching fonts on other devices.')),
-          number('weight', t('字重', 'Weight'), 400, '', divisions: 8),
-          number('size', t('字号', 'Size'), 20, 'px', divisions: 56),
-          toggle('italic', t('斜体', 'Italic'), true),
+          number('weight', ModuStrings.text(context, '字重', 'Weight'), 400, '',
+              divisions: 8),
+          number('size', ModuStrings.text(context, '字号', 'Size'), 20, 'px',
+              divisions: 56),
+          toggle('italic', ModuStrings.text(context, '斜体', 'Italic'), true),
         ]),
-        group(t('段落排版', 'Paragraph layout'), [
+        group(ModuStrings.text(context, '段落排版', 'Paragraph layout'), [
           choices('align', {
-            'start': t('起始对齐', 'Start'),
-            'center': t('居中', 'Center'),
-            'end': t('末尾对齐', 'End'),
-            'justify': t('两端对齐', 'Justify')
+            'start': ModuStrings.text(context, '起始对齐', 'Start'),
+            'center': ModuStrings.text(context, '居中', 'Center'),
+            'end': ModuStrings.text(context, '末尾对齐', 'End'),
+            'justify': ModuStrings.text(context, '两端对齐', 'Justify')
           }),
-          number('lineHeight', t('行距', 'Line height'), 1.8, ''),
-          number('spacing', t('字间距', 'Letter spacing'), 0.08, 'em'),
-          number('indent', t('首行缩进', 'Indent'), 2, 'em'),
-          number('paragraphGap', t('段落间距', 'Paragraph gap'), 0.6, 'em'),
+          number('lineHeight', ModuStrings.text(context, '行距', 'Line height'),
+              1.8, ''),
+          number('spacing', ModuStrings.text(context, '字间距', 'Letter spacing'),
+              0.08, 'em'),
+          number(
+              'indent', ModuStrings.text(context, '首行缩进', 'Indent'), 2, 'em'),
+          number('paragraphGap',
+              ModuStrings.text(context, '段落间距', 'Paragraph gap'), 0.6, 'em'),
         ]),
       ] else
-        Text(t('局部正则高亮仅支持颜色、背景色与下划线，不更改正文节点；字体、图片、SVG 和偏移仅用于排版模板。',
+        Text(ModuStrings.text(
+            context,
+            '局部正则高亮仅支持颜色、背景色与下划线，不更改正文节点；字体、图片、SVG 和偏移仅用于排版模板。',
             'Regex highlights preserve text nodes and support colors and underlines only. Fonts, images, SVG and offset require a layout template.')),
     ]);
   }

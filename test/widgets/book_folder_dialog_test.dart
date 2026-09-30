@@ -5,6 +5,7 @@ import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +63,9 @@ void main() {
           groupDaoProvider.overrideWith(() => groups),
         ],
         child: MaterialApp(
+            locale: const Locale('zh', 'CN'),
+            supportedLocales: const [Locale('zh', 'CN')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
             home: Scaffold(
                 body: Builder(
                     builder: (context) => TextButton(

@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
@@ -34,10 +35,9 @@ class _TtsWidgetState extends State<TtsWidget> {
 
   String _unitLabel(BuildContext context, {required bool previous}) {
     final paragraph = tts_svc.getTtsService(Prefs().ttsService).isOnline;
-    if (Localizations.localeOf(context).languageCode == 'zh') {
-      return '${previous ? '上一' : '下一'}${paragraph ? '段' : '句'}';
-    }
-    return '${previous ? 'Previous' : 'Next'} ${paragraph ? 'passage' : 'sentence'}';
+    return paragraph
+        ? (previous ? ModuStrings.text(context, '上一段', 'Previous passage') : ModuStrings.text(context, '下一段', 'Next passage'))
+        : (previous ? ModuStrings.text(context, '上一句', 'Previous sentence') : ModuStrings.text(context, '下一句', 'Next sentence'));
   }
 
   @override
@@ -161,9 +161,10 @@ class _TtsWidgetState extends State<TtsWidget> {
                 pitch(),
                 rate(),
                 if (tts_svc.getTtsService(Prefs().ttsService).isOnline)
-                  Text(Localizations.localeOf(context).languageCode == 'zh'
-                      ? '连贯朗读：同段相邻句合成，高亮和前后跳转按小段；长段自动拆分。'
-                      : 'Continuous narration: adjacent sentences are grouped. Highlighting and Previous/Next follow each group; long paragraphs are split.'),
+                  Text(ModuStrings.text(
+                      context,
+                      '连贯朗读：同段相邻句合成，高亮和前后跳转按小段；长段自动拆分。',
+                      'Continuous narration: adjacent sentences are grouped. Highlighting and Previous/Next follow each group; long paragraphs are split.')),
                 Row(
                   children: [
                     Text(L10n.of(context).ttsType),

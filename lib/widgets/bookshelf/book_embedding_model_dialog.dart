@@ -1,4 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
@@ -67,7 +68,8 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
                     : (value) => setState(() => choice = value!),
               );
           return AlertDialog(
-            title: const Text('本书向量化模型'),
+            title: Text(ModuStrings.text(
+                context, '本书向量化模型', 'Embedding model for this book')),
             content: SizedBox(
                 width: 440,
                 child: SingleChildScrollView(
@@ -76,18 +78,49 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.book.title),
-                    option('', '使用默认模型', '跟随设置中的全局模型：$defaultName'),
+                    option(
+                        '',
+                        ModuStrings.text(
+                            context, '使用默认模型', 'Use default model'),
+                        ModuStrings.format(context, '跟随设置中的全局模型：{model}',
+                            'Follow the global model: {model}',
+                            values: {'model': defaultName})),
                     for (final model in LocalEmbeddingModels.all)
-                      option('local:${model.id}', model.name,
-                          '本地 · ${model.dimensions} 维 · ${model.languages}'),
-                    option('remote', '使用远程模型',
-                        '使用向量设置中的接口和密钥：${prefs.vectorModelConfig['modelId'] ?? '尚未配置'}'),
+                      option(
+                          'local:${model.id}',
+                          model.name,
+                          ModuStrings.format(
+                              context,
+                              '本地 · {dimensions} 维 · {languages}',
+                              'Local · {dimensions} dimensions · {languages}',
+                              values: {
+                                'dimensions': model.dimensions,
+                                'languages': model.languages
+                              })),
+                    option(
+                        'remote',
+                        ModuStrings.text(context, '使用远程模型', 'Use remote model'),
+                        ModuStrings.format(context, '使用向量设置中的接口和密钥：{model}',
+                            'Use the endpoint and key from embedding settings: {model}',
+                            values: {
+                              'model': prefs.vectorModelConfig['modelId'] ??
+                                  ModuStrings.text(
+                                      context, '尚未配置', 'Not configured')
+                            })),
                     const SizedBox(height: 12),
-                    const Text(
-                        '仅影响本书，不修改全局设置。保存不会自动开始任务；已有索引需在书籍菜单中重新向量化。模型不匹配期间，AI 检索仅使用关键词，避免混用向量。'),
-                    const Text(
-                        '远程模型会发送书籍片段到配置的服务商。本书选择不另存 API 密钥；全局向量功能关闭时，本书也不进行向量推理。'),
-                    if (busy) const Text('本书正在排队或向量化，请完成或取消任务后再更换模型。'),
+                    Text(ModuStrings.text(
+                        context,
+                        '仅影响本书，不修改全局设置。保存不会自动开始任务；已有索引需在书籍菜单中重新向量化。模型不匹配期间，AI 检索仅使用关键词，避免混用向量。',
+                        'Only affects this book, not global settings. Saving does not start a task; rebuild existing embeddings from the book menu. While models differ, AI retrieval uses keywords only to avoid mixing vectors.')),
+                    Text(ModuStrings.text(
+                        context,
+                        '远程模型会发送书籍片段到配置的服务商。本书选择不另存 API 密钥；全局向量功能关闭时，本书也不进行向量推理。',
+                        'Remote models send book excerpts to the configured provider. This book does not store a separate API key. Disabling global embeddings also disables vector inference for this book.')),
+                    if (busy)
+                      Text(ModuStrings.text(
+                          context,
+                          '本书正在排队或向量化，请完成或取消任务后再更换模型。',
+                          'This book is queued or being embedded. Finish or cancel the task before changing models.')),
                     if (error != null)
                       Text(error!,
                           style: TextStyle(
@@ -97,10 +130,10 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
             actions: [
               TextButton(
                   onPressed: saving ? null : () => Navigator.of(context).pop(),
-                  child: const Text('取消')),
+                  child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
               FilledButton(
                   onPressed: busy || saving ? null : save,
-                  child: const Text('保存')),
+                  child: Text(ModuStrings.text(context, '保存', 'Save'))),
             ],
           );
         },

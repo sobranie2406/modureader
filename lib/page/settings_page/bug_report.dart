@@ -1,4 +1,5 @@
 import 'package:anx_reader/service/feedback/bug_report.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -40,8 +41,7 @@ class _BugReportSettingsState extends State<BugReportSettings> {
   String _deviceEnvironment = '';
   int _logRequest = 0;
 
-  String _tr(String zh, String en) =>
-      Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
+  String _tr(String zh, String en) => ModuStrings.text(context, zh, en);
 
   @override
   void initState() {

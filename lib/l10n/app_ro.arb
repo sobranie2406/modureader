@@ -883,5 +883,58 @@
    "aiModelOrSelectBelow": "Sau selectează din listă:",
    "aiChatFontSize": "Dimensiune font",
    "commonAddSuccess": "Adăugat cu succes",
-   "commonSaveSuccess": "Salvat cu succes"
+   "commonSaveSuccess": "Salvat cu succes",
+   "fontImportedAndApplied": "Importat și aplicat: {font}",
+   "@fontImportedAndApplied": {
+     "placeholders": {
+       "font": {
+         "type": "String"
+       }
+     }
+   },
+   "fontImportFailedCount": "Nu s-au putut importa {count} fonturi.",
+   "@fontImportFailedCount": {
+     "placeholders": {
+       "count": {
+         "type": "int"
+       }
+     }
+   },
+   "readingBrightness": "Luminozitatea aplicației",
+   "readingBrightnessFollowSystem": "Urmează sistemul",
+   "readingBrightnessWindowHint": "Reglează doar această fereastră a aplicației; luminozitatea sistemului rămâne neschimbată.",
+   "readingBrightnessDimHint": "Reduce luminozitatea doar în această aplicație. 100% păstrează luminozitatea sistemului; nu poate crește luminozitatea ecranului peste valoarea din sistem.",
+   "readingPageReadingInfoChapterPageProgress": "Pagini în acest capitol",
+   "readingPagePreviousChapter": "Capitolul anterior",
+   "readingPagePreviousPage": "Pagina anterioară",
+   "readingPageNextPage": "Pagina următoare",
+   "readingPageNextChapter": "Capitolul următor",
+   "readingPageChapterNumber": "Capitolul {number}",
+   "@readingPageChapterNumber": {
+     "placeholders": {
+       "number": {
+         "type": "int"
+       }
+     }
+   },
+   "settingsAiProviderReasoningEffort": "Intensitatea raționamentului",
+   "settingsAiProviderReasoningEffortHelp": "Automat este valoarea implicită și nu trimite acest parametru. Unele modele sau furnizori îl pot ignora ori pot respinge solicitarea dacă nu acceptă reasoning_effort.",
+   "settingsAiProviderReasoningEffortAuto": "Automat",
+   "settingsAiProviderReasoningEffortLow": "Scăzută",
+   "settingsAiProviderReasoningEffortMedium": "Medie",
+   "settingsAiProviderReasoningEffortHigh": "Ridicată",
+   "settingsAdvancedNetwork": "Rețea",
+   "settingsAdvancedHttpProxyEnabled": "Activează proxy HTTP",
+   "settingsAdvancedHttpProxyConfig": "Configurarea proxy-ului HTTP",
+   "settingsAdvancedHttpProxyHost": "Gazda proxy-ului",
+   "settingsAdvancedHttpProxyHostHint": "de exemplu 127.0.0.1",
+   "settingsAdvancedHttpProxyPort": "Portul proxy-ului",
+   "settingsAdvancedHttpProxyPortHint": "de exemplu 7890",
+   "settingsAdvancedHttpProxyNotConfigured": "Neconfigurat",
+   "settingsAdvancedHttpProxyInvalidInput": "Gazdă sau port proxy nevalid",
+   "settingsAdvancedHttpProxyTestUrl": "URL de test",
+   "settingsAdvancedHttpProxyTest": "Testează conexiunea",
+   "settingsAdvancedHttpProxyTesting": "Se testează...",
+   "settingsAdvancedHttpProxyTestSuccess": "Conexiune reușită",
+   "settingsAdvancedHttpProxyTestFailed": "Conexiunea a eșuat"
 }

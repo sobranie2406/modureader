@@ -10,6 +10,7 @@ import 'package:anx_reader/widgets/context_menu/excerpt_menu.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,9 +28,15 @@ class FakeDictionaries extends LocalDictionaryStore {
   Future<List<DictionaryEntry>> lookup(String word) async {
     queries.add(word);
     if (delayed != null) return delayed!.future;
-    return items.any((d) => d.enabled) && word == 'apple'
-        ? [DictionaryEntry(items.first.name, word, '苹果\n${'文字释义。' * 300}')]
-        : [];
+    if (!items.any((d) => d.enabled)) return [];
+    return switch (word) {
+      'apple' => [
+          DictionaryEntry(items.first.name, word, '苹果\n${'文字释义。' * 300}')
+        ],
+      '苹果' => [DictionaryEntry(items.first.name, word, 'apple; apple tree')],
+      '中国' => [DictionaryEntry(items.first.name, word, 'China')],
+      _ => [],
+    };
   }
 
   @override
@@ -65,10 +72,39 @@ Widget app(Widget body) => MaterialApp(
     );
 
 void main() {
+  test(
+      'Android picker does not disable dictionary files with unknown MIME types',
+      () {
+    expect(dictionaryPickerType(TargetPlatform.android), FileType.any);
+    for (final platform in [
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+      TargetPlatform.linux
+    ]) {
+      expect(dictionaryPickerType(platform), FileType.custom);
+    }
+    expect(dictionaryExtensions,
+        containsAll(['mdx', 'ifo', 'idx', 'dict', 'syn']));
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     await L10n.delegate.load(const Locale('zh'));
+  });
+  testWidgets('Chinese selection and edited queries reach enabled dictionaries',
+      (tester) async {
+    final store = FakeDictionaries();
+    await tester.pumpWidget(app(DictionaryLookup(word: ' 苹果 ', store: store)));
+    await tester.pumpAndSettle();
+    expect(store.queries, ['苹果']);
+    expect(find.text('apple; apple tree'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '中国');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(store.queries, ['苹果', '中国']);
+    expect(find.text('China'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   for (final size in [const Size(390, 844), const Size(1200, 900)]) {
     testWidgets('lookup scrolls with normal text and accessible close at $size',

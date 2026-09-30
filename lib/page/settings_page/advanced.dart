@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -50,19 +51,16 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
     return settingsSections(
       sections: [
         SettingsSection(
-          title: Text(Localizations.localeOf(context).languageCode == 'zh'
-              ? '数据迁移'
-              : 'Data migration'),
+          title: Text(ModuStrings.text(context, '数据迁移', 'Data migration')),
           tiles: [
             SettingsTile.navigation(
               leading: const Icon(Icons.move_to_inbox_outlined),
-              title: Text(Localizations.localeOf(context).languageCode == 'zh'
-                  ? '导入 ANX Reader 的备份文件'
-                  : 'Import ANX Reader backup'),
-              description: Text(Localizations.localeOf(context).languageCode ==
-                      'zh'
-                  ? '选择 ANX 导出的 ZIP，查看步骤和限制后合并书库'
-                  : 'Import a ZIP exported by ANX; review steps and limitations first'),
+              title: Text(ModuStrings.text(
+                  context, '导入 ANX Reader 的备份文件', 'Import ANX Reader backup')),
+              description: Text(ModuStrings.text(
+                  context,
+                  '选择 ANX 导出的 ZIP，查看步骤和限制后合并书库',
+                  'Import a ZIP exported by ANX; review steps and limitations first')),
               onPressed: (_) => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const AnxBackupImportPage())),
             ),
@@ -178,10 +176,10 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
             SettingsTile.switchTile(
               title: Text(
                   L10n.of(context).settingsAdvancedEnableJavascriptForEpub),
-              description: Text(Localizations.localeOf(context).languageCode ==
-                      'zh'
-                  ? '仅允许可信 EPUB 内附的脚本。关闭不影响阅读器自身脚本；更改后请重新打开书籍。部分 WebKit 平台需保留事件兼容权限，但关闭时仍清理并禁用书籍脚本。'
-                  : 'Only enable scripts in trusted EPUBs. Reader-owned scripts remain active. Reopen the book after changes. WebKit retains event compatibility permission, while book scripts are still sanitized and blocked when disabled.'),
+              description: Text(ModuStrings.text(
+                  context,
+                  '仅允许可信 EPUB 内附的脚本。关闭不影响阅读器自身脚本；更改后请重新打开书籍。部分 WebKit 平台需保留事件兼容权限，但关闭时仍清理并禁用书籍脚本。',
+                  'Only enable scripts in trusted EPUBs. Reader-owned scripts remain active. Reopen the book after changes. WebKit retains event compatibility permission, while book scripts are still sanitized and blocked when disabled.')),
               leading: const Icon(Icons.code),
               initialValue: Prefs().enableJsForEpub,
               onToggle: (value) {

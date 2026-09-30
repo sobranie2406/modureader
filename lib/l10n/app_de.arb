@@ -883,5 +883,58 @@
   "aiModelSwitchTitle": "Modell wechseln",
   "aiModelEnterManually": "Modellname eingeben",
   "aiModelOrSelectBelow": "Oder aus Liste auswählen:",
-  "aiChatFontSize": "Schriftgröße"
+  "aiChatFontSize": "Schriftgröße",
+  "fontImportedAndApplied": "Importiert und angewendet: {font}",
+  "@fontImportedAndApplied": {
+    "placeholders": {
+      "font": {
+        "type": "String"
+      }
+    }
+  },
+  "fontImportFailedCount": "{count} Schrift(en) konnten nicht importiert werden.",
+  "@fontImportFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readingBrightness": "App-Helligkeit",
+  "readingBrightnessFollowSystem": "Systemeinstellung verwenden",
+  "readingBrightnessWindowHint": "Ändert nur dieses App-Fenster; die Systemhelligkeit bleibt unverändert.",
+  "readingBrightnessDimHint": "Dimmt nur diese App. 100% behält die Systemhelligkeit bei; die Anzeige kann nicht heller als die Systemeinstellung werden.",
+  "readingPageReadingInfoChapterPageProgress": "Seiten in diesem Kapitel",
+  "readingPagePreviousChapter": "Vorheriges Kapitel",
+  "readingPagePreviousPage": "Vorherige Seite",
+  "readingPageNextPage": "Nächste Seite",
+  "readingPageNextChapter": "Nächstes Kapitel",
+  "readingPageChapterNumber": "Kapitel {number}",
+  "@readingPageChapterNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsAiProviderReasoningEffort": "Schlussfolgerungsaufwand",
+  "settingsAiProviderReasoningEffortHelp": "„Automatisch“ ist der Standard und sendet diesen Parameter nicht. Manche Modelle oder Anbieter ignorieren ihn oder lehnen die Anfrage ab, wenn sie reasoning_effort nicht unterstützen.",
+  "settingsAiProviderReasoningEffortAuto": "Automatisch",
+  "settingsAiProviderReasoningEffortLow": "Niedrig",
+  "settingsAiProviderReasoningEffortMedium": "Mittel",
+  "settingsAiProviderReasoningEffortHigh": "Hoch",
+  "settingsAdvancedNetwork": "Netzwerk",
+  "settingsAdvancedHttpProxyEnabled": "HTTP-Proxy aktivieren",
+  "settingsAdvancedHttpProxyConfig": "HTTP-Proxy-Konfiguration",
+  "settingsAdvancedHttpProxyHost": "Proxy-Host",
+  "settingsAdvancedHttpProxyHostHint": "z. B. 127.0.0.1",
+  "settingsAdvancedHttpProxyPort": "Proxy-Port",
+  "settingsAdvancedHttpProxyPortHint": "z. B. 7890",
+  "settingsAdvancedHttpProxyNotConfigured": "Nicht konfiguriert",
+  "settingsAdvancedHttpProxyInvalidInput": "Ungültiger Proxy-Host oder Port",
+  "settingsAdvancedHttpProxyTestUrl": "Test-URL",
+  "settingsAdvancedHttpProxyTest": "Verbindung testen",
+  "settingsAdvancedHttpProxyTesting": "Wird getestet…",
+  "settingsAdvancedHttpProxyTestSuccess": "Verbindung erfolgreich",
+  "settingsAdvancedHttpProxyTestFailed": "Verbindung fehlgeschlagen"
 }

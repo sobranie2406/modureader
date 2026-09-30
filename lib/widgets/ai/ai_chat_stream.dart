@@ -28,6 +28,7 @@ import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/delete_confirm.dart';
 import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -46,6 +47,9 @@ class AiChatStream extends ConsumerStatefulWidget {
   const AiChatStream({
     super.key,
     this.initialMessage,
+    this.initialSourceText,
+    this.initialSkillId,
+    this.newConversation = false,
     this.sendImmediate = false,
     this.quickPromptChips = const [],
     this.trailing,
@@ -53,6 +57,9 @@ class AiChatStream extends ConsumerStatefulWidget {
   });
 
   final String? initialMessage;
+  final String? initialSourceText;
+  final String? initialSkillId;
+  final bool newConversation;
   final bool sendImmediate;
   final List<AiQuickPromptChip> quickPromptChips;
   final List<Widget>? trailing;
@@ -69,6 +76,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   StreamController<List<ChatMessage>>? _messageController;
   StreamSubscription<List<ChatMessage>>? _messageSubscription;
   final AiChatScrollController _scrollController = AiChatScrollController();
+  GlobalKey _replyStartKey = GlobalKey(debugLabel: 'ai-reply-start');
   final FocusNode _inputFocusNode = FocusNode();
   bool _isStreaming = false;
   bool _showSkillPrompts = false;
@@ -127,18 +135,27 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     super.initState();
     _fontSize = Prefs().aiChatFontSize;
     inputController.text = widget.initialMessage ?? '';
-    _readerSourceText = _normalizeSourceText(widget.initialMessage);
-    if (widget.sendImmediate) {
-      _sendMessage();
-    }
+    _readerSourceText =
+        _normalizeSourceText(widget.initialSourceText ?? widget.initialMessage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.newConversation) _resetConversation();
+      if (widget.sendImmediate) {
+        _sendMessage(
+            skillId: widget.initialSkillId, sourceText: _readerSourceText);
+      }
+    });
     _scrollToBottom();
   }
 
   @override
   void didUpdateWidget(covariant AiChatStream oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialMessage != widget.initialMessage) {
-      setReaderSourceText(widget.initialMessage);
+    if (oldWidget.initialMessage != widget.initialMessage ||
+        oldWidget.initialSourceText != widget.initialSourceText) {
+      _readerSourceText = _normalizeSourceText(
+          widget.initialSourceText ?? widget.initialMessage);
+      inputController.text = widget.initialMessage ?? '';
     }
   }
 
@@ -153,6 +170,36 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     if (normalized != null) {
       inputController.text = normalized;
     }
+  }
+
+  void _resetConversation() {
+    _cancelStreaming();
+    _scrollController.stopFollowing();
+    _messageSubscription?.cancel();
+    _messageSubscription = null;
+    _messageController?.close();
+    _messageController = null;
+    ref.read(aiChatProvider(widget.scope).notifier).clear();
+    setState(() {
+      _messageStream = null;
+      _lastSubmittedSkillId = null;
+      _lastSubmittedSourceText = null;
+      _lastSubmittedHomePromptId = null;
+      _showSkillPrompts = false;
+    });
+  }
+
+  /// Also works when the existing split panel keeps this State alive.
+  void beginSelectionQuestion(
+      {required String message,
+      required String sourceText,
+      String? skillId,
+      bool sendImmediate = true}) {
+    _resetConversation();
+    _readerSourceText = _normalizeSourceText(sourceText);
+    inputController.text = message;
+    if (sendImmediate)
+      _sendMessage(skillId: skillId, sourceText: _readerSourceText);
   }
 
   @override
@@ -420,6 +467,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
     if (inputController.text.trim().isEmpty) return;
     final message = inputController.text.trim();
+    // Reader requests are independent tasks. Clearing starts a fresh session
+    // without deleting saved history; regenerate still replays the same task.
+    if (widget.scope == AiChatScope.reader && !isRegenerate) {
+      ref.read(aiChatProvider(widget.scope).notifier).clear();
+    }
     inputController.clear();
     _lastSubmittedSkillId = skillId;
     _lastSubmittedSourceText = _normalizeSourceText(sourceText);
@@ -431,6 +483,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _requestRunner?.cancel();
     final requestRunner = _requestRunner = CancelableLangchainRunner();
     final controller = StreamController<List<ChatMessage>>();
+    var requestFailed = false;
     final stream =
         ref.read(aiChatProvider(widget.scope).notifier).sendMessageStream(
               message,
@@ -446,6 +499,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _messageController = controller;
       _messageStream = controller.stream;
       _isStreaming = true;
+      _replyStartKey = GlobalKey(debugLabel: 'ai-reply-start');
       _showSkillPrompts = false;
     });
     _scrollToBottom();
@@ -462,6 +516,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         if (controller.isClosed || !identical(_requestRunner, requestRunner)) {
           return;
         }
+        requestFailed = true;
         controller.addError(error, stack);
         if (!controller.isClosed) {
           controller.close();
@@ -482,6 +537,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           setState(() {
             _isStreaming = false;
           });
+          if (!requestFailed) {
+            _scrollController.returnToReplyStartAfterLayout(_replyStartKey);
+          }
         }
       },
       cancelOnError: false,
@@ -556,6 +614,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
   void _cancelStreaming() {
     if (!_isStreaming) return;
+    _scrollController.stopFollowing();
     _requestRunner?.cancel();
     _requestRunner = null;
     _messageSubscription?.cancel();
@@ -564,7 +623,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _messageController = null;
     setState(() {
       _isStreaming = false;
-      _messageStream = null;
+      // Retain the closed stream's last snapshot and its current viewport.
     });
   }
 
@@ -829,11 +888,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                 ),
                 IconButton(
                   key: const ValueKey('ai-skill-prompts-toggle'),
-                  tooltip: Localizations.localeOf(context).languageCode == 'zh'
-                      ? (_showSkillPrompts ? '收起技能标签' : '展开技能标签')
-                      : (_showSkillPrompts
-                          ? 'Hide skill shortcuts'
-                          : 'Show skill shortcuts'),
+                  tooltip: _showSkillPrompts
+                      ? ModuStrings.text(
+                          context, '收起技能标签', 'Hide skill shortcuts')
+                      : ModuStrings.text(
+                          context, '展开技能标签', 'Show skill shortcuts'),
                   isSelected: _showSkillPrompts,
                   icon: const Icon(Icons.auto_awesome_outlined, size: 18),
                   selectedIcon: const Icon(Icons.auto_awesome, size: 18),
@@ -1002,6 +1061,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   Widget _buildMessageList(List<ChatMessage> messages) {
+    final latestReplyIndex =
+        messages.lastIndexWhere((message) => message is AIChatMessage);
     final sessionId =
         ref.read(aiChatProvider(widget.scope).notifier).currentSessionId;
     final history =
@@ -1013,17 +1074,22 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         break;
       }
     }
-    return NotificationListener<ScrollNotification>(
-      onNotification: _scrollController.handleNotification,
-      child: ListView.builder(
-        controller: _scrollController,
-        itemCount: messages.length,
-        itemBuilder: (context, index) {
-          final message = messages[index];
-          final isStreaming = _isStreaming && index == messages.length - 1;
-          return _buildMessageItem(message, index, isStreaming,
-              skillLabel: labels[index]);
-        },
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: _scrollController.handleMetricsNotification,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _scrollController.handleNotification,
+        child: ListView.builder(
+          controller: _scrollController,
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final message = messages[index];
+            final isStreaming = _isStreaming && index == messages.length - 1;
+            return _buildMessageItem(message, index, isStreaming,
+                skillLabel: labels[index],
+                replyStartKey:
+                    index == latestReplyIndex ? _replyStartKey : null);
+          },
+        ),
       ),
     );
   }
@@ -1033,6 +1099,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     int index,
     bool isStreaming, {
     String? skillLabel,
+    GlobalKey? replyStartKey,
   }) {
     final isUser = message is HumanChatMessage;
     final content = chatMessageDisplayContent(message);
@@ -1093,7 +1160,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                 children: [
                   isUser
                       ? _buildCollapsibleText(content, isLongMessage)
-                      : _buildAssistantTimeline(parsed, isStreaming),
+                      : _buildAssistantTimeline(parsed, isStreaming,
+                          replyStartKey: replyStartKey),
                   if (!isUser)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1167,7 +1235,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     return copyText;
   }
 
-  Widget _buildAssistantTimeline(ParsedReasoning parsed, bool isStreaming) {
+  Widget _buildAssistantTimeline(ParsedReasoning parsed, bool isStreaming,
+      {GlobalKey? replyStartKey}) {
     if (parsed.timeline.isEmpty) {
       return isStreaming
           ? Skeletonizer.zone(child: Bone.multiText())
@@ -1181,7 +1250,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final answerWidgets = _buildTimelineWidgets(
       parsed.answerTimeline,
       fontSize: _fontSize,
+      replyStartKey: replyStartKey,
     );
+    final hasReply = visibleAnswerTimeline(parsed.answerTimeline).any((entry) =>
+        entry.type == ParsedReasoningEntryType.reply &&
+        (entry.text?.trim().isNotEmpty ?? false));
     final widgets = <Widget>[];
 
     if (reasoningWidgets.isNotEmpty) {
@@ -1197,6 +1270,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     }
 
     return Column(
+      // Tool-only replies (such as a generated mind map) use their own start.
+      key: hasReply ? null : replyStartKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widgets,
     );
@@ -1205,9 +1280,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   List<Widget> _buildTimelineWidgets(
     List<ParsedReasoningEntry> timeline, {
     required double fontSize,
+    GlobalKey? replyStartKey,
   }) {
     timeline = visibleAnswerTimeline(timeline);
     final widgets = <Widget>[];
+    var firstReply = true;
     for (var i = 0; i < timeline.length; i++) {
       final entry = timeline[i];
       switch (entry.type) {
@@ -1215,11 +1292,13 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           if (entry.text != null && entry.text!.trim().isNotEmpty) {
             widgets.add(
               StyledMarkdown(
+                key: firstReply ? replyStartKey : null,
                 data: entry.text!,
                 selectable: true,
                 fontSize: fontSize,
               ),
             );
+            firstReply = false;
           }
           break;
         case ParsedReasoningEntryType.tool:

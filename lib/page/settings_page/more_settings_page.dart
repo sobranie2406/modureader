@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/ai.dart';
@@ -16,6 +17,7 @@ import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/page/settings_page/translate.dart';
 import 'package:anx_reader/page/settings_page/dictionaries.dart';
 import 'package:anx_reader/page/settings_page/selection_search.dart';
+import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
 import 'package:anx_reader/page/settings_page/css_settings.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -102,6 +104,8 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
             List<Map<String, dynamic>> settings = [
               {
                 "title": L10n.of(context).settingsAppearance,
+                "titleBuilder": (BuildContext context) =>
+                    L10n.of(context).settingsAppearance,
                 "icon": Icons.color_lens_outlined,
                 "sections": const AppearanceSetting(),
                 "subtitles": [
@@ -122,39 +126,41 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? 'CSS 设置'
-                    : 'CSS settings',
+                "title": ModuStrings.text(context, 'CSS 设置', 'CSS settings'),
                 "icon": Icons.tune,
                 "sections": const CssSettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '预设模板 · 图形调节 · 自定义代码'
-                      : 'Templates · Visual controls · Custom code'
+                  ModuStrings.text(context, '预设模板 · 图形调节 · 自定义代码',
+                      'Templates · Visual controls · Custom code')
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '自定义字典'
-                    : 'Custom dictionaries',
+                "title":
+                    ModuStrings.text(context, '自定义字典', 'Custom dictionaries'),
                 "icon": Icons.menu_book_outlined,
                 "sections": const DictionarySettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '本地导入 · 离线选词查询'
-                      : 'Local import · Offline word lookup'
+                  ModuStrings.text(context, '本地导入 · 离线选词查询',
+                      'Local import · Offline word lookup')
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '选词搜索'
-                    : 'Selection search',
+                "title": ModuStrings.text(context, '选词搜索', 'Selection search'),
                 "icon": Icons.travel_explore,
                 "sections": const SelectionSearchSettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '内置浏览器 · 自定义搜索引擎'
-                      : 'In-app browser · Custom search engines'
+                  ModuStrings.text(context, '内置浏览器 · 自定义搜索引擎',
+                      'In-app browser · Custom search engines')
+                ],
+              },
+              {
+                "title":
+                    ModuStrings.text(context, '划词工具栏', 'Selection toolbar'),
+                "icon": Icons.touch_app_outlined,
+                "sections": const SelectionToolbarSettings(),
+                "subtitles": [
+                  ModuStrings.text(context, '按钮开关 · 排序 · AI 划词模板',
+                      'Actions · Order · AI selection templates')
                 ],
               },
               if (EnvVar.enableAIFeature)
@@ -164,37 +170,30 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   "sections": const AISettings(),
                   "subtitles": [
                     L10n.of(context).settingsAiServices,
-                    Localizations.localeOf(context).languageCode == 'zh'
-                        ? '模型参数、显示与工具'
-                        : 'Models, display and tools',
+                    ModuStrings.text(
+                        context, '模型参数、显示与工具', 'Models, display and tools'),
                   ],
                 },
               if (EnvVar.enableAIFeature)
                 {
-                  "title": Localizations.localeOf(context).languageCode == 'zh'
-                      ? 'AI 阅读技能'
-                      : 'AI Reading Skills',
+                  "title":
+                      ModuStrings.text(context, 'AI 阅读技能', 'AI Reading Skills'),
                   "icon": Icons.extension_outlined,
                   "sections": const AiReadingSkillsSettings(),
                   "subtitles": [
-                    Localizations.localeOf(context).languageCode == 'zh'
-                        ? '内置技能、自定义技能与提示词'
-                        : 'Built-in, custom skills and prompts',
+                    ModuStrings.text(context, '内置技能、自定义技能与提示词',
+                        'Built-in, custom skills and prompts'),
                   ],
                 },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '向量模型'
-                    : 'Vector Model',
+                "title": ModuStrings.text(context, '向量模型', 'Vector Model'),
                 "icon": Icons.hub_outlined,
                 "sections": const VectorModelSettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '语义搜索与 RAG'
-                      : 'Semantic search and RAG',
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '本地或远程嵌入模型'
-                      : 'Local or remote embeddings',
+                  ModuStrings.text(
+                      context, '语义搜索与 RAG', 'Semantic search and RAG'),
+                  ModuStrings.text(
+                      context, '本地或远程嵌入模型', 'Local or remote embeddings'),
                 ],
               },
               {
@@ -216,27 +215,23 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '全局设置备份'
-                    : 'Global settings backup',
+                "title": ModuStrings.text(
+                    context, '全局设置备份', 'Global settings backup'),
                 "icon": Icons.settings_backup_restore,
                 "sections": const GlobalSettingsPage(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '文件、二维码与 modu 链接 · 可选迁移账号密钥'
-                      : 'Files, QR and modu links · Optional credentials'
+                  ModuStrings.text(context, '文件、二维码与 modu 链接 · 可选迁移账号密钥',
+                      'Files, QR and modu links · Optional credentials')
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '远程书库设置'
-                    : 'Remote library settings',
+                "title": ModuStrings.text(
+                    context, '远程书库设置', 'Remote library settings'),
                 "icon": Icons.folder_shared_outlined,
                 "sections": const RemoteLibrarySettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '远程文件浏览与书籍下载（独立于同步）'
-                      : 'Browse and download books (separate from sync)'
+                  ModuStrings.text(context, '远程文件浏览与书籍下载（独立于同步）',
+                      'Browse and download books (separate from sync)')
                 ],
               },
               {
@@ -244,9 +239,8 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "icon": Icons.translate_outlined,
                 "sections": const TranslateSetting(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '翻译引擎、目标语言'
-                      : 'Engine and target language',
+                  ModuStrings.text(
+                      context, '翻译引擎、目标语言', 'Engine and target language'),
                 ],
               },
               {
@@ -271,15 +265,12 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 ],
               },
               {
-                "title": Localizations.localeOf(context).languageCode == 'zh'
-                    ? '提交 Bug'
-                    : 'Report a bug',
+                "title": ModuStrings.text(context, '提交 Bug', 'Report a bug'),
                 "icon": Icons.bug_report_outlined,
                 "sections": const BugReportSettings(),
                 "subtitles": [
-                  Localizations.localeOf(context).languageCode == 'zh'
-                      ? '问题反馈与处理进度'
-                      : 'Bug reports and issue status',
+                  ModuStrings.text(
+                      context, '问题反馈与处理进度', 'Bug reports and issue status'),
                 ],
               },
             ];
@@ -310,6 +301,7 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     title: settings[index]["title"],
+                    titleBuilder: settings[index]["titleBuilder"],
                     sections: settings[index]["sections"],
                     subTitles: settings[index]["subtitles"],
                   ),

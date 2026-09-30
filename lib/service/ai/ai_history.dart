@@ -152,7 +152,7 @@ String _inferLegacyScope(List<ChatMessage> messages) {
   if (firstHumanPrompt.isEmpty) return 'library';
 
   final matchesCurrentSkill = readAnySkills.any(
-    (skill) => skill.defaultPrompt.trim() == firstHumanPrompt,
+    (skill) => skill.isDefaultPrompt(firstHumanPrompt),
   );
   if (matchesCurrentSkill) return 'reader';
 

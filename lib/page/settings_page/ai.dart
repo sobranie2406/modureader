@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_chat_display_mode.dart';
 import 'package:anx_reader/enums/ai_panel_position.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/page/settings_page/ai_provider_list_page.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
@@ -109,13 +110,16 @@ class _AISettingsState extends ConsumerState<AISettings> {
         ],
       ),
       SettingsSection(
-        title: const Text('AI 对话历史'),
+        title: Text(ModuStrings.text(context, 'AI 对话历史', 'AI chat history')),
         tiles: [
           CustomSettingsTile(
-            child: const ListTile(
-              title: Text('保留对话历史'),
-              subtitle:
-                  Text('对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。'),
+            child: ListTile(
+              title: Text(
+                  ModuStrings.text(context, '保留对话历史', 'Keep chat history')),
+              subtitle: Text(ModuStrings.text(
+                  context,
+                  '对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。',
+                  'Chats are stored locally and are not removed when clearing the cache or changing its size limit. Manage them separately in AI chat history.')),
             ),
           ),
         ],

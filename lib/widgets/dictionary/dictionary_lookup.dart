@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/page/settings_page/dictionaries.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_common.dart';
@@ -48,7 +49,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
         _hasDictionaries = dictionaries.any((d) => d.enabled);
         _entries = entries;
         if (word.length > 256) {
-          _error = t('请选择不超过 256 个字符的词语，或在上方修改查询内容。',
+          _error = ModuStrings.text(context, '请选择不超过 256 个字符的词语，或在上方修改查询内容。',
               'Select a word of up to 256 characters, or edit the query above.');
         }
       });
@@ -64,7 +65,9 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
   Future<void> _settings() async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-            appBar: AppBar(title: Text(t('自定义字典', 'Custom dictionaries'))),
+            appBar: AppBar(
+                title: Text(
+                    ModuStrings.text(context, '自定义字典', 'Custom dictionaries'))),
             body: DictionarySettings(store: store))));
     if (mounted) await _search();
   }
@@ -76,15 +79,15 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
           const Icon(Icons.menu_book_outlined),
           const SizedBox(width: 8),
           Expanded(
-              child: Text(t('字典查询', 'Dictionary'),
+              child: Text(ModuStrings.text(context, '字典查询', 'Dictionary'),
                   style: Theme.of(context).textTheme.titleLarge)),
           IconButton(
               onPressed: _settings,
-              tooltip: t('管理字典', 'Manage dictionaries'),
+              tooltip: ModuStrings.text(context, '管理字典', 'Manage dictionaries'),
               icon: const Icon(Icons.settings_outlined)),
           IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              tooltip: t('关闭', 'Close'),
+              tooltip: ModuStrings.text(context, '关闭', 'Close'),
               icon: const Icon(Icons.close)),
         ]),
         Padding(
@@ -95,11 +98,12 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                 onSubmitted: (_) => _search(),
                 decoration: InputDecoration(
                     border: const OutlineInputBorder(),
-                    labelText: t('查询词语', 'Look up a word'),
+                    labelText:
+                        ModuStrings.text(context, '查询词语', 'Look up a word'),
                     suffixIcon: IconButton(
                         onPressed: _search,
                         icon: const Icon(Icons.search),
-                        tooltip: t('查询', 'Search'))))),
+                        tooltip: ModuStrings.text(context, '查询', 'Search'))))),
         if (_busy) const LinearProgressIndicator(),
         Expanded(
             child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -107,13 +111,14 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
             Text(_error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           if (!_busy && _error == null && !_hasDictionaries) ...[
-            Text(t('尚无已启用的字典。请先导入或启用本地字典。',
+            Text(ModuStrings.text(context, '尚无已启用的字典。请先导入或启用本地字典。',
                 'No enabled dictionaries. Import or enable a local dictionary first.')),
             TextButton(
                 onPressed: _settings,
-                child: Text(t('导入 / 管理字典', 'Import / manage dictionaries'))),
+                child: Text(ModuStrings.text(
+                    context, '导入 / 管理字典', 'Import / manage dictionaries'))),
           ] else if (!_busy && _error == null && _entries.isEmpty)
-            Text(t('未找到完全匹配的词条，可修改词语后重试。',
+            Text(ModuStrings.text(context, '未找到完全匹配的词条，可修改词语后重试。',
                 'No exact match. Edit the word and try again.')),
           for (final entry in _entries)
             Card(
@@ -131,7 +136,9 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                           const SizedBox(height: 12),
                           SelectableText(
                               entry.definition.isEmpty
-                                  ? t('此词条没有文字释义，可能仅包含暂不支持的多媒体资源。',
+                                  ? ModuStrings.text(
+                                      context,
+                                      '此词条没有文字释义，可能仅包含暂不支持的多媒体资源。',
                                       'No text definition; this entry may contain unsupported media only.')
                                   : entry.definition,
                               style:

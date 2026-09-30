@@ -886,5 +886,58 @@
    "aiModelSwitchTitle": "Сменить модель",
    "aiModelEnterManually": "Введите название модели",
    "aiModelOrSelectBelow": "Или выберите из списка:",
-   "aiChatFontSize": "Размер шрифта"
+   "aiChatFontSize": "Размер шрифта",
+   "fontImportedAndApplied": "Импортировано и применено: {font}",
+   "@fontImportedAndApplied": {
+      "placeholders": {
+         "font": {
+            "type": "String"
+         }
+      }
+   },
+   "fontImportFailedCount": "Не удалось импортировать шрифтов: {count}.",
+   "@fontImportFailedCount": {
+      "placeholders": {
+         "count": {
+            "type": "int"
+         }
+      }
+   },
+   "readingBrightness": "Яркость приложения",
+   "readingBrightnessFollowSystem": "Следовать системе",
+   "readingBrightnessWindowHint": "Меняет яркость только окна приложения; системная яркость сохраняется.",
+   "readingBrightnessDimHint": "Затемняет только это приложение. 100% сохраняет системную яркость; сделать экран ярче системного уровня невозможно.",
+   "readingPageReadingInfoChapterPageProgress": "Страницы в этой главе",
+   "readingPagePreviousChapter": "Предыдущая глава",
+   "readingPagePreviousPage": "Предыдущая страница",
+   "readingPageNextPage": "Следующая страница",
+   "readingPageNextChapter": "Следующая глава",
+   "readingPageChapterNumber": "Глава {number}",
+   "@readingPageChapterNumber": {
+      "placeholders": {
+         "number": {
+            "type": "int"
+         }
+      }
+   },
+   "settingsAiProviderReasoningEffort": "Уровень рассуждения",
+   "settingsAiProviderReasoningEffortHelp": "По умолчанию используется «Авто», и параметр не отправляется. Модели или провайдеры без поддержки reasoning_effort могут проигнорировать его или отклонить запрос.",
+   "settingsAiProviderReasoningEffortAuto": "Авто",
+   "settingsAiProviderReasoningEffortLow": "Низкий",
+   "settingsAiProviderReasoningEffortMedium": "Средний",
+   "settingsAiProviderReasoningEffortHigh": "Высокий",
+   "settingsAdvancedNetwork": "Сеть",
+   "settingsAdvancedHttpProxyEnabled": "Включить HTTP-прокси",
+   "settingsAdvancedHttpProxyConfig": "Настройки HTTP-прокси",
+   "settingsAdvancedHttpProxyHost": "Хост прокси",
+   "settingsAdvancedHttpProxyHostHint": "Например: 127.0.0.1",
+   "settingsAdvancedHttpProxyPort": "Порт прокси",
+   "settingsAdvancedHttpProxyPortHint": "Например: 7890",
+   "settingsAdvancedHttpProxyNotConfigured": "Не настроено",
+   "settingsAdvancedHttpProxyInvalidInput": "Неверный хост или порт прокси",
+   "settingsAdvancedHttpProxyTestUrl": "URL для проверки",
+   "settingsAdvancedHttpProxyTest": "Проверить подключение",
+   "settingsAdvancedHttpProxyTesting": "Проверка…",
+   "settingsAdvancedHttpProxyTestSuccess": "Подключение успешно",
+   "settingsAdvancedHttpProxyTestFailed": "Ошибка подключения"
 }

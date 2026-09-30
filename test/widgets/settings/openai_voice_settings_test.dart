@@ -1,9 +1,12 @@
 import 'package:anx_reader/service/tts/openai_voice_presets.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/widgets/settings/openai_voice_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  String localized(String text) =>
+      ModuStrings.label(const Locale('en'), text, text);
   late Map<String, dynamic> config;
   late StateSetter rebuild;
   setUp(() => config = {
@@ -31,20 +34,21 @@ void main() {
     await open(tester);
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('睡前轻读').last);
+    await tester.tap(find.text(localized('睡前轻读')).last);
     await tester.pumpAndSettle();
-    expect(config['instructions'], OpenAiVoicePresets.templates['睡前轻读']);
+    expect(config['instructions'],
+        localized(OpenAiVoicePresets.templates['睡前轻读']!));
     final field = find.byKey(const ValueKey('openai-description'));
     await tester.enterText(field, '自己的描述');
     await tester.pump();
-    final chip = find.widgetWithText(ActionChip, '温暖音色');
+    final chip = find.widgetWithText(ActionChip, localized('温暖音色'));
     await tester.ensureVisible(chip);
     await tester.tap(chip);
     await tester.pump();
     await tester.tap(chip);
     await tester.pump();
-    expect(
-        config['instructions'], '自己的描述\n${OpenAiVoicePresets.phrases['温暖音色']}');
+    expect(config['instructions'],
+        '自己的描述\n${localized(OpenAiVoicePresets.phrases['温暖音色']!)}');
     expect(config['voice'], 'nova');
     expect(config['key'], 'fixture-key');
     await tester.ensureVisible(find.text('Clear description'));

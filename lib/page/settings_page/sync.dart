@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:anx_reader/widgets/settings/reading_sync_settings.dart';
@@ -56,10 +57,10 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             SettingsTile.navigation(
                 title: Text(L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
-                description: Text(_label(
-                  '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。',
-                  'Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day.',
-                )),
+                description: Text(ModuStrings.text(
+                    context,
+                    '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。',
+                    'Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day.')),
                 value: Text(Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
                     'Not set'),
                 // enabled: Prefs().webdavStatus,
@@ -85,11 +86,12 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                   });
                 }),
             SettingsTile.switchTile(
-                title: Text(_label('同步成功提示', 'Sync success notification')),
-                description: Text(_label(
-                  '仅在同步成功时提示；失败始终显示原因。同步过程中不弹出提示。',
-                  'Notify on success only; failures always show a reason. No in-progress notifications.',
-                )),
+                title: Text(ModuStrings.text(
+                    context, '同步成功提示', 'Sync success notification')),
+                description: Text(ModuStrings.text(
+                    context,
+                    '仅在同步成功时提示；失败始终显示原因。同步过程中不弹出提示。',
+                    'Notify on success only; failures always show a reason. No in-progress notifications.')),
                 leading: const Icon(Icons.notifications),
                 initialValue: Prefs().syncCompletedToast,
                 onToggle: (bool value) {
@@ -117,20 +119,22 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           ],
         ),
         SettingsSection(
-          title: Text(_label('敏感数据同步', 'Sensitive data sync')),
+          title:
+              Text(ModuStrings.text(context, '敏感数据同步', 'Sensitive data sync')),
           tiles: [
             SettingsTile.switchTile(
-              title: Text(_label('同步 API Key', 'Sync API keys')),
+              title: Text(
+                  ModuStrings.text(context, '同步 API Key', 'Sync API keys')),
               description: Text(
                 Prefs().syncAiSettingsToWebdav
-                    ? _label(
+                    ? ModuStrings.text(
+                        context,
                         '已单独开启。AI、翻译、向量、在线语音及远程书库配置（含书库密码）将加密后写入 WebDAV 同步数据库。',
-                        'Enabled separately. AI, translation, vector, online speech and remote library settings (including its password) are encrypted before being written to the WebDAV database.',
-                      )
-                    : _label(
+                        'Enabled separately. AI, translation, vector, online speech and remote library settings (including its password) are encrypted before being written to the WebDAV database.')
+                    : ModuStrings.text(
+                        context,
                         '默认不随 WebDAV 同步。开启时需要设置独立加密密码并确认风险。',
-                        'Excluded from WebDAV sync by default. Enabling it requires a separate encryption password and risk confirmation.',
-                      ),
+                        'Excluded from WebDAV sync by default. Enabling it requires a separate encryption password and risk confirmation.'),
               ),
               leading: const Icon(Icons.key_outlined),
               initialValue: Prefs().syncAiSettingsToWebdav,
@@ -138,14 +142,12 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             ),
             if (Prefs().syncAiSettingsToWebdav)
               SettingsTile.navigation(
-                title: Text(_label(
-                  '修改同步加密密码',
-                  'Change sync encryption password',
-                )),
-                description: Text(_label(
-                  '其他设备必须输入相同密码。密码无法找回。',
-                  'Other devices must use the same password. It cannot be recovered.',
-                )),
+                title: Text(ModuStrings.text(
+                    context, '修改同步加密密码', 'Change sync encryption password')),
+                description: Text(ModuStrings.text(
+                    context,
+                    '其他设备必须输入相同密码。密码无法找回。',
+                    'Other devices must use the same password. It cannot be recovered.')),
                 leading: const Icon(Icons.password_outlined),
                 onPressed: (_) => _changeAiSettingsSyncPassword(),
               ),
@@ -170,10 +172,6 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
         ),
       ],
     );
-  }
-
-  String _label(String zh, String en) {
-    return Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
   }
 
   Future<void> _toggleAiSettingsSync(bool enabled) async {
@@ -208,10 +206,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       if (mounted) setState(() {});
     } catch (error) {
       AnxLog.severe('Failed to enable encrypted AI settings sync: $error');
-      AnxToast.show(_label(
-        '无法启用 API Key 同步，请稍后重试',
-        'Could not enable API key sync. Please try again.',
-      ));
+      AnxToast.show(ModuStrings.text(context, '无法启用 API Key 同步，请稍后重试',
+          'Could not enable API key sync. Please try again.'));
     }
   }
 
@@ -231,16 +227,12 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       );
       await Prefs().saveSyncAiSettingsEncryptionPassword(password);
       if (mounted) setState(() {});
-      AnxToast.show(_label(
-        '同步加密密码已更新，下次上传数据库后生效',
-        'The encryption password was updated and will take effect after the next database upload.',
-      ));
+      AnxToast.show(ModuStrings.text(context, '同步加密密码已更新，下次上传数据库后生效',
+          'The encryption password was updated and will take effect after the next database upload.'));
     } catch (error) {
       AnxLog.severe('Failed to change AI settings sync password: $error');
-      AnxToast.show(_label(
-        '无法修改同步加密密码',
-        'Could not change the sync encryption password.',
-      ));
+      AnxToast.show(ModuStrings.text(context, '无法修改同步加密密码',
+          'Could not change the sync encryption password.'));
     }
   }
 
@@ -373,16 +365,20 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-                title: const Text('恢复备份'),
-                content:
-                    const Text('恢复会替换现有书库、笔记和备份中的设置。程序会先校验备份并保留旧目录的恢复副本。是否继续？'),
+                title:
+                    Text(ModuStrings.text(context, '恢复备份', 'Restore backup')),
+                content: Text(ModuStrings.text(
+                    context,
+                    '恢复会替换现有书库、笔记和备份中的设置。程序会先校验备份并保留旧目录的恢复副本。是否继续？',
+                    'Restoring replaces your library, notes and backed-up settings. The backup is validated first, and a recovery copy of the old directory is kept. Continue?')),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('取消')),
+                      child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
                   TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('校验并恢复'))
+                      child: Text(ModuStrings.text(
+                          context, '校验并恢复', 'Validate and restore')))
                 ],
               ));
       if (confirmed != true) return;
@@ -494,7 +490,9 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.exporting ? '导出本地备份' : '解密备份设置'),
+        title: Text(widget.exporting
+            ? ModuStrings.text(context, '导出本地备份', 'Export local backup')
+            : ModuStrings.text(context, '解密备份设置', 'Decrypt backup settings')),
         content: SizedBox(
             width: 420,
             child: SingleChildScrollView(
@@ -502,31 +500,42 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
               if (widget.exporting)
                 CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('包含服务配置与 API Key（加密）'),
-                    subtitle: const Text(
-                        '默认不导出 AI、翻译、语音、向量、WebDAV 和远程书库的配置与凭据。勾选后包含远程书库密码并加密设置。书籍、笔记和一般设置仍会导出。'),
+                    title: Text(ModuStrings.text(context, '包含服务配置与 API Key（加密）',
+                        'Include service settings and API keys (encrypted)')),
+                    subtitle: Text(ModuStrings.text(
+                        context,
+                        '默认不导出 AI、翻译、语音、向量、WebDAV 和远程书库的配置与凭据。勾选后包含远程书库密码并加密设置。书籍、笔记和一般设置仍会导出。',
+                        'AI, translation, speech, vector, WebDAV and remote library settings and credentials are excluded by default. Enable this to include remote library passwords and encrypt settings. Books, notes and general settings are always exported.')),
                     value: _include,
                     onChanged: (value) =>
                         setState(() => _include = value ?? false)),
               if (!widget.exporting || _include) ...[
-                const Text(
-                    '设置使用 AES-256-GCM 加密；书籍、笔记和 AI 对话历史不加密。请使用独立强密码，遗失密码无法恢复密钥。密码不会写入备份。'),
+                Text(ModuStrings.text(
+                    context,
+                    '设置使用 AES-256-GCM 加密；书籍、笔记和 AI 对话历史不加密。请使用独立强密码，遗失密码无法恢复密钥。密码不会写入备份。',
+                    'Settings use AES-256-GCM encryption; books, notes and AI chat history are not encrypted. Use a unique strong password. Keys cannot be recovered if the password is lost. The password is not stored in the backup.')),
                 TextField(
                     controller: _password,
                     obscureText: true,
-                    decoration:
-                        InputDecoration(labelText: '备份密码', errorText: _error)),
+                    decoration: InputDecoration(
+                        labelText: ModuStrings.text(
+                            context, '备份密码', 'Backup password'),
+                        errorText: _error)),
                 if (widget.exporting)
                   TextField(
                       controller: _confirm,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                          labelText: '再次输入密码（至少 12 个字符）')),
+                      decoration: InputDecoration(
+                          labelText: ModuStrings.text(
+                              context,
+                              '再次输入密码（至少 12 个字符）',
+                              'Repeat password (at least 12 characters)'))),
               ],
             ]))),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+              onPressed: () => Navigator.pop(context),
+              child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
           TextButton(
               onPressed: () {
                 if (widget.exporting && !_include) {
@@ -537,12 +546,17 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
                     (widget.exporting &&
                         (_password.text.length < 12 ||
                             _password.text != _confirm.text))) {
-                  setState(() => _error = '请检查密码长度和两次输入');
+                  setState(() => _error = ModuStrings.text(
+                      context,
+                      '请检查密码长度和两次输入',
+                      'Check the password length and that both entries match'));
                   return;
                 }
                 Navigator.pop(context, _password.text);
               },
-              child: Text(widget.exporting ? '导出' : '解密'))
+              child: Text(widget.exporting
+                  ? ModuStrings.text(context, '导出', 'Export')
+                  : ModuStrings.text(context, '解密', 'Decrypt')))
         ],
       );
 }
@@ -576,16 +590,15 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
     final password = _passwordController.text;
     if (password.length < 12) {
       setState(() {
-        _errorText = _label(
-          '密码至少需要 12 个字符',
-          'Password must contain at least 12 characters',
-        );
+        _errorText = ModuStrings.text(context, '密码至少需要 12 个字符',
+            'Password must contain at least 12 characters');
       });
       return;
     }
     if (password != _confirmationController.text) {
       setState(() {
-        _errorText = _label('两次输入的密码不一致', 'The passwords do not match');
+        _errorText = ModuStrings.text(
+            context, '两次输入的密码不一致', 'The passwords do not match');
       });
       return;
     }
@@ -608,25 +621,23 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
           children: [
             if (widget.confirmRisk) ...[
               Text(
-                _label(
-                  '开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。',
-                  'When enabled, AI, translation, vector and online speech settings and API keys, plus remote library settings and its password, are encrypted with AES-256-GCM and written to the WebDAV sync database.',
-                ),
+                ModuStrings.text(
+                    context,
+                    '开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。',
+                    'When enabled, AI, translation, vector and online speech settings and API keys, plus remote library settings and its password, are encrypted with AES-256-GCM and written to the WebDAV sync database.'),
               ),
               const SizedBox(height: 10),
               Text(
-                _label(
-                  '风险：加密不能代替可信的 WebDAV 服务。弱密码可能被猜出；任何得到数据库和正确密码的人都能读取密钥。请使用独立强密码，并妥善保管。',
-                  'Risk: encryption does not replace a trusted WebDAV service. Weak passwords may be guessed, and anyone with the database and correct password can read the keys. Use and protect a strong, unique password.',
-                ),
+                ModuStrings.text(
+                    context,
+                    '风险：加密不能代替可信的 WebDAV 服务。弱密码可能被猜出；任何得到数据库和正确密码的人都能读取密钥。请使用独立强密码，并妥善保管。',
+                    'Risk: encryption does not replace a trusted WebDAV service. Weak passwords may be guessed, and anyone with the database and correct password can read the keys. Use and protect a strong, unique password.'),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
               const SizedBox(height: 14),
             ] else ...[
-              Text(_label(
-                '修改后，其他设备也必须改用新密码。旧密码无法恢复新上传的数据。',
-                'After changing it, other devices must use the new password. The old password cannot decrypt newly uploaded data.',
-              )),
+              Text(ModuStrings.text(context, '修改后，其他设备也必须改用新密码。旧密码无法恢复新上传的数据。',
+                  'After changing it, other devices must use the new password. The old password cannot decrypt newly uploaded data.')),
               const SizedBox(height: 14),
             ],
             TextField(
@@ -634,11 +645,10 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
               obscureText: true,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: _label('同步加密密码', 'Sync encryption password'),
-                helperText: _label(
-                  '至少 12 个字符，仅保存在本机',
-                  'At least 12 characters; stored only on this device',
-                ),
+                labelText: ModuStrings.text(
+                    context, '同步加密密码', 'Sync encryption password'),
+                helperText: ModuStrings.text(context, '至少 12 个字符，仅保存在本机',
+                    'At least 12 characters; stored only on this device'),
               ),
             ),
             const SizedBox(height: 8),
@@ -646,7 +656,8 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
               controller: _confirmationController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: _label('再次输入密码', 'Enter password again'),
+                labelText:
+                    ModuStrings.text(context, '再次输入密码', 'Enter password again'),
                 errorText: _errorText,
               ),
               onSubmitted: (_) => _submit(),

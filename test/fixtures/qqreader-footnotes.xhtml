@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="zh-CN">
+  <head><title>图片注释兼容性测试</title></head>
+  <body style="font-size:16px">
+    <p style="font-size:30px">第一段正文。<img id="note" class="qqreader-footnote" src="../Images/note.png" alt="词语解释：甲 &amp; 乙，&lt;b&gt;不是 HTML&lt;/b&gt;。" />正文继续。</p>
+    <p>第二段正文。<a href="other.xhtml"><img id="linked-note" class="qqreader-footnote extra" src="../Images/note.png" alt="链接里的图片注释。" /></a></p>
+    <p><a id="standard-ref" epub:type="noteref" href="#standard-note"><img id="standard-icon" src="../Images/note.png" alt="[1]" /></a></p>
+    <aside id="standard-note" epub:type="footnote"><p>标准 EPUB 脚注。</p></aside>
+    <p><img id="cover" src="../Images/cover.jpg" alt="普通封面说明，不是注释。" /></p>
+    <p><img id="empty-note" class="qqreader-footnote" src="../Images/note.png" alt="   " /></p>
+    <span id="not-image" class="qqreader-footnote" alt="不是图片。">第三段正文。</span>
+  </body>
+</html>

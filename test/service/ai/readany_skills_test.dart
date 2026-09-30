@@ -1,8 +1,10 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
 import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,6 +83,7 @@ void main() {
   test('custom built-in prompt overrides and resets independently', () async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
+    await Prefs().saveLocaleToPrefs('zh-CN');
     final skill = readAnySkills.firstWhere(
       (item) => item.id == 'concept_explainer',
     );
@@ -89,13 +92,18 @@ void main() {
     expect(ReadingSkillPromptStore.promptFor(skill), '自定义概念提示词');
 
     ReadingSkillPromptStore.reset(skill);
-    expect(ReadingSkillPromptStore.promptFor(skill), skill.defaultPrompt);
+    expect(Prefs().readAnySkillPrompts, isNot(contains(skill.id)));
+    expect(
+      ReadingSkillPromptStore.promptFor(skill),
+      skill.localizedPrompt(const Locale('zh', 'CN')),
+    );
   });
 
   testWidgets('AI reading skills settings exposes toggles and prompt editor',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
+    await Prefs().saveLocaleToPrefs('zh-CN');
     tester.view.physicalSize = const Size(1200, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -103,7 +111,15 @@ void main() {
 
     await tester.pumpWidget(
       const ProviderScope(
-        child: MaterialApp(home: AiReadingSkillsSettings()),
+        child: MaterialApp(
+          locale: Locale('zh', 'CN'),
+          supportedLocales: L10n.supportedLocales,
+          localizationsDelegates: [
+            L10n.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          home: AiReadingSkillsSettings(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -125,7 +141,7 @@ void main() {
       find.byKey(const ValueKey('reading-skill-concept_explainer')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('概念解析·提示词'), findsOneWidget);
+    expect(find.text('概念解析 · 提示词'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('reading-skill-prompt-editor')),
       findsOneWidget,

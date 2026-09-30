@@ -13,7 +13,7 @@ keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn scrollPagePercent show
 useBookStyles pageTurnMode customPageTurnConfig readingInfo showTextUnderIconButton
 pageHeaderMargin pageHeaderLeftMargin pageHeaderRightMargin pageHeaderFontSize
 pageFooterMargin pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize
-writingMode verticalRedFrame textAlignment bgimgFit bgimg''',
+writingMode verticalRedFrame textAlignment bgimgFit bgimg selectionToolbar''',
   'css':
       '''customCSSEnabled customCSS customCssProfiles customCssDefaultIndex customCssDefaultIndices''',
   'selection-search': 'selectionSearchSettings selectionSearchZoomPercent',

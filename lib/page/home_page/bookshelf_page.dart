@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:math';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -569,14 +570,15 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                       ? null
                       : () => organizeSelectedBooks(true),
                   icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('新建文件夹'),
+                  label: Text(ModuStrings.text(context, '新建文件夹', 'New folder')),
                 ),
                 TextButton.icon(
                   onPressed: selectedBooks.isEmpty
                       ? null
                       : () => organizeSelectedBooks(false),
                   icon: const Icon(Icons.drive_file_move_outline),
-                  label: const Text('移入文件夹'),
+                  label: Text(
+                      ModuStrings.text(context, '移入文件夹', 'Move to folder')),
                 ),
                 TextButton.icon(
                   onPressed: selectedBooks.isEmpty
@@ -586,7 +588,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                           exitSelectionMode();
                         },
                   icon: const Icon(Icons.hub_outlined),
-                  label: const Text('向量化'),
+                  label: Text(ModuStrings.text(context, '向量化', 'Vectorize')),
                 ),
                 TextButton.icon(
                   style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -599,7 +601,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                           if (deleted && mounted) exitSelectionMode();
                         },
                   icon: const Icon(Icons.delete_outline),
-                  label: const Text('删除'),
+                  label: Text(ModuStrings.text(context, '删除', 'Delete')),
                 ),
               ],
             ),
@@ -664,7 +666,9 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     PreferredSizeWidget appBar = AppBar(
       forceMaterialTransparency: true,
       title: _selectionMode
-          ? Text('已选 ${selectedBooks.length} 本')
+          ? Text(ModuStrings.format(
+              context, '已选 {count} 本', '{count} books selected',
+              values: {'count': selectedBooks.length}))
           : Container(
               height: 34,
               constraints: const BoxConstraints(maxWidth: 400),
@@ -717,12 +721,12 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                 child: Text(
                   selectedBooks.length == visibleBooks.length &&
                           visibleBooks.isNotEmpty
-                      ? '取消全选'
-                      : '全选',
+                      ? ModuStrings.text(context, '取消全选', 'Deselect all')
+                      : ModuStrings.text(context, '全选', 'Select all'),
                 ),
               ),
               IconButton(
-                tooltip: '退出选择',
+                tooltip: ModuStrings.text(context, '退出选择', 'Exit selection'),
                 onPressed: exitSelectionMode,
                 icon: const Icon(Icons.close),
               ),
@@ -736,7 +740,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                       _selectedBookIds.clear();
                     });
                   },
-                  child: const Text('选择'),
+                  child: Text(ModuStrings.text(context, '选择', 'Select')),
                 ),
               const SyncButton(),
               IconButton(

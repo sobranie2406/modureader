@@ -1,9 +1,11 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/page_turn_mode.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/reading_page.dart';
+import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
 import 'package:anx_reader/utils/ui/status_bar.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
@@ -342,6 +344,14 @@ class _OtherSettingsState extends State<OtherSettings> {
           autoAdjustReadingTheme(),
           autoTranslateSelection(),
           autoMarkSelection(),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.touch_app_outlined),
+            title:
+                Text(ModuStrings.text(context, '划词工具栏', 'Selection toolbar')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showSelectionToolbarSettings(context),
+          ),
           autoSummaryPreviousContent(),
           screenTimeout(),
           pageTurningControl(),

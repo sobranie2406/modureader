@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:anx_reader/service/notes/reading_link.dart';
@@ -148,9 +149,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       },
       {
         'icon': Icons.cloud_download_outlined,
-        'label': Localizations.localeOf(context).languageCode == 'zh'
-            ? '远程书库'
-            : 'Remote library',
+        'label': ModuStrings.text(context, '远程书库', 'Remote library'),
         'identifier': 'remoteLibrary'
       },
       if (Prefs().bottomNavigatorShowStatistics)

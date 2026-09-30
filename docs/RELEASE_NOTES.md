@@ -1,20 +1,20 @@
-# 默读 / Modu 1.1.7 正式版
+# 默读 / Modu 1.1.8 正式版
 
-版本：**1.1.7+10052**。
+版本：**1.1.8+10061**。
 
 ## 本次更新
 
-- **书架管理与 Markdown**：支持 MD / Markdown 书籍；书籍、文件夹可置顶和取消置顶，批量选择书籍建立文件夹或移入已有文件夹。
-- **阅读排版与搜索**：滚动翻页步长可在 80%～100% 之间调整；修复安卓平板横屏和桌面滚动模式下的侧边距调节。增加标注颜色与内置搜索窗口缩放。
-- **AI 词典与思维导图**：词典优先用当前模型知识解释选词，按需查询维基词典、维基百科和百度百科，再由同一模型整理并附来源，无需另配搜索 API Key，不发送书籍正文。精简阅读工具调用展示；思维导图支持全屏、缩放移动和节点展开/折叠。
-- **笔记返回原文**：导出笔记附带默读原文位置链接，可从支持链接的外部应用跳回对应书籍位置；保留原文括号、Markdown 高亮与创建/修改时间。
-- **WebDAV 同步**：加强条件写入及 ETag 可靠性检测，处理相同内容重复书籍与关联笔记；可靠服务端以数据库为主，兼容模式整理合并日志，清理已安全覆盖的历史日志。
-- **ANX 备份迁移**：所有客户端在“设置 → 高级 → 导入 ANX Reader 的备份文件”选择 ZIP，按步骤校验并合并书籍、笔记、进度、阅读记录、文件夹和标签。导入前自动备份，重复导入保留现有记录；范围及兼容要求在导入界面说明。
-- **朗读与平台兼容**：改进后台跨章节预取与缓冲状态，优化 Windows 系统语音启动兼容性。Android 播放器通知明确静音、无振动，短暂音频打断只暂停和恢复一次，用户主动暂停优先。
+- **自定义划词工具栏**：内置动作、标注工具和自定义 AI 命令均可开关、拖动排序；支持编辑名称、图标、提示词和显示数量，内置常用 AI 模板默认关闭。
+- **AI 阅读体验**：划词模板与阅读技能分别管理，共用阅读 AI 弹窗；每次划词 AI 提问开启新对话，生成结束后自动返回首段。全局设置备份只保存内置提示词的用户改动。
+- **语言与提示词**：可手动选择应用语言或跟随系统，界面文字、内置技能和语音描述模板同步切换，保留用户自定义提示词。
+- **章节与页数导航**：点击正文直接显示进度滑块，拖动预览章节标题；增加上一章、上一页、下一页、下一章按钮。区分「章节进度」和本章当前页/总页数。
+- **字典与网页翻译**：改进 MDX 原生词目查询，保留字典本身的双向词目，不进行中文释义反查；新增百度、有道网页翻译，优化移动端自动填词和滚动。
+- **阅读与标注修复**：适配常见图片式注释引用；修复垃圾桶无法删除新建高亮、划线，以及改色后旧标记在切换章节时重新出现的问题。删除采用明确确认，并等待存储和页面清除完成。
+- **更新来源统一**：检查与下载共用同一 GitHub/Gitee 来源选择，默认优先 GitHub，手动切换后重新检查。
 
 ## 升级与下载
 
-[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.7) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.7)
+[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.8) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.8)
 
 覆盖升级即可，**不要先卸载或清空数据**，升级前建议备份书库。Android 沿用原签名；macOS 退出旧应用后，使用 DMG 拖入应用程序覆盖安装。
 
@@ -25,16 +25,16 @@
 - Linux DEB 面向 Debian 13，请使用 APT 安装依赖。
 - iOS IPA 需用自己的有效签名配置签署主应用及 Share Extension 后安装。
 
-Gitee 先移除旧应用发行版，再上传同一批 GitHub 原包；校验通过后更新下载清单。GitHub 保留历史发行版及源码标签，独立模型镜像不变。
+GitHub 保留历史发行版及源码标签；Gitee 替换旧应用发行版，提供同一批安装包和校验文件。独立模型镜像不变。
 
-对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.7) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.7.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.7/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
+对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.8) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.8.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.8/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
 
 ## English
 
-Modu **1.1.7 (build 10052)** adds Markdown books, pinned books/folders, batch folder management, adjustable scrolling steps, expanded annotation colors and embedded search zoom. Landscape tablet and desktop side margins are corrected.
+Modu **1.1.8 (build 10061)** adds customizable selection tools, individually switchable and reorderable annotation controls, and editable AI prompt templates that start disabled. Selection AI commands and reading skills have separate settings and share the reading popup; each selection request starts a new conversation and returns to the beginning when generation ends. Backups retain only user edits to bundled prompts.
 
-The AI dictionary uses the current model's knowledge first, with optional Wiktionary, Wikipedia and Baidu Baike lookup, without sending book contents or requiring a separate search API key. Mind maps support fullscreen viewing, zoom/pan and collapsible nodes. Exported notes link back to their original reading position.
+Choose an application language or follow the system; interface text and bundled AI/voice prompts follow that choice while custom prompts remain unchanged. Tap the reader to access chapter/page controls, preview chapter titles while dragging progress, and distinguish chapter ordinal from pages within the current chapter.
 
-WebDAV sync improves conditional-write checks, duplicate-book reconciliation and safe log compaction. Advanced settings imports ANX Reader ZIP backups with validation, deduplication and a pre-import database snapshot. Background narration and Windows system voice compatibility are improved; Android player notifications are silent and transient audio interruptions resume only once.
+Dictionary lookup preserves native MDX headwords without reverse-searching definitions. Baidu and Youdao translation webpages support mobile prefilling and scrolling. Common image-marker footnotes are supported. Highlight/underline deletion now uses a visible confirmation, waits for storage and rendering, and clears duplicate annotation caches. Update checking and downloading share one source selector.
 
 Upgrade in place after backing up. Nine packages cover Android, macOS, Windows and Debian 13 on ARM64/x64, plus iOS ARM64. macOS is not notarized, Windows requires WebView2, and iOS requires your own valid signing. Gitee receives identical, hash-verified GitHub packages.

@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -52,9 +53,6 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   final Map<String, Map<String, dynamic>> _configDrafts = {};
   bool _savingSettings = false;
   int _configRevision = 0;
-
-  String _text(String zh, String en) =>
-      Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
 
   Future<void> _applySettings(Map<String, dynamic> data) async {
     // Reject invalid imports before interrupting speech or changing anything.
@@ -115,13 +113,14 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       await _applySettings(data);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_text('朗读设置已保存', 'Speech settings saved')),
+          content: Text(
+              ModuStrings.text(context, '朗读设置已保存', 'Speech settings saved')),
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_text('保存失败，请检查接口地址和朗读参数后重试',
+          content: Text(ModuStrings.text(context, '保存失败，请检查接口地址和朗读参数后重试',
               'Could not save. Check the service URL and speech parameters.')),
         ));
       }
@@ -132,17 +131,19 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_text('清除朗读设置？', 'Clear speech settings?')),
-        content: Text(_text(
+        title: Text(
+            ModuStrings.text(context, '清除朗读设置？', 'Clear speech settings?')),
+        content: Text(ModuStrings.text(
+            context,
             '将停止朗读，清除所有朗读服务的 API Key、接口配置、声音选择和未保存修改，并恢复默认语速、音调、音量及系统朗读。不影响 AI、书籍、笔记或同步设置。',
             'Stop speech, remove all TTS keys, service configurations, voice selections and drafts, and restore default rate, pitch, volume and system speech. AI, books, notes and sync settings are unchanged.')),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(_text('取消', 'Cancel'))),
+              child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_text('清除', 'Clear'))),
+              child: Text(ModuStrings.text(context, '清除', 'Clear'))),
         ],
       ),
     );
@@ -151,28 +152,31 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       await _applySettings(TtsConfigTransfer.defaults());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_text('朗读设置已清除', 'Speech settings cleared')),
+          content: Text(
+              ModuStrings.text(context, '朗读设置已清除', 'Speech settings cleared')),
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              _text('清除失败，请重试', 'Could not clear settings. Please retry.')),
+          content: Text(ModuStrings.text(
+              context, '清除失败，请重试', 'Could not clear settings. Please retry.')),
         ));
       }
     }
   }
 
   Widget _buildSettingsTransfer() => SettingsSection(
-        title: Text(_text('朗读设置管理', 'Speech settings management')),
+        title: Text(
+            ModuStrings.text(context, '朗读设置管理', 'Speech settings management')),
         tiles: [
           CustomSettingsTile(
               child: Padding(
             padding: const EdgeInsets.all(16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_text(
+              Text(ModuStrings.text(
+                  context,
                   '接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用二维码或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。',
                   'Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via QR images or modu links. System voices may need reselection on another device.')),
               const SizedBox(height: 12),
@@ -180,16 +184,20 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
                 FilledButton.icon(
                     onPressed: _savingSettings ? null : _saveSettings,
                     icon: const Icon(Icons.save_outlined),
-                    label: Text(_text('保存设置', 'Save settings'))),
+                    label: Text(
+                        ModuStrings.text(context, '保存设置', 'Save settings'))),
                 OutlinedButton.icon(
                     onPressed: _savingSettings ? null : _clearSettings,
                     icon: const Icon(Icons.delete_outline),
-                    label: Text(_text('清除设置', 'Clear settings'))),
+                    label: Text(
+                        ModuStrings.text(context, '清除设置', 'Clear settings'))),
               ]),
               if (_configDrafts.isNotEmpty)
                 Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(_text('有未保存的接口修改。保存后可在“全局设置备份”中导出。',
+                    child: Text(ModuStrings.text(
+                        context,
+                        '有未保存的接口修改。保存后可在“全局设置备份”中导出。',
                         'Unsaved edits. Save before exporting in Global settings backup.'))),
             ]),
           )),
@@ -509,13 +517,10 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             if (AnxPlatform.isAndroid)
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
-                title: Text(Localizations.localeOf(context).languageCode == 'zh'
-                    ? '朗读通知'
-                    : 'Reading notifications'),
-                subtitle: Text(Localizations.localeOf(context).languageCode ==
-                        'zh'
-                    ? '在系统设置中管理通知栏与锁屏播放控制'
-                    : 'Manage notification and lock-screen controls in system settings'),
+                title: Text(
+                    ModuStrings.text(context, '朗读通知', 'Reading notifications')),
+                subtitle: Text(ModuStrings.text(context, '在系统设置中管理通知栏与锁屏播放控制',
+                    'Manage notification and lock-screen controls in system settings')),
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () async {
                   await openAppSettings();
@@ -625,7 +630,6 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   }
 
   Widget _buildServiceSelection(String currentServiceId) {
-    final isChinese = Localizations.localeOf(context).languageCode == 'zh';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: DropdownButtonFormField<String>(
@@ -642,14 +646,14 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               enabled: supportsSystemTts(),
               child: Text(supportsSystemTts()
                   ? L10n.of(context).settingsNarrateSystemTts
-                  : (isChinese
-                      ? '系统语音（此平台不支持）'
-                      : 'System speech (unavailable)'))),
+                  : (ModuStrings.text(context, '系统语音（此平台不支持）',
+                      'System speech (unavailable)')))),
           const DropdownMenuItem(value: 'dashscope', child: Text('DashScope')),
           const DropdownMenuItem(value: 'xiaomi', child: Text('Xiaomi MiMo')),
           DropdownMenuItem(
               value: 'openai',
-              child: Text(isChinese ? 'OpenAI 兼容' : 'OpenAI compatible')),
+              child: Text(
+                  ModuStrings.text(context, 'OpenAI 兼容', 'OpenAI compatible'))),
         ],
         onChanged: (value) async {
           if (value != null && value != currentServiceId) {

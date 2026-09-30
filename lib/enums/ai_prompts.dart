@@ -1,3 +1,6 @@
+import 'dart:ui';
+import 'package:anx_reader/l10n/modu_strings.dart';
+
 enum AiPrompts {
   test,
   summaryTheChapter,
@@ -9,6 +12,12 @@ enum AiPrompts {
 }
 
 extension AiPromptsJson on AiPrompts {
+  String localizedPrompt(Locale locale) =>
+      ModuStrings.value(locale, 'ai_${name}_prompt', getPrompt());
+
+  bool isDefaultPrompt(String value) =>
+      ModuStrings.isDefault('ai_${name}_prompt', value, getPrompt());
+
   String getPrompt() {
     switch (this) {
       case AiPrompts.test:

@@ -1,9 +1,10 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/constants/note_annotations.dart';
 import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book_note.dart';
+import 'package:anx_reader/models/selection_toolbar.dart';
+import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -11,18 +12,20 @@ import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/book_share/excerpt_share_service.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
 import 'package:anx_reader/widgets/context_menu/annotation_color_palette.dart';
-import 'package:anx_reader/widgets/icon_and_text.dart';
+import 'package:anx_reader/widgets/context_menu/selection_action_toolbar.dart';
+import 'package:anx_reader/widgets/context_menu/selection_toolbar_labels.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:icons_plus/icons_plus.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 
 class ExcerptMenu extends StatefulWidget {
   final String annoCfi;
   final String annoContent;
   final int? id;
+  final BookNoteDao? dao;
+  final Future<void> Function(String cfi)? removeAnnotation;
   final Function() onClose;
   final bool footnote;
   final BoxDecoration decoration;
@@ -32,12 +35,15 @@ class ExcerptMenu extends StatefulWidget {
   final void Function(int noteId) onNoteCreated;
   final Axis axis;
   final bool reverse;
+  final ModalRoute<dynamic>? parentRoute;
 
   const ExcerptMenu({
     super.key,
     required this.annoCfi,
     required this.annoContent,
     this.id,
+    this.dao,
+    this.removeAnnotation,
     required this.onClose,
     required this.footnote,
     required this.decoration,
@@ -47,6 +53,7 @@ class ExcerptMenu extends StatefulWidget {
     required this.onNoteCreated,
     required this.axis,
     required this.reverse,
+    this.parentRoute,
   });
 
   @override
@@ -54,15 +61,18 @@ class ExcerptMenu extends StatefulWidget {
 }
 
 class ExcerptMenuState extends State<ExcerptMenu> {
-  bool deleteConfirm = false;
+  bool _deleting = false;
+  bool _saving = false;
   int? noteId;
   BookNote? _currentNote;
   late String annoType;
   late String annoColor;
+  BookNoteDao get _dao => widget.dao ?? bookNoteDao;
 
   @override
   initState() {
     super.initState();
+    noteId = widget.id;
     annoType = Prefs().annotationType;
     annoColor = Prefs().annotationColor;
     _initializeExistingNote();
@@ -75,7 +85,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     }
 
     try {
-      final note = await bookNoteDao.selectBookNoteById(existingId);
+      final note = await _dao.selectBookNoteById(existingId);
       if (!mounted) {
         return;
       }
@@ -98,11 +108,15 @@ class ExcerptMenuState extends State<ExcerptMenu> {
   Future<BookNote?> _fetchLatestNote() async {
     final existingId = noteId ?? widget.id;
     if (existingId == null) {
-      return null;
+      final bookId = epubPlayerKey.currentState?.widget.book.id;
+      if (bookId == null) return null;
+      final notes =
+          await _dao.selectBookNoteByCfiAndBookId(widget.annoCfi, bookId);
+      return notes.isEmpty ? null : notes.last;
     }
 
     try {
-      return await bookNoteDao.selectBookNoteById(existingId);
+      return await _dao.selectBookNoteById(existingId);
     } catch (_) {
       return null;
     }
@@ -122,7 +136,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     final resolvedColor = color ?? existingNote?.color ?? annoColor;
 
     final BookNote bookNote = BookNote(
-      id: existingNote?.id ?? widget.id,
+      id: existingNote?.id ?? noteId ?? widget.id,
       bookId:
           existingNote?.bookId ?? epubPlayerKey.currentState!.widget.book.id,
       content: resolvedContent,
@@ -137,7 +151,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     );
     if (existingNote != null) bookNote.inheritVersion(existingNote);
 
-    final id = await bookNoteDao.save(bookNote);
+    final id = await _dao.save(bookNote);
     bookNote.setId(id);
     widget.onNoteCreated(id);
 
@@ -158,30 +172,61 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     return bookNote;
   }
 
-  Icon deleteIcon() {
-    return deleteConfirm
-        ? const Icon(
-            EvaIcons.close_circle,
-            color: Colors.red,
-          )
-        : const Icon(Icons.delete);
-  }
+  Future<void> deleteHandler() async {
+    if (_deleting || _saving) return;
+    setState(() => _deleting = true);
+    try {
+      final l10n = L10n.of(context);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.contextMenuDelete),
+          content: Text(widget.annoContent,
+              maxLines: 5, overflow: TextOverflow.ellipsis),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.commonCancel),
+            ),
+            TextButton(
+              key: const ValueKey('annotation-confirm-delete'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.commonDelete),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
 
-  void deleteHandler() {
-    if (deleteConfirm) {
-      if (widget.id != null) {
-        bookNoteDao.deleteBookNoteById(widget.id!);
-        epubPlayerKey.currentState!.removeAnnotation(widget.annoCfi);
+      final note = await _fetchLatestNote() ?? _currentNote;
+      if (note != null) _currentNote = note;
+      final id = noteId ?? note?.id ?? widget.id;
+      if (id != null) {
+        // New marks can be saved while this same toolbar remains open. The
+        // original widget.id is then null, but noteId holds the persisted ID.
+        await _dao.deleteBookNoteById(id);
+        final cfi = note?.cfi ?? widget.annoCfi;
+        if (widget.removeAnnotation != null) {
+          await widget.removeAnnotation!(cfi);
+        } else {
+          await epubPlayerKey.currentState?.removeAnnotation(cfi);
+        }
       }
-      widget.onClose();
-    } else {
-      setState(() {
-        deleteConfirm = true;
-      });
+      if (mounted) widget.onClose();
+    } catch (_) {
+      if (mounted) {
+        final l10n = L10n.of(context);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Text('${l10n.commonDelete}: ${l10n.commonFailed}')));
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
   Future<void> onColorSelected(String color, {bool close = true}) async {
+    if (_saving || _deleting) return;
+    setState(() => _saving = true);
     Prefs().annotationColor = color;
     if (mounted) {
       setState(() {
@@ -190,23 +235,24 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     } else {
       annoColor = color;
     }
-    BookNote bookNote;
     try {
-      bookNote = await _persistNote(color: color);
+      final bookNote = await _persistNote(color: color);
+      await epubPlayerKey.currentState!.addAnnotation(bookNote);
+      if (close && mounted) widget.onClose();
     } on NoteConflictException {
       if (mounted) {
         AnxToast.show(NoteConflictException.message(
             Localizations.localeOf(context).languageCode == 'zh'));
       }
       return;
-    }
-    epubPlayerKey.currentState!.addAnnotation(bookNote);
-    if (close) {
-      widget.onClose();
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> onTypeSelected(String type) async {
+    if (_saving || _deleting) return;
+    setState(() => _saving = true);
     Prefs().annotationType = type;
     if (mounted) {
       setState(() {
@@ -215,21 +261,24 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     } else {
       annoType = type;
     }
-    BookNote bookNote;
     try {
-      bookNote = await _persistNote(type: type);
+      final bookNote = await _persistNote(type: type);
+      await epubPlayerKey.currentState!.addAnnotation(bookNote);
     } on NoteConflictException {
       if (mounted) {
         AnxToast.show(NoteConflictException.message(
             Localizations.localeOf(context).languageCode == 'zh'));
       }
       return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    epubPlayerKey.currentState!.addAnnotation(bookNote);
   }
 
-  Widget iconButton({required Icon icon, required Function() onPressed}) {
+  Widget iconButton(
+      {Key? key, required Icon icon, required VoidCallback? onPressed}) {
     return IconButton(
+      key: key,
       padding: const EdgeInsets.all(2),
       constraints: const BoxConstraints(),
       style: const ButtonStyle(
@@ -240,216 +289,186 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     );
   }
 
-  Widget typeButton(String type, IconData icon) {
-    return iconButton(
-      icon: Icon(icon,
-          color: annoType == type ? Color(int.parse('0xff$annoColor')) : null),
-      onPressed: () {
-        onTypeSelected(type);
-      },
+  Future<void> _runAction(SelectionToolbarItem item) async {
+    final popupContext = Navigator.of(context).context;
+    final reader = readingPageKey.currentState;
+    final text = widget.annoContent;
+    switch (item.action) {
+      case 'copy':
+        final message = L10n.of(context).notesPageCopied;
+        await Clipboard.setData(ClipboardData(text: text));
+        AnxToast.show(message);
+        if (mounted) widget.onClose();
+        break;
+      case 'search':
+        widget.onClose();
+        if (reader != null) {
+          await reader.showSelectionSearch(text);
+        } else if (popupContext.mounted) {
+          await showSelectionSearchBrowser(popupContext, text: text);
+        }
+        break;
+      case 'translate':
+        widget.toggleTranslationMenu();
+        break;
+      case 'dictionary':
+        widget.onClose();
+        if (reader != null) {
+          await reader.showSelectionDictionary(text);
+        } else if (popupContext.mounted) {
+          await showReaderPopup(popupContext,
+              builder: (_) => DictionaryLookup(word: text));
+        }
+        break;
+      case 'narrate':
+        final cfi = widget.annoCfi;
+        widget.onClose();
+        final player = epubPlayerKey.currentState;
+        if (player == null) return;
+        await audioHandler.stop();
+        if (!player.mounted || epubPlayerKey.currentState != player) return;
+        await TtsHandler().init(
+            () => player.initTts(fromCfi: cfi), player.ttsNext, player.ttsPrev);
+        await audioHandler.play();
+        break;
+      case 'note':
+        epubPlayerKey.currentState?.setSelectionClearLocked(true);
+        await onColorSelected(annoColor, close: false);
+        if (!mounted) return;
+        final targetId = noteId ?? widget.id;
+        if (targetId != null) {
+          await widget.openReaderNoteMenu(targetId);
+        } else {
+          widget.toggleReaderNoteMenu(show: true);
+        }
+        break;
+      case 'ai':
+      case 'aiCommand':
+        widget.onClose();
+        await reader?.showAiChat(
+          content: item.prompt.isEmpty
+              ? text
+              : item.promptForSelection(text,
+                  locale: Localizations.localeOf(context)),
+          sourceText: text,
+          skillId: item.prompt.isEmpty ? null : item.skillId,
+          sendImmediate: item.prompt.isNotEmpty,
+          newConversation: true,
+          forcePopup: true,
+        );
+        break;
+      case 'share':
+        final player = epubPlayerKey.currentState;
+        if (player == null) return;
+        final book = player.book;
+        final chapter = player.chapterTitle;
+        widget.onClose();
+        if (!popupContext.mounted) return;
+        ExcerptShareService.showShareExcerpt(
+          context: popupContext,
+          bookTitle: book.title,
+          author: book.author,
+          excerpt: text,
+          chapter: chapter,
+        );
+        break;
+    }
+  }
+
+  void _openSettings() {
+    final popupContext = Navigator.of(context).context;
+    widget.onClose();
+    if (popupContext.mounted) showSelectionToolbarSettings(popupContext);
+  }
+
+  Widget _annotationAction(SelectionToolbarItem item, List<String> colors) {
+    if (item.action == 'colors') {
+      return Tooltip(
+        message: selectionToolbarLabel(context, item),
+        child: IgnorePointer(
+          ignoring: _saving || _deleting,
+          child: AnnotationColorPalette(
+              axis: widget.axis,
+              colors: colors,
+              selectedColor: annoColor,
+              onSelected: (color) => onColorSelected(color)),
+        ),
+      );
+    }
+    final type = item.action == 'highlight' ? 'highlight' : 'underline';
+    return Tooltip(
+      message: selectionToolbarLabel(context, item),
+      child: iconButton(
+        key: ValueKey('annotation-action-${item.action}'),
+        icon: Icon(selectionToolbarIcon(item),
+            color: item.action != 'delete' && annoType == type
+                ? Color(int.parse('ff$annoColor', radix: 16))
+                : null),
+        onPressed: _saving || _deleting
+            ? null
+            : () {
+                if (item.action == 'delete') {
+                  deleteHandler();
+                } else {
+                  onTypeSelected(type);
+                }
+              },
+      ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    Widget annotationMenu = Container(
-      padding: const EdgeInsets.all(6),
-      decoration: widget.decoration,
-      child: AxisFlex(
-        axis: widget.axis,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          iconButton(
-            onPressed: deleteHandler,
-            icon: deleteIcon(),
-          ),
-          for (final type in notesType) typeButton(type.type, type.icon),
-          AnnotationColorPalette(
-            axis: widget.axis,
-            selectedColor: annoColor,
-            onSelected: (color) => onColorSelected(color),
-          ),
-        ],
-      ),
-    );
-
-    Widget operatorMenu = Container(
-      // width: 48,
-      decoration: widget.decoration,
-      child: AxisFlex(
-        axis: widget.axis,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // copy
-          IconAndText(
-            compact: true,
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: widget.annoContent));
-              AnxToast.show(L10n.of(context).notesPageCopied);
-              widget.onClose();
-            },
-            icon: const Icon(EvaIcons.copy),
-            text: L10n.of(context).contextMenuCopy,
-          ),
-          // Web search
-          IconAndText(
-            compact: true,
-            onTap: () async {
-              final popupContext = Navigator.of(context).context;
-              final text = widget.annoContent;
-              final reader = readingPageKey.currentState;
-              widget.onClose();
-              if (reader != null) {
-                await reader.showSelectionSearch(text);
-              } else {
-                await showSelectionSearchBrowser(popupContext, text: text);
-              }
-            },
-            icon: const Icon(EvaIcons.globe),
-            text: L10n.of(context).contextMenuSearch,
-          ),
-          // toggle translation menu
-          IconAndText(
-            compact: true,
-            onTap: widget.toggleTranslationMenu,
-            icon: const Icon(Icons.translate),
-            text: L10n.of(context).contextMenuTranslate,
-          ),
-          // Offline dictionary
-          IconAndText(
-            compact: true,
-            onTap: () async {
-              // Keep a navigator-owned context: closing the selection removes
-              // this overlay and invalidates its own BuildContext.
-              final popupContext = Navigator.of(context).context;
-              final word = widget.annoContent;
-              final reader = readingPageKey.currentState;
-              widget.onClose();
-              if (reader != null) {
-                await reader.showSelectionDictionary(word);
-              } else {
-                await showReaderPopup(popupContext,
-                    builder: (_) => DictionaryLookup(word: word));
-              }
-            },
-            icon: const Icon(Icons.menu_book_outlined),
-            text: Localizations.localeOf(context).languageCode == 'zh'
-                ? '字典'
-                : 'Dictionary',
-          ),
-          // narrate
-          IconAndText(
-            compact: true,
-            onTap: () async {
-              final startCfi = widget.annoCfi;
-              widget.onClose();
-              final playerState = epubPlayerKey.currentState;
-              if (playerState == null) return;
-
-              // Stop existing TTS playback if any
-              await audioHandler.stop();
-              if (!playerState.mounted ||
-                  epubPlayerKey.currentState != playerState) {
-                return;
-              }
-
-              // Now initialize TTS - it will use the current (updated) position
-              await TtsHandler().init(
-                () => playerState.initTts(fromCfi: startCfi),
-                playerState.ttsNext,
-                playerState.ttsPrev,
-              );
-
-              // Start TTS - audioHandler.play() will call TTS speak
-              await audioHandler.play();
-            },
-            icon: const Icon(Icons.headphones),
-            text: Localizations.localeOf(context).languageCode == 'zh'
-                ? '朗读'
-                : 'Read from here',
-          ),
-          // edit note
-          if (!widget.footnote)
-            IconAndText(
-              compact: true,
-              onTap: () async {
-                epubPlayerKey.currentState?.setSelectionClearLocked(true);
-                await onColorSelected(annoColor, close: false);
-                final targetId = noteId ?? widget.id;
-                if (targetId != null) {
-                  await widget.openReaderNoteMenu(targetId);
-                } else {
-                  widget.toggleReaderNoteMenu(show: true);
-                }
-              },
-              icon: const Icon(EvaIcons.edit_2_outline),
-              text: L10n.of(context).contextMenuWriteIdea,
-            ),
-          // AI chat
-          if (EnvVar.enableAIFeature)
-            IconAndText(
-              compact: true,
-              onTap: () {
-                widget.onClose();
-                final key = readingPageKey.currentState;
-                if (key != null) {
-                  key.showAiChat(
-                    content: widget.annoContent,
-                    sendImmediate: false,
-                  );
-                  key.aiChatKey.currentState
-                      ?.setReaderSourceText(widget.annoContent);
-                }
-              },
-              icon: const Icon(EvaIcons.message_circle_outline),
-              text: L10n.of(context).navBarAI,
-            ),
-          // share
-          IconAndText(
-            compact: true,
-            onTap: () {
-              widget.onClose();
-              ExcerptShareService.showShareExcerpt(
-                context: context,
-                bookTitle: epubPlayerKey.currentState!.book.title,
-                author: epubPlayerKey.currentState!.book.author,
-                excerpt: widget.annoContent,
-                chapter: epubPlayerKey.currentState!.chapterTitle,
-              );
-            },
-            icon: const Icon(EvaIcons.share_outline),
-            text: L10n.of(context).contextMenuShare,
-          ),
-        ],
-      ),
-    );
-
-    return Expanded(
-      child: AxisFlex(
-        reverse: widget.reverse,
-        axis: flipAxis(widget.axis),
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AxisFlex(
-            axis: flipAxis(widget.axis),
-            reverse: widget.reverse,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SingleChildScrollView(
-                  scrollDirection: widget.axis, child: operatorMenu),
-              const SizedBox.square(dimension: 10),
-              if (!widget.footnote)
-                SingleChildScrollView(
-                  scrollDirection: widget.axis,
-                  child: annotationMenu,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Expanded(
+        child: AnimatedBuilder(
+            animation: Prefs(),
+            builder: (context, _) {
+              final config = Prefs().selectionToolbar;
+              if (!config.enabled) return const SizedBox.shrink();
+              final annotationItems =
+                  config.annotations.where((i) => i.enabled).toList();
+              return LayoutBuilder(builder: (context, constraints) {
+                final extent = widget.axis == Axis.horizontal
+                    ? constraints.maxWidth
+                    : constraints.maxHeight;
+                final menu = SelectionActionToolbar(
+                  items: config.availableItems(
+                      footnote: widget.footnote,
+                      aiEnabled: EnvVar.enableAIFeature),
+                  visibleCount: config.visibleCount,
+                  axis: widget.axis,
+                  maxExtent: extent,
+                  onAction: _runAction,
+                  onSettings: _openSettings,
+                  parentRoute: widget.parentRoute,
+                );
+                return AxisFlex(
+                  reverse: widget.reverse,
+                  axis: flipAxis(widget.axis),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(decoration: widget.decoration, child: menu),
+                    if (!widget.footnote && annotationItems.isNotEmpty) ...[
+                      const SizedBox.square(dimension: 10),
+                      SingleChildScrollView(
+                        scrollDirection: widget.axis,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: widget.decoration,
+                          child: AxisFlex(
+                            axis: widget.axis,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final item in annotationItems)
+                                _annotationAction(item, config.colors)
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              });
+            }),
+      );
 }

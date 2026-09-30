@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/constants/note_annotations.dart';
 import 'package:flutter/material.dart';
 
@@ -9,27 +10,29 @@ class AnnotationColorPalette extends StatelessWidget {
     required this.axis,
     required this.selectedColor,
     required this.onSelected,
+    this.colors = notesColors,
   });
 
   final Axis axis;
   final String selectedColor;
   final ValueChanged<String> onSelected;
+  final List<String> colors;
 
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     return SizedBox(
       width: axis == Axis.horizontal ? 160 : null,
       height: axis == Axis.vertical ? 160 : null,
       child: Wrap(
         direction: axis,
         children: [
-          for (final color in notesColors)
+          for (final color in colors)
             Semantics(
               selected: selectedColor.toUpperCase() == color,
               child: IconButton(
                 key: ValueKey('annotation-color-$color'),
-                tooltip: '${zh ? '批注颜色' : 'Annotation colour'} #$color',
+                tooltip:
+                    '${ModuStrings.text(context, '批注颜色', 'Annotation colour')} #$color',
                 padding: const EdgeInsets.all(4),
                 constraints:
                     const BoxConstraints.tightFor(width: 32, height: 32),

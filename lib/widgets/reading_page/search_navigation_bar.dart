@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:flutter/material.dart';
 
@@ -15,7 +16,6 @@ class SearchNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final matches = state.matches;
     final index = state.activeIndex;
     Widget action(
@@ -48,23 +48,31 @@ class SearchNavigationBar extends StatelessWidget {
               if (state.isSearching)
                 Padding(
                     padding: const EdgeInsets.only(left: 8),
-                    child: Text(zh ? '搜索中…' : 'Searching…',
+                    child: Text(ModuStrings.text(context, '搜索中…', 'Searching…'),
                         style: Theme.of(context).textTheme.labelSmall)),
             ]),
             Row(children: [
-              action('search', Icons.search, zh ? '全文搜索' : 'Search', onSearch),
-              action('previous', Icons.arrow_back, zh ? '上一个' : 'Previous',
+              action('search', Icons.search,
+                  ModuStrings.text(context, '全文搜索', 'Search'), onSearch),
+              action(
+                  'previous',
+                  Icons.arrow_back,
+                  ModuStrings.text(context, '上一个', 'Previous'),
                   !state.isNavigating && index > 0 ? onPrevious : null),
               action(
                   'next',
                   Icons.arrow_forward,
-                  zh ? '下一个' : 'Next',
+                  ModuStrings.text(context, '下一个', 'Next'),
                   !state.isNavigating && index + 1 < matches.length
                       ? onNext
                       : null),
-              action('return', Icons.keyboard_return, zh ? '返回原处' : 'Return',
+              action(
+                  'return',
+                  Icons.keyboard_return,
+                  ModuStrings.text(context, '返回原处', 'Return'),
                   state.originCfi?.isNotEmpty == true ? onReturn : null),
-              action('close', Icons.close, zh ? '关闭' : 'Close', onClose),
+              action('close', Icons.close,
+                  ModuStrings.text(context, '关闭', 'Close'), onClose),
             ]),
           ])),
     );

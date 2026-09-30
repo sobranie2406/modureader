@@ -165,7 +165,13 @@
   "readingPageReadingInfoBattery": "电量",
   "readingPageReadingInfoTime": "时间",
   "readingPageReadingInfoBatteryAndTime": "电量和时间",
-  "readingPageReadingInfoChapterProgress": "本章进度",
+  "readingPageReadingInfoChapterProgress": "章节进度",
+  "readingPageReadingInfoChapterPageProgress": "本章进度",
+  "readingPagePreviousChapter": "上一章",
+  "readingPagePreviousPage": "向前翻页",
+  "readingPageNextPage": "向后翻页",
+  "readingPageNextChapter": "下一章",
+  "readingPageChapterNumber": "第 {number} 章",
   "readingPageReadingInfoBookProgress": "全书进度",
   "bookshelfDragging": "松开以导入",
   "bookshelfSort": "排序",
@@ -905,5 +911,11 @@
     "aiModelSwitchTitle": "切换模型",
     "aiModelEnterManually": "输入模型名称",
     "aiModelOrSelectBelow": "或从列表中选择：",
-    "aiChatFontSize": "字体大小"
+    "aiChatFontSize": "字体大小",
+    "settingsAiProviderReasoningEffort": "推理强度",
+    "settingsAiProviderReasoningEffortHelp": "默认使用自动。设置为自动时不会传递此参数。若模型或供应商不支持 reasoning_effort，可能会忽略该参数，或直接拒绝请求。",
+    "settingsAiProviderReasoningEffortAuto": "自动",
+    "settingsAiProviderReasoningEffortLow": "低",
+    "settingsAiProviderReasoningEffortMedium": "中",
+    "settingsAiProviderReasoningEffortHigh": "高"
 }

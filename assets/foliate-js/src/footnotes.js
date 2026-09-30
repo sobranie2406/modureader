@@ -1,4 +1,5 @@
 import { sourceBodyFontSize } from './footnote-typography.js'
+import { createImageFootnoteBook } from './image-footnotes.js'
 
 const getTypes = el => new Set(el?.getAttributeNS?.('http://www.idpf.org/2007/ops', 'type')?.split(' '))
 const getRoles = el => new Set(el?.getAttribute?.('role')?.split(' '))
@@ -50,10 +51,23 @@ const extractFootnote = (doc, anchor) => {
 
 export class FootnoteHandler extends EventTarget {
     detectFootnotes = true
+    #view
+    #request = 0
+    close() {
+        ++this.#request
+        this.#view?.close()
+        this.#view?.remove()
+        this.#view = null
+    }
     #showFragment(book, { index, anchor }, href, sourceFontSize) {
+        this.close()
+        const request = this.#request
         const view = document.createElement('foliate-view')
+        this.#view = view
+        const current = () => this.#request === request && this.#view === view
         return new Promise((resolve, reject) => {
             view.addEventListener('load', e => {
+                if (!current()) return
                 try {
                     const { doc } = e.detail
                     const el = anchor(doc)
@@ -73,14 +87,38 @@ export class FootnoteHandler extends EventTarget {
                     this.dispatchEvent(new CustomEvent('render', { detail }))
                     resolve()
                 } catch (e) {
+                    if (current()) this.close()
                     reject(e)
                 }
             })
             view.open(book)
-                .then(() => this.dispatchEvent(new CustomEvent('before-render', { detail: { view, sourceFontSize } })))
-                .then(() => view.goTo(index))
-                .catch(reject)
+                .then(() => {
+                    if (!current()) {
+                        view.close()
+                        return
+                    }
+                    this.dispatchEvent(new CustomEvent('before-render', { detail: { view, sourceFontSize } }))
+                    return view.goTo(index)
+                })
+                .then(target => {
+                    if (!current()) resolve()
+                    else if (!target) throw new Error('Failed to load footnote')
+                })
+                .catch(error => {
+                    if (current()) this.close()
+                    reject(error)
+                })
         })
+    }
+    handleImage(e) {
+        const { img } = e.detail
+        const book = createImageFootnoteBook(img)
+        if (!book) return
+        e.preventDefault()
+        const sourceFontSize = sourceBodyFontSize(img)
+        return this.#showFragment(book, {
+            index: 0, anchor: doc => doc.querySelector('[role="doc-footnote"]'),
+        }, null, sourceFontSize)
     }
     handle(book, e) {
         const { a, href } = e.detail

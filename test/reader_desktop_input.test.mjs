@@ -105,12 +105,13 @@ test('destroy detaches handlers and releases pending gesture', async () => {
   assert.equal(f.send('keydown',{key:'ArrowDown'}).defaultPrevented,false);
   f.point('pointerup',70); await settle(); assert.deepEqual(f.turns,[]);
 });
-test('runtime wires desktop-only input for outer document and every loaded chapter', async () => {
+test('runtime wires mobile keyboard and desktop-only mouse input for every chapter', async () => {
   const book=await readFile(new URL('../assets/foliate-js/src/book.js',import.meta.url),'utf8');
   const dart=await readFile(new URL('../lib/page/book_player/epub_player.dart',import.meta.url),'utf8');
   assert.match(book,/this\.installDesktopInput\(document\)/);
   assert.match(book,/this\.installDesktopInput\(doc\)/);
   assert.match(book,/style\.desktopPageInput === true && !window\.isFootNoteOpen\(\)/);
+  assert.match(book,/nativeKeysEnabled: \(\) => !window\.isFootNoteOpen\(\)/);
   assert.match(book,/focusOnPointerDown: enabled/);
   assert.match(dart,/desktopPageInput: \$\{AnxPlatform\.isDesktop\}/);
   const initial=await readFile(new URL('../lib/utils/webView/gererate_url.dart',import.meta.url),'utf8');
@@ -126,6 +127,29 @@ test('runtime wires desktop-only input for outer document and every loaded chapt
   const page=await readFile(new URL('../lib/page/reading_page.dart',import.meta.url),'utf8');
   assert.match(page,/readerOwnsPageKeys\(_readerFocusNode, _readerWebViewFocusScope/);
   assert.match(page,/turnPageFromKeyboard\(direction\)/);
+});
+
+test('mobile native remote keys page without enabling DOM keys or mouse drags', async () => {
+  const doc = new EventTarget();
+  doc.getSelection = () => '';
+  let allowed = true;
+  const turns = [];
+  const controller = installDesktopPageInput(doc, {
+    enabled: () => false, nativeKeysEnabled: () => allowed,
+    turnPage: direction => turns.push(direction),
+  });
+  const key = new Event('keydown', { cancelable: true });
+  Object.assign(key, { key: 'ArrowDown' });
+  doc.dispatchEvent(key);
+  assert.equal(key.defaultPrevented, false);
+  await settle(); assert.deepEqual(turns, []);
+  assert.equal(controller.turnFromKeyboard(1), true);
+  await settle(); assert.deepEqual(turns, [1]);
+  doc.activeElement = { isContentEditable: true };
+  assert.equal(controller.turnFromKeyboard(-1), false);
+  doc.activeElement = null; allowed = false;
+  assert.equal(controller.turnFromKeyboard(-1), false);
+  controller.destroy();
 });
 
 test('completed reader taps restore the book WebView on desktops even with AI open', async () => {

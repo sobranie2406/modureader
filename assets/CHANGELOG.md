@@ -2,18 +2,20 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.7
+## 1.1.8
 
-- Add Markdown books, bookshelf pinning and batch folder management.
-- Add configurable scroll-page distance, wider annotation palettes, search zoom and fullscreen interactive mind maps; fix landscape and desktop side margins.
-- Add reading-position links to exported notes and an AI dictionary with optional Wikipedia, Wiktionary and Baidu Baike lookup.
-- Improve WebDAV capability checks, duplicate-book reconciliation and safe log compaction for compatible servers.
-- Import ANX Reader ZIP backups from Advanced settings with validation, deduplication and a pre-import database snapshot.
-- Improve Windows system voice startup compatibility and background narration buffering; make Android player notifications silent and stabilize transient interruption recovery.
+- Add configurable selection tools and annotation controls, drag ordering, editable AI templates and independent template management.
+- Start selection AI requests in new conversations and return completed output to the first paragraph; back up only user changes to bundled prompts.
+- Add manual or system-following app language selection and localized bundled AI and voice prompts.
+- Show chapter/page navigation directly, preview chapter titles while dragging progress, and separate chapter ordinals from current-chapter page counts.
+- Improve native MDX headword lookup and add embedded Baidu/Youdao translation webpages with mobile prefilling and scrolling.
+- Support common image-marker footnotes and fix persistent highlight/underline deletion with explicit confirmation and duplicate-cache cleanup.
+- Use one GitHub/Gitee source selector for update checking and downloading.
 
-- 支持 Markdown 书籍，书籍和文件夹置顶，批量建文件夹和移入文件夹。
-- 新增滚动翻页比例、标注颜色、搜索窗口缩放、思维导图全屏缩放移动与节点折叠；修复横屏及桌面侧边距调节。
-- 导出笔记附带返回书中原位置的链接；新增 AI 词典，按需检索维基词典、维基百科和百度百科后整理词义。
-- 改进 WebDAV 条件写入能力检测、重复书籍合并与兼容模式日志整理。
-- 高级设置新增 ANX Reader ZIP 备份导入，提供操作步骤、校验、去重及导入前数据库备份。
-- 改进 Windows 系统语音启动兼容性与后台朗读预取；安卓播放器通知明确静音，优化短暂音频打断后的单次恢复。
+- 新增可开关和拖动排序的划词工具栏、标注工具及自定义 AI 命令；常用 AI 模板默认关闭，独立管理。
+- 划词 AI 每次新建对话，生成结束回到首段；内置提示词仅备份用户修改。
+- 新增手动选择或跟随系统的应用语言，界面、内置 AI 提示词与语音描述模板同步切换。
+- 点击正文直接显示章节和翻页控制，拖动预览章节标题；区分章节序号与本章当前页/总页数。
+- 改进 MDX 原生词目查询，增加百度、有道网页翻译及移动端自动填词、滚动支持。
+- 适配常见图片式注释引用；修复高亮、划线删除，增加明确确认并清理重复标注缓存。
+- 检查更新与下载安装共用 GitHub/Gitee 来源选择。

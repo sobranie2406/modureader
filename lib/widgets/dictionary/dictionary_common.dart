@@ -1,6 +1,7 @@
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 
 LocalDictionaryStore? _store;
 LocalDictionaryStore defaultDictionaryStore() {
@@ -10,7 +11,7 @@ LocalDictionaryStore defaultDictionaryStore() {
 }
 
 String dictionaryLabel(BuildContext context, String zh, String en) =>
-    Localizations.localeOf(context).languageCode == 'zh' ? zh : en;
+    ModuStrings.text(context, zh, en);
 
 String dictionaryError(BuildContext context, Object error) {
   final code = error is DictionaryFailure ? error.code : '';

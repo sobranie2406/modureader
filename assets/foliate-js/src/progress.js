@@ -55,12 +55,27 @@ export class TOCProgress {
     }
 }
 
-// Paginator page numbers already include the leading sentinel page. Fixed
-// layout uses zero-based section indexes instead; only that fallback needs +1.
-export const getChapterLocation = (renderer, section) => ({
-    current: renderer.page ?? ((section?.current ?? 0) + 1),
-    total: renderer.pages ? renderer.pages - 2 : (section?.total ?? 0),
-})
+// Keep chapter-page counts separate from the book's section index/count. A
+// continuous renderer has no page/pages getters; use its active chapter's
+// viewport fraction, never its book-wide scroll height or section ordinal.
+export const getChapterLocation = (renderer, section, viewport = {}) => {
+    if (renderer.scrolled || renderer.continuous) {
+        const size = Number.isFinite(viewport.size) && viewport.size > 0
+            ? viewport.size : renderer.size / renderer.viewSize
+        if (!Number.isFinite(size) || size <= 0) return { current: 0, total: 0 }
+        const fraction = Math.max(0, Math.min(1, viewport.fraction ?? 0))
+        const total = Math.max(1, Math.ceil(1 / size - 1e-9))
+        const current = fraction + size >= 1 - 1e-9
+            ? total : Math.min(total, Math.floor(fraction / size + 1e-9) + 1)
+        return { current, total }
+    }
+    const total = renderer.pages - 2
+    if (Number.isFinite(renderer.page) && Number.isFinite(total) && total > 0)
+        return { current: Math.max(1, Math.min(total, renderer.page)), total }
+    // Fixed-layout spine entries each represent one page. Their book-wide
+    // ordinal is reported separately in section.current / section.total.
+    return { current: 1, total: 1 }
+}
 
 export class SectionProgress {
     constructor(sections, sizePerLoc, sizePerTimeUnit) {
@@ -112,7 +127,12 @@ export class SectionProgress {
     // get index of and fraction in section based on total fraction
     getSection(fraction) {
         if (fraction <= 0) return [0, 0]
-        if (fraction >= 1) return [this.sizes.length - 1, 1]
+        if (fraction >= 1) {
+            // A trailing non-linear/empty spine item has no slider range.
+            // Keep 100% consistent with the last non-empty chapter preview.
+            const last = this.sizes.findLastIndex(size => size > 0)
+            return [last < 0 ? this.sizes.length - 1 : last, 1]
+        }
         fraction = fraction + Number.EPSILON
         const { sizeTotal } = this
         let index = this.sectionFractions.findIndex(x => x > fraction) - 1

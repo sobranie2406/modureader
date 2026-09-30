@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/enums/translation_mode.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:flutter/foundation.dart';
@@ -26,7 +27,6 @@ class TranslationToolbarAction extends StatelessWidget {
         onPressed: onOpenSettings,
       );
     }
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     return PopupMenuButton<bool>(
       key: const ValueKey('reader-translation-button'),
       tooltip: tooltip,
@@ -36,11 +36,12 @@ class TranslationToolbarAction extends StatelessWidget {
         PopupMenuItem(
           key: const ValueKey('reader-toolbar-stop-translation'),
           value: true,
-          child: Text(zh ? '停止翻译' : 'Stop translation'),
+          child: Text(ModuStrings.text(context, '停止翻译', 'Stop translation')),
         ),
         PopupMenuItem(
           value: false,
-          child: Text(zh ? '翻译设置' : 'Translation settings'),
+          child:
+              Text(ModuStrings.text(context, '翻译设置', 'Translation settings')),
         ),
       ],
     );

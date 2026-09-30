@@ -44,7 +44,7 @@ test('sync restore labels navigation callbacks as passive and releases suppressi
 test('Flutter bridge cannot mistake a sync restore or passive layout for a reading action', () => {
   const messages = [], window = {readerApplyingSync:false};
   const notify = runInNewContext(`${chunk('const onRelocated =', '\nconst onAnnotationClick')}; onRelocated`, {
-    window, reader:{view:{renderer:{writingMode:'horizontal-tb'}}},
+    window, reader:{view:{renderer:{writingMode:'horizontal-tb'},book:{sections:Array(3)}}},
     applyVerticalPageChrome, style: {},
     callFlutter: (_, data) => messages.push(data),
   });

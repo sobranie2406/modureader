@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 import 'package:anx_reader/widgets/reading_page/vertical_page_chrome.dart';
 import 'package:anx_reader/service/translate/ai.dart';
@@ -27,6 +28,7 @@ import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/models/reading_rules.dart';
 import 'package:anx_reader/models/search_result_model.dart';
 import 'package:anx_reader/models/toc_item.dart';
+import 'package:anx_reader/models/reader_progress.dart';
 import 'package:anx_reader/page/book_player/image_viewer.dart';
 import 'package:anx_reader/page/home_page.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -105,6 +107,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   String chapterHref = '';
   int chapterCurrentPage = 0;
   int chapterTotalPages = 0;
+  int currentChapter = 0;
+  int totalChapters = 0;
+  final readingProgress = ValueNotifier<ReaderProgress>(const ReaderProgress());
   int bookCurrentPage = 0;
   int bookTotalPages = 0;
   Map<String, double>? _lastVerticalInsets;
@@ -185,11 +190,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   void _quickMarkError() {
     if (!mounted) return;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(zh
-            ? '快速标记保存失败，请重试。'
-            : 'Could not save the highlight. Please retry.')));
+        content: Text(ModuStrings.text(context, '快速标记保存失败，请重试。',
+            'Could not save the highlight. Please retry.'))));
   }
 
   // Scroll wheel debounce
@@ -430,10 +433,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void goToCfi(String cfi) => webViewController.evaluateJavascript(
       source: 'goToCfi(${jsonEncode(cfi)});');
 
-  void addAnnotation(BookNote bookNote) {
+  Future<void> addAnnotation(BookNote bookNote) async {
     // JSON also safely handles quotes, backslashes and multiline excerpts.
-    webViewController.evaluateJavascript(
-        source: 'addAnnotation(${jsonEncode(bookNote.toJson())}); void 0;');
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody:
+            'await window.addAnnotation(${jsonEncode(bookNote.toJson())});');
+    if (result?.error != null) {
+      throw StateError('Annotation rendering failed: ${result!.error}');
+    }
   }
 
   void addBookmark(BookmarkModel bookmark) {
@@ -454,8 +461,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       ''');
   }
 
-  void removeAnnotation(String cfi) =>
-      webViewController.evaluateJavascript(source: "removeAnnotation('$cfi')");
+  Future<void> removeAnnotation(String cfi) async {
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody: 'await window.removeAnnotation(${jsonEncode(cfi)});');
+    if (result?.error != null) {
+      throw StateError('Annotation removal failed: ${result!.error}');
+    }
+  }
 
   void clearSearch() {
     ref.read(tocSearchProvider.notifier).clear();
@@ -478,9 +490,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       }
     } catch (_) {
       if (mounted)
-        AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
-            ? '无法跳转到搜索结果，请重试'
-            : 'Could not open this search result');
+        AnxToast.show(ModuStrings.text(
+            context, '无法跳转到搜索结果，请重试', 'Could not open this search result'));
     } finally {
       _searchNavigation = null;
       if (mounted) {
@@ -523,9 +534,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       }
     } catch (_) {
       if (mounted)
-        AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
-            ? '无法返回原阅读位置'
-            : 'Could not return to the original position');
+        AnxToast.show(ModuStrings.text(
+            context, '无法返回原阅读位置', 'Could not return to the original position'));
     }
   }
 
@@ -916,11 +926,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           if (result?.value != true) {
             _syncRefreshRetry?.cancel();
             if (++_syncRestoreAttempts >= 3) {
-              final zh = Localizations.localeOf(context).languageCode == 'zh';
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(zh
-                      ? '同步后的阅读位置暂时无法打开，请重新打开书籍。未覆盖云端进度。'
-                      : 'Could not open the synced position. Reopen the book; the synced progress was not overwritten.')));
+                  content: Text(ModuStrings.text(
+                      context,
+                      '同步后的阅读位置暂时无法打开，请重新打开书籍。未覆盖云端进度。',
+                      'Could not open the synced position. Reopen the book; the synced progress was not overwritten.'))));
               return;
             }
             _syncRefreshRetry = Timer(const Duration(milliseconds: 400), () {
@@ -1054,6 +1064,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
               writingMode.code == location['writingMode'] &&
               chapterCurrentPage == location['chapterCurrentPage'] &&
               chapterTotalPages == location['chapterTotalPages'] &&
+              currentChapter == location['currentChapter'] &&
+              totalChapters == location['totalChapters'] &&
               bookCurrentPage == location['bookCurrentPage'] &&
               bookTotalPages == location['bookTotalPages']) {
             if (location['readingAction'] == true) {
@@ -1072,6 +1084,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             chapterHref = location['chapterHref'] ?? '';
             chapterCurrentPage = location['chapterCurrentPage'] ?? 0;
             chapterTotalPages = location['chapterTotalPages'] ?? 0;
+            currentChapter = location['currentChapter'] ?? 0;
+            totalChapters = location['totalChapters'] ?? 0;
             bookCurrentPage = location['bookCurrentPage'] ?? 0;
             bookTotalPages = location['bookTotalPages'] ?? 0;
             bookmarkExists = location['bookmark']['exists'] ?? false;
@@ -1079,6 +1093,15 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             writingMode =
                 WritingModeEnum.fromCode(location['writingMode'] ?? '');
           });
+          readingProgress.value = ReaderProgress(
+            percentage: percentage,
+            chapterTitle: chapterTitle,
+            currentChapter: currentChapter,
+            totalChapters: totalChapters,
+            currentPage: chapterCurrentPage,
+            totalPages: chapterTotalPages,
+            chapters: readingProgress.value.chapters,
+          );
           if (AnxPlatform.isMacOS) {
             // Only update labels. changeStyle here would repaginate and emit
             // another relocation on every page turn.
@@ -1147,6 +1170,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           ref.read(bookTocProvider.notifier).setToc(toc);
         });
     controller.addJavaScriptHandler(
+        handlerName: 'onSetProgressChapters',
+        callback: (args) {
+          if (!mounted || args.isEmpty || args.first is! List) return;
+          final chapters = (args.first as List)
+              .map((raw) => ReaderProgressChapter.fromJson(
+                  Map<String, dynamic>.from(raw as Map)))
+              .toList();
+          readingProgress.value =
+              readingProgress.value.copyWithChapters(chapters);
+        });
+    controller.addJavaScriptHandler(
         handlerName: 'onQuickMark',
         callback: (args) async {
           if (!mounted ||
@@ -1174,23 +1208,19 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         handlerName: 'onCustomHighlightStatus',
         callback: (args) {
           if (!mounted || args.isEmpty) return;
-          final zh = Localizations.localeOf(context).languageCode == 'zh';
           final messages = {
-            'unsupported': zh
-                ? '当前阅读内核不支持正则高亮，请更新系统 WebView；普通 CSS 仍可使用。'
-                : 'This web engine does not support regex highlights. Update WebView; layout CSS still works.',
-            'timeout': zh
-                ? '高亮规则匹配超时，已停止，请简化正则表达式。'
-                : 'Highlight matching timed out. Please simplify the regex.',
-            'invalid': zh
-                ? '部分高亮正则有误，已跳过无效规则。'
-                : 'Invalid highlight expressions were skipped.',
-            'limited': zh
-                ? '本章高亮达到安全上限，仅显示部分匹配。'
-                : 'Chapter highlight limit reached; showing partial matches.',
-            'error': zh
-                ? '高亮规则暂时无法应用，正文阅读不受影响。'
-                : 'Could not apply highlights; reading is unaffected.',
+            'unsupported': ModuStrings.text(
+                context,
+                '当前阅读内核不支持正则高亮，请更新系统 WebView；普通 CSS 仍可使用。',
+                'This web engine does not support regex highlights. Update WebView; layout CSS still works.'),
+            'timeout': ModuStrings.text(context, '高亮规则匹配超时，已停止，请简化正则表达式。',
+                'Highlight matching timed out. Please simplify the regex.'),
+            'invalid': ModuStrings.text(context, '部分高亮正则有误，已跳过无效规则。',
+                'Invalid highlight expressions were skipped.'),
+            'limited': ModuStrings.text(context, '本章高亮达到安全上限，仅显示部分匹配。',
+                'Chapter highlight limit reached; showing partial matches.'),
+            'error': ModuStrings.text(context, '高亮规则暂时无法应用，正文阅读不受影响。',
+                'Could not apply highlights; reading is unaffected.'),
           };
           final message = messages[args.first];
           if (message != null) AnxToast.show(message);
@@ -1300,9 +1330,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         final tocSearch = ref.read(tocSearchProvider.notifier);
         if (search['error'] == true) {
           tocSearch.updateProgress(1);
-          AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
-              ? '书内搜索失败，请重试'
-              : 'Book search failed; please retry');
+          AnxToast.show(ModuStrings.text(
+              context, '书内搜索失败，请重试', 'Book search failed; please retry'));
         } else if (search['process'] != null) {
           final progress = search['process'].toDouble();
           tocSearch.updateProgress(progress);
@@ -1428,9 +1457,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
               args[1] == _translationSession.generation) {
             unawaited(
                 setTranslationMode(TranslationModeEnum.off).catchError((_) {}));
-            AnxToast.show(Localizations.localeOf(context).languageCode == 'zh'
-                ? '翻译失败，已停止。请检查翻译服务后重试。'
-                : 'Translation failed and stopped. Check the service and try again.');
+            AnxToast.show(ModuStrings.text(context, '翻译失败，已停止。请检查翻译服务后重试。',
+                'Translation failed and stopped. Check the service and try again.'));
           }
           return null;
         }
@@ -1556,6 +1584,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   void dispose() {
     _translationSession.stop();
     translationMode.dispose();
+    readingProgress.dispose();
     _syncRefreshRetry?.cancel();
     _scrollDebounceTimer?.cancel();
     _animationController?.dispose();
@@ -1683,12 +1712,16 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       final batteryIconSize = (textStyle.fontSize ?? 10) * 2.7;
 
       final chapterTitleWidget = Text(
-        (chapterCurrentPage == 1 ? widget.book.title : chapterTitle),
+        chapterTitle.isEmpty ? widget.book.title : chapterTitle,
         style: textStyle,
       );
 
       final chapterProgressWidget = Text(
-        '$chapterCurrentPage/$chapterTotalPages',
+        readingProgress.value.chapterProgress,
+        style: textStyle,
+      );
+      final chapterPageProgressWidget = Text(
+        readingProgress.value.chapterPageProgress,
         style: textStyle,
       );
 
@@ -1733,6 +1766,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           return chapterTitleWidget;
         case ReadingInfoEnum.chapterProgress:
           return chapterProgressWidget;
+        case ReadingInfoEnum.chapterPageProgress:
+          return chapterPageProgressWidget;
         case ReadingInfoEnum.bookProgress:
           return bookProgressWidget;
         case ReadingInfoEnum.battery:

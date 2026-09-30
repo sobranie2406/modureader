@@ -4,6 +4,7 @@ import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
@@ -68,7 +69,6 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
       valueListenable: _handler.ttsStateNotifier,
       builder: (context, ttsState, _) {
         final paragraph = getTtsService(Prefs().ttsService).isOnline;
-        final zh = Localizations.localeOf(context).languageCode == 'zh';
         final isPlaying = ttsState == TtsStateEnum.playing;
         final ttsActive =
             ttsState == TtsStateEnum.playing || ttsState == TtsStateEnum.paused;
@@ -119,11 +119,11 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                             children: [
                               _ActionButton(
                                 icon: EvaIcons.chevron_left,
-                                tooltip: zh
-                                    ? (paragraph ? '上一段' : '上一句')
-                                    : (paragraph
-                                        ? 'Previous passage'
-                                        : 'Previous sentence'),
+                                tooltip: paragraph
+                                    ? ModuStrings.text(
+                                        context, '上一段', 'Previous passage')
+                                    : ModuStrings.text(
+                                        context, '上一句', 'Previous sentence'),
                                 onPressed: () {
                                   _handler.playPrevious();
                                 },
@@ -142,11 +142,11 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                               ),
                               _ActionButton(
                                 icon: EvaIcons.chevron_right,
-                                tooltip: zh
-                                    ? (paragraph ? '下一段' : '下一句')
-                                    : (paragraph
-                                        ? 'Next passage'
-                                        : 'Next sentence'),
+                                tooltip: paragraph
+                                    ? ModuStrings.text(
+                                        context, '下一段', 'Next passage')
+                                    : ModuStrings.text(
+                                        context, '下一句', 'Next sentence'),
                                 onPressed: () {
                                   _handler.playNext();
                                 },

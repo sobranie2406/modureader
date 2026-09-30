@@ -883,5 +883,58 @@
   "aiModelSwitchTitle": "Cambiar modelo",
   "aiModelEnterManually": "Ingrese nombre del modelo",
   "aiModelOrSelectBelow": "O seleccione de la lista:",
-  "aiChatFontSize": "Tamaño de fuente"
+  "aiChatFontSize": "Tamaño de fuente",
+  "fontImportedAndApplied": "Importada y aplicada: {font}",
+  "@fontImportedAndApplied": {
+    "placeholders": {
+      "font": {
+        "type": "String"
+      }
+    }
+  },
+  "fontImportFailedCount": "No se pudieron importar {count} fuente(s).",
+  "@fontImportFailedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readingBrightness": "Brillo de la aplicación",
+  "readingBrightnessFollowSystem": "Seguir al sistema",
+  "readingBrightnessWindowHint": "Ajusta solo esta ventana; el brillo del sistema no cambia.",
+  "readingBrightnessDimHint": "Atenúa solo esta aplicación. 100% conserva el brillo del sistema; no puede aumentar el brillo de la pantalla más allá del ajuste del sistema.",
+  "readingPageReadingInfoChapterPageProgress": "Páginas de este capítulo",
+  "readingPagePreviousChapter": "Capítulo anterior",
+  "readingPagePreviousPage": "Página anterior",
+  "readingPageNextPage": "Página siguiente",
+  "readingPageNextChapter": "Capítulo siguiente",
+  "readingPageChapterNumber": "Capítulo {number}",
+  "@readingPageChapterNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsAiProviderReasoningEffort": "Esfuerzo de razonamiento",
+  "settingsAiProviderReasoningEffortHelp": "«Automático» es el valor predeterminado y no envía este parámetro. Algunos modelos o proveedores pueden ignorarlo o rechazar la solicitud si no admiten reasoning_effort.",
+  "settingsAiProviderReasoningEffortAuto": "Automático",
+  "settingsAiProviderReasoningEffortLow": "Bajo",
+  "settingsAiProviderReasoningEffortMedium": "Medio",
+  "settingsAiProviderReasoningEffortHigh": "Alto",
+  "settingsAdvancedNetwork": "Red",
+  "settingsAdvancedHttpProxyEnabled": "Activar proxy HTTP",
+  "settingsAdvancedHttpProxyConfig": "Configuración del proxy HTTP",
+  "settingsAdvancedHttpProxyHost": "Host del proxy",
+  "settingsAdvancedHttpProxyHostHint": "Por ejemplo, 127.0.0.1",
+  "settingsAdvancedHttpProxyPort": "Puerto del proxy",
+  "settingsAdvancedHttpProxyPortHint": "Por ejemplo, 7890",
+  "settingsAdvancedHttpProxyNotConfigured": "Sin configurar",
+  "settingsAdvancedHttpProxyInvalidInput": "Host o puerto del proxy no válido",
+  "settingsAdvancedHttpProxyTestUrl": "URL de prueba",
+  "settingsAdvancedHttpProxyTest": "Probar conexión",
+  "settingsAdvancedHttpProxyTesting": "Probando…",
+  "settingsAdvancedHttpProxyTestSuccess": "Conexión correcta",
+  "settingsAdvancedHttpProxyTestFailed": "Conexión fallida"
 }

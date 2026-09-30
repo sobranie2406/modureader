@@ -1,4 +1,6 @@
 import 'package:anx_reader/enums/ai_prompts.dart';
+import 'dart:ui';
+import 'package:anx_reader/l10n/modu_strings.dart';
 
 /// A built-in AI reading skill exposed in Settings and the reader AI panel.
 class ReadAnySkill {
@@ -17,6 +19,17 @@ class ReadAnySkill {
   final AiPrompts? aiPrompt;
 
   String get defaultPrompt => aiPrompt?.getPrompt() ?? prompt!;
+
+  String localizedName(Locale locale) =>
+      ModuStrings.value(locale, 'skill_${id}_name', name);
+  String localizedDescription(Locale locale) =>
+      ModuStrings.value(locale, 'skill_${id}_description', description);
+  String localizedPrompt(Locale locale) =>
+      aiPrompt?.localizedPrompt(locale) ??
+      ModuStrings.value(locale, 'skill_${id}_prompt', prompt!);
+  bool isDefaultPrompt(String value) =>
+      aiPrompt?.isDefaultPrompt(value) ??
+      ModuStrings.isDefault('skill_${id}_prompt', value, defaultPrompt);
 }
 
 const List<ReadAnySkill> readAnySkills = [

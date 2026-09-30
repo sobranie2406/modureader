@@ -990,6 +990,8 @@ const closeFootnote = () => {
   footnoteSizing?.destroy()
   footnoteSizing = null
   footnoteDialog.style.display = 'none'
+  reader.closeFootnote()
+  delete globalThis.footnoteSelection
   callFlutter("onFootnoteClose")
 }
 footnoteDialog.addEventListener('click', e => {
@@ -999,6 +1001,7 @@ footnoteDialog.addEventListener('click', e => {
 const replaceFootnote = (view, sourceFontSize) => {
   footnoteSizing?.destroy()
   footnoteSizing = null
+  delete globalThis.footnoteSelection
   clearSelection()
   footnoteDialog.querySelector('main').replaceChildren(view)
 
@@ -1177,6 +1180,9 @@ class Reader {
         this.view.goTo(e.detail.href)
       }))
 
+    view.addEventListener('image-footnote', e =>
+      this.#footnoteHandler.handleImage(e)?.catch(err => console.warn(err)))
+
     view.history.addEventListener('index-change', () => {
       // Inline footnotes have their own renderer/history; they must not
       // replace the main book's return controls when opening or closing.
@@ -1198,6 +1204,10 @@ class Reader {
       })
       callFlutter('onImageClick', base64)
     })
+  }
+
+  closeFootnote() {
+    this.#footnoteHandler.close()
   }
 
   async renderAnnotation(annotations) {
@@ -1242,9 +1252,12 @@ class Reader {
     const { value } = annotation
     const spineCode = (value.split('/')[2].split('!')[0] - 2) / 2
 
-    const list = this.annotations.get(spineCode)
-    if (list) list.push(annotation)
-    else this.annotations.set(spineCode, [annotation])
+    // A color/type change replaces the same mark; it must not leave another
+    // copy that create-overlay can paint again after the mark was deleted.
+    const list = (this.annotations.get(spineCode) ?? [])
+      .filter(item => item.value !== value)
+    list.push(annotation)
+    this.annotations.set(spineCode, list)
 
     this.annotationsByValue.set(value, annotation)
 
@@ -1305,21 +1318,24 @@ class Reader {
     }
   }
 
-  removeAnnotation(cfi) {
+  async removeAnnotation(cfi) {
     const annotation = this.annotationsByValue.get(cfi)
     if (!annotation) return
     const { value } = annotation
     const spineCode = (value.split('/')[2].split('!')[0] - 2) / 2
 
+    // Keep the registry on rendering failure so a retry can still locate and
+    // remove the visible mark, even if its database row has already gone.
+    await this.view.addAnnotation(annotation, true)
     const list = this.annotations.get(spineCode)
     if (list) {
-      const index = list.findIndex(a => a.id === annotation.id)
-      if (index !== -1) list.splice(index, 1)
+      // Also clear duplicates created by older versions of addAnnotation.
+      const remaining = list.filter(item => item.value !== value)
+      if (remaining.length) this.annotations.set(spineCode, remaining)
+      else this.annotations.delete(spineCode)
     }
 
     this.annotationsByValue.delete(value)
-
-    this.view.addAnnotation(annotation, true)
 
     if (annotation.type === 'bookmark' && this.#checkBookmark(annotation)) {
       this.#hideBookmarkIcon()
@@ -1339,6 +1355,9 @@ class Reader {
     desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
       enabled,
       ctrlBrackets: () => style.keyboardShortcutTurnPage === true,
+      // Android receives remote keys through the scoped Activity bridge. Do not
+      // also activate DOM keys behind a Flutter dialog or reader settings panel.
+      nativeKeysEnabled: () => !window.isFootNoteOpen(),
       focusOnPointerDown: enabled,
       hasSelection: () => this.view.renderer.getContents().some(
         ({ doc: content }) => !!content.getSelection()?.toString()),
@@ -1379,10 +1398,10 @@ class Reader {
             });
             // Remove old overlays only after the database transaction succeeds.
             if (!result) return;
-            for (const cfi of result.replacedCfis ?? []) this.removeAnnotation(cfi);
+            for (const cfi of result.replacedCfis ?? []) await this.removeAnnotation(cfi);
             const annotation = result.annotation;
             if (annotation && !this.annotationsByValue.has(annotation.value))
-              this.addAnnotation(annotation);
+              await this.addAnnotation(annotation);
             if (annotation && quickMarkEnabled && quickMarkShowMenu && range.startContainer.isConnected)
               await callFlutter('onAnnotationClick', {
                 annotation, quickMark: true, pos: getPosition(range),
@@ -1421,7 +1440,7 @@ class Reader {
       desktopInputDocuments.get(doc)?.cancel();
       quickMarkDocuments.get(doc)?.cancel();
     }
-    const { cfi, fraction, location, tocItem, pageItem, chapterLocation } = detail
+    const { cfi, fraction, location, tocItem, pageItem, chapterLocation, section } = detail
     const loc = pageItem
       ? `Page ${pageItem.label}`
       : `Loc ${location.current}`
@@ -1435,6 +1454,7 @@ class Reader {
       pageItem,
       location,
       chapterLocation,
+      section,
       bookmark: this.#bookmarkInfo,
     })
   }
@@ -1909,6 +1929,8 @@ const onRelocated = (currentInfo) => {
     chapterHref,
     chapterTotalPages,
     chapterCurrentPage,
+    currentChapter: (currentInfo.section?.current ?? 0) + 1,
+    totalChapters: currentInfo.section?.total ?? reader.view.book.sections.length,
     bookTotalPages,
     bookCurrentPage,
     cfi,
@@ -1924,7 +1946,10 @@ const onClickView = (x, y) => callFlutter('onClick', { x, y })
 
 const onExternalLink = (link) => callFlutter('onExternalLink', link)
 
-const onSetToc = () => callFlutter('onSetToc', reader.toc)
+const onSetToc = () => {
+  callFlutter('onSetToc', reader.toc)
+  callFlutter('onSetProgressChapters', reader.view.getProgressChapters())
+}
 
 const getMetadata = async book => {
   let cover = null

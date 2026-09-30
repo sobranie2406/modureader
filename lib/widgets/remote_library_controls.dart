@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/remote_library/library_view_options.dart';
 import 'package:flutter/material.dart';
 
@@ -9,17 +10,21 @@ class RemoteLibraryControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
-    String t(String cn, String en) => zh ? cn : en;
     String sortLabel(LibrarySortField field) => switch (field) {
-          LibrarySortField.name => t('书名 / 文件名', 'Book / file name'),
-          LibrarySortField.createdAt => t('添加时间', 'Date added'),
-          LibrarySortField.modifiedAt => t('修改时间', 'Date modified'),
-          LibrarySortField.size => t('文件大小', 'File size'),
+          LibrarySortField.name =>
+            ModuStrings.text(context, '书名 / 文件名', 'Book / file name'),
+          LibrarySortField.createdAt =>
+            ModuStrings.text(context, '添加时间', 'Date added'),
+          LibrarySortField.modifiedAt =>
+            ModuStrings.text(context, '修改时间', 'Date modified'),
+          LibrarySortField.size =>
+            ModuStrings.text(context, '文件大小', 'File size'),
         };
     String filterLabel(LibraryFileFilter filter) => switch (filter) {
-          LibraryFileFilter.all => t('全部文件', 'All files'),
-          LibraryFileFilter.books => t('仅书籍', 'Books only'),
+          LibraryFileFilter.all =>
+            ModuStrings.text(context, '全部文件', 'All files'),
+          LibraryFileFilter.books =>
+            ModuStrings.text(context, '仅书籍', 'Books only'),
           _ => filter.name.toUpperCase(),
         };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -47,8 +52,8 @@ class RemoteLibraryControls extends StatelessWidget {
                   options.ascending ? Icons.arrow_upward : Icons.arrow_downward,
                   size: 18),
               label: Text(options.ascending
-                  ? t('升序', 'Ascending')
-                  : t('降序', 'Descending')),
+                  ? ModuStrings.text(context, '升序', 'Ascending')
+                  : ModuStrings.text(context, '降序', 'Descending')),
             ),
             DropdownButton<LibraryFileFilter>(
               key: const ValueKey('library-file-filter'),
@@ -69,9 +74,9 @@ class RemoteLibraryControls extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               options.sort == LibrarySortField.createdAt
-                  ? t('添加时间使用服务器创建时间；未提供的排在末尾。',
+                  ? ModuStrings.text(context, '添加时间使用服务器创建时间；未提供的排在末尾。',
                       'Date added uses server creation time; missing dates sort last.')
-                  : t('使用服务器修改时间；未提供的排在末尾。',
+                  : ModuStrings.text(context, '使用服务器修改时间；未提供的排在末尾。',
                       'Uses server modification time; missing dates sort last.'),
               style: Theme.of(context).textTheme.bodySmall,
             )),

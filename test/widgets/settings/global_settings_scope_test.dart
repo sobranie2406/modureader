@@ -136,4 +136,48 @@ void main() {
     expect(Prefs().autoSync, true);
     expect(tester.takeException(), isNull);
   });
+
+  for (final includeSecrets in [false, true]) {
+    testWidgets('credential confirmation matches toggle $includeSecrets',
+        (tester) async {
+      await Prefs()
+          .prefs
+          .setString('onlineTtsConfig_openai', '{"key":"backup-test-key"}');
+      final file = await GlobalSettingsTransfer.export(Prefs(),
+          scope: 'tts', includeSecrets: true);
+      await Prefs()
+          .prefs
+          .setString('onlineTtsConfig_openai', '{"key":"local-test-key"}');
+      await open(tester);
+      if (includeSecrets) {
+        await tester.ensureVisible(find.byType(SwitchListTile));
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+      }
+      await preview(tester, GlobalSettingsTransfer.link(file));
+      expect(find.textContaining('文件中包含的账号及密钥也会一并恢复'), findsNothing);
+      expect(
+          find.textContaining(
+              includeSecrets ? '仅恢复文件实际包含的账号、密钥及供应商配置' : '迁移开关已关闭'),
+          findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(Prefs().getOnlineTtsConfig('openai')['key'], 'local-test-key');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('enabled credential toggle describes a file without credentials',
+      (tester) async {
+    final file = await GlobalSettingsTransfer.export(Prefs(), scope: 'tts');
+    await open(tester);
+    await tester.ensureVisible(find.byType(SwitchListTile));
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    await preview(tester, GlobalSettingsTransfer.link(file));
+    expect(find.textContaining('本次内容不包含账号或密钥配置'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

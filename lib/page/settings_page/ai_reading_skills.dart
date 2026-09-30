@@ -1,5 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_prompts.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/user_prompt.dart';
 import 'package:anx_reader/providers/user_prompts.dart';
 import 'package:anx_reader/service/ai/readany_skills.dart';
@@ -53,7 +54,7 @@ class _AiReadingSkillsSettingsState
     return settingsSections(
       sections: [
         SettingsSection(
-          title: const Text('内置阅读技能'),
+          title: Text(ModuStrings.text(context, '内置阅读技能', '内置阅读技能')),
           tiles: [
             CustomSettingsTile(
               child: Material(
@@ -61,7 +62,10 @@ class _AiReadingSkillsSettingsState
                 child: Column(
                   children: [
                     _hint(
-                      '阅读界面只显示已启用的技能。点击技能可查看和修改提示词。',
+                      ModuStrings.text(
+                          context,
+                          '阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。',
+                          '阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。'),
                     ),
                     for (final skill in readAnySkills) _builtInSkillTile(skill),
                   ],
@@ -71,7 +75,7 @@ class _AiReadingSkillsSettingsState
           ],
         ),
         SettingsSection(
-          title: const Text('自定义技能'),
+          title: Text(ModuStrings.text(context, '自定义技能', '自定义技能')),
           tiles: [
             CustomSettingsTile(
               child: Material(
@@ -84,7 +88,10 @@ class _AiReadingSkillsSettingsState
                         children: [
                           Expanded(
                             child: Text(
-                              '自定义技能会与内置技能一起出现在阅读 AI 面板中。',
+                              ModuStrings.text(
+                                  context,
+                                  '自定义技能会与内置技能一起出现在阅读 AI 面板中。',
+                                  '自定义技能会与内置技能一起出现在阅读 AI 面板中。'),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
@@ -93,15 +100,17 @@ class _AiReadingSkillsSettingsState
                             key: const ValueKey('add-custom-reading-skill'),
                             onPressed: () => _showCustomSkillDialog(),
                             icon: const Icon(Icons.add, size: 18),
-                            label: const Text('新建技能'),
+                            label:
+                                Text(ModuStrings.text(context, '新建技能', '新建技能')),
                           ),
                         ],
                       ),
                     ),
                     if (customSkills.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(24),
-                        child: Text('还没有自定义技能'),
+                        child: Text(
+                            ModuStrings.text(context, '还没有自定义技能', '还没有自定义技能')),
                       )
                     else
                       for (var index = 0; index < customSkills.length; index++)
@@ -117,19 +126,25 @@ class _AiReadingSkillsSettingsState
           ],
         ),
         SettingsSection(
-          title: const Text('功能提示词'),
+          title: Text(ModuStrings.text(context, '功能提示词', '功能提示词')),
           tiles: [
             CustomSettingsTile(
               child: Material(
                 color: Colors.transparent,
                 child: Column(
                   children: [
-                    _hint('这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。'),
+                    _hint(ModuStrings.text(
+                        context,
+                        '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。',
+                        '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。')),
                     for (final item in _featurePrompts)
                       ListTile(
+                        key: ValueKey('reading-feature-${item.prompt.name}'),
                         leading: const Icon(Icons.code_outlined),
-                        title: Text(item.name),
-                        subtitle: Text(item.description),
+                        title: Text(
+                            ModuStrings.text(context, item.name, item.name)),
+                        subtitle: Text(ModuStrings.text(
+                            context, item.description, item.description)),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _showFeaturePromptDialog(item),
                       ),
@@ -164,14 +179,15 @@ class _AiReadingSkillsSettingsState
     return ListTile(
       key: ValueKey('reading-skill-${skill.id}'),
       leading: Icon(_skillIcon(skill.id)),
-      title: Text(skill.name),
-      subtitle: Text(skill.description),
+      title: Text(skill.localizedName(Localizations.localeOf(context))),
+      subtitle:
+          Text(skill.localizedDescription(Localizations.localeOf(context))),
       onTap: () => _showBuiltInSkillDialog(skill),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            tooltip: '查看提示词',
+            tooltip: ModuStrings.text(context, '查看提示词', '查看提示词'),
             onPressed: () => _showBuiltInSkillDialog(skill),
             icon: const Icon(Icons.edit_outlined),
           ),
@@ -208,7 +224,7 @@ class _AiReadingSkillsSettingsState
             onChanged: (_) => notifier.toggleEnabled(skill.id),
           ),
           PopupMenuButton<_CustomSkillAction>(
-            tooltip: '更多操作',
+            tooltip: ModuStrings.text(context, '更多操作', '更多操作'),
             onSelected: (action) {
               switch (action) {
                 case _CustomSkillAction.edit:
@@ -226,23 +242,23 @@ class _AiReadingSkillsSettingsState
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CustomSkillAction.edit,
-                child: Text('编辑提示词'),
+                child: Text(ModuStrings.text(context, '编辑提示词', '编辑提示词')),
               ),
               PopupMenuItem(
                 value: _CustomSkillAction.moveUp,
                 enabled: index > 0,
-                child: const Text('上移'),
+                child: Text(ModuStrings.text(context, '上移', '上移')),
               ),
               PopupMenuItem(
                 value: _CustomSkillAction.moveDown,
                 enabled: index < count - 1,
-                child: const Text('下移'),
+                child: Text(ModuStrings.text(context, '下移', '下移')),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CustomSkillAction.delete,
-                child: Text('删除'),
+                child: Text(ModuStrings.text(context, '删除', '删除')),
               ),
             ],
           ),
@@ -251,27 +267,53 @@ class _AiReadingSkillsSettingsState
     );
   }
 
+  Future<void> _showEditorDialog({
+    required WidgetBuilder builder,
+    required List<TextEditingController> controllers,
+  }) async {
+    ModalRoute<dynamic>? route;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          route = ModalRoute.of(dialogContext);
+          return builder(dialogContext);
+        },
+      );
+    } finally {
+      // showDialog completes at pop, before its reverse transition ends.
+      // Keep the controllers alive until the editor has left the widget tree.
+      await route?.completed;
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    }
+  }
+
   Future<void> _showBuiltInSkillDialog(ReadAnySkill skill) async {
     final controller = TextEditingController(
-      text: ReadingSkillPromptStore.promptFor(skill),
+      text: ReadingSkillPromptStore.promptFor(skill,
+          locale: Localizations.localeOf(context)),
     );
-    await showDialog<void>(
-      context: context,
+    await _showEditorDialog(
+      controllers: [controller],
       builder: (dialogContext) => AlertDialog(
-        title: Text('${skill.name}·提示词'),
+        title: Text(
+            '${skill.localizedName(Localizations.localeOf(context))} · ${ModuStrings.text(context, '提示词', 'Prompt')}'),
         content: _promptEditor(controller),
         actions: [
           TextButton(
             onPressed: () {
               ReadingSkillPromptStore.reset(skill);
-              controller.text = skill.defaultPrompt.trim();
+              controller.text =
+                  skill.localizedPrompt(Localizations.localeOf(context)).trim();
               setState(() {});
             },
-            child: const Text('恢复默认'),
+            child: Text(ModuStrings.text(context, '恢复默认', '恢复默认')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
+            child: Text(ModuStrings.text(context, '取消', '取消')),
           ),
           FilledButton(
             onPressed: () {
@@ -281,33 +323,36 @@ class _AiReadingSkillsSettingsState
               Navigator.pop(dialogContext);
               setState(() {});
             },
-            child: const Text('保存'),
+            child: Text(ModuStrings.text(context, '保存', '保存')),
           ),
         ],
       ),
     );
-    controller.dispose();
   }
 
   Future<void> _showFeaturePromptDialog(_FeaturePrompt item) async {
-    final controller =
-        TextEditingController(text: Prefs().getAiPrompt(item.prompt));
-    await showDialog<void>(
-      context: context,
+    final controller = TextEditingController(
+        text: Prefs()
+            .getAiPrompt(item.prompt, locale: Localizations.localeOf(context)));
+    await _showEditorDialog(
+      controllers: [controller],
       builder: (dialogContext) => AlertDialog(
-        title: Text('${item.name}·提示词'),
+        title: Text(
+            '${ModuStrings.text(context, item.name, item.name)} · ${ModuStrings.text(context, '提示词', 'Prompt')}'),
         content: _promptEditor(controller, variables: item.variables),
         actions: [
           TextButton(
             onPressed: () {
               Prefs().deleteAiPrompt(item.prompt);
-              controller.text = item.prompt.getPrompt().trim();
+              controller.text = item.prompt
+                  .localizedPrompt(Localizations.localeOf(context))
+                  .trim();
             },
-            child: const Text('恢复默认'),
+            child: Text(ModuStrings.text(context, '恢复默认', '恢复默认')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
+            child: Text(ModuStrings.text(context, '取消', '取消')),
           ),
           FilledButton(
             onPressed: () {
@@ -316,12 +361,11 @@ class _AiReadingSkillsSettingsState
               Prefs().saveAiPrompt(item.prompt, prompt);
               Navigator.pop(dialogContext);
             },
-            child: const Text('保存'),
+            child: Text(ModuStrings.text(context, '保存', '保存')),
           ),
         ],
       ),
     );
-    controller.dispose();
   }
 
   Widget _promptEditor(
@@ -340,15 +384,15 @@ class _AiReadingSkillsSettingsState
               controller: controller,
               minLines: 8,
               maxLines: 16,
-              decoration: const InputDecoration(
-                labelText: '提示词',
+              decoration: InputDecoration(
+                labelText: ModuStrings.text(context, '提示词', '提示词'),
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
               ),
             ),
             if (variables.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const Text('可用变量'),
+              Text(ModuStrings.text(context, '可用变量', '可用变量')),
               Wrap(
                 spacing: 8,
                 children: [
@@ -381,11 +425,13 @@ class _AiReadingSkillsSettingsState
     final nameController = TextEditingController(text: skill?.name ?? '');
     final promptController = TextEditingController(text: skill?.content ?? '');
     var enabled = skill?.enabled ?? true;
-    await showDialog<void>(
-      context: context,
+    await _showEditorDialog(
+      controllers: [nameController, promptController],
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(skill == null ? '新建自定义技能' : '编辑自定义技能'),
+          title: Text(skill == null
+              ? ModuStrings.text(context, '新建技能', 'New skill')
+              : ModuStrings.text(context, '编辑提示词', 'Edit prompt')),
           content: SizedBox(
             width: 620,
             child: SingleChildScrollView(
@@ -396,8 +442,8 @@ class _AiReadingSkillsSettingsState
                     key: const ValueKey('custom-skill-name-editor'),
                     controller: nameController,
                     maxLength: 50,
-                    decoration: const InputDecoration(
-                      labelText: '技能名称',
+                    decoration: InputDecoration(
+                      labelText: ModuStrings.text(context, '技能名称', '技能名称'),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -408,15 +454,16 @@ class _AiReadingSkillsSettingsState
                     minLines: 8,
                     maxLines: 16,
                     maxLength: 4000,
-                    decoration: const InputDecoration(
-                      labelText: '提示词',
+                    decoration: InputDecoration(
+                      labelText: ModuStrings.text(context, '提示词', '提示词'),
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                     ),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('在阅读 AI 面板中启用'),
+                    title: Text(ModuStrings.text(
+                        context, '在阅读 AI 面板中启用', '在阅读 AI 面板中启用')),
                     value: enabled,
                     onChanged: (value) => setDialogState(() => enabled = value),
                   ),
@@ -427,7 +474,7 @@ class _AiReadingSkillsSettingsState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
+              child: Text(ModuStrings.text(context, '取消', '取消')),
             ),
             FilledButton(
               onPressed: () {
@@ -455,30 +502,29 @@ class _AiReadingSkillsSettingsState
                 }
                 Navigator.pop(dialogContext);
               },
-              child: const Text('保存'),
+              child: Text(ModuStrings.text(context, '保存', '保存')),
             ),
           ],
         ),
       ),
     );
-    nameController.dispose();
-    promptController.dispose();
   }
 
   Future<void> _confirmDeleteCustomSkill(UserPrompt skill) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('删除自定义技能'),
-        content: Text('确定删除“${skill.name}”吗？'),
+        title: Text(ModuStrings.text(context, '删除自定义技能', '删除自定义技能')),
+        content: Text(
+            '${ModuStrings.text(context, '确认删除此技能吗？', 'Delete this skill?')}\n${skill.name}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
+            child: Text(ModuStrings.text(context, '取消', '取消')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('删除'),
+            child: Text(ModuStrings.text(context, '删除', '删除')),
           ),
         ],
       ),
@@ -496,7 +542,9 @@ class _AiReadingSkillsSettingsState
 
   void _showRequiredFieldsMessage() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('技能名称和提示词不能为空')),
+      SnackBar(
+          content:
+              Text(ModuStrings.text(context, '技能名称和提示词不能为空', '技能名称和提示词不能为空'))),
     );
   }
 

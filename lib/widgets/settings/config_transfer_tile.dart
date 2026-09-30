@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
 import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
@@ -44,7 +45,7 @@ class ConfigTransferTile extends AbstractSettingsTile {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _text(context, '配置迁移', 'Configuration transfer'),
+            ModuStrings.text(context, '配置迁移', 'Configuration transfer'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 6),
@@ -99,7 +100,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
         qrError = error.message;
       } catch (_) {
         if (!context.mounted) return;
-        qrError = _text(context, '二维码生成失败', 'Could not generate QR code');
+        qrError =
+            ModuStrings.text(context, '二维码生成失败', 'Could not generate QR code');
       }
     }
     if (!context.mounted) return;
@@ -132,11 +134,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    _text(
-                      context,
-                      '在另一台设备扫描二维码，或复制下方配置代码导入。',
-                      'Scan this QR code on another device, or copy the configuration code below.',
-                    ),
+                    ModuStrings.text(context, '在另一台设备扫描二维码，或复制下方配置代码导入。',
+                        'Scan this QR code on another device, or copy the configuration code below.'),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -144,11 +143,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
                 ] else ...[
                   Text(
                     qrError ??
-                        _text(
-                          context,
-                          '当前平台暂不支持二维码，请复制配置代码。',
-                          'QR export is unavailable on this platform. Copy the code instead.',
-                        ),
+                        ModuStrings.text(context, '当前平台暂不支持二维码，请复制配置代码。',
+                            'QR export is unavailable on this platform. Copy the code instead.'),
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
@@ -156,7 +152,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
                 ],
                 InputDecorator(
                   decoration: InputDecoration(
-                    labelText: _text(context, '配置代码', 'Configuration code'),
+                    labelText:
+                        ModuStrings.text(context, '配置代码', 'Configuration code'),
                     border: const OutlineInputBorder(),
                   ),
                   child: ConstrainedBox(
@@ -184,11 +181,10 @@ class ConfigTransferTile extends AbstractSettingsTile {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        _text(
-                          context,
-                          '配置代码和二维码不是加密数据，可能包含密码或 API Key。',
-                          'The code and QR image are not encrypted and may contain passwords or API keys.',
-                        ),
+                        ModuStrings.text(
+                            context,
+                            '配置代码和二维码不是加密数据，可能包含密码或 API Key。',
+                            'The code and QR image are not encrypted and may contain passwords or API keys.'),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -205,16 +201,17 @@ class ConfigTransferTile extends AbstractSettingsTile {
               if (dialogContext.mounted) {
                 _message(
                   dialogContext,
-                  _text(context, '配置代码已复制', 'Configuration code copied'),
+                  ModuStrings.text(
+                      context, '配置代码已复制', 'Configuration code copied'),
                 );
               }
             },
             icon: const Icon(Icons.copy),
-            label: Text(_text(context, '复制代码', 'Copy code')),
+            label: Text(ModuStrings.text(context, '复制代码', 'Copy code')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(_text(context, '关闭', 'Close')),
+            child: Text(ModuStrings.text(context, '关闭', 'Close')),
           ),
         ],
       ),
@@ -276,9 +273,10 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
   String _friendlyError(Object error) {
     if (error is FormatException) return error.message.toString();
     if (error is PlatformException) {
-      return error.message ?? _text('二维码读取失败', 'Could not read QR code');
+      return error.message ??
+          ModuStrings.text(context, '二维码读取失败', 'Could not read QR code');
     }
-    return _text('配置格式无效', 'Invalid configuration');
+    return ModuStrings.text(context, '配置格式无效', 'Invalid configuration');
   }
 
   Future<void> _readQrImage() async {
@@ -364,13 +362,12 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
                   fontSize: 12,
                 ),
                 decoration: InputDecoration(
-                  labelText: _text('配置代码', 'Configuration code'),
+                  labelText:
+                      ModuStrings.text(context, '配置代码', 'Configuration code'),
                   hintText: widget.allowReadAny
-                      ? _text(
-                          '粘贴 modu: 或 readany: 开头的代码',
-                          'Paste a code beginning with modu: or readany:',
-                        )
-                      : _text('粘贴 modu: 开头的专用链接 / 配置代码',
+                      ? ModuStrings.text(context, '粘贴 modu: 或 readany: 开头的代码',
+                          'Paste a code beginning with modu: or readany:')
+                      : ModuStrings.text(context, '粘贴 modu: 开头的专用链接 / 配置代码',
                           'Paste a modu: configuration link / code'),
                   errorText: _errorText,
                   border: const OutlineInputBorder(),
@@ -387,7 +384,7 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
                         )
                       : const Icon(Icons.image_search),
                   label: Text(
-                    _text('从二维码图片读取', 'Read from QR image'),
+                    ModuStrings.text(context, '从二维码图片读取', 'Read from QR image'),
                   ),
                 ),
               ],
@@ -407,12 +404,13 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: Text(_text('取消', 'Cancel')),
+          child: Text(ModuStrings.text(context, '取消', 'Cancel')),
         ),
         FilledButton.icon(
           onPressed: _readingQr || _importing ? null : _importConfig,
           icon: const Icon(Icons.download),
-          label: Text(_text('导入配置', 'Import configuration')),
+          label:
+              Text(ModuStrings.text(context, '导入配置', 'Import configuration')),
         ),
       ],
     );

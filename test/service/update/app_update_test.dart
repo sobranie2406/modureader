@@ -53,19 +53,27 @@ class ControlledTransport extends UpdateTransport {
   Future<UpdateRelease> Function()? response;
   int checks = 0, downloads = 0;
   UpdateSource? checkedSource, downloadedSource;
+  bool? downloadAllowsFallback;
   @override
   Future<UpdateRelease> latest(String platform, String abi,
       {UpdateSource source = UpdateSource.github}) async {
     checkedSource = source;
     checks++;
-    return response != null ? await response!() : parse(releaseJson());
+    return response != null
+        ? await response!()
+        : UpdateRelease.parse(releaseJson(),
+            platform: platform,
+            abi: 'android_arm64',
+            fromMirror: source == UpdateSource.gitee);
   }
 
   @override
   Future<File> download(UpdateAsset a, Directory d, CancelToken c,
       void Function(int, int) progress,
-      {UpdateSource source = UpdateSource.github}) async {
+      {UpdateSource source = UpdateSource.github,
+      bool allowFallback = true}) async {
     downloadedSource = source;
+    downloadAllowsFallback = allowFallback;
     downloads++;
     await d.create(recursive: true);
     return File('${d.path}/${a.name}').writeAsBytes(payload);
@@ -198,8 +206,7 @@ void main() {
     expect(await directory.list().toList(), isEmpty);
   });
 
-  test(
-      'source choices default to GitHub and are independent, locked while busy',
+  test('one source controls checks and downloads and is locked while busy',
       () async {
     final t = ControlledTransport();
     final c = AppUpdateController(
@@ -208,26 +215,100 @@ void main() {
         installedVersion: () async => '1.0.8',
         directory: () async => directory);
     addTearDown(c.dispose);
-    expect(c.checkSource, UpdateSource.github);
-    expect(c.downloadSource, UpdateSource.github);
-    c.selectCheckSource(UpdateSource.gitee);
+    expect(c.source, UpdateSource.github);
+    c.selectSource(UpdateSource.gitee);
     await c.check();
     expect(t.checkedSource, UpdateSource.gitee);
-    expect(c.downloadSource, UpdateSource.github);
-    await c.download();
-    expect(t.downloadedSource, UpdateSource.github);
-    c.selectDownloadSource(UpdateSource.gitee);
+    expect(c.source, UpdateSource.gitee);
     await c.download();
     expect(t.downloadedSource, UpdateSource.gitee);
+    expect(t.downloadAllowsFallback, isFalse);
     final gate = Completer<UpdateRelease>();
     t.response = () => gate.future;
     final checking = c.check();
-    c.selectCheckSource(UpdateSource.github);
-    c.selectDownloadSource(UpdateSource.github);
-    expect(c.checkSource, UpdateSource.gitee);
-    expect(c.downloadSource, UpdateSource.gitee);
-    gate.complete(parse(releaseJson()));
+    c.selectSource(UpdateSource.github);
+    expect(c.source, UpdateSource.gitee);
+    gate.complete(UpdateRelease.parse(releaseJson(),
+        platform: 'android', abi: 'android_arm64', fromMirror: true));
     await checking;
+  });
+
+  test('changing source clears the old result and requires a fresh check',
+      () async {
+    final t = ControlledTransport();
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'android',
+        installedVersion: () async => '1.0.8',
+        directory: () async => directory);
+    addTearDown(c.dispose);
+    await c.check();
+    await c.download();
+    expect(c.phase, UpdatePhase.ready);
+    c.selectSource(UpdateSource.gitee);
+    expect(c.phase, UpdatePhase.idle);
+    expect(c.release, isNull);
+    expect(c.downloaded, isNull);
+    expect(c.checkedAt, isNull);
+    expect(c.progress, 0);
+    expect(c.error, isEmpty);
+    await c.download();
+    await c.install((_) async => throw StateError('must recheck first'));
+    expect(t.downloads, 1);
+    await c.check();
+    await c.download();
+    expect(t.checkedSource, UpdateSource.gitee);
+    expect(t.downloadedSource, UpdateSource.gitee);
+    expect(c.release!.fromMirror, isTrue);
+    expect(c.phase, UpdatePhase.ready);
+  });
+
+  test('check fallback switches both the source and subsequent download',
+      () async {
+    final adapter = Adapter((o) {
+      if (o.uri.toString() == moduReleaseApi) {
+        return ResponseBody.fromString('unavailable', 503);
+      }
+      if (o.uri.toString() == moduMirrorManifest) {
+        return ResponseBody.fromString(jsonEncode(mirrorJson()), 200);
+      }
+      return ResponseBody.fromBytes(payload, 200);
+    });
+    final c = AppUpdateController(
+        transport: transport(adapter),
+        platform: 'android',
+        abi: 'android_arm64',
+        installedVersion: () async => '1.0.8',
+        directory: () async => directory);
+    addTearDown(c.dispose);
+    await c.check();
+    expect(c.source, UpdateSource.gitee);
+    await c.download();
+    expect(c.phase, UpdatePhase.ready);
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduReleaseApi, moduMirrorManifest, c.release!.asset!.mirrorUrl]);
+  });
+
+  test('download failure cannot silently use a different check source',
+      () async {
+    final adapter = Adapter((o) => o.uri.toString() == moduReleaseApi
+        ? ResponseBody.fromString(jsonEncode(releaseJson()), 200)
+        : ResponseBody.fromString('unavailable', 503));
+    final c = AppUpdateController(
+        transport: transport(adapter),
+        platform: 'android',
+        abi: 'android_arm64',
+        installedVersion: () async => '1.0.8',
+        directory: () async => directory);
+    addTearDown(c.dispose);
+    await c.check();
+    await c.download();
+    expect(c.source, UpdateSource.github);
+    expect(c.phase, UpdatePhase.error);
+    expect(c.downloaded, isNull);
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduReleaseApi, asset.url]);
+    expect(await directory.list().toList(), isEmpty);
   });
 
   test('fetches fixed official endpoint with bounded metadata', () async {
@@ -1062,7 +1143,28 @@ void main() {
     expect(c.phase, UpdatePhase.available);
     expect(c.error, 'browser_github_opened');
     expect(c.downloaded, isNull);
-    await c.openBrowserDownload((_) async => true, mirrorOnly: true);
+    c.selectSource(UpdateSource.gitee);
+    c.release = UpdateRelease('1.1.3', '', macAsset, fromMirror: true);
+    await c.openBrowserDownload((_) async => true);
     expect(c.error, 'browser_gitee_opened');
+  });
+
+  test('macOS browser download keeps the checked source on endpoint failure',
+      () async {
+    final adapter = Adapter((_) => ResponseBody.fromString('unavailable', 503));
+    final c =
+        AppUpdateController(platform: 'macos', transport: transport(adapter))
+          ..currentVersion = '1.1.2'
+          ..release = UpdateRelease('1.1.3', '', macAsset);
+    addTearDown(c.dispose);
+    var opened = false;
+    await c.openBrowserDownload((_) async {
+      opened = true;
+      return true;
+    });
+    expect(opened, isFalse);
+    expect(c.phase, UpdatePhase.error);
+    expect(c.source, UpdateSource.github);
+    expect(adapter.requests.single.uri.toString(), macAsset.url);
   });
 }

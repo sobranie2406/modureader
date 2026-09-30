@@ -3,6 +3,7 @@ import 'dart:core';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
 
 import 'package:anx_reader/enums/ai_prompts.dart';
+import 'package:anx_reader/l10n/app_language.dart';
 import 'package:anx_reader/enums/bgimg_alignment.dart';
 import 'package:anx_reader/enums/bgimg_type.dart';
 import 'package:anx_reader/enums/bookshelf_folder_style.dart';
@@ -27,6 +28,7 @@ import 'package:anx_reader/models/bgimg.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/selection_search.dart';
+import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:anx_reader/models/chapter_split_presets.dart';
 import 'package:anx_reader/models/chapter_split_rule.dart';
 import 'package:anx_reader/models/font_model.dart';
@@ -38,6 +40,7 @@ import 'package:anx_reader/models/user_prompt.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:anx_reader/models/window_info.dart';
 import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
+import 'package:anx_reader/service/ai/reading_prompt_overrides.dart';
 import 'package:anx_reader/service/translate/index.dart';
 import 'package:anx_reader/utils/get_current_language_code.dart';
 import 'package:anx_reader/utils/log/common.dart';
@@ -80,13 +83,29 @@ const Set<String> _prefsExportSkipKeys = {
 };
 
 class Prefs extends ChangeNotifier {
+  SelectionToolbarConfig get selectionToolbar {
+    final raw = prefs.get('selectionToolbar');
+    try {
+      if (raw is String) return SelectionToolbarConfig.decode(raw);
+    } catch (_) {/* A damaged preference must not disable selection tools. */}
+    return const SelectionToolbarConfig();
+  }
+
+  Future<void> saveSelectionToolbar(SelectionToolbarConfig config) async {
+    if (!await prefs.setString('selectionToolbar', config.encode())) {
+      throw StateError('Could not save selection toolbar');
+    }
+    notifyListeners();
+  }
+
   int get selectionSearchZoomPercent {
     final value = prefs.get('selectionSearchZoomPercent');
     return value is int ? value.clamp(50, 200) : 100;
   }
 
   Future<void> saveSelectionSearchZoomPercent(int value) async {
-    if (!await prefs.setInt('selectionSearchZoomPercent', value.clamp(50, 200))) {
+    if (!await prefs.setInt(
+        'selectionSearchZoomPercent', value.clamp(50, 200))) {
       throw StateError('Could not save search zoom');
     }
     notifyListeners();
@@ -192,7 +211,7 @@ class Prefs extends ChangeNotifier {
     };
     for (final String key in prefs.getKeys()) {
       if (_prefsExportSkipKeys.contains(key)) continue;
-      final Object? value = prefs.get(key);
+      final Object? value = readingPromptOverride(key, prefs.get(key));
       final Map<String, Object?>? encoded = encodePrefsBackupEntry(value);
       if (encoded != null) {
         backup[key] = encoded;
@@ -250,14 +269,10 @@ class Prefs extends ChangeNotifier {
   }
 
   Locale? get locale {
-    String? localeCode = prefs.getString('locale');
-    if (localeCode == null || localeCode == 'System') return null;
-    if (localeCode.contains('-')) {
-      List<String> codes = localeCode.split('-');
-      return Locale(codes[0], codes[1]);
-    }
-    return Locale(localeCode);
+    return parseAppLocale(prefs.getString('locale'));
   }
+
+  Locale get effectiveLocale => currentAppLocale(locale);
 
   Future<void> saveLocaleToPrefs(String localeCode) async {
     await prefs.setString('locale', localeCode);
@@ -723,6 +738,10 @@ class Prefs extends ChangeNotifier {
   }
 
   set fullTextTranslateService(TranslateService service) {
+    if (service.isWebView) {
+      throw ArgumentError.value(service, 'service',
+          'Web pages cannot provide automatic full-text translation');
+    }
     prefs.setString('fullTextTranslateService', service.name);
     notifyListeners();
   }
@@ -734,7 +753,8 @@ class Prefs extends ChangeNotifier {
       prefs.setString('fullTextTranslateService', 'microsoftApi');
       return TranslateService.microsoftApi;
     }
-    return getTranslateService(serviceName);
+    final service = getTranslateService(serviceName);
+    return service.isWebView ? TranslateService.microsoftFree : service;
   }
 
   set translationAiService(String identifier) {
@@ -992,8 +1012,12 @@ class Prefs extends ChangeNotifier {
   }
 
   set selectedAiService(String identifier) {
+    saveSelectedAiService(identifier);
+  }
+
+  void saveSelectedAiService(String identifier, {bool notify = true}) {
     prefs.setString('selectedAiService', identifier);
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   String get selectedAiService {
@@ -1085,7 +1109,7 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
-  void saveAiProviders(List<dynamic> providers) {
+  void saveAiProviders(List<dynamic> providers, {bool notify = true}) {
     final jsonList = providers.map((p) {
       // Handle both AiProvider objects and already-serialized maps
       if (p is Map<String, dynamic>) {
@@ -1095,7 +1119,7 @@ class Prefs extends ChangeNotifier {
       }
     }).toList();
     prefs.setString('aiProviders', jsonEncode(jsonList));
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   List<dynamic> getAiProviders() {
@@ -1113,14 +1137,19 @@ class Prefs extends ChangeNotifier {
   }
 
   void saveAiPrompt(AiPrompts identifier, String prompt) {
-    prefs.setString('aiPrompt_${identifier.name}', prompt);
+    final key = 'aiPrompt_${identifier.name}';
+    if (readingPromptOverride(key, prompt) == null) {
+      prefs.remove(key);
+    } else {
+      prefs.setString(key, prompt);
+    }
     notifyListeners();
   }
 
-  String getAiPrompt(AiPrompts identifier) {
+  String getAiPrompt(AiPrompts identifier, {Locale? locale}) {
     String? aiPrompt = prefs.getString('aiPrompt_${identifier.name}');
-    if (aiPrompt == null) {
-      return identifier.getPrompt();
+    if (aiPrompt == null || identifier.isDefaultPrompt(aiPrompt)) {
+      return identifier.localizedPrompt(locale ?? effectiveLocale);
     }
     return aiPrompt;
   }
@@ -1270,7 +1299,13 @@ class Prefs extends ChangeNotifier {
   void setReadAnySkillPrompt(String skillId, String prompt) {
     final prompts = Map<String, String>.from(readAnySkillPrompts);
     prompts[skillId] = prompt;
-    prefs.setString(_readAnySkillPromptsKey, jsonEncode(prompts));
+    final overrides =
+        readingPromptOverride(_readAnySkillPromptsKey, jsonEncode(prompts));
+    if (overrides == null) {
+      prefs.remove(_readAnySkillPromptsKey);
+    } else {
+      prefs.setString(_readAnySkillPromptsKey, overrides as String);
+    }
     notifyListeners();
   }
 

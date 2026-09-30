@@ -25,6 +25,7 @@ Future<void> showContextMenu(
     {String? contextText}) async {
   final playerKey = epubPlayerKey.currentState;
   if (playerKey == null) return;
+  final parentRoute = ModalRoute.of(context);
   bool isNewNote = false;
 
   if (Prefs().autoMarkSelection && annoId == null) {
@@ -48,6 +49,11 @@ Future<void> showContextMenu(
     playerKey.addAnnotation(bookNote);
     annoId = id;
     isNewNote = true;
+  }
+
+  if (!Prefs().selectionToolbar.enabled) {
+    playerKey.removeOverlay();
+    return;
   }
 
   final renderBox =
@@ -157,6 +163,7 @@ Future<void> showContextMenu(
       verticalMargin: verticalMargin,
       gap: gap,
       initialBottomInset: keyboardInset,
+      parentRoute: parentRoute,
     );
   });
 
@@ -259,6 +266,7 @@ class _ContextMenuOverlay extends StatefulWidget {
     required this.verticalMargin,
     required this.gap,
     required this.initialBottomInset,
+    this.parentRoute,
   });
 
   final Axis axis;
@@ -278,6 +286,7 @@ class _ContextMenuOverlay extends StatefulWidget {
   final double verticalMargin;
   final double gap;
   final double initialBottomInset;
+  final ModalRoute<dynamic>? parentRoute;
 
   @override
   State<_ContextMenuOverlay> createState() => _ContextMenuOverlayState();
@@ -514,7 +523,7 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
                                 ExcerptMenu(
                                   annoCfi: widget.annoCfi,
                                   annoContent: widget.annoContent,
-                                  id: widget.annoId,
+                                  id: _noteId,
                                   onClose: widget.onClose,
                                   footnote: widget.footnote,
                                   decoration: widget.decoration,
@@ -524,6 +533,7 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
                                   onNoteCreated: _handleNoteCreated,
                                   axis: widget.axis,
                                   reverse: _reverse,
+                                  parentRoute: widget.parentRoute,
                                 ),
                               ],
                             ),

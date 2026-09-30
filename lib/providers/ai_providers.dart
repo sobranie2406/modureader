@@ -46,7 +46,7 @@ class AiProviders extends _$AiProviders {
           contextTurns: contextTurns,
         );
       }).toList();
-      if (parametersMigrated) Prefs().saveAiProviders(providers);
+      if (parametersMigrated) Prefs().saveAiProviders(providers, notify: false);
       return _reconcileBuiltinProviders(providers);
     } catch (e) {
       // If parsing fails, reinitialize
@@ -60,8 +60,10 @@ class AiProviders extends _$AiProviders {
     final providers = defaultServices.map(_providerFromOption).toList();
 
     // Save to storage
-    Prefs().saveAiProviders(providers);
-    _ensureValidSelection(providers);
+    // Provider initialization can happen during a widget build. Its initial
+    // state already reaches consumers; do not invalidate ancestor widgets.
+    Prefs().saveAiProviders(providers, notify: false);
+    _ensureValidSelection(providers, notify: false);
 
     return providers;
   }
@@ -95,8 +97,8 @@ class AiProviders extends _$AiProviders {
       }
     }
 
-    if (changed) Prefs().saveAiProviders(providers);
-    _ensureValidSelection(providers);
+    if (changed) Prefs().saveAiProviders(providers, notify: false);
+    _ensureValidSelection(providers, notify: false);
     return providers;
   }
 
@@ -155,7 +157,7 @@ class AiProviders extends _$AiProviders {
     };
   }
 
-  void _ensureValidSelection(List<AiProvider> providers) {
+  void _ensureValidSelection(List<AiProvider> providers, {bool notify = true}) {
     final selectedId = Prefs().selectedAiService;
     final isValid = providers.any(
       (provider) => provider.id == selectedId && provider.enabled,
@@ -163,7 +165,9 @@ class AiProviders extends _$AiProviders {
     if (isValid) return;
     final enabled = providers.where((provider) => provider.enabled).toList();
     final replacement = enabled.isEmpty ? '' : enabled.first.id;
-    if (replacement != selectedId) Prefs().selectedAiService = replacement;
+    if (replacement != selectedId) {
+      Prefs().saveSelectedAiService(replacement, notify: notify);
+    }
   }
 
   /// Get the currently selected provider

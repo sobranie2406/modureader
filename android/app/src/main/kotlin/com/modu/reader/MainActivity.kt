@@ -4,11 +4,37 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.WindowInsets
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
+    private val readerKeys = ReaderPageKeys()
+    private var pageKeyChannel: MethodChannel? = null
+    private var readerKeysActive = false
+    private var readerVolumeKeys = false
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val imeVisible = Build.VERSION.SDK_INT >= 30 &&
+            window.decorView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true
+        val result = readerKeys.handle(
+            event.keyCode, event.action, event.repeatCount, event.deviceId,
+            readerKeysActive && hasWindowFocus() && !imeVisible,
+            readerVolumeKeys,
+            event.isCtrlPressed || event.isAltPressed || event.isShiftPressed || event.isMetaPressed,
+        )
+        if (result == -1 || result == 1) pageKeyChannel?.invokeMethod("turnPage", result)
+        // Do not also deliver handled keys to Flutter/WebView (double paging).
+        return if (result != ReaderPageKeys.PASS) true else super.dispatchKeyEvent(event)
+    }
+
+    override fun onPause() {
+        readerKeysActive = false
+        readerKeys.reset()
+        super.onPause()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,6 +51,17 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        readerKeysActive = false
+        pageKeyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "com.modu.reader/page_keys").also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                if (call.method == "configure") {
+                    readerKeysActive = call.argument<Boolean>("active") == true
+                    readerVolumeKeys = call.argument<Boolean>("volume") == true
+                    result.success(null)
+                } else result.notImplemented()
+            }
+        }
         // A per-window override needs no WRITE_SETTINGS permission and has no
         // effect on another app or on the system's saved brightness setting.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,

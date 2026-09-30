@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/selection_search.dart';
 import 'package:flutter/material.dart';
@@ -24,8 +25,8 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
       await Prefs().saveSelectionSearchSettings(config);
     } catch (_) {
       if (mounted) {
-        setState(() =>
-            _error = t('保存失败，请检查搜索配置后重试。', 'Could not save search settings.'));
+        setState(() => _error = ModuStrings.text(
+            context, '保存失败，请检查搜索配置后重试。', 'Could not save search settings.'));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -52,10 +53,10 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: Text(t('取消', 'Cancel'))),
+                    child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
                 FilledButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: Text(t('删除', 'Delete'))),
+                    child: Text(ModuStrings.text(context, '删除', 'Delete'))),
               ],
             ));
     if (confirmed != true || !mounted) return;
@@ -74,7 +75,9 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
         return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             children: [
-              Text(t('选词搜索将在默读内打开。选择默认引擎，也可以在搜索窗口中随时切换。关键词会发送给所选网站，网站可用性取决于网络。',
+              Text(ModuStrings.text(
+                  context,
+                  '选词搜索将在默读内打开。选择默认引擎，也可以在搜索窗口中随时切换。关键词会发送给所选网站，网站可用性取决于网络。',
                   'Selection search opens inside Modu. Choose a default or switch in the search window. The selected website receives your query; availability depends on your network.')),
               const SizedBox(height: 16),
               for (final engine in config.engines)
@@ -91,11 +94,12 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
                   trailing: config.custom.any((e) => e.id == engine.id)
                       ? Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(
-                              tooltip: t('编辑', 'Edit'),
+                              tooltip: ModuStrings.text(context, '编辑', 'Edit'),
                               onPressed: _busy ? null : () => _edit(engine),
                               icon: const Icon(Icons.edit_outlined)),
                           IconButton(
-                              tooltip: t('删除', 'Delete'),
+                              tooltip:
+                                  ModuStrings.text(context, '删除', 'Delete'),
                               onPressed: _busy ? null : () => _delete(engine),
                               icon: const Icon(Icons.delete_outline)),
                         ])
@@ -106,9 +110,11 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
                       ? null
                       : () => _edit(),
                   icon: const Icon(Icons.add),
-                  label: Text(t('添加自定义搜索引擎', 'Add custom search engine'))),
+                  label: Text(ModuStrings.text(
+                      context, '添加自定义搜索引擎', 'Add custom search engine'))),
               const SizedBox(height: 12),
-              Text(t(
+              Text(ModuStrings.text(
+                  context,
                   '可添加最多 20 个自定义引擎。使用 {query} 表示选中的文字，例如 https://www.baidu.com/s?wd={query}。配置可随全局设置导出。',
                   'Add up to 20 engines. Use {query} for selected text, e.g. https://www.baidu.com/s?wd={query}. These settings are included in global settings exports.')),
               if (_error != null)
@@ -147,7 +153,8 @@ class _EngineEditorState extends State<_EngineEditor> {
     try {
       engine.validate();
     } catch (_) {
-      setState(() => _error = t(
+      setState(() => _error = ModuStrings.text(
+          context,
           '请填写名称和含 {query} 的 HTTP(S) 地址；占位符不能放在域名中，地址不能含账号密码。',
           'Enter a name and an HTTP(S) URL containing {query} in its path or query, without credentials.'));
       return;
@@ -157,7 +164,8 @@ class _EngineEditorState extends State<_EngineEditor> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(t('自定义搜索引擎', 'Custom search engine')),
+        title:
+            Text(ModuStrings.text(context, '自定义搜索引擎', 'Custom search engine')),
         content: SizedBox(
             width: 460,
             child: SingleChildScrollView(
@@ -165,7 +173,8 @@ class _EngineEditorState extends State<_EngineEditor> {
               TextField(
                   controller: _name,
                   maxLength: 60,
-                  decoration: InputDecoration(labelText: t('名称', 'Name'))),
+                  decoration: InputDecoration(
+                      labelText: ModuStrings.text(context, '名称', 'Name'))),
               TextField(
                   controller: _url,
                   maxLength: 2048,
@@ -174,8 +183,8 @@ class _EngineEditorState extends State<_EngineEditor> {
                   autocorrect: false,
                   enableSuggestions: false,
                   decoration: InputDecoration(
-                      labelText:
-                          t('搜索地址（含 {query}）', 'Search URL (with {query})'))),
+                      labelText: ModuStrings.text(context, '搜索地址（含 {query}）',
+                          'Search URL (with {query})'))),
               if (_error != null)
                 Text(_error!,
                     style:
@@ -184,8 +193,10 @@ class _EngineEditorState extends State<_EngineEditor> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(t('取消', 'Cancel'))),
-          FilledButton(onPressed: _save, child: Text(t('保存', 'Save')))
+              child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
+          FilledButton(
+              onPressed: _save,
+              child: Text(ModuStrings.text(context, '保存', 'Save')))
         ],
       );
 }

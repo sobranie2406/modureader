@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 
 import 'package:anx_reader/page/settings_page/remote_library.dart';
@@ -52,7 +53,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
     try {
       await LibraryViewOptionsStore.save(options);
     } catch (_) {
-      _message(t('排序已生效，但无法保存到本机。',
+      _message(ModuStrings.text(context, '排序已生效，但无法保存到本机。',
           'Sorting applied, but preferences could not be saved.'));
     }
   }
@@ -113,8 +114,9 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         context,
         MaterialPageRoute(
             builder: (_) => Scaffold(
-                appBar:
-                    AppBar(title: Text(t('远程书库设置', 'Remote library settings'))),
+                appBar: AppBar(
+                    title: Text(ModuStrings.text(
+                        context, '远程书库设置', 'Remote library settings'))),
                 body: const RemoteLibrarySettings())));
     if (mounted) await _connect();
   }
@@ -160,22 +162,22 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       if (duplicate != null &&
           !duplicate.isDeleted &&
           File(duplicate.fileFullPath).existsSync()) {
-        _message(t('书架中已存在这本书，无需重复导入。',
+        _message(ModuStrings.text(context, '书架中已存在这本书，无需重复导入。',
             'This book is already available on your bookshelf.'));
       } else {
         await importBook(file, ref,
             onImported: () =>
                 container.read(bookListProvider.notifier).refresh());
-        _message(
-            t('已下载并导入本地书架。', 'Downloaded and imported to your bookshelf.'));
+        _message(ModuStrings.text(context, '已下载并导入本地书架。',
+            'Downloaded and imported to your bookshelf.'));
       }
       if (mounted) setState(() => _imported.add(entry.uri.toString()));
     } catch (error) {
       if (mounted)
         _message(token.isCancelled
-            ? t('下载已取消。', 'Download cancelled.')
+            ? ModuStrings.text(context, '下载已取消。', 'Download cancelled.')
             : _importing
-                ? t('文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。',
+                ? ModuStrings.text(context, '文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。',
                     'Download completed, but import failed. Check the format, encryption or file integrity.')
                 : libraryError(error, zh));
     } finally {
@@ -208,8 +210,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
 
   String _entrySubtitle(LibraryEntry entry) {
     final info = entry.isDirectory
-        ? t('文件夹', 'Folder')
-        : '${_size(entry.size)}${entry.isBook ? '' : t(' · 不支持导入', ' · Import not supported')}';
+        ? ModuStrings.text(context, '文件夹', 'Folder')
+        : '${_size(entry.size)}${entry.isBook ? '' : ModuStrings.text(context, ' · 不支持导入', ' · Import not supported')}';
     final date = switch (_viewOptions.sort) {
       LibrarySortField.createdAt => entry.createdAt,
       LibrarySortField.modifiedAt => entry.modifiedAt,
@@ -220,9 +222,9 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       return info;
     }
     final label = _viewOptions.sort == LibrarySortField.createdAt
-        ? t('添加', 'Added')
-        : t('修改', 'Modified');
-    return '$info · $label: ${date == null ? t('未提供', 'Not provided') : DateFormat('yyyy-MM-dd HH:mm').format(date.toLocal())}';
+        ? ModuStrings.text(context, '添加', 'Added')
+        : ModuStrings.text(context, '修改', 'Modified');
+    return '$info · $label: ${date == null ? ModuStrings.text(context, '未提供', 'Not provided') : DateFormat('yyyy-MM-dd HH:mm').format(date.toLocal())}';
   }
 
   @override
@@ -231,25 +233,30 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
     final root = _client?.root;
     final visible = _viewOptions.apply(_entries, query: _filter);
     return Scaffold(
-        appBar: AppBar(title: Text(t('远程书库', 'Remote library')), actions: [
-          IconButton(
-              tooltip: t('刷新', 'Refresh'),
-              onPressed: _loading
-                  ? null
-                  : () => directory == null ? _connect() : _browse(directory),
-              icon: const Icon(Icons.refresh)),
-          IconButton(
-              tooltip: t('远程书库设置', 'Remote library settings'),
-              onPressed: _activeName == null ? _settings : null,
-              icon: const Icon(Icons.settings_outlined)),
-        ]),
+        appBar: AppBar(
+            title: Text(ModuStrings.text(context, '远程书库', 'Remote library')),
+            actions: [
+              IconButton(
+                  tooltip: ModuStrings.text(context, '刷新', 'Refresh'),
+                  onPressed: _loading
+                      ? null
+                      : () =>
+                          directory == null ? _connect() : _browse(directory),
+                  icon: const Icon(Icons.refresh)),
+              IconButton(
+                  tooltip: ModuStrings.text(
+                      context, '远程书库设置', 'Remote library settings'),
+                  onPressed: _activeName == null ? _settings : null,
+                  icon: const Icon(Icons.settings_outlined)),
+            ]),
         body: Column(children: [
           if (root != null)
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(children: [
                   IconButton(
-                      tooltip: t('上一级', 'Parent folder'),
+                      tooltip:
+                          ModuStrings.text(context, '上一级', 'Parent folder'),
                       icon: const Icon(Icons.arrow_upward),
                       onPressed:
                           _loading || directory == null || directory == root
@@ -257,7 +264,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                               : () => _browse(directory.resolve('../'))),
                   TextButton(
                       onPressed: _loading ? null : () => _browse(root),
-                      child: Text(t('根目录', 'Root'))),
+                      child: Text(ModuStrings.text(context, '根目录', 'Root'))),
                   Expanded(
                       child: SelectableText(
                           directory == null
@@ -272,8 +279,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                     onChanged: (value) => setState(() => _filter = value),
                     decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search),
-                        hintText:
-                            t('筛选当前目录中的文件', 'Filter files in this folder'),
+                        hintText: ModuStrings.text(context, '筛选当前目录中的文件',
+                            'Filter files in this folder'),
                         border: const OutlineInputBorder()))),
           if (root != null)
             Padding(
@@ -293,7 +300,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                     TextButton(
                         onPressed:
                             _importing ? null : () => _download?.cancel(),
-                        child: Text(t('取消', 'Cancel')))
+                        child: Text(ModuStrings.text(context, '取消', 'Cancel')))
                   ]),
                   LinearProgressIndicator(
                       value: _importing || _total <= 0
@@ -314,7 +321,9 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                     const SizedBox(height: 16),
                                     OutlinedButton(
                                         onPressed: _settings,
-                                        child: Text(t('检查连接设置',
+                                        child: Text(ModuStrings.text(
+                                            context,
+                                            '检查连接设置',
                                             'Check connection settings')))
                                   ])))
                       : root == null
@@ -326,18 +335,24 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                       size: 64),
                                   const SizedBox(height: 16),
                                   Text(
-                                      t('连接 WebDAV，浏览远程目录并将书籍下载到本地书架。',
+                                      ModuStrings.text(
+                                          context,
+                                          '连接 WebDAV，浏览远程目录并将书籍下载到本地书架。',
                                           'Connect WebDAV to browse and import books into your local bookshelf.'),
                                       textAlign: TextAlign.center),
                                   const SizedBox(height: 16),
                                   FilledButton(
                                       onPressed: _settings,
-                                      child: Text(t('配置书库 WebDAV',
+                                      child: Text(ModuStrings.text(
+                                          context,
+                                          '配置书库 WebDAV',
                                           'Configure library WebDAV')))
                                 ]))
                           : visible.isEmpty
                               ? Center(
-                                  child: Text(t('当前目录没有匹配的文件。',
+                                  child: Text(ModuStrings.text(
+                                      context,
+                                      '当前目录没有匹配的文件。',
                                       'No matching files in this folder.')))
                               : ListView.builder(
                                   padding: EdgeInsets.only(
@@ -368,9 +383,13 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                                 ? null
                                                 : IconButton(
                                                     tooltip: imported
-                                                        ? t('本次已导入',
+                                                        ? ModuStrings.text(
+                                                            context,
+                                                            '本次已导入',
                                                             'Imported this session')
-                                                        : t('下载并导入书架',
+                                                        : ModuStrings.text(
+                                                            context,
+                                                            '下载并导入书架',
                                                             'Download and import'),
                                                     onPressed: _activeName !=
                                                                 null ||
@@ -387,7 +406,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
             Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
-                    t('下载期间离开此标签页会取消下载；导入开始后请等待完成。',
+                    ModuStrings.text(context, '下载期间离开此标签页会取消下载；导入开始后请等待完成。',
                         'Leaving this tab cancels a download; please wait once import starts.'),
                     style: Theme.of(context).textTheme.bodySmall)),
         ]));

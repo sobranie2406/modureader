@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -129,9 +130,7 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
           child: PopupMenuButton<MindmapExportFormat>(
             key: const ValueKey('mindmap-export'),
             enabled: !_exporting && _document != null,
-            tooltip: Localizations.localeOf(context).languageCode == 'zh'
-                ? '导出思维导图'
-                : 'Export mind map',
+            tooltip: ModuStrings.text(context, '导出思维导图', 'Export mind map'),
             onSelected: _export,
             itemBuilder: (_) => MindmapExportFormat.values
                 .map((format) => PopupMenuItem(
@@ -150,9 +149,7 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
                 else
                   const Icon(Icons.file_download_outlined, size: 20),
                 const SizedBox(width: 6),
-                Text(Localizations.localeOf(context).languageCode == 'zh'
-                    ? '导出'
-                    : 'Export'),
+                Text(ModuStrings.text(context, '导出', 'Export')),
               ]),
             ),
           ),
@@ -199,9 +196,10 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(zh
-                ? '导出失败，请重试。大型导图可选择 SVG 或 Markdown。'
-                : 'Export failed. Try again, or use SVG / Markdown for large maps.')));
+            content: Text(ModuStrings.text(
+                context,
+                '导出失败，请重试。大型导图可选择 SVG 或 Markdown。',
+                'Export failed. Try again, or use SVG / Markdown for large maps.'))));
       }
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -238,7 +236,6 @@ class _MindmapViewerState extends State<MindmapViewer> {
   Size _viewportSize = Size.zero;
   bool _fitScheduled = false;
 
-  bool get _zh => Localizations.localeOf(context).languageCode == 'zh';
 
   @override
   void initState() {
@@ -398,7 +395,7 @@ class _MindmapViewerState extends State<MindmapViewer> {
             children: [
               IconButton(
                 key: const ValueKey('mindmap-zoom-out'),
-                tooltip: _zh ? '缩小' : 'Zoom out',
+                tooltip: ModuStrings.text(context, '缩小', 'Zoom out'),
                 onPressed: () => _zoom(1 / 1.25),
                 icon: const Icon(Icons.zoom_out),
               ),
@@ -412,32 +409,32 @@ class _MindmapViewerState extends State<MindmapViewer> {
               ),
               IconButton(
                 key: const ValueKey('mindmap-zoom-in'),
-                tooltip: _zh ? '放大' : 'Zoom in',
+                tooltip: ModuStrings.text(context, '放大', 'Zoom in'),
                 onPressed: () => _zoom(1.25),
                 icon: const Icon(Icons.zoom_in),
               ),
               IconButton(
                 key: const ValueKey('mindmap-fit'),
-                tooltip: _zh ? '适应窗口' : 'Fit to window',
+                tooltip: ModuStrings.text(context, '适应窗口', 'Fit to window'),
                 onPressed: _fit,
                 icon: const Icon(Icons.fit_screen),
               ),
               IconButton(
                 key: const ValueKey('mindmap-expand-all'),
-                tooltip: _zh ? '全部展开' : 'Expand all',
+                tooltip: ModuStrings.text(context, '全部展开', 'Expand all'),
                 onPressed: () => _setAll(false),
                 icon: const Icon(Icons.unfold_more),
               ),
               IconButton(
                 key: const ValueKey('mindmap-collapse-all'),
-                tooltip: _zh ? '全部收起' : 'Collapse all',
+                tooltip: ModuStrings.text(context, '全部收起', 'Collapse all'),
                 onPressed: () => _setAll(true),
                 icon: const Icon(Icons.unfold_less),
               ),
               if (!widget.fullscreen)
                 IconButton(
                   key: const ValueKey('mindmap-fullscreen'),
-                  tooltip: _zh ? '全屏查看' : 'Full screen',
+                  tooltip: ModuStrings.text(context, '全屏查看', 'Full screen'),
                   onPressed: _openFullscreen,
                   icon: const Icon(Icons.fullscreen),
                 ),
@@ -542,7 +539,8 @@ class _MindmapNodeCard extends StatelessWidget {
                       ? (zh
                           ? '展开 $childCount 个分支'
                           : 'Expand $childCount branches')
-                      : (zh ? '收起分支' : 'Collapse branches'),
+                      : (ModuStrings.text(
+                          context, '收起分支', 'Collapse branches')),
                   child: Icon(
                       collapsed
                           ? Icons.add_circle_outline

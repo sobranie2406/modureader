@@ -10,12 +10,14 @@ class FakeTransport extends UpdateTransport {
       UpdateAsset('Modu-1.0.9-android-arm64.apk', '', 200, 'test'));
   bool offline = false;
   final browserRequests = <bool>[];
+  final browserFallback = <bool>[];
   final checkRequests = <UpdateSource>[];
   Completer<UpdateRelease>? gate;
   @override
   Future<Uri> browserDownloadUrl(UpdateAsset asset,
-      {bool mirrorOnly = false}) async {
+      {bool mirrorOnly = false, bool allowFallback = true}) async {
     browserRequests.add(mirrorOnly);
+    browserFallback.add(allowFallback);
     return Uri.parse(mirrorOnly ? asset.mirrorUrl! : asset.url);
   }
 
@@ -25,7 +27,8 @@ class FakeTransport extends UpdateTransport {
     checkRequests.add(source);
     if (gate != null) return gate!.future;
     if (offline) throw const SocketException('offline');
-    return value;
+    return UpdateRelease(value.version, value.notes, value.asset,
+        fromMirror: value.fromMirror || source == UpdateSource.gitee);
   }
 }
 
@@ -51,7 +54,7 @@ void main() {
   }
 
   testWidgets(
-      'source selectors default to GitHub, explicit Gitee check is dispatched',
+      'one selector defaults to GitHub and controls checking and downloading',
       (tester) async {
     final t = FakeTransport();
     final c = AppUpdateController(
@@ -63,10 +66,11 @@ void main() {
     expect(
         tester
             .widget<DropdownButton<UpdateSource>>(
-                find.byKey(const ValueKey('update-check-source')))
+                find.byKey(const ValueKey('update-source')))
             .value,
         UpdateSource.github);
-    await choose(tester, 'update-check-source', 'Gitee');
+    expect(find.byType(DropdownButton<UpdateSource>), findsOneWidget);
+    await choose(tester, 'update-source', 'Gitee');
     await tester.ensureVisible(find.text('Check for updates'));
     await tester.tap(find.text('Check for updates'));
     await tester.pumpAndSettle();
@@ -74,21 +78,21 @@ void main() {
     expect(
         tester
             .widget<DropdownButton<UpdateSource>>(
-                find.byKey(const ValueKey('update-download-source')))
+                find.byKey(const ValueKey('update-source')))
             .value,
-        UpdateSource.github);
-    await choose(tester, 'update-download-source', 'Gitee');
-    expect(c.downloadSource, UpdateSource.gitee);
+        UpdateSource.gitee);
+    expect(find.byType(DropdownButton<UpdateSource>), findsOneWidget);
+    expect(find.byKey(const ValueKey('update-download-source')), findsNothing);
+    expect(c.source, UpdateSource.gitee);
     t.gate = Completer<UpdateRelease>();
     final pending = c.check();
     await tester.pump();
-    for (final id in ['update-check-source', 'update-download-source']) {
-      expect(
-          tester
-              .widget<DropdownButton<UpdateSource>>(find.byKey(ValueKey(id)))
-              .onChanged,
-          isNull);
-    }
+    expect(
+        tester
+            .widget<DropdownButton<UpdateSource>>(
+                find.byKey(const ValueKey('update-source')))
+            .onChanged,
+        isNull);
     t.gate!.complete(t.value);
     await pending;
     await tester.pumpAndSettle();
@@ -118,11 +122,17 @@ void main() {
       opened.add(uri);
       return true;
     });
-    await choose(tester, 'update-download-source', 'Gitee');
+    await choose(tester, 'update-source', 'Gitee');
+    expect(find.text('Download in browser'), findsNothing);
+    await tester.ensureVisible(find.text('Check for updates'));
+    await tester.tap(find.text('Check for updates'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Download in browser'));
     await tester.tap(find.text('Download in browser'));
     await tester.pumpAndSettle();
     expect(t.browserRequests, [true]);
+    expect(t.browserFallback, [false]);
+    expect(t.checkRequests, [UpdateSource.github, UpdateSource.gitee]);
     expect(opened.single.toString(), t.value.asset!.mirrorUrl);
     expect(find.text('Install update'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -145,8 +155,8 @@ void main() {
     expect(find.text('Install update'), findsNothing);
     expect(find.text('Update available'), findsOneWidget);
     expect(find.text('Release information source: GitHub'), findsOneWidget);
-    expect(find.textContaining('Checks GitHub first'), findsOneWidget);
-    expect(find.textContaining('downloads from GitHub first'), findsOneWidget);
+    expect(find.textContaining('Checking and downloading use the same source'),
+        findsOneWidget);
   });
 
   testWidgets('displays mirror metadata source without claiming installation',
@@ -161,6 +171,13 @@ void main() {
     await c.check();
     await show(tester, c);
     expect(find.text('Release information source: Gitee'), findsOneWidget);
+    expect(c.source, UpdateSource.gitee);
+    expect(
+        tester
+            .widget<DropdownButton<UpdateSource>>(
+                find.byKey(const ValueKey('update-source')))
+            .value,
+        UpdateSource.gitee);
     expect(find.text('Download update'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
   });
@@ -229,7 +246,7 @@ void main() {
   });
 
   testWidgets(
-      'macOS uses browser and offers manual mirror, never cached install',
+      'macOS uses browser and rechecks before switching source, never cached install',
       (tester) async {
     final t = FakeTransport()
       ..value = const UpdateRelease(
@@ -264,11 +281,20 @@ void main() {
     expect(opened.single.toString(), t.value.asset!.url);
     expect(find.textContaining('GitHub download opened'), findsOneWidget);
     expect(c.downloaded, isNull);
-    await tester.ensureVisible(find.text('Download from Gitee'));
-    await tester.tap(find.text('Download from Gitee'));
+    expect(find.text('Download from Gitee'), findsNothing);
+    await choose(tester, 'update-source', 'Gitee');
+    expect(c.release, isNull);
+    expect(find.text('Download in browser'), findsNothing);
+    await tester.ensureVisible(find.text('Check for updates'));
+    await tester.tap(find.text('Check for updates'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Download in browser'));
+    await tester.tap(find.text('Download in browser'));
     await tester.pumpAndSettle();
     expect(opened.last.toString(), t.value.asset!.mirrorUrl);
     expect(t.browserRequests, [false, true]);
+    expect(t.browserFallback, [false, false]);
+    expect(t.checkRequests, [UpdateSource.github, UpdateSource.gitee]);
     expect(find.textContaining('Gitee download opened'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
   });

@@ -71,6 +71,16 @@ test('failure/cancellation never inserts an error string into book content',asyn
   s.translator.destroy();s.calls[1].resolve('late');await tick();s.dom.window.close();
 });
 
+test('repeated popup disposal is safe and does not reconnect translation observers',()=>{
+  const s=setup();
+  s.translator.destroy();
+  assert.doesNotThrow(()=>s.translator.destroy());
+  assert.equal(s.observers[0].items.size,0);
+  assert.equal(s.translator.observedElements.size,0);
+  assert.equal(s.calls.length,0);
+  s.dom.window.close();
+});
+
 test('a chapter container with an inline heading is not treated as one paragraph',async()=>{
   const s=setup();s.translator.destroy();
   // A span heading previously caused the surrounding div's entire chapter

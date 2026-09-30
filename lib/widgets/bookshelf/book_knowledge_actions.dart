@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/l10n/modu_strings.dart';
 
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/models/book.dart';
@@ -112,21 +113,35 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
   final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text(list.length == 1 ? '删除书籍' : '删除 ${list.length} 本书'),
+          title: Text(list.length == 1
+              ? ModuStrings.text(dialogContext, '删除书籍', 'Delete book')
+              : ModuStrings.format(
+                  dialogContext, '删除 {count} 本书', 'Delete {count} books',
+                  values: {'count': list.length})),
           content: Text(
             list.length == 1
-                ? '确定删除《${list.first.title}》吗？书籍文件及本地向量索引也会被删除。'
-                : '确定删除所选 ${list.length} 本书吗？书籍文件及本地向量索引也会被删除。',
+                ? ModuStrings.format(
+                    dialogContext,
+                    '确定删除《{title}》吗？书籍文件及本地向量索引也会被删除。',
+                    'Delete “{title}”? The book file and local vector index will also be deleted.',
+                    values: {
+                        'title': list.first.title
+                      })
+                : ModuStrings.format(
+                    dialogContext,
+                    '确定删除所选 {count} 本书吗？书籍文件及本地向量索引也会被删除。',
+                    'Delete the {count} selected books? Their files and local vector indexes will also be deleted.',
+                    values: {'count': list.length}),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
+              child: Text(ModuStrings.text(dialogContext, '取消', 'Cancel')),
             ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('删除'),
+              child: Text(ModuStrings.text(dialogContext, '删除', 'Delete')),
             ),
           ],
         ),

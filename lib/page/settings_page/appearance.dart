@@ -1,9 +1,10 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/app_language.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
-import 'package:anx_reader/widgets/settings/simple_dialog.dart';
 import 'package:anx_reader/widgets/settings/theme_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -42,15 +43,11 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
   @override
   Widget build(BuildContext context) {
     final languageSubtitle = Prefs().locale == null
-        ? languageOptions[0].values.first
+        ? ModuStrings.text(context, '跟随系统', 'Follow system')
         : languageOptions
             .firstWhere(
                 (element) =>
-                    element.values.first ==
-                    Prefs().locale!.languageCode +
-                        (Prefs().locale!.countryCode != null
-                            ? "-${Prefs().locale!.countryCode}"
-                            : ""),
+                    element.values.first == appLocaleKey(Prefs().locale!),
                 orElse: () => languageOptions[0])
             .keys
             .first;
@@ -72,7 +69,7 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
                   await showColorPickerDialog(context);
                 }),
             SettingsTile.switchTile(
-              title: const Text("OLED Dark Mode"),
+              title: Text('OLED · ${L10n.of(context).settingsDarkMode}'),
               leading: const Icon(Icons.brightness_2),
               initialValue: Prefs().trueDarkMode,
               onToggle: (bool value) {
@@ -100,6 +97,10 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               SettingsTile.navigation(
                   title: Text(L10n.of(context).settingsAppearanceLanguage),
                   value: Text(languageSubtitle),
+                  description: Text(ModuStrings.text(
+                      context,
+                      '界面与内置提示词使用所选语言，用户自定义的提示词保持不变。',
+                      'The interface and built-in prompts use this language. Custom prompts remain unchanged.')),
                   leading: const Icon(Icons.language),
                   onPressed: (context) {
                     showLanguagePickerDialog(context);
@@ -107,11 +108,10 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               SettingsTile.switchTile(
                 title:
                     Text(L10n.of(context).settingsAppearanceOpenBookAnimation),
-                description: Text(Localizations.localeOf(context)
-                            .languageCode ==
-                        'zh'
-                    ? '控制从书架进入书籍时的滑入、封面过渡和淡出。关闭后直接进入阅读，不影响正文翻页设置。'
-                    : 'Animate opening books from the library. Turn off for instant navigation; page-turn settings are unchanged.'),
+                description: Text(ModuStrings.text(
+                    context,
+                    '控制从书架进入书籍时的滑入、封面过渡和淡出。关闭后直接进入阅读，不影响正文翻页设置。',
+                    'Animate opening books from the library. Turn off for instant navigation; page-turn settings are unchanged.')),
                 leading: const Icon(Icons.animation),
                 initialValue: Prefs().openBookAnimation,
                 onToggle: (bool value) {
@@ -122,7 +122,8 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               ),
               SettingsTile.switchTile(
                 title: Text(L10n.of(context).settingsAdvancedAutoHideBottomBar),
-                description: const Text('仅用于窄窗口的底部导航栏，不影响桌面侧边栏。'),
+                description: Text(ModuStrings.text(context,
+                    '仅用于窄窗口的底部导航栏，不影响桌面侧边栏。', '仅用于窄窗口的底部导航栏，不影响桌面侧边栏。')),
                 leading: const Icon(Icons.vertical_align_bottom),
                 initialValue: Prefs().autoHideBottomBar,
                 onToggle: (value) {
@@ -271,14 +272,33 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
 
 void showLanguagePickerDialog(BuildContext context) {
   final title = L10n.of(context).settingsAppearanceLanguage;
-  final saveToPrefs = Prefs().saveLocaleToPrefs;
-
-  final children = languageOptions.map((e) {
-    final key = e.keys.first;
-    final value = e[key]!;
-    return dialogOption(key, value, saveToPrefs);
-  }).toList();
-  showSimpleDialog(title, saveToPrefs, children);
+  showDialog<void>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+            key: const ValueKey('app-language-picker'),
+            title: Text(title),
+            children: languageOptions.map((option) {
+              final code = option.values.first;
+              return SimpleDialogOption(
+                key: ValueKey('app-language-$code'),
+                onPressed: () async {
+                  await Prefs().saveLocaleToPrefs(code);
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                },
+                child: Row(children: [
+                  Expanded(
+                      child: Text(code == 'System'
+                          ? ModuStrings.text(context, '跟随系统', 'Follow system')
+                          : option.keys.first)),
+                  if (code ==
+                      (Prefs().locale == null
+                          ? 'System'
+                          : appLocaleKey(Prefs().locale!)))
+                    const Icon(Icons.check, size: 20),
+                ]),
+              );
+            }).toList(),
+          ));
 }
 
 Future<void> showColorPickerDialog(BuildContext context) async {

@@ -1,5 +1,6 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
@@ -17,9 +18,7 @@ class AiTranslateProvider extends TranslateServiceProvider {
 
   @override
   String getLabel(BuildContext context) =>
-      Localizations.localeOf(context).languageCode == 'zh'
-          ? 'AI 翻译'
-          : 'AI Translation';
+      ModuStrings.text(context, 'AI 翻译', 'AI Translation');
 
   /// AI translation uses native language names (e.g., "简体中文", "English")
   /// instead of ISO codes for better prompt understanding.

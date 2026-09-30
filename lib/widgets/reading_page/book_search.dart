@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:math' as math;
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/search_result_model.dart';
@@ -138,14 +139,13 @@ class _BookSearchState extends ConsumerState<BookSearch> {
     ref.listen(tocSearchProvider.select((value) => value.query), (_, next) {
       if (_query.text != (next ?? '')) _query.text = next ?? '';
     });
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     return Padding(
       // Dialog handles the keyboard inset; do not subtract it twice.
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(children: [
         Row(children: [
           Expanded(
-              child: Text(zh ? '书内搜索' : 'Search this book',
+              child: Text(ModuStrings.text(context, '书内搜索', 'Search this book'),
                   style: Theme.of(context).textTheme.titleLarge)),
           IconButton(
               key: const ValueKey('book-search-close'),
@@ -161,7 +161,7 @@ class _BookSearchState extends ConsumerState<BookSearch> {
           textInputAction: TextInputAction.search,
           onSubmitted: (_) => _submit(),
           decoration: InputDecoration(
-            hintText: zh ? '输入书内关键词' : 'Enter a keyword',
+            hintText: ModuStrings.text(context, '输入书内关键词', 'Enter a keyword'),
             border: const OutlineInputBorder(),
             prefixIcon: IconButton(
                 onPressed: _submit,
@@ -171,7 +171,7 @@ class _BookSearchState extends ConsumerState<BookSearch> {
                 key: const ValueKey('book-search-clear'),
                 onPressed: _clear,
                 icon: const Icon(Icons.clear),
-                tooltip: zh ? '清除搜索' : 'Clear search'),
+                tooltip: ModuStrings.text(context, '清除搜索', 'Clear search')),
           ),
         ),
         const SizedBox(height: 8),
@@ -182,12 +182,12 @@ class _BookSearchState extends ConsumerState<BookSearch> {
             child: state.results.isEmpty
                 ? Center(
                     child: Text(state.isSearching
-                        ? (zh ? '正在搜索…' : 'Searching…')
+                        ? (ModuStrings.text(context, '正在搜索…', 'Searching…'))
                         : state.isActive
-                            ? (zh ? '没有找到匹配内容' : 'No matches found')
-                            : (zh
-                                ? '输入关键词搜索本书内容'
-                                : 'Search for text within this book')))
+                            ? (ModuStrings.text(
+                                context, '没有找到匹配内容', 'No matches found'))
+                            : (ModuStrings.text(context, '输入关键词搜索本书内容',
+                                'Search for text within this book'))))
                 : ListView.builder(
                     controller: _scroll,
                     itemCount: state.results.length,

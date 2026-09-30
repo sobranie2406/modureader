@@ -224,7 +224,7 @@ class UpdateTransport {
   /// from the sandbox: macOS can mark it as created without user consent.
   /// The browser gets the stable official URL, not an expiring CDN redirect.
   Future<Uri> browserDownloadUrl(UpdateAsset asset,
-      {bool mirrorOnly = false}) async {
+      {bool mirrorOnly = false, bool allowFallback = true}) async {
     Future<Uri> probe(String url, {required bool mirror}) async {
       final cancel = CancelToken();
       try {
@@ -247,7 +247,9 @@ class UpdateTransport {
       try {
         return await probe(asset.url, mirror: false);
       } on Exception catch (error) {
-        if (asset.mirrorUrl == null || !_isUnavailable(error)) rethrow;
+        if (!allowFallback || asset.mirrorUrl == null || !_isUnavailable(error)) {
+          rethrow;
+        }
       }
     }
     final mirror = asset.mirrorUrl;
@@ -323,7 +325,8 @@ class UpdateTransport {
 
   Future<File> download(UpdateAsset asset, Directory directory,
       CancelToken cancel, void Function(int, int) progress,
-      {UpdateSource source = UpdateSource.github}) async {
+      {UpdateSource source = UpdateSource.github,
+      bool allowFallback = true}) async {
     if (asset.name.contains('/') ||
         asset.name.contains('\\') ||
         !asset.name.startsWith('Modu-') ||
@@ -356,7 +359,9 @@ class UpdateTransport {
           mirror: false);
     } on Exception catch (e) {
       _checkCancelled(cancel);
-      if (asset.mirrorUrl == null || !_isUnavailable(e)) rethrow;
+      if (!allowFallback || asset.mirrorUrl == null || !_isUnavailable(e)) {
+        rethrow;
+      }
       progress(0, asset.size);
     }
     _checkCancelled(cancel);
@@ -445,22 +450,22 @@ class AppUpdateController extends ChangeNotifier {
   DateTime? checkedAt;
   double progress = 0;
   CancelToken? _cancel;
-  UpdateSource _checkSource = UpdateSource.github;
-  UpdateSource _downloadSource = UpdateSource.github;
-  UpdateSource get checkSource => _checkSource;
-  UpdateSource get downloadSource => _downloadSource;
+  UpdateSource _source = UpdateSource.github;
+  UpdateSource get source => _source;
 
   // Keep choices for this app session; fresh launches remain GitHub-first.
   // Never change the source underneath an in-flight check/download/install.
-  void selectCheckSource(UpdateSource source) {
-    if (busy || source == _checkSource) return;
-    _checkSource = source;
-    notifyListeners();
-  }
-
-  void selectDownloadSource(UpdateSource source) {
-    if (busy || source == _downloadSource) return;
-    _downloadSource = source;
+  void selectSource(UpdateSource source) {
+    if (busy || source == _source) return;
+    _source = source;
+    // A different server may publish a different version or installer digest.
+    // Require a fresh check before exposing downloads or cached installation.
+    release = null;
+    downloaded = null;
+    checkedAt = null;
+    progress = 0;
+    error = '';
+    phase = UpdatePhase.idle;
     notifyListeners();
   }
 
@@ -483,11 +488,17 @@ class AppUpdateController extends ChangeNotifier {
     notifyListeners();
     try {
       currentVersion = await installedVersion();
-      final latest = await transport.latest(platform, abi, source: checkSource);
+      final latest = await transport.latest(platform, abi, source: source);
+      final resolvedSource =
+          latest.fromMirror ? UpdateSource.gitee : UpdateSource.github;
       if (usesBrowserDownload ||
+          source != resolvedSource ||
+          release?.asset?.name != latest.asset?.name ||
           release?.asset?.digest != latest.asset?.digest) {
         downloaded = null;
       }
+      // A check falling back to Gitee switches the whole update workflow.
+      _source = resolvedSource;
       release = latest;
       checkedAt = DateTime.now();
       phase = !newer
@@ -523,7 +534,7 @@ class AppUpdateController extends ChangeNotifier {
           last = DateTime.now();
           notifyListeners();
         }
-      }, source: downloadSource);
+      }, source: source, allowFallback: false);
       _checkCancelled(cancel);
       phase = UpdatePhase.ready;
     } catch (e) {
@@ -540,8 +551,7 @@ class AppUpdateController extends ChangeNotifier {
 
   void cancelDownload() => _cancel?.cancel();
 
-  Future<void> openBrowserDownload(Future<bool> Function(Uri) open,
-      {bool mirrorOnly = false}) async {
+  Future<void> openBrowserDownload(Future<bool> Function(Uri) open) async {
     if (!usesBrowserDownload || busy || !newer || release?.asset == null) {
       return;
     }
@@ -551,7 +561,7 @@ class AppUpdateController extends ChangeNotifier {
     notifyListeners();
     try {
       final url = await transport.browserDownloadUrl(release!.asset!,
-          mirrorOnly: mirrorOnly || downloadSource == UpdateSource.gitee);
+          mirrorOnly: source == UpdateSource.gitee, allowFallback: false);
       if (!await open(url)) {
         throw PlatformException(code: 'BROWSER_OPEN_FAILED');
       }

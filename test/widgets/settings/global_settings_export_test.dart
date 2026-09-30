@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/page/settings_page/global_settings.dart';
+import 'package:anx_reader/widgets/settings/settings_export_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -123,4 +124,44 @@ void main() {
     expect(directory.listSync(), isEmpty);
     expect(tester.takeException(), isNull);
   }, skip: Platform.isWindows); // Windows saves directly to Downloads.
+
+  for (final entry in {
+    '/document/43': true,
+    'content://com.android.providers.downloads.documents/document/43': true,
+    r'C:\Users\tester\Downloads\Modu-settings.json': false,
+  }.entries) {
+    testWidgets('export destination handles ${entry.key}', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      await open(tester);
+      final destination = SettingsExportDestination(
+          path: entry.key, fileName: 'Modu-settings.json');
+      showDialog<void>(
+          context: tester.element(find.byType(GlobalSettingsPage)),
+          builder: (_) => SettingsExportDialog(destination: destination));
+      await tester.pumpAndSettle();
+      expect(destination.isSystemDocument, entry.value);
+      expect(
+          find.widgetWithText(SelectableText,
+              entry.value ? destination.fileName : destination.path),
+          findsOneWidget);
+      if (entry.value) {
+        expect(find.textContaining('/document/'), findsNothing);
+        expect(find.textContaining('系统保存窗口选择的位置'), findsOneWidget);
+        expect(destination.status(zh: true), isNot(contains(entry.key)));
+      }
+      await tester.tap(find.text(entry.value ? '复制文件名' : '复制保存位置'));
+      await tester.pump();
+      expect(copied, destination.copyValue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

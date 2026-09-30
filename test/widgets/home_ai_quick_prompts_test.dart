@@ -285,7 +285,9 @@ void main() {
     expect(restored.copyWith(updatedAt: 2).skillLabels, {0: '本章总结'});
     final legacy = entry.toJson()..remove('skillLabels');
     expect(AiChatHistoryEntry.fromJson(legacy).skillLabels, isEmpty);
-    expect(skillMessageLabel(prompt), '本章总结');
+    expect(skillMessageLabel(prompt, locale: const Locale('zh', 'CN')), '本章总结');
+    expect(skillMessageLabel(prompt, locale: const Locale('en')),
+        'Chapter Summary');
     expect(skillMessageLabel('请解释本章总结为什么会失败'), isNull);
   });
 }

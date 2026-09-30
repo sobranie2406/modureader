@@ -6,6 +6,7 @@ import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +19,9 @@ void main() {
   Future<void> open(WidgetTester tester,
       {BookKnowledgeIndexQueue? queue}) async {
     await tester.pumpWidget(MaterialApp(
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: Builder(
             builder: (context) => TextButton(
                 onPressed: () => showDialog<void>(

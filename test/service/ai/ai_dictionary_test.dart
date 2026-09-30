@@ -82,6 +82,7 @@ void main() {
   test('dictionary prompt can be customized, labelled and reset', () async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
+    await Prefs().saveLocaleToPrefs('zh-CN');
     expect(Prefs().isReadAnySkillEnabled(skill.id), true);
     ReadingSkillPromptStore.save(skill, '按简明词典格式解释');
     expect(ReadingSkillPromptStore.promptFor(skill), '按简明词典格式解释');

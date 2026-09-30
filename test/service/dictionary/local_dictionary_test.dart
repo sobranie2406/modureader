@@ -57,12 +57,14 @@ String mdx(Directory dir,
     {int version = 2,
     bool compressed = true,
     bool utf16 = false,
-    String encrypted = 'No'}) {
-  final entries = {
-    'apple': '<p>苹果</p><script>bad()</script><p>水果</p>',
-    'apples': '@@@LINK=apple',
-    'cycle': '@@@LINK=cycle'
-  };
+    String encrypted = 'No',
+    Map<String, String>? definitions}) {
+  final entries = definitions ??
+      {
+        'apple': '<p>苹果</p><script>bad()</script><p>水果</p>',
+        'apples': '@@@LINK=apple',
+        'cycle': '@@@LINK=cycle'
+      };
   List<int> encode(String s) =>
       utf16 ? const Utf16Encoder().encodeUtf16Le(s) : utf8.encode(s);
   final width = version < 2 ? 4 : 8;
@@ -174,8 +176,53 @@ void main() {
         expect(body, isNot(contains('bad')));
         expect(await store.lookup('cycle'), isEmpty);
       });
+      test('MDX v$version Chinese headwords and Chinese-to-English redirects',
+          () async {
+        await store.importFiles([
+          mdx(sources, version: version, utf16: utf16, definitions: {
+            'apple': '<p>apple: 苹果</p>',
+            '苹果': '@@@LINK=apple',
+            '革命': '<p>revolution</p>',
+          })
+        ], 'Bilingual');
+        expect((await store.lookup('苹果')).single.definition, 'apple: 苹果');
+        expect((await store.lookup(' 革命 ')).single.definition, 'revolution');
+        expect((await store.lookup('apple')).single.definition, 'apple: 苹果');
+      });
     }
   }
+  test('definition-only Chinese text is not treated as a native headword',
+      () async {
+    await store.importFiles([
+      mdx(sources, definitions: {
+        'apple': '<p>苹果；苹果树</p>',
+        'apple-link': '@@@LINK=apple',
+        for (var i = 0; i < 30; i++) 'fruit-$i': '<p>苹果相关用法</p>',
+        'unrelated': '<p>nothing else</p>',
+      })
+    ], 'English');
+    final restored = LocalDictionaryStore(store.root);
+    final result = await restored.lookup('苹果');
+    expect(result, isEmpty);
+    expect((await restored.lookup('apple')).single.word, 'apple');
+    expect(await restored.lookup('苹果%'), isEmpty);
+    expect(await restored.lookup('苹果" OR 1=1 --'), isEmpty);
+    expect(await restored.lookup('苹' * 33), isEmpty);
+    await restored.enable((await restored.list()).single.id, false);
+    expect(await restored.lookup('苹果'), isEmpty);
+  });
+  test('native Chinese entries in any enabled dictionary take precedence',
+      () async {
+    await store.importFiles([
+      mdx(sources, definitions: {'apple': '苹果'})
+    ], 'English');
+    await store.importFiles([
+      mdx(sources, definitions: {'苹果': 'apple'})
+    ], 'Chinese');
+    final result = await store.lookup('苹果');
+    expect(result, hasLength(1));
+    expect(result.single.word, '苹果');
+  });
   test('ZIP dictionary import, CRC and nested paths', () async {
     final files = star(sources, compressed: true);
     final archive = Archive();

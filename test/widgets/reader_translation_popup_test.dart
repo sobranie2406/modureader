@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/translate/ai.dart';
+import 'package:anx_reader/service/translate/index.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
@@ -166,6 +167,28 @@ void main() {
     expect(calls.length, 2);
     expect(tester.takeException(), isNull);
   });
+
+  for (final engine in [
+    TranslateService.baiduWeb,
+    TranslateService.youdaoWeb,
+    TranslateService.googleWeb
+  ]) {
+    testWidgets('${engine.name} exposes only effective language controls',
+        (tester) async {
+      Prefs().translateService = engine;
+      await tester.pumpWidget(app(ReaderPopup(
+          child: TranslationMenu(
+        content: 'hello',
+        resultBuilder: (_, __) => const Text('web result'),
+      ))));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(
+          find.byKey(const ValueKey('selection-translation-language-picker')),
+          engine.usesPageLanguagePicker ? findsNothing : findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   test('AI translation delegates scrolling to the translation viewport', () {
     final widget = AiTranslateProvider()

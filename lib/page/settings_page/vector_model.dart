@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
 import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
@@ -92,7 +93,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       _dimensionController.text = detectedDimension.toString();
     }
     if (mounted) {
-      AnxToast.show(_label('向量模型配置已保存', 'Vector model saved'));
+      AnxToast.show(
+          ModuStrings.text(context, '向量模型配置已保存', 'Vector model saved'));
       setState(() {});
     }
   }
@@ -103,8 +105,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     OpenAiCompatibleEmbeddingProvider? provider;
     try {
       provider = OpenAiCompatibleEmbeddingProvider(config: _formConfig());
-      final vector = await provider
-          .embed(_label('默读向量模型连接测试', 'Modu embedding connection test'));
+      final vector = await provider.embed(ModuStrings.text(
+          context, '默读向量模型连接测试', 'Modu embedding connection test'));
       await _save(detectedDimension: vector.length);
       if (mounted) {
         AnxToast.show(
@@ -135,7 +137,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       }
     } catch (_) {
       if (mounted) {
-        AnxToast.show(_label('无法读取本地模型，请重新进入设置重试',
+        AnxToast.show(ModuStrings.text(context, '无法读取本地模型，请重新进入设置重试',
             'Could not check local models. Reopen settings to retry.'));
       }
     }
@@ -191,9 +193,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     );
     try {
       final vector = await provider.embed(
-        model.id == 'bge-small-zh-v1.5'
-            ? '默读本地向量模型测试'
-            : 'Modu local embedding model test',
+        ModuStrings.text(
+            context, '默读本地向量模型测试', 'Modu local embedding model test'),
       );
       if (mounted) {
         AnxToast.show(_label(
@@ -228,7 +229,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(_label('删除已下载模型？', 'Delete downloaded model?')),
+        title: Text(
+            ModuStrings.text(context, '删除已下载模型？', 'Delete downloaded model?')),
         content: Text(_label(
           '将删除本机的 ${model.name} 模型及分词器，释放存储空间。书籍和已有索引不会删除，模型选择保持不变。使用该模型进行语义检索或向量化前，需要重新下载。',
           'Remove ${model.name} and its tokenizer from this device to free storage. Books, existing indexes and model selections are preserved. Download it again before semantic search or indexing with this model.',
@@ -236,10 +238,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text(_label('取消', 'Cancel'))),
+              child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text(_label('删除', 'Delete'))),
+              child: Text(ModuStrings.text(context, '删除', 'Delete'))),
         ],
       ),
     );
@@ -250,7 +252,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           releaseModel: () =>
               LocalOnnxEmbeddingEngine.instance.releaseModel(model.id));
       if (mounted) {
-        AnxToast.show(_label('模型已删除，可按需重新下载',
+        AnxToast.show(ModuStrings.text(context, '模型已删除，可按需重新下载',
             'Model deleted. You can download it again when needed.'));
       }
     } catch (error) {
@@ -272,7 +274,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     return settingsSections(
       sections: [
         SettingsSection(
-          title: Text(_label('向量模型', 'Vector model')),
+          title: Text(ModuStrings.text(context, '向量模型', 'Vector model')),
           tiles: [
             SettingsTile.switchTile(
               initialValue: prefs.vectorModelEnabled,
@@ -280,11 +282,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 prefs.vectorModelEnabled = value;
                 setState(() {});
               },
-              title: Text(_label('启用向量模型', 'Enable vector model')),
-              description: Text(_label(
-                '用于语义搜索和混合 RAG 检索',
-                'Used by semantic search and hybrid RAG retrieval',
-              )),
+              title: Text(
+                  ModuStrings.text(context, '启用向量模型', 'Enable vector model')),
+              description: Text(ModuStrings.text(context, '用于语义搜索和混合 RAG 检索',
+                  'Used by semantic search and hybrid RAG retrieval')),
             ),
             SettingsTile.switchTile(
               initialValue: prefs.autoVectorizeOnImport,
@@ -293,19 +294,17 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 prefs.autoVectorizeOnImport = value;
                 setState(() {});
               },
-              title: Text(_label(
-                '导入后自动向量化',
-                'Vectorize after import',
-              )),
-              description: Text(_label(
-                '新导入书籍会在后台排队建立索引；默认关闭，避免意外消耗模型额度。',
-                'New books are indexed in the background. Disabled by default to avoid unexpected API usage.',
-              )),
+              title: Text(ModuStrings.text(
+                  context, '导入后自动向量化', 'Vectorize after import')),
+              description: Text(ModuStrings.text(
+                  context,
+                  '新导入书籍会在后台排队建立索引；默认关闭，避免意外消耗模型额度。',
+                  'New books are indexed in the background. Disabled by default to avoid unexpected API usage.')),
             ),
           ],
         ),
         SettingsSection(
-          title: Text(_label('模型来源', 'Model source')),
+          title: Text(ModuStrings.text(context, '模型来源', 'Model source')),
           tiles: [
             CustomSettingsTile(
               child: Padding(
@@ -315,12 +314,12 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                   segments: [
                     SegmentButtonItem(
                       value: 'builtin',
-                      label: _label('本地模型', 'Local models'),
+                      label: ModuStrings.text(context, '本地模型', 'Local models'),
                       icon: const Icon(Icons.computer_rounded),
                     ),
                     SegmentButtonItem(
                       value: 'remote',
-                      label: _label('远程 API', 'Remote API'),
+                      label: ModuStrings.text(context, '远程 API', 'Remote API'),
                       icon: const Icon(Icons.cloud_outlined),
                     ),
                   ],
@@ -336,8 +335,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         ),
         if (!isRemote)
           SettingsSection(
-            title: Text(
-                _label('本地模型 · 按需下载', 'Local models · On-demand download')),
+            title: Text(ModuStrings.text(
+                context, '本地模型 · 按需下载', 'Local models · On-demand download')),
             tiles: [
               CustomSettingsTile(
                   child: Padding(
@@ -345,13 +344,15 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                 child: DropdownButtonFormField<String>(
                   initialValue: prefs.vectorModelDownloadSource,
                   decoration: InputDecoration(
-                      labelText: _label('模型下载源', 'Model download source')),
+                      labelText: ModuStrings.text(
+                          context, '模型下载源', 'Model download source')),
                   items: [
                     const DropdownMenuItem(
                         value: 'huggingFace', child: Text('Hugging Face')),
                     DropdownMenuItem(
                         value: 'gitee',
-                        child: Text(_label('Gitee 镜像', 'Gitee mirror'))),
+                        child: Text(ModuStrings.text(
+                            context, 'Gitee 镜像', 'Gitee mirror'))),
                   ],
                   onChanged: _downloadProgress.isNotEmpty
                       ? null
@@ -372,7 +373,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           ),
         if (isRemote)
           SettingsSection(
-            title: Text(_label('远程模型', 'Remote model')),
+            title: Text(ModuStrings.text(context, '远程模型', 'Remote model')),
             tiles: [
               CustomSettingsTile(child: _buildRemoteForm()),
             ],
@@ -402,10 +403,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: Text(
-              _label(
-                '安装包不内嵌模型。请选择下载源，再按需下载所选模型及分词器；下载会消耗流量，请保持页面打开直到完成。文件经大小与 SHA-256 校验后可离线使用，无需 API Key。旧版已准备的完整模型继续复用。Gitee 镜像不可用时，可切换 Hugging Face；不会自动更换下载源。自动向量化默认关闭，启动或索引不会自动下载模型。切换模型后请重新向量化已有书籍。',
-                'Models are not bundled. Select a source and download only the model and tokenizer you need. Downloads consume data; keep this page open until complete. Files are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused. Switch to Hugging Face if the mirror is unavailable; sources never switch silently. Automatic indexing is off and neither startup nor indexing downloads models automatically. Reindex books after switching models.',
-              ),
+              ModuStrings.text(
+                  context,
+                  '安装包不内嵌模型。请选择下载源，再按需下载所选模型及分词器；下载会消耗流量，请保持页面打开直到完成。文件经大小与 SHA-256 校验后可离线使用，无需 API Key。旧版已准备的完整模型继续复用。Gitee 镜像不可用时，可切换 Hugging Face；不会自动更换下载源。自动向量化默认关闭，启动或索引不会自动下载模型。切换模型后请重新向量化已有书籍。',
+                  'Models are not bundled. Select a source and download only the model and tokenizer you need. Downloads consume data; keep this page open until complete. Files are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused. Switch to Hugging Face if the mirror is unavailable; sources never switch silently. Automatic indexing is off and neither startup nor indexing downloads models automatically. Reindex books after switching models.'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -449,13 +450,14 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                     padding: const EdgeInsetsDirectional.only(end: 6),
                     child: Chip(
                       visualDensity: VisualDensity.compact,
-                      label: Text(_label('推荐', 'Recommended')),
+                      label:
+                          Text(ModuStrings.text(context, '推荐', 'Recommended')),
                     ),
                   ),
                 if (selected)
                   Chip(
                     visualDensity: VisualDensity.compact,
-                    label: Text(_label('当前', 'Active')),
+                    label: Text(ModuStrings.text(context, '当前', 'Active')),
                   ),
               ],
             ),
@@ -463,8 +465,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             Text(_modelDescription(model)),
             const SizedBox(height: 8),
             Text(
-              '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${_label('维', 'dimensions')}'
-              ' · ${bundled ? _label('已内嵌 · 离线可用', 'Bundled · Offline ready') : downloaded ? _label('已下载', 'Downloaded') : _label('未下载或需修复', 'Download required')}',
+              '${model.languages} · ${model.sizeLabel} · ${model.dimensions} ${ModuStrings.text(context, '维', 'dimensions')}'
+              ' · ${bundled ? ModuStrings.text(context, '已内嵌 · 离线可用', 'Bundled · Offline ready') : downloaded ? ModuStrings.text(context, '已下载', 'Downloaded') : ModuStrings.text(context, '未下载或需修复', 'Download required')}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (progress != null) ...[
@@ -473,7 +475,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
               const SizedBox(height: 4),
               Text(
                 progress == 0
-                    ? _label('正在连接下载源…', 'Connecting…')
+                    ? ModuStrings.text(context, '正在连接下载源…', 'Connecting…')
                     : _label(
                         progress >= .99
                             ? '正在校验模型文件…'
@@ -499,14 +501,16 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                       onPressed: testing || deleting || progress != null
                           ? null
                           : () => _deleteLocalModel(model),
-                      child: Text(_label('删除模型', 'Delete model')),
+                      child: Text(
+                          ModuStrings.text(context, '删除模型', 'Delete model')),
                     ),
                   AnxButton.text(
                     isLoading: testing,
                     onPressed: testing || deleting
                         ? null
                         : () => _testLocalModel(model),
-                    child: Text(_label('测试推理', 'Test inference')),
+                    child: Text(
+                        ModuStrings.text(context, '测试推理', 'Test inference')),
                   ),
                   const SizedBox(width: 8),
                   AnxButton.outlined(
@@ -521,8 +525,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                             ));
                           },
                     child: Text(selected
-                        ? _label('使用中', 'Selected')
-                        : _label('使用', 'Use')),
+                        ? ModuStrings.text(context, '使用中', 'Selected')
+                        : ModuStrings.text(context, '使用', 'Use')),
                   ),
                 ] else
                   AnxButton.outlined(
@@ -530,7 +534,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                     onPressed: _downloadProgress.isEmpty && !deleting
                         ? () => _downloadLocalModel(model)
                         : null,
-                    child: Text(_label('下载并使用', 'Download and use')),
+                    child: Text(
+                        ModuStrings.text(context, '下载并使用', 'Download and use')),
                   ),
               ],
             ),
@@ -570,30 +575,33 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         children: [
           TextField(
             controller: _nameController,
-            decoration: decoration(_label('名称', 'Name')),
+            decoration: decoration(ModuStrings.text(context, '名称', 'Name')),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _modelController,
-            decoration: decoration(_label('模型 ID', 'Model ID')),
+            decoration:
+                decoration(ModuStrings.text(context, '模型 ID', 'Model ID')),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _endpointController,
             keyboardType: TextInputType.url,
             decoration: decoration(
-              _label('API 端点', 'API endpoint'),
-              helper: _label(
-                '支持 API 根地址、/v1 地址或完整 /embeddings 地址',
-                'Accepts an API root, /v1 base, or full /embeddings URL',
-              ),
+              ModuStrings.text(context, 'API 端点', 'API endpoint'),
+              helper: ModuStrings.text(
+                  context,
+                  '支持 API 根地址、/v1 地址或完整 /embeddings 地址',
+                  'Accepts an API root, /v1 base, or full /embeddings URL'),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _apiKeyController,
             obscureText: _obscureApiKey,
-            decoration: decoration(_label('API 密钥', 'API key')).copyWith(
+            decoration:
+                decoration(ModuStrings.text(context, 'API 密钥', 'API key'))
+                    .copyWith(
               suffixIcon: IconButton(
                 onPressed: () =>
                     setState(() => _obscureApiKey = !_obscureApiKey),
@@ -607,15 +615,14 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           TextField(
             controller: _dimensionController,
             keyboardType: TextInputType.number,
-            decoration: decoration(_label(
-              '维度（可留空，测试后自动填写）',
-              'Dimensions (optional; detected by test)',
-            )),
+            decoration: decoration(ModuStrings.text(context, '维度（可留空，测试后自动填写）',
+                'Dimensions (optional; detected by test)')),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _descriptionController,
-            decoration: decoration(_label('描述（可选）', 'Description')),
+            decoration:
+                decoration(ModuStrings.text(context, '描述（可选）', 'Description')),
           ),
           const SizedBox(height: 16),
           Row(
@@ -624,12 +631,12 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
               AnxButton.outlined(
                 isLoading: _testing,
                 onPressed: _testing ? null : _testConnection,
-                child: Text(_label('测试', 'Test')),
+                child: Text(ModuStrings.text(context, '测试', 'Test')),
               ),
               const SizedBox(width: 8),
               AnxButton(
                 onPressed: () => _save(),
-                child: Text(_label('保存', 'Save')),
+                child: Text(ModuStrings.text(context, '保存', 'Save')),
               ),
             ],
           ),

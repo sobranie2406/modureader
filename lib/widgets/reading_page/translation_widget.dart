@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/enums/translation_mode.dart';
@@ -73,7 +74,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: Text(
-                  _label('翻译引擎', 'Translation engine'),
+                  ModuStrings.text(context, '翻译引擎', 'Translation engine'),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -114,7 +115,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    _label('目标语言', 'Target language'),
+                    ModuStrings.text(context, '目标语言', 'Target language'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -226,7 +227,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
               const Icon(Icons.translate_outlined),
               const SizedBox(width: 8),
               Text(
-                _label('阅读翻译', 'Reader translation'),
+                ModuStrings.text(context, '阅读翻译', 'Reader translation'),
                 style: theme.textTheme.titleMedium,
               ),
               const Spacer(),
@@ -235,7 +236,8 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                   key: const ValueKey('reader-stop-translation'),
                   onPressed: _stopTranslation,
                   icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                  label: Text(_label('停止翻译', 'Stop translation')),
+                  label: Text(
+                      ModuStrings.text(context, '停止翻译', 'Stop translation')),
                 ),
             ],
           ),
@@ -244,7 +246,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
             children: [
               Expanded(
                 child: _ChoiceButton(
-                  label: _label('翻译引擎', 'Engine'),
+                  label: ModuStrings.text(context, '翻译引擎', 'Engine'),
                   value: service.getLabel(context),
                   icon: Icons.translate_outlined,
                   onTap: _translating ? null : _showServicePicker,
@@ -253,7 +255,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
               const SizedBox(width: 10),
               Expanded(
                 child: _ChoiceButton(
-                  label: _label('目标语言', 'Target language'),
+                  label: ModuStrings.text(context, '目标语言', 'Target language'),
                   value: target.nativeName,
                   icon: Icons.language_outlined,
                   onTap: _translating ? null : _showLanguagePicker,
@@ -263,7 +265,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
           ),
           const SizedBox(height: 14),
           Text(
-            _label('显示方式', 'Display'),
+            ModuStrings.text(context, '显示方式', 'Display'),
             style: theme.textTheme.labelLarge,
           ),
           const SizedBox(height: 6),
@@ -273,12 +275,13 @@ class _TranslationWidgetState extends State<TranslationWidget> {
               enabled: !_translating,
               segments: [
                 SegmentButtonItem(
-                  label: _label('仅译文', 'Translation only'),
+                  label: ModuStrings.text(context, '仅译文', 'Translation only'),
                   value: TranslationModeEnum.translationOnly,
                   icon: const Icon(Icons.g_translate),
                 ),
                 SegmentButtonItem(
-                  label: _label('原文 + 译文', 'Original + translation'),
+                  label: ModuStrings.text(
+                      context, '原文 + 译文', 'Original + translation'),
                   value: TranslationModeEnum.bilingual,
                   icon: const Icon(Icons.compare_outlined),
                 ),
@@ -317,25 +320,27 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                   : const Icon(Icons.translate),
               label: Text(
                 _translating
-                    ? _label('翻译中…', 'Translating…')
+                    ? ModuStrings.text(context, '翻译中…', 'Translating…')
                     : _activeMode == TranslationModeEnum.off
-                        ? _label('翻译当前阅读内容', 'Translate visible content')
+                        ? ModuStrings.text(
+                            context, '翻译当前阅读内容', 'Translate visible content')
                         : settingsChanged
-                            ? _label(
-                                '按新设置重新翻译', 'Retranslate with new settings')
+                            ? ModuStrings.text(context, '按新设置重新翻译',
+                                'Retranslate with new settings')
                             : modeChanged
-                                ? _label('应用显示方式', 'Apply display mode')
-                                : _label(
-                                    '重新翻译当前内容', 'Retranslate current content'),
+                                ? ModuStrings.text(
+                                    context, '应用显示方式', 'Apply display mode')
+                                : ModuStrings.text(context, '重新翻译当前内容',
+                                    'Retranslate current content'),
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            _label(
-              '仅在你启动后翻译可见段落，滚动时逐段加载，不会一次发送整章。可随时停止；关闭书籍后停止，重新打开不会自动继续。',
-              'Translate visible paragraphs only after you start; scrolling loads them one at a time. Stop at any time. Closing the book stops translation; reopening never resumes it automatically.',
-            ),
+            ModuStrings.text(
+                context,
+                '仅在你启动后翻译可见段落，滚动时逐段加载，不会一次发送整章。可随时停止；关闭书籍后停止，重新打开不会自动继续。',
+                'Translate visible paragraphs only after you start; scrolling loads them one at a time. Stop at any time. Closing the book stops translation; reopening never resumes it automatically.'),
             style: theme.textTheme.bodySmall,
           ),
         ],

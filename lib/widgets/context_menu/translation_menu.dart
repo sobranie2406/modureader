@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/service/translate/index.dart';
@@ -138,7 +139,6 @@ class _TranslationMenuState extends State<TranslationMenu> {
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     return SafeArea(
       top: false,
       child: Column(
@@ -158,15 +158,18 @@ class _TranslationMenuState extends State<TranslationMenu> {
                   onPressed: () => Navigator.of(context).pop()),
             ]),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child:
-                Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-              _langPicker(true),
-              const Icon(Icons.arrow_forward, size: 16),
-              _langPicker(false),
-            ]),
-          ),
+          if (!Prefs().translateService.usesPageLanguagePicker)
+            Padding(
+              key: const ValueKey('selection-translation-language-picker'),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _langPicker(true),
+                    const Icon(Icons.arrow_forward, size: 16),
+                    _langPicker(false),
+                  ]),
+            ),
           const Divider(height: 1),
           Expanded(
             child: Scrollbar(
@@ -191,8 +194,10 @@ class _TranslationMenuState extends State<TranslationMenu> {
                           onPressed: () => setState(
                               () => _showFullSource = !_showFullSource),
                           child: Text(_showFullSource
-                              ? (zh ? '收起原文' : 'Collapse original')
-                              : (zh ? '展开原文' : 'Expand original')),
+                              ? (ModuStrings.text(
+                                  context, '收起原文', 'Collapse original'))
+                              : (ModuStrings.text(
+                                  context, '展开原文', 'Expand original'))),
                         ),
                         const Divider(),
                         _translationWidget ?? const Text('...'),

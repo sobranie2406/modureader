@@ -17,6 +17,7 @@ import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/app_language.dart';
 import 'package:anx_reader/models/window_info.dart';
 import 'package:anx_reader/page/home_page.dart';
 import 'package:anx_reader/page/android_storage_startup.dart';
@@ -160,7 +161,6 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp>
     with WidgetsBindingObserver, WindowListener {
-  static const Locale _englishFallbackLocale = Locale('en');
   bool _closingWindow = false;
 
   @override
@@ -327,31 +327,7 @@ class _MyAppState extends ConsumerState<MyApp>
     List<Locale>? preferredLocales,
     Iterable<Locale> supportedLocales,
   ) {
-    if (preferredLocales == null || preferredLocales.isEmpty) {
-      return _englishFallbackLocale;
-    }
-
-    final Locale resolvedLocale = basicLocaleListResolution(
-      preferredLocales,
-      supportedLocales,
-    );
-
-    final bool hasMatch = preferredLocales.any((Locale preferredLocale) {
-      return supportedLocales.any((Locale supportedLocale) {
-        if (preferredLocale.languageCode != supportedLocale.languageCode) {
-          return false;
-        }
-
-        final String? preferredCountryCode = preferredLocale.countryCode;
-        final String? supportedCountryCode = supportedLocale.countryCode;
-
-        return preferredCountryCode == null ||
-            supportedCountryCode == null ||
-            preferredCountryCode == supportedCountryCode;
-      });
-    });
-
-    return hasMatch ? resolvedLocale : _englishFallbackLocale;
+    return resolveAppLocale(preferredLocales, supportedLocales);
   }
 }
 

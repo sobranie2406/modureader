@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/storage_info.dart';
 
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -181,24 +182,29 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
           final confirmed = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
-                    title: const Text('清理缓存'),
-                    content: const Text(
-                        '将清理可重新生成的临时数据。书籍、笔记、AI 对话历史、已下载模型和向量索引不会删除。请在导入、同步和下载完成后清理。'),
+                    title:
+                        Text(ModuStrings.text(context, '清理缓存', 'Clear cache')),
+                    content: Text(ModuStrings.text(
+                        context,
+                        '将清理可重新生成的临时数据。书籍、笔记、AI 对话历史、已下载模型和向量索引不会删除。请在导入、同步和下载完成后清理。',
+                        'This clears regenerable temporary data. Books, notes, AI chat history, downloaded models and vector indexes are kept. Wait for imports, sync and downloads to finish before clearing.')),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('取消')),
+                          child:
+                              Text(ModuStrings.text(context, '取消', 'Cancel'))),
                       TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('清理'))
+                          child: Text(ModuStrings.text(context, '清理', 'Clear')))
                     ],
                   ));
           if (confirmed != true || !mounted) return;
           final success =
               await ref.read(storageInfoProvider.notifier).clearCache();
           if (!success && context.mounted)
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('清理失败，已保留尚未迁移的数据。')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(ModuStrings.text(context, '清理失败，已保留尚未迁移的数据。',
+                    'Cache clearing failed. Data awaiting migration was kept.'))));
           ref.invalidate(storageInfoProvider);
         },
         child: Text('${L10n.of(context).storageClearCache} $size'),
@@ -282,15 +288,14 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
 
       if (AnxPlatform.isAndroid)
         SettingsSection(
-          title: const Text('存储位置'),
+          title: Text(ModuStrings.text(context, '存储位置', 'Storage location')),
           tiles: [
             CustomSettingsTile(
                 child: ListTile(
-              title: const Text('应用数据目录'),
-              subtitle: Text('${_currentStoragePath ?? "..."}\n'
-                  '书籍、字体、数据库、模型和索引保存在此目录。'
-                  '卸载应用会删除此目录；部分系统仍限制文件管理器访问 Android/data。'
-                  '账号设置和密钥仍保存在应用私有区域。'),
+              title: Text(
+                  ModuStrings.text(context, '应用数据目录', 'App data directory')),
+              subtitle: Text(
+                  '${_currentStoragePath ?? "..."}\n${ModuStrings.text(context, '书籍、字体、数据库、模型和索引保存在此目录。卸载应用会删除此目录；部分系统仍限制文件管理器访问 Android/data。账号设置和密钥仍保存在应用私有区域。', 'Books, fonts, databases, models and indexes are stored here. Uninstalling deletes this directory; some systems restrict file manager access to Android/data. Account settings and keys remain in private app storage.')}'),
             )),
           ],
         ),

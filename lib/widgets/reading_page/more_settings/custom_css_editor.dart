@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -82,8 +83,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     if (_highlight &&
         (_patternController.text.trim().isEmpty ||
             _patternController.text.length > 512)) {
-      setState(() => _error =
-          _text('请输入 1–512 个字符的正则表达式', 'Enter a regex of 1–512 characters'));
+      setState(() => _error = ModuStrings.text(
+          context, '请输入 1–512 个字符的正则表达式', 'Enter a regex of 1–512 characters'));
       return false;
     }
     final css = _cssController.text;
@@ -134,8 +135,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       }
     } catch (_) {
       if (mounted) {
-        setState(
-            () => _error = _text('保存失败，请重试', 'Could not save. Please retry.'));
+        setState(() => _error = ModuStrings.text(
+            context, '保存失败，请重试', 'Could not save. Please retry.'));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -194,10 +195,10 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               AlertDialog(title: Text(title), content: Text(message), actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: Text(_text('取消', 'Cancel'))),
+                    child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
                 TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: Text(_text('确认', 'Confirm'))),
+                    child: Text(ModuStrings.text(context, '确认', 'Confirm'))),
               ])) ??
       false;
 
@@ -229,7 +230,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         final template = await showDialog<CustomCssProfile>(
             context: context,
             builder: (context) => SimpleDialog(
-                  title: Text(_text('添加预设模板', 'Add a preset template')),
+                  title: Text(ModuStrings.text(
+                      context, '添加预设模板', 'Add a preset template')),
                   children: [
                     for (final p in customCssTemplates)
                       SimpleDialogOption(
@@ -247,7 +249,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         final p = Prefs().customCssProfiles[_index];
         await _append([
           CustomCssProfile(
-              name: '${p.name} ${_text('副本', 'copy')}',
+              name: '${p.name} ${ModuStrings.text(context, '副本', 'copy')}',
               css: p.css,
               pattern: p.pattern,
               scope: p.scope,
@@ -257,8 +259,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
 
   Future<void> _delete() => _run(() async {
         if (!await _confirm(
-            _text('删除当前方案？', 'Delete this profile?'),
-            _text('将清空此方案，并在使用它的所有书籍中停用。',
+            ModuStrings.text(context, '删除当前方案？', 'Delete this profile?'),
+            ModuStrings.text(context, '将清空此方案，并在使用它的所有书籍中停用。',
                 'This clears the profile and disables it in all books.'))) {
           return;
         }
@@ -287,7 +289,9 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         if (!await _confirm(
             _text('导入 ${additions.length} 套方案？',
                 'Import ${additions.length} profiles?'),
-            _text('仅填入空位，默认停用，不覆盖已有方案。请仅导入可信 CSS；启用后其中的图片或字体网址可能发起网络请求。',
+            ModuStrings.text(
+                context,
+                '仅填入空位，默认停用，不覆盖已有方案。请仅导入可信 CSS；启用后其中的图片或字体网址可能发起网络请求。',
                 'Only empty slots are used; imported profiles stay disabled. Import trusted CSS only: enabled styles may request remote images or fonts.'))) {
           return;
         }
@@ -344,9 +348,9 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       ]),
       Text(
           widget.bookKey == null
-              ? _text('默认 CSS 方案', 'Default CSS profile')
-              : _text(
-                  '本书 CSS 方案（本机记忆）', 'CSS profile for this book (this device)'),
+              ? ModuStrings.text(context, '默认 CSS 方案', 'Default CSS profile')
+              : ModuStrings.text(context, '本书 CSS 方案（本机记忆）',
+                  'CSS profile for this book (this device)'),
           style: Theme.of(context).textTheme.titleSmall),
       const SizedBox(height: 8),
       DropdownButton<int>(
@@ -360,8 +364,9 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                   value: i,
                   child: Text(
                       profiles[i].name.isEmpty
-                          ? _text('自定义 CSS', 'Custom CSS')
-                          : profiles[i].name,
+                          ? ModuStrings.text(context, '自定义 CSS', 'Custom CSS')
+                          : profiles[i]
+                              .localizedName(Localizations.localeOf(context)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis))
         ],
@@ -373,14 +378,16 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       ),
       const SizedBox(height: 8),
       Text(
-          _text('按名称管理模板，可同时启用多套；修改会影响使用它的书籍。内置与导入模板默认停用，最多保存 32 套。',
+          ModuStrings.text(
+              context,
+              '按名称管理模板，可同时启用多套；修改会影响使用它的书籍。内置与导入模板默认停用，最多保存 32 套。',
               'Manage named templates; multiple templates can be active. Shared edits affect books using them. Built-ins and imports start disabled. Up to 32 templates.'),
           style: Theme.of(context).textTheme.bodySmall),
       Wrap(spacing: 8, children: [
         TextButton.icon(
             onPressed: _busy ? null : _template,
             icon: const Icon(Icons.auto_awesome),
-            label: Text(_text('预设模板', 'Templates'))),
+            label: Text(ModuStrings.text(context, '预设模板', 'Templates'))),
         TextButton(
             onPressed: _busy
                 ? null
@@ -388,41 +395,48 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                       if (!_validate()) return;
                       await _persistDraft();
                       await _append([
-                        CustomCssProfile(name: _text('新方案', 'New profile'))
+                        CustomCssProfile(
+                            name:
+                                ModuStrings.text(context, '新方案', 'New profile'))
                       ]);
                     }),
-            child: Text(_text('新建', 'New'))),
+            child: Text(ModuStrings.text(context, '新建', 'New'))),
         TextButton(
             onPressed: _busy ? null : _copy,
-            child: Text(_text('复制', 'Duplicate'))),
+            child: Text(ModuStrings.text(context, '复制', 'Duplicate'))),
         TextButton(
             onPressed: _busy ? null : _import,
-            child: Text(_text('导入', 'Import'))),
+            child: Text(ModuStrings.text(context, '导入', 'Import'))),
         PopupMenuButton<bool>(
             enabled: !_busy,
             onSelected: _export,
             itemBuilder: (_) => [
                   PopupMenuItem(
                       value: false,
-                      child: Text(_text('导出当前方案', 'Export current'))),
+                      child: Text(ModuStrings.text(
+                          context, '导出当前方案', 'Export current'))),
                   PopupMenuItem(
-                      value: true, child: Text(_text('导出全部方案', 'Export all'))),
+                      value: true,
+                      child: Text(
+                          ModuStrings.text(context, '导出全部方案', 'Export all'))),
                 ],
             child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(_text('导出', 'Export')))),
+                child: Text(ModuStrings.text(context, '导出', 'Export')))),
         TextButton(
             onPressed: _busy ? null : _delete,
-            child: Text(_text('删除', 'Delete'))),
+            child: Text(ModuStrings.text(context, '删除', 'Delete'))),
       ]),
       if (widget.bookKey != null)
         Wrap(spacing: 8, children: [
           TextButton(
               onPressed: _busy ? null : _followDefault,
-              child: Text(_text('跟随默认方案', 'Follow default'))),
+              child:
+                  Text(ModuStrings.text(context, '跟随默认方案', 'Follow default'))),
           TextButton(
               onPressed: _busy ? null : () => _save(asDefault: true),
-              child: Text(_text('设为默认方案', 'Set as default'))),
+              child:
+                  Text(ModuStrings.text(context, '设为默认方案', 'Set as default'))),
         ]),
       const SizedBox(height: 12),
       Material(
@@ -430,21 +444,23 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             key: const ValueKey('custom-css-slot-enabled'),
-            title: Text(_text('启用当前方案', 'Enable this profile')),
+            title: Text(
+                ModuStrings.text(context, '启用当前方案', 'Enable this profile')),
             subtitle: !_enabled
-                ? Text(_text('总开关关闭时，所有方案均不生效', 'The master switch is off'))
+                ? Text(ModuStrings.text(
+                    context, '总开关关闭时，所有方案均不生效', 'The master switch is off'))
                 : null,
             value: _active.contains(_index),
             onChanged: _busy ? null : _toggleSlot,
           )),
       Wrap(spacing: 8, children: [
         ChoiceChip(
-            label: Text(_text('排版 CSS', 'Layout CSS')),
+            label: Text(ModuStrings.text(context, '排版 CSS', 'Layout CSS')),
             selected: !_highlight,
             onSelected:
                 _busy ? null : (_) => setState(() => _highlight = false)),
         ChoiceChip(
-            label: Text(_text('正则高亮', 'Regex highlight')),
+            label: Text(ModuStrings.text(context, '正则高亮', 'Regex highlight')),
             selected: _highlight,
             onSelected:
                 _busy ? null : (_) => setState(() => _highlight = true)),
@@ -455,8 +471,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           enabled: !_busy,
           maxLength: 40,
           decoration: InputDecoration(
-              labelText: _text('方案名称', 'Profile name'),
-              hintText: _text('例如：竖排古籍、横排小说、精排保留',
+              labelText: ModuStrings.text(context, '方案名称', 'Profile name'),
+              hintText: ModuStrings.text(context, '例如：竖排古籍、横排小说、精排保留',
                   'e.g. Vertical, Novel, Publisher layout'))),
       if (_highlight) ...[
         TextField(
@@ -465,7 +481,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
             enabled: !_busy,
             maxLength: 512,
             decoration: InputDecoration(
-                labelText: _text('正则表达式（JavaScript，无需 / /）',
+                labelText: ModuStrings.text(context, '正则表达式（JavaScript，无需 / /）',
                     'Regular expression (JavaScript, no / /)'))),
       ],
       DropdownButton<String>(
@@ -473,12 +489,17 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           isExpanded: true,
           items: [
             DropdownMenuItem(
-                value: 'all', child: Text(_text('作用范围：全部', 'Scope: All'))),
+                value: 'all',
+                child:
+                    Text(ModuStrings.text(context, '作用范围：全部', 'Scope: All'))),
             DropdownMenuItem(
                 value: 'title',
-                child: Text(_text('作用范围：标题', 'Scope: Headings'))),
+                child: Text(
+                    ModuStrings.text(context, '作用范围：标题', 'Scope: Headings'))),
             DropdownMenuItem(
-                value: 'body', child: Text(_text('作用范围：正文', 'Scope: Body'))),
+                value: 'body',
+                child:
+                    Text(ModuStrings.text(context, '作用范围：正文', 'Scope: Body'))),
           ],
           onChanged: _busy ? null : (value) => setState(() => _scope = value!)),
       IgnorePointer(
@@ -495,13 +516,14 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error))),
       ExpansionTile(
         key: ValueKey('css-code-editor-$_index'),
-        title: Text(_text('自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
+        title: Text(ModuStrings.text(
+            context, '自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
         initiallyExpanded: _cssController.text.isNotEmpty,
         children: [
           Text(_highlight
-              ? _text('局部高亮填写 CSS 声明，不加选择器和花括号。',
+              ? ModuStrings.text(context, '局部高亮填写 CSS 声明，不加选择器和花括号。',
                   'For highlights, enter declarations without selectors or braces.')
-              : _text('保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
+              : ModuStrings.text(context, '保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
                   'Original code is preserved and follows visual settings. Code selectors determine its scope.')),
           SizedBox(
               height: 200,
@@ -534,11 +556,12 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                       _error = null;
                     }),
             icon: const Icon(Icons.clear, size: 16),
-            label: Text(_text('清空当前代码', 'Clear current CSS'))),
+            label:
+                Text(ModuStrings.text(context, '清空当前代码', 'Clear current CSS'))),
         ElevatedButton.icon(
             onPressed: _busy ? null : () => _save(),
             icon: const Icon(Icons.save, size: 16),
-            label: Text(_text('保存模板', 'Save template'))),
+            label: Text(ModuStrings.text(context, '保存模板', 'Save template'))),
       ]),
       const SizedBox(height: 8),
     ]);

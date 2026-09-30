@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_prompts.dart';
 import 'package:langchain_core/chat_models.dart';
@@ -41,7 +39,7 @@ PromptTemplatePayload generatePromptTest() {
   final template = ChatPromptTemplate.fromPromptMessages([
     HumanChatMessagePromptTemplate.fromTemplate(normalized),
   ]);
-  final currentLocale = Prefs().locale?.languageCode ?? Platform.localeName;
+  final currentLocale = Prefs().effectiveLocale.toLanguageTag();
   return PromptTemplatePayload(
     template: template,
     variables: {'language_locale': currentLocale},

@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
@@ -16,14 +17,14 @@ class FolderPinMenu extends ConsumerWidget {
     final pinned = ref.watch(bookshelfPinsProvider).contains(key);
     return PopupMenuButton<bool>(
       key: menuKey,
-      tooltip: zh ? '文件夹操作' : 'Folder actions',
+      tooltip: ModuStrings.text(context, '文件夹操作', 'Folder actions'),
       icon: Icon(pinned ? Icons.push_pin : Icons.more_vert),
       onSelected: (value) async {
         try {
           await ref.read(bookshelfPinsProvider.notifier).setPinned(key, value);
         } catch (_) {
-          AnxToast.show(
-              zh ? '置顶设置保存失败，请重试' : 'Could not save pin. Please retry.');
+          AnxToast.show(ModuStrings.text(
+              context, '置顶设置保存失败，请重试', 'Could not save pin. Please retry.'));
         }
       },
       itemBuilder: (_) => [

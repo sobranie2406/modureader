@@ -1,0 +1,3199 @@
+{
+  "ai_fullTextTranslate_prompt": {
+    "en": "You are a professional translator. Translate the following text into {{to_locale}}.\n\nSource language: {{from_locale}}\nSource text: {{text}}\n\nRequirements:\n- Output ONLY the translated text, nothing else.\n- Do not include any explanations, notes, commentary, or the original text.\n- Preserve paragraph structure and formatting.\n- Maintain the tone and style of the original text.\n        "
+  },
+  "ai_mindmap_prompt": {
+    "zh": "你是一名把阅读内容转化为结构化知识的思维导图设计师。请基于当前阅读范围建立导图，展示关系和层级，不要把摘要拆成一堆孤立句子。\n\n建图步骤：\n1. 确定一个能覆盖当前内容的中心主题。\n2. 根据体裁选择分支：文学作品优先使用情节、人物、关系、冲突、意象与主题；非虚构作品优先使用问题、概念、论点、证据、方法与结论。\n3. 保留 4–7 个一级分支，每个分支包含 2–4 个二级节点；只在确有帮助时增加第三层。\n4. 节点标签尽量控制在 8 个字或单词内，同层节点使用一致的语法形式。\n5. 使用“导致、支持、对比、冲突、属于”等关系组织节点，合并重复概念。\n\n优先调用 `mindmap_draw` 工具绘制导图：`title` 使用简洁主题，`nodes` 使用唯一且稳定的节点 ID，所有标签与原文语言一致。工具不可用时，用 Markdown 树状列表输出同一结构，并明确说明未能绘图。\n\n建图后只补充 2–3 句解读：指出整体结构、最重要的联系和一个值得注意的张力或空白。只使用可验证的文本信息；不确定的关系要标注为推断，不要自行补全。\n        "
+  },
+  "ai_summaryTheBook_prompt": {
+    "zh": "你是一名负责全书综述的阅读助手。如果可以使用全书检索或目录工具，先获取全书结构和关键章节；不要只根据当前页面或出版简介推断全书。\n\n先判断体裁：\n- 文学/叙事作品：总结核心冲突、主要人物的目标与关键选择、情节转折以及主题如何形成。除非用户明确要求完整剧透，不披露最终结局。\n- 非虚构/论述作品：总结中心问题、核心论点、全书结构、关键证据或案例、推导路径及最终结论。\n\n按以下结构输出：\n1. 一句话总览：概括这本书最核心的问题和结论。\n2. 全书架构：用 4–7 个节点说明内容如何展开，而不是逐章复述。\n3. 核心内容：根据体裁概括关键人物与转折，或主要论点与证据。\n4. 主题与价值：给出 3–5 个主题词，并说明作品如何支持它们。\n5. 限制与留白：说明文本没有解决的问题、可争议之处或需要继续核对的内容。\n\n使用与原文一致的语言。只总结能从书中验证的内容，不杜撰细节或引文。如果无法获取全书，必须在开头说明实际覆盖范围，并将结果标为“基于可用内容的总结”。\n        "
+  },
+  "ai_summaryTheChapter_prompt": {
+    "zh": "你是一名注重准确性和阅读进度的章节总结助手。请只总结当前章节，不要用全书简介或后续情节补全本章。\n\n先判断内容类型，再调整重点：\n- 文学/叙事内容：聚焦情节推进、人物选择与关系变化、冲突、意象和主题。\n- 非虚构/论述内容：聚焦核心问题、主要主张、证据、推理过程、关键概念和结论。\n\n按以下结构输出：\n1. 章节主旨：用 1–2 句说明这一章解决了什么问题或推动了什么变化。\n2. 内容脉络：按文本的内在顺序列出 3–6 个关键节点，体现它们之间的因果或逻辑关系。\n3. 关键细节：列出 2–4 个不应在压缩中丢失的事实、选择、证据或概念。\n4. 意义与作用：说明本章在当前阅读范围中的作用，不预告后文。\n\n使用与原文一致的语言，保持简洁但信息完整。不要杜撰人物、引文、数据或作者意图；如上下文只覆盖章节的一部分，开头明确写“以下为已提供内容的阶段性总结”。\n        "
+  },
+  "ai_summaryThePreviousContent_prompt": {
+    "en": "I'm revisiting a book I read long ago. Help me quickly recall the previous content to continue reading:\n[Requirements]\n3-5 sentences\nSame language as original previous content\nAvoid verbatim repetition; preserve core information\n\n[Previous Content]\n{{previous_content}}\n        "
+  },
+  "ai_test_prompt": {
+    "en": "Write a concise and friendly self-introduction. Use the language code: {{language_locale}}\n        "
+  },
+  "ai_translate_prompt": {
+    "en": "You are the Modu \"Translation & Reference\" expert. Deliver an authoritative answer in the user's preferred language {{to_locale}}.\n\nInput for this request:\n- Source Text: {{text}}\n- Source Language hint: {{from_locale}}\n- Reader Context (may be empty): {{contextText}}\n\n## Response Structure (CRITICAL)\nYour response MUST follow this two-part structure:\nDON'T output the skeleton or the instructions, only the final answer.\n\n### Part 1: Quick Context-Aware Explanation (ALWAYS FIRST)\nStart with 1-2 concise words that:\n- Directly explain the meaning/translation in the reading context\n- Address any ambiguity resolved by the context\n- Use plain, conversational language\n- Don't quote the source text unless necessary for clarity, and avoid excessive quoting\n\n### Part 2: Detailed Analysis (AFTER the quick explanation)\nProvide comprehensive information using the format below.\n\n## Core Duties\n1. Interpret the text precisely, using Reader Context to resolve pronouns, tone, domain knowledge, or cultural references. If no context is provided, state that you inferred meaning from the snippet alone.\n2. Provide dictionary-level detail (phonetics, part of speech, nuanced senses) AND an encyclopedia-style insight (origin, cultural background, literary reference, or factual hook).\n3. Offer practical guidance so the reader can use or understand the expression naturally.\n\n## Constraints\n- All responses must stay in {{to_locale}}.\n- Be concise but complete; remove any template sections only when genuinely inapplicable and indicate why.\n- Never output markdown lists, numbering symbols, or code fences—just localized headings and text.\n\n## Decision Tree\n- If source language matches {{to_locale}} → act as an advanced monolingual dictionary entry.\n- Otherwise → act as a translator plus tutor.\n\n## Detail (plain text, no bullet symbols, each heading MUST translated into {{to_locale}})\n\nWhen acting as a dictionary (same language):\n- Pronunciation: best-available phonetic transcription or note if unknown.\n- Part of speech: list every relevant part of speech.\n- Meanings: enumerate key senses with concise explanations.\n- Examples: provide two natural example sentences with brief clarifications.\n- Encyclopedia: share one contextual or cultural fact (history, literature, idiom origin, domain usage).\n\nWhen acting as a translator (different languages):\n- Source excerpt: quote or lightly trim the source snippet (note when shortened).\n- Translation: produce a fluent translation honoring tone and register.\n- Translation notes: justify critical word choices, including how context shaped them.\n- Glossary: highlight 2-4 pivotal terms with short meaning notes in {{to_locale}}.\n- Encyclopedia: add one background detail (culture, setting, concept) that aids understanding.\n      "
+  },
+  "selection_custom-preset-dictionary_name": {
+    "zh": "AI 词典"
+  },
+  "selection_custom-preset-dictionary_prompt": {
+    "zh": "解释所选词语 {selection}。英文给出 IPA 音标、词性、中文翻译、中英文释义、例句与常用搭配；中文给出带声调的拼音、含义、用法和相关词语。优先用模型已有知识，不足时根据应用返回的词典／百科资料整理并注明来源。不使用本书知识库，不编造读音或词源。"
+  },
+  "selection_custom-preset-explain_name": {
+    "zh": "通俗解释"
+  },
+  "selection_custom-preset-explain_prompt": {
+    "zh": "请通俗解释选中的文字 {selection}，先说明含义，再解释关键概念，必要时给一个简短例子。只围绕选中文字，不补写书中的情节或上下文。"
+  },
+  "selection_custom-preset-points_name": {
+    "zh": "提炼要点"
+  },
+  "selection_custom-preset-points_prompt": {
+    "zh": "从选中的文字 {selection} 中提炼关键要点，用简短列表呈现；有论证时区分观点和依据，有事件时区分人物、事件和结果。要点数量按原文决定，不凑数。"
+  },
+  "selection_custom-preset-polish_name": {
+    "zh": "润色"
+  },
+  "selection_custom-preset-polish_prompt": {
+    "zh": "润色选中的文字 {selection}，让表达自然、清晰、流畅，保留原意、事实与语气，不增加信息。先给润色结果，再简短说明主要改动。"
+  },
+  "selection_custom-preset-summary_name": {
+    "zh": "摘要"
+  },
+  "selection_custom-preset-summary_prompt": {
+    "zh": "用简洁语言概括选中的文字 {selection}，保留核心观点、关键事实和因果关系。不引用其他段落，不添加原文没有的信息。"
+  },
+  "selection_custom-preset-translate_name": {
+    "zh": "AI 翻译"
+  },
+  "selection_custom-preset-translate_prompt": {
+    "zh": "翻译选中文字 {selection}：英文译成自然的中文，中文译成自然的英文；混合文本按主要语言处理。保持原意和段落，先给译文，必要时补充易误解的词语。"
+  },
+  "skill_ai_dictionary_description": {
+    "zh": "模型知识优先，不足时联网查词典／百科；英文音标与双语释义、中文拼音及相关词语知识"
+  },
+  "skill_ai_dictionary_name": {
+    "zh": "AI 词典解释"
+  },
+  "skill_ai_dictionary_prompt": {
+    "zh": "请作为独立的 AI 词典，使用当前 AI 模型已有的语言与百科知识，解释用户选中的词语或短语。不以本书知识库为依据，不分析当前书籍或章节，不生成“本段词汇网”。直接从词条开始回答，不输出获取上下文、书名或章节的开场说明。\n\n英文词语：\n1. 词条与音标：给出 IPA 国际音标；英式和美式不同则分别列出，标明词性。\n2. 中文翻译：列出最常见的中文对应词，多义词按常用义项区分。\n3. 中英文解释：每个主要义项给出中文释义与简洁的英文 definition。\n4. 用法：给出 1–2 个英文例句及中文翻译，必要时补充常用搭配。\n\n中文词语：\n1. 词条与拼音：使用带声调的拼音；多音字或不同读法分开说明，不擅自确定缺少语境的读音。\n2. 词语解释：用现代汉语说明常见含义，标注古义、成语义或专业义，不假设书中含义。\n3. 用法：给出简短例句；词源或典故只有可靠时才补充。\n\n相关词语知识（中英文均提供）：\n- 挑选 2–4 个确实相关的近义词、反义词、易混词或派生词，分别给出简短释义，并说明与所选词语的关系或区别；不存在合适条目时不要凑数。\n- 补充常用搭配、使用场景；词源、典故、专业背景等仅在有助于理解且有把握时简述。\n- 英文相关词附中文含义；中文相关词如有生僻字或多音字，补充带声调的拼音。不扩展为与词语无关的书籍分析。\n\n中英混合输入分别解释；长句先选取关键生词，不把整句硬当成一个词。没有把握的音标、拼音、释义和相关知识应明确说明，不能编造。优先使用模型已有知识；不足时由应用联网搜索在线词典／百科，再根据返回的真实资料整理答案。未收到检索资料前不要声称“已查询知识库”或“网上查到”，不捏造权威来源。保持简明，避免重复说明知识来源。\n"
+  },
+  "skill_argument_analyzer_description": {
+    "zh": "分析作者的推理、论点和支持证据"
+  },
+  "skill_argument_analyzer_name": {
+    "zh": "论证分析"
+  },
+  "skill_argument_analyzer_prompt": {
+    "zh": "你是一名严谨、公平的论证分析助手。请重建当前内容的推理结构，先准确理解作者，再评估论证，不要把你的立场冒充作者立场。\n\n按以下结构输出：\n- 核心结论：用一句话概括作者希望读者接受的主张。\n- 论证链：用“前提 → 推理 → 中间结论 → 最终结论”展示逻辑。\n- 证据清单：区分数据、案例、引证、类比和经验判断，说明各自支持哪一步。\n- 隐含假设：列出论证成立必须默认为真的条件。\n- 强度评估：分别说明有效之处、证据缺口、逻辑跳跃或概念滑移。\n- 最强反方：给出一个尽可能有力的反例或替代解释，并说明它会动摇哪一环。\n- 审慎结论：说明证据最多能支持到什么程度。\n\n只根据可见文本分析。文中没有提供的数据或来源不得自行补全；上下文不足时标注“待验证”。使用与原文一致的语言。\n"
+  },
+  "skill_book_summary_description": {
+    "zh": "按体裁概括全书结构、核心内容与主题"
+  },
+  "skill_book_summary_name": {
+    "zh": "全书总结"
+  },
+  "skill_character_tracker_description": {
+    "zh": "追踪书中的人物、关系和发展轨迹"
+  },
+  "skill_character_tracker_name": {
+    "zh": "人物追踪"
+  },
+  "skill_character_tracker_prompt": {
+    "zh": "你是一名严格遵守阅读进度的人物档案助手。请整理截至当前位置已出现的重要人物，不得引用后续情节、结局或书外剧透信息。\n\n输出三部分：\n1. 人物档案：对每个重要人物列出身份/定位、当前目标、关键行动、显示出的性格与变化。\n2. 关系网：用“人物 A ↔ 人物 B：关系性质／当前冲突／关键事件”表示重要联系。\n3. 发展线索：概括已发生的转折、尚未解决的矛盾和值得继续观察的线索。\n\n对动机、情感或未明示的关系，必须标注“文本事实”或“合理推断”，并给出推断依据。同名、别名或称谓要合并；不确定时保留多种可能。使用与原文一致的语言。\n"
+  },
+  "skill_concept_explainer_description": {
+    "zh": "深入解释书中的概念、术语和抽象观点"
+  },
+  "skill_concept_explainer_name": {
+    "zh": "概念解析"
+  },
+  "skill_concept_explainer_prompt": {
+    "zh": "你是一名善于把复杂思想讲清楚的阅读助手。请从当前阅读内容中选出 1–3 个理解本段最关键的概念，不要把普通词汇全部扩展成概念。\n\n对每个概念按以下结构回答：\n1. 一句话定义：先用通俗语言说清“它是什么”。\n2. 文中含义：说明作者在当前语境中如何使用它，与通常含义有何差异。\n3. 运作方式：说明原因、机制或与其他概念的关系。\n4. 具体例子：给出一个贴合书中语境的简短例子或类比。\n5. 易混点：指出一个常见误解、边界或与相近概念的区别。\n\n优先使用书中的定义和例子。事实、作者观点和你的辅助解释要明确区分；上下文不足时直接说明，不要猜测。使用与原文一致的语言。\n"
+  },
+  "skill_mindmap_description": {
+    "zh": "把当前阅读内容整理为清晰的层级结构"
+  },
+  "skill_mindmap_name": {
+    "zh": "思维导图"
+  },
+  "skill_quote_collector_description": {
+    "zh": "发现并整理书中值得记录的语句和段落"
+  },
+  "skill_quote_collector_name": {
+    "zh": "金句摘录"
+  },
+  "skill_quote_collector_prompt": {
+    "zh": "你是一名注重准确引用的摘录编辑。请从当前可见的阅读内容中精选 3–7 条最值得保留的句子或短段，优先选择能独立表达核心观点、精准刻画人物或具有独特语言力量的原文。\n\n每条按以下格式输出：\n- 主题标签\n- 原文引用：逐字保留，不改写、不拼接\n- 摘录理由：用 1–2 句说明它与本章思想、人物或写作手法的关系\n- 位置：如上下文提供章节名、页码或段落信息则标注，否则写“当前内容”\n\n引号内只能放可核对的原文。绝对不得凭印象补全、改写后冒充引文，也不得引用当前上下文之外的内容。没有足够值得摘录的句子时，宁可少选并说明原因。\n"
+  },
+  "skill_reading_guide_description": {
+    "zh": "提供阅读建议、讨论问题和反思提示"
+  },
+  "skill_reading_guide_name": {
+    "zh": "阅读指南"
+  },
+  "skill_reading_guide_prompt": {
+    "zh": "你是一名引导深度阅读的导读者。请为当前内容制作一份可以边读边用的阅读指南，重点是帮助读者观察、提问和建立联系，不要只是重复内容摘要。\n\n按以下结构输出：\n1. 阅读目标：用 2–3 句说明这部分值得关注什么。\n2. 重点地图：列出 3–5 个核心概念、情节节点或论证转折，说明它们的联系。\n3. 别忽略：指出 2–4 个容易跳过但可能重要的细节、意象、前提或变化。\n4. 边读边问：给出 3 个可回到文本验证的问题。\n5. 深入反思：给出 2 个开放问题，分别连接作者选择与读者经验。\n6. 阅读后自检：给出一个能检验是否真正理解的小任务。\n\n根据体裁调整重点：文学作品关注人物、叙事、意象和语气；非虚构作品关注概念、证据、假设和结论。严格停留在当前阅读进度，不剧透后续内容。\n"
+  },
+  "skill_smart_summary_description": {
+    "zh": "总结当前章节，提取情节、人物和主题"
+  },
+  "skill_smart_summary_name": {
+    "zh": "本章总结"
+  },
+  "skill_smart_translator_description": {
+    "zh": "结合书籍语境翻译外语内容"
+  },
+  "skill_smart_translator_name": {
+    "zh": "智能翻译"
+  },
+  "skill_smart_translator_prompt": {
+    "zh": "你是一名注重书籍语境和风格一致性的文学翻译。请翻译当前选中或可见的外语内容；若用户没有指定目标语言，翻译为用户当前使用的语言。\n\n翻译原则：\n- 先利用前后文消解代词、省略、双关和多义词，不按孤立句子机械直译。\n- 保留原文的人称、时态、语气、节奏和正式程度；不擅自润色成另一种文风。\n- 人名、地名、专有名词和反复术语始终使用同一译法。\n- 保留段落、引号、标题和列表结构，不遗漏信息，不添加原文没有的结论。\n\n输出时先给出完整译文。只在确实存在歧义、文化背景或难以直译的表达时，再增加“翻译说明”，简要解释关键取舍；没有必要时不要附加解说。原文不完整时，明确标出断句不确定处。\n"
+  },
+  "skill_vocabulary_helper_description": {
+    "zh": "解释生词、习语和专业术语"
+  },
+  "skill_vocabulary_helper_name": {
+    "zh": "词汇助手"
+  },
+  "skill_vocabulary_helper_prompt": {
+    "zh": "你是一名以语境理解为核心的词汇导师。请从当前内容中挑选 5–10 个最值得学习的生词、习语、固定搭配或专业术语。优先选择影响理解、在本书里反复出现或具有特殊语境含义的表达，跳过过于基础的词。\n\n每个词条包含：\n- 原词与词性；如适用，补充标准发音或音标\n- 本文语境义：先说清在这句话里具体是什么意思\n- 常见义对比：只在与语境义有明显差异时补充\n- 常用搭配或构词线索：选最有助于记忆的 1–2 项\n- 一个自然、简短的新例句及译文，不要复制原句\n\n最后补充“本段词汇网”，用 2–4 句说明这些词如何共同服务于当前主题。对不确定的发音、词源或专业含义要明确标注，不要编造。解释使用用户的当前语言。\n"
+  },
+  "ui_10480101": {
+    "zh": "语气轻快明朗。"
+  },
+  "ui_104bf2d8": {
+    "zh": "使用偏低沉、稳重的表达，语气从容，情绪克制，保持清晰度，不刻意压低到含混。"
+  },
+  "ui_107020e6": {
+    "zh": "系统语音（此平台不支持）",
+    "en": "System speech (unavailable)"
+  },
+  "ui_1074e7e6": {
+    "zh": "配置迁移",
+    "en": "Configuration transfer"
+  },
+  "ui_107b6f93": {
+    "zh": "本章使用的字体加载失败，请重试或切换章节。",
+    "en": "A chapter font failed to load. Retry or select another chapter."
+  },
+  "ui_10d3aae4": {
+    "zh": "正在处理字典，已导入 {count} 条…",
+    "en": "Processing dictionary: {count} entries…"
+  },
+  "ui_10d4f470": {
+    "zh": "音色描述（必填）",
+    "en": "Voice description (required)"
+  },
+  "ui_10e077da": {
+    "zh": "标题",
+    "en": "Title"
+  },
+  "ui_114a0bdc": {
+    "zh": "CSS 设置",
+    "en": "CSS settings"
+  },
+  "ui_11582a9a": {
+    "zh": "仅在你启动后翻译可见段落，滚动时逐段加载，不会一次发送整章。可随时停止；关闭书籍后停止，重新打开不会自动继续。",
+    "en": "Translate visible paragraphs only after you start; scrolling loads them one at a time. Stop at any time. Closing the book stops translation; reopening never resumes it automatically."
+  },
+  "ui_11cdc70f": {
+    "zh": "保存失败，请检查搜索配置后重试。",
+    "en": "Could not save search settings."
+  },
+  "ui_11d89063": {
+    "zh": "连贯朗读：同段相邻句合成，高亮和前后跳转按小段；长段自动拆分。",
+    "en": "Continuous narration: adjacent sentences are grouped. Highlighting and Previous/Next follow each group; long paragraphs are split."
+  },
+  "ui_12070956": {
+    "zh": "无需 API 密钥，开箱即用",
+    "en": "Works without an API key"
+  },
+  "ui_1212bc91": {
+    "zh": "未找到完全匹配的词条，可修改词语后重试。",
+    "en": "No exact match. Edit the word and try again."
+  },
+  "ui_1288da52": {
+    "zh": "线条宽度",
+    "en": "Thickness"
+  },
+  "ui_12f63048": {
+    "zh": "章节加载失败，请重试或切换章节。",
+    "en": "Chapter loading failed. Retry or select another chapter."
+  },
+  "ui_1359f116": {
+    "zh": "上一段",
+    "en": "Previous passage"
+  },
+  "ui_1377423": {
+    "zh": "自定义技能",
+    "en": "自定义技能"
+  },
+  "ui_137825e0": {
+    "zh": "密码（保存在本机）",
+    "en": "Password (saved on this device)"
+  },
+  "ui_13b9962b": {
+    "zh": "描述音色质感、语气、情绪、语速或停顿。留空使用默认风格，提示词不会拼入朗读正文。",
+    "en": "Describe timbre, tone, emotion, pace or pauses. Leave empty for the default style. Instructions are not added to the spoken text."
+  },
+  "ui_13e64f89": {
+    "zh": "按新设置重新翻译",
+    "en": "Retranslate with new settings"
+  },
+  "ui_1451b75": {
+    "zh": "报告较长，将复制完整内容到剪贴板，再打开 GitHub。请手动粘贴，不会截断内容。",
+    "en": "This report is long. Copy the full text to your clipboard and open GitHub, then paste it manually. Nothing will be truncated."
+  },
+  "ui_147ba286": {
+    "zh": "文件夹名称",
+    "en": "Folder name"
+  },
+  "ui_147c7bbf": {
+    "zh": "开始导入",
+    "en": "Start import"
+  },
+  "ui_147cfaf5": {
+    "zh": "选词搜索",
+    "en": "Selection search"
+  },
+  "ui_14883c0": {
+    "zh": "上一级",
+    "en": "Parent folder"
+  },
+  "ui_1534b3ce": {
+    "zh": "正在搜索…",
+    "en": "Searching…"
+  },
+  "ui_157b9ad6": {
+    "zh": "语音描述 / 朗读风格（可选）",
+    "en": "Speech description / style (optional)"
+  },
+  "ui_15fd8050": {
+    "zh": "发现新版本",
+    "en": "Update available"
+  },
+  "ui_1611b7db": {
+    "zh": "字典超过导入大小限制，请选择较小的字典。",
+    "en": "Dictionary exceeds the import size limit. Please choose a smaller dictionary."
+  },
+  "ui_16357fa6": {
+    "zh": "翻译引擎",
+    "en": "Translation engine"
+  },
+  "ui_1694d258": {
+    "zh": "斜体",
+    "en": "Italic"
+  },
+  "ui_16a3eebb": {
+    "zh": "更多",
+    "en": "More"
+  },
+  "ui_16e3fb99": {
+    "zh": "显示或隐藏密码",
+    "en": "Show or hide password"
+  },
+  "ui_1736a04c": {
+    "zh": "恢复默认",
+    "en": "Restore defaults"
+  },
+  "ui_175c4d1a": {
+    "zh": "用于语义搜索和混合 RAG 检索",
+    "en": "Used by semantic search and hybrid RAG retrieval"
+  },
+  "ui_17a4043c": {
+    "zh": "AI 命令",
+    "en": "AI command"
+  },
+  "ui_17eeee9d": {
+    "zh": "官方预置音色",
+    "en": "Preset voices"
+  },
+  "ui_17f972b5": {
+    "zh": "用户名（匿名访问可留空）",
+    "en": "Username (optional for anonymous access)"
+  },
+  "ui_1863547f": {
+    "zh": "MDX 暂支持不超过 256 MiB 的文件，请选择较小的字典。",
+    "en": "MDX files are currently limited to 256 MiB. Please choose a smaller dictionary."
+  },
+  "ui_189168b5": {
+    "zh": "降序",
+    "en": "Descending"
+  },
+  "ui_192cd88b": {
+    "zh": "保存配置",
+    "en": "Save"
+  },
+  "ui_195a6bc6": {
+    "zh": "导出全局设置文件",
+    "en": "Export global settings file"
+  },
+  "ui_195f342f": {
+    "zh": "尚无已启用的字典。请先导入或启用本地字典。",
+    "en": "No enabled dictionaries. Import or enable a local dictionary first."
+  },
+  "ui_198b6628": {
+    "zh": "将 {count} 本书移入文件夹",
+    "en": "Move {count} books to a folder"
+  },
+  "ui_198e4bfc": {
+    "zh": "收起技能标签",
+    "en": "Hide skill shortcuts"
+  },
+  "ui_19cf6b51": {
+    "zh": "其他设备必须输入相同密码。密码无法找回。",
+    "en": "Other devices must use the same password. It cannot be recovered."
+  },
+  "ui_19d9fed": {
+    "zh": "字典查询",
+    "en": "Dictionary"
+  },
+  "ui_1a0a2836": {
+    "zh": "本次内容不包含账号或密钥配置，本机已有账号与密钥保持不变。",
+    "en": "This content contains no account or key configurations. Existing local accounts and keys stay unchanged."
+  },
+  "ui_1a6d5b34": {
+    "zh": "滚动翻页幅度",
+    "en": "Scroll page step"
+  },
+  "ui_1aa6069f": {
+    "zh": "已将 Gitee 下载链接交给浏览器，请在浏览器中查看下载。",
+    "en": "Gitee download opened in your browser. Check the download there."
+  },
+  "ui_1acea56d": {
+    "zh": "移入",
+    "en": "Move"
+  },
+  "ui_1b08567b": {
+    "zh": "上次检查",
+    "en": "Last checked"
+  },
+  "ui_1b8c988b": {
+    "zh": "升序",
+    "en": "Ascending"
+  },
+  "ui_1bcbe14f": {
+    "zh": "取消下载",
+    "en": "Cancel download"
+  },
+  "ui_1c240959": {
+    "zh": "无法保存搜索引擎，请重试。",
+    "en": "Could not save the engine. Retry."
+  },
+  "ui_1c87b879": {
+    "zh": "应用数据准备失败，请重试；若持续失败，请保留数据并反馈问题。",
+    "en": "App data preparation failed. Retry; if the problem persists, keep your data and report the issue."
+  },
+  "ui_1d067f3f": {
+    "zh": "还没有自定义技能",
+    "en": "还没有自定义技能"
+  },
+  "ui_1dca406e": {
+    "zh": "作用范围：正文",
+    "en": "Scope: Body"
+  },
+  "ui_1e13bd21": {
+    "zh": "完成",
+    "en": "Done"
+  },
+  "ui_1e61dd53": {
+    "zh": "更换",
+    "en": "Replace"
+  },
+  "ui_1eb88a0f": {
+    "zh": "暂无已有文件夹，请先使用“新建文件夹”。",
+    "en": "No folders yet. Use New folder first."
+  },
+  "ui_1f7222bb": {
+    "zh": "内置技能、自定义技能与提示词",
+    "en": "Built-in, custom skills and prompts"
+  },
+  "ui_2033da69": {
+    "zh": "继续阅读时自动概括之前的内容"
+  },
+  "ui_2036ab45": {
+    "zh": "推荐",
+    "en": "Recommended"
+  },
+  "ui_2051f2a": {
+    "zh": "文字与背景",
+    "en": "Text and background"
+  },
+  "ui_207488a4": {
+    "zh": "附带崩溃日志（可选）",
+    "en": "Include crash diagnostics (optional)"
+  },
+  "ui_20b37506": {
+    "zh": "提示词",
+    "en": "Prompt"
+  },
+  "ui_20b68482": {
+    "zh": "支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址",
+    "en": "Supports official DeepL, a DeepLX base URL, or a full /translate URL"
+  },
+  "ui_213e674c": {
+    "zh": "直接划过文字，松手即高亮；退出后恢复滑动翻页。",
+    "en": "Swipe across text to highlight. Exit to resume swipe navigation."
+  },
+  "ui_2168f1a3": {
+    "zh": "启用语音提示词",
+    "en": "Enable speech instructions"
+  },
+  "ui_219422ef": {
+    "zh": "以自然的讲述方式朗读，吐字清楚，句间停顿适中，情绪平稳，适合长时间听书。"
+  },
+  "ui_21fcf85": {
+    "zh": "以故事讲述的方式朗读，根据上下文适度表现人物情绪，对话与旁白略有区分，避免夸张表演。"
+  },
+  "ui_21fe033b": {
+    "zh": "改名",
+    "en": "Rename"
+  },
+  "ui_2320f84e": {
+    "zh": "文件大小",
+    "en": "File size"
+  },
+  "ui_2338504": {
+    "zh": "新建 AI 命令",
+    "en": "New AI command"
+  },
+  "ui_235eaf2a": {
+    "zh": "已打开系统安装界面，请按提示操作；这不表示安装已完成。",
+    "en": "The system installer was opened. Follow its instructions; installation is not yet confirmed."
+  },
+  "ui_23ab5ab2": {
+    "zh": "选中文字时显示工具栏",
+    "en": "Show toolbar when selecting text"
+  },
+  "ui_24757ce2": {
+    "zh": "请输入或选择模型",
+    "en": "Enter or select a model"
+  },
+  "ui_24901752": {
+    "zh": "成年女性的柔和中音，音色温暖、清晰。以亲切而平稳的语气讲述，节奏舒缓，适合睡前听书。"
+  },
+  "ui_24e19205": {
+    "zh": "两端对齐",
+    "en": "Justify"
+  },
+  "ui_2526ea26": {
+    "zh": "衬线字体",
+    "en": "Serif"
+  },
+  "ui_26842853": {
+    "zh": "仅影响本书，不修改全局设置。保存不会自动开始任务；已有索引需在书籍菜单中重新向量化。模型不匹配期间，AI 检索仅使用关键词，避免混用向量。",
+    "en": "Only affects this book, not global settings. Saving does not start a task; rebuild existing embeddings from the book menu. While models differ, AI retrieval uses keywords only to avoid mixing vectors."
+  },
+  "ui_268eaa8a": {
+    "zh": "默认不随 WebDAV 同步。开启时需要设置独立加密密码并确认风险。",
+    "en": "Excluded from WebDAV sync by default. Enabling it requires a separate encryption password and risk confirmation."
+  },
+  "ui_26c13825": {
+    "zh": "最大 Token 数",
+    "en": "Max tokens"
+  },
+  "ui_274f72ea": {
+    "zh": "请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。",
+    "en": "Wait for the book to load. PDF and fixed-layout books are not supported."
+  },
+  "ui_2756d8aa": {
+    "zh": "亮度调节暂不可用，已保留系统亮度以确保阅读操作正常。",
+    "en": "Brightness adjustment is unavailable. System brightness is preserved so reader input remains usable."
+  },
+  "ui_28253f76": {
+    "zh": "允许 HTTP 明文连接",
+    "en": "Allow unencrypted HTTP"
+  },
+  "ui_284ce444": {
+    "zh": "返回原处",
+    "en": "Return"
+  },
+  "ui_28642210": {
+    "zh": "古文诵读"
+  },
+  "ui_28ad9c81": {
+    "zh": "字重",
+    "en": "Weight"
+  },
+  "ui_290da6f9": {
+    "zh": "前进",
+    "en": "Forward"
+  },
+  "ui_293257d3": {
+    "zh": "全文翻译引擎",
+    "en": "Full-text translation engine"
+  },
+  "ui_293faeb2": {
+    "zh": "当前阅读内核不支持正则高亮，请更新系统 WebView；普通 CSS 仍可使用。",
+    "en": "This web engine does not support regex highlights. Update WebView; layout CSS still works."
+  },
+  "ui_29ce20bb": {
+    "zh": "情绪克制"
+  },
+  "ui_29d6d280": {
+    "zh": "轻快明朗"
+  },
+  "ui_29dfc281": {
+    "zh": "语速稍慢，不拖长尾音。"
+  },
+  "ui_2a08ec21": {
+    "zh": "导入配置",
+    "en": "Import configuration"
+  },
+  "ui_2a95d5e9": {
+    "zh": "文件大小与兼容限制",
+    "en": "Size and compatibility limits"
+  },
+  "ui_2acdad69": {
+    "zh": "置顶设置保存失败，请重试",
+    "en": "Could not save pin. Please retry."
+  },
+  "ui_2bc3b49d": {
+    "zh": "连接成功，目录可读取（未写入任何远程文件）。",
+    "en": "Connected. Directory is readable; no remote files were written."
+  },
+  "ui_2be48f03": {
+    "zh": "接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用二维码或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。",
+    "en": "Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via QR images or modu links. System voices may need reselection on another device."
+  },
+  "ui_2ca705da": {
+    "zh": "恢复默认工具栏？",
+    "en": "Restore default toolbar?"
+  },
+  "ui_2cb88215": {
+    "zh": "划词工具栏设置",
+    "en": "Selection toolbar settings"
+  },
+  "ui_2d081e34": {
+    "zh": "维度（可留空，测试后自动填写）",
+    "en": "Dimensions (optional; detected by test)"
+  },
+  "ui_2d44f7ea": {
+    "zh": "编辑参数",
+    "en": "Edit parameters"
+  },
+  "ui_2d89f873": {
+    "zh": "百度网页翻译",
+    "en": "Baidu Web Translate"
+  },
+  "ui_2db6015e": {
+    "zh": "已清除连接配置和保存的密码。",
+    "en": "Connection and saved password cleared."
+  },
+  "ui_2dd43e60": {
+    "zh": "复制保存位置",
+    "en": "Copy location"
+  },
+  "ui_2df8ed7c": {
+    "zh": "仅点击翻页",
+    "en": "Tap-only page turning"
+  },
+  "ui_2dfccfd3": {
+    "zh": "包含账号、密码和 API Key",
+    "en": "Include accounts, passwords and API keys"
+  },
+  "ui_2e9c6732": {
+    "zh": "清理",
+    "en": "Clear"
+  },
+  "ui_2edb8665": {
+    "zh": "显示方式",
+    "en": "Display"
+  },
+  "ui_2f2a5e46": {
+    "zh": "本书 CSS 方案（本机记忆）",
+    "en": "CSS profile for this book (this device)"
+  },
+  "ui_2f4b6aa": {
+    "zh": "展开技能标签",
+    "en": "Show skill shortcuts"
+  },
+  "ui_2fd8bff3": {
+    "zh": "字号",
+    "en": "Size"
+  },
+  "ui_2fdafaad": {
+    "zh": "更新未完成",
+    "en": "Update could not complete"
+  },
+  "ui_2ffce2a7": {
+    "zh": "翻译引擎、目标语言",
+    "en": "Engine and target language"
+  },
+  "ui_2fff75cb": {
+    "zh": "用于阅读页的全文翻译功能"
+  },
+  "ui_3000757b": {
+    "zh": "翻译失败，已停止。请检查翻译服务后重试。",
+    "en": "Translation failed and stopped. Check the service and try again."
+  },
+  "ui_3070c3f": {
+    "zh": "清除朗读设置？",
+    "en": "Clear speech settings?"
+  },
+  "ui_30c65ef7": {
+    "zh": "自定义字体（未设置）",
+    "en": "Custom font (not set)"
+  },
+  "ui_30f66ff0": {
+    "zh": "小说演绎"
+  },
+  "ui_3121b602": {
+    "zh": "同步后的阅读位置暂时无法打开，请重新打开书籍。未覆盖云端进度。",
+    "en": "Could not open the synced position. Reopen the book; the synced progress was not overwritten."
+  },
+  "ui_317aee3e": {
+    "zh": "对关键内容适当重读。"
+  },
+  "ui_31ad0300": {
+    "zh": "网页加载失败，请刷新或切换搜索引擎。",
+    "en": "Could not load the page. Reload or switch engines."
+  },
+  "ui_323ddea4": {
+    "zh": "添加预设模板",
+    "en": "Add a preset template"
+  },
+  "ui_3328af16": {
+    "zh": "翻译中…",
+    "en": "Translating…"
+  },
+  "ui_33c9cc": {
+    "zh": "搜索中…",
+    "en": "Searching…"
+  },
+  "ui_33d1135e": {
+    "zh": "仅处理选中文字",
+    "en": "Selected text only"
+  },
+  "ui_33fc695d": {
+    "zh": "恢复默认值？",
+    "en": "Restore defaults?"
+  },
+  "ui_34321453": {
+    "zh": "导出",
+    "en": "Export"
+  },
+  "ui_3477ba41": {
+    "zh": "正在备份默读数据库并合并书库，请勿关闭应用…",
+    "en": "Backing up Modu and merging the library. Keep the app open…"
+  },
+  "ui_34917dd5": {
+    "zh": "填写 1–20 个不重复的六位颜色值，例如 66CCFF。",
+    "en": "Enter 1–20 unique six-digit RGB colours, e.g. 66CCFF."
+  },
+  "ui_34d27af7": {
+    "zh": "本书向量化模型",
+    "en": "Embedding model for this book"
+  },
+  "ui_356a249e": {
+    "zh": "更新请求失败，请检查网络或代理后重试。",
+    "en": "Update request failed. Check your connection or proxy and retry."
+  },
+  "ui_356e54ac": {
+    "zh": "SVG 下划线与背景图使用同一背景层；启用时优先显示 SVG。",
+    "en": "SVG underline takes precedence over the background image."
+  },
+  "ui_35954522": {
+    "zh": "填写问题并预览后，前往默读 GitHub 仓库确认提交（需要 GitHub 账号）。截图可在 GitHub 页面添加。",
+    "en": "Describe and preview your report, then confirm it in the Modu GitHub repository (GitHub account required). Attach screenshots on GitHub."
+  },
+  "ui_361a9bd6": {
+    "zh": "朗读设置已清除",
+    "en": "Speech settings cleared"
+  },
+  "ui_3633fd81": {
+    "zh": "设置使用 AES-256-GCM 加密；书籍、笔记和 AI 对话历史不加密。请使用独立强密码，遗失密码无法恢复密钥。密码不会写入备份。",
+    "en": "Settings use AES-256-GCM encryption; books, notes and AI chat history are not encrypted. Use a unique strong password. Keys cannot be recovered if the password is lost. The password is not stored in the backup."
+  },
+  "ui_363b2df9": {
+    "zh": "选择颜色",
+    "en": "Choose color"
+  },
+  "ui_36a35656": {
+    "zh": "朗读通知",
+    "en": "Reading notifications"
+  },
+  "ui_36b32e11": {
+    "zh": "方案名称",
+    "en": "Profile name"
+  },
+  "ui_36fbb946": {
+    "zh": "本地导入 · 离线选词查询",
+    "en": "Local import · Offline word lookup"
+  },
+  "ui_378bc2d0": {
+    "zh": "保存失败，请检查接口地址和朗读参数后重试",
+    "en": "Could not save. Check the service URL and speech parameters."
+  },
+  "ui_383eff74": {
+    "zh": "保存模板",
+    "en": "Save template"
+  },
+  "ui_3842aa88": {
+    "zh": "总开关关闭时，所有方案均不生效",
+    "en": "The master switch is off"
+  },
+  "ui_385f8c21": {
+    "zh": "根目录",
+    "en": "Root"
+  },
+  "ui_38740058": {
+    "zh": "粘贴 modu: 开头的专用链接 / 配置代码",
+    "en": "Paste a modu: configuration link / code"
+  },
+  "ui_38c79e6e": {
+    "zh": "展开原文",
+    "en": "Expand original"
+  },
+  "ui_38f85b8a": {
+    "zh": "请输入 1–512 个字符的正则表达式",
+    "en": "Enter a regex of 1–512 characters"
+  },
+  "ui_3967959d": {
+    "zh": "描述（可选）",
+    "en": "Description"
+  },
+  "ui_39a3aa11": {
+    "zh": "发布信息或安装包校验失败，已阻止安装。请重新检查并下载。",
+    "en": "Release or installer verification failed. Installation blocked; check and download again."
+  },
+  "ui_39b523bd": {
+    "zh": "关闭",
+    "en": "Close"
+  },
+  "ui_39c0bce2": {
+    "zh": "默读提供的可编辑模板；选择后替换下方描述。",
+    "en": "Editable Modu templates. Selecting one replaces the description below."
+  },
+  "ui_3b0f25fa": {
+    "zh": "修改时间",
+    "en": "Date modified"
+  },
+  "ui_3beb904c": {
+    "zh": "段落间距",
+    "en": "Paragraph gap"
+  },
+  "ui_3c1568a4": {
+    "zh": "请检查密码长度和两次输入",
+    "en": "Check the password length and that both entries match"
+  },
+  "ui_3c6bcb73": {
+    "zh": "第三方接口若不支持 instructions，可关闭此项；已写的描述会保留。",
+    "en": "Turn off if your provider does not support instructions. Your description will be retained."
+  },
+  "ui_3cf26379": {
+    "zh": "知识讲解"
+  },
+  "ui_3d23e901": {
+    "zh": "当前目录没有匹配的文件。",
+    "en": "No matching files in this folder."
+  },
+  "ui_3d2ad435": {
+    "zh": "可添加最多 20 个自定义引擎。使用 {query} 表示选中的文字，例如 https://www.baidu.com/s?wd={query}。配置可随全局设置导出。",
+    "en": "Add up to 20 engines. Use {query} for selected text, e.g. https://www.baidu.com/s?wd={query}. These settings are included in global settings exports."
+  },
+  "ui_3d809738": {
+    "zh": "删除书籍",
+    "en": "Delete book"
+  },
+  "ui_3d9a06e": {
+    "zh": "无法保存安装包，请检查剩余空间和文件权限。",
+    "en": "Cannot save the installer. Check free space and file permissions."
+  },
+  "ui_3e585b8c": {
+    "zh": "删除 {count} 本书",
+    "en": "Delete {count} books"
+  },
+  "ui_3e6d79a1": {
+    "zh": "向量模型设置",
+    "en": "Vector model settings"
+  },
+  "ui_3ef75859": {
+    "zh": "清空描述",
+    "en": "Clear description"
+  },
+  "ui_3f29a4fa": {
+    "zh": "创建并移入",
+    "en": "Create and move"
+  },
+  "ui_3fc9a7d9": {
+    "zh": "全局设置备份",
+    "en": "Global settings backup"
+  },
+  "ui_3fe5db71": {
+    "zh": "删除模型",
+    "en": "Delete model"
+  },
+  "ui_3ffcd5e6": {
+    "zh": "温度 {temperature} · 最大 {tokens} Token · {turns} 轮",
+    "en": "Temperature {temperature} · {tokens} tokens · {turns} turns"
+  },
+  "ui_407fc89d": {
+    "zh": "向量化模型",
+    "en": "Embedding model"
+  },
+  "ui_40c9dc9": {
+    "zh": "旧音色不受支持，请重新选择",
+    "en": "Unsupported voice — select another"
+  },
+  "ui_40dd92f8": {
+    "zh": "名称",
+    "en": "Name"
+  },
+  "ui_40edd028": {
+    "zh": "恢复会替换现有书库、笔记和备份中的设置。程序会先校验备份并保留旧目录的恢复副本。是否继续？",
+    "en": "Restoring replaces your library, notes and backed-up settings. The backup is validated first, and a recovery copy of the old directory is kept. Continue?"
+  },
+  "ui_414b35b7": {
+    "zh": "检查连接设置",
+    "en": "Check connection settings"
+  },
+  "ui_4158d1da": {
+    "zh": "复制文件名",
+    "en": "Copy file name"
+  },
+  "ui_41643a94": {
+    "zh": "已下载并导入本地书架。",
+    "en": "Downloaded and imported to your bookshelf."
+  },
+  "ui_419e312d": {
+    "zh": "吐字清晰，避免含混。"
+  },
+  "ui_41a2edcc": {
+    "zh": "仅译文",
+    "en": "Translation only"
+  },
+  "ui_41b097fc": {
+    "zh": "快速标记中 · 退出",
+    "en": "Quick mark · Exit"
+  },
+  "ui_422bea0a": {
+    "zh": "常用提示词（点击追加，可继续编辑）",
+    "en": "Prompt suggestions (tap to append, then edit)"
+  },
+  "ui_424f7b1b": {
+    "zh": "问题反馈与处理进度",
+    "en": "Bug reports and issue status"
+  },
+  "ui_42527520": {
+    "zh": "无法读取文件或写入字典，请检查文件权限和可用空间。",
+    "en": "Cannot read or save dictionary. Check file permissions and free space."
+  },
+  "ui_427cc4fe": {
+    "zh": "选择已导入字体",
+    "en": "Choose an imported font"
+  },
+  "ui_43462a92": {
+    "zh": "DeepL 请求地址",
+    "en": "DeepL request URL"
+  },
+  "ui_442818eb": {
+    "zh": "配置代码和二维码不是加密数据，可能包含密码或 API Key。",
+    "en": "The code and QR image are not encrypted and may contain passwords or API keys."
+  },
+  "ui_445c1139": {
+    "zh": "重现步骤",
+    "en": "Steps to reproduce"
+  },
+  "ui_44f11afd": {
+    "zh": "本章高亮达到安全上限，仅显示部分匹配。",
+    "en": "Chapter highlight limit reached; showing partial matches."
+  },
+  "ui_450eb818": {
+    "zh": "远程模型",
+    "en": "Remote model"
+  },
+  "ui_453be9d1": {
+    "zh": "无法切换快速标记，请重试。",
+    "en": "Could not switch quick mark. Please retry."
+  },
+  "ui_45b90fdf": {
+    "zh": "添加时间使用服务器创建时间；未提供的排在末尾。",
+    "en": "Date added uses server creation time; missing dates sort last."
+  },
+  "ui_46331a04": {
+    "zh": "导出思维导图",
+    "en": "Export mind map"
+  },
+  "ui_469e76c4": {
+    "zh": "部分高亮正则有误，已跳过无效规则。",
+    "en": "Invalid highlight expressions were skipped."
+  },
+  "ui_46b56632": {
+    "zh": "有未保存的接口修改。保存后可在“全局设置备份”中导出。",
+    "en": "Unsaved edits. Save before exporting in Global settings backup."
+  },
+  "ui_46ca88f1": {
+    "zh": "保存失败，请重试",
+    "en": "Could not save. Please retry."
+  },
+  "ui_46f4e0a3": {
+    "zh": "远程书库",
+    "en": "Remote library"
+  },
+  "ui_4718f649": {
+    "zh": "本地 · {dimensions} 维 · {languages}",
+    "en": "Local · {dimensions} dimensions · {languages}"
+  },
+  "ui_4767d233": {
+    "zh": "自然听书"
+  },
+  "ui_47c5d78a": {
+    "zh": "修改后，其他设备也必须改用新密码。旧密码无法恢复新上传的数据。",
+    "en": "After changing it, other devices must use the new password. The old password cannot decrypt newly uploaded data."
+  },
+  "ui_47ca1d3": {
+    "zh": "重新排队",
+    "en": "Retry indexing"
+  },
+  "ui_47ed7949": {
+    "zh": "稍快语速"
+  },
+  "ui_47f879f5": {
+    "zh": "1 小时",
+    "en": "1 hour"
+  },
+  "ui_4811bdc7": {
+    "zh": "预设模板",
+    "en": "Templates"
+  },
+  "ui_4859c61e": {
+    "zh": "发布页面",
+    "en": "Release page"
+  },
+  "ui_485bf45": {
+    "zh": "吐字清晰"
+  },
+  "ui_48726d58": {
+    "zh": "清理失败，已保留尚未迁移的数据。",
+    "en": "Cache clearing failed. Data awaiting migration was kept."
+  },
+  "ui_487acc4a": {
+    "zh": "Gitee 镜像",
+    "en": "Gitee mirror"
+  },
+  "ui_48f5529e": {
+    "zh": "压缩包路径、压缩方式或校验无效，未导入。",
+    "en": "Unsafe, unsupported or damaged archive; nothing was imported."
+  },
+  "ui_49917d3c": {
+    "zh": "下一个",
+    "en": "Next"
+  },
+  "ui_49d30985": {
+    "zh": "同步需手动重新开启。",
+    "en": " Re-enable sync manually."
+  },
+  "ui_4a94f36b": {
+    "zh": "语义搜索与 RAG",
+    "en": "Semantic search and RAG"
+  },
+  "ui_4ab439de": {
+    "zh": "完整报告已复制；请在 GitHub 粘贴到问题描述中，补全必填项后提交。",
+    "en": "Full report copied. Paste into the GitHub description, complete required fields and submit."
+  },
+  "ui_4aca8e2d": {
+    "zh": "使用中",
+    "en": "Selected"
+  },
+  "ui_4ad2ef8f": {
+    "zh": "确认",
+    "en": "Confirm"
+  },
+  "ui_4ae2572a": {
+    "zh": "无法打开安装器，或 Android 包名、签名、版本不匹配。请使用官方安装包。",
+    "en": "Installer could not open, or Android package/signature/version does not match. Use an official package."
+  },
+  "ui_4af834a5": {
+    "zh": "外观与书架",
+    "en": "Appearance and bookshelf"
+  },
+  "ui_4b6927a5": {
+    "zh": "选择 ANX 备份 ZIP",
+    "en": "Select ANX backup ZIP"
+  },
+  "ui_4b725988": {
+    "zh": "默读基于 Anx Reader 与 ReadAny 开发，\n以 GPL-3.0-or-later 发布，非上游官方发行版。",
+    "en": "Modu is based on Anx Reader and ReadAny.\nReleased under GPL-3.0-or-later; not an official upstream release."
+  },
+  "ui_4b75eec5": {
+    "zh": "删除供应商？",
+    "en": "Delete provider?"
+  },
+  "ui_4cdf1a58": {
+    "zh": "删除供应商",
+    "en": "Delete provider"
+  },
+  "ui_4ce17940": {
+    "zh": "排版 CSS",
+    "en": "Layout CSS"
+  },
+  "ui_4d12a957": {
+    "zh": "搜索地址（含 {query}）",
+    "en": "Search URL (with {query})"
+  },
+  "ui_4d51d476": {
+    "zh": "复制失败，请在预览中手动选择并复制。",
+    "en": "Copy failed. Select and copy the text in the preview."
+  },
+  "ui_4d72decb": {
+    "zh": "长者讲述"
+  },
+  "ui_4df1b21b": {
+    "zh": "内容超过二维码容量或二维码不可用，请复制完整链接或导出文件。",
+    "en": "QR unavailable or too large. Copy the complete link or export a file."
+  },
+  "ui_4e12057b": {
+    "zh": "同步 WebDAV",
+    "en": "Sync WebDAV"
+  },
+  "ui_4e23e092": {
+    "zh": "新闻播报"
+  },
+  "ui_4e683b86": {
+    "zh": "温度",
+    "en": "Temperature"
+  },
+  "ui_4e941a37": {
+    "zh": "重试",
+    "en": "Retry"
+  },
+  "ui_4f37ed31": {
+    "zh": "清理缓存",
+    "en": "Clear cache"
+  },
+  "ui_4f5dd674": {
+    "zh": "正则表达式（JavaScript，无需 / /）",
+    "en": "Regular expression (JavaScript, no / /)"
+  },
+  "ui_4fd3eee": {
+    "zh": "仅用于窄窗口的底部导航栏，不影响桌面侧边栏。",
+    "en": "仅用于窄窗口的底部导航栏，不影响桌面侧边栏。"
+  },
+  "ui_5048ce3b": {
+    "zh": "首行缩进",
+    "en": "Indent"
+  },
+  "ui_5132b5ad": {
+    "zh": "中文",
+    "en": "Chinese"
+  },
+  "ui_51654e6a": {
+    "zh": "删除已下载模型？",
+    "en": "Delete downloaded model?"
+  },
+  "ui_51d5185c": {
+    "zh": "设为默认方案",
+    "en": "Set as default"
+  },
+  "ui_529121ad": {
+    "zh": "操作失败，请确认书籍和文件夹仍然存在后重试",
+    "en": "Operation failed. Check that the books and folder still exist, then retry."
+  },
+  "ui_52a48a71": {
+    "zh": "保存失败，请检查配置后重试。",
+    "en": "Could not save toolbar settings."
+  },
+  "ui_530a4f9a": {
+    "zh": "未配置",
+    "en": "Not configured"
+  },
+  "ui_53723785": {
+    "zh": "情绪表达克制，避免夸张起伏。"
+  },
+  "ui_53d392a3": {
+    "zh": "下移",
+    "en": "下移"
+  },
+  "ui_5411f96f": {
+    "zh": "执行翻译时，当前文字会发送到所选翻译服务。",
+    "en": "When translating, the current text is sent to the selected translation service."
+  },
+  "ui_54266a90": {
+    "zh": "请填写名称和含 {query} 的 HTTP(S) 地址；占位符不能放在域名中，地址不能含账号密码。",
+    "en": "Enter a name and an HTTP(S) URL containing {query} in its path or query, without credentials."
+  },
+  "ui_54706ac3": {
+    "zh": "有道网页翻译",
+    "en": "Youdao Web Translate"
+  },
+  "ui_54b03ce7": {
+    "zh": "本地或远程嵌入模型",
+    "en": "Local or remote embeddings"
+  },
+  "ui_552cc3d8": {
+    "zh": "自然停顿"
+  },
+  "ui_5546ad49": {
+    "zh": "上下文轮数",
+    "en": "Context turns"
+  },
+  "ui_5570734c": {
+    "zh": "请输入有效的 HTTP 或 HTTPS 地址",
+    "en": "Enter a valid HTTP or HTTPS URL"
+  },
+  "ui_560b22e5": {
+    "zh": "本书正在排队或向量化，请完成或取消任务后再更换模型。",
+    "en": "This book is queued or being embedded. Finish or cancel the task before changing models."
+  },
+  "ui_5615c9d1": {
+    "zh": "本地模型",
+    "en": "Local models"
+  },
+  "ui_5636740c": {
+    "zh": "备份密码",
+    "en": "Backup password"
+  },
+  "ui_56477d87": {
+    "zh": "单独控制批注栏的按钮和顺序，不影响已有笔记。",
+    "en": "Configure the annotation row without changing existing notes."
+  },
+  "ui_565b5519": {
+    "zh": "已保存到你在系统保存窗口选择的位置，可用系统文件管理器查找。若修改了文件名，请以保存窗口中的名称为准。",
+    "en": "Saved to the location you selected in the system save dialog. Find it in your file manager using the name you chose there."
+  },
+  "ui_56f04556": {
+    "zh": "远程文件浏览与书籍下载（独立于同步）",
+    "en": "Browse and download books (separate from sync)"
+  },
+  "ui_5760a409": {
+    "zh": "同步成功提示",
+    "en": "Sync success notification"
+  },
+  "ui_57c53ccd": {
+    "zh": "无法启用 API Key 同步，请稍后重试",
+    "en": "Could not enable API key sync. Please try again."
+  },
+  "ui_57f68b40": {
+    "zh": "版本检查与更新",
+    "en": "App updates"
+  },
+  "ui_580e312a": {
+    "zh": "应用 CSS 模板",
+    "en": "Apply CSS templates"
+  },
+  "ui_5825c9b8": {
+    "zh": "文件读取或写入失败，请检查权限及剩余空间。",
+    "en": "File access failed. Check permissions and free disk space."
+  },
+  "ui_5879600d": {
+    "zh": "从文件恢复设置",
+    "en": "Restore settings from file"
+  },
+  "ui_58b50f4c": {
+    "zh": "预设 AI 模板 · 可编辑",
+    "en": "AI template · Editable"
+  },
+  "ui_58c94440": {
+    "zh": "选中文本后自动翻译",
+    "en": "Translate selected text automatically"
+  },
+  "ui_5906b75c": {
+    "zh": "请先在 AI 设置中配置服务商和模型",
+    "en": "Configure a provider and model in AI settings first"
+  },
+  "ui_5957a657": {
+    "zh": "居中",
+    "en": "Center"
+  },
+  "ui_596287b5": {
+    "zh": "同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。",
+    "en": "Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day."
+  },
+  "ui_59d4700d": {
+    "zh": "自定义搜索引擎",
+    "en": "Custom search engine"
+  },
+  "ui_5a27b9ee": {
+    "zh": "确认恢复",
+    "en": "Restore"
+  },
+  "ui_5a6078ca": {
+    "zh": "文件夹操作",
+    "en": "Folder actions"
+  },
+  "ui_5aa24586": {
+    "zh": "波浪线",
+    "en": "Wavy"
+  },
+  "ui_5ab0d48a": {
+    "zh": "快速标记保存失败，请重试。",
+    "en": "Could not save the highlight. Please retry."
+  },
+  "ui_5b56fa6e": {
+    "zh": "默认不导出 AI、翻译、语音、向量、WebDAV 和远程书库的配置与凭据。勾选后包含远程书库密码并加密设置。书籍、笔记和一般设置仍会导出。",
+    "en": "AI, translation, speech, vector, WebDAV and remote library settings and credentials are excluded by default. Enable this to include remote library passwords and encrypt settings. Books, notes and general settings are always exported."
+  },
+  "ui_5b7e51da": {
+    "zh": "应用不内嵌字典。请导入有权使用的本地字典；选中文字后点“字典”即可离线查询所有已启用的字典。字典仅保存在本机，不参加 WebDAV 同步或设置备份。",
+    "en": "No dictionaries are bundled. Import dictionaries you are licensed to use, then select text and tap Dictionary to search enabled dictionaries offline. Dictionaries stay on this device and are excluded from WebDAV sync and settings backups."
+  },
+  "ui_5bad345f": {
+    "zh": "请输入文件夹名称",
+    "en": "Enter a folder name"
+  },
+  "ui_5bd770d2": {
+    "zh": "上移",
+    "en": "上移"
+  },
+  "ui_5be957ff": {
+    "zh": "配置代码已复制",
+    "en": "Configuration code copied"
+  },
+  "ui_5cd0e0b3": {
+    "zh": "文字设计音色",
+    "en": "Voice design"
+  },
+  "ui_5d1b96ef": {
+    "zh": "阅读与排版",
+    "en": "Reading and layout"
+  },
+  "ui_5d542919": {
+    "zh": "睡前轻读"
+  },
+  "ui_5d90de7d": {
+    "zh": "正在检查备份…",
+    "en": "Checking backup…"
+  },
+  "ui_5dd72d0d": {
+    "zh": "服务器地址、用户名和密码保存在本机应用配置中，重启后仍保留，本地不额外加密。开启「同步 → 同步 API Key」后，书库配置和密码会跟随自动同步加密上传，各设备需使用相同同步加密密码。导出设置备份时勾选「包含服务配置与 API Key（加密）」即可备份书库配置。清除连接也会同步清除其他已开启此开关设备的书库配置，不删除书籍。",
+    "en": "The server, username and password persist locally without additional local encryption. Enable Sync → Sync API keys to include this connection in encrypted automatic sync; devices must use the same encryption password. For backups, select the encrypted service settings option. Clearing this connection also propagates to other opted-in devices; books are kept."
+  },
+  "ui_5de221e4": {
+    "zh": "旧模型不受支持，请重新选择",
+    "en": "Unsupported model — select another"
+  },
+  "ui_5e0ccb62": {
+    "zh": "沉稳男声"
+  },
+  "ui_5e8a8ea5": {
+    "zh": "请先添加并启用 API Key",
+    "en": "Add and enable an API key first"
+  },
+  "ui_5f921690": {
+    "zh": "正在向量化",
+    "en": "Indexing"
+  },
+  "ui_5fbf30ca": {
+    "zh": "控制从书架进入书籍时的滑入、封面过渡和淡出。关闭后直接进入阅读，不影响正文翻页设置。",
+    "en": "Animate opening books from the library. Turn off for instant navigation; page-turn settings are unchanged."
+  },
+  "ui_5fce7533": {
+    "zh": "可用变量",
+    "en": "可用变量"
+  },
+  "ui_5fe370b7": {
+    "zh": "选择",
+    "en": "Choose"
+  },
+  "ui_601b0180": {
+    "zh": "DEB 面向 Debian 13，由系统软件安装器完成更新；未配置安装器时请自行安装已下载的 DEB。",
+    "en": "DEB packages target Debian 13. Use your system package installer, or install the downloaded DEB manually."
+  },
+  "ui_60367141": {
+    "zh": "字间距",
+    "en": "Letter spacing"
+  },
+  "ui_606efeaf": {
+    "zh": "提交 Bug",
+    "en": "Report a bug"
+  },
+  "ui_607348a8": {
+    "zh": "编辑",
+    "en": "Edit"
+  },
+  "ui_6085fbae": {
+    "zh": "重新翻译当前内容",
+    "en": "Retranslate current content"
+  },
+  "ui_60bbd079": {
+    "zh": "温暖男声"
+  },
+  "ui_60bd692c": {
+    "zh": "请妥善保管，不要公开分享。",
+    "en": "Keep this file private."
+  },
+  "ui_60c62d30": {
+    "zh": "界面与内置提示词使用所选语言，用户自定义的提示词保持不变。",
+    "en": "The interface and built-in prompts use this language. Custom prompts remain unchanged."
+  },
+  "ui_610a4758": {
+    "zh": "提交后内容将公开。请删除密钥、个人信息及私人书籍内容。",
+    "en": "Submitted reports are public. Remove keys, personal information and private book content."
+  },
+  "ui_61c7372a": {
+    "zh": "在另一台设备扫描二维码，或复制下方配置代码导入。",
+    "en": "Scan this QR code on another device, or copy the configuration code below."
+  },
+  "ui_61cb664d": {
+    "zh": "回忆前文"
+  },
+  "ui_61df3243": {
+    "zh": "后退",
+    "en": "Back"
+  },
+  "ui_61f0d4d0": {
+    "zh": "自定义文字颜色",
+    "en": "Text color"
+  },
+  "ui_62286969": {
+    "zh": "同步加密密码已更新，下次上传数据库后生效",
+    "en": "The encryption password was updated and will take effect after the next database upload."
+  },
+  "ui_62e3349e": {
+    "zh": "未下载或需修复",
+    "en": "Download required"
+  },
+  "ui_64299a19": {
+    "zh": "GitHub（默认，优先）",
+    "en": "GitHub (default, preferred)"
+  },
+  "ui_64512a5e": {
+    "zh": "复制代码",
+    "en": "Copy code"
+  },
+  "ui_645d1809": {
+    "zh": "至少 12 个字符，仅保存在本机",
+    "en": "At least 12 characters; stored only on this device"
+  },
+  "ui_64b277e9": {
+    "zh": "粘贴 modu 链接",
+    "en": "Paste modu link"
+  },
+  "ui_64bca37c": {
+    "zh": "解密",
+    "en": "Decrypt"
+  },
+  "ui_64edaba1": {
+    "zh": "报告已复制，请注意剪贴板隐私。",
+    "en": "Report copied. Please keep your clipboard private."
+  },
+  "ui_651f352d": {
+    "zh": "网络代理",
+    "en": "Network proxy"
+  },
+  "ui_65479baf": {
+    "zh": "Google 翻译（免费）",
+    "en": "Google Translate (Free)"
+  },
+  "ui_6556c39e": {
+    "zh": "默读提供的可编辑模板，选择后替换下方描述，不改变 Voice 音色。",
+    "en": "Editable Modu templates replace the description without changing Voice."
+  },
+  "ui_656aeae7": {
+    "zh": "条词目",
+    "en": "entries"
+  },
+  "ui_65b7d137": {
+    "zh": "默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件、二维码和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。",
+    "en": "Off by default: omit credential-bearing API/server configurations on export and skip them on import, preserving local accounts and keys. When enabled, transfers contain plaintext credentials. Keep them private. Sync encryption is unchanged and its password is never exported. Do not place private credentials in custom CSS, prompts or URLs."
+  },
+  "ui_66b49baf": {
+    "zh": "二维码读取失败",
+    "en": "Could not read QR code"
+  },
+  "ui_66c196ce": {
+    "zh": "从二维码图片恢复",
+    "en": "Restore from QR image"
+  },
+  "ui_66d37089": {
+    "zh": "文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。",
+    "en": "Download completed, but import failed. Check the format, encryption or file integrity."
+  },
+  "ui_672ce864": {
+    "zh": "AI 词典（知识优先／联网补充）",
+    "en": "AI dictionary (knowledge / web lookup)"
+  },
+  "ui_686847c4": {
+    "zh": "低沉稳重"
+  },
+  "ui_68a5025b": {
+    "zh": "检查与下载使用同一来源，默认优先 GitHub。检查时连接失败、超时或服务不可用会整体切换为 Gitee；手动切换来源后请重新检查再下载。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。",
+    "en": "Checking and downloading use the same source, with GitHub preferred by default. If a check cannot reach GitHub, both switch to Gitee. Check again after changing sources before downloading. File size and SHA-256 verification are required. No books, notes or account keys are sent."
+  },
+  "ui_68e8387d": {
+    "zh": "导入字典",
+    "en": "Import dictionary"
+  },
+  "ui_68f030b1": {
+    "zh": "退出选择",
+    "en": "Exit selection"
+  },
+  "ui_696af408": {
+    "zh": "修改同步加密密码",
+    "en": "Change sync encryption password"
+  },
+  "ui_69ea928b": {
+    "zh": "更新说明",
+    "en": "Release notes"
+  },
+  "ui_6a0f3760": {
+    "zh": "已阻止打开外部应用或非网页链接。",
+    "en": "External apps and non-web links are blocked."
+  },
+  "ui_6a1df5b2": {
+    "zh": "新导入书籍会在后台排队建立索引；默认关闭，避免意外消耗模型额度。",
+    "en": "New books are indexed in the background. Disabled by default to avoid unexpected API usage."
+  },
+  "ui_6a303f59": {
+    "zh": "请填写此项",
+    "en": "This field is required"
+  },
+  "ui_6a6b9c37": {
+    "zh": "处理方式",
+    "en": "Processing mode"
+  },
+  "ui_6b0cda31": {
+    "zh": "网页缩放失败，请重试。",
+    "en": "Could not apply page zoom. Please retry."
+  },
+  "ui_6b1e167": {
+    "zh": "导出本地备份",
+    "en": "Export local backup"
+  },
+  "ui_6b29028d": {
+    "zh": "正在检查版本…",
+    "en": "Checking for updates…"
+  },
+  "ui_6b6417d7": {
+    "zh": "按名称管理模板，可同时启用多套；修改会影响使用它的书籍。内置与导入模板默认停用，最多保存 32 套。",
+    "en": "Manage named templates; multiple templates can be active. Shared edits affect books using them. Built-ins and imports start disabled. Up to 32 templates."
+  },
+  "ui_6b65f2c7": {
+    "zh": "提示词不能超过 4000 个字符",
+    "en": "Prompts cannot exceed 4,000 characters"
+  },
+  "ui_6bbe7f8e": {
+    "zh": "下载并使用",
+    "en": "Download and use"
+  },
+  "ui_6c2df05d": {
+    "zh": "语气沉着稳重。"
+  },
+  "ui_6c78bff": {
+    "zh": "用于检查模型服务是否能正常回答"
+  },
+  "ui_6cafda82": {
+    "zh": "声音清亮，语气轻快自然，表达有活力但不过分夸张，句间留出自然停顿。"
+  },
+  "ui_6cd452e6": {
+    "zh": "书架中已存在这本书，无需重复导入。",
+    "en": "This book is already available on your bookshelf."
+  },
+  "ui_6d1b13dd": {
+    "zh": "导入 / 管理字典",
+    "en": "Import / manage dictionaries"
+  },
+  "ui_6d9059ba": {
+    "zh": "导出全部方案",
+    "en": "Export all"
+  },
+  "ui_6da845b6": {
+    "zh": "含正文列间分隔线。章节名在右侧，剩余页数和全书位置在左侧。",
+    "en": "Includes rules between text columns. Chapter on the right; remaining pages and book position on the left."
+  },
+  "ui_6e138ea9": {
+    "zh": "选词搜索将在默读内打开。选择默认引擎，也可以在搜索窗口中随时切换。关键词会发送给所选网站，网站可用性取决于网络。",
+    "en": "Selection search opens inside Modu. Choose a default or switch in the search window. The selected website receives your query; availability depends on your network."
+  },
+  "ui_6e199c95": {
+    "zh": "开源项目与来源",
+    "en": "Open-source projects and credits"
+  },
+  "ui_6e60f8d4": {
+    "zh": "拖动排序",
+    "en": "Drag to reorder"
+  },
+  "ui_6e730618": {
+    "zh": "各平台在本机保留有限的脱敏异常与操作记录，默认不附带、不上传。勾选后附带可用的系统崩溃诊断，不读取普通日志、AI 配置、密钥或书籍正文。报告提交后公开可见，请预览检查。附带日志时将复制报告，再由你粘贴到 GitHub。",
+    "en": "All platforms retain a small local journal of sanitized errors and checkpoints, never attached or uploaded by default. Opting in includes available crash diagnostics, not ordinary logs, AI settings, keys or book text. Review before sharing: reports become public. Reports with logs are copied for you to paste into GitHub."
+  },
+  "ui_6e733d2b": {
+    "zh": "文件夹",
+    "en": "Folder"
+  },
+  "ui_6eb9ed9e": {
+    "zh": "打开安装程序后按系统提示覆盖安装；如提示应用正在运行，请先完成同步并退出默读。",
+    "en": "Follow the installer to update. If prompted, finish syncing and quit Modu first."
+  },
+  "ui_6f60f5ad": {
+    "zh": "输入关键词搜索本书内容",
+    "en": "Search for text within this book"
+  },
+  "ui_6f86db5d": {
+    "zh": "高亮规则匹配超时，已停止，请简化正则表达式。",
+    "en": "Highlight matching timed out. Please simplify the regex."
+  },
+  "ui_6fdab95e": {
+    "zh": "保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。",
+    "en": "Original code is preserved and follows visual settings. Code selectors determine its scope."
+  },
+  "ui_70cd6377": {
+    "zh": "导入范围与限制",
+    "en": "Scope and limitations"
+  },
+  "ui_70f57871": {
+    "zh": "继续",
+    "en": "Continue"
+  },
+  "ui_7141eb3c": {
+    "zh": "使用 AI 设置中已配置的服务商和模型",
+    "en": "Uses a provider and model configured in AI settings"
+  },
+  "ui_7179a623": {
+    "zh": "维",
+    "en": "dimensions"
+  },
+  "ui_71c66a3": {
+    "zh": "建议文件名：",
+    "en": "Suggested file name:"
+  },
+  "ui_7242a6b4": {
+    "zh": "粘贴 modu: 或 readany: 开头的代码",
+    "en": "Paste a code beginning with modu: or readany:"
+  },
+  "ui_726102e3": {
+    "zh": "排序已生效，但无法保存到本机。",
+    "en": "Sorting applied, but preferences could not be saved."
+  },
+  "ui_726df4f5": {
+    "zh": "本地模型 · 按需下载",
+    "en": "Local models · On-demand download"
+  },
+  "ui_7426344e": {
+    "zh": "添加",
+    "en": "Added"
+  },
+  "ui_745de1f5": {
+    "zh": "再次输入密码（至少 12 个字符）",
+    "en": "Repeat password (at least 12 characters)"
+  },
+  "ui_7593b3b5": {
+    "zh": "年长男性的低沉声线，略带岁月感但吐字清楚。语气从容亲切，按语义停顿，适合回忆录。"
+  },
+  "ui_75b44029": {
+    "zh": "清除连接",
+    "en": "Clear connection"
+  },
+  "ui_75dba666": {
+    "zh": "启用向量模型",
+    "en": "Enable vector model"
+  },
+  "ui_76129a21": {
+    "zh": "预览并提交",
+    "en": "Preview and submit"
+  },
+  "ui_7637770b": {
+    "zh": "默认 CSS 方案",
+    "en": "Default CSS profile"
+  },
+  "ui_765307b6": {
+    "zh": "自定义划词菜单的按钮显示和顺序。长按卡片或拖动左侧手柄排序，点击编辑图标调整参数。",
+    "en": "Choose which selection actions appear and in what order. Hold a card or drag its handle; edit parameters using the pencil."
+  },
+  "ui_76997238": {
+    "zh": "全部文件",
+    "en": "All files"
+  },
+  "ui_76c397da": {
+    "zh": "远程模型会发送书籍片段到配置的服务商。本书选择不另存 API 密钥；全局向量功能关闭时，本书也不进行向量推理。",
+    "en": "Remote models send book excerpts to the configured provider. This book does not store a separate API key. Disabling global embeddings also disables vector inference for this book."
+  },
+  "ui_7708bcda": {
+    "zh": "实线",
+    "en": "Solid"
+  },
+  "ui_78186b7f": {
+    "zh": "网页操作失败，请重试。",
+    "en": "Page operation failed. Retry."
+  },
+  "ui_78a24b20": {
+    "zh": "添加自定义搜索引擎",
+    "en": "Add custom search engine"
+  },
+  "ui_78e0367e": {
+    "zh": "起始对齐",
+    "en": "Start"
+  },
+  "ui_79784bec": {
+    "zh": "无法读取字体目录",
+    "en": "Could not read fonts"
+  },
+  "ui_798e782f": {
+    "zh": "留空时只打开 AI 对话；填写提示词后点击即执行。",
+    "en": "Leave blank to open chat; enter a prompt to run it on tap."
+  },
+  "ui_79bf347c": {
+    "zh": "批注工具",
+    "en": "Annotation tools"
+  },
+  "ui_79d1bb34": {
+    "zh": "朗读设置管理",
+    "en": "Speech settings management"
+  },
+  "ui_79d94594": {
+    "zh": "API 密钥",
+    "en": "API key"
+  },
+  "ui_7a38843e": {
+    "zh": "将清理可重新生成的临时数据。书籍、笔记、AI 对话历史、已下载模型和向量索引不会删除。请在导入、同步和下载完成后清理。",
+    "en": "This clears regenerable temporary data. Books, notes, AI chat history, downloaded models and vector indexes are kept. Wait for imports, sync and downloads to finish before clearing."
+  },
+  "ui_7a670bf8": {
+    "zh": "自定义（保留当前描述）",
+    "en": "Custom (keep current text)"
+  },
+  "ui_7bc9f61e": {
+    "zh": "手动选择背景后将关闭跟随系统的阅读主题，可在更多设置中重新开启。",
+    "en": "Selecting a background turns off automatic reading themes. You can enable them again in More settings."
+  },
+  "ui_7bdec195": {
+    "zh": "下划线",
+    "en": "Underline"
+  },
+  "ui_7c9d9208": {
+    "zh": "仅允许可信 EPUB 内附的脚本。关闭不影响阅读器自身脚本；更改后请重新打开书籍。部分 WebKit 平台需保留事件兼容权限，但关闭时仍清理并禁用书籍脚本。",
+    "en": "Only enable scripts in trusted EPUBs. Reader-owned scripts remain active. Reopen the book after changes. WebKit retains event compatibility permission, while book scripts are still sanitized and blocked when disabled."
+  },
+  "ui_7cff187d": {
+    "zh": "同段相邻句合成，高亮和前后跳转按小段，长段自动拆分。启用提示词时自动附加匀速听书要求（留空描述也会发送）；实际效果取决于模型。关闭提示词或使用 tts-1 / tts-1-hd 时不发送。",
+    "en": "Adjacent sentences are synthesized as passages, with passage highlighting and navigation; long paragraphs are split. When instructions are enabled, steady narration is requested even with an empty description. Results depend on the model. No instructions are sent when disabled or for tts-1 / tts-1-hd."
+  },
+  "ui_7d0c75c8": {
+    "zh": "收起原文",
+    "en": "Collapse original"
+  },
+  "ui_7daa19cd": {
+    "zh": "向量化",
+    "en": "Vectorize"
+  },
+  "ui_7e47b666": {
+    "zh": "查看已有问题",
+    "en": "Existing issues"
+  },
+  "ui_7ef2393f": {
+    "zh": "导出二维码 / modu 链接",
+    "en": "Export QR / modu link"
+  },
+  "ui_7f23fd9c": {
+    "zh": "描述预设",
+    "en": "Description template"
+  },
+  "ui_7fc05b5b": {
+    "zh": "翻译当前阅读内容",
+    "en": "Translate visible content"
+  },
+  "ui_80522c4e": {
+    "zh": "描述不会作为正文朗读。语速滑块在本地调节播放速度（0.5–2.0 倍），松手后生效，无需重新生成语音。1 倍是接口返回音频的原始速度；描述中的快慢节奏仍可能影响原始音频。音高仍由提示词控制。修改描述后点击“保存设置”生效。",
+    "en": "Descriptions are instructions, not spoken text. The rate slider controls local playback (0.5–2.0×) on release without regenerating speech. 1× is the original generated speed; timing instructions can still affect that audio. Pitch remains prompt-controlled. Save settings to apply description changes."
+  },
+  "ui_80ef3b18": {
+    "zh": "用客观、干练的播报语气朗读，咬字准确，节奏均匀，减少情绪起伏。"
+  },
+  "ui_8108ff9a": {
+    "zh": "操作未完成：请检查文件格式或存储权限；配置过大时请使用文件迁移。",
+    "en": "Operation failed. Check the file or storage permissions; use a file for large configurations."
+  },
+  "ui_81aa2e71": {
+    "zh": "书籍详情",
+    "en": "Book details"
+  },
+  "ui_82340599": {
+    "zh": "搜索内容",
+    "en": "Search text"
+  },
+  "ui_82cc47e6": {
+    "zh": "两次输入的密码不一致",
+    "en": "The passwords do not match"
+  },
+  "ui_82fa701a": {
+    "zh": "连接和密码已保存在本机，请到首页“远程书库”连接。",
+    "en": "Connection and password saved on this device. Open Remote library to connect."
+  },
+  "ui_8348ad60": {
+    "zh": "一次迁移全部全局设置，文件、二维码和 modu 链接统一在这里导入导出。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。",
+    "en": "Transfer all global settings together via files, QR codes or modu links. Older AI, speech, sync and library links remain supported; the actual contents are shown before import."
+  },
+  "ui_83644438": {
+    "zh": "技能名称和提示词不能为空",
+    "en": "技能名称和提示词不能为空"
+  },
+  "ui_83f2af49": {
+    "zh": "进入或恢复阅读后等待一个完整间隔；同步期间不重复发起，结束后重新计时。遵循“仅 Wi-Fi”设置。",
+    "en": "Waits a full interval on entry or resume. No overlapping runs; restarts the interval after completion. Respects Wi-Fi-only sync."
+  },
+  "ui_843ef4f0": {
+    "zh": "全局设置导入导出",
+    "en": "Global settings transfer"
+  },
+  "ui_84b5c43c": {
+    "zh": "保存主题失败，请重试。",
+    "en": "Could not save the theme. Please try again."
+  },
+  "ui_84f4515a": {
+    "zh": "检查更新",
+    "en": "Check for updates"
+  },
+  "ui_85b2a691": {
+    "zh": "同步加密密码",
+    "en": "Sync encryption password"
+  },
+  "ui_86117a01": {
+    "zh": "无法读取本地模型，请重新进入设置重试",
+    "en": "Could not check local models. Reopen settings to retry."
+  },
+  "ui_86efbb52": {
+    "zh": "青年女性的清亮声线，发音干净利落。语气自然有活力，停顿适中，适合小说旁白。"
+  },
+  "ui_8711ba5": {
+    "zh": "预设模板 · 图形调节 · 自定义代码",
+    "en": "Templates · Visual controls · Custom code"
+  },
+  "ui_8732d659": {
+    "zh": "1. 在 ANX Reader 中下载需要迁移的书籍。\n2. 打开 ANX Reader「设置 → 同步 → 导出与导入 → 导出」，保存 ZIP 备份（不同版本菜单名称可能略有差异）。\n3. 将 ZIP 保存到当前设备，不要解压或修改文件。\n4. 在此选择备份，检查识别结果后点击「开始导入」。",
+    "en": "1. Download the books to migrate in ANX Reader.\n2. In ANX Reader, open Settings → Sync → Export and Import → Export, and save the ZIP backup (menu labels may vary).\n3. Save the ZIP on this device; do not extract or modify it.\n4. Select the backup here, review the results and start importing."
+  },
+  "ui_879356f6": {
+    "zh": "风险：加密不能代替可信的 WebDAV 服务。弱密码可能被猜出；任何得到数据库和正确密码的人都能读取密钥。请使用独立强密码，并妥善保管。",
+    "en": "Risk: encryption does not replace a trusted WebDAV service. Weak passwords may be guessed, and anyone with the database and correct password can read the keys. Use and protect a strong, unique password."
+  },
+  "ui_88106859": {
+    "zh": "AI 技能与提示词",
+    "en": "AI skills and prompts"
+  },
+  "ui_88c3418d": {
+    "zh": "测试",
+    "en": "Test"
+  },
+  "ui_88f4737e": {
+    "zh": "自动不发送推理控制参数，不等于关闭。关闭会请求模型停用推理，可用于减少全文翻译等待；翻译会沿用所选模型的此项设置，也影响该模型的其他 AI 请求。低/中/高适用于支持 reasoning_effort 的接口。部分模型强制推理或不支持关闭参数，需改回自动或换用支持的模型；不保证一定提速。",
+    "en": "Auto omits reasoning controls; it does not turn reasoning off. Off requests non-reasoning output and may reduce full-text translation latency. Translation and other AI requests use the selected model’s setting. Low/medium/high require reasoning_effort support. Some models require reasoning or reject disable parameters: use Auto or a compatible model. Speed gains are not guaranteed."
+  },
+  "ui_899cf072": {
+    "zh": "支持：MDX 1/2（非 LZO、非加密正文，≤256 MiB）；StarDict 2.4.2/3.0.0（IFO + IDX/IDX.GZ + DICT/DICT.DZ，可选 SYN），也支持单本字典 ZIP。仅显示文字释义；不执行脚本、不加载外部资源，暂不支持 MDD 图片/音频和 DSL。",
+    "en": "Supported: MDX 1/2 (no LZO or encrypted records, ≤256 MiB); StarDict 2.4.2/3.0.0 (IFO + IDX/IDX.GZ + DICT/DICT.DZ, optional SYN), or a ZIP with one dictionary. Text definitions only: no scripts or external resources. MDD images/audio and DSL are not supported yet."
+  },
+  "ui_8a3c2f52": {
+    "zh": "支持 API 根地址、/v1 地址或完整 /embeddings 地址",
+    "en": "Accepts an API root, /v1 base, or full /embeddings URL"
+  },
+  "ui_8a6ec641": {
+    "zh": "编辑提示词",
+    "en": "编辑提示词"
+  },
+  "ui_8a891b09": {
+    "zh": "排队中",
+    "en": "Queued"
+  },
+  "ui_8aee8af": {
+    "zh": "跟随正文字体",
+    "en": "Follow body font"
+  },
+  "ui_8b9fe232": {
+    "zh": "刷新",
+    "en": "Refresh"
+  },
+  "ui_8c18508a": {
+    "zh": "正在处理…",
+    "en": "Working…"
+  },
+  "ui_8c5dca82": {
+    "zh": "尚无匹配当前架构且带有效校验信息的安装包，请查看发布页。",
+    "en": "No matching package with valid verification metadata. See the release page."
+  },
+  "ui_8c91f7eb": {
+    "zh": "使用向量设置中的接口和密钥：{model}",
+    "en": "Use the endpoint and key from embedding settings: {model}"
+  },
+  "ui_8c9bc54": {
+    "zh": "粘贴 modu 链接恢复",
+    "en": "Restore from modu link"
+  },
+  "ui_8d2bda22": {
+    "zh": "尚未配置",
+    "en": "Not configured"
+  },
+  "ui_8d324dfd": {
+    "zh": "正在连接下载源…",
+    "en": "Connecting…"
+  },
+  "ui_8d63b3d4": {
+    "zh": "添加时间",
+    "en": "Date added"
+  },
+  "ui_8dcaf4c5": {
+    "zh": "同步 API Key",
+    "en": "Sync API keys"
+  },
+  "ui_8dd430a5": {
+    "zh": "导入未完成，现有数据库未被替换。请确认备份完整、版本兼容后重试。",
+    "en": "Import did not complete. Your database was not replaced. Check backup integrity and version compatibility."
+  },
+  "ui_8e1ad9d1": {
+    "zh": "缩小",
+    "en": "Zoom out"
+  },
+  "ui_8e22ca18": {
+    "zh": "修改",
+    "en": "Modified"
+  },
+  "ui_8e94f1b7": {
+    "zh": "上一个",
+    "en": "Previous"
+  },
+  "ui_8efedec8": {
+    "zh": "重点清楚"
+  },
+  "ui_8f2449be": {
+    "zh": "跟随默认方案",
+    "en": "Follow default"
+  },
+  "ui_8fc5c6b5": {
+    "zh": "段落排版",
+    "en": "Paragraph layout"
+  },
+  "ui_8fda02e5": {
+    "zh": "存储读写或迁移未完成。请检查可用空间和存储权限后重试。",
+    "en": "Storage access or migration did not complete. Check free space and storage permissions, then retry."
+  },
+  "ui_90377d1": {
+    "zh": "此模式通过描述设计声音，不使用预置音色。切回时保留原音色选择。",
+    "en": "Design a voice with text. The preset voice is retained for switching back, but is not sent in this mode."
+  },
+  "ui_90bc6e01": {
+    "zh": "下一句",
+    "en": "Next sentence"
+  },
+  "ui_91148c76": {
+    "zh": "无法返回原阅读位置",
+    "en": "Could not return to the original position"
+  },
+  "ui_92058c0": {
+    "zh": "暂时没有可用的正式发布，请稍后重试。",
+    "en": "No stable release is currently available."
+  },
+  "ui_923b2133": {
+    "zh": "温柔亲切"
+  },
+  "ui_924f4ae4": {
+    "zh": "例如：竖排古籍、横排小说、精排保留",
+    "en": "e.g. Vertical, Novel, Publisher layout"
+  },
+  "ui_92ead0a1": {
+    "zh": "收起分支",
+    "en": "Collapse branches"
+  },
+  "ui_9336b07e": {
+    "zh": "兼容旧版配置",
+    "en": "Legacy-compatible provider"
+  },
+  "ui_93799013": {
+    "zh": "正在检查下载地址并打开浏览器…",
+    "en": "Checking download availability and opening browser…"
+  },
+  "ui_938fffde": {
+    "zh": "新方案",
+    "en": "New profile"
+  },
+  "ui_939808da": {
+    "zh": "中文／正文字体",
+    "en": "Chinese / body font"
+  },
+  "ui_93d66237": {
+    "zh": "连接 WebDAV，浏览远程目录并将书籍下载到本地书架。",
+    "en": "Connect WebDAV to browse and import books into your local bookshelf."
+  },
+  "ui_93f8d95f": {
+    "zh": "字体",
+    "en": "Font"
+  },
+  "ui_9465ddef": {
+    "zh": "用清晰严谨的讲解语气朗读，关键概念适当重读，层次之间自然停顿。"
+  },
+  "ui_949856b3": {
+    "zh": "取消",
+    "en": "Cancel"
+  },
+  "ui_94dc0439": {
+    "zh": "当前版本",
+    "en": "Installed"
+  },
+  "ui_957eab9c": {
+    "zh": "高级设置",
+    "en": "Advanced settings"
+  },
+  "ui_95c088e9": {
+    "zh": "翻译设置",
+    "en": "Translation settings"
+  },
+  "ui_95d73b75": {
+    "zh": "复制报告",
+    "en": "Copy report"
+  },
+  "ui_96152f97": {
+    "zh": "下载期间离开此标签页会取消下载；导入开始后请等待完成。",
+    "en": "Leaving this tab cancels a download; please wait once import starts."
+  },
+  "ui_96193ca0": {
+    "zh": "语气温柔亲切。"
+  },
+  "ui_970ae2c0": {
+    "zh": "模型已删除，可按需重新下载",
+    "en": "Model deleted. You can download it again when needed."
+  },
+  "ui_97237386": {
+    "zh": "更新来源（检查与下载）",
+    "en": "Update source (check and download)"
+  },
+  "ui_975f03b0": {
+    "zh": "连接独立的远程书籍目录，只浏览和下载。不会修改服务器文件，也不会改变现有 WebDAV 同步设置。",
+    "en": "Browse and download from a separate remote book directory. Server files and existing sync settings are not modified."
+  },
+  "ui_975f53f6": {
+    "zh": "配置代码",
+    "en": "Configuration code"
+  },
+  "ui_97706d2": {
+    "zh": "全文搜索",
+    "en": "Search"
+  },
+  "ui_9794e978": {
+    "zh": " · 不支持导入",
+    "en": " · Import not supported"
+  },
+  "ui_97b90847": {
+    "zh": "使用远程模型",
+    "en": "Use remote model"
+  },
+  "ui_97dcbfa8": {
+    "zh": "搜索引擎设置",
+    "en": "Search engine settings"
+  },
+  "ui_9824ed29": {
+    "zh": "不会清空书库。迁移完成前请勿卸载应用或手动移动文件。",
+    "en": "Your library will not be cleared. Do not uninstall the app or move files manually before migration finishes."
+  },
+  "ui_988a7b27": {
+    "zh": "WebDAV 书库完整地址",
+    "en": "Full WebDAV library URL"
+  },
+  "ui_988a9a0d": {
+    "zh": "仅书籍",
+    "en": "Books only"
+  },
+  "ui_98a9b8e8": {
+    "zh": "翻译与词典"
+  },
+  "ui_991cea5d": {
+    "zh": "在系统设置中管理通知栏与锁屏播放控制",
+    "en": "Manage notification and lock-screen controls in system settings"
+  },
+  "ui_999ddda6": {
+    "zh": "查询",
+    "en": "Search"
+  },
+  "ui_9adda898": {
+    "zh": "请先在字体设置中导入字体。",
+    "en": "Import fonts in font settings first."
+  },
+  "ui_9ae2bdaa": {
+    "zh": "下载并导入书架",
+    "en": "Download and import"
+  },
+  "ui_9b518b72": {
+    "zh": "稍慢语速"
+  },
+  "ui_9b820053": {
+    "zh": "此发行渠道提供未签名 IPA，iOS 不允许在应用内直接安装。可下载并导出，再自行签名安装。",
+    "en": "This channel provides unsigned IPA files. iOS cannot install them directly in-app. Download/export and sign them yourself."
+  },
+  "ui_9bb04d18": {
+    "zh": "正在准备应用数据…\n首次迁移到 Android/data 可能需要一些时间。",
+    "en": "Preparing app data…\nThe first migration to Android/data may take some time."
+  },
+  "ui_9bbeef96": {
+    "zh": "返回修改",
+    "en": "Keep editing"
+  },
+  "ui_9c1b51f2": {
+    "zh": "清空当前代码",
+    "en": "Clear current CSS"
+  },
+  "ui_9c3792b": {
+    "zh": "导入前数据库备份位置：",
+    "en": "Pre-import database backup:"
+  },
+  "ui_9c401511": {
+    "zh": "请勿公开分享。导入时请到“全局设置备份”粘贴链接或读取二维码图片。",
+    "en": "Keep private. Paste this link or import its QR image in Global settings backup."
+  },
+  "ui_9c43ebb6": {
+    "zh": "清除搜索",
+    "en": "Clear search"
+  },
+  "ui_9c746037": {
+    "zh": "恢复内置按钮、预设模板和颜色；预设 AI 模板默认关闭，自建 AI 命令保留。",
+    "en": "Reset built-in actions, templates and colours. AI templates start disabled; your own commands are kept."
+  },
+  "ui_9d5708fb": {
+    "zh": "内容中没有可导入的设置，未作任何更改。",
+    "en": "No settings to import. Nothing was changed."
+  },
+  "ui_9dce3a31": {
+    "zh": "语速稍快，仍保持每个字清楚。"
+  },
+  "ui_9e774e24": {
+    "zh": "留空使用默认名称",
+    "en": "Leave blank for the default name"
+  },
+  "ui_9e903536": {
+    "zh": "副本",
+    "en": "copy"
+  },
+  "ui_9ea88fc0": {
+    "zh": "朗读配置",
+    "en": "Speech settings"
+  },
+  "ui_9f556367": {
+    "zh": "AI 对话历史",
+    "en": "AI chat history"
+  },
+  "ui_9f829252": {
+    "zh": "自定义 SVG",
+    "en": "Custom SVG"
+  },
+  "ui_9fd05df0": {
+    "zh": "请选择不超过 256 KiB 的有效图片；SVG 仅支持静态图形。",
+    "en": "Use an image up to 256 KiB; SVG must be a static drawing."
+  },
+  "ui_a104e211": {
+    "zh": "内置阅读技能",
+    "en": "内置阅读技能"
+  },
+  "ui_a18a2eb4": {
+    "zh": "问题描述",
+    "en": "Description"
+  },
+  "ui_a1a82646": {
+    "zh": "在阅读 AI 面板中启用",
+    "en": "在阅读 AI 面板中启用"
+  },
+  "ui_a2182ac2": {
+    "zh": "行距",
+    "en": "Line height"
+  },
+  "ui_a3939d2b": {
+    "zh": "关闭推理",
+    "en": "Off"
+  },
+  "ui_a3b72679": {
+    "zh": "密码至少需要 12 个字符",
+    "en": "Password must contain at least 12 characters"
+  },
+  "ui_a3ce6236": {
+    "zh": "对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。",
+    "en": "Chats are stored locally and are not removed when clearing the cache or changing its size limit. Manage them separately in AI chat history."
+  },
+  "ui_a3fe50bc": {
+    "zh": "清除连接配置及密码。开启「同步 API Key」时，下次同步也会清除其他已开启此开关设备的书库配置。不删除本地书籍或服务器文件。",
+    "en": "Clear the connection and password. If Sync API keys is enabled, the next sync also clears this connection on other opted-in devices. Books and server files are kept."
+  },
+  "ui_a4c85337": {
+    "zh": "本次已导入",
+    "en": "Imported this session"
+  },
+  "ui_a6033fd4": {
+    "zh": "采用舒缓的讲述节奏。"
+  },
+  "ui_a6357fcf": {
+    "zh": "用 {selection} 引用选中文字；没有占位符也会附上原文。",
+    "en": "Use {selection} for selected text. Text is also included without a placeholder."
+  },
+  "ui_a7b51055": {
+    "zh": "阅读器底栏也可以临时切换目标语言",
+    "en": "The target can also be changed from the reader toolbar"
+  },
+  "ui_a7bc912": {
+    "zh": "图标",
+    "en": "Icon"
+  },
+  "ui_a7f23193": {
+    "zh": "书内搜索失败，请重试",
+    "en": "Book search failed; please retry"
+  },
+  "ui_a81b938": {
+    "zh": "远程书库 WebDAV",
+    "en": "Library WebDAV"
+  },
+  "ui_a868cc60": {
+    "zh": "直接显示的按钮数量",
+    "en": "Visible action count"
+  },
+  "ui_a90de0a8": {
+    "zh": "请填写名称和提示词。",
+    "en": "Enter a name and prompt."
+  },
+  "ui_a95c0609": {
+    "zh": "向量模型",
+    "en": "Vector Model"
+  },
+  "ui_a9681d41": {
+    "zh": "用轻柔放松的语气朗读，节奏舒缓，句末自然收束，避免突然提高音量。"
+  },
+  "ui_a9862bfc": {
+    "zh": "阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。",
+    "en": "阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。"
+  },
+  "ui_a986b950": {
+    "zh": "无法打开浏览器。请复制报告，并使用下方网址手动提交。",
+    "en": "Could not open the browser. Copy the report and use the URL below."
+  },
+  "ui_aaf8da2": {
+    "zh": "浏览器下载更新",
+    "en": "Download in browser"
+  },
+  "ui_ab00de96": {
+    "zh": "请在系统设置允许安装此来源的应用，返回后再次点击安装。",
+    "en": "Allow installation from this source in system settings, then return and tap Install again."
+  },
+  "ui_ab1e54ae": {
+    "zh": "检查版本 · 下载 · 安装",
+    "en": "Check version · Download · Install"
+  },
+  "ui_ab579934": {
+    "zh": "附带设备与运行环境",
+    "en": "Include device and environment info"
+  },
+  "ui_abd9fdb": {
+    "zh": "复制链接",
+    "en": "Copy link"
+  },
+  "ui_ac1a6a52": {
+    "zh": "OpenAI 兼容",
+    "en": "OpenAI compatible"
+  },
+  "ui_acd77e26": {
+    "zh": "阅读时定时同步",
+    "en": "Sync periodically while reading"
+  },
+  "ui_ad44712": {
+    "zh": "使用",
+    "en": "Use"
+  },
+  "ui_ad5b82b0": {
+    "zh": "保存",
+    "en": "Save"
+  },
+  "ui_ad98a0ba": {
+    "zh": "更多操作",
+    "en": "More actions"
+  },
+  "ui_ada7b1e5": {
+    "zh": "确定删除《{title}》吗？书籍文件及本地向量索引也会被删除。",
+    "en": "Delete “{title}”? The book file and local vector index will also be deleted."
+  },
+  "ui_ae455645": {
+    "zh": "声音稍低沉，保持清晰自然。"
+  },
+  "ui_ae72ad4a": {
+    "zh": "将清空此方案，并在使用它的所有书籍中停用。",
+    "en": "This clears the profile and disables it in all books."
+  },
+  "ui_ae72d276": {
+    "zh": "再次输入密码",
+    "en": "Enter password again"
+  },
+  "ui_ae997629": {
+    "zh": "低沉音色"
+  },
+  "ui_aea0c3ba": {
+    "zh": "应用数据目录",
+    "en": "App data directory"
+  },
+  "ui_aed9cede": {
+    "zh": "批注颜色",
+    "en": "Colours"
+  },
+  "ui_af1ab9f9": {
+    "zh": "恢复此内置供应商的名称、接口地址、协议、默认模型、温度、Token 数、上下文轮数和推理设置。将清空全部已保存的 API Key（包括旧版配置中的密钥），重置密钥轮换位置，并恢复默认的“启用”状态。当前页面未保存的修改将被放弃，之后需要重新填写 API Key。确认后立即保存，不会发起网络请求。",
+    "en": "Restore this built-in provider’s name, endpoint, protocol, default model and model parameters. All saved API keys (including legacy credentials) will be cleared, key rotation reset, and the provider enabled by default. Unsaved edits will be discarded. You will need to enter an API key again. Changes are saved immediately; no network request is sent."
+  },
+  "ui_af549128": {
+    "zh": "清除设置",
+    "en": "Clear settings"
+  },
+  "ui_af550e55": {
+    "zh": "等宽字体",
+    "en": "Monospace"
+  },
+  "ui_af7d9ade": {
+    "zh": "自定义技能会与内置技能一起出现在阅读 AI 面板中。",
+    "en": "自定义技能会与内置技能一起出现在阅读 AI 面板中。"
+  },
+  "ui_b01a095e": {
+    "zh": "从二维码图片读取",
+    "en": "Read from QR image"
+  },
+  "ui_b07a21e8": {
+    "zh": "英文字体（字母、数字）",
+    "en": "English font (letters, numbers)"
+  },
+  "ui_b0dc37b4": {
+    "zh": "无衬线字体",
+    "en": "Sans serif"
+  },
+  "ui_b11cb914": {
+    "zh": "筛选当前目录中的文件",
+    "en": "Filter files in this folder"
+  },
+  "ui_b124afba": {
+    "zh": "敏感数据同步",
+    "en": "Sensitive data sync"
+  },
+  "ui_b1db955d": {
+    "zh": "保留对话历史",
+    "en": "Keep chat history"
+  },
+  "ui_b1f5c8d7": {
+    "zh": "关闭模块即跟随书籍原样式；自定义代码在图形参数之后叠加。",
+    "en": "Disabled modules inherit book styles. Custom code follows the visual settings."
+  },
+  "ui_b31695cd": {
+    "zh": "选择即应用，可叠加多套。参数与代码请在“设置 → CSS 设置”中调整。",
+    "en": "Select to apply multiple templates. Edit parameters and code in Settings → CSS settings."
+  },
+  "ui_b33517ce": {
+    "zh": "书内搜索",
+    "en": "Search this book"
+  },
+  "ui_b4035c43": {
+    "zh": "下载完成，SHA-256 校验通过",
+    "en": "Downloaded; SHA-256 verified"
+  },
+  "ui_b424f4ae": {
+    "zh": "重新向量化",
+    "en": "Reindex"
+  },
+  "ui_b46a386d": {
+    "zh": "垂直偏移",
+    "en": "Offset"
+  },
+  "ui_b48210d2": {
+    "zh": "查看提示词",
+    "en": "查看提示词"
+  },
+  "ui_b494a385": {
+    "zh": "跟随系统",
+    "en": "Follow system"
+  },
+  "ui_b519b811": {
+    "zh": "已打开 IPA 导出菜单；需自行签名后安装。",
+    "en": "IPA export opened. You must sign it yourself before installation."
+  },
+  "ui_b5271888": {
+    "zh": "文件夹加载失败，点击重试",
+    "en": "Could not load folders. Tap to retry."
+  },
+  "ui_b5509ab8": {
+    "zh": "全部展开",
+    "en": "Expand all"
+  },
+  "ui_b5c355ac": {
+    "zh": "作用范围：全部",
+    "en": "Scope: All"
+  },
+  "ui_b5e95ade": {
+    "zh": "若网页未自动填入，请复制原文后粘贴；目标语言在网页内选择。",
+    "en": "If the text is not filled in automatically, copy and paste it. Choose the target language on the page."
+  },
+  "ui_b6423575": {
+    "zh": "ZIP 最多 10 万个条目，展开后不超过 20 GiB；数据库及 WAL 各不超过 256 MiB，每张数据表最多 20 万行。旧系统若不支持安全数据库快照，会终止导入。备份可能包含敏感设置，请妥善保管。",
+    "en": "Maximum 100,000 ZIP entries and 20 GiB expanded; database/WAL each up to 256 MiB, up to 200,000 rows per table. Import stops if an older system cannot create a safe database snapshot. Backups may contain sensitive settings; store them securely."
+  },
+  "ui_b68607ad": {
+    "zh": "官方网页翻译，无需 API Key；仅用于选词弹窗，全文翻译使用独立引擎。",
+    "en": "Official translation page, no API key. Selection only; full-text translation uses a separate engine."
+  },
+  "ui_b6b8105d": {
+    "zh": "尚未导入字典",
+    "en": "No dictionaries imported"
+  },
+  "ui_b6ebef1d": {
+    "zh": "建议 1–4 句，描述性别、年龄感、音色、语气和节奏，避免相互矛盾。",
+    "en": "Use 1–4 sentences about gender, age, timbre, tone and pace. Avoid conflicting descriptions."
+  },
+  "ui_b6efa3b": {
+    "zh": "搜索",
+    "en": "Search"
+  },
+  "ui_b7490894": {
+    "zh": "查询词语",
+    "en": "Look up a word"
+  },
+  "ui_b784c58": {
+    "zh": "声音温暖柔和，语气亲切，减少尖锐感，保持吐字清晰，以自然的节奏讲述。"
+  },
+  "ui_b7e1fdb9": {
+    "zh": "下载更新",
+    "en": "Download update"
+  },
+  "ui_b81c73b2": {
+    "zh": "包含外观、阅读排版、CSS 方案、AI 技能、朗读、翻译及其他通用设置。不包含书籍、笔记、聊天记录、阅读进度、字体/背景图片文件、字典或向量模型。",
+    "en": "Export appearance, reading layout, CSS profiles, AI skills, speech, translation and general preferences. Books, notes, chats, reading progress, fonts/background files, dictionaries and vector models are not included."
+  },
+  "ui_b868ad6b": {
+    "zh": "温柔女声"
+  },
+  "ui_b8c8a94f": {
+    "zh": "新建",
+    "en": "New"
+  },
+  "ui_b906cb43": {
+    "zh": "停止翻译",
+    "en": "Stop translation"
+  },
+  "ui_b91cfee8": {
+    "zh": "规则背景图片",
+    "en": "Background image"
+  },
+  "ui_b941c943": {
+    "zh": "按钮开关 · 排序 · AI 划词模板",
+    "en": "Actions · Order · AI selection templates"
+  },
+  "ui_b97e488f": {
+    "zh": "请输入服务商名称",
+    "en": "Enter a provider name"
+  },
+  "ui_b9d2bac": {
+    "zh": "清除",
+    "en": "Clear"
+  },
+  "ui_b9d791a3": {
+    "zh": "仅在同步成功时提示；失败始终显示原因。同步过程中不弹出提示。",
+    "en": "Notify on success only; failures always show a reason. No in-progress notifications."
+  },
+  "ui_b9e559bd": {
+    "zh": "操作步骤",
+    "en": "Steps"
+  },
+  "ui_ba1a8fe4": {
+    "zh": "测试连接",
+    "en": "Test connection"
+  },
+  "ui_ba2d3ba": {
+    "zh": "存储位置",
+    "en": "Storage location"
+  },
+  "ui_baae268d": {
+    "zh": "语音模式",
+    "en": "Speech mode"
+  },
+  "ui_bafe1d66": {
+    "zh": "已将 GitHub 下载链接交给浏览器，请在浏览器中查看下载；若失败，可将“更新来源”切换为 Gitee，重新检查后下载。",
+    "en": "GitHub download opened in your browser. Check the download there; if it fails, select Gitee as the update source, check again, then download."
+  },
+  "ui_bb4557c0": {
+    "zh": "远程 API",
+    "en": "Remote API"
+  },
+  "ui_bc3e3fd1": {
+    "zh": "请等待当前同步完成后再导入。",
+    "en": "Wait for the current sync to finish before importing."
+  },
+  "ui_bc750e13": {
+    "zh": "仅填入空位，默认停用，不覆盖已有方案。请仅导入可信 CSS；启用后其中的图片或字体网址可能发起网络请求。",
+    "en": "Only empty slots are used; imported profiles stay disabled. Import trusted CSS only: enabled styles may request remote images or fonts."
+  },
+  "ui_bcc89b7d": {
+    "zh": "没有找到匹配内容",
+    "en": "No matches found"
+  },
+  "ui_bccf22df": {
+    "zh": "删除自定义技能",
+    "en": "删除自定义技能"
+  },
+  "ui_bcdcc3ea": {
+    "zh": "字典",
+    "en": "Dictionary"
+  },
+  "ui_bce6027": {
+    "zh": "无法修改同步加密密码",
+    "en": "Could not change the sync encryption password."
+  },
+  "ui_bd262128": {
+    "zh": "这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。",
+    "en": "这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。"
+  },
+  "ui_bd34a965": {
+    "zh": "API 端点",
+    "en": "API endpoint"
+  },
+  "ui_bd8c8c43": {
+    "zh": "下载已取消。",
+    "en": "Download cancelled."
+  },
+  "ui_bde2780": {
+    "zh": "已恢复默认值",
+    "en": "Defaults restored"
+  },
+  "ui_be2271dd": {
+    "zh": "划词工具栏",
+    "en": "Selection toolbar"
+  },
+  "ui_be55c6b": {
+    "zh": "当前平台暂不支持二维码，请复制配置代码。",
+    "en": "QR export is unavailable on this platform. Copy the code instead."
+  },
+  "ui_bea30ead": {
+    "zh": "书籍操作",
+    "en": "Book actions"
+  },
+  "ui_bea8b222": {
+    "zh": "使用默认模型",
+    "en": "Use default model"
+  },
+  "ui_bec1c713": {
+    "zh": "启用当前方案",
+    "en": "Enable this profile"
+  },
+  "ui_beebe82a": {
+    "zh": "预置音色",
+    "en": "Preset voice"
+  },
+  "ui_bf09fd3d": {
+    "zh": "高亮规则暂时无法应用，正文阅读不受影响。",
+    "en": "Could not apply highlights; reading is unaffected."
+  },
+  "ui_bf2c275d": {
+    "zh": "中年男性的偏低声线，音色厚实而清晰。表达沉着、情绪克制，句子之间自然停顿，适合历史叙事。"
+  },
+  "ui_bf32aebd": {
+    "zh": "当前",
+    "en": "Active"
+  },
+  "ui_bf532e81": {
+    "zh": "翻译模型",
+    "en": "Translation model"
+  },
+  "ui_c010314b": {
+    "zh": "作用范围：标题",
+    "en": "Scope: Headings"
+  },
+  "ui_c039320b": {
+    "zh": "其余已启用按钮放入“更多”，小屏幕会自动减少直接显示数量。",
+    "en": "Remaining enabled actions appear under More. Smaller screens fit fewer buttons."
+  },
+  "ui_c06cf6f": {
+    "zh": "配置格式无效",
+    "en": "Invalid configuration"
+  },
+  "ui_c0c0e600": {
+    "zh": "全文翻译"
+  },
+  "ui_c0c5a2cb": {
+    "zh": "CSS 模板与高亮规则",
+    "en": "CSS profiles and highlights"
+  },
+  "ui_c0c95191": {
+    "zh": "下一段",
+    "en": "Next passage"
+  },
+  "ui_c0d3e4c8": {
+    "zh": "复制并前往 GitHub",
+    "en": "Copy and open GitHub"
+  },
+  "ui_c105a0cf": {
+    "zh": "字典名称",
+    "en": "Dictionary name"
+  },
+  "ui_c10fe512": {
+    "zh": "导出成功",
+    "en": "Export complete"
+  },
+  "ui_c123b7c5": {
+    "zh": "风险：账号、密码和文件可能被网络中的其他人读取。优先使用 HTTPS 和专用只读账号。",
+    "en": "Risk: credentials and files may be intercepted. Prefer HTTPS and a dedicated read-only account."
+  },
+  "ui_c20288b1": {
+    "zh": "每次导入一本字典：选择一个 MDX，或同时选择同名字典的 IFO、IDX（可为 IDX.GZ）、DICT（可为 DICT.DZ）及可选 SYN。也可选择包含这些文件的 ZIP。",
+    "en": "Import one MDX, or select the matching IFO, IDX/IDX.GZ, DICT/DICT.DZ and optional SYN together. A ZIP containing one dictionary also works."
+  },
+  "ui_c2240365": {
+    "zh": "自定义 CSS 代码（高级）",
+    "en": "Custom CSS code (advanced)"
+  },
+  "ui_c37f3b26": {
+    "zh": "上一句",
+    "en": "Previous sentence"
+  },
+  "ui_c3bd8c52": {
+    "zh": "选择正文后直接打开翻译结果",
+    "en": "Open translation automatically after selecting text"
+  },
+  "ui_c3ed1bbc": {
+    "zh": "模型参数、显示与工具",
+    "en": "Models, display and tools"
+  },
+  "ui_c3f5b07b": {
+    "zh": "此词条没有文字释义，可能仅包含暂不支持的多媒体资源。",
+    "en": "No text definition; this entry may contain unsupported media only."
+  },
+  "ui_c44d2032": {
+    "zh": "朗读设置已保存",
+    "en": "Speech settings saved"
+  },
+  "ui_c4d2912f": {
+    "zh": "安装更新",
+    "en": "Install update"
+  },
+  "ui_c515ff97": {
+    "zh": "标准普通话"
+  },
+  "ui_c52f1929": {
+    "zh": "文件、二维码与 modu 链接 · 可选迁移账号密钥",
+    "en": "Files, QR and modu links · Optional credentials"
+  },
+  "ui_c5774cb9": {
+    "zh": "仅删除默读中的“{name}”及其查询索引，不删除原始字典文件。",
+    "en": "Remove “{name}” and its lookup index from Modu only. Original source files are not deleted."
+  },
+  "ui_c5fd3ab7": {
+    "zh": "温暖音色"
+  },
+  "ui_c664b25a": {
+    "zh": "将停止朗读，清除所有朗读服务的 API Key、接口配置、声音选择和未保存修改，并恢复默认语速、音调、音量及系统朗读。不影响 AI、书籍、笔记或同步设置。",
+    "en": "Stop speech, remove all TTS keys, service configurations, voice selections and drafts, and restore default rate, pitch, volume and system speech. AI, books, notes and sync settings are unchanged."
+  },
+  "ui_c6b986c1": {
+    "zh": "应用显示方式",
+    "en": "Apply display mode"
+  },
+  "ui_c6cf8797": {
+    "zh": "更新服务器拒绝访问，请检查网络或代理，或从官方发布页下载。",
+    "en": "Update server denied access. Check your network or proxy, or download from the official release page."
+  },
+  "ui_c7aeac55": {
+    "zh": "崩溃日志读取失败，可重新勾选重试；仍可提交普通报告。",
+    "en": "Could not load crash diagnostics. Select again to retry, or submit without logs."
+  },
+  "ui_c807217b": {
+    "zh": "颜色列表（逗号分隔）",
+    "en": "Colours (comma separated)"
+  },
+  "ui_c814e9e4": {
+    "zh": "内置浏览器 · 自定义搜索引擎",
+    "en": "In-app browser · Custom search engines"
+  },
+  "ui_c8cff597": {
+    "zh": "数据迁移",
+    "en": "Data migration"
+  },
+  "ui_c8fb585a": {
+    "zh": "安装包不内嵌模型。请选择下载源，再按需下载所选模型及分词器；下载会消耗流量，请保持页面打开直到完成。文件经大小与 SHA-256 校验后可离线使用，无需 API Key。旧版已准备的完整模型继续复用。Gitee 镜像不可用时，可切换 Hugging Face；不会自动更换下载源。自动向量化默认关闭，启动或索引不会自动下载模型。切换模型后请重新向量化已有书籍。",
+    "en": "Models are not bundled. Select a source and download only the model and tokenizer you need. Downloads consume data; keep this page open until complete. Files are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused. Switch to Hugging Face if the mirror is unavailable; sources never switch silently. Automatic indexing is off and neither startup nor indexing downloads models automatically. Reindex books after switching models."
+  },
+  "ui_c978ff2d": {
+    "zh": "用于阅读页选词翻译和语境解释"
+  },
+  "ui_ca16d7d1": {
+    "zh": "选择 ANX 导出的 ZIP，查看步骤和限制后合并书库",
+    "en": "Import a ZIP exported by ANX; review steps and limitations first"
+  },
+  "ui_ca1939f6": {
+    "zh": "字典没有可查询的词条。",
+    "en": "Dictionary has no entries."
+  },
+  "ui_ca3845c3": {
+    "zh": "确认更新",
+    "en": "Confirm update"
+  },
+  "ui_ca51d233": {
+    "zh": "技能名称",
+    "en": "技能名称"
+  },
+  "ui_cae34bfa": {
+    "zh": "确定删除所选 {count} 本书吗？书籍文件及本地向量索引也会被删除。",
+    "en": "Delete the {count} selected books? Their files and local vector indexes will also be deleted."
+  },
+  "ui_cbda3c4f": {
+    "zh": "模型参数",
+    "en": "Model parameters"
+  },
+  "ui_cc6f8540": {
+    "zh": "检查与下载使用同一来源，默认优先 GitHub。检查时连接失败、超时或服务不可用会整体切换为 Gitee；手动切换来源后请重新检查再下载。下载由浏览器完成，默读无法监测其后续进度，也不会显示下载完成或 SHA-256 校验通过。不发送书籍、笔记或账号密钥。",
+    "en": "Checking and downloading use the same source, with GitHub preferred by default. If a check cannot reach GitHub, both switch to Gitee. Check again after changing sources before downloading. Your browser handles the download; Modu cannot monitor its progress or verify the downloaded file. No books, notes or account keys are sent."
+  },
+  "ui_cd93c8b7": {
+    "zh": "当前已是最新版本（或高于已发布版本）",
+    "en": "Up to date (or newer than the published release)"
+  },
+  "ui_ce47b912": {
+    "zh": "已内嵌 · 离线可用",
+    "en": "Bundled · Offline ready"
+  },
+  "ui_cec9c9cb": {
+    "zh": "请填写描述或选择一个预设",
+    "en": "Enter a description or select a template"
+  },
+  "ui_cf365bf6": {
+    "zh": "虚线",
+    "en": "Dashed"
+  },
+  "ui_cf80c810": {
+    "zh": "解密备份设置",
+    "en": "Decrypt backup settings"
+  },
+  "ui_d0223a29": {
+    "zh": "管理字典",
+    "en": "Manage dictionaries"
+  },
+  "ui_d05dcf21": {
+    "zh": "选择目标语言",
+    "en": "Select target language"
+  },
+  "ui_d068b21": {
+    "zh": "前往 GitHub 提交",
+    "en": "Continue on GitHub"
+  },
+  "ui_d08fe7d4": {
+    "zh": "局部正则高亮仅支持颜色、背景色与下划线，不更改正文节点；字体、图片、SVG 和偏移仅用于排版模板。",
+    "en": "Regex highlights preserve text nodes and support colors and underlines only. Fonts, images, SVG and offset require a layout template."
+  },
+  "ui_d09fdc5a": {
+    "zh": "已打开 GitHub；报告尚未提交，请登录并确认提交。",
+    "en": "GitHub opened. Nothing submitted yet; sign in and confirm there."
+  },
+  "ui_d0a6fdf2": {
+    "zh": "原文 + 译文",
+    "en": "Original + translation"
+  },
+  "ui_d117a592": {
+    "zh": "模型 ID",
+    "en": "Model ID"
+  },
+  "ui_d1330b7a": {
+    "zh": "导入",
+    "en": "Import"
+  },
+  "ui_d1613041": {
+    "zh": "英文",
+    "en": "English"
+  },
+  "ui_d1772dbc": {
+    "zh": "配置此功能的参数",
+    "en": "Configure feature parameters"
+  },
+  "ui_d19439a9": {
+    "zh": "关闭此窗口后下载继续，可从“关于默读”返回查看或取消。",
+    "en": "Closing this dialog keeps downloading. Return from About to view progress or cancel."
+  },
+  "ui_d23480e5": {
+    "zh": "清除失败，请重试",
+    "en": "Could not clear settings. Please retry."
+  },
+  "ui_d277f8c0": {
+    "zh": "导入后自动向量化",
+    "en": "Vectorize after import"
+  },
+  "ui_d285b5bb": {
+    "zh": "测试推理",
+    "en": "Test inference"
+  },
+  "ui_d28c3d66": {
+    "zh": "背景颜色",
+    "en": "Background color"
+  },
+  "ui_d3108ee4": {
+    "zh": "开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。",
+    "en": "When enabled, AI, translation, vector and online speech settings and API keys, plus remote library settings and its password, are encrypted with AES-256-GCM and written to the WebDAV sync database."
+  },
+  "ui_d3501042": {
+    "zh": "使用标准普通话，自然表达。"
+  },
+  "ui_d3aef0c9": {
+    "zh": "书名 / 文件名",
+    "en": "Book / file name"
+  },
+  "ui_d4144db": {
+    "zh": "本地书籍已在队列中或队列暂不可用。",
+    "en": "Local books are already queued or the queue is unavailable."
+  },
+  "ui_d42633fa": {
+    "zh": "导出失败，请重试。大型导图可选择 SVG 或 Markdown。",
+    "en": "Export failed. Try again, or use SVG / Markdown for large maps."
+  },
+  "ui_d4348d62": {
+    "zh": "编辑工具参数",
+    "en": "Edit action parameters"
+  },
+  "ui_d44e7128": {
+    "zh": "描述语气、情绪和节奏；留空使用音色默认风格。",
+    "en": "Describe tone, emotion and pace, or leave empty for the default style."
+  },
+  "ui_d49c19ed": {
+    "zh": "舒缓节奏"
+  },
+  "ui_d4e1645a": {
+    "zh": "配置书库 WebDAV",
+    "en": "Configure library WebDAV"
+  },
+  "ui_d518b5d4": {
+    "zh": "输入书内关键词",
+    "en": "Enter a keyword"
+  },
+  "ui_d569c287": {
+    "zh": "目标语言",
+    "en": "Target language"
+  },
+  "ui_d5bdd286": {
+    "zh": "无法切换标记菜单，请重试。",
+    "en": "Could not switch the marking menu. Please retry."
+  },
+  "ui_d62bbdce": {
+    "zh": "统计布局",
+    "en": "Statistics layout"
+  },
+  "ui_d66fe7b5": {
+    "zh": "书籍、字体、数据库、模型和索引保存在此目录。卸载应用会删除此目录；部分系统仍限制文件管理器访问 Android/data。账号设置和密钥仍保存在应用私有区域。",
+    "en": "Books, fonts, databases, models and indexes are stored here. Uninstalling deletes this directory; some systems restrict file manager access to Android/data. Account settings and keys remain in private app storage."
+  },
+  "ui_d74bfd1a": {
+    "zh": "竖排红色边框",
+    "en": "Red frame for vertical reading"
+  },
+  "ui_d8380e72": {
+    "zh": "AI 配置测试"
+  },
+  "ui_d8399048": {
+    "zh": "网页缩放",
+    "en": "Page zoom"
+  },
+  "ui_d84f461d": {
+    "zh": "末尾对齐",
+    "en": "End"
+  },
+  "ui_d8ee7237": {
+    "zh": "自定义 AI 命令",
+    "en": "Custom AI command"
+  },
+  "ui_d8f8349": {
+    "zh": "二维码生成失败",
+    "en": "Could not generate QR code"
+  },
+  "ui_d9084d2e": {
+    "zh": "恢复多项设置？",
+    "en": "Restore multiple settings?"
+  },
+  "ui_d9d3f020": {
+    "zh": "使用服务器修改时间；未提供的排在末尾。",
+    "en": "Uses server modification time; missing dates sort last."
+  },
+  "ui_d9e3509d": {
+    "zh": "默读向量模型连接测试",
+    "en": "Modu embedding connection test"
+  },
+  "ui_da2571e": {
+    "zh": "温暖柔和"
+  },
+  "ui_da6b9567": {
+    "zh": "已选 {count} 本",
+    "en": "{count} books selected"
+  },
+  "ui_da711856": {
+    "zh": "预览 Bug 报告",
+    "en": "Preview bug report"
+  },
+  "ui_da974d75": {
+    "zh": "正在复核并打开安装包…",
+    "en": "Verifying and opening installer…"
+  },
+  "ui_db146421": {
+    "zh": "请填写技能名称和提示词",
+    "en": "Enter a skill name and prompt"
+  },
+  "ui_db9c2277": {
+    "zh": "请先启用 WebDAV 和自动同步。",
+    "en": "Enable WebDAV and automatic sync first."
+  },
+  "ui_dbe4b7ca": {
+    "zh": "商店版本请通过原应用商店更新，不进行侧载安装。",
+    "en": "Update store builds through their original store, not sideloading."
+  },
+  "ui_dbe89779": {
+    "zh": "默认音色（由服务地区决定）",
+    "en": "Default voice (regional)"
+  },
+  "ui_dbef6f6b": {
+    "zh": "远程书库设置",
+    "en": "Remote library settings"
+  },
+  "ui_dc0ca772": {
+    "zh": "放大",
+    "en": "Zoom in"
+  },
+  "ui_dc7554de": {
+    "zh": "包含当前平台可用的退出原因、内存采样、向量化进度和脱敏原生堆栈。Apple 报告可能延迟；Linux 需要系统保留记录。强制退出不保证有堆栈。提交后公开，请先预览。",
+    "en": "Includes available exit reasons, memory samples, index checkpoints and sanitized native frames. Apple delivery can be delayed; Linux requires retained system records. Force-kills may have no stack. Preview before public submission."
+  },
+  "ui_ddaf4cca": {
+    "zh": "工具按钮与 AI 模板",
+    "en": "Actions and AI templates"
+  },
+  "ui_deee8677": {
+    "zh": "校验并恢复",
+    "en": "Validate and restore"
+  },
+  "ui_def498f0": {
+    "zh": "模型来源",
+    "en": "Model source"
+  },
+  "ui_df3975a9": {
+    "zh": "新建文件夹",
+    "en": "New folder"
+  },
+  "ui_e037fb1f": {
+    "zh": "正则高亮",
+    "en": "Regex highlight"
+  },
+  "ui_e049a138": {
+    "zh": "清亮轻快"
+  },
+  "ui_e0afcb65": {
+    "zh": "全部全局设置",
+    "en": "All global settings"
+  },
+  "ui_e1083a34": {
+    "zh": "字典不完整、损坏或格式暂不支持。请核对配套文件；暂不支持 MDX 3、LZO 压缩及加密正文。已有字典未改变。",
+    "en": "Dictionary is incomplete, damaged or unsupported. Check companion files. MDX 3, LZO and encrypted records are unsupported. Existing dictionaries are unchanged."
+  },
+  "ui_e1a5047c": {
+    "zh": "输入 DeepL API Key",
+    "en": "Enter DeepL API key"
+  },
+  "ui_e1dfa2ad": {
+    "zh": "阅读翻译",
+    "en": "Reader translation"
+  },
+  "ui_e221d5cf": {
+    "zh": "跟随默认模板",
+    "en": "Follow default templates"
+  },
+  "ui_e239a063": {
+    "zh": "导出 IPA",
+    "en": "Export IPA"
+  },
+  "ui_e2ba53f0": {
+    "zh": "在语义完整处自然停顿。"
+  },
+  "ui_e2bb4f37": {
+    "zh": "网站暂时无法访问，请刷新或切换搜索引擎。",
+    "en": "Website unavailable. Reload or switch engines."
+  },
+  "ui_e2f94f47": {
+    "zh": "支持 DeepL 官方接口和 DeepLX 自定义地址",
+    "en": "Supports official DeepL and custom DeepLX endpoints"
+  },
+  "ui_e30c09b8": {
+    "zh": "tts-1 / tts-1-hd 不支持提示词；保留描述但不发送。",
+    "en": "tts-1 / tts-1-hd do not support instructions. Your description is kept but not sent."
+  },
+  "ui_e344e8f1": {
+    "zh": "无法跳转到搜索结果，请重试",
+    "en": "Could not open this search result"
+  },
+  "ui_e350953a": {
+    "zh": "操作失败，内容仍保留。可预览并手动复制报告和下方网址。",
+    "en": "Action failed. Your draft is retained. Preview and manually copy the report and URL below."
+  },
+  "ui_e51799ba": {
+    "zh": "功能提示词",
+    "en": "功能提示词"
+  },
+  "ui_e532f468": {
+    "zh": "版本信息来源",
+    "en": "Release information source"
+  },
+  "ui_e539cf14": {
+    "zh": "自定义下划线颜色",
+    "en": "Underline color"
+  },
+  "ui_e779e811": {
+    "zh": "向量模型配置已保存",
+    "en": "Vector model saved"
+  },
+  "ui_e823b771": {
+    "zh": "清亮女声"
+  },
+  "ui_e8477bc2": {
+    "zh": "全部收起",
+    "en": "Collapse all"
+  },
+  "ui_e8644f90": {
+    "zh": "更新服务器暂时限制请求，请稍后重试。",
+    "en": "Update server rate limit reached. Please retry later."
+  },
+  "ui_e872f101": {
+    "zh": "已单独开启。AI、翻译、向量、在线语音及远程书库配置（含书库密码）将加密后写入 WebDAV 同步数据库。",
+    "en": "Enabled separately. AI, translation, vector, online speech and remote library settings (including its password) are encrypted before being written to the WebDAV database."
+  },
+  "ui_e8a49165": {
+    "zh": "最新正式版",
+    "en": "Latest stable"
+  },
+  "ui_e948435c": {
+    "zh": "确认删除此技能吗？",
+    "en": "Delete this skill?"
+  },
+  "ui_ea8d5381": {
+    "zh": "删除",
+    "en": "Delete"
+  },
+  "ui_eaec8cc7": {
+    "zh": "我的反馈（GitHub）",
+    "en": "My reports (GitHub)"
+  },
+  "ui_eb0a3a16": {
+    "zh": "划词 AI",
+    "en": "Selection AI"
+  },
+  "ui_ed666b8a": {
+    "zh": "请在发布页查看适合此设备的安装方式。",
+    "en": "See the release page for supported installation methods."
+  },
+  "ui_ed74bd64": {
+    "zh": "未提供",
+    "en": "Not provided"
+  },
+  "ui_ed98e576": {
+    "zh": "字典名称应为 1–80 个字符。",
+    "en": "Use a name of 1–80 characters."
+  },
+  "ui_edc89713": {
+    "zh": "选择翻译模型",
+    "en": "Select translation model"
+  },
+  "ui_ee0d8d7b": {
+    "zh": "自定义 CSS",
+    "en": "Custom CSS"
+  },
+  "ui_ee526f10": {
+    "zh": "AI 供应商与对话",
+    "en": "AI providers and chat"
+  },
+  "ui_ee721de4": {
+    "zh": "配置翻译选项",
+    "en": "Configure translation options"
+  },
+  "ui_ef7ef9fd": {
+    "zh": "成年男性的温暖中音，声音放松而不含混。像面对面讲故事一样娓娓道来，节奏均匀。"
+  },
+  "ui_efb3c20b": {
+    "zh": "100%（恢复默认）",
+    "en": "100% (Reset)"
+  },
+  "ui_f05dd0e0": {
+    "zh": "提示词不能为空",
+    "en": "The prompt cannot be empty"
+  },
+  "ui_f077c753": {
+    "zh": "移入文件夹",
+    "en": "Move to folder"
+  },
+  "ui_f081e74f": {
+    "zh": "清除书库连接？",
+    "en": "Clear library connection?"
+  },
+  "ui_f09e8b61": {
+    "zh": "查看将附带的崩溃日志",
+    "en": "Preview attached crash diagnostics"
+  },
+  "ui_f20870cd": {
+    "zh": "适应窗口",
+    "en": "Fit to window"
+  },
+  "ui_f2264980": {
+    "zh": "正在取消",
+    "en": "Cancelling"
+  },
+  "ui_f29b5e13": {
+    "zh": "仅恢复文件实际包含的账号、密钥及供应商配置；未包含的配置保持不变。",
+    "en": "Restore only the accounts, keys and provider configurations actually included; other configurations stay unchanged."
+  },
+  "ui_f2c8c005": {
+    "zh": "跟随设置中的全局模型：{model}",
+    "en": "Follow the global model: {model}"
+  },
+  "ui_f30b5109": {
+    "zh": "AI 翻译",
+    "en": "AI Translation"
+  },
+  "ui_f3326d53": {
+    "zh": "同一自然段内相邻句合成，高亮和前后跳转按小段，长段自动拆分。自动附加匀速听书要求，不改写已保存的描述；实际音色与节奏仍取决于模型。",
+    "en": "Adjacent sentences in one paragraph are synthesized together. Highlighting and navigation follow each passage; long paragraphs are split. Steady narration instructions are added without changing your saved description. Voice and timing still depend on the model."
+  },
+  "ui_f33e5028": {
+    "zh": "• 导入书籍文件、封面、笔记/高亮、阅读进度、阅读时长、文件夹和标签。\n• 不导入 ANX 的账号、密码、API 密钥、同步配置、AI 聊天记录、字体、主题或其他应用设置。\n• 仅支持原版 ANX ZIP 备份，内部数据库版本为 7（不是 ANX 应用版本号）；不接受单独的 DB、加密 ZIP 或修改版数据库。\n• 已删除书籍不导入；备份缺少正文文件的书籍及其笔记、记录会跳过，并显示书名。请在 ANX 下载完整后重新备份。\n• 相同文件内容识别为同一本书，保留默读已有进度、笔记修改和文件夹安排。重复导入同一备份不会重复创建同一记录，不会用旧备份覆盖已有数据。\n• 不改动原 ZIP，不直接访问 ANX 私有目录。导入前自动备份默读数据库，完成后显示备份位置。\n• 请预留足够空间用于解压、文件复制及数据库备份；准备阶段只校验，不会替换现有书库。",
+    "en": "• Imports book files, covers, notes/highlights, reading position/time, folders and tags.\n• Does not import accounts, passwords, API keys, sync configuration, AI chats, fonts, themes or other app settings.\n• Supports original ANX ZIP backups with database schema version 7 (not the app version). Standalone DBs, encrypted ZIPs and modified databases are not supported.\n• Deleted books are excluded. Books without their actual files, and their notes/history, are skipped and listed. Download them in ANX and export again.\n• Identical contents are deduplicated. Existing Modu positions, note edits and folder assignments are preserved. Reimporting the same backup does not recreate the same records or overwrite existing data.\n• The ZIP is unchanged; ANX private storage is never accessed. A local Modu database backup is created before importing, with its location shown afterwards.\n• Allow space for extraction, copies and the database backup. Preparation only validates the backup."
+  },
+  "ui_f388b7a3": {
+    "zh": "无法打开默认浏览器，请重试或手动访问官方发布页。",
+    "en": "Could not open the default browser. Retry or visit the official release page."
+  },
+  "ui_f38fcdf3": {
+    "zh": "使用默认浏览器下载 DMG，避免应用内下载触发 macOS 沙盒隔离。不要使用旧的应用内下载缓存。下载后打开 DMG，退出默读，再将新应用拖入“应用程序”替换旧版，书库数据不变。当前发行包未经 Apple 公证。",
+    "en": "Download the DMG using your default browser to avoid macOS sandbox quarantine. Do not reuse an old in-app download. Open the DMG, quit Modu, and drag the new app into Applications to replace it; your library is preserved. Current packages are not Apple-notarized."
+  },
+  "ui_f3e93354": {
+    "zh": "全屏查看",
+    "en": "Full screen"
+  },
+  "ui_f4809d40": {
+    "zh": "沉着稳重"
+  },
+  "ui_f48352d1": {
+    "zh": "局部高亮填写 CSS 声明，不加选择器和花括号。",
+    "en": "For highlights, enter declarations without selectors or braces."
+  },
+  "ui_f4ec8c48": {
+    "zh": "包含服务配置与 API Key（加密）",
+    "en": "Include service settings and API keys (encrypted)"
+  },
+  "ui_f4f32703": {
+    "zh": "自定义字典",
+    "en": "Custom dictionaries"
+  },
+  "ui_f4f9460": {
+    "zh": "新建技能",
+    "en": "新建技能"
+  },
+  "ui_f55085f9": {
+    "zh": "请通过浏览器重新下载 DMG，不要使用旧的应用内下载缓存。",
+    "en": "Download the DMG again in your browser; do not reuse an old in-app download."
+  },
+  "ui_f56638f2": {
+    "zh": "AI 阅读技能",
+    "en": "AI Reading Skills"
+  },
+  "ui_f5e364b1": {
+    "zh": "仅前台阅读时计时；退出书籍、切换其他页面或锁屏后暂停。使用双向合并，同步已保存的笔记、阅读进度及其他正常同步内容；不自动保存编辑草稿。",
+    "en": "Runs only while reading in the foreground. Pauses on other pages or in the background. Merges saved notes, reading positions and normal sync data; unsaved drafts are not submitted."
+  },
+  "ui_f60680bf": {
+    "zh": "模型下载源",
+    "en": "Model download source"
+  },
+  "ui_f651aa13": {
+    "zh": "保存二维码",
+    "en": "Save QR"
+  },
+  "ui_f65d0111": {
+    "zh": "强调条",
+    "en": "Emphasis"
+  },
+  "ui_f6877183": {
+    "zh": "导入 ANX Reader 的备份文件",
+    "en": "Import ANX Reader backup"
+  },
+  "ui_f687e87b": {
+    "zh": "笔记与书摘设置",
+    "en": "Notes and excerpts"
+  },
+  "ui_f6d5ddd0": {
+    "zh": "无法打开浏览器，请稍后重试。",
+    "en": "Could not open the browser. Please retry."
+  },
+  "ui_f6e64898": {
+    "zh": "默读本地向量模型测试",
+    "en": "Modu local embedding model test"
+  },
+  "ui_f79b47e3": {
+    "zh": "删除字典？",
+    "en": "Delete dictionary?"
+  },
+  "ui_f82ce566": {
+    "zh": "导出当前方案",
+    "en": "Export current"
+  },
+  "ui_f863d66d": {
+    "zh": "删除当前方案？",
+    "en": "Delete this profile?"
+  },
+  "ui_f889920d": {
+    "zh": "用端正从容的语气诵读，按语义自然断句，注意节奏，不刻意拖长尾音。"
+  },
+  "ui_f8bf9596": {
+    "zh": "请选择不超过 256 个字符的词语，或在上方修改查询内容。",
+    "en": "Select a word of up to 256 characters, or edit the query above."
+  },
+  "ui_f8c35645": {
+    "zh": "已下载",
+    "en": "Downloaded"
+  },
+  "ui_f9691a74": {
+    "zh": "每次启动自动检查正式版本，不会自动下载或安装。",
+    "en": "Checks for stable releases on each launch. Downloads and installation require your action."
+  },
+  "ui_f9d572aa": {
+    "zh": "复制",
+    "en": "Duplicate"
+  },
+  "ui_fb3cc246": {
+    "zh": "请等待同步、向量化任务结束后再导入。",
+    "en": "Wait for sync and indexing to finish before importing."
+  },
+  "ui_fb7c8050": {
+    "zh": "恢复默认值",
+    "en": "Restore defaults"
+  },
+  "ui_fba0a352": {
+    "zh": "自定义字体优先于通用字体。导出仅包含文件名，其他设备需另行导入同名字体。",
+    "en": "Custom fonts take precedence. Exports include filenames only; import matching fonts on other devices."
+  },
+  "ui_fc514e70": {
+    "zh": "恢复备份",
+    "en": "Restore backup"
+  },
+  "ui_fc740faa": {
+    "zh": "效果取决于服务商和模型，提示词不能代替 Voice 音色或克隆声音。使用提示词控制语速、音高时，请把播放器语速与音调设为 1.0，避免冲突。点击“保存设置”后生效。",
+    "en": "Results depend on the provider and model; prompts do not replace Voice or clone a voice. Set the player rate and pitch to 1.0 when controlling them with text to avoid conflicts. Use Save settings to apply."
+  },
+  "ui_fcbf376c": {
+    "zh": "保存设置",
+    "en": "Save settings"
+  },
+  "ui_fcd32e36": {
+    "zh": "阅读同步间隔",
+    "en": "Reading sync interval"
+  },
+  "ui_fd64bffa": {
+    "zh": "全选",
+    "en": "Select all"
+  },
+  "ui_fd94b8f8": {
+    "zh": "安装需要系统确认；首次使用可能需要允许安装此来源的应用。不会卸载旧版或删除书库。",
+    "en": "Installation requires system confirmation and possibly permission for this source. Your existing app and library will not be uninstalled."
+  },
+  "ui_fe295b7c": {
+    "zh": "\n\nWebDAV 及自动同步需手动重新开启。",
+    "en": "\n\nRe-enable WebDAV and automatic sync manually."
+  },
+  "ui_fe2ea582": {
+    "zh": "声音温暖柔和，减少尖锐感。"
+  },
+  "ui_fe446080": {
+    "zh": "选择翻译引擎",
+    "en": "Select translation engine"
+  },
+  "ui_fe632310": {
+    "zh": "搜索、翻译、字典和朗读共用各自功能的设置。AI 划词模板在此独立管理，默认关闭，使用当前 AI 服务，只发送选中文字；无需新增 API Key。每次提问开启新对话，共用阅读 AI 弹出框，回答完成后回到第一段。此配置随全局设置备份导出和导入。",
+    "en": "AI selection templates are managed here separately, disabled by default and use your current AI provider. Each question starts a new conversation in the reader AI popup, returning to the answer start on completion. Search, translation, dictionary and speech share their feature settings. Toolbar configuration is included in global settings backups."
+  },
+  "ui_fe769926": {
+    "zh": "预期行为",
+    "en": "Expected behavior"
+  },
+  "ui_fee7010e": {
+    "zh": "账号、密码和 API Key 迁移开关已关闭：含凭据的配置将被跳过，本机已有账号与密钥保持不变。",
+    "en": "Credential transfer is off: credential-bearing configurations are skipped and existing local accounts and keys stay unchanged."
+  },
+  "ui_ff64c5e6": {
+    "zh": "文件已保存至：",
+    "en": "File saved to:"
+  },
+  "ui_ff7ff1d8": {
+    "zh": "取消全选",
+    "en": "Deselect all"
+  },
+  "ui_fff6666": {
+    "zh": "开启后，分页模式下滑动、拖动不翻页，也不触发上下拉手势；关闭后可滑动翻页。不影响选词、快速标记和滚动阅读模式。",
+    "en": "In page mode, disable swipe navigation and pull gestures. Turn off to allow swipes. Text selection, quick mark and scrolling mode are unchanged."
+  }
+}

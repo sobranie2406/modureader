@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -134,18 +135,17 @@ Future<void> openAboutDialog() async {
                   ListTile(
                       leading: const Icon(Icons.system_update_outlined),
                       title: Text(
-                          Localizations.localeOf(context).languageCode == 'zh'
-                              ? '版本检查与更新'
-                              : 'App updates'),
-                      subtitle: Text(
-                          Localizations.localeOf(context).languageCode == 'zh'
-                              ? '检查版本 · 下载 · 安装'
-                              : 'Check version · Download · Install'),
+                          ModuStrings.text(context, '版本检查与更新', 'App updates')),
+                      subtitle: Text(ModuStrings.text(context, '检查版本 · 下载 · 安装',
+                          'Check version · Download · Install')),
                       onTap: () => checkUpdate(true)),
                 ListTile(
-                  title: const Text('开源项目与来源'),
-                  subtitle: const Text('默读基于 Anx Reader 与 ReadAny 开发，\n'
-                      '以 GPL-3.0-or-later 发布，非上游官方发行版。'),
+                  title: Text(ModuStrings.text(
+                      context, '开源项目与来源', 'Open-source projects and credits')),
+                  subtitle: Text(ModuStrings.text(
+                      context,
+                      '默读基于 Anx Reader 与 ReadAny 开发，\n以 GPL-3.0-or-later 发布，非上游官方发行版。',
+                      'Modu is based on Anx Reader and ReadAny.\nReleased under GPL-3.0-or-later; not an official upstream release.')),
                   isThreeLine: true,
                   onTap: () => launchUrl(
                     Uri.parse('https://github.com/sobranie2406/modureader'),

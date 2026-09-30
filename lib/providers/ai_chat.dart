@@ -154,7 +154,8 @@ class AiChat extends _$AiChat {
           : [ChatMessage.system(knowledgeContext), ...messages];
     }
 
-    if (requestRunner?.isCancelled == true) return;
+    if (requestRunner?.isCancelled == true || _currentSessionId != sessionId)
+      return;
     final reading = widgetRef.read(currentReadingProvider);
     final readingRequest = _scope == AiChatScope.reader
         ? (isRegenerate
@@ -199,13 +200,17 @@ class AiChat extends _$AiChat {
     );
 
     await historyNotifier.upsert(draftEntry);
-    if (requestRunner?.isCancelled == true) return;
+    if (requestRunner?.isCancelled == true || _currentSessionId != sessionId)
+      return;
     _lastReadingRequest = readingRequest;
     state = AsyncData(updatedMessages);
 
     yield updatedMessages;
+    if (requestRunner?.isCancelled == true || _currentSessionId != sessionId)
+      return;
 
     String assistantResponse = "";
+    var latestMessages = updatedMessages;
     try {
       // Each AI stream closes its runner on completion. Use a child per stage
       // so completing the knowledge answer cannot cancel the subsequent search.
@@ -253,6 +258,10 @@ class AiChat extends _$AiChat {
               requestRunner: requestRunner,
             );
       await for (final chunk in coalesceSnapshots(responseStream)) {
+        // A fresh selection may start while an old provider is still closing.
+        // Its late output must not replace the new conversation or its history.
+        if (requestRunner?.isCancelled == true ||
+            _currentSessionId != sessionId) return;
         assistantResponse = chunk;
 
         final updatedMessagesWithResponse =
@@ -260,20 +269,23 @@ class AiChat extends _$AiChat {
         updatedMessagesWithResponse[updatedMessagesWithResponse.length - 1] =
             assistantMessageFromDisplayContent(assistantResponse);
 
-        yield updatedMessagesWithResponse;
-
+        latestMessages = updatedMessagesWithResponse;
         state = AsyncData(updatedMessagesWithResponse);
+        yield updatedMessagesWithResponse;
       }
+      if (requestRunner?.isCancelled == true || _currentSessionId != sessionId)
+        return;
       final completedEntry = draftEntry.copyWith(
-        messages: List<ChatMessage>.from(state.value ?? updatedMessages),
+        messages: List<ChatMessage>.from(latestMessages),
         updatedAt: DateTime.now().millisecondsSinceEpoch,
         completed: true,
         model: model,
       );
       await historyNotifier.upsert(completedEntry);
     } catch (_) {
+      if (_currentSessionId != sessionId) return;
       final failedEntry = draftEntry.copyWith(
-        messages: List<ChatMessage>.from(state.value ?? updatedMessages),
+        messages: List<ChatMessage>.from(latestMessages),
         updatedAt: DateTime.now().millisecondsSinceEpoch,
         completed: false,
         model: model,
@@ -324,10 +336,12 @@ class AiChat extends _$AiChat {
         break;
       case ReadingSkillSourceScope.selectionRequired:
         if (normalizedSelection == null || normalizedSelection.isEmpty) {
-          throw StateError('请先在阅读界面选择需要翻译的原文，再使用“智能翻译”。');
+          throw StateError(policy.id == selectionToolbarSkillId
+              ? '请先在阅读界面选择需要处理的文字。'
+              : '请先在阅读界面选择需要翻译的原文，再使用“智能翻译”。');
         }
         source = _ReadingSkillSource(
-          description: '用户在当前章节中选中的待翻译原文',
+          description: '用户在当前章节中选中的原文',
           content: normalizedSelection,
         );
         break;
@@ -362,6 +376,7 @@ class AiChat extends _$AiChat {
       bookTitle: reading.book?.title,
       chapterTitle: reading.chapterTitle,
       chapterHref: reading.chapterHref,
+      responseLanguage: Prefs().effectiveLocale.toLanguageTag(),
       agentAvailable: agentAvailable,
     );
     AnxLog.info(

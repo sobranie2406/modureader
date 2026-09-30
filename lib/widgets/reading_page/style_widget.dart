@@ -1,3 +1,4 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -186,9 +187,8 @@ class StyleWidgetState extends State<StyleWidget> {
       ),
       Expanded(
         child: DropdownMenu<FontModel>(
-          label: Text(Localizations.localeOf(context).languageCode == 'zh'
-              ? '中文／正文字体'
-              : 'Chinese / body font'),
+          label:
+              Text(ModuStrings.text(context, '中文／正文字体', 'Chinese / body font')),
           expandedInsets: const EdgeInsets.only(left: 5),
           initialSelection: font,
           inputDecorationTheme: InputDecorationTheme(
@@ -234,9 +234,8 @@ class StyleWidgetState extends State<StyleWidget> {
   }
 
   Widget englishFontSelector() {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final follow = FontModel(
-        label: zh ? '跟随正文字体' : 'Follow body font',
+        label: ModuStrings.text(context, '跟随正文字体', 'Follow body font'),
         name: 'follow',
         path: 'follow');
     final choices = [follow, ...fonts().where((font) => font.name != 'book')];
@@ -246,7 +245,8 @@ class StyleWidgetState extends State<StyleWidget> {
         orElse: () => follow);
     return DropdownMenu<FontModel>(
       key: ValueKey('english-font-${current.litePath}'),
-      label: Text(zh ? '英文字体（字母、数字）' : 'English font (letters, numbers)'),
+      label: Text(ModuStrings.text(
+          context, '英文字体（字母、数字）', 'English font (letters, numbers)')),
       expandedInsets: EdgeInsets.zero,
       initialSelection: current,
       inputDecorationTheme: InputDecorationTheme(
@@ -540,9 +540,8 @@ class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text(Localizations.localeOf(context).languageCode == 'zh'
-              ? '保存主题失败，请重试。'
-              : 'Could not save the theme. Please try again.'),
+          content: Text(ModuStrings.text(context, '保存主题失败，请重试。',
+              'Could not save the theme. Please try again.')),
         ));
       }
     } finally {

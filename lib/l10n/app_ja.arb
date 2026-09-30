@@ -883,5 +883,58 @@
    "aiModelSwitchTitle": "モデル切替",
    "aiModelEnterManually": "モデル名を入力",
    "aiModelOrSelectBelow": "またはリストから選択：",
-   "aiChatFontSize": "フォントサイズ"
+   "aiChatFontSize": "フォントサイズ",
+   "fontImportedAndApplied": "取り込み・適用済み：{font}",
+   "@fontImportedAndApplied": {
+      "placeholders": {
+         "font": {
+            "type": "String"
+         }
+      }
+   },
+   "fontImportFailedCount": "{count} 個のフォントをインポートできませんでした。",
+   "@fontImportFailedCount": {
+      "placeholders": {
+         "count": {
+            "type": "int"
+         }
+      }
+   },
+   "readingBrightness": "アプリの明るさ",
+   "readingBrightnessFollowSystem": "システムに合わせる",
+   "readingBrightnessWindowHint": "このアプリのウィンドウだけを調整し、システムの明るさは変更しません。",
+   "readingBrightnessDimHint": "このアプリだけを暗くします。100% ではシステムの明るさを維持し、システム設定より明るくはできません。",
+   "readingPageReadingInfoChapterPageProgress": "この章のページ数",
+   "readingPagePreviousChapter": "前の章",
+   "readingPagePreviousPage": "前のページ",
+   "readingPageNextPage": "次のページ",
+   "readingPageNextChapter": "次の章",
+   "readingPageChapterNumber": "第 {number} 章",
+   "@readingPageChapterNumber": {
+      "placeholders": {
+         "number": {
+            "type": "int"
+         }
+      }
+   },
+   "settingsAiProviderReasoningEffort": "推論の強度",
+   "settingsAiProviderReasoningEffortHelp": "標準は「自動」で、このパラメーターを送信しません。reasoning_effort に未対応のモデルやプロバイダーは、パラメーターを無視するか要求を拒否する場合があります。",
+   "settingsAiProviderReasoningEffortAuto": "自動",
+   "settingsAiProviderReasoningEffortLow": "低",
+   "settingsAiProviderReasoningEffortMedium": "中",
+   "settingsAiProviderReasoningEffortHigh": "高",
+   "settingsAdvancedNetwork": "ネットワーク",
+   "settingsAdvancedHttpProxyEnabled": "HTTP プロキシを有効化",
+   "settingsAdvancedHttpProxyConfig": "HTTP プロキシ設定",
+   "settingsAdvancedHttpProxyHost": "プロキシホスト",
+   "settingsAdvancedHttpProxyHostHint": "例：127.0.0.1",
+   "settingsAdvancedHttpProxyPort": "プロキシポート",
+   "settingsAdvancedHttpProxyPortHint": "例：7890",
+   "settingsAdvancedHttpProxyNotConfigured": "未設定",
+   "settingsAdvancedHttpProxyInvalidInput": "プロキシのホストまたはポートが不正です",
+   "settingsAdvancedHttpProxyTestUrl": "テスト URL",
+   "settingsAdvancedHttpProxyTest": "接続テスト",
+   "settingsAdvancedHttpProxyTesting": "テスト中…",
+   "settingsAdvancedHttpProxyTestSuccess": "接続成功",
+   "settingsAdvancedHttpProxyTestFailed": "接続失敗"
 }
