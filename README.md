@@ -16,7 +16,7 @@
 
 如果默读对你有帮助，欢迎点击仓库右上角的 **Star ⭐**，让更多人发现它，也为持续改进添一份支持。谢谢！
 
-[功能介绍](#功能一览) · [界面预览](#界面预览) · [开始使用](#开始使用) · [设置指南](docs/SETTINGS.md) · [下载](#下载)
+[功能介绍与实拍截图](#功能一览) · [开始使用](#开始使用) · [设置指南](docs/SETTINGS.md) · [下载](#下载)
 
 ## 下载
 
@@ -65,9 +65,15 @@
 | 外观与工具 | 系统/深色/浅色主题、封面显示、字体导入后自动应用、字体下载、应用亮度调节（左侧自动、中间滑杆、右侧夜间模式）、网络与日志选项 | 阅读页亮度按钮；设置 → 外观 / 阅读 / 高级 |
 | 问题反馈 | 填写问题与复现步骤，预览后前往 GitHub 提交 | 设置 → 提交 Bug |
 
+以下功能配图均实拍自 **Mac 版 1.1.9（10063）**，分别放在对应功能介绍中。阅读画面使用原创示例书《阅读，让思考慢下来》（六章，约 3400 字），不展示个人书架、私人笔记或对话。[下载原创示例 EPUB](docs/examples/modu-reading-demo.epub) · [截图来源](docs/images/README.md)
+
+![Mac 横排双列阅读：原创示例书](docs/images/v1.1.9/macos-zh/reading-horizontal.jpg)
+
 ### 竖排与存储
 
 竖排阅读可选择红色边框和正文分栏线，标题置右、页码置左，中文环境显示中文数字。注释字号按实际段落正文的 80% 计算，不按注释序号计算；弹窗最多占屏幕面积 25%，竖排长注释左右滚动。
+
+![Mac 竖排阅读：红色边框与正文分栏线](docs/images/v1.1.9/macos-zh/reading-vertical-frame.jpg)
 
 Android 主要书库数据迁移至 `Android/data/com.modu.reader/files`，首次升级会先校验迁移，再打开书库；旧私有目录副本保留，遇到冲突不会直接覆盖。密钥与偏好设置仍保留私有位置。请先备份、覆盖升级，不要卸载或清除数据；Android/data 仍受系统访问限制，不能代替备份。详见[迁移说明](docs/testing/android-app-storage.md)。
 
@@ -75,11 +81,27 @@ Android 主要书库数据迁移至 `Android/data/com.modu.reader/files`，首�
 
 阅读样式中可分别设置「中文／正文字体」和「英文字体（字母、数字）」。英文字体默认跟随正文；选择独立字体后，拉丁字母、数字和西文标点使用该字体，汉字及中文标点保留正文字体，横排、竖排与注释均适用。从英文入口导入 TTF/OTF 会自动应用到英文，不改变中文选择；PDF 等固定版式文件不承诺重排字体。
 
+![Mac 阅读样式：独立字体、字号、行距与背景](docs/images/v1.1.9/macos-zh/reader-style.jpg)
+
+### 语言与外观
+
+在「设置 → 外观」选择跟随系统或手动指定语言，并调整主题、主题颜色、OLED 与电子墨水模式。内置 AI 提示词随应用语言切换，自行编辑的提示词保留原文。
+
+| 外观与主题 | 应用语言 |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-zh/appearance.jpg" width="440" alt="Mac 外观、主题与显示设置"> | <img src="docs/images/v1.1.9/macos-zh/languages.jpg" width="440" alt="Mac 语言选择：跟随系统或手动指定"> |
+
 ### 自定义 CSS 方案
 
 在「设置 → CSS 设置」管理最多 32 套命名模板，附 13 个可编辑预设。通过开关、颜色选择和滑块调整文字、背景、下划线、字体、字重、行距、缩进等模块，也可叠加自定义 CSS 代码。支持多套独立开关、组合应用、复制和文件导入导出，以及正则文字高亮规则。
 
 阅读页仅需选择并应用模板；参数统一在设置中编辑。每本书在本机记住所选模板，也可跟随默认。已有 CSS 会保留，修改共享模板会影响使用它的书籍。详见 [CSS 预设](docs/CSS_PRESETS.md)。
+
+| 多套方案管理 | 常用预设模板 |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-zh/css-profiles.jpg" width="440" alt="Mac CSS 方案管理、独立开关与导入导出"> | <img src="docs/images/v1.1.9/macos-zh/css-presets.jpg" width="440" alt="Mac CSS 排版、对白、关键词和标题预设"> |
+
+![Mac CSS 图形调节：字重、对齐、首行缩进与段落间距](docs/images/v1.1.9/macos-zh/css-visual-controls.jpg)
 
 ### 清晰的笔记导出
 
@@ -100,6 +122,10 @@ Android 主要书库数据迁移至 `Android/data/com.modu.reader/files`，首�
 滚动模式下，点击翻页或使用翻页快捷键的步长可在阅读设置中调为阅读区域的 80%～100%，默认 80%。自由滚动不受此步长限制。桌面正文支持方向键翻页；在 AI 输入框内，方向键仍用于移动光标。
 
 阅读样式 → 更多设置 → 其他提供「仅点击翻页」开关，默认关闭。开启后，分页模式下滑动、拖动不翻页，也不触发上下拉手势，点击翻页仍有效；关闭后恢复滑动翻页。不影响选词、快速标记和滚动阅读模式，桌面端不显示此移动端开关。
+
+桌面和手机均可点击正文显示章节进度与翻页控制，拖动滑块预览章节标题。下图为 Mac 版的上一章、上一页、下一页和下一章按钮。
+
+![Mac 章节与页数导航](docs/images/v1.1.9/macos-zh/reading-controls.jpg)
 
 ### 手机快速标记
 
@@ -145,6 +171,20 @@ AI 词典优先使用当前模型已有知识直接回答，不读取本书正�
 
 点击技能可打开提示词，修改后保存，也可恢复默认；自定义技能与内置技能一起出现在阅读 AI 面板中。「回忆前文」「翻译与词典」「全文翻译」等功能提示词也集中在同一设置页管理。
 
+| 阅读技能管理 | 查看与编辑提示词 |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-zh/ai-reading-skills.jpg" width="440" alt="Mac AI 阅读技能及独立开关"> | <img src="docs/images/v1.1.9/macos-zh/reading-prompt-editor.jpg" width="440" alt="Mac 本章总结提示词编辑与恢复默认"> |
+
+### 划词工具栏与 AI 模板
+
+在「设置 → 划词工具栏」开关和拖动排序内置动作、标注工具及自定义 AI 命令，可调整名称、图标、提示词和显示数量。常用 AI 模板默认关闭，与 AI 阅读技能分开管理；每次划词 AI 提问开启新对话，使用阅读 AI 弹窗，生成结束后回到首段。设置备份只保存内置提示词的用户改动，不重复保存默认模板。
+
+| 工具开关与排序 | 独立管理 AI 划词模板 |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-zh/selection-toolbar.jpg" width="440" alt="Mac 划词工具栏按钮开关与顺序设置"> | <img src="docs/images/v1.1.9/macos-zh/selection-ai-templates.jpg" width="440" alt="Mac AI 划词模板：词典、解释、翻译、润色、摘要与要点"> |
+
+![Mac 自定义 AI 命令：名称、图标、处理方式与 selection 提示词](docs/images/v1.1.9/macos-zh/selection-prompt-editor.jpg)
+
 ### 书籍向量化与本地模型
 
 已下载模型可在模型设置中管理和删除。较大本地索引采用流式读取，支持最高 1 GiB 的索引文件。
@@ -172,7 +212,7 @@ AI 词典优先使用当前模型已有知识直接回答，不读取本书正�
 
 选中文字或点击阅读页上方 AI 旁的翻译按钮即可翻译，支持 Google 翻译、AI 翻译和 DeepL/DeepLX，也可在应用内打开百度、有道网页翻译。选文翻译统一正文字号并限制标题字号，长译文在与 AI 对话同规格的弹窗内滚动阅读。
 
-在「设置 → 划词工具栏」开关和拖动排序内置动作、标注工具及自定义 AI 命令，可调整名称、图标、提示词和显示数量；常用 AI 模板默认关闭，与 AI 阅读技能分开管理。每次划词 AI 提问开启新对话，使用阅读 AI 弹窗，生成结束后回到首段。设置备份只保存内置提示词的用户改动，不重复保存默认模板。
+![Mac 翻译服务选择：Google、AI、DeepL 与网页翻译](docs/images/v1.1.9/macos-zh/translation-engines.jpg)
 
 点击正文即可显示进度滑块和上一章、上一页、下一页、下一章按钮，拖动时预览章节标题。页眉页脚的「章节进度」显示章节序号，「本章进度」显示本章当前页与总页数。选中已有高亮或下划线的局部或全部，再点垃圾桶并确认，可删除相交的完整标注及其备注；确认框不会被工具条和颜色栏遮挡。阅读器也支持常见图片式注释引用。
 
@@ -193,58 +233,11 @@ MiMo 提供官方音色、风格与音色设计模板、常用提示词，语速
 - 加密不代表书籍、笔记和整个备份都被加密，也不能代替可信的 WebDAV 服务与强密码。
 - **配置代码和二维码不是加密数据**，可能包含密码或 API Key。不要放入公开截图、Issue 或聊天群；它们与加密密钥同步是不同功能。
 
-## 界面预览
+### 全局设置迁移
 
-以下截图实拍自 **1.1.9（10063）Android 手机和 Mac 版**。所有阅读画面只使用项目原创示例书《阅读，让思考慢下来》，不展示个人书架、私人笔记或对话。[下载原创示例 EPUB](docs/examples/modu-reading-demo.epub) · [截图来源](docs/images/README.md)
+外观、阅读、CSS、AI 技能、朗读与翻译等设置统一导入导出，支持设置文件、二维码图片和 `modu:` 链接。账号、密码和 API Key 由独立开关控制，默认关闭；开启后导出为可还原的明文凭据，请勿公开分享。书籍与笔记使用书库备份或同步，不包含在设置文件内。
 
-### 手机阅读：横排、竖排与章节导航
-
-| 横排阅读 | 竖排阅读 | 章节与页数导航 |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/reading-horizontal-android.png" width="260" alt="Android 原创示例书横排阅读"> | <img src="docs/images/v1.1.9/reading-vertical-android.png" width="260" alt="Android 原创示例书竖排阅读"> | <img src="docs/images/v1.1.9/reading-controls-android.png" width="260" alt="章节标题、进度滑块与前后翻页按钮"> |
-
-### Mac 阅读：双列正文
-
-同一本原创示例书的桌面阅读界面；可在阅读设置中调整字体、字号、页边距和列数。
-
-![Mac 1.1.9 原创示例书双列阅读](docs/images/v1.1.9/reading-horizontal-macos.jpg)
-
-### 划词工具栏与自定义 AI 提示词
-
-内置工具可以开关、拖动排序；划词 AI 模板独立管理，可编辑名称、图标和提示词。常用模板默认关闭，截图展示当前设备的配置。
-
-| 工具开关与排序 | 划词 AI 模板 | 编辑提示词 |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/selection-toolbar-android.png" width="260" alt="划词工具栏开关与排序设置"> | <img src="docs/images/v1.1.9/selection-ai-templates-android.png" width="260" alt="AI 词典、通俗解释、翻译和润色模板"> | <img src="docs/images/v1.1.9/selection-prompt-editor-android.png" width="260" alt="自定义 AI 模板名称、图标与 selection 提示词"> |
-
-### AI 阅读技能：查看、修改与恢复提示词
-
-| 阅读技能管理 | 本章总结提示词 |
-| --- | --- |
-| <img src="docs/images/v1.1.9/ai-reading-skills-android.png" width="300" alt="AI 阅读技能及独立开关"> | <img src="docs/images/v1.1.9/reading-prompt-editor-android.png" width="300" alt="内置阅读提示词编辑和恢复默认"> |
-
-### CSS 方案：预设模板与图形调节
-
-| 多套方案管理 | 常用预设模板 | 下划线与字体参数 |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/css-profiles-android.png" width="260" alt="CSS 方案命名、启用、导入导出"> | <img src="docs/images/v1.1.9/css-presets-android.png" width="260" alt="排版、对白、关键词和标题预设模板"> | <img src="docs/images/v1.1.9/css-visual-controls-android.png" width="260" alt="可视化下划线、字体和排版控制"> |
-
-<details>
-<summary>更多设置截图：外观、语言、翻译、阅读样式与全局备份</summary>
-
-竖排可选红色边框与正文列间分隔线，章节标题、剩余页数和全书位置显示在两侧。
-
-<p align="center"><img src="docs/images/v1.1.9/reading-vertical-frame-android.png" width="300" alt="原创示例书竖排红色边框和分栏线"></p>
-
-| 设置入口 | 外观与主题 | 应用语言 |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/settings-android.png" width="260" alt="设置分类入口"> | <img src="docs/images/v1.1.9/appearance-android.png" width="260" alt="主题、OLED、电子墨水和语言设置"> | <img src="docs/images/v1.1.9/languages-android.png" width="260" alt="手动选择语言或跟随系统"> |
-
-| 阅读样式 | 翻译引擎 | 全局设置备份 |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/reader-style-android.png" width="260" alt="阅读字体、间距和背景设置"> | <img src="docs/images/v1.1.9/translation-engines-android.png" width="260" alt="Google、AI、DeepL 和网页翻译选择"> | <img src="docs/images/v1.1.9/settings-transfer-android.png" width="260" alt="全局导入导出及独立凭据开关"> |
-
-</details>
+![Mac 全局设置导入导出与独立凭据开关](docs/images/v1.1.9/macos-zh/settings-transfer.jpg)
 
 ## 开始使用
 

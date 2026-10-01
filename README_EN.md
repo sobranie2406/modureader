@@ -16,7 +16,7 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 
 If Modu helps you enjoy reading, please give the repository a **Star ⭐** in the top-right corner. It helps more readers discover the project and encourages continued development. Thank you!
 
-[Features](#features) · [Screenshots](#screenshots) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
+[Features and app screenshots](#features) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
 **Latest release: 1.1.9** — Delete overlapping highlights and underlines with an unobstructed confirmation; get faster knowledge-first AI dictionary answers and explicitly request online verification in the same chat.
 
@@ -67,7 +67,9 @@ The current version provides the following reading, AI and library features.
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
 | Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
 
-Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
+Screenshots alongside the feature descriptions show **Modu 1.1.9 (10063) on Mac**, with the app set to English. Reading views use *The Quiet Reader*, an original English demo book with six chapters and approximately 2,200 words. No personal library, private notes or conversations are shown. [Download the English demo EPUB](docs/examples/modu-reading-demo-en.epub) · [Screenshot provenance](docs/images/README.md)
+
+![Mac reading an original English book in horizontal layout](docs/images/v1.1.9/macos-en/reading-horizontal.jpg)
 
 Tap the reading area to show the progress slider and previous/next chapter and page controls. Dragging previews the chapter title. Chapter progress shows the chapter ordinal; current-chapter progress shows the current and total pages within that chapter. Select part or all of an existing highlight or underline and choose the trash action to delete the entire overlapping annotation and its comment after confirmation. The confirmation stays above the selection tools and color palette. Common image-marker footnotes are also supported.
 
@@ -83,9 +85,19 @@ Downloaded embedding models can be deleted in settings unless protected by an ac
 
 Reader styles offer separate Chinese/body and English (letters/numbers) fonts. English follows the body font by default; an independent face covers Latin letters, digits and western punctuation while Chinese text and punctuation retain the body face. This works in reflowable horizontal/vertical text and footnotes. Importing TTF/OTF from the English selector applies it only to English. Fixed-layout books such as PDFs are not re-typeset.
 
+![Mac reader styles: independent fonts, text size, spacing and backgrounds](docs/images/v1.1.9/macos-en/reader-style.jpg)
+
+### Language and appearance
+
+Choose a language or follow the system in Settings → Appearance. Change themes, theme colors, OLED and e-ink modes in the same section. Bundled AI prompts follow the app language; edited prompts retain their original text.
+
+![Mac appearance settings with the app set to English](docs/images/v1.1.9/macos-en/appearance.jpg)
+
 ### Custom CSS profiles
 
 Manage 32 named profiles in Settings → CSS settings, with 13 editable presets and visual controls for colors, fonts, spacing, paragraph layout and underlines. Custom CSS and regex highlights remain available, along with independent switches, combined activation and file import/export. Reader controls apply profiles; detailed editing stays in Settings. Existing slots and per-book choices are preserved. See [CSS presets (Chinese)](docs/CSS_PRESETS.md).
+
+![Mac visual CSS controls for fonts, paragraph alignment, indentation and spacing](docs/images/v1.1.9/macos-en/css-visual-controls.jpg)
 
 ### Notes export
 
@@ -113,6 +125,10 @@ In scrolling mode, page-turn taps and shortcuts move by an adjustable 80–100% 
 
 Reader styles → More settings → Other includes **Tap-only page turning**, off by default. When enabled in paginated mode, swipes and drags neither turn pages nor trigger pull gestures; taps still work. Turn it off to restore swipe navigation. Text selection, Quick mark and scrolling mode remain available. This mobile-only switch is not shown on desktop.
 
+Chapter and page navigation is available on both desktop and mobile. The Mac controls below show the current chapter title, a progress slider, and separate previous/next chapter and page buttons.
+
+![Mac chapter and page controls over the original English demo book](docs/images/v1.1.9/macos-en/reading-controls.jpg)
+
 ### Quick marking on mobile
 
 The top-right menu toggle controls whether saving a quick highlight immediately opens the selection menu. It is off by default and remembered on this device.
@@ -139,23 +155,37 @@ Enable AI tools as needed, including finding books and notes, searching text, re
 
 Quick skills in AI chat are collapsed by default; expand them with the skill button beside the input. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
 
-Built-in skill names and prompts follow your selected application language. The Chinese names and their English meanings are provided below.
+Built-in skill names and prompts follow your selected application language.
 
 | Skill | Purpose |
 | --- | --- |
-| AI 词典解释 — AI Dictionary | Explain selected words from model knowledge, with pronunciation and bilingual meanings; verify online only when explicitly requested |
-| 本章总结 — Chapter Summary | Outline the current chapter's content, plot and themes |
-| 全书总结 — Book Summary | Summarize available book content and structure |
-| 概念解析 — Concept Explainer | Explain concepts, terminology and abstract ideas |
-| 论证分析 — Argument Analyzer | Break down claims, reasoning and supporting evidence |
-| 人物追踪 — Character Tracker | Track character relationships and development |
-| 金句摘录 — Quote Collector | Extract noteworthy passages from the original text |
-| 阅读指南 — Reading Guide | Suggest reading approaches, discussion questions and reflection topics |
-| 智能翻译 — Smart Translator | Translate content in its book context |
-| 词汇助手 — Vocabulary Helper | Explain unfamiliar words, idioms and technical expressions |
-| 思维导图 — Mind Map | Organize content into a hierarchy |
+| AI Dictionary Explanation | Explain selected words from model knowledge, with pronunciation and bilingual meanings; verify online only when explicitly requested |
+| Chapter Summary | Outline the current chapter's content, plot and themes |
+| Book Summary | Summarize available book content and structure |
+| Concept Explanation | Explain concepts, terminology and abstract ideas |
+| Argument Analysis | Break down claims, reasoning and supporting evidence |
+| Character Tracking | Track character relationships and development |
+| Quote Collection | Extract noteworthy passages from the original text |
+| Reading Guide | Suggest reading approaches, discussion questions and reflection topics |
+| Smart Translation | Translate content in its book context |
+| Vocabulary Assistant | Explain unfamiliar words, idioms and technical expressions |
+| Mind Map | Organize content into a hierarchy |
 
 Open a skill to inspect its prompt, edit and save it, or restore the default. Custom skills appear alongside built-in skills in the reader AI panel. Prompts for recalling previous content, translation/dictionary and full-text translation are managed on the same settings page.
+
+| Reading skill management | Inspect and edit a prompt |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-en/ai-reading-skills.jpg" width="440" alt="Mac reading skills with individual switches"> | <img src="docs/images/v1.1.9/macos-en/reading-prompt-editor.jpg" width="440" alt="Mac English chapter-summary prompt and restore-default action"> |
+
+### Selection toolbar and AI templates
+
+Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
+
+| Tool switches and ordering | Independently managed AI templates |
+| --- | --- |
+| <img src="docs/images/v1.1.9/macos-en/selection-toolbar.jpg" width="440" alt="Mac selection toolbar switches and ordering"> | <img src="docs/images/v1.1.9/macos-en/selection-ai-templates.jpg" width="440" alt="Mac dictionary, explanation, translation, polish, summary and key-point templates"> |
+
+![Mac custom AI command editor: label, icon, processing mode and selection prompt](docs/images/v1.1.9/macos-en/selection-prompt-editor.jpg)
 
 ### Book indexing and local models
 
@@ -182,6 +212,8 @@ At a chapter boundary, narration automatically continues with the next chapter's
 
 Full-text translation stop controls stay in the toolbar without covering the text. Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
 
+![Mac translation provider choices including Google, AI, DeepL and embedded webpages](docs/images/v1.1.9/macos-en/translation-engines.jpg)
+
 Online narration groups adjacent sentences within a natural paragraph for Edge, MiMo, OpenAI-compatible and DashScope services. Each playback group has accurate highlighting and previous/next group navigation. System speech retains sentence navigation; select text and choose Read aloud to start there. The first group is prioritized and later groups are continuously prefetched during playback to reduce pauses between paragraphs. MiMo playback speed follows the reader slider. MiMo and supported compatible services use voice/style descriptions and stable narration guidance; OpenAI-compatible settings offer editable instructions and presets. Actual synthesis or playback errors retain the position for retry.
 
 ### Sync and key security
@@ -195,58 +227,11 @@ Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.
 - **Configuration codes and QR codes are not encrypted** and may contain passwords or API keys. Do not post them in public screenshots, issues or group chats. Configuration transfer is separate from encrypted key sync.
 
-## Screenshots
+### Global settings transfer
 
-Captured from **Modu 1.1.9 (10063) on an Android phone and Mac**. Every reading view uses the project's original demo book, *Reading: Let Your Thinking Slow Down* (《阅读，让思考慢下来》), never a personal library, private notes or conversations. [Download the demo EPUB](docs/examples/modu-reading-demo.epub) · [Screenshot provenance](docs/images/README.md)
+Transfer appearance, reading layout, CSS, AI skills, speech, translation and general settings together via files, QR images or `modu:` links. Accounts, passwords and API keys have a separate switch, off by default. Enabled exports contain recoverable plaintext credentials and must be kept private. Books and notes use library backup or sync rather than the settings file.
 
-### Phone reading: horizontal, vertical and chapter navigation
-
-| Horizontal reading | Vertical reading | Chapter and page navigation |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/reading-horizontal-android.png" width="260" alt="Original demo EPUB in Android horizontal layout"> | <img src="docs/images/v1.1.9/reading-vertical-android.png" width="260" alt="Original demo EPUB in Android vertical layout"> | <img src="docs/images/v1.1.9/reading-controls-android.png" width="260" alt="Chapter title, progress slider and navigation controls"> |
-
-### Mac reading: two-column layout
-
-The same original demo book on desktop. Adjust fonts, text size, margins and columns in reading settings.
-
-![Mac 1.1.9 reading the original demo EPUB in two columns](docs/images/v1.1.9/reading-horizontal-macos.jpg)
-
-### Selection toolbar and custom AI prompts
-
-Enable, disable and reorder built-in tools. Selection AI templates are managed separately, with editable labels, icons and prompts. Common templates start disabled; screenshots show this device's current configuration.
-
-| Tool switches and ordering | Selection AI templates | Prompt editor |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/selection-toolbar-android.png" width="260" alt="Selection toolbar switches and ordering"> | <img src="docs/images/v1.1.9/selection-ai-templates-android.png" width="260" alt="Dictionary, explanation, translation and writing templates"> | <img src="docs/images/v1.1.9/selection-prompt-editor-android.png" width="260" alt="Custom AI label, icon and selection prompt"> |
-
-### AI reading skills: inspect, edit and restore prompts
-
-| Reading skill management | Chapter summary prompt |
-| --- | --- |
-| <img src="docs/images/v1.1.9/ai-reading-skills-android.png" width="300" alt="AI reading skills and individual switches"> | <img src="docs/images/v1.1.9/reading-prompt-editor-android.png" width="300" alt="Reading prompt editor and restore-default action"> |
-
-### CSS profiles: presets and visual controls
-
-| Multiple profiles | Preset templates | Underline and font parameters |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/css-profiles-android.png" width="260" alt="CSS profile names, switches, import and export"> | <img src="docs/images/v1.1.9/css-presets-android.png" width="260" alt="Layout, dialogue, keyword and heading presets"> | <img src="docs/images/v1.1.9/css-visual-controls-android.png" width="260" alt="Visual underline, font and layout controls"> |
-
-<details>
-<summary>More settings: appearance, languages, translation, reader styles and global backup</summary>
-
-Vertical reading offers optional red frames and column rules, with the chapter title, remaining pages and book position along the sides.
-
-<p align="center"><img src="docs/images/v1.1.9/reading-vertical-frame-android.png" width="300" alt="Original demo EPUB with vertical red frames and column rules"></p>
-
-| Settings overview | Appearance and themes | Application language |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/settings-android.png" width="260" alt="Settings categories"> | <img src="docs/images/v1.1.9/appearance-android.png" width="260" alt="Theme, OLED, e-ink and language settings"> | <img src="docs/images/v1.1.9/languages-android.png" width="260" alt="Manual language selection and system language"> |
-
-| Reader styles | Translation engines | Global settings backup |
-| --- | --- | --- |
-| <img src="docs/images/v1.1.9/reader-style-android.png" width="260" alt="Reader fonts, spacing and background"> | <img src="docs/images/v1.1.9/translation-engines-android.png" width="260" alt="Google, AI, DeepL and webpage translation choices"> | <img src="docs/images/v1.1.9/settings-transfer-android.png" width="260" alt="Global settings transfer with a separate credentials switch"> |
-
-</details>
+![Mac global settings transfer with an independent credentials switch](docs/images/v1.1.9/macos-en/settings-transfer.jpg)
 
 ## Getting started
 
