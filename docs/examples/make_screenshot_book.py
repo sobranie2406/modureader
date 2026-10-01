@@ -10,6 +10,9 @@ CHAPTERS = [
         '读到一个陌生的概念，可以先用自己的话解释它。解释得清楚，说明我们已经抓住了一部分；解释不清楚，也不必着急，那正是继续阅读的起点。带着问题回到原文，比匆忙记住一个答案更有价值。',
         '一本书不需要一次读完。目录帮助我们看见全貌，书签让我们找回停下的位置，笔记则保存那些稍纵即逝的想法。把这些线索连在一起，零散的阅读就逐渐成为自己的知识。',
         '试着给今天读过的一页写一句总结：作者在回答什么问题？他给出了哪些理由？我赞同其中的哪一部分，又有什么疑问？不必写得漂亮，只需要诚实地记录此刻的理解。',
+        '有一次，林舟读到一段关于耐心的文字。他起初只圈出了结论，第二天却发现自己已经忘记作者为什么这样说。于是他回到前一页，把例子和转折一起读完。这一次，留下的笔记不是一句格言，而是一条能够重新走过的思路。',
+        '阅读的速度也可以因内容而改变。熟悉的叙述让我们自然向前，密集的论证则需要慢一些。遇到一个定义，不妨看看它在后面怎样被使用；遇到一个故事，可以先追随人物的行动，再回头想一想叙述者选择了哪些细节。',
+        '窗外的光线渐渐移动，桌上的茶已经凉了。林舟没有因此觉得这一小时浪费了。他只读了几页，却能够向朋友说明其中一个观点，也知道自己还有哪里不懂。数量没有增加多少，理解却有了可以落脚的地方。',
         '合上书以后，留一点空白。让一个句子、一幅画面或者一个问题，在心里继续停留。好的阅读并不总是立刻带来答案，它也会教我们更耐心地提问。',
     ]),
     ('让 AI 成为阅读伙伴', [
@@ -18,6 +21,9 @@ CHAPTERS = [
         '面对一段总结，我们仍然需要回到书中核对。哪些信息来自原文，哪些只是推测？引用能否定位到相关段落？把 AI 的回答当作讨论的起点，而不是代替阅读的终点。',
         '阅读技能可以成为一种提问习惯。先梳理本章的核心观点，再寻找支持观点的证据，最后写下自己的疑问。不同的书适合不同的读法，也可以按自己的目的编辑提示词。',
         '如果问题涉及整本书，可以借助索引寻找相关段落。如果问题只针对当前章节，就应当保持范围清楚。检索到的信息并不天然正确，理解它仍然需要上下文。',
+        '林舟曾请阅读伙伴解释一个陌生的词。回答很流畅，他却发现其中一种含义并不适合眼前的句子。他补充了自己的疑问，并要求区分通常用法与此处用法。对话没有让第一次解释变成真理，而是让需要核对的地方更加清楚。',
+        '当回答列出几个理由时，可以逐个检查它们之间的关系。一个理由是在解释原因，还是只提供了相似的例子？几个观点是否真的支持同一个结论？把问题拆开，有助于发现那些被顺畅语言掩盖的跳跃。',
+        '也可以让伙伴提出反对意见，但不要为了争论而争论。好的反对意见会准确复述原观点，再指出条件、证据或推理上的问题。若它只是换了一个话题，就还没有回应文本。判断回答的质量，最终仍取决于我们是否愿意认真读回去。',
         '技术最好的位置，是帮助我们更专注地阅读。它可以缩短寻找资料的时间，但不必替我们决定一本书的意义。保留自己的判断，让对话回到文本，也回到真实的经验。',
     ]),
     ('留下自己的理解', [
@@ -25,26 +31,64 @@ CHAPTERS = [
         '记下一个观点时，也写下它为什么引起注意。它与过去的经验有什么联系？它改变了什么，又留下了什么疑问？这样的笔记，在下一次翻看时仍然能够开启对话。',
         '不必把每个段落都标亮。选择少数真正重要的句子，为它们留下自己的解释。少一点堆积，多一点连接，阅读记录才会慢慢变成能够使用的知识。',
         '隔一段时间回顾笔记，可以发现理解的变化。曾经觉得难懂的地方，也许已经自然地融入新的认识。也有一些旧问题，会因为另一本书而得到不同的回答。',
-        '这本小册子是默读项目为界面展示创作的示例内容，不包含私人资料，也不代表任何模型的实际回答。你可以用它体验阅读、目录与 AI 功能入口。',
+        '林舟给一条笔记加上了日期。那天他认为作者过于乐观，一个月以后，他又补了一段新的理解。他没有删除旧意见，因为旧意见记录了当时的依据。两段文字并排放着，让变化本身也成为值得观察的内容。',
+        '笔记不必总是完整的文章。一个问题、一张关系图，甚至一句尚未说完的话，都可以保存思考的线索。重要的是让未来的自己知道，当时为什么留下它，以及可以从哪里继续。',
+        '整理时，可以区分原文和自己的评论。原文保留准确措辞，评论则允许试探、怀疑和联想。清楚的边界帮助我们引用，也提醒我们不要把自己的解释误当作作者已经说过的话。',
+        '如果一条笔记与另一章有关，就为它们建立联系。第一次连接可能只是一个模糊的猜想，下一次阅读却可能带来支持或反例。知识并不只在分类整齐时增长，它也在这些小小的往返中变得可以使用。',
+    ]),
+    ('把问题问得更清楚', [
+        '一个清楚的问题，常常已经包含了理解的第一步。',
+        '读不懂的时候，我们很容易说：这一段太难了。这句话表达了感受，却还没有指出困难在哪里。可以再往前走一步：是某个词不熟悉，是前后的关系不明白，还是作者省略了一个需要解释的步骤？',
+        '林舟把问题写在页边：作者为什么从这个例子得出那样的结论？这比请求解释整章更容易讨论。他先列出例子的条件，又找出结论中增加的内容。问题因此从一团模糊的不安，变成了能够逐项检查的事情。',
+        '有些问题询问事实，有些询问含义，还有一些询问价值。事实问题需要证据，含义问题需要语境，价值问题则需要说清判断的标准。把它们分开，并不意味着它们互不相关，而是避免用一种回答匆忙代替另一种回答。',
+        '如果正在比较两个观点，可以先寻找共同的问题。它们讨论的是同一件事吗？使用的词是否具有相同含义？一个观点适用于个人经验，另一个适用于公共决策，表面上的冲突也许来自范围不同。',
+        '提问还需要耐心倾听。我们有时只等待一个能够验证原先想法的答案，因而忽略了真正的新信息。暂时放下胜负，准确复述对方的理由，再说明自己的疑问，会让讨论更接近理解。',
+        '不必要求每个问题立即得到解决。有些问题需要更多材料，有些需要亲身经验，还有些会随着知识增长而改变。把未解决的问题记下来，并标注已经知道的部分，等待就不再是毫无方向的停留。',
+        '那天晚上，林舟留下了三个问题，只回答了其中一个。他仍觉得这次阅读很充实，因为另外两个问题已经比早晨清楚。阅读的收获，有时正是一种更加准确的不确定。',
+    ]),
+    ('让零散的阅读相遇', [
+        '一本书可以独自成立，也可以成为通向另一本书的桥。',
+        '书架上不同主题的书，看起来各有位置。阅读时，联系却常常越过这些分隔。一个关于城市的故事，也许帮助我们理解公共空间；一段有关记忆的讨论，也许改变我们重读旧日笔记的方式。',
+        '林舟在一篇随笔和一本科普书里遇到了相似的比喻。他没有立刻把它们视为同一个观点，而是分别记下作者用比喻说明什么。相似的表达提供了连接的机会，差异则决定这条连接究竟是否可靠。',
+        '建立联系时，最好保留出处和上下文。一个句子离开原来的问题，可能显得格外有力，也可能完全变了意思。记录书名、章节和自己当时的解释，有助于日后重新检查这条联系。',
+        '也可以围绕一个小问题组织阅读。例如：一个人怎样形成习惯？故事提供具体的生活情境，研究提供可讨论的证据，日记则留下个人观察。不同材料各有用途，不必强迫它们给出完全一致的答案。',
+        '联系不是把一切混在一起。读到不同意见时，应该让差异保持可见。哪些条件发生了变化？哪些证据仍然不足？一张清楚的关系图既能连接观点，也能标出它们暂时不能相接的地方。',
+        '整理书架和整理思想并不是同一件事。文件夹让资料更容易找到，理解则需要不断比较和重读。一个主题下的书越多，越值得写下一段自己的说明：我想从这些书中寻找什么，目前又看见了什么。',
+        '慢慢地，林舟发现自己不再只是记住某本书说过什么。他开始看见问题如何在不同文本之间变化。这些往返让书架从存放文件的地方，变成了一组随时能够重新开始的对话。',
+    ]),
+    ('重新打开熟悉的一页', [
+        '重读并不是原地踏步，因为回来的读者已经有所不同。',
+        '第一次阅读，我们常常被情节、结论或新鲜的概念吸引。第二次阅读，注意力可能转向结构和细节。曾经匆匆略过的过渡句，忽然让整个论证变得清楚；曾经觉得平淡的描写，也可能与新的经验发生联系。',
+        '林舟打开一年前留下的书签。他仍记得那段文字带来的感动，却已经不再完全赞同当时写下的评论。他把新想法加在后面，既没有否定过去的自己，也没有要求现在的理解永远不变。',
+        '重读可以从一个问题开始，而不必从第一页重新开始。找回相关章节，读一读标注前后的段落，看看原先的解释是否遗漏了限制条件。这样的小范围重读，往往比孤立地回看摘抄更有帮助。',
+        '也有适合完整重读的书。随着全貌变得熟悉，我们能够更早看见伏笔、更清楚地理解顺序。故事的终点不再是唯一目标，沿途怎样铺陈、如何转折，也成为阅读的乐趣。',
+        '留下一个简短的阅读记录：这次重读的原因是什么？新的理解来自文本的哪些细节，又来自生活中的哪些变化？记录不需要证明自己进步了，只需要为变化留下一份诚实的说明。',
+        '窗边的桌子还是那张桌子，书却不再只是第一次打开时的书。林舟合上它，决定把一个尚未解决的问题留到下次。熟悉并没有消除好奇，反而让好奇拥有了更具体的方向。',
+        '本书是默读项目原创的六章示例内容，供公开文档和界面展示使用，不包含私人资料，也不代表应用中的真实 AI 回答。中英文示例分别创作，可随项目以 GPL-3.0-or-later 许可分发，用于体验阅读、目录、笔记与相关设置。',
     ]),
 ]
 
-def build():
-    path = Path(__file__).with_name('modu-reading-demo.epub')
+def build(*, chapters=CHAPTERS, filename='modu-reading-demo.epub',
+          title='阅读，让思考慢下来', creator='默读功能演示', language='zh-CN',
+          identifier='urn:modu:documentation:reading-demo:1'):
+    path = Path(__file__).with_name(filename)
     style = 'body{line-height:1.9}h1{font-size:1.55em;margin:1.8em 0 1.2em}p{margin:0 0 1em}p.lead{font-weight:bold}'
     manifest, spine, toc = [], [], []
     with ZipFile(path, 'w', compression=ZIP_DEFLATED) as z:
         z.writestr('mimetype', 'application/epub+zip', compress_type=ZIP_STORED)
         z.writestr('META-INF/container.xml', '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/book.opf" media-type="application/oebps-package+xml"/></rootfiles></container>')
-        for index, (title, paragraphs) in enumerate(CHAPTERS, 1):
+        for index, (chapter_title, paragraphs) in enumerate(chapters, 1):
             filename = f'chapter{index}.xhtml'
+            heading = (f'Chapter {index} · {chapter_title}' if language == 'en'
+                       else f'第{index}章 · {chapter_title}')
             content = ''.join(f'<p class="{"lead" if n == 0 else "body"}">{escape(p)}</p>' for n, p in enumerate(paragraphs))
-            z.writestr('OEBPS/' + filename, f'<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN"><head><title>{title}</title><style>{style}</style></head><body><h1>第{index}章 · {title}</h1>{content}</body></html>')
+            z.writestr('OEBPS/' + filename, f'<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="{language}"><head><title>{escape(chapter_title)}</title><style>{style}</style></head><body><h1>{escape(heading)}</h1>{content}</body></html>')
             manifest.append(f'<item id="c{index}" href="{filename}" media-type="application/xhtml+xml"/>')
             spine.append(f'<itemref idref="c{index}"/>')
-            toc.append(f'<li><a href="{filename}">第{index}章 · {title}</a></li>')
-        z.writestr('OEBPS/nav.xhtml', '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目录</title></head><body><nav epub:type="toc"><ol>' + ''.join(toc) + '</ol></nav></body></html>')
-        z.writestr('OEBPS/book.opf', '<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">urn:modu:documentation:reading-demo:1</dc:identifier><dc:title>阅读，让思考慢下来</dc:title><dc:creator>默读功能演示</dc:creator><dc:language>zh-CN</dc:language><dc:rights>Original Modu documentation sample; GPL-3.0-or-later.</dc:rights><meta property="dcterms:modified">2026-09-05T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' + ''.join(manifest) + '</manifest><spine>' + ''.join(spine) + '</spine></package>')
+            toc.append(f'<li><a href="{filename}">{escape(heading)}</a></li>')
+        nav_title = 'Contents' if language == 'en' else '目录'
+        z.writestr('OEBPS/nav.xhtml', '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>' + nav_title + '</title></head><body><nav epub:type="toc"><ol>' + ''.join(toc) + '</ol></nav></body></html>')
+        z.writestr('OEBPS/book.opf', f'<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">{escape(identifier)}</dc:identifier><dc:title>{escape(title)}</dc:title><dc:creator>{escape(creator)}</dc:creator><dc:language>{language}</dc:language><dc:rights>Original Modu documentation sample; GPL-3.0-or-later.</dc:rights><meta property="dcterms:modified">2026-10-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' + ''.join(manifest) + '</manifest><spine>' + ''.join(spine) + '</spine></package>')
     print(path)
 
 if __name__ == '__main__':
