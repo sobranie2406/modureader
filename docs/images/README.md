@@ -13,6 +13,8 @@ The screenshots cover horizontal reading, Chinese vertical reading, chapter/page
 
 当前中英文首页仅使用上述两个目录内的 Mac 实拍截图，分散在各功能介绍旁。中文阅读图采用六章原创中文书，竖排展示红色边框与分栏线；英文阅读图采用六章原创英文书，不展示竖排。设置画面只展示功能参数和模板，不公开账号密钥、私人笔记或对话。
 
+The current Mac set also includes `tts-style-templates.jpg` and `tts-prompt-editor.jpg` in each language directory: actual MiMo template selection and editable narration instructions with shortcut suggestions. Templates were selected in the unsaved draft only; no synthesis request was sent and no credentials were captured. The original system-speech selection and system-following UI language were restored after capture.
+
 ## Historical captures / 历史截图
 
 The earlier Android screenshots and `v1.1.9/reading-horizontal-macos.jpg` remain for provenance but are no longer linked from the root READMEs. They were captured from 1.1.9+10063 on 2026-10-01 before the current Mac-only set; Android captures used ADB and the Mac capture used Computer Use. Their reading views use the original Chinese demonstration book.

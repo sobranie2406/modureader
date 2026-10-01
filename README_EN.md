@@ -214,7 +214,32 @@ Full-text translation stop controls stay in the toolbar without covering the tex
 
 ![Mac translation provider choices including Google, AI, DeepL and embedded webpages](docs/images/v1.1.9/macos-en/translation-engines.jpg)
 
-Online narration groups adjacent sentences within a natural paragraph for Edge, MiMo, OpenAI-compatible and DashScope services. Each playback group has accurate highlighting and previous/next group navigation. System speech retains sentence navigation; select text and choose Read aloud to start there. The first group is prioritized and later groups are continuously prefetched during playback to reduce pauses between paragraphs. MiMo playback speed follows the reader slider. MiMo and supported compatible services use voice/style descriptions and stable narration guidance; OpenAI-compatible settings offer editable instructions and presets. Actual synthesis or playback errors retain the position for retry.
+### Listening and voice prompt templates
+
+Choose system speech, Edge, Xiaomi MiMo, an OpenAI-compatible provider or DashScope in **Settings → Narrate**. Open the reader's narration panel to listen, or select text and choose Read aloud to start there. Narration continues into the next chapter.
+
+**Start with a template, then make the voice your own.** MiMo's Preset voices mode combines a selected voice with narration style instructions. Voice design mode uses descriptions of gender, perceived age, timbre, tone and pace to design the voice.
+
+| Template type | Built-in examples |
+| --- | --- |
+| Everyday listening and storytelling | Natural Narration, Gentle Bedtime Reading, Fiction Performance |
+| Content delivery | Knowledge Explanation, Classical Recitation, News Reading |
+| MiMo voice design | Gentle female, bright female, steady male, warm male, elder storyteller |
+| OpenAI-compatible descriptions | Narration styles plus warm/soft, low/steady and bright/light styles |
+
+![Mac narration style template selector](docs/images/v1.1.9/macos-en/tts-style-templates.jpg)
+
+Selecting a Description template fills the editable instructions. Click suggestions such as Clear Articulation, Natural Pauses, Relaxed Pace or Restrained Emotion to append them, then choose **Save settings**. For example, Natural Narration starts with:
+
+> Read in a natural storytelling style with clear articulation, moderate pauses between sentences, and steady emotion, suitable for long listening sessions.
+
+Add a gentle, friendly tone or clear emphasis on key ideas to personalize it. Instructions guide the voice rather than becoming spoken book text. These are editable Modu descriptions, not additional official voice IDs or voice-cloning presets.
+
+![Mac editable speech description and one-click prompt suggestions](docs/images/v1.1.9/macos-en/tts-prompt-editor.jpg)
+
+OpenAI-compatible settings offer a separate **Enable speech instructions** switch, templates and an editor; selecting a template does not change Voice. Enabled instructions add steady narration guidance, as does MiMo. MiMo's rate slider changes local playback speed from **0.5–2.0×** on release without regenerating audio; prompt descriptions guide the generated delivery. When using OpenAI-compatible prompts to control pace or pitch, keep the player rate and pitch at 1.0. Instructions are not sent for `tts-1` / `tts-1-hd`, and can be disabled for compatible endpoints that do not support them.
+
+Edge, MiMo, OpenAI-compatible and DashScope narration groups adjacent sentences within a natural paragraph, splitting long paragraphs. Highlighting and previous/next navigation follow each passage; system speech retains sentence navigation. The first passage is prioritized and later passages are prefetched during playback to reduce pauses. Errors retain the position for retry. Saved listening settings can be transferred through Global settings backup.
 
 ### Sync and key security
 
