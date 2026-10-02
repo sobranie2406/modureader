@@ -1,0 +1,45 @@
+// Keep Chromium's native selection handles when the reader replaces only the
+// menu buttons with its Flutter toolbar. Upstream finishes ActionMode, which
+// hides the handles and can reset our expanded range to the original glyph.
+// Compile a generated copy; never mutate the shared Pub cache.
+project(':flutter_inappwebview_android').afterEvaluate { webviewProject ->
+    def upstream = webviewProject.file('src/main/java')
+    def webview = new File(upstream,
+            'com/pichillilorenzo/flutter_inappwebview_android/webview/in_app_webview/InAppWebView.java')
+    def anchor = 'Menu actionMenu = actionMode.getMenu();'
+    def generated = webviewProject.layout.buildDirectory.dir('generated/moduReaderSelection/java')
+    def patchTask = webviewProject.tasks.register('prepareModuReaderSelection', Sync) {
+        inputs.property('moduSelectionHandlesPolicy', 2)
+        from(upstream) {
+            filesMatching('**/webview/in_app_webview/InAppWebView.java') {
+                filter { String line ->
+                    if (line.trim() != anchor) return line
+                    return '''    // Modu reader: suppress menu buttons, not the native selection UI.
+    if (!customSettings.disableContextMenu && contextMenu != null) {
+      Object settings = contextMenu.get("settings");
+      Object items = contextMenu.get("menuItems");
+      if (settings instanceof Map &&
+          Boolean.TRUE.equals(((Map<?, ?>) settings).get("hideDefaultSystemContextMenuItems")) &&
+          (items == null || (items instanceof List && ((List<?>) items).isEmpty()))) {
+        // Do not run hide(3000) or finish(): keep the first native selection UI.
+        actionMode.getMenu().clear();
+        sendOnCreateContextMenuEvent();
+        return actionMode;
+      }
+    }
+''' + line
+                }
+            }
+        }
+        into(generated)
+        doFirst {
+            def source = webview.getText('UTF-8')
+            if (source.readLines().count { it.trim() == anchor } != 1 ||
+                    !source.contains('actionMenu.clear();\n    actionMode.finish();')) {
+                throw new GradleException('WebView ActionMode changed; review Modu selection handles before building')
+            }
+        }
+    }
+    webviewProject.android.sourceSets.main.java.setSrcDirs([generated])
+    webviewProject.tasks.named('preBuild').configure { dependsOn(patchTask) }
+}

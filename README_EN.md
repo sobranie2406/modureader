@@ -18,7 +18,7 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features and app screenshots](#features) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
-**Latest release: 1.1.10** — Compact narration controls and up to 4× playback; reading-skill switches, mixed ordering and editable drafts; selection knowledge and context options; clearer settings transfer and database backup guidance.
+**Latest release: 1.1.11** — Adjustable handles immediately after automatic selection, without repeated snapping; fixes for missing AI answer endings and blank historical answers; follow-up questions in current and restored reader conversations.
 
 ## Downloads
 
@@ -159,6 +159,8 @@ Reading skills are visible by default and can be collapsed with a switch; built-
 
 Built-in skill names and prompts follow your selected application language. Enable the draft option to fill the input field before sending, allowing changes such as a chapter range; it is off by default, so clicking a skill sends it immediately. The settings page and AI chat share this option.
 
+Type a follow-up in the current or restored conversation to continue with its existing context. The history clock icon sits immediately to the left of the top-right options menu. Starting a new chat or a new skill/selection task still creates an independent conversation.
+
 | Skill | Purpose |
 | --- | --- |
 | Chapter Summary | Outline the current chapter's content, plot and themes |
@@ -180,7 +182,9 @@ Open a skill to inspect its prompt, edit and save it, or restore the default. Cu
 
 ### Selection toolbar and AI templates
 
-Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
+Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Starting a new selection AI task opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Manually typed follow-ups continue that conversation. Settings backups include user edits to bundled prompts, not duplicate default templates.
+
+On Android, the initial long-press selection can expand to a word or paragraph and immediately show draggable handles. Adjust the range freely afterward without triggering automatic matching again.
 
 AI Knowledge remains a selection template only. It concisely explains meaning, background and related knowledge in the selected text's language, without adding pronunciation, translations or examples by default. Every selection AI command supports selected text only (the default) or nearby context, plus an independent online-search checkbox. Without online search it uses model knowledge first; explicit confirmation in the same chat can retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources, without another search API key.
 

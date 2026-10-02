@@ -24,7 +24,7 @@ function fixture(html = '<p>我喜欢中国文化。</p>', options = {}) {
     return right > left ? [{ left, right, top: 0, bottom: 20 }] : [];
   };
   const send = (type, props = {}, element = target) => {
-    const e = new dom.window.Event(type, { bubbles: true, cancelable: true });
+    const e = new dom.window.Event(type, { bubbles: true, cancelable: true, composed: true });
     Object.defineProperties(e, Object.fromEntries(Object.entries({
       clientX: hit.offset * 10 + 1, clientY: 10, button: 0, pointerType: 'touch', ...props,
     }).map(([k, value]) => [k, { value }])));
@@ -130,6 +130,133 @@ test('Android native single-character selection expands once; handle adjustments
   assert.equal(isInitialSmartSelection(f.doc, changed), false);
   f.advance(1000);
   assert.deepEqual(f.adjusted, ['中国']);
+  f.close();
+});
+
+const handlesHost = f => f.doc.querySelector('[data-modu-selection-handles]');
+const handleAt = (f, side) => handlesHost(f)?.shadowRoot.querySelector(`[data-selection-handle="${side}"]`);
+
+test('Android automatic word and paragraph expansion immediately displays two draggable handles', async () => {
+  for (const paragraph of [false, true]) {
+    const f = fixture(undefined, { nativeTouchSelection: true, paragraph: () => paragraph });
+    f.send('pointerdown'); f.send('pointercancel'); f.select(3, 4);
+    await f.control.beforeSelection();
+    assert.equal(f.text(), paragraph ? '我喜欢中国文化。' : '中国');
+    for (const side of ['start', 'end']) {
+      assert.ok(handleAt(f, side), side);
+      assert.equal(handleAt(f, side).style.display, 'block');
+    }
+    assert.equal(handlesHost(f).textContent, ''); // Never changes extracted book text.
+    f.close();
+    assert.equal(handlesHost(f), null);
+  }
+});
+
+test('native word selection that already has the desired range gets no duplicate handles', async () => {
+  const f = fixture(undefined, { nativeTouchSelection: true });
+  f.select(3, 5); await f.control.beforeSelection();
+  assert.equal(f.text(), '中国');
+  assert.equal(handlesHost(f), null);
+  f.close();
+});
+
+test('expanded handles drag either endpoint and cross without snapping back to the word', async () => {
+  for (const [side, destination, expected] of [
+    ['start', 1, '喜欢中国'], ['end', 7, '中国文化'],
+    ['end', 2, '欢'], ['start', 6, '文'],
+  ]) {
+    const f = fixture(undefined, { nativeTouchSelection: true });
+    f.select(3, 4); await f.control.beforeSelection();
+    const control = handleAt(f, side), node = f.doc.querySelector('p').firstChild;
+    let bubbled = 0;
+    f.doc.addEventListener('pointerdown', () => bubbled++);
+    assert.equal(f.send('pointerdown', { pointerId: 1 }, control).defaultPrevented, true);
+    assert.equal(bubbled, 0);
+    f.hit(node, destination);
+    assert.equal(f.send('pointermove', { pointerId: 1 }).defaultPrevented, true);
+    f.send('pointerup', { pointerId: 1 });
+    f.send('scroll', {}, f.doc); // Native scroll-to-selection keeps the handles.
+    f.control.nativeLongPress(); await f.control.beforeSelection();
+    assert.equal(f.text(), expected, side);
+    assert.equal(f.adjusted.length, 1);
+    assert.ok(handlesHost(f));
+    assert.equal(f.send('click', {}, control).defaultPrevented, true);
+    f.close();
+  }
+});
+
+test('handle drag can extend across inline markup and paragraphs without moving the other endpoint', async () => {
+  const f = fixture('<p>我爱<span>中</span><em>国</em>文化。</p><p>下一段</p>', {
+    nativeTouchSelection: true, segmentWord: async () => [2, 4],
+  });
+  f.select(0, 1, f.doc.querySelector('span').firstChild); await f.control.beforeSelection();
+  f.send('pointerdown', { pointerId: 1 }, handleAt(f, 'end'));
+  f.hit(f.doc.querySelectorAll('p')[1].firstChild, 2);
+  f.send('pointermove', { pointerId: 1 }); f.send('pointerup', { pointerId: 1 });
+  await f.control.beforeSelection();
+  assert.equal(f.text(), '中国文化。下一');
+  assert.equal(f.doc.getSelection().getRangeAt(0).startContainer, f.doc.querySelector('span').firstChild);
+  f.close();
+});
+
+test('clearing/replacing selection, leaving the page or handing back to native UI removes expanded handles', async () => {
+  for (const action of ['clear', 'replace', 'pagehide', 'visibility', 'press', 'destroy']) {
+    const f = fixture(undefined, { nativeTouchSelection: true });
+    f.select(3, 4); await f.control.beforeSelection();
+    assert.ok(handlesHost(f));
+    if (action === 'clear') f.select(3, 3);
+    if (action === 'replace') f.select(1, 7);
+    if (action === 'pagehide') f.dom.window.dispatchEvent(new f.dom.window.Event('pagehide'));
+    if (action === 'visibility') f.send('visibilitychange', {}, f.doc);
+    if (action === 'press') f.send('pointerdown');
+    if (action === 'destroy') f.control.destroy();
+    assert.equal(handlesHost(f), null, action);
+    f.close();
+  }
+});
+
+test('late segmentation after the selection changed cannot resurrect expanded handles', async () => {
+  let finish;
+  const f = fixture(undefined, { nativeTouchSelection: true,
+    segmentWord: () => new Promise(resolve => { finish = resolve; }) });
+  f.select(3, 4);
+  const pending = f.control.beforeSelection();
+  assert.equal(handlesHost(f), null);
+  f.select(2, 6); finish([3, 5]); await pending;
+  assert.equal(handlesHost(f), null);
+  assert.equal(f.text(), '欢中国文'); f.close();
+});
+
+test('expanded handle positions support horizontal RTL and vertical text and refresh on resize', async () => {
+  for (const [style, startX, startY, endX, endY] of [
+    ['', '30px', '30px', '50px', '30px'],
+    ['direction:rtl', '40px', '30px', '40px', '30px'],
+    ['writing-mode:vertical-rl', '20px', '18px', '30px', '20px'],
+  ]) {
+    const f = fixture(`<p style="${style}">我喜欢中国文化。</p>`, { nativeTouchSelection: true });
+    f.select(3, 4); await f.control.beforeSelection();
+    assert.equal(handleAt(f, 'start').style.left, startX);
+    assert.equal(handleAt(f, 'start').style.top, startY);
+    assert.equal(handleAt(f, 'end').style.left, endX);
+    assert.equal(handleAt(f, 'end').style.top, endY);
+    f.dom.window.Range.prototype.getClientRects = () => [{ left: 100, right: 120, top: 100, bottom: 120 }];
+    f.dom.window.dispatchEvent(new f.dom.window.Event('resize'));
+    assert.notEqual(handleAt(f, 'start').style.left, startX);
+    f.close();
+  }
+});
+
+test('pointer cancellation, a second finger and invalid caret hits never corrupt the expanded range', async () => {
+  const f = fixture(undefined, { nativeTouchSelection: true });
+  f.select(3, 4); await f.control.beforeSelection();
+  f.send('pointerdown', { pointerId: 1 }, handleAt(f, 'end'));
+  f.hit(f.doc.querySelector('p').firstChild, 7);
+  f.send('pointermove', { pointerId: 2 }); assert.equal(f.text(), '中国');
+  f.doc.caretPositionFromPoint = () => { throw Error('no caret'); };
+  f.send('pointermove', { pointerId: 1 }); assert.equal(f.text(), '中国');
+  f.send('pointercancel', { pointerId: 1 });
+  assert.ok(handlesHost(f));
+  assert.equal(handlesHost(f).style.visibility, '');
   f.close();
 });
 
@@ -251,14 +378,20 @@ test('Android waits for native selection instead of creating a competing range o
   f.close();
 });
 
-test('Android native menu callback repairs a late system reset to the seed character', async () => {
+test('Android menu recreation never re-expands a manually selected seed character', async () => {
   const f = fixture(undefined, { nativeTouchSelection: true });
   f.select(3, 4); await f.control.beforeSelection?.();
   assert.equal(f.text(), '中国');
   f.select(3, 4);
   f.control.nativeLongPress?.();
   await f.control.beforeSelection?.();
-  assert.equal(f.text(), '中国');
+  assert.equal(f.text(), '中');
+  assert.equal(f.adjusted.length, 1);
+  f.select(2, 6);
+  f.control.nativeLongPress();
+  await f.control.beforeSelection();
+  assert.equal(f.text(), '欢中国文');
+  assert.equal(f.adjusted.length, 1);
   f.close();
 });
 
@@ -269,6 +402,24 @@ test('native scroll-to-selection preserves pending expansion; explicit navigatio
     f.control.cancel({ preserveActiveSelection: preserve });
     await f.control.beforeSelection?.();
     assert.equal(f.text(), preserve ? '中国' : '中');
+    f.close();
+  }
+});
+
+test('Android handle collapse and menu callbacks cannot re-arm word or paragraph expansion', async () => {
+  for (const paragraph of [false, true]) {
+    const f = fixture(undefined, { nativeTouchSelection: true, paragraph: () => paragraph });
+    f.select(3, 4); await f.control.beforeSelection();
+    assert.equal(f.adjusted.length, 1);
+    f.doc.getSelection().removeAllRanges(); f.send('selectionchange', {}, f.doc);
+    f.select(3, 4); f.control.nativeLongPress(); await f.control.beforeSelection();
+    assert.equal(f.text(), '中');
+    assert.equal(f.adjusted.length, 1);
+    f.doc.getSelection().removeAllRanges(); f.send('selectionchange', {}, f.doc);
+    f.send('touchstart', { touches: [{ clientX: 31, clientY: 10 }] });
+    f.select(3, 4); await f.control.beforeSelection();
+    assert.equal(f.text(), paragraph ? '我喜欢中国文化。' : '中国');
+    assert.equal(f.adjusted.length, 2);
     f.close();
   }
 });

@@ -60,6 +60,7 @@ Stream<String> aiGenerateStream(
   LangchainAiRegistry registry = LangchainAiRegistry(ref);
   final runner = requestRunner ?? CancelableLangchainRunner();
   StreamSubscription<String>? subscription;
+  var sourceCompleted = false;
   late StreamController<String> controller;
   controller = StreamController<String>(
     onListen: () {
@@ -73,11 +74,15 @@ Stream<String> aiGenerateStream(
               useAgent: useAgent,
               allowedToolIds: allowedToolIds,
               registry: registry)
-          .listen(controller.add,
-              onError: controller.addError, onDone: controller.close);
+          .listen(controller.add, onError: controller.addError, onDone: () {
+        // StreamController invokes onCancel even for a normally closed stream.
+        // Do not invalidate pending coalesced text or the final history write.
+        sourceCompleted = true;
+        unawaited(controller.close());
+      });
     },
     onCancel: () async {
-      await runner.cancel();
+      if (!sourceCompleted) await runner.cancel();
       await subscription?.cancel();
     },
   );

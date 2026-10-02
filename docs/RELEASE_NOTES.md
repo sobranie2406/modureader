@@ -1,28 +1,19 @@
-# 默读 / Modu 1.1.10 正式版
+# 默读 / Modu 1.1.11 正式版
 
-版本：**1.1.10+10069**。
+版本：**1.1.11+10072**。
 
 ## 本次更新
 
-- **朗读快捷栏**：阅读页面新增小型操作栏，支持回到朗读位置、播放/暂停、从当前阅读位置朗读和打开设置。
-- **最高 4 倍语速**：在线朗读提供 2 倍、3 倍、4 倍档位，保留低倍速细调；MiMo 通过本地播放倍率调整，无需重复合成。
-- **AI 阅读技能更易用**：默认显示技能列表，内置与自定义技能均可开关、混合排序；可开启先填入输入框，编辑或追加要求后手动发送，默认仍为点击发送。
-- **划词 AI 模板更简明**：AI 词典改为“AI 知识”，只介绍含义、背景与相关知识，按选词语言作答；所有划词 AI 命令均可选择仅选中文字或结合上下文，并可独立勾选联网搜索。默认不自动联网，仍可输入“确认联网搜索”补查，无需额外搜索 API Key。
-- **移除重复阅读预设**：AI 阅读技能不再显示默认“AI 知识”，划词工具栏中的模板和用户自定义内容保留，已有对话历史继续兼容。
-- **智能长按选词**：长按按所在词语选择文字，可在阅读设置中改为长按选择整段；安卓从触摸后系统实际选中的文字扩展选区，不再依赖字间命中点，兼容系统接管触摸及旧版 Android WebView，保留手动调整选区。
-- **目录切换白屏修复**：目录打开、关闭与切后台时不再读取已移除控件的焦点上下文，避免焦点异常导致阅读页面持续无法重建。
-- **字体粗细调节与字重修复**：将字体粗细调节移至底部样式栏的字体大小与行间距之间，滑块显示 0.5–2.0，按 0.1 步进，1.0 为正常粗细；正文嵌套标签与内联字重不再阻止粗细调整，图形 CSS 模板也覆盖嵌套文字；保留标题、强调文字和自定义代码，切回书籍样式时恢复原有字重。
-- **固定字体模拟加粗**：字体粗细旁新增“模拟加粗”按钮，默认关闭；开启后 1.0 保持原样，1.1–2.0 通过同色描边逐档加粗，不能将固定粗体变细。开关随阅读样式保存和备份，关闭后恢复正常字重调节。
-- **向量索引升级保留**：按书籍实际内容识别索引，不再因路径、文件修改时间变化误判失效；旧索引经本地校验后复用原向量，复制后失效的索引状态可自动恢复。
-- **翻译服务切换**：翻译弹窗内可切换已配置的翻译提供方，无需退出当前弹窗。
-- **全局设置备份简化**：保留文件与 modu 链接迁移，移除超出容量的二维码导出和图片导入；账号、密码及 API 接口配置保留独立开关，备份仅携带用户改动，不重复包含默认提示词。
-- **数据库备份指引**：同步界面明确“数据库备份导出/导入”，说明 ZIP 内容、保存位置、覆盖恢复步骤；导出成功后显示并可复制实际保存位置。
-- **GitHub 反馈改进**：区分 Bug 和功能建议，按模板填写与预览后提交；环境信息及脱敏诊断可选，默认不附带日志。
-- **说明文档更新**：中英文 README 同步更新朗读、AI 技能、划词与备份功能说明。
+- **选区自由调整**：安卓仅在首次长按时自动扩展到所在词语或整段；随后拖动选区不会再次强制匹配，也不会被锁回原来的范围。
+- **选词手柄直接显示**：自动扩展后立即显示两端拖动手柄，不必再点一次；工具栏预留手柄操作空间。
+- **AI 回答完整保存**：修复流式输出正常结束被误判为取消的问题，避免回答末尾丢字、完成后的回答未正确保存，以及重新打开历史记录时回答空白。此前未写入的历史回答无法凭空恢复，可重新生成。
+- **阅读 AI 连续追问**：在当前对话或打开的历史对话中输入新问题，保留已有问答上下文继续回答；明确新建对话、发起新的技能或划词任务时才开始独立对话。
+- **历史入口更直观**：使用时钟图标，移到右上角更多选项左侧；同时修复手机窄屏上模型名称及时间的布局溢出。
+- **说明文档更新**：中英文 README 同步说明自动选词、选区调整和多轮对话行为。
 
 ## 升级与下载
 
-[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.10) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.10)
+[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.11) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.11)
 
 覆盖升级即可，**不要先卸载或清空数据**，升级前建议备份书库。Android 沿用原签名；macOS 退出旧应用后，使用 DMG 拖入应用程序覆盖安装。
 
@@ -35,16 +26,14 @@
 
 GitHub 保留历史发行版及源码标签；Gitee 替换旧应用发行版，提供同一批安装包和校验文件。独立模型镜像不变。
 
-对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.10) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.10.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.10/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
+对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.11) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.11.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.11/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
 
 ## English
 
-Modu **1.1.10 (build 10069)** adds a compact narration toolbar and online speech rates up to 4×, with 3× and 4× steps after 2×. MiMo changes local playback speed without regenerating audio. Drawer and focus transitions no longer inspect disposed widget contexts, avoiding a persistent blank reader. Font-weight controls now reach nested book text while preserving emphasis and user CSS. The control is labeled Font thickness, ranges from 0.5 to 2.0 in 0.1 steps, and sits between font size and line spacing. An optional Simulated bold button adds stroke-based thickness for fixed-weight fonts above 1.0 and is saved with the reading style.
+Modu **1.1.11 (build 10072)** fixes repeated selection snapping on Android. Automatic expansion runs only on the initial long press, then displays draggable handles immediately so the selected range remains freely adjustable.
 
-Unchanged book vectors survive upgrades and file migrations. Content-based identities and local legacy verification restore copied index metadata without regenerating embeddings.
+AI stream completion no longer incorrectly cancels the request, preventing missing answer endings and unsaved answers that appeared blank when reopening history. Answers that were never written by earlier versions cannot be reconstructed; regenerate them if needed.
 
-Reading skills are visible by default; built-in and custom skills can be toggled and reordered together. The optional draft mode fills the input field before manual sending, while immediate sending remains the default. AI Knowledge is now a selection-toolbar template only; existing conversations and custom skills remain compatible. Selection AI commands use concise prompts, support selected text or nearby context, and offer optional online search. Model knowledge is used first when search is off; explicit confirmation can still request source-backed verification.
-
-Long presses select the current word, with an optional whole-paragraph mode. Translation providers can be switched inside the translation popup. Global settings use files and modu links rather than oversized QR codes, retain independent credential controls and exclude unchanged default prompts. Database ZIP backup guidance explains contents, destinations and replacement restores, with a persistent saved-location confirmation. GitHub feedback separates bugs from feature requests and previews optional, sanitized diagnostics before submission. Both READMEs have been updated.
+Manually typed follow-up questions continue the current reader conversation, including conversations restored from history. Explicit new chats and new skill or selection tasks remain independent. The history clock icon now sits beside the options menu, and narrow-screen history rows no longer overflow.
 
 Upgrade in place after backing up. Nine packages cover Android, macOS, Windows and Debian 13 on ARM64/x64, plus iOS ARM64. macOS is not notarized, Windows requires WebView2, and iOS requires your own valid signing. Gitee receives identical, hash-verified GitHub packages.

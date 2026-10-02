@@ -78,7 +78,15 @@ class _Chat extends AiChat {
   }
 
   void emit(String answer) {
+    final previous = (state.value ?? const <ChatMessage>[])
+        .take(requests.last.previousCount)
+        .toList();
+    if (requests.last.regenerate) {
+      final index = previous.lastIndexWhere((m) => m is HumanChatMessage);
+      if (index >= 0) previous.removeRange(index, previous.length);
+    }
     final messages = [
+      ...previous,
       ChatMessage.humanText(requests.last.message),
       ChatMessage.ai(answer)
     ];
@@ -288,17 +296,20 @@ void main() {
   });
 
   testWidgets(
-      'ordinary reader questions start fresh; regenerate keeps the same task',
+      'ordinary reader follow-ups keep the conversation; regenerate replaces only the last answer',
       (tester) async {
-    await mount(tester);
+    await mount(tester, immediate: true);
+    chat.emit('旧回答');
+    await chat.streams.last.close();
+    await tester.pumpAndSettle();
     chat.restore([ChatMessage.humanText('旧问题'), ChatMessage.ai('旧回答')],
         sessionId: 'old-session');
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '这次的问题');
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pump();
-    expect(chat.requests.last.previousCount, 0);
-    expect(chat.currentSessionId, isNull);
+    expect(chat.requests.last.previousCount, 2);
+    expect(chat.currentSessionId, 'old-session');
     chat.emit('这次的回答');
     await chat.streams.last.close();
     await tester.pumpAndSettle();
@@ -308,7 +319,7 @@ void main() {
     await tester.pump();
     expect(chat.clears, clears);
     expect(chat.requests.last.regenerate, true);
-    expect(chat.requests.last.previousCount, 2);
+    expect(chat.requests.last.previousCount, 4);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     unawaited(chat.streams.last.close());

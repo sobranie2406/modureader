@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
 import 'package:anx_reader/widgets/context_menu/excerpt_menu.dart';
 import 'package:anx_reader/widgets/context_menu/reader_note_menu.dart';
@@ -85,7 +86,9 @@ Future<void> showContextMenu(
 
   const double horizontalMargin = 16;
   const double verticalMargin = 16;
-  const double gap = 12;
+  // Leave room for Android's draggable selection endpoints below/alongside
+  // the selected text, including the handles restored after smart expansion.
+  final double gap = AnxPlatform.isAndroid && !footnote ? 32 : 12;
 
   final double maxMenuWidth =
       math.min(350, math.max(120, screenWidth - horizontalMargin * 2));

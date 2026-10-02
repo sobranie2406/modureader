@@ -47,13 +47,18 @@ class ProjectIdentityTest(unittest.TestCase):
         self.assertIn("## " + version, text)
         self.assertNotIn("## 1.15.0", text)
         self.assertNotIn("Anx-Reader has changed", text)
-        # Current reader splits English and Chinese bullet lists into two halves.
-        bullets = [line for line in text.splitlines() if line.startswith("- ")]
-        self.assertGreater(len(bullets), 0)
-        self.assertEqual(len(bullets) % 2, 0)
-        half = len(bullets) // 2
-        self.assertTrue(all(not re.search(r"[\u4e00-\u9fff]", b) for b in bullets[:half]))
-        self.assertTrue(all(re.search(r"[\u4e00-\u9fff]", b) for b in bullets[half:]))
+        # The reader extracts one version before splitting its English/Chinese
+        # bullets into halves. Keep validating every retained version separately.
+        sections = re.split(r"^## ", text, flags=re.MULTILINE)[1:]
+        self.assertGreater(len(sections), 0)
+        for section in sections:
+            with self.subTest(version=section.splitlines()[0]):
+                bullets = [line for line in section.splitlines() if line.startswith("- ")]
+                self.assertGreater(len(bullets), 0)
+                self.assertEqual(len(bullets) % 2, 0)
+                half = len(bullets) // 2
+                self.assertTrue(all(not re.search(r"[\u4e00-\u9fff]", b) for b in bullets[:half]))
+                self.assertTrue(all(re.search(r"[\u4e00-\u9fff]", b) for b in bullets[half:]))
         archive = (ROOT / "docs/upstream/anx-reader-changelog.md").read_text()
         self.assertIn("not Modu version history", archive)
         self.assertIn("## 1.15.0", archive)

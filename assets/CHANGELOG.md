@@ -2,6 +2,18 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
+## 1.1.11
+
+- Automatically expand only the initial Android long-press selection; show draggable handles immediately and preserve subsequent manual range adjustments.
+- Fix missing final AI answer text and blank answers when reopening conversation history.
+- Continue current and restored reader conversations when manually sending follow-up questions; keep new skill and selection tasks independent.
+- Move history to a clock icon beside the options menu and prevent narrow-screen history entries from overflowing.
+
+- 安卓仅在首次长按时自动扩展词语或段落，直接显示拖动手柄，后续手动框选不再强制匹配。
+- 修复 AI 回答末尾丢字、历史记录重新打开后回答空白的问题。
+- 阅读 AI 的当前对话和历史对话支持手动连续追问，新的技能及划词任务仍保持独立对话。
+- 历史入口改为更多选项左侧的时钟图标，修复窄屏历史条目布局溢出。
+
 ## 1.1.10
 
 - Add a compact narration toolbar and online speech rates up to 4x, with 3x and 4x steps after 2x.

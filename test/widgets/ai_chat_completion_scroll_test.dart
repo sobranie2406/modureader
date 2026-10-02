@@ -160,6 +160,27 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets(
+      'completion in the final token frame keeps all six trailing CJK characters',
+      (tester) async {
+    final chat = await mount(tester, AiChatScope.reader);
+    final prefix = '$firstParagraph\n\n${'词语释义和相关知识。\n\n' * 80}后来泛指所有';
+    const tail = '房屋或房间。';
+    chat.emit(prefix);
+    await tester.pumpAndSettle();
+    chat.emit('$prefix$tail');
+    await chat.streams.last.close();
+    await tester.pumpAndSettle();
+    expect(tester.widget<StyledMarkdown>(answer()).data, '$prefix$tail');
+    final text = tester
+        .widgetList<RichText>(find.byType(RichText))
+        .map((widget) => widget.text.toPlainText())
+        .join();
+    expect(text, contains('后来泛指所有$tail'));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('regeneration returns to the new answer once, not an old answer',
       (tester) async {
     final chat = await mount(tester, AiChatScope.library);

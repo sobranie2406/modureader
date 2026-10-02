@@ -139,13 +139,160 @@ export function isInitialSmartSelection(doc, range) {
   return false;
 }
 
+// Chromium clears ShouldShowHandle for script-created selections (including
+// setBaseAndExtent and live Range edits). Supply touch handles only for ranges
+// we expanded ourselves; ordinary native selections keep their native handles.
+function installExpandedSelectionHandles(doc, { onDragStart }) {
+  let host, controls = [], owned, drag, disposed = false;
+  const win = doc.defaultView, listeners = [];
+  const hide = () => {
+    drag = null; owned = null;
+    host?.remove(); host = null; controls = [];
+  };
+  const isHandle = event => host && event.composedPath().includes(host);
+  const endpoint = (range, end) => {
+    const node = end ? range.endContainer : range.startContainer;
+    const offset = end ? range.endOffset : range.startOffset;
+    if (node.nodeType !== 3 || !node.isConnected) return null;
+    const probe = doc.createRange();
+    // Use the boundary glyph, not the whole range's bounding box: wrapped and
+    // vertical paragraphs can have their endpoints on different lines/columns.
+    const previous = Array.from(node.data.slice(0, offset)).at(-1)?.length ?? 0;
+    const next = Array.from(node.data.slice(offset))[0]?.length ?? 0;
+    probe.setStart(node, end ? offset - previous : offset);
+    probe.setEnd(node, end ? offset : offset + next);
+    const rects = [...probe.getClientRects()];
+    const rect = end ? rects.at(-1) : rects[0];
+    if (!rect) return null;
+    const css = win.getComputedStyle(node.parentElement);
+    const vertical = /^(vertical|sideways)/.test(css.writingMode);
+    const rtl = css.direction === 'rtl';
+    return vertical
+      ? { x: rect.left - 10, y: end ? rect.bottom : rect.top,
+        hitX: (rect.left + rect.right) / 2, hitY: end ? rect.bottom : rect.top }
+      : { x: end !== rtl ? rect.right : rect.left, y: rect.bottom + 10,
+        hitX: end !== rtl ? rect.right : rect.left, hitY: (rect.top + rect.bottom) / 2 };
+  };
+  const paint = () => {
+    if (!owned || !sameRange(owned, activeRange(doc))) { hide(); return; }
+    controls.forEach((control, index) => {
+      const point = endpoint(owned, index === 1);
+      const visible = point && point.x >= -10 && point.x <= win.innerWidth + 10 &&
+        point.y >= 0 && point.y <= win.innerHeight + 10;
+      control.style.display = visible ? 'block' : 'none';
+      if (!visible) return;
+      control.style.left = `${Math.max(18, Math.min(win.innerWidth - 18, point.x))}px`;
+      control.style.top = `${Math.max(18, Math.min(win.innerHeight - 18, point.y))}px`;
+    });
+  };
+  const show = range => {
+    hide();
+    if (disposed) return;
+    owned = range.cloneRange();
+    host = doc.createElement('div');
+    host.dataset.moduSelectionHandles = '';
+    host.setAttribute('aria-hidden', 'true'); // Native selection stays accessible.
+    host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483647!important;';
+    const root = host.attachShadow({ mode: 'open' });
+    const css = doc.createElement('style');
+    css.textContent = `
+      span { position:fixed; width:36px; height:36px; transform:translate(-50%,-50%);
+        pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none; }
+      span::after { content:''; position:absolute; left:10px; top:10px; width:16px; height:16px;
+        box-sizing:border-box; border:1px solid white; border-radius:50%; background:#1976d2;
+        box-shadow:0 1px 3px #0006; }
+    `;
+    root.append(css);
+    controls = ['start', 'end'].map(side => {
+      const control = doc.createElement('span');
+      control.dataset.selectionHandle = side;
+      root.append(control);
+      return control;
+    });
+    doc.documentElement.append(host);
+    paint();
+  };
+  const consume = event => { event.preventDefault(); event.stopImmediatePropagation(); };
+  const start = event => {
+    if (!isHandle(event)) { hide(); return; }
+    consume(event);
+    if (event.isPrimary === false || event.button > 0) return;
+    const control = controls.find(item => event.composedPath().includes(item));
+    if (!control || !owned) return;
+    const end = control === controls[1];
+    const point = endpoint(owned, end);
+    if (!point) return;
+    onDragStart();
+    // Keep the opposite endpoint fixed, but allow crossing it without snapping
+    // to a word again. Preserve the finger-to-text offset below the handle.
+    drag = { id: event.pointerId, control,
+      node: end ? owned.startContainer : owned.endContainer,
+      offset: end ? owned.startOffset : owned.endOffset,
+      dx: point.hitX - event.clientX, dy: point.hitY - event.clientY };
+    try { control.setPointerCapture(event.pointerId); } catch { /* Document listener is the fallback. */ }
+  };
+  const move = event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    consume(event);
+    if (!drag.node.isConnected || !sameRange(owned, activeRange(doc))) { hide(); return; }
+    const x = event.clientX + drag.dx, y = event.clientY + drag.dy;
+    // Remove our hit target for caret hit-testing, not the selection itself.
+    host.style.setProperty('visibility', 'hidden', 'important');
+    let caret;
+    try {
+      const position = doc.caretPositionFromPoint?.(x, y);
+      const range = position ? null : doc.caretRangeFromPoint?.(x, y);
+      caret = { node: position?.offsetNode ?? range?.startContainer,
+        offset: position?.offset ?? range?.startOffset };
+    } catch { return; }
+    finally { host.style.removeProperty('visibility'); }
+    if (!Number.isInteger(caret.offset) || caret.offset < 0 || caret.offset > caret.node?.length ||
+        !contextAt(doc, caret.node, caret.offset)) return;
+    const range = doc.createRange();
+    range.setStart(drag.node, drag.offset); range.collapse(true);
+    if (range.comparePoint(caret.node, caret.offset) < 0) range.setStart(caret.node, caret.offset);
+    else range.setEnd(caret.node, caret.offset);
+    if (range.collapsed) return;
+    owned = range.cloneRange();
+    doc.getSelection().setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
+    paint();
+    doc.dispatchEvent(new win.Event('selectionchange'));
+  };
+  const end = event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    consume(event);
+    const previous = drag; drag = null;
+    try { previous.control.releasePointerCapture(previous.id); } catch { /* Already released. */ }
+    doc.dispatchEvent(new win.Event('selectionchange'));
+  };
+  const on = (target, name, handler) => {
+    target.addEventListener(name, handler, { capture: true, passive: false });
+    listeners.push(() => target.removeEventListener(name, handler, true));
+  };
+  on(doc, 'pointerdown', start); on(doc, 'pointermove', move);
+  on(doc, 'pointerup', end); on(doc, 'pointercancel', end);
+  // Suppress compatibility touch/click events before they reach page flipping,
+  // quick-mark, smart-selection or the native long-press recognizer.
+  for (const name of ['touchstart', 'touchmove', 'touchend', 'click', 'contextmenu'])
+    on(doc, name, event => { if (isHandle(event)) consume(event); });
+  on(doc, 'selectionchange', paint);
+  on(doc, 'scroll', paint); on(win, 'resize', paint);
+  on(doc, 'visibilitychange', hide); on(win, 'pagehide', hide);
+  return { show, hide, ownsSelection: () => owned && sameRange(owned, activeRange(doc)),
+    destroy() { disposed = true; hide(); listeners.forEach(remove => remove()); } };
+}
+
 // Android owns touch selection and can publish its initial character after
 // pointercancel, action-mode creation or scroll-to-selection. Do not compete
 // with it using a caret hit/timer: normalize the actual, settled native range.
 function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentWord, onAdjusted, now }) {
   let session = null, hadSelection = !!activeRange(doc), excluded = false;
-  let disposed = false, touch = null, lastAdjustment = null, suppressClickUntil = 0;
+  let disposed = false, touch = null, suppressClickUntil = 0;
   const listeners = [];
+  const handles = installExpandedSelectionHandles(doc, { onDragStart: () => {
+    session = null; touch = null; excluded = true; hadSelection = true;
+    delete doc.__moduInitialSmartSelectionRange;
+  } });
   const permitted = () => !disposed && enabled() && !doc.__moduQuickMarkEnabled;
   const capture = range => {
     if (!permitted() || !range || !contextAt(doc, range.startContainer, range.startOffset) ||
@@ -156,8 +303,10 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
   const change = () => {
     const range = activeRange(doc);
     if (!range) {
+      // Handles can briefly cross/collapse without a DOM touch event. Only a
+      // fresh physical press with no selection may arm normalization again.
+      if (hadSelection) excluded = true;
       session = null; hadSelection = false;
-      if (touch?.handles) { touch.handles = false; excluded = false; }
       delete doc.__moduInitialSmartSelectionRange;
       return;
     }
@@ -165,14 +314,17 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
     hadSelection = true;
     if (session && !sameRange(session.seed, range) && !sameRange(session.normalized, range)) {
       session = null; // Native handle changes are never repeatedly expanded.
+      excluded = true;
       delete doc.__moduInitialSmartSelectionRange;
     }
   };
   const cancel = ({ preserveActiveSelection = false } = {}) => {
     const range = activeRange(doc);
+    if (preserveActiveSelection && handles.ownsSelection()) return;
     if (preserveActiveSelection && session && range &&
         (sameRange(session.seed, range) || sameRange(session.normalized, range))) return;
-    session = null; touch = null; lastAdjustment = null;
+    session = null; touch = null;
+    handles.hide();
     hadSelection = !!range; excluded = true;
     delete doc.__moduInitialSmartSelectionRange;
   };
@@ -206,13 +358,13 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
       if (!range || !range.startContainer.isConnected || !range.endContainer.isConnected) return;
       current.normalized = range.cloneRange();
       doc.__moduInitialSmartSelectionRange = range.cloneRange();
-      lastAdjustment = { seed: current.seed.cloneRange(), normalized: range.cloneRange(), at: now() };
       suppressClickUntil = now() + 600;
       if (sameRange(current.seed, range)) return;
       const selection = doc.getSelection();
       if (selection.setBaseAndExtent)
         selection.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
       else { selection.removeAllRanges(); selection.addRange(range); }
+      handles.show(range);
       onAdjusted(range);
       doc.dispatchEvent(new doc.defaultView.Event('selectionchange'));
     })();
@@ -220,18 +372,10 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
   };
   const nativeLongPress = () => {
     if (!permitted()) return;
-    const range = activeRange(doc);
-    if (session && (sameRange(session.seed, range) || sameRange(session.normalized, range))) {
-      if (session.finished && !excluded && sameRange(session.seed, range) &&
-          !sameRange(session.seed, session.normalized)) capture(range);
-      // Already pending/expanded. A repeated native menu callback must not
-      // produce another bridge request or an action-mode/selection loop.
-    } else if (range && !excluded && lastAdjustment && now() - lastAdjustment.at < 1500 &&
-        sameRange(lastAdjustment.seed, range)) capture(range);
-    else if (!touch?.handles) {
-      excluded = false;
-      if (range) capture(range);
-    }
+    // Android recreates its menu while the user drags native handles, sometimes
+    // without DOM touch events. A menu callback is NOT a new long press. Never
+    // re-arm a finished session, even if the user selects the seed character.
+    change();
     doc.dispatchEvent(new doc.defaultView.Event('selectionchange'));
   };
   const start = e => {
@@ -242,7 +386,7 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
     // Browsers dispatch both pointerdown and touchstart for one contact.
     if (touch && now() - touch.at < 50 &&
         Math.hypot(point.clientX - touch.x, point.clientY - touch.y) < 2) return;
-    session = null; lastAdjustment = null;
+    session = null;
     hadSelection = !!activeRange(doc); excluded = hadSelection;
     touch = { x: point.clientX, y: point.clientY, at: now(), handles: hadSelection };
     delete doc.__moduInitialSmartSelectionRange;
@@ -266,7 +410,7 @@ function installNativeTouchSelection(doc, { enabled, paragraph, locale, segmentW
   on(doc.defaultView, 'pagehide', () => cancel());
   // Do not discard the range when the native action mode steals DOM focus.
   return { cancel, beforeSelection, nativeLongPress,
-    destroy() { disposed = true; cancel(); for (const remove of listeners) remove(); } };
+    destroy() { disposed = true; cancel(); handles.destroy(); for (const remove of listeners) remove(); } };
 }
 
 export function installSmartSelection(doc, {

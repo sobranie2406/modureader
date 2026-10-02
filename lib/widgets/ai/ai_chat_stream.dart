@@ -447,22 +447,26 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
             ),
             Row(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                    Text(
-                      _formatTimestamp(entry.updatedAt),
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      Text(
+                        _formatTimestamp(entry.updatedAt),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
                 ),
-                Spacer(),
+                const SizedBox(width: 8),
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -623,11 +627,13 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       // A reader-skill chip is a separate task, not the pending toolbar command.
       _clearPendingTemplate();
     }
-    // Reader requests are independent tasks. Clearing starts a fresh session
-    // without deleting saved history; regenerate still replays the same task.
+    // Only an explicitly invoked skill/selection starts an independent task.
+    // Text entered in this conversation (also after restoring history) is a
+    // follow-up: retain its session and previous user/assistant messages.
     if (widget.scope == AiChatScope.reader &&
         !isRegenerate &&
-        !confirmingDictionarySearch) {
+        !confirmingDictionarySearch &&
+        (skillId != null || selectionRequest)) {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
     }
     inputController.clear();
@@ -1090,11 +1096,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(L10n.of(context).aiChat),
-        leading: IconButton(
-          icon: const Icon(Icons.insert_drive_file),
-          tooltip: L10n.of(context).history,
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
+        automaticallyImplyLeading: false,
         actions: [
           if (_isReaderSkills)
             IconButton(
@@ -1108,8 +1110,15 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
             icon: const Icon(Icons.edit_document),
             onPressed: _clearMessage,
           ),
+          IconButton(
+            key: const ValueKey('ai-chat-history'),
+            icon: const Icon(Icons.history),
+            tooltip: L10n.of(context).history,
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          ),
           Builder(
             builder: (context) => IconButton(
+              key: const ValueKey('ai-chat-options'),
               icon: const Icon(Icons.more_vert),
               onPressed: () => _showFontSizeMenu(context),
             ),
