@@ -87,6 +87,8 @@ Reader styles offer separate Chinese/body and English (letters/numbers) fonts. E
 
 ![Mac reader styles: independent fonts, text size, spacing and backgrounds](docs/images/v1.1.9/macos-en/reader-style.jpg)
 
+In the reader's Style panel, **Font thickness** sits between font size and line spacing. It ranges from 0.5 to 2.0 in 0.1 steps, with 1.0 as normal. For fixed-weight fonts, the adjacent **Simulated bold** button adds matching-color text strokes above 1.0; it cannot make a fixed bold face thinner. The option is off by default and is saved and backed up with the reading style.
+
 ### Language and appearance
 
 Choose a language or follow the system in Settings → Appearance. Change themes, theme colors, OLED and e-ink modes in the same section. Bundled AI prompts follow the app language; edited prompts retain their original text.
