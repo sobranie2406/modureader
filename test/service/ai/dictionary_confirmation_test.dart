@@ -15,9 +15,11 @@ void main() {
       expect(isDictionaryWebConfirmation(command), true);
       expect(isDictionaryWebConfirmation(' $command。 '), true);
       expect(entry.value['ui_dictionary_web_follow_up'], contains(command));
-      expect(entry.value['skill_ai_dictionary_prompt'], contains(command));
+      // The persistent hint owns consent instructions; bundled task prompts
+      // stay concise and do not repeat the UI's follow-up instructions.
+      expect(entry.value['skill_ai_dictionary_prompt']!.length, lessThan(500));
       expect(entry.value['selection_custom-preset-dictionary_prompt'],
-          contains(command));
+          contains('{selection}'));
     });
   }
   for (final text in [

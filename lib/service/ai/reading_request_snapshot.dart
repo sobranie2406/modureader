@@ -30,6 +30,11 @@ class ReadingRequestSnapshot {
         'messages': request.messages.map((m) => m.toMap()).toList(),
         'useAgent': request.useAgent,
         'allowedToolIds': request.allowedToolIds?.toList(),
+        if (request.selectionText != null)
+          'selectionText': request.selectionText,
+        if (request.selectionContext != null)
+          'selectionContext': request.selectionContext,
+        if (request.webSearch) 'webSearch': true,
       };
 
   factory ReadingRequestSnapshot.fromJson(Map<String, dynamic> json) {
@@ -48,6 +53,10 @@ class ReadingRequestSnapshot {
       request: ReadingSkillRequest(
           messages: messages,
           useAgent: json['useAgent'] == true,
+          selectionText: json['selectionText'] as String?,
+          selectionContext:
+              boundedSelectionContext(json['selectionContext'] as String?),
+          webSearch: json['webSearch'] == true,
           allowedToolIds:
               (json['allowedToolIds'] as List?)?.cast<String>().toSet()),
     );

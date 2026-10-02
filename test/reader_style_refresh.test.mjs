@@ -23,6 +23,7 @@ function fixture(continuous) {
   }; Harness`, {
     clearReaderFontFallback:()=>counts.cleared++,
     captureBookFontFamilies:()=>counts.captured++,
+    prepareReaderFontWeight:()=>{},
     waitForReaderFonts:async()=>{counts.waited++;return true},
   });
   return {reader:new Harness({},pair,continuous),counts};

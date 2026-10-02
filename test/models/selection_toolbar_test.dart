@@ -60,6 +60,50 @@ void main() {
         '解释 ${jsonEncode(source)} / ${jsonEncode(source)}');
   });
 
+  test('all AI commands default to selection only and no network', () {
+    for (final item
+        in SelectionToolbarConfig.initialItems.where((i) => i.isAi)) {
+      expect(item.scope, SelectionAiScope.selection);
+      expect(item.webSearch, false);
+      expect(item.toJson().containsKey('scope'), false);
+      expect(item.toJson().containsKey('webSearch'), false);
+    }
+  });
+
+  test('custom AI context and web choices survive roundtrip', () async {
+    final item = own.copyWith(scope: SelectionAiScope.context, webSearch: true);
+    final config = SelectionToolbarConfig(
+        items: [item, ...SelectionToolbarConfig.initialItems]);
+    await Prefs().saveSelectionToolbar(config);
+    await Prefs().initPrefs();
+    expect(
+        Prefs().selectionToolbar.items.first.scope, SelectionAiScope.context);
+    expect(Prefs().selectionToolbar.items.first.webSearch, true);
+    expect(
+        SelectionToolbarItem.fromJson({
+          'id': own.id,
+          'action': own.action,
+          'name': own.name,
+          'prompt': own.prompt
+        }).scope,
+        SelectionAiScope.selection);
+  });
+
+  test('invalid scopes and network flags are rejected', () {
+    for (final raw in [
+      {...own.toJson(), 'scope': 'chapter'},
+      {...own.toJson(), 'scope': false},
+      {...own.toJson(), 'webSearch': 'true'},
+    ]) {
+      expect(() => SelectionToolbarItem.fromJson(raw), throwsFormatException);
+    }
+    final config = const SelectionToolbarConfig().copyWith(items: [
+      SelectionToolbarConfig.initialItems.first.copyWith(webSearch: true),
+      ...SelectionToolbarConfig.initialItems.skip(1),
+    ]);
+    expect(config.validate, throwsFormatException);
+  });
+
   test('bundled template text is omitted; only changed fields travel', () {
     const defaults = SelectionToolbarConfig();
     final raw = jsonDecode(defaults.encode()) as Map;
@@ -123,9 +167,12 @@ void main() {
 
   test('global file, modu link and QR restore all toolbar parameters',
       () async {
-    final config = const SelectionToolbarConfig().copyWith(
-        items: [own, ...SelectionToolbarConfig.initialItems],
-        colors: ['00897B']);
+    final config = const SelectionToolbarConfig().copyWith(items: [
+      own.copyWith(scope: SelectionAiScope.context, webSearch: true),
+      ...SelectionToolbarConfig.initialItems
+    ], colors: [
+      '00897B'
+    ]);
     await Prefs().saveSelectionToolbar(config);
     final file = await GlobalSettingsTransfer.export(Prefs());
     final data = await GlobalSettingsTransfer.decode(file);

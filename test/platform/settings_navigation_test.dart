@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('bug reporting is a settings category before the final About entry', () {
+  test(
+      'bug and feature reporting is a settings category before the final About entry',
+      () {
     final source = File('lib/page/settings_page/more_settings_page.dart')
         .readAsStringSync();
     expect(source, contains('"sections": const BugReportSettings()'));
-    expect(source, contains('提交 Bug'));
+    expect(source, contains('问题反馈与功能建议'));
     expect(source.indexOf('const BugReportSettings()'),
         lessThan(source.indexOf('const About(leadingColor: true)')));
   });
@@ -18,8 +20,10 @@ void main() {
     final reader =
         File('lib/widgets/reading_page/tts_widget.dart').readAsStringSync();
     expect(settings, contains('enabled: supportsSystemTts()'));
-    expect(settings, matches(RegExp(
-        r'if\s*\(!unsupportedSystem\s*&&\s*!_configDrafts\.containsKey\(ttsServiceId\)\)')));
+    expect(
+        settings,
+        matches(RegExp(
+            r'if\s*\(!unsupportedSystem\s*&&\s*!_configDrafts\.containsKey\(ttsServiceId\)\)')));
     expect(settings, contains('systemTtsUnsupportedMessage('));
     expect(reader, contains('if (!_unsupportedSystem &&'));
     expect(reader, contains('if (_unsupportedSystem)'));
@@ -70,10 +74,16 @@ void main() {
     expect(settings, contains('AI 阅读技能'));
     expect(ai, isNot(contains('userPromptsTile()')));
     expect(ai, isNot(contains('AiPrompts.summaryTheChapter')));
-    expect(readingSkills, contains('内置阅读技能'));
-    expect(readingSkills, contains('自定义技能'));
+    expect(
+        readingSkills,
+        contains(
+            'orderedReadingSkills(customSkills, Prefs().readAnySkillOrder)'));
+    expect(readingSkills, contains("ValueKey('reading-skills-order-list')"));
+    expect(readingSkills, contains('_builtInSkillTile(entry.builtIn!'));
+    expect(readingSkills, contains('_customSkillTile(entry.custom!'));
     expect(readingSkills, contains('功能提示词'));
     expect(aiChat, contains('bool _showSkillPrompts = false;'));
-    expect(aiChat, contains('if (_showSkillPrompts) _buildSkillPicker(context)'));
+    expect(aiChat, contains('if (_isReaderSkills && _showSkillPrompts)'));
+    expect(aiChat, contains('_buildSkillPicker(context)'));
   });
 }

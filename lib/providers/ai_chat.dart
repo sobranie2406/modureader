@@ -70,6 +70,9 @@ class AiChat extends _$AiChat {
     bool isRegenerate, {
     String? skillId,
     String? sourceText,
+    String? sourceContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
     String? homePromptId,
     CancelableLangchainRunner? requestRunner,
   }) async* {
@@ -102,10 +105,14 @@ class AiChat extends _$AiChat {
       final original = dictionarySelectionFromRequest(
           _lastReadingRequest ?? entry?.readingRequest);
       if (original == null) {
-        throw StateError('无法找到这段对话原先查询的词语，请重新选词使用 AI 词典后，再输入“确认联网搜索”。');
+        throw StateError('无法找到这段对话原先查询的词语，请重新选词使用 AI 知识后，再输入“确认联网搜索”。');
       }
       skillId = aiDictionaryWebSkillId;
       sourceText = original;
+      sourceContext = (_lastReadingRequest ?? entry?.readingRequest)
+          ?.request
+          .selectionContext;
+      webSearch = true;
     }
 
     final previousMessages = List<ChatMessage>.from(state.value ?? const []);
@@ -149,6 +156,9 @@ class AiChat extends _$AiChat {
                 policy: skillPolicy,
                 prompt: message,
                 selectedText: sourceText,
+                selectedContext: sourceContext,
+                selectionRequest: selectionRequest,
+                webSearch: webSearch,
               ));
     final homeRequest = skillRequest == null && _scope == AiChatScope.library
         ? buildHomeAiRequest(
@@ -244,7 +254,8 @@ class AiChat extends _$AiChat {
             identifier: serviceId,
             providerOverride: selectedProvider,
             regenerate: isRegenerate,
-            useAgent: false,
+            useAgent: skillRequest?.useAgent ?? false,
+            allowedToolIds: skillRequest?.allowedToolIds,
             ref: widgetRef,
             requestRunner: child,
           );
@@ -254,9 +265,11 @@ class AiChat extends _$AiChat {
         }
       }
 
-      final responseStream = readingRequest?.skillId == aiDictionaryWebSkillId
+      final responseStream = skillRequest?.webSearch == true ||
+              readingRequest?.skillId == aiDictionaryWebSkillId
           ? dictionaryWebLookup(
               messages: requestMessages,
+              selectedText: skillRequest?.selectionText,
               generate: dictionaryGenerate,
               search: (term) => DictionaryWebSearch()
                   .search(term, cancelled: requestRunner?.whenCancelled),
@@ -321,69 +334,80 @@ class AiChat extends _$AiChat {
     required ReadingSkillExecutionPolicy policy,
     required String prompt,
     String? selectedText,
+    String? selectedContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
   }) async {
     final reading = ref.read(currentReadingProvider);
     final normalizedSelection = selectedText?.trim();
     late final _ReadingSkillSource source;
 
-    switch (policy.scope) {
-      case ReadingSkillSourceScope.dictionarySelection:
-        if (normalizedSelection == null || normalizedSelection.isEmpty) {
-          throw StateError('请先选择需要查询的词语，再使用“AI 词典解释”。');
-        }
-        source = _ReadingSkillSource(
-          description: '待解释的选中词语（不使用本书知识库）',
-          content: normalizedSelection,
-        );
-        break;
-      case ReadingSkillSourceScope.currentChapter:
-        source = _ReadingSkillSource(
-          description: '当前章节正文',
-          content: await _requireCurrentChapter(ref),
-        );
-        break;
-      case ReadingSkillSourceScope.selectionOrCurrentChapter:
-        if (normalizedSelection != null && normalizedSelection.isNotEmpty) {
+    if (selectionRequest) {
+      if (normalizedSelection == null || normalizedSelection.isEmpty) {
+        throw StateError('请先在阅读界面选择需要处理的文字。');
+      }
+      source = _ReadingSkillSource(
+          description: '用户选中文字', content: normalizedSelection);
+    } else {
+      switch (policy.scope) {
+        case ReadingSkillSourceScope.dictionarySelection:
+          if (normalizedSelection == null || normalizedSelection.isEmpty) {
+            throw StateError('请先选择需要查询的词语，再使用“AI 知识”。');
+          }
+          source = _ReadingSkillSource(
+            description: '待解释的选中词语（不使用本书知识库）',
+            content: normalizedSelection,
+          );
+          break;
+        case ReadingSkillSourceScope.currentChapter:
+          source = _ReadingSkillSource(
+            description: '当前章节正文',
+            content: await _requireCurrentChapter(ref),
+          );
+          break;
+        case ReadingSkillSourceScope.selectionOrCurrentChapter:
+          if (normalizedSelection != null && normalizedSelection.isNotEmpty) {
+            source = _ReadingSkillSource(
+              description: '用户在当前章节中选中的原文',
+              content: normalizedSelection,
+            );
+          } else {
+            source = _ReadingSkillSource(
+              description: '当前章节正文（用户未选择具体文本）',
+              content: await _requireCurrentChapter(ref),
+            );
+          }
+          break;
+        case ReadingSkillSourceScope.selectionRequired:
+          if (normalizedSelection == null || normalizedSelection.isEmpty) {
+            throw StateError(policy.id == selectionToolbarSkillId
+                ? '请先在阅读界面选择需要处理的文字。'
+                : '请先在阅读界面选择需要翻译的原文，再使用“智能翻译”。');
+          }
           source = _ReadingSkillSource(
             description: '用户在当前章节中选中的原文',
             content: normalizedSelection,
           );
-        } else {
+          break;
+        case ReadingSkillSourceScope.throughCurrentPosition:
           source = _ReadingSkillSource(
-            description: '当前章节正文（用户未选择具体文本）',
-            content: await _requireCurrentChapter(ref),
+            description: '从全书开头到当前阅读位置的进度内原文',
+            content: await _buildBookCoverage(
+              ref,
+              throughCurrentPosition: true,
+            ),
           );
-        }
-        break;
-      case ReadingSkillSourceScope.selectionRequired:
-        if (normalizedSelection == null || normalizedSelection.isEmpty) {
-          throw StateError(policy.id == selectionToolbarSkillId
-              ? '请先在阅读界面选择需要处理的文字。'
-              : '请先在阅读界面选择需要翻译的原文，再使用“智能翻译”。');
-        }
-        source = _ReadingSkillSource(
-          description: '用户在当前章节中选中的原文',
-          content: normalizedSelection,
-        );
-        break;
-      case ReadingSkillSourceScope.throughCurrentPosition:
-        source = _ReadingSkillSource(
-          description: '从全书开头到当前阅读位置的进度内原文',
-          content: await _buildBookCoverage(
-            ref,
-            throughCurrentPosition: true,
-          ),
-        );
-        break;
-      case ReadingSkillSourceScope.wholeBook:
-        source = _ReadingSkillSource(
-          description: '按目录覆盖全书的章节代表性原文',
-          content: await _buildBookCoverage(
-            ref,
-            throughCurrentPosition: false,
-          ),
-        );
-        break;
+          break;
+        case ReadingSkillSourceScope.wholeBook:
+          source = _ReadingSkillSource(
+            description: '按目录覆盖全书的章节代表性原文',
+            content: await _buildBookCoverage(
+              ref,
+              throughCurrentPosition: false,
+            ),
+          );
+          break;
+      }
     }
 
     final allowedTools = policy.allowedToolIds;
@@ -399,6 +423,9 @@ class AiChat extends _$AiChat {
       chapterHref: reading.chapterHref,
       responseLanguage: Prefs().effectiveLocale.toLanguageTag(),
       agentAvailable: agentAvailable,
+      selectionContext: selectedContext,
+      selectionRequest: selectionRequest,
+      webSearch: webSearch,
     );
     AnxLog.info(
       'AI reading skill ${policy.id}: scope=${policy.scope.name}, '

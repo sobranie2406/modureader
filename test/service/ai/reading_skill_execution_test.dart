@@ -8,7 +8,11 @@ void main() {
     test('cover every built-in reading skill', () {
       expect(
         readingSkillPolicies.keys.toSet(),
-        {...readAnySkills.map((skill) => skill.id), selectionToolbarSkillId},
+        {
+          ...readAnySkills.map((skill) => skill.id),
+          selectionToolbarSkillId,
+          aiDictionarySkillId,
+        },
       );
     });
 
@@ -97,9 +101,15 @@ void main() {
           responseLanguage: 'ja',
         );
         final system = request.messages.first.contentAsString;
-        expect(system, contains('Default response language: ja.'));
-        expect(system, contains('unless the user explicitly requests another'));
-        expect(system, contains('required bilingual dictionary entries'));
+        if (id == aiDictionarySkillId) {
+          expect(system, contains('使用选中文字的语言回答'));
+          expect(system, isNot(contains('Default response language: ja.')));
+        } else {
+          expect(system, contains('Default response language: ja.'));
+          expect(
+              system, contains('unless the user explicitly requests another'));
+          expect(system, contains('translation targets'));
+        }
         expect(request.messages.map((m) => m.contentAsString).join('\n'),
             contains(custom));
       });

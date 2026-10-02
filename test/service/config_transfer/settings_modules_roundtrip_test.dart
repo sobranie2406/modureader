@@ -16,7 +16,10 @@ void main() {
     'trueDarkMode': true,
     'pageTurnStyle': 'scroll',
     'scrollPagePercent': 93,
-    'readStyle': BookStyle(fontSize: 1.8, fontFamily: 'source-only').toJson(),
+    'longPressSelectParagraph': true,
+    'readStyle':
+        BookStyle(fontSize: 1.8, fontFamily: 'source-only', simulateBold: true)
+            .toJson(),
     'readingRules': '{"convertChineseMode":"none","bionicReading":true}',
     'customPageTurnConfig': '2,3,1,2,3,1,2,3,1',
     'bgimg':
@@ -33,6 +36,9 @@ void main() {
     'aiTemperature': 0.3,
     'enabledAiTools': <String>['search_books'],
     'readAnySkillStates': '{"summary":false}',
+    'aiReadingSkillsVisible': false,
+    'aiSkillTemplateDraft': true,
+    'readAnySkillOrder': <String>['custom:first', 'builtin:mindmap'],
     'readAnySkillPrompts': '{"summary":"Summarize briefly"}',
     'vectorModelEnabled': false,
     'vectorModelConfig': '{"apiKey":"test-only-secret","dimensions":512}',
@@ -139,6 +145,7 @@ void main() {
       expect(Prefs().bgimg.path, 'target.png');
       if (module == 'reading') {
         expect(Prefs().bookStyle.fontSize, 1.8);
+        expect(Prefs().bookStyle.simulateBold, isTrue);
         expect(Prefs().bgimg.opacity, 0.5);
       }
     });

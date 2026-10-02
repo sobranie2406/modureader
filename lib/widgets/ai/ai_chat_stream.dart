@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:anx_reader/service/ai/answer_presentation.dart';
+import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_scroll_controller.dart';
+import 'package:anx_reader/widgets/ai/skill_template_draft_tile.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/hint_key.dart';
@@ -14,6 +16,7 @@ import 'package:anx_reader/service/ai/ai_services.dart';
 import 'package:anx_reader/service/ai/ai_history.dart';
 import 'package:anx_reader/service/ai/skill_message_label.dart';
 import 'package:anx_reader/service/ai/dictionary_confirmation.dart';
+import 'package:anx_reader/service/ai/reading_skill_execution.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/utils/env_var.dart';
@@ -49,20 +52,27 @@ class AiChatStream extends ConsumerStatefulWidget {
     super.key,
     this.initialMessage,
     this.initialSourceText,
+    this.initialSourceContext,
+    this.initialSelectionRequest = false,
+    this.initialWebSearch = false,
     this.initialSkillId,
     this.newConversation = false,
     this.sendImmediate = false,
     this.quickPromptChips = const [],
+    this.quickPromptChipsBuilder,
     this.trailing,
     this.scope = AiChatScope.library,
   });
 
   final String? initialMessage;
   final String? initialSourceText;
+  final String? initialSourceContext;
+  final bool initialSelectionRequest, initialWebSearch;
   final String? initialSkillId;
   final bool newConversation;
   final bool sendImmediate;
   final List<AiQuickPromptChip> quickPromptChips;
+  final List<AiQuickPromptChip> Function()? quickPromptChipsBuilder;
   final List<Widget>? trailing;
   final AiChatScope scope;
 
@@ -81,10 +91,51 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   final FocusNode _inputFocusNode = FocusNode();
   bool _isStreaming = false;
   bool _showSkillPrompts = false;
+  bool get _isReaderSkills =>
+      widget.scope == AiChatScope.reader || widget.quickPromptChips.isNotEmpty;
+  List<AiQuickPromptChip> get _readingChips =>
+      widget.quickPromptChipsBuilder?.call() ?? widget.quickPromptChips;
+
+  void _onSkillPreferencesChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (_isReaderSkills) _showSkillPrompts = Prefs().aiReadingSkillsVisible;
+    });
+  }
+
+  void _toggleSkillPrompts() {
+    if (!_showSkillPrompts) _inputFocusNode.unfocus();
+    final value = !_showSkillPrompts;
+    if (_isReaderSkills) {
+      Prefs().aiReadingSkillsVisible = value;
+    } else {
+      setState(() => _showSkillPrompts = value);
+    }
+  }
+
+  Future<void> _manageReadingSkills() async {
+    _inputFocusNode.unfocus();
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(
+            title: Text(ModuStrings.text(context, 'AI 阅读技能', 'AI 阅读技能'))),
+        body: const AiReadingSkillsSettings(),
+      ),
+    ));
+    if (mounted) setState(() {});
+  }
+
   double _fontSize = 14.0;
   String? _readerSourceText;
   String? _lastSubmittedSkillId;
   String? _lastSubmittedSourceText;
+  String? _lastSubmittedSourceContext;
+  bool _lastSelectionRequest = false, _lastWebSearch = false;
+  String? _pendingSelectionSkill;
+  String? _pendingSelectionContext;
+  bool _pendingSelectionRequest = false, _pendingWebSearch = false;
+  bool _hasPendingTemplate = false;
+  String? _pendingSourceText, _pendingHomePromptId;
   String? _lastSubmittedHomePromptId;
   CancelableLangchainRunner? _requestRunner;
 
@@ -135,15 +186,27 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   void initState() {
     super.initState();
     _fontSize = Prefs().aiChatFontSize;
+    _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
+    Prefs().addListener(_onSkillPreferencesChanged);
     inputController.text = widget.initialMessage ?? '';
     _readerSourceText =
         _normalizeSourceText(widget.initialSourceText ?? widget.initialMessage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.newConversation) _resetConversation();
-      if (widget.sendImmediate) {
+      _pendingSelectionSkill = widget.initialSkillId;
+      _pendingSelectionContext = widget.initialSourceContext;
+      _pendingSelectionRequest = widget.initialSelectionRequest;
+      _pendingWebSearch = widget.initialWebSearch;
+      _hasPendingTemplate =
+          widget.initialSelectionRequest || widget.initialSkillId != null;
+      _pendingSourceText = _readerSourceText;
+      if (widget.sendImmediate &&
+          !(_hasPendingTemplate && Prefs().aiSkillTemplateDraft)) {
         _sendMessage(
             skillId: widget.initialSkillId, sourceText: _readerSourceText);
+      } else if (_hasPendingTemplate && Prefs().aiSkillTemplateDraft) {
+        _focusDraft();
       }
     });
     _scrollToBottom();
@@ -156,6 +219,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         oldWidget.initialSourceText != widget.initialSourceText) {
       _readerSourceText = _normalizeSourceText(
           widget.initialSourceText ?? widget.initialMessage);
+      _pendingSelectionSkill = widget.initialSkillId;
+      _pendingSelectionContext = widget.initialSourceContext;
+      _pendingSelectionRequest = widget.initialSelectionRequest;
+      _pendingWebSearch = widget.initialWebSearch;
+      _hasPendingTemplate =
+          widget.initialSelectionRequest || widget.initialSkillId != null;
+      _pendingSourceText = _readerSourceText;
+      _pendingHomePromptId = null;
       inputController.text = widget.initialMessage ?? '';
     }
   }
@@ -168,6 +239,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   void setReaderSourceText(String? value) {
     final normalized = _normalizeSourceText(value);
     _readerSourceText = normalized;
+    _clearSelectionOptions();
     if (normalized != null) {
       inputController.text = normalized;
     }
@@ -185,26 +257,83 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _messageStream = null;
       _lastSubmittedSkillId = null;
       _lastSubmittedSourceText = null;
+      _lastSubmittedSourceContext = null;
+      _lastSelectionRequest = _lastWebSearch = false;
+      _pendingSelectionSkill = _pendingSelectionContext = null;
+      _pendingSelectionRequest = _pendingWebSearch = false;
+      _hasPendingTemplate = false;
+      _pendingSourceText = _pendingHomePromptId = null;
       _lastSubmittedHomePromptId = null;
-      _showSkillPrompts = false;
+      _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
     });
+  }
+
+  void _clearSelectionOptions() {
+    _lastSubmittedSourceContext = null;
+    _lastSelectionRequest = _lastWebSearch = false;
+    _clearPendingTemplate();
+  }
+
+  void _clearPendingTemplate() {
+    _pendingSelectionSkill = _pendingSelectionContext = null;
+    _pendingSelectionRequest = _pendingWebSearch = false;
+    _hasPendingTemplate = false;
+    _pendingSourceText = _pendingHomePromptId = null;
+  }
+
+  void _focusDraft() {
+    inputController.selection =
+        TextSelection.collapsed(offset: inputController.text.length);
+    _inputFocusNode.requestFocus();
+  }
+
+  void _useSkillTemplate(String prompt,
+      {String? skillId, String? sourceText, String? homePromptId}) {
+    if (_isStreaming) return;
+    _clearPendingTemplate();
+    _hasPendingTemplate = true;
+    _pendingSelectionSkill = skillId;
+    _pendingSourceText = _normalizeSourceText(sourceText);
+    _pendingHomePromptId = homePromptId;
+    inputController.value = TextEditingValue(
+        text: prompt,
+        selection: TextSelection.collapsed(offset: prompt.length));
+    if (Prefs().aiSkillTemplateDraft) {
+      _focusDraft();
+    } else {
+      _sendMessage();
+    }
   }
 
   /// Also works when the existing split panel keeps this State alive.
   void beginSelectionQuestion(
       {required String message,
       required String sourceText,
+      String? sourceContext,
+      bool selectionRequest = false,
+      bool webSearch = false,
       String? skillId,
       bool sendImmediate = true}) {
     _resetConversation();
     _readerSourceText = _normalizeSourceText(sourceText);
+    _pendingSelectionSkill = skillId;
+    _pendingSelectionContext = sourceContext;
+    _pendingSelectionRequest = selectionRequest;
+    _pendingWebSearch = webSearch;
+    _hasPendingTemplate = selectionRequest || skillId != null;
+    _pendingSourceText = _readerSourceText;
     inputController.text = message;
-    if (sendImmediate)
+    if (sendImmediate &&
+        !(_hasPendingTemplate && Prefs().aiSkillTemplateDraft)) {
       _sendMessage(skillId: skillId, sourceText: _readerSourceText);
+    } else if (_hasPendingTemplate && Prefs().aiSkillTemplateDraft) {
+      _focusDraft();
+    }
   }
 
   @override
   void dispose() {
+    Prefs().removeListener(_onSkillPreferencesChanged);
     _requestRunner?.cancel();
     inputController.dispose();
     _messageSubscription?.cancel();
@@ -407,6 +536,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     _messageController = null;
 
     ref.read(aiChatProvider(widget.scope).notifier).loadHistoryEntry(entry);
+    _clearSelectionOptions();
 
     setState(() {
       _readerSourceText = null;
@@ -414,7 +544,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _lastSubmittedSourceText = null;
       _lastSubmittedHomePromptId = entry.homePromptId;
       _messageStream = null;
-      _showSkillPrompts = false;
+      _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
       // reset state when switching service
     });
 
@@ -431,6 +561,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final currentSessionId =
         ref.read(aiChatProvider(widget.scope).notifier).currentSessionId;
     if (currentSessionId == entry.id) {
+      _clearSelectionOptions();
       ref.read(aiChatProvider(widget.scope).notifier).clear();
       setState(() {
         _lastSubmittedSkillId = null;
@@ -443,6 +574,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   Future<void> _confirmClearHistory(BuildContext context) async {
+    _clearSelectionOptions();
     await ref
         .read(aiHistoryProvider.notifier)
         .clearScope(widget.scope.storageKey);
@@ -452,7 +584,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _lastSubmittedSourceText = null;
       _lastSubmittedHomePromptId = null;
       _messageStream = null;
-      _showSkillPrompts = false;
+      _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
     });
   }
 
@@ -460,6 +592,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     bool isRegenerate = false,
     String? skillId,
     String? sourceText,
+    String? sourceContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
     String? homePromptId,
   }) {
     if (_isStreaming) {
@@ -468,10 +603,28 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
     if (inputController.text.trim().isEmpty) return;
     final message = inputController.text.trim();
-    // Reader requests are independent tasks. Clearing starts a fresh session
-    // without deleting saved history; regenerate still replays the same task.
+    // A typed dictionary follow-up belongs to its saved answer, not to an
+    // unsubmitted template or to a later selection in the reader.
     final confirmingDictionarySearch =
         skillId == null && isDictionaryWebConfirmation(message);
+    if (!isRegenerate && confirmingDictionarySearch) _clearPendingTemplate();
+    if (!isRegenerate &&
+        _hasPendingTemplate &&
+        (skillId == null || skillId == _pendingSelectionSkill)) {
+      skillId ??= _pendingSelectionSkill ??
+          (_pendingSelectionRequest ? selectionToolbarSkillId : null);
+      sourceText ??= _pendingSourceText;
+      sourceContext ??= _pendingSelectionContext;
+      selectionRequest = selectionRequest || _pendingSelectionRequest;
+      webSearch = webSearch || _pendingWebSearch;
+      homePromptId ??= _pendingHomePromptId;
+      _clearPendingTemplate();
+    } else if (!isRegenerate) {
+      // A reader-skill chip is a separate task, not the pending toolbar command.
+      _clearPendingTemplate();
+    }
+    // Reader requests are independent tasks. Clearing starts a fresh session
+    // without deleting saved history; regenerate still replays the same task.
     if (widget.scope == AiChatScope.reader &&
         !isRegenerate &&
         !confirmingDictionarySearch) {
@@ -480,6 +633,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     inputController.clear();
     _lastSubmittedSkillId = skillId;
     _lastSubmittedSourceText = _normalizeSourceText(sourceText);
+    _lastSubmittedSourceContext = sourceContext;
+    _lastSelectionRequest = selectionRequest;
+    _lastWebSearch = webSearch;
     _lastSubmittedHomePromptId = homePromptId;
 
     _messageSubscription?.cancel();
@@ -496,6 +652,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
               isRegenerate,
               skillId: skillId,
               sourceText: _lastSubmittedSourceText,
+              sourceContext: _lastSubmittedSourceContext,
+              selectionRequest: _lastSelectionRequest,
+              webSearch: _lastWebSearch,
               homePromptId: homePromptId,
               requestRunner: requestRunner,
             );
@@ -505,7 +664,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _messageStream = controller.stream;
       _isStreaming = true;
       _replyStartKey = GlobalKey(debugLabel: 'ai-reply-start');
-      _showSkillPrompts = false;
+      _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
     });
     _scrollToBottom();
 
@@ -561,21 +720,21 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       _inputFocusNode.requestFocus();
       return;
     }
-    inputController.text = '$prompt $subject';
-    _sendMessage();
+    _useSkillTemplate('$prompt $subject');
   }
 
   void _clearMessage() {
     if (_isStreaming) {
       return;
     }
+    _clearSelectionOptions();
     _messageSubscription?.cancel();
     _messageSubscription = null;
     _messageController?.close();
     _messageController = null;
     setState(() {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
-      _showSkillPrompts = false;
+      _showSkillPrompts = _isReaderSkills && Prefs().aiReadingSkillsVisible;
       _readerSourceText = null;
       _lastSubmittedSkillId = null;
       _lastSubmittedSourceText = null;
@@ -596,14 +755,19 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     for (int i = messages.length - 1; i >= 0; i--) {
       final message = messages[i];
       if (message is HumanChatMessage) {
+        final draft = _hasPendingTemplate ? inputController.value : null;
         setState(() {
           inputController.text = message.contentAsString;
           _sendMessage(
             isRegenerate: true,
             skillId: _lastSubmittedSkillId,
             sourceText: _lastSubmittedSourceText,
+            sourceContext: _lastSubmittedSourceContext,
+            selectionRequest: _lastSelectionRequest,
+            webSearch: _lastWebSearch,
             homePromptId: _lastSubmittedHomePromptId,
           );
+          if (draft != null) inputController.value = draft;
         });
         break;
       }
@@ -726,7 +890,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           onPressed: _isStreaming ? null : onPressed,
         );
 
-    final hasReaderSkills = widget.quickPromptChips.isNotEmpty;
+    final hasReaderSkills = _isReaderSkills;
+    final chips = _readingChips;
     return Material(
       key: const ValueKey('ai-skill-picker'),
       color: Theme.of(context).colorScheme.surface,
@@ -737,21 +902,17 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
             hasReaderSkills ? 'reader-skill-chips' : 'home-quick-prompts'),
         primary: false,
         padding: const EdgeInsets.all(8),
-        // Use the conversation viewport, not a growing row above the input.
-        // Normal reader skills fit vertically; small windows/large text still
-        // allow overflow to scroll without clipping or shrinking tap targets.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (hasReaderSkills)
-              for (final (index, chip) in widget.quickPromptChips.indexed)
+              for (final (index, chip) in chips.indexed)
                 option(
                   key: ValueKey('reader-skill-$index'),
                   label: chip.label,
                   icon: chip.icon,
                   onPressed: () {
-                    inputController.text = chip.prompt;
-                    _sendMessage(
+                    _useSkillTemplate(chip.prompt,
                         skillId: chip.skillId, sourceText: _readerSourceText);
                   },
                 )
@@ -768,11 +929,17 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                   key: ValueKey('home-prompt-${prompt.id}'),
                   label: prompt.text,
                   onPressed: () {
-                    inputController.text = prompt.text;
-                    _sendMessage(homePromptId: prompt.id);
+                    _useSkillTemplate(prompt.text, homePromptId: prompt.id);
                   },
                 ),
             ],
+            if (hasReaderSkills && chips.isEmpty)
+              Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(ModuStrings.value(
+                      Localizations.localeOf(context),
+                      'reading_skills_none',
+                      'No reading skills enabled. Enable them in Manage.'))),
           ],
         ),
       ),
@@ -845,6 +1012,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       child: SafeArea(
         child: Column(
           children: [
+            const SkillTemplateDraftTile(compact: true),
             TextField(
               controller: inputController,
               focusNode: _inputFocusNode,
@@ -902,11 +1070,11 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                   icon: const Icon(Icons.auto_awesome_outlined, size: 18),
                   selectedIcon: const Icon(Icons.auto_awesome, size: 18),
                   onPressed: () {
-                    if (!_showSkillPrompts) _inputFocusNode.unfocus();
-                    setState(() => _showSkillPrompts = !_showSkillPrompts);
+                    _toggleSkillPrompts();
                   },
                 ),
                 IconButton(
+                  key: const ValueKey('ai-send-message'),
                   icon: Icon(_isStreaming ? Icons.stop : Icons.send, size: 18),
                   onPressed: _isStreaming ? _cancelStreaming : _sendMessage,
                 ),
@@ -928,6 +1096,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
+          if (_isReaderSkills)
+            IconButton(
+              key: const ValueKey('manage-reading-skills'),
+              tooltip: ModuStrings.value(Localizations.localeOf(context),
+                  'reading_skills_manage', 'Manage reading skills'),
+              icon: const Icon(Icons.tune),
+              onPressed: _manageReadingSkills,
+            ),
           IconButton(
             icon: const Icon(Icons.edit_document),
             onPressed: _clearMessage,
@@ -950,60 +1126,74 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
           : Column(
               children: [
                 Expanded(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _messageStream != null
-                          ? StreamBuilder<List<ChatMessage>>(
-                              stream: _messageStream,
-                              builder: (context, snapshot) {
-                                if (snapshot.hasError) {
-                                  return SingleChildScrollView(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Text(
-                                        snapshot.error
-                                            .toString()
-                                            .replaceFirst('Bad state: ', ''),
-                                        key: const ValueKey('ai-request-error'),
-                                        style: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .error)),
-                                  );
-                                }
-                                if (!snapshot.hasData) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.done) {
-                                    return const SizedBox.expand();
-                                  }
-                                  return Skeletonizer.zone(
-                                      child: Bone.multiText());
-                                }
+                  child: LayoutBuilder(
+                      builder: (context, constraints) => Column(
+                            children: [
+                              Expanded(
+                                  child: Stack(fit: StackFit.expand, children: [
+                                _messageStream != null
+                                    ? StreamBuilder<List<ChatMessage>>(
+                                        stream: _messageStream,
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasError) {
+                                            return SingleChildScrollView(
+                                              padding: const EdgeInsets.all(24),
+                                              child: Text(
+                                                  snapshot.error
+                                                      .toString()
+                                                      .replaceFirst(
+                                                          'Bad state: ', ''),
+                                                  key: const ValueKey(
+                                                      'ai-request-error'),
+                                                  style: TextStyle(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .error)),
+                                            );
+                                          }
+                                          if (!snapshot.hasData) {
+                                            if (snapshot.connectionState ==
+                                                ConnectionState.done) {
+                                              return const SizedBox.expand();
+                                            }
+                                            return Skeletonizer.zone(
+                                                child: Bone.multiText());
+                                          }
 
-                                final messages = snapshot.data!;
-                                if (messages.isEmpty) {
-                                  return const SizedBox.expand();
-                                }
+                                          final messages = snapshot.data!;
+                                          if (messages.isEmpty) {
+                                            return const SizedBox.expand();
+                                          }
 
-                                return _buildMessageList(messages);
-                              },
-                            )
-                          : ref.watch(aiChatProvider(widget.scope)).when(
-                                data: (messages) {
-                                  if (messages.isEmpty) {
-                                    return const SizedBox.expand();
-                                  }
+                                          return _buildMessageList(messages);
+                                        },
+                                      )
+                                    : ref
+                                        .watch(aiChatProvider(widget.scope))
+                                        .when(
+                                          data: (messages) {
+                                            if (messages.isEmpty) {
+                                              return const SizedBox.expand();
+                                            }
 
-                                  return _buildMessageList(messages);
-                                },
-                                loading: () =>
-                                    Skeletonizer.zone(child: Bone.multiText()),
-                                error: (error, stack) =>
-                                    Center(child: Text('error: $error')),
-                              ),
-                      if (_showSkillPrompts) _buildSkillPicker(context),
-                    ],
-                  ),
+                                            return _buildMessageList(messages);
+                                          },
+                                          loading: () => Skeletonizer.zone(
+                                              child: Bone.multiText()),
+                                          error: (error, stack) => Center(
+                                              child: Text('error: $error')),
+                                        ),
+                                if (_showSkillPrompts && !_isReaderSkills)
+                                  _buildSkillPicker(context),
+                              ])),
+                              if (_isReaderSkills && _showSkillPrompts)
+                                SizedBox(
+                                  height: (constraints.maxHeight * 0.4)
+                                      .clamp(0.0, 280.0),
+                                  child: _buildSkillPicker(context),
+                                ),
+                            ],
+                          )),
                 ),
                 inputBox,
               ],
@@ -1110,7 +1300,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final content = chatMessageDisplayContent(message);
     if (isUser) {
       skillLabel ??= skillMessageLabel(content);
-      for (final chip in widget.quickPromptChips) {
+      for (final chip in _readingChips) {
         if (skillLabel == null && chip.prompt.trim() == content.trim()) {
           skillLabel = chip.label;
           break;

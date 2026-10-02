@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:anx_reader/service/tts/edge_tts_backend.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
@@ -150,10 +151,12 @@ class OnlineTts extends BaseTts {
 
   @override
   set rate(double rate) {
-    if (!rate.isFinite || rate < 0 || rate > 2 || rate == this.rate) return;
-    Prefs().ttsRate = _usesPlaybackRate ? rate.clamp(0.5, 2.0) : rate;
-    if (_usesPlaybackRate) {
-      // Keep synthesized/prefetched audio: MiMo speed is a playback property.
+    if (!rate.isFinite || rate < 0 || rate > 4 || rate == this.rate) return;
+    final previousSynthesisRate = _synthesisRate;
+    Prefs().ttsRate =
+        backend is XiaomiMimoTtsProvider ? rate.clamp(0.5, 4.0) : rate;
+    if (_usesPlaybackRate && _synthesisRate == previousSynthesisRate) {
+      // Keep audio when only playback speed changes (MiMo, or Edge above 2x).
       final player = _player;
       final command = _commandVersion;
       unawaited(_serializeAudioControl(() async {
@@ -177,9 +180,22 @@ class OnlineTts extends BaseTts {
   @override
   double get rate => Prefs().ttsRate;
 
-  bool get _usesPlaybackRate => backend is XiaomiMimoTtsProvider;
-  double get _playbackRate => rate.isFinite ? rate.clamp(0.5, 2.0) : 1.0;
-  double get _synthesisRate => _usesPlaybackRate ? 1.0 : rate;
+  bool get _usesPlaybackRate =>
+      backend is XiaomiMimoTtsProvider || backend is EdgeTtsProvider;
+  double get _playbackRate {
+    if (!rate.isFinite) return 1.0;
+    if (backend is XiaomiMimoTtsProvider) return rate.clamp(0.5, 4.0);
+    // Retain Edge's existing synthesis range. High speeds use 2x synthesis
+    // plus local acceleration, rather than an unverified high-speed request.
+    if (backend is EdgeTtsProvider) return rate.clamp(2.0, 4.0) / 2;
+    return 1.0;
+  }
+
+  double get _synthesisRate {
+    if (backend is XiaomiMimoTtsProvider) return 1.0;
+    if (backend is EdgeTtsProvider) return rate.clamp(0.0, 2.0);
+    return rate;
+  }
 
   @override
   bool get isPlaying => ttsStateNotifier.value == TtsStateEnum.playing;

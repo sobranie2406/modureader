@@ -93,6 +93,12 @@ void main() {
     expect(player.playedRates, [1.2]);
     tts.rate = 1.8;
     await until(() => player.rates.last == 1.8);
+    tts.rate = 3;
+    await until(() => player.rates.last == 3);
+    tts.rate = 4;
+    await until(() => player.rates.last == 4);
+    expect(Prefs().ttsRate, 4);
+    expect(requests.length, 2); // No new synthesis for 3x/4x playback.
     await tts.pause();
     final before = player.rates.length;
     tts.rate = 0.7;
@@ -128,5 +134,21 @@ void main() {
     await tts.speakWithVoice('再次试听', 'mimo_default');
     expect(player.playedRates.last, 1.6);
     expect(requests.length, 2);
+  });
+
+  test('saved 4x is used for preview and restored playback', () async {
+    Prefs().ttsRate = 4;
+    final tts = OnlineTts.forTesting(
+      backend: provider,
+      createPlayer: () => player,
+      collect: (_) async => [],
+    );
+    addTearDown(tts.stop);
+    await tts.speakWithVoice('四倍速试听', 'mimo_default');
+    expect(player.playedRates, [4]);
+    for (final value in [4.1, -1.0, double.infinity, double.nan]) {
+      tts.rate = value;
+      expect(Prefs().ttsRate, 4);
+    }
   });
 }

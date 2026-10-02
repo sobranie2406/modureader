@@ -33,7 +33,7 @@ keyboardShortcutTurnPage swapPageTurnArea showMenuOnHover showActionLabels showB
 showAuthorOnDefaultCover openBookAnimation onlySyncWhenWifi useBookStyles bottomNavigatorShowNote
 bottomNavigatorShowStatistics bottomNavigatorShowAI syncCompletedToast autoSync readingTimedSync
 isSystemTts showTextUnderIconButton notesExportMergeChapters verticalRedFrame enableJsForEpub
-httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn'''
+httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn longPressSelectParagraph aiReadingSkillsVisible aiSkillTemplateDraft'''
             .split(RegExp(r'\s+')))
       key: 'bool',
     for (final key
@@ -61,6 +61,7 @@ webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selecti
       key: 'string',
     'statisticsDashboardTiles': 'stringList',
     'enabledAiTools': 'stringList',
+    'readAnySkillOrder': 'stringList',
   };
 
   static String? _type(String key) {
@@ -400,7 +401,7 @@ webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selecti
       }
       final range = switch (entry.key) {
         'ttsVolume' => (0.0, 1.0),
-        'ttsRate' => (0.0, 2.0),
+        'ttsRate' => (0.0, 4.0),
         'ttsPitch' => (0.5, 2.0),
         _ => null,
       };

@@ -112,6 +112,22 @@ void main() {
     expect((await store.load('fixture'))!.vectors.length, 2);
   });
 
+  test(
+      'valid large indexes without a receipt recover by streaming, not full snapshot reads',
+      () async {
+    final snapshot = KnowledgeSearchService().rebuild(
+        bookId: 'fixture',
+        chapters: {for (var i = 0; i < 450; i++) '$i': '正文$i'},
+        vectorize: (_) => List<double>.filled(1024, 0.123456789));
+    final store = NoSnapshotReads(file);
+    await store.save(snapshot);
+    expect(await file.length(), greaterThan(4 * 1024 * 1024));
+    await store.summaryFile.delete();
+    expect((await store.summary('fixture'))!['vectorCount'], 450);
+    await file.setLastModified(DateTime(2040));
+    expect((await store.summary('fixture'))!['vectorCount'], 450);
+  });
+
   test('model teardown finishes before saving and vectors are compact',
       () async {
     final events = <String>[];

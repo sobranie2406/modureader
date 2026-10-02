@@ -60,6 +60,25 @@ void main() {
     expect(restored.compiledCss, contains('@font-face'));
   });
 
+  test('visual weight reaches nested text without changing emphasis or layout',
+      () {
+    for (final scope in ['body', 'title', 'all']) {
+      final css = const CssVisualStyle({'weight': 700})
+          .css(scope: scope, highlight: false);
+      expect(css, contains('font-weight: 700 !important'));
+      expect(css, contains('font-weight: inherit !important'));
+      expect(css, contains('font-synthesis: weight style !important'));
+      expect(
+          css, contains(':where(span, font, a, em, i, u, s, small, sup, sub)'));
+      expect(css, isNot(contains('margin')));
+      expect(css, isNot(contains('font-size')));
+    }
+    expect(
+        const CssVisualStyle({'color': '#112233'})
+            .css(scope: 'all', highlight: false),
+        isNot(contains('font-weight')));
+  });
+
   test('malformed graphical settings rejected before either import writes', () {
     for (final values in [
       {'color': 'red;display:none'},

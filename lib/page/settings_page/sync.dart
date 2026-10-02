@@ -2,6 +2,8 @@ import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:anx_reader/widgets/settings/reading_sync_settings.dart';
+import 'package:anx_reader/widgets/settings/database_backup_section.dart';
+import 'package:anx_reader/widgets/settings/settings_export_dialog.dart';
 
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/service/local_data/backup_safety.dart';
@@ -153,22 +155,10 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
               ),
           ],
         ),
-        SettingsSection(
-          title: Text(L10n.of(context).exportAndImport),
-          tiles: [
-            SettingsTile.navigation(
-                title: Text(L10n.of(context).exportAndImportExport),
-                leading: const Icon(Icons.cloud_upload),
-                onPressed: (context) {
-                  exportData(context);
-                }),
-            SettingsTile.navigation(
-                title: Text(L10n.of(context).exportAndImportImport),
-                leading: const Icon(Icons.cloud_download),
-                onPressed: (context) {
-                  importData();
-                }),
-          ],
+        DatabaseBackupSection(
+          busy: _backupBusy,
+          onExport: () => exportData(context),
+          onImport: importData,
         ),
       ],
     );
@@ -264,7 +254,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
   Future<void> exportData(BuildContext context) async {
     AnxLog.info('exportData: start');
     if (!mounted || _backupBusy) return;
-    _backupBusy = true;
+    setState(() => _backupBusy = true);
     File? snapshot;
     File? prefsFile;
     try {
@@ -291,11 +281,6 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       final file = File(zipPath);
       SmartDialog.dismiss();
       if (await file.exists()) {
-        // SaveFileDialogParams params = SaveFileDialogParams(
-        //   sourceFilePath: file.path,
-        //   mimeTypesFilter: ['application/zip'],
-        // );
-        // final filePath = await FlutterFileDialog.saveFile(params: params);
         String fileName =
             'Modu-Backup-${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}-v3.zip';
 
@@ -308,8 +293,15 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
 
         if (filePath != null) {
           AnxLog.info('exportData: Saved to: $filePath');
-          AnxToast.show(
-              L10n.of(navigatorKey.currentContext!).exportTo(filePath));
+          if (context.mounted) {
+            await showDialog<void>(
+              context: context,
+              builder: (_) => SettingsExportDialog(
+                destination: SettingsExportDestination(
+                    path: filePath, fileName: fileName),
+              ),
+            );
+          }
         } else {
           AnxLog.info('exportData: Cancelled');
           AnxToast.show(L10n.of(navigatorKey.currentContext!).commonCanceled);
@@ -321,7 +313,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       if (await snapshot?.exists() ?? false) await snapshot!.delete();
       if (await prefsFile?.exists() ?? false) await prefsFile!.delete();
       SmartDialog.dismiss();
-      _backupBusy = false;
+      if (mounted) setState(() => _backupBusy = false);
     }
   }
 
@@ -333,7 +325,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       AnxToast.show('请等待同步和向量队列结束后再恢复备份。');
       return;
     }
-    _backupBusy = true;
+    setState(() => _backupBusy = true);
     Directory? staging;
     BackupDirectoryTransaction? transaction;
     try {
@@ -365,8 +357,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-                title:
-                    Text(ModuStrings.text(context, '恢复备份', 'Restore backup')),
+                title: Text(ModuStrings.text(
+                    context, '数据库备份导入', 'Import database backup')),
                 content: Text(ModuStrings.text(
                     context,
                     '恢复会替换现有书库、笔记和备份中的设置。程序会先校验备份并保留旧目录的恢复副本。是否继续？',
@@ -464,7 +456,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       if (staging != null && await staging.exists()) {
         await staging.delete(recursive: true);
       }
-      _backupBusy = false;
+      if (mounted) setState(() => _backupBusy = false);
     }
   }
 }
@@ -491,7 +483,7 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(widget.exporting
-            ? ModuStrings.text(context, '导出本地备份', 'Export local backup')
+            ? ModuStrings.text(context, '数据库备份导出', 'Export database backup')
             : ModuStrings.text(context, '解密备份设置', 'Decrypt backup settings')),
         content: SizedBox(
             width: 420,

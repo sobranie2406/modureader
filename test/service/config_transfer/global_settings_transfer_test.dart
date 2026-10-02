@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:math';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
 import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,14 +52,66 @@ void main() {
     expect(text, isNot(contains('/device/bg.png')));
   });
 
-  test('CSS multi-selection and highlight rules travel through global export', () async {
+  for (final rate in [3.0, 4.0]) {
+    test('${rate}x speed survives global settings file and link import',
+        () async {
+      Prefs().ttsRate = rate;
+      final text = await GlobalSettingsTransfer.export(Prefs());
+      for (final input in [text, GlobalSettingsTransfer.link(text)]) {
+        Prefs().ttsRate = 0.6;
+        final data = await GlobalSettingsTransfer.decode(input);
+        await GlobalSettingsTransfer.apply(Prefs(), data);
+        expect(Prefs().ttsRate, rate);
+      }
+    });
+  }
+
+  test('CSS multi-selection and highlight rules travel through global export',
+      () async {
     await Prefs().saveCustomCssProfile(1, customCssTemplates.last);
-    await Prefs().saveCustomCssSelection(const CustomCssSelection(index: 1, enabled: true, indices: [0, 1]));
-    final data = await GlobalSettingsTransfer.decode(await GlobalSettingsTransfer.export(Prefs()));
-    expect(jsonDecode(data['customCssDefaultIndices']['value'] as String), [0, 1]);
-    final profiles = jsonDecode(data['customCssProfiles']['value'] as String) as List;
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 1, enabled: true, indices: [0, 1]));
+    final data = await GlobalSettingsTransfer.decode(
+        await GlobalSettingsTransfer.export(Prefs()));
+    expect(
+        jsonDecode(data['customCssDefaultIndices']['value'] as String), [0, 1]);
+    final profiles =
+        jsonDecode(data['customCssProfiles']['value'] as String) as List;
     expect(profiles[1]['pattern'], customCssTemplates.last.pattern);
     expect(profiles[1]['scope'], 'title');
+  });
+
+  test('long-press mode survives settings file and modu link import', () async {
+    expect(Prefs().longPressSelectParagraph, false);
+    Prefs().longPressSelectParagraph = true;
+    final text = await GlobalSettingsTransfer.export(Prefs());
+    for (final input in [text, GlobalSettingsTransfer.link(text)]) {
+      Prefs().longPressSelectParagraph = false;
+      final data = await GlobalSettingsTransfer.decode(input);
+      expect(data['longPressSelectParagraph']['type'], 'bool');
+      await GlobalSettingsTransfer.apply(Prefs(), data);
+      expect(Prefs().longPressSelectParagraph, true);
+    }
+  });
+
+  test('template drafting defaults off and survives file and modu link import',
+      () async {
+    expect(Prefs().aiSkillTemplateDraft, false);
+    final defaults = await GlobalSettingsTransfer.export(Prefs());
+    Prefs().aiSkillTemplateDraft = true;
+    final enabled = await GlobalSettingsTransfer.export(Prefs());
+    for (final input in [enabled, GlobalSettingsTransfer.link(enabled)]) {
+      Prefs().aiSkillTemplateDraft = false;
+      final data = await GlobalSettingsTransfer.decode(input);
+      expect(data['aiSkillTemplateDraft']['type'], 'bool');
+      await GlobalSettingsTransfer.apply(Prefs(), data);
+      expect(Prefs().aiSkillTemplateDraft, true);
+    }
+    await GlobalSettingsTransfer.apply(
+        Prefs(), await GlobalSettingsTransfer.decode(defaults));
+    expect(Prefs().aiSkillTemplateDraft, false);
+    await Prefs().initPrefs();
+    expect(Prefs().aiSkillTemplateDraft, false);
   });
 
   test(
@@ -152,20 +203,33 @@ void main() {
     expect(Prefs().webdavStatus, true);
   });
 
-  test('small settings QR roundtrip keeps complete modu link', () async {
-    final text = await GlobalSettingsTransfer.export(Prefs(),
-        scope: 'tts', includeSecrets: true);
-    final token = GlobalSettingsTransfer.link(text);
-    final bytes = await ConfigQrBridge.generate(token);
-    final directory = await Directory.systemTemp.createTemp('modu-global-qr-');
-    try {
-      final image = File('${directory.path}/qr.png');
-      await image.writeAsBytes(bytes!);
-      expect(await ConfigQrBridge.decodeImage(image.path), token);
-    } finally {
-      await directory.delete(recursive: true);
-    }
-  });
+  for (final includeSecrets in [false, true]) {
+    test(
+        'full backups beyond QR capacity remain complete (secrets: $includeSecrets)',
+        () async {
+      final random = Random(42);
+      final css =
+          '/* ${base64Encode(List.generate(8192, (_) => random.nextInt(256)))} */\np { color: #123456; }';
+      await Prefs().prefs.setString('customCSS', css);
+      final file = await GlobalSettingsTransfer.export(Prefs(),
+          includeSecrets: includeSecrets);
+      final link = GlobalSettingsTransfer.link(file);
+      // A full settings backup must not be constrained by a single QR code.
+      expect(link.length, greaterThan(2953));
+      final snapshot = await GlobalSettingsTransfer.decode(file);
+      for (final input in [file, link]) {
+        await Prefs().prefs.setString('customCSS', '');
+        Prefs().ttsRate = 0.6;
+        final data = await GlobalSettingsTransfer.decode(input);
+        expect(data, snapshot);
+        await GlobalSettingsTransfer.apply(Prefs(), data);
+        expect(Prefs().prefs.getString('customCSS'), css);
+        expect(Prefs().ttsRate, 1.2);
+        expect(data.containsKey('onlineTtsConfig_openai'), includeSecrets);
+        expect(data.containsKey('syncAiSettingsEncryptionPassword'), false);
+      }
+    });
+  }
 
   test('unsupported envelope rejected', () async {
     final envelope =

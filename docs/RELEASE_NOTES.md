@@ -1,19 +1,28 @@
-# 默读 / Modu 1.1.9 正式版
+# 默读 / Modu 1.1.10 正式版
 
-版本：**1.1.9+10063**。
+版本：**1.1.10+10069**。
 
 ## 本次更新
 
-- **高亮与下划线删除**：选中已有标注的局部或全部，即可删除相交的完整标注；同步清理重复标记，避免删除后仍残留。删除包含该标注的备注，请按确认框提示操作。
-- **删除确认清晰可见**：弹出确认框时暂时隐藏划词工具栏和颜色栏，避免遮挡；取消删除后恢复工具栏。
-- **AI 词典更快回答**：优先使用当前模型已有知识解释选词，不再自动等待联网检索，不发送书籍正文。英文提供音标、翻译与中英文解释，中文提供拼音、词义与相关知识。
-- **联网补查由你决定**：需要核实时，在同一对话输入“确认联网搜索”并发送，才检索维基词典、维基百科和百度百科，再由当前模型整理并附来源，无需额外搜索 API Key。
-- **对话与提示词衔接**：重新打开词典对话仍能按原选词继续补查；多语言提示明确说明输入确认，不再提示点击不存在的按钮。未修改的内置提示词随版本更新，用户自定义内容保持不变。
-- **功能截图与说明更新**：中英文 README 补充新版阅读、古籍竖排、AI 提示词、划词工具栏和设置界面。
+- **朗读快捷栏**：阅读页面新增小型操作栏，支持回到朗读位置、播放/暂停、从当前阅读位置朗读和打开设置。
+- **最高 4 倍语速**：在线朗读提供 2 倍、3 倍、4 倍档位，保留低倍速细调；MiMo 通过本地播放倍率调整，无需重复合成。
+- **AI 阅读技能更易用**：默认显示技能列表，内置与自定义技能均可开关、混合排序；可开启先填入输入框，编辑或追加要求后手动发送，默认仍为点击发送。
+- **划词 AI 模板更简明**：AI 词典改为“AI 知识”，只介绍含义、背景与相关知识，按选词语言作答；所有划词 AI 命令均可选择仅选中文字或结合上下文，并可独立勾选联网搜索。默认不自动联网，仍可输入“确认联网搜索”补查，无需额外搜索 API Key。
+- **移除重复阅读预设**：AI 阅读技能不再显示默认“AI 知识”，划词工具栏中的模板和用户自定义内容保留，已有对话历史继续兼容。
+- **智能长按选词**：长按按所在词语选择文字，可在阅读设置中改为长按选择整段；安卓从触摸后系统实际选中的文字扩展选区，不再依赖字间命中点，兼容系统接管触摸及旧版 Android WebView，保留手动调整选区。
+- **目录切换白屏修复**：目录打开、关闭与切后台时不再读取已移除控件的焦点上下文，避免焦点异常导致阅读页面持续无法重建。
+- **字体粗细调节与字重修复**：将字体粗细调节移至底部样式栏的字体大小与行间距之间，滑块显示 0.5–2.0，按 0.1 步进，1.0 为正常粗细；正文嵌套标签与内联字重不再阻止粗细调整，图形 CSS 模板也覆盖嵌套文字；保留标题、强调文字和自定义代码，切回书籍样式时恢复原有字重。
+- **固定字体模拟加粗**：字体粗细旁新增“模拟加粗”按钮，默认关闭；开启后 1.0 保持原样，1.1–2.0 通过同色描边逐档加粗，不能将固定粗体变细。开关随阅读样式保存和备份，关闭后恢复正常字重调节。
+- **向量索引升级保留**：按书籍实际内容识别索引，不再因路径、文件修改时间变化误判失效；旧索引经本地校验后复用原向量，复制后失效的索引状态可自动恢复。
+- **翻译服务切换**：翻译弹窗内可切换已配置的翻译提供方，无需退出当前弹窗。
+- **全局设置备份简化**：保留文件与 modu 链接迁移，移除超出容量的二维码导出和图片导入；账号、密码及 API 接口配置保留独立开关，备份仅携带用户改动，不重复包含默认提示词。
+- **数据库备份指引**：同步界面明确“数据库备份导出/导入”，说明 ZIP 内容、保存位置、覆盖恢复步骤；导出成功后显示并可复制实际保存位置。
+- **GitHub 反馈改进**：区分 Bug 和功能建议，按模板填写与预览后提交；环境信息及脱敏诊断可选，默认不附带日志。
+- **说明文档更新**：中英文 README 同步更新朗读、AI 技能、划词与备份功能说明。
 
 ## 升级与下载
 
-[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.9) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.9)
+[GitHub 安装包](https://github.com/sobranie2406/modureader/releases/tag/v1.1.10) · [Gitee 安装包](https://gitee.com/sobranie2406/modureader/releases/tag/v1.1.10)
 
 覆盖升级即可，**不要先卸载或清空数据**，升级前建议备份书库。Android 沿用原签名；macOS 退出旧应用后，使用 DMG 拖入应用程序覆盖安装。
 
@@ -26,14 +35,16 @@
 
 GitHub 保留历史发行版及源码标签；Gitee 替换旧应用发行版，提供同一批安装包和校验文件。独立模型镜像不变。
 
-对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.9) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.9.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.9/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
+对应源码：[源码目录](https://github.com/sobranie2406/modureader/tree/v1.1.10) · [源码 ZIP](https://github.com/sobranie2406/modureader/archive/refs/tags/v1.1.10.zip) · [构建说明](https://github.com/sobranie2406/modureader/blob/v1.1.10/docs/RELEASING.md)。许可与版权信息见同标签 LICENSE、NOTICE、UPSTREAM.md 和 LICENSES。
 
 ## English
 
-Modu **1.1.9 (build 10063)** fixes highlight and underline deletion. Select any overlapping part of a mark to delete its complete annotation, including duplicate marks. The confirmation stays visible above selection tools and color controls; cancelling restores the toolbar.
+Modu **1.1.10 (build 10069)** adds a compact narration toolbar and online speech rates up to 4×, with 3× and 4× steps after 2×. MiMo changes local playback speed without regenerating audio. Drawer and focus transitions no longer inspect disposed widget contexts, avoiding a persistent blank reader. Font-weight controls now reach nested book text while preserving emphasis and user CSS. The control is labeled Font thickness, ranges from 0.5 to 2.0 in 0.1 steps, and sits between font size and line spacing. An optional Simulated bold button adds stroke-based thickness for fixed-weight fonts above 1.0 and is saved with the reading style.
 
-The AI dictionary answers from the current model's knowledge first, without automatically waiting for web retrieval or sending book contents. When verification is needed, type the displayed confirmation phrase in the same conversation. Modu then checks Wiktionary, Wikipedia and Baidu Baike and lets the same model summarize the results with sources, without an additional search API key. Reopened conversations retain the original selected term. Updated localized instructions preserve user-edited prompts.
+Unchanged book vectors survive upgrades and file migrations. Content-based identities and local legacy verification restore copied index metadata without regenerating embeddings.
 
-The Chinese and English READMEs include new 1.1.9 screenshots covering reading, vertical layout, custom AI prompts, selection tools and settings.
+Reading skills are visible by default; built-in and custom skills can be toggled and reordered together. The optional draft mode fills the input field before manual sending, while immediate sending remains the default. AI Knowledge is now a selection-toolbar template only; existing conversations and custom skills remain compatible. Selection AI commands use concise prompts, support selected text or nearby context, and offer optional online search. Model knowledge is used first when search is off; explicit confirmation can still request source-backed verification.
+
+Long presses select the current word, with an optional whole-paragraph mode. Translation providers can be switched inside the translation popup. Global settings use files and modu links rather than oversized QR codes, retain independent credential controls and exclude unchanged default prompts. Database ZIP backup guidance explains contents, destinations and replacement restores, with a persistent saved-location confirmation. GitHub feedback separates bugs from feature requests and previews optional, sanitized diagnostics before submission. Both READMEs have been updated.
 
 Upgrade in place after backing up. Nine packages cover Android, macOS, Windows and Debian 13 on ARM64/x64, plus iOS ARM64. macOS is not notarized, Windows requires WebView2, and iOS requires your own valid signing. Gitee receives identical, hash-verified GitHub packages.

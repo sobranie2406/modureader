@@ -4,6 +4,7 @@ class BookStyle {
   double fontSize;
   String fontFamily;
   double fontWeight;
+  bool simulateBold;
   double lineHeight;
   double letterSpacing;
   double wordSpacing;
@@ -20,6 +21,7 @@ class BookStyle {
     this.fontSize = 1.4,
     this.fontFamily = 'Arial',
     this.fontWeight = 400,
+    this.simulateBold = false,
     this.lineHeight = 1.8,
     this.letterSpacing = 0.0,
     this.wordSpacing = 0.0,
@@ -37,6 +39,7 @@ class BookStyle {
     double? fontSize,
     String? fontFamily,
     double? fontWeight,
+    bool? simulateBold,
     double? lineHeight,
     double? letterSpacing,
     double? wordSpacing,
@@ -53,6 +56,7 @@ class BookStyle {
       fontSize: fontSize ?? this.fontSize,
       fontFamily: fontFamily ?? this.fontFamily,
       fontWeight: fontWeight ?? this.fontWeight,
+      simulateBold: simulateBold ?? this.simulateBold,
       lineHeight: lineHeight ?? this.lineHeight,
       letterSpacing: letterSpacing ?? this.letterSpacing,
       wordSpacing: wordSpacing ?? this.wordSpacing,
@@ -72,6 +76,7 @@ class BookStyle {
       'fontSize': fontSize,
       'fontFamily': fontFamily,
       'fontWeight': fontWeight,
+      'simulateBold': simulateBold,
       'lineHeight': lineHeight,
       'letterSpacing': letterSpacing,
       'wordSpacing': wordSpacing,
@@ -92,6 +97,7 @@ class BookStyle {
       "fontSize": $fontSize,
       "fontFamily": "$fontFamily",
       "fontWeight": $fontWeight,
+      "simulateBold": $simulateBold,
       "lineHeight": $lineHeight,
       "letterSpacing": $letterSpacing,
       "wordSpacing": $wordSpacing,
@@ -109,6 +115,9 @@ class BookStyle {
 
   factory BookStyle.fromJson(String json) {
     Map<String, dynamic> data = jsonDecode(json);
+    if (data['simulateBold'] != null && data['simulateBold'] is! bool) {
+      throw const FormatException('Invalid simulated bold setting');
+    }
     double fontsSize = data['fontSize'] is String
         ? double.parse(data['fontSize'])
         : data['fontSize'];
@@ -132,6 +141,7 @@ class BookStyle {
       fontSize: fontsSize,
       fontFamily: data['fontFamily'],
       fontWeight: fontWeight,
+      simulateBold: data['simulateBold'] == true,
       lineHeight: data['lineHeight'] is String
           ? double.parse(data['lineHeight'])
           : data['lineHeight'],

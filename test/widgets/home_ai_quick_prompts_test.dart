@@ -10,6 +10,8 @@ import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/service/ai/home_ai_execution.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
 import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
+import 'package:anx_reader/widgets/ai/reading_skill_chips.dart';
+import 'package:anx_reader/models/user_prompt.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +38,9 @@ class _RecordingAiChat extends AiChat {
     bool isRegenerate, {
     String? skillId,
     String? sourceText,
+    String? sourceContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
     String? homePromptId,
     CancelableLangchainRunner? requestRunner,
   }) async* {
@@ -49,7 +54,10 @@ class _RecordingAiChat extends AiChat {
 
 void main() {
   Future<_RecordingAiChat> mount(WidgetTester tester, Size size,
-      {double textScale = 1, List<AiQuickPromptChip> chips = const []}) async {
+      {double textScale = 1,
+      List<AiQuickPromptChip> chips = const [],
+      bool configuredSkills = false,
+      bool reader = false}) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     final directory = Directory.systemTemp.createTempSync('modu-home-prompts-');
@@ -64,8 +72,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final chat = _RecordingAiChat();
+    final scope = configuredSkills || reader || chips.isNotEmpty
+        ? AiChatScope.reader
+        : AiChatScope.library;
     await tester.pumpWidget(ProviderScope(
-      overrides: [aiChatProvider(AiChatScope.library).overrideWith(() => chat)],
+      overrides: [aiChatProvider(scope).overrideWith(() => chat)],
       child: MaterialApp(
         locale: const Locale('zh'),
         supportedLocales: L10n.supportedLocales,
@@ -80,7 +91,12 @@ void main() {
               .copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
-        home: AiChatStream(quickPromptChips: chips),
+        home: AiChatStream(
+            scope: scope,
+            quickPromptChips: chips,
+            quickPromptChipsBuilder: configuredSkills
+                ? () => configuredReadingSkillChips(const Locale('zh'))
+                : null),
       ),
     ));
     await tester.pumpAndSettle();
@@ -164,16 +180,13 @@ void main() {
           skillId: skill.id),
     ]);
     chat.showReply = true;
-    expect(find.byKey(const ValueKey('reader-skill-chips')), findsNothing);
-    await togglePrompts(tester);
+    // Reader shortcuts are visible immediately, unlike the home AI menu.
     expect(find.byKey(const ValueKey('reader-skill-chips')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('reader-skill-0')));
     await tester.pumpAndSettle();
     expect(chat.requests.single.text, skill.defaultPrompt.trim());
     expect(find.byKey(const ValueKey('ai-message-skill-0')), findsOneWidget);
     expect(find.textContaining('你是一名注重准确性'), findsNothing);
-    expect(find.byKey(const ValueKey('reader-skill-chips')), findsNothing);
-    await togglePrompts(tester);
     expect(find.byKey(const ValueKey('reader-skill-chips')), findsOneWidget);
     await togglePrompts(tester);
     expect(find.byKey(const ValueKey('ai-message-skill-0')), findsOneWidget);
@@ -185,7 +198,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ten reader skills fit in one vertical menu inside the dialog',
+  testWidgets(
+      'reader skills use a bounded vertical panel without covering input',
       (tester) async {
     await mount(tester, const Size(390, 800), chips: [
       for (final skill in readAnySkills)
@@ -196,22 +210,17 @@ void main() {
             skillId: skill.id),
     ]);
     final inputRect = tester.getRect(find.byType(TextField));
-    await togglePrompts(tester);
     final panel = tester.getRect(find.byKey(const ValueKey('ai-skill-picker')));
     expect(tester.getRect(find.byType(TextField)), inputRect);
-    Rect? previous;
     for (var i = 0; i < readAnySkills.length; i++) {
       final item = find.byKey(ValueKey('reader-skill-$i'));
+      await tester.ensureVisible(item);
+      await tester.pumpAndSettle();
       expect(item.hitTestable(), findsOneWidget);
       final rect = tester.getRect(item);
       expect(rect.left, greaterThanOrEqualTo(panel.left));
       expect(rect.right, lessThanOrEqualTo(panel.right));
       expect(rect.bottom, lessThanOrEqualTo(panel.bottom));
-      if (previous != null) {
-        expect(rect.top, greaterThanOrEqualTo(previous.bottom));
-        expect(rect.left, previous.left);
-      }
-      previous = rect;
     }
     final scrolls = tester.widgetList<SingleChildScrollView>(find.descendant(
       of: find.byKey(const ValueKey('ai-skill-picker')),
@@ -219,6 +228,7 @@ void main() {
     ));
     expect(scrolls.every((scroll) => scroll.scrollDirection == Axis.vertical),
         isTrue);
+    expect(panel.height, lessThan(300));
     expect(tester.takeException(), isNull);
   });
 
@@ -251,14 +261,92 @@ void main() {
             prompt: skill.defaultPrompt,
             skillId: skill.id),
     ]);
-    await togglePrompts(tester);
     final last =
         find.byKey(ValueKey('reader-skill-${readAnySkills.length - 1}'));
     await tester.ensureVisible(last);
     await tester.tap(last);
     await tester.pumpAndSettle();
     expect(chat.requests.single.text, readAnySkills.last.defaultPrompt.trim());
+    expect(find.byKey(const ValueKey('ai-skill-picker')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'reader visibility preference survives new chat and settings changes',
+      (tester) async {
+    await mount(tester, const Size(390, 800), reader: true);
+    expect(find.byKey(const ValueKey('ai-skill-picker')), findsOneWidget);
+    await togglePrompts(tester);
+    expect(Prefs().aiReadingSkillsVisible, isFalse);
+    await tester.tap(find.byIcon(Icons.edit_document));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('ai-skill-picker')), findsNothing);
+    Prefs().aiReadingSkillsVisible = true;
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ai-skill-picker')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-quick-prompts')), findsNothing);
+  });
+
+  testWidgets(
+      'configured reader chips refresh mixed ordering, toggles and management in place',
+      (tester) async {
+    await mount(tester, const Size(390, 800), configuredSkills: true);
+    Prefs().userPrompts = [
+      UserPrompt(
+          id: 'first',
+          name: '我的技能',
+          content: '提示',
+          order: 0,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026))
+    ];
+    Prefs().readAnySkillOrder = ['custom:first', 'builtin:mindmap'];
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<Text>(find.descendant(
+                of: find.byKey(const ValueKey('reader-skill-0')),
+                matching: find.byType(Text)))
+            .data,
+        '我的技能');
+    final second = find.byKey(const ValueKey('reader-skill-1'));
+    expect(
+        tester
+            .widget<Text>(
+                find.descendant(of: second, matching: find.byType(Text)))
+            .data,
+        '思维导图');
+    Prefs().setReadAnySkillEnabled('mindmap', false);
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<Text>(
+                find.descendant(of: second, matching: find.byType(Text)))
+            .data,
+        isNot('思维导图'));
+    await tester.tap(find.byKey(const ValueKey('manage-reading-skills')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reading-skills-order-list')),
+        findsOneWidget);
+    await tester
+        .tap(find.byKey(const ValueKey('reading-skills-visible-switch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reader-skill-chips')), findsNothing);
+    expect(Prefs().aiReadingSkillsVisible, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('all disabled skills show management hint, not home AI tasks',
+      (tester) async {
+    await mount(tester, const Size(360, 640), configuredSkills: true);
+    for (final skill in readAnySkills)
+      Prefs().setReadAnySkillEnabled(skill.id, false);
+    await tester.pumpAndSettle();
+    expect(find.text('尚未启用阅读技能，可在管理中开启。'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-quick-prompts')), findsNothing);
+    expect(find.byKey(const ValueKey('reader-skill-0')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -65,6 +65,17 @@ void main() {
     }
   });
 
+  for (final rate in [3.0, 4.0]) {
+    test('${rate}x speed survives TTS export and import', () async {
+      final data = example()..['rate'] = rate;
+      final token = ConfigTransferCodec.encode(kind: 'tts', data: data);
+      await TtsConfigTransfer.apply(
+          Prefs(), ConfigTransferCodec.decode(token).data);
+      expect(Prefs().ttsRate, rate);
+      expect(TtsConfigTransfer.snapshot(Prefs())['rate'], rate);
+    });
+  }
+
   test(
       'clearing only resets TTS and does not resurrect legacy selected service',
       () async {
@@ -95,6 +106,7 @@ void main() {
     'invalid volume': (d) => d['volume'] = 2,
     'invalid pitch': (d) => d['pitch'] = 0,
     'invalid rate': (d) => d['rate'] = double.nan,
+    'rate exceeds 4x': (d) => d['rate'] = 4.1,
     'invalid mix': (d) => d['allowMixWithOtherAudio'] = 'yes',
   };
   for (final entry in invalid.entries) {

@@ -1,14 +1,33 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+/// Block paging while a text editor or a stale/transitional focus owns input.
+/// A FocusNode may briefly retain an unmounted Element during menu removal.
+/// Reading its widget before checking mounted throws in release builds too.
+bool readerFocusBlocksPageKeys(BuildContext? focused) {
+  if (focused == null) {
+    return false;
+  }
+  if (!focused.mounted) {
+    return true;
+  }
+  try {
+    return focused.widget is EditableText ||
+        focused.findAncestorWidgetOfExactType<EditableText>() != null;
+  } on FlutterError {
+    // Mounted Elements can still be temporarily inactive during reparenting.
+    // Do not walk that tree or intercept keys until the next focus update.
+    return true;
+  }
+}
+
 /// Windows' texture WebView owns a child Focus and may bubble unhandled keys.
 /// Do not steal focus from it (which would deactivate the native selection).
 bool readerOwnsPageKeys(FocusNode reader, FocusScopeNode webView,
     {required bool windows}) {
   if (reader.hasPrimaryFocus) return true;
   if (!windows || !reader.hasFocus || !webView.hasFocus) return false;
-  final context = FocusManager.instance.primaryFocus?.context;
-  if (context?.findAncestorWidgetOfExactType<EditableText>() != null) {
+  if (readerFocusBlocksPageKeys(FocusManager.instance.primaryFocus?.context)) {
     return false;
   }
   return true;

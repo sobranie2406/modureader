@@ -18,7 +18,7 @@ Object? readingPromptOverride(String key, Object? value) {
     final raw = jsonDecode(value);
     if (raw is! Map || raw.values.any((v) => v is! String)) return value;
     final overrides = Map<String, dynamic>.from(raw);
-    for (final skill in readAnySkills) {
+    for (final skill in readingSkillPromptDefinitions) {
       final saved = overrides[skill.id] as String?;
       if (saved != null && skill.isDefaultPrompt(saved)) {
         overrides.remove(skill.id);

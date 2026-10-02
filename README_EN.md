@@ -18,7 +18,7 @@ If Modu helps you enjoy reading, please give the repository a **Star ⭐** in th
 
 [Features and app screenshots](#features) · [Getting started](#getting-started) · [Settings guide (Chinese)](docs/SETTINGS.md) · [Downloads](#downloads)
 
-**Latest release: 1.1.9** — Delete overlapping highlights and underlines with an unobstructed confirmation; get faster knowledge-first AI dictionary answers and explicitly request online verification in the same chat.
+**Latest release: 1.1.10** — Compact narration controls and up to 4× playback; reading-skill switches, mixed ordering and editable drafts; selection knowledge and context options; clearer settings transfer and database backup guidance.
 
 ## Downloads
 
@@ -61,11 +61,11 @@ The current version provides the following reading, AI and library features.
 | Semantic search and RAG | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing | Book menu; Settings → Embedding Models |
 | Translation | Free Google translation, AI translation, DeepL/DeepLX, and embedded Baidu/Youdao translation webpages; long selected-text results scroll in an AI-sized popup | Settings → Translation; top reader toolbar, next to AI |
 | Read aloud | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters | Settings → Read Aloud; reader playback controls |
-| Sync and backup | WebDAV sync for books, notes and reading progress; local backups; separately enabled encrypted API-key sync | Settings → Sync |
-| Configuration transfer | All global settings via files, QR images and modu links, with an independent credentials switch | Settings → Advanced → Global settings backup |
+| Sync and backup | WebDAV sync for books, notes and reading progress; ZIP database backup export/import with destination guidance; separately enabled encrypted API-key sync | Settings → Sync |
+| Configuration transfer | All global settings via files and modu links, with an independent credentials switch | Settings → Advanced → Global settings backup |
 | ANX library migration | Validate and merge ANX ZIP backups, retaining existing Modu records and creating a pre-import database snapshot | Settings → Advanced → Import ANX Reader backup |
 | Appearance and tools | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options | Reader brightness button; Settings → Appearance / Reading / Advanced |
-| Bug reporting | Describe a problem and reproduction steps, preview the report, then submit it on GitHub | Settings → Report a Bug |
+| Bugs and feature requests | Separate forms for bugs and ideas, with preview before confirmation on GitHub; optional environment info and sanitized diagnostics | Settings → Bug reports and feature requests |
 
 Screenshots alongside the feature descriptions show **Modu 1.1.9 (10063) on Mac**, with the app set to English. Reading views use *The Quiet Reader*, an original English demo book with six chapters and approximately 2,200 words. No personal library, private notes or conversations are shown. [Download the English demo EPUB](docs/examples/modu-reading-demo-en.epub) · [Screenshot provenance](docs/images/README.md)
 
@@ -115,9 +115,9 @@ Enter the full book-directory URL, username and password in Settings → Remote 
 
 This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Global settings backup can explicitly include account credentials; this export is unencrypted and excludes credentials by default. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
 
-Use Settings → Advanced → Global settings backup to transfer all preferences through files, modu links or QR images. A separate switch includes accounts, passwords and API configurations and is off by default; when off, import also preserves existing local credentials. Explicit exports containing credentials are unencrypted: keep them private. Import validates before restoring and does not automatically connect to servers.
+Use Settings → Advanced → Global settings backup to transfer all preferences through settings files or modu links. A separate switch includes accounts, passwords and API configurations and is off by default; when off, import also preserves existing local credentials. Explicit exports containing credentials are unencrypted: keep them private. Import validates before restoring and does not automatically connect to servers.
 
-After saving a settings file or QR image, a confirmation shows its full location with a copy action. Windows saves to the current user's Downloads folder; other platforms use the location selected in the save dialog.
+After saving a settings file, a confirmation shows its full location with a copy action. Windows saves to the current user's Downloads folder; other platforms use the location selected in the save dialog.
 
 ### Mobile page-turn controls
 
@@ -153,13 +153,12 @@ Enable AI tools as needed, including finding books and notes, searching text, re
 
 ### Reading skills and custom prompts
 
-Quick skills in AI chat are collapsed by default; expand them with the skill button beside the input. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
+Reading skills are visible by default and can be collapsed with a switch; built-in and custom skills can be toggled and reordered together. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
 
-Built-in skill names and prompts follow your selected application language.
+Built-in skill names and prompts follow your selected application language. Enable the draft option to fill the input field before sending, allowing changes such as a chapter range; it is off by default, so clicking a skill sends it immediately. The settings page and AI chat share this option.
 
 | Skill | Purpose |
 | --- | --- |
-| AI Dictionary Explanation | Explain selected words from model knowledge, with pronunciation and bilingual meanings; verify online only when explicitly requested |
 | Chapter Summary | Outline the current chapter's content, plot and themes |
 | Book Summary | Summarize available book content and structure |
 | Concept Explanation | Explain concepts, terminology and abstract ideas |
@@ -180,6 +179,8 @@ Open a skill to inspect its prompt, edit and save it, or restore the default. Cu
 ### Selection toolbar and AI templates
 
 Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Each selection AI request opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Settings backups include user edits to bundled prompts, not duplicate default templates.
+
+AI Knowledge remains a selection template only. It concisely explains meaning, background and related knowledge in the selected text's language, without adding pronunciation, translations or examples by default. Every selection AI command supports selected text only (the default) or nearby context, plus an independent online-search checkbox. Without online search it uses model knowledge first; explicit confirmation in the same chat can retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources, without another search API key.
 
 | Tool switches and ordering | Independently managed AI templates |
 | --- | --- |
@@ -237,7 +238,9 @@ Add a gentle, friendly tone or clear emphasis on key ideas to personalize it. In
 
 ![Mac editable speech description and one-click prompt suggestions](docs/images/v1.1.9/macos-en/tts-prompt-editor.jpg)
 
-OpenAI-compatible settings offer a separate **Enable speech instructions** switch, templates and an editor; selecting a template does not change Voice. Enabled instructions add steady narration guidance, as does MiMo. MiMo's rate slider changes local playback speed from **0.5–2.0×** on release without regenerating audio; prompt descriptions guide the generated delivery. When using OpenAI-compatible prompts to control pace or pitch, keep the player rate and pitch at 1.0. Instructions are not sent for `tts-1` / `tts-1-hd`, and can be disabled for compatible endpoints that do not support them.
+OpenAI-compatible settings offer a separate **Enable speech instructions** switch, templates and an editor; selecting a template does not change Voice. Enabled instructions add steady narration guidance, as does MiMo. Online narration supports up to 4× speed, with 3× and 4× steps after 2×. MiMo's rate slider changes local playback speed from **0.5–4.0×** on release without regenerating audio; prompt descriptions guide the generated delivery. When using OpenAI-compatible prompts to control pace or pitch, keep the player rate and pitch at 1.0. Instructions are not sent for `tts-1` / `tts-1-hd`, and can be disabled for compatible endpoints that do not support them.
+
+The reader's compact narration toolbar offers return to the narration position, play/pause, read from the current reading position and speech settings.
 
 Edge, MiMo, OpenAI-compatible and DashScope narration groups adjacent sentences within a natural paragraph, splitting long paragraphs. Highlighting and previous/next navigation follow each passage; system speech retains sentence navigation. The first passage is prioritized and later passages are prefetched during playback to reduce pauses. Errors retain the position for retry. Saved listening settings can be transferred through Global settings backup.
 
@@ -250,11 +253,17 @@ Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10
 - **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
 - Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
 - This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.
-- **Configuration codes and QR codes are not encrypted** and may contain passwords or API keys. Do not post them in public screenshots, issues or group chats. Configuration transfer is separate from encrypted key sync.
+- **Settings files and configuration links are not encrypted** and may contain passwords or API keys. Do not post them in public screenshots, issues or group chats. Configuration transfer is separate from encrypted key sync.
+
+### Database backup
+
+Settings → Sync → Database backup exports `Modu-Backup-*.zip`, including local books, covers, the library database (notes, highlights, bookmarks and reading records), fonts, background images, AI chat history and general settings. Download books you want to transfer first. Service settings and credentials are excluded by default and can optionally be included with encryption in the export dialog.
+
+Windows saves to the current user's Downloads folder, usually `C:\Users\<username>\Downloads`; Mac, Linux and mobile devices use the location selected in the system save dialog. Export confirms the full path or file name with a copy action. Select the ZIP to import without extracting it. Import validates then replaces existing data rather than merging; back up current data first and restart Modu after restoring. This is separate from Global settings backup, which transfers preferences only.
 
 ### Global settings transfer
 
-Transfer appearance, reading layout, CSS, AI skills, speech, translation and general settings together via files, QR images or `modu:` links. Accounts, passwords and API keys have a separate switch, off by default. Enabled exports contain recoverable plaintext credentials and must be kept private. Books and notes use library backup or sync rather than the settings file.
+Transfer appearance, reading layout, CSS, AI skills, speech, translation and general settings together via settings files or `modu:` links. Full settings can exceed QR capacity, so QR export and image import are no longer offered; files are recommended for backups. Accounts, passwords and API keys have a separate switch, off by default. Enabled exports contain recoverable plaintext credentials and must be kept private. Books and notes use library backup or sync rather than the settings file.
 
 ![Mac global settings transfer with an independent credentials switch](docs/images/v1.1.9/macos-en/settings-transfer.jpg)
 
@@ -270,7 +279,7 @@ Transfer appearance, reading layout, CSS, AI skills, speech, translation and gen
 
 See [Releases](https://github.com/sobranie2406/modureader/releases) for version changes and downloads.
 
-When reporting an issue in [this repository](https://github.com/sobranie2406/modureader/issues), include your version, system, architecture, reproduction steps and a sample without private information. Never submit API keys, WebDAV passwords or configuration QR codes.
+When reporting an issue in [this repository](https://github.com/sobranie2406/modureader/issues), include your version, system, architecture, reproduction steps and a sample without private information. Never submit API keys, WebDAV passwords or settings files and links containing credentials.
 
 ## Build from source
 

@@ -14,7 +14,8 @@ Future<void> showSelectionToolbarSettings(BuildContext context) =>
         enableDrag: false,
         builder: (context) => Scaffold(
             appBar: AppBar(
-                title: Text(ModuStrings.text(context, '划词工具栏', 'Selection toolbar')),
+                title: Text(
+                    ModuStrings.text(context, '划词工具栏', 'Selection toolbar')),
                 automaticallyImplyLeading: false,
                 actions: [
                   IconButton(
@@ -52,8 +53,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
       await Prefs().saveSelectionToolbar(config);
     } catch (_) {
       if (mounted)
-        setState(() =>
-            _error = ModuStrings.text(context, '保存失败，请检查配置后重试。', 'Could not save toolbar settings.'));
+        setState(() => _error = ModuStrings.text(
+            context, '保存失败，请检查配置后重试。', 'Could not save toolbar settings.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -121,15 +122,20 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: Text(ModuStrings.text(context, '恢复默认工具栏？', 'Restore default toolbar?')),
-                content: Text(ModuStrings.text(context, '恢复内置按钮、预设模板和颜色；预设 AI 模板默认关闭，自建 AI 命令保留。', 'Reset built-in actions, templates and colours. AI templates start disabled; your own commands are kept.')),
+                title: Text(ModuStrings.text(
+                    context, '恢复默认工具栏？', 'Restore default toolbar?')),
+                content: Text(ModuStrings.text(
+                    context,
+                    '恢复内置按钮、预设模板和颜色；预设 AI 模板默认关闭，自建 AI 命令保留。',
+                    'Reset built-in actions, templates and colours. AI templates start disabled; your own commands are kept.')),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
                       child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: Text(ModuStrings.text(context, '恢复默认', 'Restore defaults')))
+                      child: Text(ModuStrings.text(
+                          context, '恢复默认', 'Restore defaults')))
                 ]));
     if (confirmed == true && mounted)
       await _save(Prefs().selectionToolbar.restoreDefaults());
@@ -167,8 +173,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                               child: Padding(
                                   padding: const EdgeInsets.all(8),
                                   child: Icon(Icons.drag_indicator,
-                                      semanticLabel:
-                                          ModuStrings.text(context, '拖动排序', 'Drag to reorder')))),
+                                      semanticLabel: ModuStrings.text(context,
+                                          '拖动排序', 'Drag to reorder')))),
                           Icon(selectionToolbarIcon(item)),
                           const SizedBox(width: 12),
                           Expanded(
@@ -195,15 +201,22 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                                                 if (item.isCustom)
                                                   Text(
                                                       preset
-                                                          ? ModuStrings.text(context, '预设 AI 模板 · 可编辑', 'AI template · Editable')
-                                                          : ModuStrings.text(context, '自定义 AI 命令', 'Custom AI command'),
+                                                          ? ModuStrings.text(
+                                                              context,
+                                                              '预设 AI 模板 · 可编辑',
+                                                              'AI template · Editable')
+                                                          : ModuStrings.text(
+                                                              context,
+                                                              '自定义 AI 命令',
+                                                              'Custom AI command'),
                                                       style: Theme.of(context)
                                                           .textTheme
                                                           .bodySmall),
                                               ]))))),
                           IconButton(
                               key: ValueKey('toolbar-edit-${item.id}'),
-                              tooltip: ModuStrings.text(context, '编辑参数', 'Edit parameters'),
+                              tooltip: ModuStrings.text(
+                                  context, '编辑参数', 'Edit parameters'),
                               icon: const Icon(Icons.edit_outlined, size: 20),
                               onPressed: _busy
                                   ? null
@@ -218,13 +231,15 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                                       annotations)),
                           if (item.isCustom)
                             PopupMenuButton<String>(
-                                tooltip: ModuStrings.text(context, '更多', 'More'),
+                                tooltip:
+                                    ModuStrings.text(context, '更多', 'More'),
                                 enabled: !_busy,
                                 onSelected: (_) => _delete(item),
                                 itemBuilder: (_) => [
                                       PopupMenuItem(
                                           value: 'delete',
-                                          child: Text(ModuStrings.text(context, '删除', 'Delete')))
+                                          child: Text(ModuStrings.text(
+                                              context, '删除', 'Delete')))
                                     ]),
                         ])));
               }));
@@ -244,21 +259,28 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
           slivers: [
             _section(
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(ModuStrings.text(context, '自定义划词菜单的按钮显示和顺序。长按卡片或拖动左侧手柄排序，点击编辑图标调整参数。', 'Choose which selection actions appear and in what order. Hold a card or drag its handle; edit parameters using the pencil.')),
+              Text(ModuStrings.text(
+                  context,
+                  '自定义划词菜单的按钮显示和顺序。长按卡片或拖动左侧手柄排序，点击编辑图标调整参数。',
+                  'Choose which selection actions appear and in what order. Hold a card or drag its handle; edit parameters using the pencil.')),
               const SizedBox(height: 12),
               SwitchListTile(
                   key: const ValueKey('selection-toolbar-enabled'),
                   contentPadding: EdgeInsets.zero,
-                  title:
-                      Text(ModuStrings.text(context, '选中文字时显示工具栏', 'Show toolbar when selecting text')),
+                  title: Text(ModuStrings.text(context, '选中文字时显示工具栏',
+                      'Show toolbar when selecting text')),
                   value: config.enabled,
                   onChanged: _busy
                       ? null
                       : (value) => _save(config.copyWith(enabled: value))),
               ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(ModuStrings.text(context, '直接显示的按钮数量', 'Visible action count')),
-                  subtitle: Text(ModuStrings.text(context, '其余已启用按钮放入“更多”，小屏幕会自动减少直接显示数量。', 'Remaining enabled actions appear under More. Smaller screens fit fewer buttons.')),
+                  title: Text(ModuStrings.text(
+                      context, '直接显示的按钮数量', 'Visible action count')),
+                  subtitle: Text(ModuStrings.text(
+                      context,
+                      '其余已启用按钮放入“更多”，小屏幕会自动减少直接显示数量。',
+                      'Remaining enabled actions appear under More. Smaller screens fit fewer buttons.')),
                   trailing: DropdownButton<int>(
                       key: const ValueKey('selection-toolbar-visible-count'),
                       value: config.visibleCount,
@@ -274,7 +296,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                 FilledButton.icon(
                     key: const ValueKey('toolbar-add-ai'),
                     icon: const Icon(Icons.add),
-                    label: Text(ModuStrings.text(context, '新建 AI 命令', 'New AI command')),
+                    label: Text(ModuStrings.text(
+                        context, '新建 AI 命令', 'New AI command')),
                     onPressed: _busy ||
                             config.items
                                     .where((i) =>
@@ -288,7 +311,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                 OutlinedButton.icon(
                     key: const ValueKey('toolbar-restore'),
                     icon: const Icon(Icons.restore),
-                    label: Text(ModuStrings.text(context, '恢复默认', 'Restore defaults')),
+                    label: Text(
+                        ModuStrings.text(context, '恢复默认', 'Restore defaults')),
                     onPressed: _busy ? null : _restore),
               ]),
               if (_error != null)
@@ -296,7 +320,9 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error)),
               const SizedBox(height: 24),
-              Text(ModuStrings.text(context, '工具按钮与 AI 模板', 'Actions and AI templates'),
+              Text(
+                  ModuStrings.text(
+                      context, '工具按钮与 AI 模板', 'Actions and AI templates'),
                   style: Theme.of(context).textTheme.titleLarge),
             ])),
             _list(config.items, false),
@@ -304,10 +330,12 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(ModuStrings.text(context, '批注工具', 'Annotation tools'),
                   style: Theme.of(context).textTheme.titleLarge),
-              Text(ModuStrings.text(context, '单独控制批注栏的按钮和顺序，不影响已有笔记。', 'Configure the annotation row without changing existing notes.')),
+              Text(ModuStrings.text(context, '单独控制批注栏的按钮和顺序，不影响已有笔记。',
+                  'Configure the annotation row without changing existing notes.')),
             ])),
             _list(config.annotations, true),
-            _section(Text(ModuStrings.text(context, '搜索、翻译、字典和朗读共用各自功能的设置。AI 划词模板在此独立管理，默认关闭，使用当前 AI 服务，只发送选中文字；无需新增 API Key。每次提问开启新对话，共用阅读 AI 弹出框，回答完成后回到第一段。此配置随全局设置备份导出和导入。', 'AI selection templates are managed here separately, disabled by default and use your current AI provider. Each question starts a new conversation in the reader AI popup, returning to the answer start on completion. Search, translation, dictionary and speech share their feature settings. Toolbar configuration is included in global settings backups.'))),
+            _section(Text(ModuStrings.value(Localizations.localeOf(context),
+                'selection_ai_help', 'AI 模板默认关闭，可分别选择内容范围和联网搜索，用户改动随全局设置备份。'))),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         );
@@ -333,6 +361,7 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
       _prompt.text = widget.item?.localizedPrompt(locale) ?? '';
     }
   }
+
   late final _name = TextEditingController(text: widget.item?.name);
   late final _prompt = TextEditingController(text: widget.item?.prompt);
   late final _colors =
@@ -341,6 +370,9 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
       ? widget.item!.icon
       : (widget.item?.action ?? 'ai');
   late String _skillId = widget.item?.skillId ?? 'selection_toolbar';
+  late SelectionAiScope _scope =
+      widget.item?.scope ?? SelectionAiScope.selection;
+  late bool _webSearch = widget.item?.webSearch ?? false;
   String? _error;
   bool get ai => widget.item == null || widget.item!.isAi;
   String t(String zh, String en) =>
@@ -377,9 +409,12 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
             name: _name.text.trim(),
             icon: _icon,
             prompt: _prompt.text.trim(),
+            scope: _scope,
+            webSearch: _webSearch,
             skillId: _skillId);
     if (item.isCustom && (item.name.isEmpty || item.prompt.isEmpty)) {
-      setState(() => _error = ModuStrings.text(context, '请填写名称和提示词。', 'Enter a name and prompt.'));
+      setState(() => _error =
+          ModuStrings.text(context, '请填写名称和提示词。', 'Enter a name and prompt.'));
       return;
     }
     List<String>? colors;
@@ -393,7 +428,10 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
         Prefs().selectionToolbar.copyWith(colors: colors).validate();
       } catch (_) {
         if (mounted)
-          setState(() => _error = ModuStrings.text(context, '填写 1–20 个不重复的六位颜色值，例如 66CCFF。', 'Enter 1–20 unique six-digit RGB colours, e.g. 66CCFF.'));
+          setState(() => _error = ModuStrings.text(
+              context,
+              '填写 1–20 个不重复的六位颜色值，例如 66CCFF。',
+              'Enter 1–20 unique six-digit RGB colours, e.g. 66CCFF.'));
         return;
       }
     }
@@ -422,7 +460,8 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                                 ? null
                                 : selectionToolbarLabel(context, widget.item!),
                             helperText: widget.item?.isCustom == false
-                                ? ModuStrings.text(context, '留空使用默认名称', 'Leave blank for the default name')
+                                ? ModuStrings.text(context, '留空使用默认名称',
+                                    'Leave blank for the default name')
                                 : null)),
                     const SizedBox(height: 12),
                     Text(ModuStrings.text(context, '图标', 'Icon')),
@@ -442,15 +481,21 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                           isExpanded: true,
                           initialValue: _skillId,
                           decoration: InputDecoration(
-                              labelText: ModuStrings.text(context, '处理方式', 'Processing mode')),
+                              labelText: ModuStrings.text(
+                                  context, '处理方式', 'Processing mode')),
                           items: [
                             DropdownMenuItem(
                                 value: 'selection_toolbar',
-                                child:
-                                    Text(ModuStrings.text(context, '仅处理选中文字', 'Selected text only'))),
+                                child: Text(ModuStrings.value(
+                                    Localizations.localeOf(context),
+                                    'selection_ai_prompt_mode',
+                                    '提示词处理'))),
                             DropdownMenuItem(
                                 value: 'ai_dictionary',
-                                child: Text(ModuStrings.text(context, 'AI 词典（知识优先／联网补充）', 'AI dictionary (knowledge / web lookup)'))),
+                                child: Text(ModuStrings.value(
+                                    Localizations.localeOf(context),
+                                    'skill_ai_dictionary_name',
+                                    'AI 知识'))),
                             for (final id in [
                               'concept_explainer',
                               'smart_translator',
@@ -463,6 +508,29 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                           onChanged: (value) =>
                               setState(() => _skillId = value!)),
                       const SizedBox(height: 12),
+                      DropdownButtonFormField<SelectionAiScope>(
+                        key: const ValueKey('toolbar-ai-scope'),
+                        initialValue: _scope,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                            labelText: ModuStrings.value(
+                                Localizations.localeOf(context),
+                                'selection_ai_scope',
+                                '内容范围')),
+                        items: [
+                          for (final scope in SelectionAiScope.values)
+                            DropdownMenuItem(
+                                value: scope,
+                                child: Text(ModuStrings.value(
+                                    Localizations.localeOf(context),
+                                    'selection_ai_scope_${scope.name}',
+                                    scope == SelectionAiScope.selection
+                                        ? '仅选中文字'
+                                        : '结合上下文'))),
+                        ],
+                        onChanged: (value) => setState(() => _scope = value!),
+                      ),
+                      const SizedBox(height: 12),
                       TextField(
                           key: const ValueKey('toolbar-prompt'),
                           controller: _prompt,
@@ -470,11 +538,33 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                           maxLines: 12,
                           maxLength: 8000,
                           decoration: InputDecoration(
-                              labelText: ModuStrings.text(context, '提示词', 'Prompt'),
+                              labelText:
+                                  ModuStrings.text(context, '提示词', 'Prompt'),
                               border: const OutlineInputBorder(),
-                              helperText: ModuStrings.text(context, '用 {selection} 引用选中文字；没有占位符也会附上原文。', 'Use {selection} for selected text. Text is also included without a placeholder.'))),
+                              helperText: ModuStrings.text(
+                                  context,
+                                  '用 {selection} 引用选中文字；没有占位符也会附上原文。',
+                                  'Use {selection} for selected text. Text is also included without a placeholder.'))),
+                      CheckboxListTile(
+                        key: const ValueKey('toolbar-ai-web-search'),
+                        contentPadding: EdgeInsets.zero,
+                        value: _webSearch,
+                        title: Text(ModuStrings.value(
+                            Localizations.localeOf(context),
+                            'selection_ai_web_search',
+                            '联网搜索')),
+                        subtitle: Text(ModuStrings.value(
+                            Localizations.localeOf(context),
+                            'selection_ai_web_search_help',
+                            '勾选后检索公开词典／百科并交给当前模型整理，附来源；无需额外 API Key。')),
+                        onChanged: (value) =>
+                            setState(() => _webSearch = value!),
+                      ),
                       if (widget.item?.action == 'ai')
-                        Text(ModuStrings.text(context, '留空时只打开 AI 对话；填写提示词后点击即执行。', 'Leave blank to open chat; enter a prompt to run it on tap.')),
+                        Text(ModuStrings.text(
+                            context,
+                            '留空时只打开 AI 对话；填写提示词后点击即执行。',
+                            'Leave blank to open chat; enter a prompt to run it on tap.')),
                     ],
                     if (widget.item?.action == 'colors') ...[
                       TextField(
@@ -483,15 +573,16 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                           minLines: 2,
                           maxLines: 4,
                           decoration: InputDecoration(
-                              labelText: ModuStrings.text(context, '颜色列表（逗号分隔）', 'Colours (comma separated)'))),
+                              labelText: ModuStrings.text(context, '颜色列表（逗号分隔）',
+                                  'Colours (comma separated)'))),
                     ],
                     if (['search', 'translate', 'dictionary', 'narrate']
                         .contains(widget.item?.action))
                       TextButton.icon(
                           icon: const Icon(Icons.settings_outlined),
                           onPressed: _featureSettings,
-                          label: Text(
-                              ModuStrings.text(context, '配置此功能的参数', 'Configure feature parameters'))),
+                          label: Text(ModuStrings.text(context, '配置此功能的参数',
+                              'Configure feature parameters'))),
                     if (_error != null)
                       Text(_error!,
                           style: TextStyle(

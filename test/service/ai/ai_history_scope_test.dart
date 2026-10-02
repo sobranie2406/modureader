@@ -73,4 +73,14 @@ void main() {
 
     expect(restored.scope, 'reader');
   });
+
+  test('retired AI knowledge history retains its original reader scope', () {
+    final restored = AiChatHistoryEntry.fromJson({
+      'id': 'legacy-knowledge-session',
+      'messages': [
+        ChatMessage.humanText(legacyAiKnowledgeSkill.defaultPrompt).toMap(),
+      ],
+    });
+    expect(restored.scope, 'reader');
+  });
 }

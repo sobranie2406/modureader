@@ -9,7 +9,7 @@ bottomNavigatorShowStatistics bottomNavigatorShowAI sortField sortOrder''',
       '''readStyle readTheme hideStatusBar readerFullscreen autoHideBottomBar
 awakeTime pageTurningType pageTurnStyle readingRules chapterSplitCustomRules
 chapterSplitSelectedRuleId autoAdjustReadingTheme readingNightMode volumeKeyTurnPage
-keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn scrollPagePercent showMenuOnHover showActionLabels
+keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn longPressSelectParagraph scrollPagePercent showMenuOnHover showActionLabels
 useBookStyles pageTurnMode customPageTurnConfig readingInfo showTextUnderIconButton
 pageHeaderMargin pageHeaderLeftMargin pageHeaderRightMargin pageHeaderFontSize
 pageFooterMargin pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize
@@ -22,7 +22,7 @@ writingMode verticalRedFrame textAlignment bgimgFit bgimg selectionToolbar''',
 aiTemperature aiChatFontSize aiPanelWidth aiPanelHeight aiPanelPosition aiChatDisplayMode
 codeHighlightTheme enabledAiTools''',
   'ai-skills':
-      '''readAnySkillStates readAnySkillPrompts userPrompts autoSummaryPreviousContent''',
+      '''readAnySkillStates readAnySkillPrompts userPrompts autoSummaryPreviousContent aiReadingSkillsVisible aiSkillTemplateDraft readAnySkillOrder''',
   'vector':
       '''vectorModelEnabled autoVectorizeOnImport vectorModelMode vectorLocalModelId
 vectorModelDownloadSource vectorModelConfig''',

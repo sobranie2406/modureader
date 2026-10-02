@@ -81,6 +81,30 @@ void main() {
     }
   });
 
+  test('simulated bold and its weight are supplied on first open', () async {
+    for (final enabled in [false, true]) {
+      await Prefs().saveBookStyleToPrefs(
+          Prefs().bookStyle.copyWith(fontWeight: 640, simulateBold: enabled));
+      final uri = Uri.parse(generateUrl('https://example.test/book.epub', '',
+          fontName: 'body', fontPath: '/body.ttf'));
+      final style = jsonDecode(uri.queryParameters['style']!);
+      expect(style['simulateBold'], enabled);
+      expect(style['fontWeight'], 640);
+    }
+  });
+
+  test('long-press mode and app language are applied on first open', () async {
+    for (final paragraph in [false, true]) {
+      Prefs().longPressSelectParagraph = paragraph;
+      await Prefs().saveLocaleToPrefs('zh-CN');
+      final uri = Uri.parse(generateUrl('https://example.test/book.epub', '',
+          fontName: 'serif', fontPath: ''));
+      final style = jsonDecode(uri.queryParameters['style']!);
+      expect(style['longPressSelectParagraph'], paragraph);
+      expect(style['selectionLocale'], 'zh-CN');
+    }
+  });
+
   test('reader receives e-ink mode without changing the saved page style', () {
     final savedStyle = Prefs().pageTurnStyle;
     for (final eInk in [true, false]) {

@@ -54,7 +54,8 @@ void main() {
 
   test('only changed prompts travel; switches and custom skills survive',
       () async {
-    final source = readAnySkills.first;
+    final source =
+        readAnySkills.singleWhere((s) => s.id == 'argument_analyzer');
     await Prefs().prefs.setString(
         'readAnySkillPrompts',
         jsonEncode({
@@ -116,5 +117,16 @@ void main() {
     await GlobalSettingsTransfer.apply(Prefs(), backup);
     expect(Prefs().prefs.containsKey('aiPrompt_mindmap'), false);
     expect(Prefs().prefs.containsKey('readAnySkillPrompts'), false);
+  });
+
+  test('retired AI knowledge defaults are still excluded from backup',
+      () async {
+    Prefs().setReadAnySkillPrompt(
+        legacyAiKnowledgeSkill.id, legacyAiKnowledgeSkill.defaultPrompt);
+    final backup = await GlobalSettingsTransfer.decode(
+        await GlobalSettingsTransfer.export(Prefs()));
+    expect(backup['readAnySkillPrompts']['type'], 'reset');
+    expect(readAnySkills.any((skill) => skill.id == legacyAiKnowledgeSkill.id),
+        isFalse);
   });
 }

@@ -177,8 +177,8 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(ModuStrings.text(
                   context,
-                  '接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用二维码或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。',
-                  'Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via QR images or modu links. System voices may need reselection on another device.')),
+                  '接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用设置文件或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。',
+                  'Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via settings files or modu links. System voices may need reselection on another device.')),
               const SizedBox(height: 12),
               Wrap(spacing: 10, runSpacing: 10, children: [
                 FilledButton.icon(

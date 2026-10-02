@@ -93,7 +93,7 @@ class TtsConfigTransfer {
       'service': data['service'],
       'volume': number('volume', 0, 1),
       'pitch': number('pitch', 0.5, 2),
-      'rate': number('rate', 0, 2),
+      'rate': number('rate', 0, 4),
       'allowMixWithOtherAudio': data['allowMixWithOtherAudio'],
       'providers': providers,
     };

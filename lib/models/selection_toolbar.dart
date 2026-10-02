@@ -5,16 +5,22 @@ import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/constants/note_annotations.dart';
 
 /// Stable action IDs, rather than translated labels or platform icon codes.
+enum SelectionAiScope { selection, context }
+
 class SelectionToolbarItem {
   const SelectionToolbarItem(this.id, this.action,
       {this.enabled = true,
       this.name = '',
       this.icon = '',
       this.prompt = '',
+      this.scope = SelectionAiScope.selection,
+      this.webSearch = false,
       this.skillId = 'selection_toolbar'});
 
   final String id, action, name, icon, prompt, skillId;
   final bool enabled;
+  final SelectionAiScope scope;
+  final bool webSearch;
   bool get isCustom => action == 'aiCommand';
   bool get isAi => action == 'ai' || isCustom;
 
@@ -23,12 +29,16 @@ class SelectionToolbarItem {
           String? name,
           String? icon,
           String? prompt,
+          SelectionAiScope? scope,
+          bool? webSearch,
           String? skillId}) =>
       SelectionToolbarItem(id, action,
           enabled: enabled ?? this.enabled,
           name: name ?? this.name,
           icon: icon ?? this.icon,
           prompt: prompt ?? this.prompt,
+          scope: scope ?? this.scope,
+          webSearch: webSearch ?? this.webSearch,
           skillId: skillId ?? this.skillId);
 
   String localizedName(Locale locale) => _isDefaultName
@@ -65,6 +75,8 @@ class SelectionToolbarItem {
   Map<String, Object> toJson() => {
         'id': id,
         'action': action,
+        if (scope != SelectionAiScope.selection) 'scope': scope.name,
+        if (webSearch) 'webSearch': true,
         if (enabled != (_defaultItem?.enabled ?? true)) 'enabled': enabled,
         if (!_isDefaultName && name != (_defaultItem?.name ?? '')) 'name': name,
         if (icon != (_defaultItem?.icon ?? '')) 'icon': icon,
@@ -79,6 +91,9 @@ class SelectionToolbarItem {
         raw['id'] is! String ||
         raw['action'] is! String ||
         (raw.containsKey('enabled') && raw['enabled'] is! bool) ||
+        (raw.containsKey('webSearch') && raw['webSearch'] is! bool) ||
+        (raw.containsKey('scope') &&
+            !SelectionAiScope.values.any((s) => s.name == raw['scope'])) ||
         ['name', 'icon', 'prompt', 'skillId']
             .any((key) => raw.containsKey(key) && raw[key] is! String)) {
       throw const FormatException('Invalid toolbar item');
@@ -90,6 +105,10 @@ class SelectionToolbarItem {
         name: raw['name'] ?? defaults?.name ?? '',
         icon: raw['icon'] ?? defaults?.icon ?? '',
         prompt: raw['prompt'] ?? defaults?.prompt ?? '',
+        scope: raw['scope'] == 'context'
+            ? SelectionAiScope.context
+            : SelectionAiScope.selection,
+        webSearch: raw['webSearch'] == true,
         skillId: raw['skillId'] ?? defaults?.skillId ?? 'selection_toolbar');
   }
 }
@@ -121,41 +140,36 @@ class SelectionToolbarConfig {
   static const templateItems = [
     SelectionToolbarItem('custom-preset-dictionary', 'aiCommand',
         enabled: false,
-        name: 'AI 词典',
+        name: 'AI 知识',
         icon: 'dictionary',
         skillId: 'ai_dictionary',
         prompt:
-            '解释所选词语 {selection}。英文给出 IPA 音标、词性、中文翻译、中英文释义、例句与常用搭配；中文给出带声调的拼音、含义、用法和相关词语。仅使用模型已有知识简明解释，不等待外部词典或百科。不确定的读音、释义或词源明确说明，不能编造读音、释义、词源或来源。如需核实，提示用户在对话框输入“确认联网搜索”并发送；不提示点击按钮，不自动搜索。不使用本书知识库。'),
+            '简要介绍 {selection} 的含义、背景和相关知识，用选中文字的语言回答。不提供拼音、音标、翻译或例句；不确定的内容明确说明。'),
     SelectionToolbarItem('custom-preset-explain', 'aiCommand',
         enabled: false,
         name: '通俗解释',
         icon: 'lightbulb',
-        prompt:
-            '请通俗解释选中的文字 {selection}，先说明含义，再解释关键概念，必要时给一个简短例子。只围绕选中文字，不补写书中的情节或上下文。'),
+        prompt: '通俗解释 {selection} 的含义与关键概念，简明直接，不编造。'),
     SelectionToolbarItem('custom-preset-translate', 'aiCommand',
         enabled: false,
         name: 'AI 翻译',
         icon: 'translate',
-        prompt:
-            '翻译选中文字 {selection}：英文译成自然的中文，中文译成自然的英文；混合文本按主要语言处理。保持原意和段落，先给译文，必要时补充易误解的词语。'),
+        prompt: '翻译 {selection}：英文译成中文，中文译成英文；其他语言译成当前界面语言。保留原意和段落，只给译文。'),
     SelectionToolbarItem('custom-preset-polish', 'aiCommand',
         enabled: false,
         name: '润色',
         icon: 'note',
-        prompt:
-            '润色选中的文字 {selection}，让表达自然、清晰、流畅，保留原意、事实与语气，不增加信息。先给润色结果，再简短说明主要改动。'),
+        prompt: '润色 {selection}，保留原意和语气，使表达自然清晰，只给结果。'),
     SelectionToolbarItem('custom-preset-summary', 'aiCommand',
         enabled: false,
         name: '摘要',
         icon: 'summary',
-        prompt:
-            '用简洁语言概括选中的文字 {selection}，保留核心观点、关键事实和因果关系。不引用其他段落，不添加原文没有的信息。'),
+        prompt: '简要概括 {selection} 的核心观点与关键事实，不添加原文没有的信息。'),
     SelectionToolbarItem('custom-preset-points', 'aiCommand',
         enabled: false,
         name: '提炼要点',
         icon: 'quote',
-        prompt:
-            '从选中的文字 {selection} 中提炼关键要点，用简短列表呈现；有论证时区分观点和依据，有事件时区分人物、事件和结果。要点数量按原文决定，不凑数。'),
+        prompt: '提炼 {selection} 的关键要点，用简短列表呈现，不凑数。'),
   ];
   static const initialItems = [...defaultItems, ...templateItems];
   static const iconIds = {
@@ -247,6 +261,8 @@ class SelectionToolbarConfig {
           item.name.length > 30 ||
           item.prompt.length > 8000 ||
           !skillIds.contains(item.skillId) ||
+          (!item.isAi &&
+              (item.webSearch || item.scope != SelectionAiScope.selection)) ||
           (item.icon.isNotEmpty && !iconIds.contains(item.icon))) {
         throw const FormatException('Invalid toolbar item');
       }

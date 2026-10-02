@@ -211,7 +211,7 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "sections": const SyncSetting(),
                 "subtitles": [
                   L10n.of(context).settingsSyncWebdav,
-                  L10n.of(context).exportAndImport,
+                  ModuStrings.text(context, '数据库备份', 'Database backup'),
                 ],
               },
               {
@@ -220,8 +220,8 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "icon": Icons.settings_backup_restore,
                 "sections": const GlobalSettingsPage(),
                 "subtitles": [
-                  ModuStrings.text(context, '文件、二维码与 modu 链接 · 可选迁移账号密钥',
-                      'Files, QR and modu links · Optional credentials')
+                  ModuStrings.text(context, '文件与 modu 链接 · 可选迁移账号密钥',
+                      'Files and modu links · Optional credentials')
                 ],
               },
               {
@@ -265,12 +265,13 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 ],
               },
               {
-                "title": ModuStrings.text(context, '提交 Bug', 'Report a bug'),
+                "title": ModuStrings.text(
+                    context, '问题反馈与功能建议', 'Bug reports and feature requests'),
                 "icon": Icons.bug_report_outlined,
                 "sections": const BugReportSettings(),
                 "subtitles": [
-                  ModuStrings.text(
-                      context, '问题反馈与处理进度', 'Bug reports and issue status'),
+                  ModuStrings.text(context, 'Bug、功能建议与处理进度',
+                      'Bugs, feature requests and issue status'),
                 ],
               },
             ];

@@ -26,14 +26,24 @@ class BugReportSettings extends StatefulWidget {
 }
 
 class _BugReportSettingsState extends State<BugReportSettings> {
-  final _form = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _description = TextEditingController();
-  final _steps = TextEditingController();
-  final _expected = TextEditingController();
+  final _forms = {
+    for (final type in FeedbackType.values) type: GlobalKey<FormState>()
+  };
+  final _drafts = {
+    FeedbackType.bug: _FeedbackDraft(includeEnvironment: true),
+    FeedbackType.feature: _FeedbackDraft(includeEnvironment: false),
+  };
+  FeedbackType _type = FeedbackType.bug;
+  _FeedbackDraft get _draft => _drafts[_type]!;
+  GlobalKey<FormState> get _form => _forms[_type]!;
+  TextEditingController get _title => _draft.title;
+  TextEditingController get _description => _draft.description;
+  TextEditingController get _steps => _draft.steps;
+  TextEditingController get _actual => _draft.actual;
+  TextEditingController get _expected => _draft.expected;
+  TextEditingController get _additional => _draft.additional;
   String _version = '…';
   String? _status;
-  bool _includeEnvironment = true;
   bool _busy = false;
   bool _includeCrashLog = false;
   bool _loadingCrashLog = false;
@@ -42,6 +52,21 @@ class _BugReportSettingsState extends State<BugReportSettings> {
   int _logRequest = 0;
 
   String _tr(String zh, String en) => ModuStrings.text(context, zh, en);
+
+  void _selectType(FeedbackType type) {
+    if (_busy || type == _type) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _type = type;
+      _status = null;
+      // Logs belong only to Bug reports. Invalidate any outstanding read and
+      // require fresh opt-in when returning, without deleting either draft.
+      ++_logRequest;
+      _includeCrashLog = false;
+      _loadingCrashLog = false;
+      _crashLog = null;
+    });
+  }
 
   @override
   void initState() {
@@ -104,8 +129,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
 
   @override
   void dispose() {
-    for (final controller in [_title, _description, _steps, _expected]) {
-      controller.dispose();
+    for (final draft in _drafts.values) {
+      draft.dispose();
     }
     super.dispose();
   }
@@ -115,14 +140,24 @@ class _BugReportSettingsState extends State<BugReportSettings> {
       '\nLocale: ${Localizations.localeOf(context).toLanguageTag()}'
       '${_deviceEnvironment.isEmpty ? '' : '\n$_deviceEnvironment'}';
 
-  BugReport get _report => BugReport(
-        title: _title.text,
-        description: _description.text,
-        steps: _steps.text,
-        expected: _expected.text,
-        environment: _includeEnvironment ? _environment : null,
-        crashLog: _includeCrashLog ? _crashLog : null,
-      );
+  FeedbackReport get _report => _type == FeedbackType.feature
+      ? FeatureRequest(
+          title: _title.text,
+          problem: _description.text,
+          solution: _expected.text,
+          alternatives: _additional.text,
+          environment: _draft.includeEnvironment ? _environment : null,
+        )
+      : BugReport(
+          title: _title.text,
+          description: _description.text,
+          steps: _steps.text,
+          expected: _expected.text,
+          actual: _actual.text,
+          additional: _additional.text,
+          environment: _draft.includeEnvironment ? _environment : null,
+          crashLog: _includeCrashLog ? _crashLog : null,
+        );
 
   Future<void> _copy(String value) async {
     try {
@@ -179,7 +214,9 @@ class _BugReportSettingsState extends State<BugReportSettings> {
     final proceed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(_tr('预览 Bug 报告', 'Preview bug report')),
+        title: Text(report.type == FeedbackType.bug
+            ? _tr('预览 Bug 报告', 'Preview bug report')
+            : _tr('预览功能建议', 'Preview feature request')),
         content: SizedBox(
           width: 600,
           child: SingleChildScrollView(
@@ -190,6 +227,9 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                     'Submitted reports are public. Remove keys, personal information and private book content.')),
                 const SizedBox(height: 16),
                 SelectableText(report.markdown),
+                const SizedBox(height: 16),
+                Text(_tr('在 GitHub 可添加截图或可公开分享的示例。请先搜索重复反馈；每条反馈只描述一个问题或建议。',
+                    'Attach screenshots or shareable examples on GitHub. Search for duplicates first; keep each report to one bug or idea.')),
                 if (report.needsClipboard) ...[
                   const SizedBox(height: 16),
                   Text(_tr('报告较长，将复制完整内容到剪贴板，再打开 GitHub。请手动粘贴，不会截断内容。',
@@ -215,25 +255,33 @@ class _BugReportSettingsState extends State<BugReportSettings> {
     );
     if (proceed != true || !mounted) return;
     await _open(
-      report.needsClipboard ? BugReport.newIssueUri : report.prefilledUri,
+      report.needsClipboard ? report.templateUri : report.prefilledUri,
       copyFirst: report.needsClipboard ? report.markdown : null,
     );
   }
 
   Widget _field(TextEditingController controller, String label,
-      {int lines = 1, int maxLength = 6000}) {
+      {int lines = 1,
+      int maxLength = 6000,
+      bool required = true,
+      String? hint}) {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: TextFormField(
+        key: ValueKey(controller),
         controller: controller,
+        enabled: !_busy,
         minLines: lines,
         maxLines: lines + 3,
         maxLength: maxLength,
         decoration: InputDecoration(
-            labelText: label, border: const OutlineInputBorder()),
-        validator: (value) => value == null || value.trim().isEmpty
-            ? _tr('请填写此项', 'This field is required')
-            : null,
+            labelText: label,
+            hintText: hint,
+            border: const OutlineInputBorder()),
+        validator: (value) =>
+            required && (value == null || value.trim().isEmpty)
+                ? _tr('请填写此项', 'This field is required')
+                : null,
       ),
     );
   }
@@ -249,21 +297,52 @@ class _BugReportSettingsState extends State<BugReportSettings> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_tr('提交 Bug', 'Report a bug'),
+              Text(_tr('问题反馈与功能建议', 'Bug reports and feature requests'),
                   style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(_tr(
                   '填写问题并预览后，前往默读 GitHub 仓库确认提交（需要 GitHub 账号）。截图可在 GitHub 页面添加。',
                   'Describe and preview your report, then confirm it in the Modu GitHub repository (GitHub account required). Attach screenshots on GitHub.')),
               const SizedBox(height: 12),
-              Text(_tr(
-                  '各平台在本机保留有限的脱敏异常与操作记录，默认不附带、不上传。勾选后附带可用的系统崩溃诊断，不读取普通日志、AI 配置、密钥或书籍正文。报告提交后公开可见，请预览检查。附带日志时将复制报告，再由你粘贴到 GitHub。',
-                  'All platforms retain a small local journal of sanitized errors and checkpoints, never attached or uploaded by default. Opting in includes available crash diagnostics, not ordinary logs, AI settings, keys or book text. Review before sharing: reports become public. Reports with logs are copied for you to paste into GitHub.')),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    key: const ValueKey('feedback-type-bug'),
+                    avatar: const Icon(Icons.bug_report_outlined, size: 18),
+                    label: Text(_tr('提交 Bug', 'Report a bug')),
+                    selected: _type == FeedbackType.bug,
+                    onSelected:
+                        _busy ? null : (_) => _selectType(FeedbackType.bug),
+                  ),
+                  ChoiceChip(
+                    key: const ValueKey('feedback-type-feature'),
+                    avatar: const Icon(Icons.lightbulb_outline, size: 18),
+                    label: Text(_tr('功能建议', 'Feature request')),
+                    selected: _type == FeedbackType.feature,
+                    onSelected:
+                        _busy ? null : (_) => _selectType(FeedbackType.feature),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(_type == FeedbackType.bug
+                  ? _tr('已有功能出错请选择 Bug；希望新增或改进功能请选择功能建议。',
+                      'Choose Bug for a broken feature, or Feature request for a new or improved capability.')
+                  : _tr('描述使用场景和希望实现的效果，无需填写重现步骤或附带崩溃日志。',
+                      'Describe your use case and the desired feature. Reproduction steps and crash logs are not needed.')),
+              if (_type == FeedbackType.bug)
+                Text(_tr(
+                    '各平台在本机保留有限的脱敏异常与操作记录，默认不附带、不上传。勾选后附带可用的系统崩溃诊断，不读取普通日志、AI 配置、密钥或书籍正文。报告提交后公开可见，请预览检查。附带日志时将复制报告，再由你粘贴到 GitHub。',
+                    'All platforms retain a small local journal of sanitized errors and checkpoints, never attached or uploaded by default. Opting in includes available crash diagnostics, not ordinary logs, AI settings, keys or book text. Review before sharing: reports become public. Reports with logs are copied for you to paste into GitHub.')),
               Wrap(
                 spacing: 8,
                 children: [
                   TextButton.icon(
-                    onPressed: _busy ? null : () => _open(BugReport.issuesUri),
+                    onPressed: _busy
+                        ? null
+                        : () => _open(FeedbackReport.searchUri(_title.text)),
                     icon: const Icon(Icons.search),
                     label: Text(_tr('查看已有问题', 'Existing issues')),
                   ),
@@ -276,30 +355,53 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                 ],
               ),
               _field(_title, _tr('标题', 'Title'), maxLength: 100),
-              _field(_description, _tr('问题描述', 'Description'), lines: 3),
-              _field(_steps, _tr('重现步骤', 'Steps to reproduce'), lines: 3),
-              _field(_expected, _tr('预期行为', 'Expected behavior'), lines: 2),
+              if (_type == FeedbackType.bug) ...[
+                _field(_description, _tr('问题描述', 'Description'), lines: 3),
+                _field(_steps, _tr('重现步骤', 'Steps to reproduce'),
+                    lines: 3,
+                    hint: _tr('按顺序列出操作；无法稳定复现时，说明出错前的操作与发生频率。',
+                        'List the steps in order. If intermittent, describe what happened before the error and how often it occurs.')),
+                _field(_actual, _tr('实际结果', 'Actual behavior'), lines: 2),
+                _field(_expected, _tr('预期行为', 'Expected behavior'), lines: 2),
+                _field(_additional,
+                    _tr('补充信息（可选）', 'Additional context (optional)'),
+                    lines: 2, required: false),
+              ] else ...[
+                _field(_description, _tr('使用场景与需求', 'Problem or use case'),
+                    lines: 3),
+                _field(_expected, _tr('希望实现的功能', 'Proposed solution'),
+                    lines: 3),
+                _field(
+                    _additional,
+                    _tr('替代方案与补充信息（可选）',
+                        'Alternatives and additional context (optional)'),
+                    lines: 2,
+                    required: false),
+              ],
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
                     _tr('附带设备与运行环境', 'Include device and environment info')),
                 subtitle: Text(_environment),
-                value: _includeEnvironment,
-                onChanged: (value) =>
-                    setState(() => _includeEnvironment = value),
+                value: _draft.includeEnvironment,
+                onChanged: _busy
+                    ? null
+                    : (value) =>
+                        setState(() => _draft.includeEnvironment = value),
               ),
-              CheckboxListTile(
-                key: const ValueKey('include-crash-log'),
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                    _tr('附带崩溃日志（可选）', 'Include crash diagnostics (optional)')),
-                subtitle: Text(_tr(
-                    '包含当前平台可用的退出原因、内存采样、向量化进度和脱敏原生堆栈。Apple 报告可能延迟；Linux 需要系统保留记录。强制退出不保证有堆栈。提交后公开，请先预览。',
-                    'Includes available exit reasons, memory samples, index checkpoints and sanitized native frames. Apple delivery can be delayed; Linux requires retained system records. Force-kills may have no stack. Preview before public submission.')),
-                value: _includeCrashLog,
-                onChanged:
-                    _busy ? null : (value) => _toggleCrashLog(value ?? false),
-              ),
+              if (_type == FeedbackType.bug)
+                CheckboxListTile(
+                  key: const ValueKey('include-crash-log'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(_tr(
+                      '附带崩溃日志（可选）', 'Include crash diagnostics (optional)')),
+                  subtitle: Text(_tr(
+                      '包含当前平台可用的退出原因、内存采样、向量化进度和脱敏原生堆栈。Apple 报告可能延迟；Linux 需要系统保留记录。强制退出不保证有堆栈。提交后公开，请先预览。',
+                      'Includes available exit reasons, memory samples, index checkpoints and sanitized native frames. Apple delivery can be delayed; Linux requires retained system records. Force-kills may have no stack. Preview before public submission.')),
+                  value: _includeCrashLog,
+                  onChanged:
+                      _busy ? null : (value) => _toggleCrashLog(value ?? false),
+                ),
               if (_loadingCrashLog) const LinearProgressIndicator(),
               if (_includeCrashLog && _crashLog != null)
                 ExpansionTile(
@@ -325,7 +427,9 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                   ),
                   FilledButton.icon(
                     onPressed: _busy || _loadingCrashLog ? null : _preview,
-                    icon: const Icon(Icons.bug_report_outlined),
+                    icon: Icon(_type == FeedbackType.bug
+                        ? Icons.bug_report_outlined
+                        : Icons.lightbulb_outline),
                     label: Text(_tr('预览并提交', 'Preview and submit')),
                   ),
                 ],
@@ -337,11 +441,39 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                       Text(_status!, key: const ValueKey('bug-report-status')),
                 ),
               const SizedBox(height: 20),
-              SelectableText(BugReport.newIssueUri.toString()),
+              SelectableText(_report.templateUri.toString()),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+/// Controllers live for the entire settings session, not individual rebuilds.
+/// Switching report type preserves text/selection and does not persist private
+/// drafts in global settings or cloud sync.
+class _FeedbackDraft {
+  _FeedbackDraft({required this.includeEnvironment});
+
+  final title = TextEditingController();
+  final description = TextEditingController();
+  final steps = TextEditingController();
+  final actual = TextEditingController();
+  final expected = TextEditingController();
+  final additional = TextEditingController();
+  bool includeEnvironment;
+
+  void dispose() {
+    for (final controller in [
+      title,
+      description,
+      steps,
+      actual,
+      expected,
+      additional
+    ]) {
+      controller.dispose();
+    }
   }
 }

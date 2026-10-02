@@ -5,9 +5,11 @@ import 'package:anx_reader/main.dart' show navigatorKey;
 import 'package:anx_reader/page/settings_page/sync.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/widgets/bookshelf/sync_status_bottom_sheet.dart';
+import 'package:anx_reader/widgets/settings/database_backup_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,6 +42,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
         child: MaterialApp(
       navigatorKey: navigatorKey,
+      builder: FlutterSmartDialog.init(),
       locale: const Locale('en'),
       localizationsDelegates: const [
         L10n.delegate,
@@ -51,6 +54,39 @@ void main() {
     )));
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+      'database export uses the renamed dialog and cancellation unlocks actions',
+      (tester) async {
+    await open(tester);
+    final export = find.byKey(const ValueKey('database-backup-export'));
+    await tester.scrollUntilVisible(export, 500,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(export);
+    await tester.pumpAndSettle();
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text('Export database backup')),
+        findsOneWidget);
+    expect(
+        tester
+            .widget<DatabaseBackupSection>(find.byType(DatabaseBackupSection))
+            .busy,
+        true);
+    expect(tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        false);
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('Cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+        tester
+            .widget<DatabaseBackupSection>(find.byType(DatabaseBackupSection))
+            .busy,
+        false);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
       'saving WebDAV immediately refreshes URL without leaving settings',

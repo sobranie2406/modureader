@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:isolate';
 import 'package:anx_reader/service/knowledge/book_index_lock.dart';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
 import 'package:anx_reader/service/knowledge/index_build_marker.dart';
@@ -10,6 +11,7 @@ import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
+import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 
 class BookKnowledgeIndexStatus {
@@ -31,6 +33,7 @@ class BookKnowledgeIndexService {
 
   final BookContentSearchRepository _chapterRepository;
   static final _indexStatusCache = <String, Future<bool>>{};
+  static Future<void> _legacyRecoveryTail = Future<void>.value();
 
   File indexFile(int bookId) => File(getBasePath('knowledge/$bookId.json'));
 
@@ -39,8 +42,10 @@ class BookKnowledgeIndexService {
   Future<FileKnowledgeIndexStore> storeFor(Book book,
       {bool Function()? isCancelled}) async {
     final fingerprint = await sourceFingerprint(book);
+    final legacy = await legacyBookSourceFingerprint(book);
     return FileKnowledgeIndexStore(indexFile(book.id),
         sourceFingerprint: fingerprint,
+        sourceFingerprintAliases: [if (legacy != null) legacy],
         isCancelled: isCancelled,
         isSourceCurrent: () async =>
             await sourceFingerprint(book) == fingerprint);
@@ -48,7 +53,12 @@ class BookKnowledgeIndexService {
 
   Future<KnowledgeIndexSnapshot?> loadSnapshot(Book book) async {
     try {
-      return await (await storeFor(book)).load(book.id.toString());
+      if (!await indexFile(book.id).exists()) return null;
+      final store = await storeFor(book);
+      final snapshot = await store.load(book.id.toString());
+      if (snapshot != null) return snapshot;
+      if (!await _recoverLegacy(book, store)) return null;
+      return await store.load(book.id.toString());
     } on FileSystemException {
       return null;
     }
@@ -57,17 +67,19 @@ class BookKnowledgeIndexService {
   Future<bool> hasIndex(Book book) async {
     try {
       if (await indexBuildMarker(indexFile(book.id)).exists()) return false;
-      final source = await sourceFingerprint(book);
       final file = indexFile(book.id);
       final stat = await file.stat();
       if (stat.type != FileSystemEntityType.file) return false;
+      final source = await sourceFingerprint(book);
       final key =
-          '${file.path}:$source:${stat.size}:${stat.modified.microsecondsSinceEpoch}';
+          '${file.path}:$source:${stat.size}:${stat.modified.microsecondsSinceEpoch}:${stat.changed.microsecondsSinceEpoch}';
       if (_indexStatusCache.length > 64) _indexStatusCache.clear();
-      return await (_indexStatusCache[key] ??=
-          FileKnowledgeIndexStore(file, sourceFingerprint: source)
-              .summary(book.id.toString())
-              .then((summary) => summary != null));
+      final result = await (_indexStatusCache[key] ??=
+          _summaryFor(book).then((summary) => summary != null));
+      // A transient unavailable WebView/storage must not permanently cache a
+      // failed legacy check for the rest of this application's lifetime.
+      if (!result) _indexStatusCache.remove(key);
+      return result;
     } on FileSystemException {
       return false;
     }
@@ -77,7 +89,7 @@ class BookKnowledgeIndexService {
     if (await indexBuildMarker(indexFile(book.id)).exists()) {
       return const BookKnowledgeIndexStatus(indexed: false);
     }
-    final summary = await (await storeFor(book)).summary(book.id.toString());
+    final summary = await _summaryFor(book);
     if (summary == null) {
       return const BookKnowledgeIndexStatus(indexed: false);
     }
@@ -87,6 +99,53 @@ class BookKnowledgeIndexService {
       vectorCount: summary['vectorCount'] as int,
     );
   }
+
+  Future<Map<String, dynamic>?> _summaryFor(Book book) async {
+    // An unindexed bookshelf tile must not read/hash the entire book.
+    if (!await indexFile(book.id).exists()) return null;
+    final store = await storeFor(book);
+    final summary = await store.summary(book.id.toString());
+    if (summary != null) return summary;
+    if (!await _recoverLegacy(book, store)) return null;
+    return store.summary(book.id.toString());
+  }
+
+  Future<bool> _recoverLegacy(Book book, FileKnowledgeIndexStore store) =>
+      withBookIndexLock(book.id, () async {
+        final prior = _legacyRecoveryTail;
+        final done = Completer<void>();
+        _legacyRecoveryTail = done.future;
+        await prior;
+        try {
+          if (await indexBuildMarker(store.file).exists()) return false;
+          if (await store.summary(book.id.toString()) != null) return true;
+          final metadata =
+              await readKnowledgeIndexMetadata(store.file, book.id.toString());
+          if (metadata == null ||
+              (metadata['sourceFingerprint'] as String?)
+                      ?.startsWith('sha256:') ==
+                  true) {
+            return false;
+          }
+          // Old timestamp/path fingerprints cannot prove a copied book's
+          // identity. Compare its locally extracted canonical chapter text.
+          // Serialize these short-lived readers to avoid opening one per tile.
+          final chapters =
+              await _chapterRepository.extractChaptersForIndex(book);
+          final hash = await Isolate.run(() => knowledgeContentHash(chapters));
+          if (hash != metadata['contentHash'] ||
+              await sourceFingerprint(book) != store.sourceFingerprint) {
+            return false;
+          }
+          return await store.adoptVerifiedLegacy(book.id.toString(), hash);
+        } on Object {
+          // Keep the old file for retry/recovery; never delete it or mark a
+          // corrupt/mismatched index complete just to suppress the badge.
+          return false;
+        } finally {
+          done.complete();
+        }
+      });
 
   Future<IndexBuildResult> build(
     Book book, {

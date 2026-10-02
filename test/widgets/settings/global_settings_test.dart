@@ -33,9 +33,14 @@ void main() {
         tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, true);
     expect(find.byType(TextField), findsNothing);
     expect(find.textContaining('plaintext'), findsOneWidget);
-    expect(find.text('Export QR / modu link'), findsOneWidget);
+    expect(find.text('Export modu link'), findsOneWidget);
+    expect(find.text('Export global settings file'), findsOneWidget);
+    expect(find.text('Restore settings from file'), findsOneWidget);
     expect(find.text('Restore from modu link'), findsOneWidget);
-    expect(find.text('Restore from QR image'), findsOneWidget);
+    expect(find.text('Export QR / modu link'), findsNothing);
+    expect(find.text('Restore from QR image'), findsNothing);
+    expect(find.byIcon(Icons.qr_code_2), findsNothing);
+    expect(find.byIcon(Icons.image_search), findsNothing);
     expect(tester.takeException(), isNull);
     await Prefs().prefs.setDouble('ttsRate', 1.2);
     await Prefs()

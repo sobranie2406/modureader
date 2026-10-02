@@ -615,6 +615,14 @@ class Prefs extends ChangeNotifier {
 
   bool get tapOnlyPageTurn => prefs.getBool('tapOnlyPageTurn') ?? false;
 
+  bool get longPressSelectParagraph =>
+      prefs.getBool('longPressSelectParagraph') ?? false;
+
+  set longPressSelectParagraph(bool value) {
+    prefs.setBool('longPressSelectParagraph', value);
+    notifyListeners();
+  }
+
   int get scrollPagePercent {
     final value = prefs.get('scrollPagePercent');
     return value is int ? value.clamp(80, 100).toInt() : 80;
@@ -1253,6 +1261,35 @@ class Prefs extends ChangeNotifier {
   set userPrompts(List<UserPrompt> prompts) {
     final jsonList = prompts.map((p) => p.toJson()).toList();
     prefs.setString(_userPromptsKey, jsonEncode(jsonList));
+    notifyListeners();
+  }
+
+  bool get aiReadingSkillsVisible =>
+      prefs.getBool('aiReadingSkillsVisible') ?? true;
+
+  set aiReadingSkillsVisible(bool value) {
+    prefs.setBool('aiReadingSkillsVisible', value);
+    notifyListeners();
+  }
+
+  bool get aiSkillTemplateDraft =>
+      prefs.getBool('aiSkillTemplateDraft') ?? false;
+
+  set aiSkillTemplateDraft(bool value) {
+    prefs.setBool('aiSkillTemplateDraft', value);
+    notifyListeners();
+  }
+
+  List<String> get readAnySkillOrder {
+    try {
+      return prefs.getStringList('readAnySkillOrder') ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  set readAnySkillOrder(List<String> value) {
+    prefs.setStringList('readAnySkillOrder', List<String>.from(value));
     notifyListeners();
   }
 

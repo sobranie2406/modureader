@@ -210,27 +210,6 @@ class _StyleSettingsState extends State<StyleSettings> {
       ]);
     }
 
-    Widget fontWeightSlider(BookStyle bookStyle, StateSetter setState) {
-      bool enabled = !Prefs().useBookStyles;
-      return StyleSlider(
-        icon: Icons.format_bold,
-        label: L10n.of(context).readingPageFontWeight,
-        value: bookStyle.fontWeight,
-        onChanged: (double value) {
-          setState(() {
-            bookStyle.fontWeight = value;
-            epubPlayerKey.currentState?.changeStyle(bookStyle);
-            Prefs().saveBookStyleToPrefs(bookStyle);
-          });
-        },
-        min: 100,
-        max: 900,
-        divisions: 8,
-        labelFormatter: (value) => value.toString(),
-        enabled: enabled,
-      );
-    }
-
     Widget headingFontSizeSlider(BookStyle bookStyle, StateSetter setState) {
       bool enabled = !Prefs().useBookStyles;
       return StyleSlider(
@@ -326,7 +305,6 @@ class _StyleSettingsState extends State<StyleSettings> {
             sideMarginSlider(bookStyle, setState),
             topBottomMarginSlider(bookStyle, setState),
             letterSpacingSlider(bookStyle, setState),
-            fontWeightSlider(bookStyle, setState),
             headingFontSizeSlider(bookStyle, setState),
           ],
         ),

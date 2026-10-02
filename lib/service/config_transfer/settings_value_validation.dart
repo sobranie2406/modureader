@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/service/ai/reading_skill_layout.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/models/chapter_split_rule.dart';
 import 'package:anx_reader/models/reading_info.dart';
@@ -105,6 +106,14 @@ void validateSettingsValue(String key, dynamic value) {
   }
   if (key == 'readAnySkillStates' && object().values.any((v) => v is! bool)) {
     throw const FormatException('Invalid skill state');
+  }
+  if (key == 'readAnySkillOrder') {
+    final order = List<String>.from(value as List);
+    if (order.length > 512 ||
+        order.toSet().length != order.length ||
+        order.any((id) => !isReadingSkillOrderId(id))) {
+      throw const FormatException('Invalid reading skill order');
+    }
   }
   if ((key == 'readAnySkillPrompts' || key.startsWith('aiConfig_')) &&
       object().values.any((v) => v is! String)) {

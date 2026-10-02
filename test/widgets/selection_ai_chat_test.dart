@@ -38,6 +38,9 @@ class _Chat extends AiChat {
     String message,
     String? source,
     String? skill,
+    String? context,
+    bool selectionRequest,
+    bool webSearch,
     bool regenerate,
     int previousCount,
     CancelableLangchainRunner? runner
@@ -53,12 +56,18 @@ class _Chat extends AiChat {
       String message, WidgetRef widgetRef, bool isRegenerate,
       {String? skillId,
       String? sourceText,
+      String? sourceContext,
+      bool selectionRequest = false,
+      bool webSearch = false,
       String? homePromptId,
       CancelableLangchainRunner? requestRunner}) {
     requests.add((
       message: message,
       source: sourceText,
       skill: skillId,
+      context: sourceContext,
+      selectionRequest: selectionRequest,
+      webSearch: webSearch,
       regenerate: isRegenerate,
       previousCount: state.value?.length ?? 0,
       runner: requestRunner
@@ -101,7 +110,11 @@ void main() {
   late _Chat chat;
   final key = GlobalKey<AiChatStreamState>();
   Future<void> mount(WidgetTester tester,
-      {bool immediate = false, bool popup = false}) async {
+      {bool immediate = false,
+      bool popup = false,
+      bool selection = false,
+      String? sourceContext,
+      bool webSearch = false}) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     final directory = Directory.systemTemp.createTempSync('modu-selection-ai-');
@@ -122,6 +135,9 @@ void main() {
         initialMessage:
             immediate ? template.promptForSelection('原文 {selection}') : '原文',
         initialSourceText: '原文 {selection}',
+        initialSourceContext: sourceContext,
+        initialSelectionRequest: selection,
+        initialWebSearch: webSearch,
         initialSkillId: template.skillId,
         sendImmediate: immediate,
         newConversation: true);
@@ -203,6 +219,43 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+
+  for (final immediate in [true, false]) {
+    testWidgets(
+        'selection options reach AI for ${immediate ? 'preset' : 'manual'} send and regeneration',
+        (tester) async {
+      await mount(tester,
+          immediate: immediate,
+          selection: true,
+          sourceContext: '选区附近的上下文',
+          webSearch: true);
+      if (!immediate) {
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        // A direct button tap also works before the input gains keyboard focus.
+        if (chat.requests.isEmpty) {
+          await tester.enterText(find.byType(TextField), '介绍相关知识');
+          await tester.testTextInput.receiveAction(TextInputAction.send);
+        }
+        await tester.pump();
+      }
+      expect(chat.requests, hasLength(1));
+      expect(chat.requests.single.context, '选区附近的上下文');
+      expect(chat.requests.single.selectionRequest, true);
+      expect(chat.requests.single.webSearch, true);
+      expect(chat.requests.single.source, '原文 {selection}');
+      chat.emit('知识介绍');
+      await chat.streams.last.close();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('重新生成'));
+      await tester.tap(find.text('重新生成'));
+      await tester.pump();
+      expect(chat.requests.last.context, '选区附近的上下文');
+      expect(chat.requests.last.webSearch, true);
+      expect(chat.requests.last.selectionRequest, true);
+      await tester.pumpWidget(const SizedBox());
+      unawaited(chat.streams.last.close());
+    });
+  }
 
   testWidgets(
       'a new selection cancels old output and starts an independent question',

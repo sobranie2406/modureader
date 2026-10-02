@@ -1,4 +1,55 @@
 {
+  "ui_reader_simulated_bold": {"zh":"模拟加粗","en":"Simulated bold"},
+  "ui_reader_simulated_bold_help": {"zh":"用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。","en":"Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner."},
+  "ui_reader_boldness": {"zh":"字体粗细","en":"Font thickness"},
+  "ui_database_backup_title": {"zh":"数据库备份","en":"Database backup"},
+  "ui_database_backup_export": {"zh":"数据库备份导出","en":"Export database backup"},
+  "ui_database_backup_import": {"zh":"数据库备份导入","en":"Import database backup"},
+  "ui_database_backup_contents": {"zh":"这是 ZIP 数据库备份包，包含书库数据库、笔记/高亮、书签、阅读记录、文件夹/标签，以及本机已有的书籍、封面、字体、背景图片、AI 对话历史和一般设置；不是仅导出数据库文件，也不同于“全局设置备份”的 JSON 文件。","en":"This ZIP database backup contains the library database, notes/highlights, bookmarks, reading records, folders/tags, local books, covers, fonts, background images, AI chat history and general settings. It is more than a database file and is separate from the JSON Global settings backup."},
+  "ui_database_backup_export_step": {"zh":"导出：选择是否加密包含服务配置与凭据 → 生成 Modu-Backup-*.zip → 保存。仅包含本机已有文件，请先下载需要迁移的书籍。","en":"Export: choose whether to include encrypted service settings and credentials → create Modu-Backup-*.zip → save. Only local files are included; download books you want to transfer first."},
+  "ui_database_backup_import_step": {"zh":"导入：选择本功能导出的 ZIP（无需解压）→ 确认覆盖并校验 → 若设置加密，输入导出时的密码 → 完成后重启默读。会替换现有书库、笔记和备份中的设置，不会合并，建议先导出当前数据。","en":"Import: select a ZIP exported here (no extraction needed) → confirm replacement and validate → enter the export password if settings are encrypted → restart Modu. This replaces the current library, notes and backed-up settings; it does not merge. Export your current data first."},
+  "ui_database_backup_save_windows": {"zh":"默认保存位置：Windows 当前用户的 Downloads（下载）文件夹，通常为 C:\\Users\\<用户名>\\Downloads。导出后显示实际完整位置，可复制。","en":"Default location: the current Windows user’s Downloads folder, usually C:\\Users\\<username>\\Downloads. Export shows the actual full location with a copy action."},
+  "ui_database_backup_save_desktop": {"zh":"保存位置：在系统保存窗口选择目录，没有固定的自动保存目录。导出后显示实际完整路径，可复制。","en":"Save location: choose a folder in the system save dialog; there is no fixed automatic destination. Export shows the actual full path with a copy action."},
+  "ui_database_backup_save_mobile": {"zh":"保存位置：在系统保存窗口选择“下载”或“文件”中的目录，以所选位置为准。导出后显示文件名或完整路径，便于查找。","en":"Save location: choose a folder in Downloads or Files using the system save dialog. Export shows the file name or full path to help you find it."},
+  "ui_settings_link_title": {"zh":"{scope}：modu 链接","en":"{scope}: modu link"},
+  "ui_settings_link_export": {"zh":"导出 modu 链接","en":"Export modu link"},
+  "ui_settings_link_help": {"zh":"请勿公开分享。在“全局设置备份”粘贴完整链接即可导入；设置较多时推荐使用设置文件。","en":"Keep private. Paste the complete link in Global settings backup to import it. Use a settings file for larger backups."},
+  "ui_settings_transfer_help": {"zh":"一次迁移全部全局设置，支持设置文件和 modu 链接，推荐使用文件备份。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。","en":"Transfer all global settings via settings files or modu links. Files are recommended for backups. Older AI, speech, sync and library links remain supported; actual contents are shown before import."},
+  "ui_settings_transfer_nav": {"zh":"文件与 modu 链接 · 可选迁移账号密钥","en":"Files and modu links · Optional credentials"},
+  "ui_settings_speech_transfer_help": {"zh":"接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用设置文件或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。","en":"Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via settings files or modu links. System voices may need reselection on another device."},
+  "ui_feedback_title": {"zh":"问题反馈与功能建议","en":"Bug reports and feature requests"},
+  "ui_feedback_subtitle": {"zh":"Bug、功能建议与处理进度","en":"Bugs, feature requests and issue status"},
+  "ui_feedback_feature": {"zh":"功能建议","en":"Feature request"},
+  "ui_feedback_preview_feature": {"zh":"预览功能建议","en":"Preview feature request"},
+  "ui_feedback_guidance": {"zh":"在 GitHub 可添加截图或可公开分享的示例。请先搜索重复反馈；每条反馈只描述一个问题或建议。","en":"Attach screenshots or shareable examples on GitHub. Search for duplicates first; keep each report to one bug or idea."},
+  "ui_feedback_choose_type": {"zh":"已有功能出错请选择 Bug；希望新增或改进功能请选择功能建议。","en":"Choose Bug for a broken feature, or Feature request for a new or improved capability."},
+  "ui_feedback_feature_help": {"zh":"描述使用场景和希望实现的效果，无需填写重现步骤或附带崩溃日志。","en":"Describe your use case and the desired feature. Reproduction steps and crash logs are not needed."},
+  "ui_feedback_steps_hint": {"zh":"按顺序列出操作；无法稳定复现时，说明出错前的操作与发生频率。","en":"List the steps in order. If intermittent, describe what happened before the error and how often it occurs."},
+  "ui_feedback_actual": {"zh":"实际结果","en":"Actual behavior"},
+  "ui_feedback_additional": {"zh":"补充信息（可选）","en":"Additional context (optional)"},
+  "ui_feedback_use_case": {"zh":"使用场景与需求","en":"Problem or use case"},
+  "ui_feedback_solution": {"zh":"希望实现的功能","en":"Proposed solution"},
+  "ui_feedback_alternatives": {"zh":"替代方案与补充信息（可选）","en":"Alternatives and additional context (optional)"},
+  "ai_skill_template_draft": {"zh":"技能模板先填入输入框","en":"Edit skill templates before sending"},
+  "ai_skill_template_draft_help": {"zh":"关闭时点击模板自动发送；开启后可先补充、修改再手动发送，不改变已保存的模板。","en":"Off: send templates immediately. On: fill the input so you can edit before sending. Saved templates stay unchanged."},
+  "reading_long_press_paragraph": {"zh":"长按选择整段","en":"Select paragraph on long press"},
+  "reading_long_press_help": {"zh":"关闭时自动选中所在词语；开启时选中所在段落。仍可拖动调整选区。","en":"Off: select the word. On: select the paragraph. Drag the selection handles to adjust either range."},
+  "reading_skills_visible": {"zh":"默认显示阅读技能","en":"Show reading skills by default"},
+  "reading_skills_layout_help": {"zh":"内置与自定义技能可一起拖动排序、独立开关。点击技能修改提示词；备份只保存用户改动。","en":"Reorder built-in and custom skills together and enable each independently. Tap a skill to edit its prompt; backups store only your changes."},
+  "reading_skills_reset_order": {"zh":"恢复默认顺序","en":"Restore default order"},
+  "reading_skills_reorder": {"zh":"拖动排序","en":"Drag to reorder"},
+  "reading_skills_none": {"zh":"尚未启用阅读技能，可在管理中开启。","en":"No reading skills enabled. Enable them in Manage."},
+  "reading_skills_manage": {"zh":"管理阅读技能","en":"Manage reading skills"},
+  "selection_ai_prompt_mode": {"zh":"提示词处理","en":"Prompt task"},
+  "selection_ai_scope": {"zh":"内容范围","en":"Content scope"},
+  "selection_ai_scope_selection": {"zh":"仅选中文字","en":"Selected text only"},
+  "selection_ai_scope_context": {"zh":"结合上下文","en":"Include nearby context"},
+  "selection_ai_web_search": {"zh":"联网搜索","en":"Search online"},
+  "selection_ai_web_search_help": {"zh":"勾选后检索公开词典／百科并交给当前模型整理，附来源；无需额外 API Key。","en":"Search public dictionaries/encyclopedias and let the current model summarize with sources. No extra API key needed."},
+  "selection_ai_help": {"zh":"AI 模板在此独立管理，默认关闭。范围默认仅选中文字，可选择附近上下文；联网搜索可单独开启。使用当前 AI 服务，每次新建对话并在回答结束后返回第一段。用户改动随全局设置备份。","en":"AI templates are managed separately and disabled by default. Use selected text only, or include nearby context; online search is optional. Each task uses the current provider in a new chat and returns to the answer start. User changes are included in global backups."},
+  "ui_tts_quick_return": {"zh":"回到朗读位置","en":"Return to narration"},
+  "ui_tts_quick_here": {"zh":"从此处朗读","en":"Read from here"},
+  "ui_tts_quick_error": {"zh":"朗读操作失败，请重试","en":"Narration action failed. Please retry."},
   "ui_dictionary_web_follow_up": {
     "zh": "如需联网补查，请在下方输入“确认联网搜索”并发送。",
     "en": "To check online, type “Confirm online search” below and send."
@@ -28,51 +79,31 @@
   "ai_translate_prompt": {
     "en": "You are the Modu \"Translation & Reference\" expert. Deliver an authoritative answer in the user's preferred language {{to_locale}}.\n\nInput for this request:\n- Source Text: {{text}}\n- Source Language hint: {{from_locale}}\n- Reader Context (may be empty): {{contextText}}\n\n## Response Structure (CRITICAL)\nYour response MUST follow this two-part structure:\nDON'T output the skeleton or the instructions, only the final answer.\n\n### Part 1: Quick Context-Aware Explanation (ALWAYS FIRST)\nStart with 1-2 concise words that:\n- Directly explain the meaning/translation in the reading context\n- Address any ambiguity resolved by the context\n- Use plain, conversational language\n- Don't quote the source text unless necessary for clarity, and avoid excessive quoting\n\n### Part 2: Detailed Analysis (AFTER the quick explanation)\nProvide comprehensive information using the format below.\n\n## Core Duties\n1. Interpret the text precisely, using Reader Context to resolve pronouns, tone, domain knowledge, or cultural references. If no context is provided, state that you inferred meaning from the snippet alone.\n2. Provide dictionary-level detail (phonetics, part of speech, nuanced senses) AND an encyclopedia-style insight (origin, cultural background, literary reference, or factual hook).\n3. Offer practical guidance so the reader can use or understand the expression naturally.\n\n## Constraints\n- All responses must stay in {{to_locale}}.\n- Be concise but complete; remove any template sections only when genuinely inapplicable and indicate why.\n- Never output markdown lists, numbering symbols, or code fences—just localized headings and text.\n\n## Decision Tree\n- If source language matches {{to_locale}} → act as an advanced monolingual dictionary entry.\n- Otherwise → act as a translator plus tutor.\n\n## Detail (plain text, no bullet symbols, each heading MUST translated into {{to_locale}})\n\nWhen acting as a dictionary (same language):\n- Pronunciation: best-available phonetic transcription or note if unknown.\n- Part of speech: list every relevant part of speech.\n- Meanings: enumerate key senses with concise explanations.\n- Examples: provide two natural example sentences with brief clarifications.\n- Encyclopedia: share one contextual or cultural fact (history, literature, idiom origin, domain usage).\n\nWhen acting as a translator (different languages):\n- Source excerpt: quote or lightly trim the source snippet (note when shortened).\n- Translation: produce a fluent translation honoring tone and register.\n- Translation notes: justify critical word choices, including how context shaped them.\n- Glossary: highlight 2-4 pivotal terms with short meaning notes in {{to_locale}}.\n- Encyclopedia: add one background detail (culture, setting, concept) that aids understanding.\n      "
   },
-  "selection_custom-preset-dictionary_name": {
-    "zh": "AI 词典"
-  },
-  "selection_custom-preset-dictionary_prompt": {
-    "zh": "解释所选词语 {selection}。英文给出 IPA 音标、词性、中文翻译、中英文释义、例句与常用搭配；中文给出带声调的拼音、含义、用法和相关词语。仅使用模型已有知识简明解释，不等待外部词典或百科。不确定的读音、释义或词源明确说明，不能编造读音、释义、词源或来源。如需核实，提示用户在对话框输入“确认联网搜索”并发送；不提示点击按钮，不自动搜索。不使用本书知识库。"
-  },
+  "selection_custom-preset-dictionary_name": {"zh":"AI 知识","en":"AI Knowledge"},
+  "selection_custom-preset-dictionary_prompt": {"zh":"简要介绍 {selection} 的含义、背景和相关知识，用选中文字的语言回答。不提供拼音、音标、翻译或例句；不确定的内容明确说明。","en":"Briefly explain the meaning, background and related knowledge of {selection}, in the selected text's language. No pronunciation, translation or example sentences; clearly flag uncertainty."},
   "selection_custom-preset-explain_name": {
     "zh": "通俗解释"
   },
-  "selection_custom-preset-explain_prompt": {
-    "zh": "请通俗解释选中的文字 {selection}，先说明含义，再解释关键概念，必要时给一个简短例子。只围绕选中文字，不补写书中的情节或上下文。"
-  },
+  "selection_custom-preset-explain_prompt": {"zh":"通俗解释 {selection} 的含义与关键概念，简明直接，不编造。","en":"Explain the meaning and key concepts of {selection} simply and concisely. Do not invent facts."},
   "selection_custom-preset-points_name": {
     "zh": "提炼要点"
   },
-  "selection_custom-preset-points_prompt": {
-    "zh": "从选中的文字 {selection} 中提炼关键要点，用简短列表呈现；有论证时区分观点和依据，有事件时区分人物、事件和结果。要点数量按原文决定，不凑数。"
-  },
+  "selection_custom-preset-points_prompt": {"zh":"提炼 {selection} 的关键要点，用简短列表呈现，不凑数。","en":"Extract the key points of {selection} as a short list. Do not pad the list."},
   "selection_custom-preset-polish_name": {
     "zh": "润色"
   },
-  "selection_custom-preset-polish_prompt": {
-    "zh": "润色选中的文字 {selection}，让表达自然、清晰、流畅，保留原意、事实与语气，不增加信息。先给润色结果，再简短说明主要改动。"
-  },
+  "selection_custom-preset-polish_prompt": {"zh":"润色 {selection}，保留原意和语气，使表达自然清晰，只给结果。","en":"Polish {selection} for clarity and natural phrasing, preserving meaning and tone. Output only the result."},
   "selection_custom-preset-summary_name": {
     "zh": "摘要"
   },
-  "selection_custom-preset-summary_prompt": {
-    "zh": "用简洁语言概括选中的文字 {selection}，保留核心观点、关键事实和因果关系。不引用其他段落，不添加原文没有的信息。"
-  },
+  "selection_custom-preset-summary_prompt": {"zh":"简要概括 {selection} 的核心观点与关键事实，不添加原文没有的信息。","en":"Briefly summarize the core ideas and key facts of {selection}, without adding information."},
   "selection_custom-preset-translate_name": {
     "zh": "AI 翻译"
   },
-  "selection_custom-preset-translate_prompt": {
-    "zh": "翻译选中文字 {selection}：英文译成自然的中文，中文译成自然的英文；混合文本按主要语言处理。保持原意和段落，先给译文，必要时补充易误解的词语。"
-  },
-  "skill_ai_dictionary_description": {
-    "zh": "直接使用模型已有知识解释；英文音标与双语释义、中文拼音及相关词语知识，联网补查需手动选择"
-  },
-  "skill_ai_dictionary_name": {
-    "zh": "AI 词典解释"
-  },
-  "skill_ai_dictionary_prompt": {
-    "zh": "请作为独立的 AI 词典，使用当前 AI 模型已有的语言与百科知识，解释用户选中的词语或短语。不以本书知识库为依据，不分析当前书籍或章节，不生成“本段词汇网”。直接从词条开始回答，不输出获取上下文、书名或章节的开场说明。\n\n英文词语：\n1. 词条与音标：给出 IPA 国际音标；英式和美式不同则分别列出，标明词性。\n2. 中文翻译：列出最常见的中文对应词，多义词按常用义项区分。\n3. 中英文解释：每个主要义项给出中文释义与简洁的英文 definition。\n4. 用法：给出 1–2 个英文例句及中文翻译，必要时补充常用搭配。\n\n中文词语：\n1. 词条与拼音：使用带声调的拼音；多音字或不同读法分开说明，不擅自确定缺少语境的读音。\n2. 词语解释：用现代汉语说明常见含义，标注古义、成语义或专业义，不假设书中含义。\n3. 用法：给出简短例句；词源或典故只有可靠时才补充。\n\n相关词语知识（中英文均提供）：\n- 挑选 2–4 个确实相关的近义词、反义词、易混词或派生词，分别给出简短释义，并说明与所选词语的关系或区别；不存在合适条目时不要凑数。\n- 补充常用搭配、使用场景；词源、典故、专业背景等仅在有助于理解且有把握时简述。\n- 英文相关词附中文含义；中文相关词如有生僻字或多音字，补充带声调的拼音。不扩展为与词语无关的书籍分析。\n\n仅使用模型已有知识简明解释，不等待外部词典或百科。不确定的读音、释义或词源明确说明，不能编造读音、释义、词源或来源。如需核实，提示用户在对话框输入“确认联网搜索”并发送；不提示点击按钮，不自动搜索。不使用本书知识库。\n"
-  },
+  "selection_custom-preset-translate_prompt": {"zh":"翻译 {selection}：英文译成中文，中文译成英文；其他语言译成当前界面语言。保留原意和段落，只给译文。","en":"Translate {selection}: English into Chinese, Chinese into English; other languages into the interface language. Preserve meaning and paragraphs. Output only the translation."},
+  "skill_ai_dictionary_description": {"zh":"用选中文字的语言简要介绍含义、背景及相关知识","en":"Brief meanings, background and related knowledge in the selection's language"},
+  "skill_ai_dictionary_name": {"zh":"AI 知识","en":"AI Knowledge"},
+  "skill_ai_dictionary_prompt": {"zh":"简要介绍所选词语的含义、背景和相关知识，用选中文字的语言回答。不提供拼音、音标、翻译或例句；不确定的内容明确说明。","en":"Briefly explain the meaning, background and related knowledge of the selected term, in the selected text's language. No pronunciation, translation or example sentences; clearly flag uncertainty."},
   "skill_argument_analyzer_description": {
     "zh": "分析作者的推理、论点和支持证据"
   },
@@ -1381,7 +1412,7 @@
     "en": "entries"
   },
   "ui_65b7d137": {
-    "zh": "默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件、二维码和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。",
+    "zh": "默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。",
     "en": "Off by default: omit credential-bearing API/server configurations on export and skip them on import, preserving local accounts and keys. When enabled, transfers contain plaintext credentials. Keep them private. Sync encryption is unchanged and its password is never exported. Do not place private credentials in custom CSS, prompts or URLs."
   },
   "ui_66b49baf": {

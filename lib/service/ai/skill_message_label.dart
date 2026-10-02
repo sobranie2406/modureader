@@ -12,7 +12,7 @@ String? skillMessageLabel(String content, {String? skillId, Locale? locale}) {
   if (prompt.isEmpty) return null;
   if (skillId == 'selection_toolbar')
     return ModuStrings.label(language, '划词 AI', 'Selection AI');
-  for (final skill in readAnySkills) {
+  for (final skill in readingSkillPromptDefinitions) {
     if (skill.id == skillId ||
         skill.isDefaultPrompt(prompt) ||
         prompt == ReadingSkillPromptStore.promptFor(skill).trim()) {

@@ -108,6 +108,9 @@ class CssVisualStyle {
       add('font-family',
           file == null ? values['font'] : '"${_fontFamily(file as String)}"');
       add('font-weight', values['weight']);
+      if (values.containsKey('weight')) {
+        add('font-synthesis', 'weight style');
+      }
       add('font-size', values['size'], 'px');
       if (values.containsKey('italic')) {
         add('font-style', values['italic'] == true ? 'italic' : 'normal');
@@ -142,7 +145,12 @@ class CssVisualStyle {
     final face = file == null
         ? ''
         : '@font-face { font-family: "${_fontFamily(file as String)}"; src: url("$fontOrigin/fonts/${Uri.encodeComponent(file)}"); font-display: swap; }\n';
-    return '$face$selector {\n  ${lines.join('\n  ')}\n}';
+    final weightInheritance = values.containsKey('weight')
+        ? '\n:is($selector) :where(span, font, a, em, i, u, s, small, sup, sub) {'
+            '\n  font-weight: inherit !important;'
+            '\n  font-synthesis: weight style !important;\n}'
+        : '';
+    return '$face$selector {\n  ${lines.join('\n  ')}\n}$weightInheritance';
   }
 
   String _fontFamily(String file) =>

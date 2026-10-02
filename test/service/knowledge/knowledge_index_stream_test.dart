@@ -115,6 +115,7 @@ void main() {
       mutate(raw);
       await input.writeAsString(jsonEncode(raw));
       await expectLater(export(), throwsFormatException);
+      expect(await readKnowledgeIndexMetadata(input, '7'), isNull);
     }
     await input
         .writeAsString(jsonEncode(fixture()).replaceFirst('0.5', '1e999'));

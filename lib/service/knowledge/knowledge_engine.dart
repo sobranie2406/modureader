@@ -290,10 +290,14 @@ abstract interface class KnowledgeIndexStore {
 
 class FileKnowledgeIndexStore implements KnowledgeIndexStore {
   const FileKnowledgeIndexStore(this.file,
-      {this.sourceFingerprint, this.isSourceCurrent, this.isCancelled});
+      {this.sourceFingerprint,
+      this.sourceFingerprintAliases = const [],
+      this.isSourceCurrent,
+      this.isCancelled});
 
   final File file;
   final String? sourceFingerprint;
+  final List<String> sourceFingerprintAliases;
   final Future<bool> Function()? isSourceCurrent;
   final bool Function()? isCancelled;
 
@@ -305,44 +309,24 @@ class FileKnowledgeIndexStore implements KnowledgeIndexStore {
   static Future<void> _legacyReadTail = Future<void>.value();
 
   /// Small commit metadata avoids deserializing all vectors just to draw a badge.
-  /// Old small files migrate lazily, one at a time. Large legacy indexes remain
-  /// usable for explicit searches, but need a rebuild for a verified badge.
+  /// Copies/legacy files repair their commit metadata by bounded streaming,
+  /// never by deserializing all vectors or generating them again.
   Future<Map<String, dynamic>?> summary(String bookId) async {
     final stat = await file.stat();
     if (stat.type != FileSystemEntityType.file) return null;
-    if (await summaryFile.exists() && await summaryFile.length() <= 4096) {
-      try {
-        final value = jsonDecode(await summaryFile.readAsString());
-        if (value is Map<String, dynamic> &&
-            value['bookId'] == bookId &&
-            value['sourceFingerprint'] == sourceFingerprint &&
-            value['size'] == stat.size &&
-            value['modified'] == stat.modified.microsecondsSinceEpoch &&
-            value['chunkCount'] is int &&
-            value['chunkCount'] > 0 &&
-            value['vectorCount'] is int &&
-            value['vectorCount'] >= 0 &&
-            (value['vectorCount'] == 0 ||
-                value['vectorCount'] == value['chunkCount'])) {
-          return value;
-        }
-      } catch (_) {}
-      // A stale commit record is not proof of a complete index.
-      return null;
-    }
-    if (stat.size > 4 * 1024 * 1024) return null;
+    final receipt = await _readSummary();
+    if (_validSummary(receipt, bookId, stat)) return receipt;
     final prior = _legacyReadTail;
     final complete = Completer<void>();
     _legacyReadTail = complete.future;
     await prior;
     try {
-      final snapshot = await load(bookId);
-      if (snapshot == null) return null;
-      final after = await file.stat();
-      if (after.size != stat.size || after.modified != stat.modified) {
+      final metadata = await readKnowledgeIndexMetadata(file, bookId);
+      if (metadata == null || !_matchesMetadataSource(metadata, receipt)) {
         return null;
       }
-      final value = _summary(snapshot, stat);
+      if (!await _metadataCurrent(metadata)) return null;
+      final value = _boundSummary(metadata);
       await _saveSummary(value);
       return value;
     } finally {
@@ -350,15 +334,88 @@ class FileKnowledgeIndexStore implements KnowledgeIndexStore {
     }
   }
 
+  Future<Map<String, dynamic>?> _readSummary() async {
+    try {
+      if (await summaryFile.exists() && await summaryFile.length() <= 4096) {
+        final value = jsonDecode(await summaryFile.readAsString());
+        if (value is Map<String, dynamic>) return value;
+      }
+    } on Object {/* A malformed receipt can be regenerated from valid data. */}
+    return null;
+  }
+
+  bool _validSummary(
+          Map<String, dynamic>? value, String bookId, FileStat stat) =>
+      value != null &&
+      value['bookId'] == bookId &&
+      (sourceFingerprint == null ||
+          value['sourceFingerprint'] == sourceFingerprint) &&
+      value['size'] == stat.size &&
+      value['modified'] == stat.modified.microsecondsSinceEpoch &&
+      (value['changed'] == null ||
+          value['changed'] == stat.changed.microsecondsSinceEpoch) &&
+      value['chunkCount'] is int &&
+      value['chunkCount'] > 0 &&
+      value['vectorCount'] is int &&
+      value['vectorCount'] >= 0 &&
+      (value['vectorCount'] == 0 ||
+          value['vectorCount'] == value['chunkCount']);
+
+  bool _matchesMetadataSource(
+          Map<String, dynamic> value, Map<String, dynamic>? receipt) =>
+      sourceFingerprint == null ||
+      value['sourceFingerprint'] == sourceFingerprint ||
+      sourceFingerprintAliases.contains(value['sourceFingerprint']) ||
+      (receipt?['sourceFingerprint'] == sourceFingerprint &&
+          receipt?['bookId'] == value['bookId'] &&
+          receipt?['indexSourceFingerprint'] == value['sourceFingerprint'] &&
+          receipt?['indexSha256'] == value['indexSha256']);
+
+  Future<bool> _metadataCurrent(Map<String, dynamic> value) async {
+    _checkCancellation();
+    if (isSourceCurrent != null && !await isSourceCurrent!()) return false;
+    final stat = await file.stat();
+    return stat.type == FileSystemEntityType.file &&
+        value['size'] == stat.size &&
+        value['modified'] == stat.modified.microsecondsSinceEpoch &&
+        value['changed'] == stat.changed.microsecondsSinceEpoch;
+  }
+
+  Map<String, dynamic> _boundSummary(Map<String, dynamic> value) => {
+        ...value,
+        'sourceFingerprint': sourceFingerprint ?? value['sourceFingerprint'],
+        'indexSourceFingerprint': value['sourceFingerprint'],
+      };
+
+  /// Only the caller's verified chapter-text hash permits legacy rebinding.
+  /// Persist a small receipt, leaving every original vector/file byte intact.
+  Future<bool> adoptVerifiedLegacy(
+      String bookId, String verifiedContentHash) async {
+    final metadata = await readKnowledgeIndexMetadata(file, bookId);
+    if (metadata == null ||
+        metadata['contentHash'] != verifiedContentHash ||
+        (metadata['sourceFingerprint'] as String?)?.startsWith('sha256:') ==
+            true ||
+        !await _metadataCurrent(metadata)) {
+      return false;
+    }
+    await _saveSummary(_boundSummary(metadata));
+    return true;
+  }
+
   Map<String, dynamic> _summary(
           KnowledgeIndexSnapshot snapshot, FileStat stat) =>
       {
         'bookId': snapshot.bookId,
         'sourceFingerprint': sourceFingerprint ?? snapshot.sourceFingerprint,
+        'indexSourceFingerprint':
+            sourceFingerprint ?? snapshot.sourceFingerprint,
+        'contentHash': snapshot.contentHash,
         'chunkCount': snapshot.chunks.length,
         'vectorCount': snapshot.vectors.length,
         'size': stat.size,
         'modified': stat.modified.microsecondsSinceEpoch,
+        'changed': stat.changed.microsecondsSinceEpoch,
       };
 
   Future<void> _saveSummary(Map<String, dynamic> value) async {
@@ -506,11 +563,16 @@ class FileKnowledgeIndexStore implements KnowledgeIndexStore {
                 (fields['embeddingDimensions'] as num?)?.toInt());
       });
       if (snapshot.bookId != bookId) return null;
-      if (sourceFingerprint != null &&
-          snapshot.sourceFingerprint != sourceFingerprint) {
-        return null;
-      }
       validate(snapshot);
+      if (sourceFingerprint != null &&
+          snapshot.sourceFingerprint != sourceFingerprint &&
+          !sourceFingerprintAliases.contains(snapshot.sourceFingerprint)) {
+        final receipt = await summary(bookId);
+        if (receipt == null ||
+            receipt['indexSourceFingerprint'] != snapshot.sourceFingerprint) {
+          return null;
+        }
+      }
       return snapshot;
     } on Object {
       return null;
@@ -529,16 +591,8 @@ class KnowledgeSearchService {
     List<double> Function(KnowledgeChunk chunk)? vectorize,
   }) {
     final chunks = <KnowledgeChunk>[];
-    final digest = _IndexDigestSink();
-    final canonical = utf8.encoder
-        .startChunkedConversion(sha256.startChunkedConversion(digest));
     for (final entry in chapters.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key))) {
-      canonical
-        ..add(entry.key)
-        ..add('\u0000')
-        ..add(entry.value)
-        ..add('\u0001');
       chunks.addAll(TextChunker().chunk(
         bookId: bookId,
         chapterId: entry.key,
@@ -546,7 +600,6 @@ class KnowledgeSearchService {
       ));
     }
 
-    canonical.close();
     final vectors = vectorize == null
         ? const <VectorEntry>[]
         : chunks
@@ -554,7 +607,7 @@ class KnowledgeSearchService {
             .toList(growable: false);
     final snapshot = KnowledgeIndexSnapshot(
       bookId: bookId,
-      contentHash: digest.value!.toString(),
+      contentHash: knowledgeContentHash(chapters),
       chunks: List.unmodifiable(chunks),
       vectors: vectors,
     );
@@ -617,6 +670,24 @@ class _IndexDigestSink implements Sink<Digest> {
   void add(Digest data) => value = data;
   @override
   void close() {}
+}
+
+/// The original canonical chapter hash, shared with legacy verification.
+/// Does not chunk text, load an embedding model or calculate any vectors.
+String knowledgeContentHash(Map<String, String> chapters) {
+  final digest = _IndexDigestSink();
+  final canonical = utf8.encoder
+      .startChunkedConversion(sha256.startChunkedConversion(digest));
+  for (final entry in chapters.entries.toList()
+    ..sort((a, b) => a.key.compareTo(b.key))) {
+    canonical
+      ..add(entry.key)
+      ..add('\u0000')
+      ..add(entry.value)
+      ..add('\u0001');
+  }
+  canonical.close();
+  return digest.value!.toString();
 }
 
 class IndexBuildResult {

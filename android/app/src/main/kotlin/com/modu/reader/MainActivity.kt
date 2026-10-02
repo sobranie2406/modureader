@@ -52,6 +52,23 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         readerKeysActive = false
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "com.modu.reader/word_selection").setMethodCallHandler { call, result ->
+            if (call.method != "bounds") {
+                result.notImplemented()
+            } else {
+                try {
+                    result.success(ReaderWordSelection.bounds(
+                        call.argument<String>("text"),
+                        call.argument<Number>("offset")?.toInt(),
+                        call.argument<String>("locale"),
+                    ))
+                } catch (_: RuntimeException) {
+                    // Never log book text or interrupt reading on a platform failure.
+                    result.success(null)
+                }
+            }
+        }
         pageKeyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
             "com.modu.reader/page_keys").also { channel ->
             channel.setMethodCallHandler { call, result ->

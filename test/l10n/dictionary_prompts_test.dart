@@ -6,7 +6,7 @@ import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final skill = readAnySkills.singleWhere((s) => s.id == 'ai_dictionary');
+  const skill = legacyAiKnowledgeSkill;
   final selection = SelectionToolbarConfig.templateItems
       .singleWhere((item) => item.id == 'custom-preset-dictionary');
   final legacy = <String, List<String>>{

@@ -13,7 +13,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('contains the complete ReadAny built-in skill catalog', () {
-    expect(readAnySkills, hasLength(11));
+    expect(readAnySkills, hasLength(10));
     expect(
       readAnySkills.map((skill) => skill.id).toSet(),
       {
@@ -27,7 +27,6 @@ void main() {
         'smart_translator',
         'vocabulary_helper',
         'mindmap',
-        'ai_dictionary',
       },
     );
   });
@@ -124,11 +123,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(Switch), findsNWidgets(11));
-    expect(find.text('AI 词典解释'), findsOneWidget);
+    expect(find.byKey(const ValueKey('reading-skills-visible-switch')),
+        findsOneWidget);
+    expect(find.text('AI 知识'), findsNothing);
+    expect(find.byKey(const ValueKey('reading-skill-ai_dictionary')),
+        findsNothing);
     expect(find.text('本章总结'), findsOneWidget);
     expect(find.text('全书总结'), findsOneWidget);
-    expect(find.text('词汇助手'), findsOneWidget);
+    await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('reading-skill-switch-vocabulary_helper')),
+        200);
 
     await tester.tap(
       find.byKey(const ValueKey('reading-skill-switch-vocabulary_helper')),

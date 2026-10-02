@@ -5,9 +5,10 @@ import 'package:anx_reader/models/user_prompt.dart';
 import 'package:anx_reader/providers/user_prompts.dart';
 import 'package:anx_reader/service/ai/readany_skills.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:anx_reader/service/ai/reading_skill_layout.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:anx_reader/widgets/ai/skill_template_draft_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,111 +52,124 @@ class _AiReadingSkillsSettingsState
   @override
   Widget build(BuildContext context) {
     final customSkills = ref.watch(userPromptsProvider);
-    return settingsSections(
-      sections: [
-        SettingsSection(
-          title: Text(ModuStrings.text(context, '内置阅读技能', '内置阅读技能')),
-          tiles: [
-            CustomSettingsTile(
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    _hint(
-                      ModuStrings.text(
-                          context,
-                          '阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。',
-                          '阅读界面只显示已启用的技能。点击技能可查看和修改提示词。备份只保存修改过的提示词，默认提示词由应用提供。'),
+    final entries =
+        orderedReadingSkills(customSkills, Prefs().readAnySkillOrder);
+    return ReorderableListView.builder(
+      key: const ValueKey('reading-skills-order-list'),
+      buildDefaultDragHandles: false,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      header: Material(
+        color: Colors.transparent,
+        child: Column(children: [
+          SwitchListTile(
+            key: const ValueKey('reading-skills-visible-switch'),
+            title: Text(ModuStrings.value(Localizations.localeOf(context),
+                'reading_skills_visible', 'Show reading skills by default')),
+            value: Prefs().aiReadingSkillsVisible,
+            onChanged: (value) =>
+                setState(() => Prefs().aiReadingSkillsVisible = value),
+          ),
+          const SkillTemplateDraftTile(),
+          _hint(ModuStrings.value(
+              Localizations.localeOf(context),
+              'reading_skills_layout_help',
+              'Reorder built-in and custom skills together and enable each independently.')),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(spacing: 12, runSpacing: 8, children: [
+              FilledButton.icon(
+                key: const ValueKey('add-custom-reading-skill'),
+                onPressed: () => _showCustomSkillDialog(),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(ModuStrings.text(context, '新建技能', '新建技能')),
+              ),
+              TextButton.icon(
+                key: const ValueKey('reset-reading-skill-order'),
+                onPressed: () => setState(() => Prefs().readAnySkillOrder = []),
+                icon: const Icon(Icons.sort),
+                label: Text(ModuStrings.value(Localizations.localeOf(context),
+                    'reading_skills_reset_order', 'Restore default order')),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+      itemCount: entries.length,
+      onReorderItem: (oldIndex, newIndex) {
+        final moved = entries.removeAt(oldIndex);
+        entries.insert(newIndex, moved);
+        setState(() =>
+            Prefs().readAnySkillOrder = entries.map((e) => e.id).toList());
+      },
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return Material(
+          key: ValueKey('reading-skill-entry-${entry.id}'),
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: Row(children: [
+            ReorderableDragStartListener(
+              key: ValueKey('reading-skill-drag-${entry.id}'),
+              index: index,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Icon(Icons.drag_handle,
+                    semanticLabel: ModuStrings.value(
+                        Localizations.localeOf(context),
+                        'reading_skills_reorder',
+                        'Drag to reorder')),
+              ),
+            ),
+            Expanded(
+                child: ReorderableDelayedDragStartListener(
+              index: index,
+              child: entry.builtIn != null
+                  ? _builtInSkillTile(entry.builtIn!, index, entries.length)
+                  : _customSkillTile(entry.custom!, index, entries.length),
+            )),
+          ]),
+        );
+      },
+      footer: SettingsSection(
+        title: Text(ModuStrings.text(context, '功能提示词', '功能提示词')),
+        tiles: [
+          CustomSettingsTile(
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                children: [
+                  _hint(ModuStrings.text(
+                      context,
+                      '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。',
+                      '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。')),
+                  for (final item in _featurePrompts)
+                    ListTile(
+                      key: ValueKey('reading-feature-${item.prompt.name}'),
+                      leading: const Icon(Icons.code_outlined),
+                      title:
+                          Text(ModuStrings.text(context, item.name, item.name)),
+                      subtitle: Text(ModuStrings.text(
+                          context, item.description, item.description)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showFeaturePromptDialog(item),
                     ),
-                    for (final skill in readAnySkills) _builtInSkillTile(skill),
-                  ],
-                ),
+                ],
               ),
             ),
-          ],
-        ),
-        SettingsSection(
-          title: Text(ModuStrings.text(context, '自定义技能', '自定义技能')),
-          tiles: [
-            CustomSettingsTile(
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              ModuStrings.text(
-                                  context,
-                                  '自定义技能会与内置技能一起出现在阅读 AI 面板中。',
-                                  '自定义技能会与内置技能一起出现在阅读 AI 面板中。'),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton.icon(
-                            key: const ValueKey('add-custom-reading-skill'),
-                            onPressed: () => _showCustomSkillDialog(),
-                            icon: const Icon(Icons.add, size: 18),
-                            label:
-                                Text(ModuStrings.text(context, '新建技能', '新建技能')),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (customSkills.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                            ModuStrings.text(context, '还没有自定义技能', '还没有自定义技能')),
-                      )
-                    else
-                      for (var index = 0; index < customSkills.length; index++)
-                        _customSkillTile(
-                          customSkills[index],
-                          index,
-                          customSkills.length,
-                        ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        SettingsSection(
-          title: Text(ModuStrings.text(context, '功能提示词', '功能提示词')),
-          tiles: [
-            CustomSettingsTile(
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    _hint(ModuStrings.text(
-                        context,
-                        '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。',
-                        '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。')),
-                    for (final item in _featurePrompts)
-                      ListTile(
-                        key: ValueKey('reading-feature-${item.prompt.name}'),
-                        leading: const Icon(Icons.code_outlined),
-                        title: Text(
-                            ModuStrings.text(context, item.name, item.name)),
-                        subtitle: Text(ModuStrings.text(
-                            context, item.description, item.description)),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showFeaturePromptDialog(item),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
+  }
+
+  void _moveSkill(String id, bool up) {
+    final entries = orderedReadingSkills(
+        ref.read(userPromptsProvider), Prefs().readAnySkillOrder);
+    final index = entries.indexWhere((e) => e.id == id);
+    final target = index + (up ? -1 : 1);
+    if (index < 0 || target < 0 || target >= entries.length) return;
+    entries.insert(target, entries.removeAt(index));
+    setState(
+        () => Prefs().readAnySkillOrder = entries.map((e) => e.id).toList());
   }
 
   Widget _hint(String text) {
@@ -174,23 +188,20 @@ class _AiReadingSkillsSettingsState
     );
   }
 
-  Widget _builtInSkillTile(ReadAnySkill skill) {
+  Widget _builtInSkillTile(ReadAnySkill skill, int index, int count) {
     final enabled = Prefs().isReadAnySkillEnabled(skill.id);
     return ListTile(
       key: ValueKey('reading-skill-${skill.id}'),
       leading: Icon(_skillIcon(skill.id)),
       title: Text(skill.localizedName(Localizations.localeOf(context))),
-      subtitle:
-          Text(skill.localizedDescription(Localizations.localeOf(context))),
+      subtitle: Text(
+          skill.localizedDescription(Localizations.localeOf(context)),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis),
       onTap: () => _showBuiltInSkillDialog(skill),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            tooltip: ModuStrings.text(context, '查看提示词', '查看提示词'),
-            onPressed: () => _showBuiltInSkillDialog(skill),
-            icon: const Icon(Icons.edit_outlined),
-          ),
           Switch(
             key: ValueKey('reading-skill-switch-${skill.id}'),
             value: enabled,
@@ -198,6 +209,33 @@ class _AiReadingSkillsSettingsState
               Prefs().setReadAnySkillEnabled(skill.id, value);
               setState(() {});
             },
+          ),
+          PopupMenuButton<_CustomSkillAction>(
+            tooltip: ModuStrings.text(context, '更多操作', '更多操作'),
+            onSelected: (action) {
+              if (action == _CustomSkillAction.edit) {
+                _showBuiltInSkillDialog(skill);
+              }
+              if (action == _CustomSkillAction.moveUp) {
+                _moveSkill('builtin:${skill.id}', true);
+              }
+              if (action == _CustomSkillAction.moveDown) {
+                _moveSkill('builtin:${skill.id}', false);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                  value: _CustomSkillAction.edit,
+                  child: Text(ModuStrings.text(context, '编辑提示词', '编辑提示词'))),
+              PopupMenuItem(
+                  value: _CustomSkillAction.moveUp,
+                  enabled: index > 0,
+                  child: Text(ModuStrings.text(context, '上移', '上移'))),
+              PopupMenuItem(
+                  value: _CustomSkillAction.moveDown,
+                  enabled: index < count - 1,
+                  child: Text(ModuStrings.text(context, '下移', '下移'))),
+            ],
           ),
         ],
       ),
@@ -220,6 +258,7 @@ class _AiReadingSkillsSettingsState
         mainAxisSize: MainAxisSize.min,
         children: [
           Switch(
+            key: ValueKey('custom-reading-skill-switch-${skill.id}'),
             value: skill.enabled,
             onChanged: (_) => notifier.toggleEnabled(skill.id),
           ),
@@ -231,10 +270,10 @@ class _AiReadingSkillsSettingsState
                   _showCustomSkillDialog(skill: skill);
                   break;
                 case _CustomSkillAction.moveUp:
-                  notifier.movePrompt(skill.id, true);
+                  _moveSkill('custom:${skill.id}', true);
                   break;
                 case _CustomSkillAction.moveDown:
-                  notifier.movePrompt(skill.id, false);
+                  _moveSkill('custom:${skill.id}', false);
                   break;
                 case _CustomSkillAction.delete:
                   _confirmDeleteCustomSkill(skill);

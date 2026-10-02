@@ -10,9 +10,11 @@ import { installQuickMark, planQuickMarkMerge } from './quick-mark.js'
 import { installDesktopPageInput } from './desktop-page-input.js'
 import { readerSelectionCSS } from './selection-style.js'
 import { readerFontCSS } from './reader-fonts.js'
+import { readerFontWeightCSS } from './reader-font-weight.js'
 import { applyCustomHighlights } from './custom-highlight.js'
 import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
+import { installSmartSelection, isInitialSmartSelection } from './smart-selection.js'
 import { selectionAnnotationIds } from './selection-annotations.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
@@ -26,6 +28,8 @@ let quickMarkShowMenu = false;
 let quickMarkColor = '#ffd54f';
 const quickMarkDocuments = new WeakMap();
 const desktopInputDocuments = new WeakMap();
+const smartSelectionDocuments = new WeakMap();
+const settledSelectionDocuments = new WeakMap();
 const highlightWarnings = new Set();
 const highlightSignatures = new WeakMap();
 const updateCustomHighlights = (doc, force = false) => {
@@ -271,6 +275,16 @@ const getAutoPageLocationKey = (lastLocation, index) => {
 };
 
 const setSelectionHandler = (view, doc, index) => {
+  smartSelectionDocuments.get(doc)?.destroy();
+  smartSelectionDocuments.set(doc, installSmartSelection(doc, {
+    enabled: () => !view.isFixedLayout,
+    paragraph: () => style.longPressSelectParagraph === true,
+    locale: () => style.selectionLocale,
+    nativeTouchSelection: navigator.userAgent.includes('Android'),
+    segmentWord: navigator.userAgent.includes('Android')
+      ? request => callFlutter('onReaderWordBounds', request) : undefined,
+    onAdjusted: () => stopAutoPageSession(view),
+  }));
   let hasActiveSelection = false;
   let lastPointerUpRange = null;
   doc.__anxSelectionClearedAt = 0;
@@ -403,10 +417,12 @@ const setSelectionHandler = (view, doc, index) => {
       }, 600);
     });
   } else { // Android
-    installSettledSelection(doc, {
+    settledSelectionDocuments.get(doc)?.();
+    settledSelectionDocuments.set(doc, installSettledSelection(doc, {
       getRange: () => getSelectionRange(doc.getSelection()),
+      beforeSelection: () => smartSelectionDocuments.get(doc)?.beforeSelection?.(),
       onSelection: () => handleSelection(view, doc, index),
-    });
+    }));
   }
   // doc.addEventListener('selectionchange', () => handleSelection(view, doc, index));
 
@@ -431,6 +447,7 @@ const setSelectionHandler = (view, doc, index) => {
 
       const selRange = getSelectionRange(doc.getSelection())
       if (!selRange) return
+      if (isInitialSmartSelection(doc, selRange)) return;
       if (!lastLocation.range) return;
 
       const container = view.shadowRoot.querySelector('foliate-paginator').shadowRoot.querySelector("#container");
@@ -662,6 +679,7 @@ const getCSS = ({ fontSize,
   englishFontName,
   englishFontPath,
   fontWeight,
+  simulateBold,
   letterSpacing,
   spacing,
   textIndent,
@@ -745,6 +763,8 @@ const getCSS = ({ fontSize,
         ${fontFamily}
     }
 
+    ${readerFontWeightCSS({ fontWeight, simulateBold, useBookStyles, pdf: isPdf })}
+
     ${useBookStyles ? '' : `
     h1 { 
         font-size: calc(2em * ${headingFontSize}) !important; 
@@ -775,7 +795,6 @@ const getCSS = ({ fontSize,
     p, li, blockquote, dd, div:not(:has(*:not(b, a, em, i, strong, u, span))), font {
         color: ${fontColor} !important;
         ${useBookStyles ? '' : `line-height: ${spacing} !important;`}
-        ${useBookStyles ? '' : `font-weight: ${fontWeight} !important;`}
         ${useBookStyles ? '' : `text-align: ${textAlign === 'auto' ? (justify ? 'justify' : 'start') : textAlign};`}
         ${useBookStyles || textIndent < 0 ? '' : 'text-indent: ' + textIndent + 'em !important;'}
         -webkit-hyphens: ${hyphenate ? 'auto' : 'manual'};
@@ -1445,6 +1464,7 @@ class Reader {
     for (const { doc } of this.view.renderer.getContents()) {
       desktopInputDocuments.get(doc)?.cancel();
       quickMarkDocuments.get(doc)?.cancel();
+      smartSelectionDocuments.get(doc)?.cancel({ preserveActiveSelection: detail.reason === 'scroll' });
     }
     const { cfi, fraction, location, tocItem, pageItem, chapterLocation, section } = detail
     const loc = pageItem
@@ -1872,6 +1892,7 @@ const setStyle = (oldStyle) => {
     englishFontName: style.englishFontName,
     englishFontPath: style.englishFontPath,
     fontWeight: style.fontWeight,
+    simulateBold: style.simulateBold,
     letterSpacing: style.letterSpacing,
     spacing: style.spacing,
     paragraphSpacing: style.paragraphSpacing,
@@ -2063,6 +2084,14 @@ window.showContextMenu = () => {
   }
 }
 
+// Native Android action mode is authoritative when DOM touch/caret events are
+// missing or when it restores its original one-character range late.
+window.onNativeReaderLongPress = () => {
+  if (!reader.view?.renderer || reader.view.isFixedLayout || isPdf || window.isFootNoteOpen()) return;
+  for (const { doc } of reader.view.renderer.getContents())
+    smartSelectionDocuments.get(doc)?.nativeLongPress?.();
+}
+
 window.getSelection = () => reader.getSelection()
 
 window.clearSelection = () => reader.view.deselect()
@@ -2121,6 +2150,10 @@ window.ttsHere = () => {
 }
 
 window.ttsFromCfi = cfi => ttsNavigator.startFromCfi(cfi)
+
+// Restore the audible passage's presentation without seeking or restarting
+// the speech iterator, including while playback is paused.
+window.ttsReturnToPosition = () => reader.view.syncTTSHighlight()
 
 window.ttsCurrentDetail = () => {
   initTts()

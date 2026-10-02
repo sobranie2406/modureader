@@ -25,6 +25,7 @@ import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 class ExcerptMenu extends StatefulWidget {
   final String annoCfi;
   final String annoContent;
+  final String? contextText;
   final int? id;
   final int? bookId;
   final List<int> annotationIds;
@@ -46,6 +47,7 @@ class ExcerptMenu extends StatefulWidget {
     super.key,
     required this.annoCfi,
     required this.annoContent,
+    this.contextText,
     this.id,
     this.bookId,
     this.annotationIds = const [],
@@ -419,14 +421,20 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         break;
       case 'ai':
       case 'aiCommand':
+        final prompt = item.prompt.isEmpty
+            ? text
+            : item.promptForSelection(text,
+                locale: Localizations.localeOf(context));
         widget.onClose();
         await reader?.showAiChat(
-          content: item.prompt.isEmpty
-              ? text
-              : item.promptForSelection(text,
-                  locale: Localizations.localeOf(context)),
+          content: prompt,
           sourceText: text,
-          skillId: item.prompt.isEmpty ? null : item.skillId,
+          sourceContext: item.scope == SelectionAiScope.context
+              ? widget.contextText
+              : null,
+          selectionRequest: true,
+          webSearch: item.webSearch,
+          skillId: item.skillId,
           sendImmediate: item.prompt.isNotEmpty,
           newConversation: true,
           forcePopup: true,

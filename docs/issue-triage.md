@@ -2,6 +2,16 @@
 
 Repository: https://github.com/sobranie2406/modureader
 
+## 应用内反馈 / In-app feedback
+
+- 设置 → 问题反馈与功能建议：Bug 与功能建议分别填写和预览，切换类型保留当前界面中的两份草稿；草稿不写入全局设置或 WebDAV。
+- Bug 填写标题、问题描述、重现步骤、实际结果与预期行为；功能建议填写标题、使用场景与希望实现的功能。补充信息可选。
+- Bug 使用 `bug-report.yaml` 的字段 ID 预填表单，实际结果合并到问题描述；功能建议使用 `feature_request.md`，以 `body` 预填完整 Markdown。标签由仓库模板指定，不在链接中传入需要权限的 `labels` 参数。
+- 运行环境可独立选择；崩溃诊断仅 Bug 可选、默认不附带。含诊断或编码后超过 1800 字符的报告，确认预览后复制全文并打开对应模板，不截断正文、不把诊断放进 URL。Bug 表单需手动粘贴报告并补齐 GitHub 必填项。
+- 打开浏览器不代表已提交。用户登录 GitHub，检查公开内容、补充截图并点击 GitHub 提交按钮后才创建 Issue。应用不持有 GitHub Token，不调用 ReadAny 的反馈服务，也不生成虚假的 Issue 编号。
+
+References: [GitHub issue URL queries](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue#creating-an-issue-from-a-url-query), [form field IDs](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema), [ReadAny feedback types](https://github.com/codedogQBY/ReadAny/blob/main/packages/core/src/feedback/feedback-types.ts), [ReadAny feedback UI](https://github.com/codedogQBY/ReadAny/blob/main/packages/app/src/components/settings/FeedbackSettings.tsx).
+
 ## 人工处理 / Manual triage
 
 - 先核对版本、平台和最小复现；查看重复报告，必要时关联上游问题，不把默读用户导向上游投诉。

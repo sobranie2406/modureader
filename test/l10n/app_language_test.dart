@@ -123,19 +123,18 @@ void main() {
       () async {
     const custom = '  My own bilingual prompt\n请保持这个自定义要求  ';
     Prefs().saveAiPrompt(AiPrompts.summaryTheChapter, custom);
-    ReadingSkillPromptStore.save(readAnySkills.first, custom);
+    final skill = readAnySkills.singleWhere((s) => s.id == 'concept_explainer');
+    ReadingSkillPromptStore.save(skill, custom);
     for (final locale in appLocales) {
       await Prefs().saveLocaleToPrefs(appLocaleKey(locale));
       expect(Prefs().getAiPrompt(AiPrompts.summaryTheChapter), custom);
-      expect(ReadingSkillPromptStore.promptFor(readAnySkills.first), custom);
+      expect(ReadingSkillPromptStore.promptFor(skill), custom);
     }
     final exported = await GlobalSettingsTransfer.export(Prefs());
     final restored = await GlobalSettingsTransfer.decode(exported);
     expect(restored['aiPrompt_summaryTheChapter']['value'], custom);
     expect(
-        jsonDecode(
-            restored['readAnySkillPrompts']['value'])[readAnySkills.first.id],
-        custom);
+        jsonDecode(restored['readAnySkillPrompts']['value'])[skill.id], custom);
   });
 
   test(

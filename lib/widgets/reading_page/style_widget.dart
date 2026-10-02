@@ -284,9 +284,82 @@ class StyleWidgetState extends State<StyleWidget> {
       child: Column(
         children: [
           fontSizeSlider(),
+          fontWeightSlider(),
           lineHeightAndParagraphSpacingSlider(),
         ],
       ),
+    );
+  }
+
+  Row fontWeightSlider() {
+    return Row(
+      children: [
+        IconAndText(
+          flexibleHeight: true,
+          icon: const Icon(Icons.format_bold),
+          text: ModuStrings.text(context, '字体粗细', 'Font thickness'),
+        ),
+        Expanded(
+          child: Slider(
+            key: const ValueKey('reading-font-weight-slider'),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            value: (bookStyle.fontWeight / 400).clamp(0.5, 2.0).toDouble(),
+            onChanged: Prefs().useBookStyles
+                ? null
+                : (double value) {
+                    setState(() =>
+                        bookStyle.fontWeight = (value * 400).roundToDouble());
+                    widget.epubPlayerKey.currentState?.changeStyle(bookStyle);
+                    Prefs().saveBookStyleToPrefs(bookStyle);
+                  },
+            min: 0.5,
+            max: 2.0,
+            divisions: 15,
+            label:
+                (bookStyle.fontWeight / 400).clamp(0.5, 2.0).toStringAsFixed(1),
+          ),
+        ),
+        Tooltip(
+          message: ModuStrings.text(
+              context,
+              '用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。',
+              'Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner.'),
+          child: Semantics(
+            key: const ValueKey('reading-simulated-bold-toggle'),
+            button: true,
+            toggled: bookStyle.simulateBold,
+            enabled: !Prefs().useBookStyles,
+            child: SizedBox(
+              width: 80,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  backgroundColor: bookStyle.simulateBold
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : null,
+                  foregroundColor: bookStyle.simulateBold
+                      ? Theme.of(context).colorScheme.onPrimaryContainer
+                      : null,
+                ),
+                onPressed: Prefs().useBookStyles
+                    ? null
+                    : () {
+                        setState(() =>
+                            bookStyle.simulateBold = !bookStyle.simulateBold);
+                        widget.epubPlayerKey.currentState
+                            ?.changeStyle(bookStyle);
+                        Prefs().saveBookStyleToPrefs(bookStyle);
+                      },
+                child: Text(
+                  ModuStrings.text(context, '模拟加粗', 'Simulated bold'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

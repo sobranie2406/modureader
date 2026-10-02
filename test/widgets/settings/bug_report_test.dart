@@ -58,6 +58,7 @@ Future<void> fill(WidgetTester tester,
     'PDF reader',
     description,
     'Import and open PDF',
+    'A blank page appears',
     'Show page'
   ];
   for (var i = 0; i < values.length; i++) {
@@ -68,7 +69,255 @@ Future<void> fill(WidgetTester tester,
   await tester.pumpAndSettle();
 }
 
+Future<void> selectType(WidgetTester tester, FeedbackType type) async {
+  final chip = find.byKey(ValueKey('feedback-type-${type.name}'));
+  await tester.ensureVisible(chip);
+  await tester.pumpAndSettle();
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+}
+
+Future<void> fillFeature(WidgetTester tester,
+    {String problem = 'A missing workflow'}) async {
+  final values = ['A useful feature', problem, 'Add a shortcut'];
+  for (var i = 0; i < values.length; i++) {
+    await tester.enterText(find.byType(TextFormField).at(i), values[i]);
+  }
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  testWidgets(
+      'feature needs only title, use case and solution; no automatic submission',
+      (tester) async {
+    final opened = <Uri>[];
+    await mount(tester, open: (uri) async {
+      opened.add(uri);
+      return true;
+    });
+    await selectType(tester, FeedbackType.feature);
+    expect(find.byType(TextFormField), findsNWidgets(4));
+    expect(find.text('Steps to reproduce'), findsNothing);
+    expect(find.byKey(const ValueKey('include-crash-log')), findsNothing);
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isFalse);
+    await click(tester, 'Preview and submit');
+    expect(find.text('This field is required'), findsNWidgets(3));
+    expect(opened, isEmpty);
+    await fillFeature(tester);
+    await click(tester, 'Preview and submit');
+    expect(find.text('Preview feature request'), findsOneWidget);
+    expect(opened, isEmpty);
+    await click(tester, 'Continue on GitHub');
+    expect(opened.single.queryParameters['template'], 'feature_request.md');
+    expect(
+        opened.single.queryParameters['title'], '[Feature]: A useful feature');
+    expect(opened.single.queryParameters['body'], contains('Add a shortcut'));
+    expect(
+        opened.single.queryParameters['body'], isNot(contains('Environment')));
+    expect(find.textContaining('Nothing submitted yet'), findsOneWidget);
+  });
+
+  testWidgets(
+      'switching types preserves independent drafts and environment choices',
+      (tester) async {
+    await mount(tester);
+    await fill(tester);
+    final bugTitle = tester
+        .widget<TextFormField>(find.byType(TextFormField).first)
+        .controller!;
+    bugTitle.selection = const TextSelection.collapsed(offset: 3);
+    await selectType(tester, FeedbackType.feature);
+    expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).first)
+            .controller!
+            .text,
+        isEmpty);
+    await fillFeature(tester);
+    await click(tester, 'Include device and environment info');
+    await selectType(tester, FeedbackType.bug);
+    expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).first)
+            .controller,
+        same(bugTitle));
+    expect(bugTitle.text, 'PDF reader');
+    expect(bugTitle.selection.baseOffset, 3);
+    expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).at(3))
+            .controller!
+            .text,
+        'A blank page appears');
+    await click(tester, 'Include device and environment info');
+    await selectType(tester, FeedbackType.feature);
+    expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).first)
+            .controller!
+            .text,
+        'A useful feature');
+    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isTrue);
+    await click(tester, 'Preview and submit');
+    expect(find.textContaining('6326'), findsWidgets);
+    expect(find.textContaining('Blank PDF'), findsNothing);
+    await click(tester, 'Keep editing');
+  });
+
+  testWidgets(
+      'switching to feature cancels diagnostics and requires fresh bug opt-in',
+      (tester) async {
+    final log = Completer<String>();
+    String? copied;
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await mount(tester, crashLog: () => log.future);
+    final tile = find.byKey(const ValueKey('include-crash-log'));
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
+    await tester.pump();
+    final chip = find.byKey(const ValueKey('feedback-type-feature'));
+    await tester.ensureVisible(chip);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    log.complete('BUG_ONLY_DIAGNOSTICS');
+    await tester.pumpAndSettle();
+    await fillFeature(tester);
+    await click(tester, 'Copy report');
+    expect(copied, contains('[Feature]: A useful feature'));
+    expect(copied, isNot(contains('BUG_ONLY_DIAGNOSTICS')));
+    await selectType(tester, FeedbackType.bug);
+    expect(tester.widget<CheckboxListTile>(tile).value, isFalse);
+    expect(find.textContaining('BUG_ONLY_DIAGNOSTICS'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'long feature copies full text only after preview and opens feature template',
+      (tester) async {
+    String? copied;
+    final opened = <Uri>[];
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await mount(tester, open: (uri) async {
+      opened.add(uri);
+      return true;
+    });
+    await selectType(tester, FeedbackType.feature);
+    await fillFeature(tester, problem: '需' * 1000);
+    await click(tester, 'Preview and submit');
+    expect(copied, isNull);
+    expect(opened, isEmpty);
+    await click(tester, 'Copy and open GitHub');
+    expect(copied, contains('需' * 1000));
+    expect(opened, [FeatureRequest.newIssueUri]);
+    expect(opened.single.toString(), isNot(contains('需')));
+  });
+
+  testWidgets('failed feature navigation retains draft and correct manual URL',
+      (tester) async {
+    await mount(tester, open: (_) async => false);
+    await selectType(tester, FeedbackType.feature);
+    await fillFeature(tester);
+    await click(tester, 'Preview and submit');
+    await click(tester, 'Continue on GitHub');
+    expect(find.textContaining('Could not open the browser'), findsOneWidget);
+    expect(find.text(FeatureRequest.newIssueUri.toString()), findsOneWidget);
+    expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField).first)
+            .controller!
+            .text,
+        'A useful feature');
+  });
+
+  testWidgets('search uses active draft title with safe query encoding',
+      (tester) async {
+    Uri? opened;
+    await mount(tester, open: (uri) async {
+      opened = uri;
+      return true;
+    });
+    await selectType(tester, FeedbackType.feature);
+    await tester.enterText(find.byType(TextFormField).first, '阅读 & ? #1');
+    await click(tester, 'Existing issues');
+    expect(opened, FeedbackReport.searchUri('阅读 & ? #1'));
+    expect(opened!.fragment, isEmpty);
+    expect(opened!.queryParameters['q'], 'is:issue 阅读 & ? #1');
+  });
+
+  testWidgets('environment refresh preserves IME composition and caret',
+      (tester) async {
+    final environment = Completer<String>();
+    await mount(tester, environment: () => environment.future);
+    await selectType(tester, FeedbackType.feature);
+    final field = find.byType(TextFormField).first;
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pump();
+    const editing = TextEditingValue(
+        text: '功能abcdef',
+        selection: TextSelection.collapsed(offset: 2),
+        composing: TextRange(start: 0, end: 2));
+    tester.testTextInput.updateEditingValue(editing);
+    await tester.pump();
+    final controller = tester.widget<TextFormField>(field).controller!;
+    environment.complete('Windows 11 / x64');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(field).controller, same(controller));
+    expect(controller.value, editing);
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+  });
+
+  for (final locale in appLocales) {
+    testWidgets(
+        '$locale feature form is localized on a narrow large-text display',
+        (tester) async {
+      await mount(tester, locale: locale, mobile: true);
+      final context = tester.element(find.byType(BugReportSettings));
+      final strings = [
+        ModuStrings.text(context, '预览功能建议', 'Preview feature request'),
+        ModuStrings.text(context, '使用场景与需求', 'Problem or use case'),
+        ModuStrings.text(context, '希望实现的功能', 'Proposed solution'),
+      ];
+      if (locale.languageCode != 'en') {
+        expect(strings[1], isNot('Problem or use case'));
+        expect(strings[2], isNot('Proposed solution'));
+      }
+      await selectType(tester, FeedbackType.feature);
+      expect(find.text(strings[1]), findsOneWidget);
+      expect(find.text(strings[2]), findsOneWidget);
+      await fillFeature(tester);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await click(
+          tester, ModuStrings.text(context, '预览并提交', 'Preview and submit'));
+      expect(find.text(strings[0]), findsOneWidget);
+      await click(tester, ModuStrings.text(context, '返回修改', 'Keep editing'));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final locale in [
     const Locale('fr'),
     const Locale('ja'),
@@ -95,8 +344,9 @@ void main() {
     final opened = <Uri>[];
     tester.binding.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'Clipboard.setData')
+      if (call.method == 'Clipboard.setData') {
         copied = (call.arguments as Map)['text'] as String;
+      }
       return null;
     });
     addTearDown(() => tester.binding.defaultBinaryMessenger
@@ -189,7 +439,7 @@ void main() {
     });
     expect(opened, isEmpty);
     await click(tester, 'Preview and submit');
-    expect(find.text('This field is required'), findsNWidgets(4));
+    expect(find.text('This field is required'), findsNWidgets(5));
     expect(opened, isEmpty);
     await fill(tester);
     await click(tester, 'Preview and submit');
@@ -199,8 +449,10 @@ void main() {
     expect(opened, isEmpty);
     await click(tester, 'Preview and submit');
     await click(tester, 'Continue on GitHub');
-    expect(
-        opened.single.queryParameters['bug_report_description'], 'Blank PDF');
+    expect(opened.single.queryParameters['bug_report_description'],
+        contains('Blank PDF'));
+    expect(opened.single.queryParameters['bug_report_description'],
+        contains('A blank page appears'));
     expect(
         opened.single.queryParameters['bug_report_desktop'], contains('6326'));
     expect(find.textContaining('Nothing submitted yet'), findsOneWidget);

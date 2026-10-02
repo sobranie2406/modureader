@@ -37,6 +37,9 @@ class _StreamingChat extends AiChat {
     bool isRegenerate, {
     String? skillId,
     String? sourceText,
+    String? sourceContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
     String? homePromptId,
     CancelableLangchainRunner? requestRunner,
   }) {

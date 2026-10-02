@@ -7,6 +7,7 @@ import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:anx_reader/service/tts/tts_service.dart' as tts_svc;
 import 'package:anx_reader/widgets/reading_page/widget_title.dart';
+import 'package:anx_reader/widgets/reading_page/tts_rate_slider.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
 import 'package:anx_reader/page/settings_page/narrate.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/more_settings.dart';
@@ -36,8 +37,12 @@ class _TtsWidgetState extends State<TtsWidget> {
   String _unitLabel(BuildContext context, {required bool previous}) {
     final paragraph = tts_svc.getTtsService(Prefs().ttsService).isOnline;
     return paragraph
-        ? (previous ? ModuStrings.text(context, '上一段', 'Previous passage') : ModuStrings.text(context, '下一段', 'Next passage'))
-        : (previous ? ModuStrings.text(context, '上一句', 'Previous sentence') : ModuStrings.text(context, '下一句', 'Next sentence'));
+        ? (previous
+            ? ModuStrings.text(context, '上一段', 'Previous passage')
+            : ModuStrings.text(context, '下一段', 'Next passage'))
+        : (previous
+            ? ModuStrings.text(context, '上一句', 'Previous sentence')
+            : ModuStrings.text(context, '下一句', 'Next sentence'));
   }
 
   @override
@@ -133,19 +138,16 @@ class _TtsWidgetState extends State<TtsWidget> {
             children: [
               Text(L10n.of(context).ttsRate),
               Expanded(
-                child: Slider(
-                  value: this.rate.clamp(isMimo ? 0.5 : 0.0, 2.0),
+                child: TtsRateSlider(
+                  rate: this.rate,
+                  isMimo: isMimo,
+                  isOnline: tts_svc.getTtsService(Prefs().ttsService).isOnline,
                   onChanged: (newRate) {
                     setState(() => this.rate = newRate);
                   },
                   // Dragging previews the value; commit once on release so
                   // each pointer event does not invalidate all speech requests.
                   onChangeEnd: (value) => TtsHandler().rate = value,
-                  min: isMimo ? 0.5 : 0.0,
-                  max: 2.0,
-                  divisions: isMimo ? 15 : 10,
-                  label:
-                      '${this.rate.clamp(isMimo ? 0.5 : 0.0, 2.0).toStringAsFixed(1)}${isMimo ? '×' : ''}',
                 ),
               ),
             ],

@@ -12,6 +12,7 @@ import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagr
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/page_turn_dropdown.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/tap_only_page_turn_tile.dart';
+import 'package:anx_reader/widgets/reading_page/more_settings/long_press_selection_tile.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/scroll_page_percent_tile.dart';
 import 'package:flutter/material.dart';
 
@@ -344,6 +345,13 @@ class _OtherSettingsState extends State<OtherSettings> {
           autoAdjustReadingTheme(),
           autoTranslateSelection(),
           autoMarkSelection(),
+          LongPressSelectionTile(
+            value: Prefs().longPressSelectParagraph,
+            onChanged: (value) {
+              setState(() => Prefs().longPressSelectParagraph = value);
+              epubPlayerKey.currentState?.changeStyle(null);
+            },
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.touch_app_outlined),

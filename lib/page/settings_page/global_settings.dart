@@ -5,7 +5,6 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/providers/ai_providers.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/local_data/backup_safety.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
@@ -83,34 +82,23 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
             includeSecrets: _includeSecrets);
         if (asLink) {
           final token = GlobalSettingsTransfer.link(text);
-          Uint8List? image;
-          try {
-            image = await ConfigQrBridge.generate(token);
-          } catch (_) {/* Keep the complete link. */}
           if (!mounted) return;
           await showDialog<void>(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                    title: Text(t('$scopeLabel：二维码 / modu 链接',
-                        '$scopeLabel: QR / modu link')),
+                    title: Text(ModuStrings.format(
+                        context, '{scope}：modu 链接', '{scope}: modu link',
+                        values: {'scope': scopeLabel})),
                     content: SizedBox(
                         width: 420,
                         child: SingleChildScrollView(
                             child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                              if (image != null)
-                                Image.memory(image, width: 260, height: 260)
-                              else
-                                Text(ModuStrings.text(
-                                    context,
-                                    '内容超过二维码容量或二维码不可用，请复制完整链接或导出文件。',
-                                    'QR unavailable or too large. Copy the complete link or export a file.')),
-                              const SizedBox(height: 12),
                               Text(ModuStrings.text(
                                   context,
-                                  '请勿公开分享。导入时请到“全局设置备份”粘贴链接或读取二维码图片。',
-                                  'Keep private. Paste this link or import its QR image in Global settings backup.')),
+                                  '请勿公开分享。在“全局设置备份”粘贴完整链接即可导入；设置较多时推荐使用设置文件。',
+                                  'Keep private. Paste the complete link in Global settings backup to import it. Use a settings file for larger backups.')),
                               const SizedBox(height: 12),
                               ConstrainedBox(
                                   constraints:
@@ -125,20 +113,6 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                           },
                           child: Text(
                               ModuStrings.text(context, '复制链接', 'Copy link'))),
-                      if (image != null)
-                        TextButton(
-                            onPressed: () async {
-                              final path = await saveFileToDownload(
-                                  bytes: image,
-                                  fileName: 'Modu-settings-qr.png',
-                                  mimeType: 'image/png');
-                              if (path != null && mounted) {
-                                await _showExportResult(path,
-                                    fileName: 'Modu-settings-qr.png');
-                              }
-                            },
-                            child: Text(
-                                ModuStrings.text(context, '保存二维码', 'Save QR'))),
                       TextButton(
                           onPressed: () => Navigator.pop(dialogContext),
                           child:
@@ -197,20 +171,10 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
         await _restore(text);
       });
 
-  Future<void> _importLink({bool image = false}) => _run(() async {
+  Future<void> _importLink() => _run(() async {
         if (!_canImport()) return;
-        String? text;
-        if (image) {
-          final picked = await FilePicker.platform
-              .pickFiles(type: FileType.image, allowMultiple: false);
-          final path = picked?.files.single.path;
-          if (path == null) return;
-          text = await ConfigQrBridge.decodeImage(path);
-          if (text == null) throw const FormatException('No QR code');
-        } else {
-          text = await showDialog<String>(
-              context: context, builder: (_) => const _SettingsLinkDialog());
-        }
+        final text = await showDialog<String>(
+            context: context, builder: (_) => const _SettingsLinkDialog());
         if (text == null || !mounted) return;
         await _restore(text);
       });
@@ -299,8 +263,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
           const SizedBox(height: 16),
           Text(ModuStrings.text(
               context,
-              '一次迁移全部全局设置，文件、二维码和 modu 链接统一在这里导入导出。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。',
-              'Transfer all global settings together via files, QR codes or modu links. Older AI, speech, sync and library links remain supported; the actual contents are shown before import.')),
+              '一次迁移全部全局设置，支持设置文件和 modu 链接，推荐使用文件备份。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。',
+              'Transfer all global settings via settings files or modu links. Files are recommended for backups. Older AI, speech, sync and library links remain supported; actual contents are shown before import.')),
           const SizedBox(height: 12),
           Text(ModuStrings.text(
               context,
@@ -313,7 +277,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                   'Include accounts, passwords and API keys')),
               subtitle: Text(ModuStrings.text(
                   context,
-                  '默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件、二维码和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。',
+                  '默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。',
                   'Off by default: omit credential-bearing API/server configurations on export and skip them on import, preserving local accounts and keys. When enabled, transfers contain plaintext credentials. Keep them private. Sync encryption is unchanged and its password is never exported. Do not place private credentials in custom CSS, prompts or URLs.')),
               value: _includeSecrets,
               onChanged:
@@ -326,9 +290,9 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                   context, '导出全局设置文件', 'Export global settings file'))),
           OutlinedButton.icon(
               onPressed: _busy ? null : () => _export(asLink: true),
-              icon: const Icon(Icons.qr_code_2),
-              label: Text(ModuStrings.text(
-                  context, '导出二维码 / modu 链接', 'Export QR / modu link'))),
+              icon: const Icon(Icons.link),
+              label: Text(
+                  ModuStrings.text(context, '导出 modu 链接', 'Export modu link'))),
           const SizedBox(height: 12),
           OutlinedButton.icon(
               onPressed: _busy ? null : _import,
@@ -336,15 +300,10 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
               label: Text(ModuStrings.text(
                   context, '从文件恢复设置', 'Restore settings from file'))),
           OutlinedButton.icon(
-              onPressed: _busy ? null : () => _importLink(),
+              onPressed: _busy ? null : _importLink,
               icon: const Icon(Icons.link),
               label: Text(ModuStrings.text(
                   context, '粘贴 modu 链接恢复', 'Restore from modu link'))),
-          OutlinedButton.icon(
-              onPressed: _busy ? null : () => _importLink(image: true),
-              icon: const Icon(Icons.image_search),
-              label: Text(ModuStrings.text(
-                  context, '从二维码图片恢复', 'Restore from QR image'))),
           if (_busy)
             const Padding(
                 padding: EdgeInsets.all(16),

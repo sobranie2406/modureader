@@ -542,6 +542,7 @@ class _ContextMenuOverlayState extends State<_ContextMenuOverlay>
                                   ExcerptMenu(
                                     annoCfi: widget.annoCfi,
                                     annoContent: widget.annoContent,
+                                    contextText: widget.contextText,
                                     id: _noteId,
                                     bookId: widget.bookId,
                                     annotationIds: widget.annotationIds,

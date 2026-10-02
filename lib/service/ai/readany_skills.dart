@@ -32,33 +32,16 @@ class ReadAnySkill {
       ModuStrings.isDefault('skill_${id}_prompt', value, defaultPrompt);
 }
 
+/// Retained only for old prompt/history compatibility, not as a reading preset.
+/// The separate selection-toolbar AI knowledge template remains available.
+const legacyAiKnowledgeSkill = ReadAnySkill(
+  id: 'ai_dictionary',
+  name: 'AI 知识',
+  description: '用选中文字的语言简要介绍含义、背景及相关知识',
+  prompt: '简要介绍所选词语的含义、背景和相关知识，用选中文字的语言回答。不提供拼音、音标、翻译或例句；不确定的内容明确说明。',
+);
+
 const List<ReadAnySkill> readAnySkills = [
-  ReadAnySkill(
-    id: 'ai_dictionary',
-    name: 'AI 词典解释',
-    description: '直接使用模型已有知识解释；英文音标与双语释义、中文拼音及相关词语知识，联网补查需手动选择',
-    prompt: '''
-请作为独立的 AI 词典，使用当前 AI 模型已有的语言与百科知识，解释用户选中的词语或短语。不以本书知识库为依据，不分析当前书籍或章节，不生成“本段词汇网”。直接从词条开始回答，不输出获取上下文、书名或章节的开场说明。
-
-英文词语：
-1. 词条与音标：给出 IPA 国际音标；英式和美式不同则分别列出，标明词性。
-2. 中文翻译：列出最常见的中文对应词，多义词按常用义项区分。
-3. 中英文解释：每个主要义项给出中文释义与简洁的英文 definition。
-4. 用法：给出 1–2 个英文例句及中文翻译，必要时补充常用搭配。
-
-中文词语：
-1. 词条与拼音：使用带声调的拼音；多音字或不同读法分开说明，不擅自确定缺少语境的读音。
-2. 词语解释：用现代汉语说明常见含义，标注古义、成语义或专业义，不假设书中含义。
-3. 用法：给出简短例句；词源或典故只有可靠时才补充。
-
-相关词语知识（中英文均提供）：
-- 挑选 2–4 个确实相关的近义词、反义词、易混词或派生词，分别给出简短释义，并说明与所选词语的关系或区别；不存在合适条目时不要凑数。
-- 补充常用搭配、使用场景；词源、典故、专业背景等仅在有助于理解且有把握时简述。
-- 英文相关词附中文含义；中文相关词如有生僻字或多音字，补充带声调的拼音。不扩展为与词语无关的书籍分析。
-
-仅使用模型已有知识简明解释，不等待外部词典或百科。不确定的读音、释义或词源明确说明，不能编造读音、释义、词源或来源。如需核实，提示用户在对话框输入“确认联网搜索”并发送；不提示点击按钮，不自动搜索。不使用本书知识库。
-''',
-  ),
   ReadAnySkill(
     id: 'smart_summary',
     name: '本章总结',
@@ -195,4 +178,10 @@ const List<ReadAnySkill> readAnySkills = [
     description: '把当前阅读内容整理为清晰的层级结构',
     aiPrompt: AiPrompts.mindmap,
   ),
+];
+
+/// Prompt recognition must include retired defaults without exposing them in UI.
+const readingSkillPromptDefinitions = [
+  ...readAnySkills,
+  legacyAiKnowledgeSkill,
 ];

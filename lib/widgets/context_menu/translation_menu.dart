@@ -29,6 +29,7 @@ class _TranslationMenuState extends State<TranslationMenu> {
   bool _translationInitialized = false;
   final ScrollController _scrollController = ScrollController();
   bool _showFullSource = false;
+  int _translationRevision = 0;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _TranslationMenuState extends State<TranslationMenu> {
                   ?.call(widget.content, effectiveContextText) ??
               translateText(
                 widget.content,
+                service: Prefs().translateService,
                 contextText: effectiveContextText,
               );
           _translationInitialized = true;
@@ -74,11 +76,70 @@ class _TranslationMenuState extends State<TranslationMenu> {
 
   void _restartTranslation() {
     _debounceTimer?.cancel();
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
     setState(() {
+      _translationRevision++;
       _translationInitialized = false;
       _translationWidget = null;
     });
     _initializeTranslation();
+  }
+
+  Future<void> _showServicePicker() async {
+    final currentService = Prefs().translateService;
+    final services = [
+      ...TranslateService.selectionValues,
+      if (!TranslateService.selectionValues.contains(currentService))
+        currentService,
+    ];
+    final selected = await showModalBottomSheet<TranslateService>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => PointerInterceptor(
+        child: SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.7,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      ModuStrings.text(
+                          context, '选择翻译引擎', 'Select translation engine'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final service in services)
+                        ListTile(
+                          key: ValueKey(
+                              'selection-translation-engine-${service.name}'),
+                          title: Text(service.getLabel(context)),
+                          selected: service == currentService,
+                          trailing: service == currentService
+                              ? const Icon(Icons.check)
+                              : null,
+                          onTap: () => Navigator.pop(context, service),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || selected == null || selected == currentService) return;
+    Prefs().translateService = selected;
+    _restartTranslation();
   }
 
   @override
@@ -158,18 +219,39 @@ class _TranslationMenuState extends State<TranslationMenu> {
                   onPressed: () => Navigator.of(context).pop()),
             ]),
           ),
-          if (!Prefs().translateService.usesPageLanguagePicker)
-            Padding(
-              key: const ValueKey('selection-translation-language-picker'),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _langPicker(true),
-                    const Icon(Icons.arrow_forward, size: 16),
-                    _langPicker(false),
-                  ]),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton.icon(
+                  key: const ValueKey('selection-translation-service-picker'),
+                  onPressed: _showServicePicker,
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(Prefs().translateService.getLabel(context)),
+                      ),
+                      const Icon(Icons.arrow_drop_down, size: 18),
+                    ],
+                  ),
+                ),
+                if (!Prefs().translateService.usesPageLanguagePicker)
+                  Wrap(
+                    key:
+                        const ValueKey('selection-translation-language-picker'),
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _langPicker(true),
+                      const Icon(Icons.arrow_forward, size: 16),
+                      _langPicker(false),
+                    ],
+                  ),
+              ],
             ),
+          ),
           const Divider(height: 1),
           Expanded(
             child: Scrollbar(
@@ -200,7 +282,13 @@ class _TranslationMenuState extends State<TranslationMenu> {
                                   context, '展开原文', 'Expand original'))),
                         ),
                         const Divider(),
-                        _translationWidget ?? const Text('...'),
+                        if (_translationWidget != null)
+                          KeyedSubtree(
+                            key: ValueKey(_translationRevision),
+                            child: _translationWidget!,
+                          )
+                        else
+                          const Text('...'),
                       ]),
                 ),
               ),

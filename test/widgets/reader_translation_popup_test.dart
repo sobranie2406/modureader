@@ -190,6 +190,141 @@ void main() {
     });
   }
 
+  for (final size in [const Size(390, 844), const Size(844, 390)]) {
+    testWidgets('provider switches retain the selection and reload at $size',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      Prefs().fullTextTranslateService = TranslateService.deepl;
+      final requests = <(TranslateService, String, String?)>[];
+      await tester.pumpWidget(app(ReaderPopup(
+        child: TranslationMenu(
+          content: 'selected words',
+          contextText: 'sentence around selected words',
+          resultBuilder: (text, contextText) {
+            final service = Prefs().translateService;
+            requests.add((service, text, contextText));
+            return Column(children: [
+              Text('result ${service.name}'),
+              ...List.generate(40, (index) => Text('paragraph $index')),
+            ]);
+          },
+        ),
+      )));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      final picker =
+          find.byKey(const ValueKey('selection-translation-service-picker'));
+      final scroll = tester
+          .widget<SingleChildScrollView>(
+              find.byKey(const ValueKey('selection-translation-scroll')))
+          .controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(picker.hitTestable(), findsOneWidget);
+
+      for (final service in [
+        TranslateService.youdaoWeb,
+        TranslateService.googleWeb,
+        TranslateService.ai,
+      ]) {
+        await tester.tap(picker);
+        await tester.pumpAndSettle();
+        final target = find
+            .byKey(ValueKey('selection-translation-engine-${service.name}'));
+        await tester.scrollUntilVisible(target, 180,
+            scrollable: find
+                .descendant(
+                    of: find.byType(BottomSheet),
+                    matching: find.byType(Scrollable))
+                .first);
+        await tester.tap(target);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        expect(Prefs().translateService, service);
+        expect(Prefs().fullTextTranslateService, TranslateService.deepl);
+        expect(requests.last,
+            (service, 'selected words', 'sentence around selected words'));
+        expect(find.text('result ${service.name}'), findsOneWidget);
+        expect(scroll.offset, 0);
+        expect(
+            find.byKey(const ValueKey('selection-translation-language-picker')),
+            service.usesPageLanguagePicker ? findsNothing : findsOneWidget);
+      }
+      expect(requests.length, 4);
+      expect(find.text('result microsoftFree'), findsNothing);
+      expect(find.text('result youdaoWeb'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('dismissal and reselecting the provider preserve the result',
+      (tester) async {
+    var requests = 0;
+    await tester.pumpWidget(app(ReaderPopup(
+      child: TranslationMenu(
+        content: 'word',
+        resultBuilder: (_, __) {
+          requests++;
+          return const Text('existing translation');
+        },
+      ),
+    )));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    final picker =
+        find.byKey(const ValueKey('selection-translation-service-picker'));
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(find
+        .byKey(const ValueKey('selection-translation-engine-microsoftFree')));
+    await tester.pumpAndSettle();
+    expect(requests, 1);
+    expect(find.text('existing translation'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('provider list scrolls on a small screen with large text',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(app(MediaQuery(
+      data: const MediaQueryData(
+          size: Size(360, 640), textScaler: TextScaler.linear(2)),
+      child: ReaderPopup(
+        child: TranslationMenu(
+          content: 'word',
+          resultBuilder: (_, __) => const Text('translation'),
+        ),
+      ),
+    )));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(
+        find.byKey(const ValueKey('selection-translation-service-picker')));
+    await tester.pumpAndSettle();
+    final target =
+        find.byKey(const ValueKey('selection-translation-engine-youdaoWeb'));
+    await tester.scrollUntilVisible(target, 180,
+        scrollable: find
+            .descendant(
+                of: find.byType(BottomSheet), matching: find.byType(Scrollable))
+            .first);
+    await tester.tap(target);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(Prefs().translateService, TranslateService.youdaoWeb);
+    expect(tester.takeException(), isNull);
+  });
+
   test('AI translation delegates scrolling to the translation viewport', () {
     final widget = AiTranslateProvider()
         .translate('hello', LangListEnum.auto, LangListEnum.english);

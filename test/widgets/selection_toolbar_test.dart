@@ -165,9 +165,27 @@ void main() {
     expect(find.text('请填写名称和提示词。'), findsOneWidget);
     await tester.enterText(key('toolbar-name'), '校对');
     await tester.enterText(key('toolbar-prompt'), '校对 {selection}，指出错字');
+    expect(
+        tester
+            .widget<DropdownButtonFormField<SelectionAiScope>>(
+                key('toolbar-ai-scope'))
+            .initialValue,
+        SelectionAiScope.selection);
+    expect(tester.widget<CheckboxListTile>(key('toolbar-ai-web-search')).value,
+        false);
+    await tester.ensureVisible(key('toolbar-ai-scope'));
+    await tester.tap(key('toolbar-ai-scope'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('结合上下文').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(key('toolbar-ai-web-search'));
+    await tester.tap(key('toolbar-ai-web-search'));
+    await tester.pumpAndSettle();
     await tester.tap(key('toolbar-editor-save'));
     await tester.pumpAndSettle();
     expect(Prefs().selectionToolbar.items.last.name, '校对');
+    expect(Prefs().selectionToolbar.items.last.scope, SelectionAiScope.context);
+    expect(Prefs().selectionToolbar.items.last.webSearch, true);
     final ownId = Prefs().selectionToolbar.items.last.id;
     await reveal(tester, key('toolbar-restore'));
     await tester.tap(key('toolbar-restore'));
@@ -213,6 +231,51 @@ void main() {
     expect(Prefs().selectionToolbar.annotations.last.name, '我的颜色');
     expect(tester.takeException(), isNull);
   });
+
+  for (final id in [
+    'ai',
+    'custom-preset-dictionary',
+    'custom-preset-explain'
+  ]) {
+    testWidgets('$id exposes independent scope and optional online search',
+        (tester) async {
+      await tester.pumpWidget(app(const SelectionToolbarSettings()));
+      await tester.pumpAndSettle();
+      await reveal(tester, key('toolbar-edit-$id'));
+      await tester.tap(key('toolbar-edit-$id'));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<DropdownButtonFormField<SelectionAiScope>>(
+                  key('toolbar-ai-scope'))
+              .initialValue,
+          SelectionAiScope.selection);
+      expect(
+          tester.widget<CheckboxListTile>(key('toolbar-ai-web-search')).value,
+          false);
+      await tester.ensureVisible(key('toolbar-ai-scope'));
+      await tester.tap(key('toolbar-ai-scope'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('结合上下文').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(key('toolbar-ai-web-search'));
+      await tester.tap(key('toolbar-ai-web-search'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('toolbar-editor-save'));
+      await tester.pumpAndSettle();
+      final item = Prefs().selectionToolbar.items.firstWhere((i) => i.id == id);
+      expect(item.scope, SelectionAiScope.context);
+      expect(item.webSearch, true);
+      expect(
+          Prefs()
+              .selectionToolbar
+              .items
+              .where((i) => i.id != id)
+              .every((i) => !i.webSearch),
+          true);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
       'small screen and enlarged text retain all settings without overflow',

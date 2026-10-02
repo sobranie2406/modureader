@@ -1,15 +1,22 @@
-name: Bug report
-description: Report a bug!|我遇到了问题！
+name: Bug report | 问题反馈
+description: Report unexpected behavior in an existing feature | 报告已有功能异常
 title: "[Bug]: "
 labels: ["bug"]
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Report one bug per issue. For new features or improvements, use the Feature request template.
+        每条反馈只描述一个问题；新增或改进功能请使用“功能建议”模板。
+        Reports are public. Do not include keys, passwords, settings links/QR codes, private books or personal information.
+        反馈公开可见。请勿提交密钥、密码、设置链接/二维码、私人书籍或个人信息。
   - type: checkboxes
     id: bug_report_is_crash
     attributes:
       label: Prerequisites|前提条件
       options:
-        - label: I have checked the troubleshooting guide|我已经查看过故障排除指南
+        - label: I have reviewed this report and removed private information|我已检查反馈内容并移除私人信息
           required: true
         - label: I have searched for similar issues and did not find any|我已经搜索过没有相同的问题
           required: true
@@ -18,8 +25,8 @@ body:
     attributes:
       label: Describe the bug|描述问题
       description: |
-        A clear and concise description of what the bug is
-        一个清晰且简洁的描述问题
+        Describe the problem and the actual result, including any error message.
+        描述问题和实际结果，包括报错信息（如有）。
     validations:
       required: true
   - type: textarea
@@ -27,8 +34,8 @@ body:
     attributes:
       label: To reproduce|重现步骤
       description: |
-        Steps to reproduce the behavior
-        如何重现问题
+        List the steps in order. If intermittent, describe what happened before the error and how often it occurs.
+        按顺序列出操作；无法稳定复现时，说明出错前的操作与发生频率。
       value: |
         1. Go to '...' | 前往...
         2. Click on '...' | 点击...

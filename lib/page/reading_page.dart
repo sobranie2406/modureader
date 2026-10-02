@@ -27,8 +27,7 @@ import 'package:anx_reader/page/book_player/epub_player.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/service/ai/prompt_generate.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
-import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:anx_reader/widgets/ai/reading_skill_chips.dart';
 import 'package:anx_reader/service/reader_focus.dart';
 import 'package:anx_reader/service/reader_keyboard.dart';
 import 'package:anx_reader/service/reader_page_keys.dart';
@@ -42,7 +41,8 @@ import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:anx_reader/widgets/reading_page/quick_mark_toggle.dart';
 import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
-import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
+import 'package:anx_reader/widgets/reading_page/tts_quick_toolbar.dart';
+import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_toolbar_action.dart';
@@ -233,20 +233,24 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   late final ReaderPageKeys _pageKeys;
 
   bool get _canUsePageKeys {
+    // Opening the drawer removes menu controls. Their old FocusNode context
+    // can outlive its Element, so check route/panel eligibility before focus.
+    if (!mounted ||
+        widget.book.isDeleted ||
+        !_readingRouteVisible ||
+        _observedRoute?.isCurrent != true ||
+        !bottomBarOffstage ||
+        _readerDrawerOpen ||
+        _searchDialogOpen ||
+        _aiChat != null) {
+      return false;
+    }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
-    final focused = FocusManager.instance.primaryFocus?.context;
-    final editing = focused?.widget is EditableText ||
-        focused?.findAncestorWidgetOfExactType<EditableText>() != null;
-    return mounted &&
-        !widget.book.isDeleted &&
-        _readingRouteVisible &&
-        ModalRoute.of(context)?.isCurrent == true &&
-        (lifecycle == null || lifecycle == AppLifecycleState.resumed) &&
-        bottomBarOffstage &&
-        !_readerDrawerOpen &&
-        !_searchDialogOpen &&
-        _aiChat == null &&
-        !editing;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+      return false;
+    }
+    return !readerFocusBlocksPageKeys(
+        FocusManager.instance.primaryFocus?.context);
   }
 
   void _updatePageKeys() {
@@ -566,6 +570,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> tocHandler() async {
+    if (!mounted || _readerDrawerOpen) {
+      return;
+    }
     _readerDrawerOpen = true;
     hideBottomBar();
     _scaffoldKey.currentState?.openDrawer();
@@ -618,6 +625,32 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         epubPlayerKey: epubPlayerKey,
       );
     });
+  }
+
+  Future<void> _returnToNarration() async {
+    await epubPlayerKey.currentState?.returnToTtsPosition();
+  }
+
+  Future<void> _readAloudFromHere() async {
+    final player = epubPlayerKey.currentState;
+    if (player == null || !player.mounted || player.cfi.isEmpty) return;
+    // Freeze the visible destination before stopping speech clears its cursor.
+    final destination = player.cfi;
+    await audioHandler.stop();
+    if (!mounted || !player.mounted || epubPlayerKey.currentState != player) {
+      return;
+    }
+    await TtsHandler().init(() => player.initTts(fromCfi: destination),
+        player.ttsNext, player.ttsPrev);
+    if (!mounted || !player.mounted || epubPlayerKey.currentState != player) {
+      return;
+    }
+    await audioHandler.play();
+  }
+
+  void _openNarrationSettings() {
+    showBottomBar();
+    ttsHandler();
   }
 
   void translationHandler() {
@@ -803,6 +836,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             initialMessage: null,
             sendImmediate: false,
             quickPromptChips: _getAiQuickPromptChips(),
+            quickPromptChipsBuilder: _getAiQuickPromptChips,
             trailing: _buildAiChatTrailing(context),
           ),
         ),
@@ -811,50 +845,15 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   List<AiQuickPromptChip> _getAiQuickPromptChips() {
-    return [
-      ...readAnySkills
-          .where((skill) => Prefs().isReadAnySkillEnabled(skill.id))
-          .map(
-            (skill) => AiQuickPromptChip(
-              icon: _readAnySkillIcon(skill.id),
-              label: skill.localizedName(Localizations.localeOf(context)),
-              prompt: ReadingSkillPromptStore.promptFor(skill,
-                  locale: Localizations.localeOf(context)),
-              skillId: skill.id,
-            ),
-          ),
-      // User custom prompts (enabled only)
-      ...Prefs()
-          .userPrompts
-          .where((p) => p.enabled)
-          .map((userPrompt) => AiQuickPromptChip(
-                icon: Icons.person_outline,
-                label: userPrompt.name,
-                prompt: userPrompt.content,
-              )),
-    ];
-  }
-
-  IconData _readAnySkillIcon(String skillId) {
-    return switch (skillId) {
-      'smart_summary' => Icons.summarize_outlined,
-      'book_summary' => Icons.menu_book_rounded,
-      'concept_explainer' => Icons.lightbulb_outline,
-      'argument_analyzer' => Icons.account_tree_outlined,
-      'character_tracker' => Icons.groups_outlined,
-      'quote_collector' => Icons.format_quote_outlined,
-      'reading_guide' => Icons.explore_outlined,
-      'smart_translator' => Icons.translate_outlined,
-      'vocabulary_helper' => Icons.spellcheck_outlined,
-      'ai_dictionary' => Icons.menu_book_outlined,
-      'mindmap' => Icons.account_tree_outlined,
-      _ => Icons.extension_outlined,
-    };
+    return configuredReadingSkillChips(Localizations.localeOf(context));
   }
 
   Future<void> showAiChat({
     String? content,
     String? sourceText,
+    String? sourceContext,
+    bool selectionRequest = false,
+    bool webSearch = false,
     String? skillId,
     bool sendImmediate = false,
     bool newConversation = false,
@@ -898,10 +897,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                 scope: AiChatScope.reader,
                 initialMessage: content,
                 initialSourceText: sourceText,
+                initialSourceContext: sourceContext,
+                initialSelectionRequest: selectionRequest,
+                initialWebSearch: webSearch,
                 initialSkillId: skillId,
                 newConversation: newConversation,
                 sendImmediate: sendImmediate,
                 quickPromptChips: quickPrompts,
+                quickPromptChipsBuilder: _getAiQuickPromptChips,
               ));
       _restoreReaderFocusAfterPanel();
     } else {
@@ -920,10 +923,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                 scope: AiChatScope.reader,
                 initialMessage: content,
                 initialSourceText: sourceText,
+                initialSourceContext: sourceContext,
+                initialSelectionRequest: selectionRequest,
+                initialWebSearch: webSearch,
                 initialSkillId: skillId,
                 newConversation: newConversation,
                 sendImmediate: existingChat == null && sendImmediate,
                 quickPromptChips: quickPrompts,
+                quickPromptChipsBuilder: _getAiQuickPromptChips,
                 trailing: _buildAiChatTrailing(navigatorKey.currentContext!),
               ),
             ),
@@ -936,6 +943,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
           existingChat.beginSelectionQuestion(
               message: content ?? '',
               sourceText: sourceText ?? content ?? '',
+              sourceContext: sourceContext,
+              selectionRequest: selectionRequest,
+              webSearch: webSearch,
               skillId: skillId,
               sendImmediate: sendImmediate);
         });
@@ -1180,6 +1190,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
               key: _scaffoldKey,
               resizeToAvoidBottomInset: false,
               onDrawerChanged: (open) {
+                if (!mounted) {
+                  return;
+                }
                 _readerDrawerOpen = open;
                 _updatePageKeys();
                 if (!open) _requestReaderFocus();
@@ -1358,14 +1371,26 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     ],
                   ),
                   controller,
-                  // TTS floating action button: always in the tree when toolbar
-                  // is hidden; TtsFab handles its own show/hide internally so
-                  // its State (expanded flag) is never destroyed mid-session.
-                  if (bottomBarOffstage)
-                    const Positioned(
-                      right: 16,
-                      bottom: 24,
-                      child: TtsFab(),
+                  // Paint controls above the book without changing WebView
+                  // dimensions, pagination or reader margins.
+                  if (bottomBarOffstage && _aiChat == null)
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 24 + MediaQuery.of(context).padding.bottom,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: TtsQuickToolbar(
+                            stateListenable: TtsHandler().ttsStateNotifier,
+                            onReturnToPosition: _returnToNarration,
+                            onReadHere: _readAloudFromHere,
+                            onPlay: audioHandler.play,
+                            onPause: audioHandler.pause,
+                            onOpenSettings: _openNarrationSettings,
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),

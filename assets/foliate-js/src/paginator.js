@@ -2,6 +2,7 @@ import { fitMobileImages } from './mobile-image-fit.js'
 import { touchPageDirection } from './touch-paging.js'
 import { waitForReaderFonts, clearReaderFontFallback } from './reader-font-ready.js'
 import { captureBookFontFamilies } from './reader-fonts.js'
+import { prepareReaderFontWeight } from './reader-font-weight.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
@@ -1588,6 +1589,7 @@ export class Paginator extends HTMLElement {
       if (pair[0].textContent === before && pair[1].textContent === after) return false
       clearReaderFontFallback(doc)
       captureBookFontFamilies(doc, this.#styles, pair)
+      prepareReaderFontWeight(doc, this.#styles)
       pair[0].textContent = before
       pair[1].textContent = after
       return true
@@ -1870,6 +1872,7 @@ export class Paginator extends HTMLElement {
     if (changed) {
       clearReaderFontFallback(this.#view.document)
       captureBookFontFamilies(this.#view.document, styles, $$styles)
+      prepareReaderFontWeight(this.#view.document, styles)
       $beforeStyle.textContent = before
       $style.textContent = after
     }

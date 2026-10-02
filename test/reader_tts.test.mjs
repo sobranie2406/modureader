@@ -22,6 +22,21 @@ function all(tts) {
   return values
 }
 
+test('returning to narration restores presentation without restarting the speech cursor', async () => {
+  const source = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8')
+  const script = source.match(/^window\.ttsReturnToPosition = .+$/m)?.[0]
+  assert.ok(script)
+  const events = []
+  const context = { window: {}, reader: { view: {
+    syncTTSHighlight: async () => { events.push('presentation') },
+    initTTS: () => { throw new Error('must not reset speech') },
+  } } }
+  vm.runInNewContext(script, context)
+  await context.window.ttsReturnToPosition()
+  await context.window.ttsReturnToPosition()
+  assert.deepEqual(events, ['presentation', 'presentation'])
+})
+
 test('presentation failure at a paragraph boundary must not stop or skip speech', async () => {
   const doc = documentFor('<p>第一段。</p><p>第二段。</p><p>第三段。</p>')
   const tts = new TTS(doc, null, range => {

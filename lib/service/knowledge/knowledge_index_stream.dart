@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'package:crypto/crypto.dart';
 
 const maxKnowledgeIndexBytes = 1024 * 1024 * 1024;
 const maxKnowledgeRecordCharacters = 2 * 1024 * 1024;
@@ -19,16 +21,19 @@ class KnowledgeJsonEvent {
 /// a time, so a gigabyte of vectors does not produce a gigabyte JSON string or
 /// a second complete decoded object tree.
 class KnowledgeJsonReader {
-  KnowledgeJsonReader(File file, {int maxBytes = maxKnowledgeIndexBytes})
+  KnowledgeJsonReader(File file,
+      {int maxBytes = maxKnowledgeIndexBytes,
+      void Function(List<int>)? onBytes})
       : _chunks = StreamIterator(
-            _boundedBytes(file, maxBytes).transform(utf8.decoder));
+            _boundedBytes(file, maxBytes, onBytes).transform(utf8.decoder));
 
   final StreamIterator<String> _chunks;
   String _buffer = '';
   int _offset = 0;
   bool _ended = false;
 
-  static Stream<List<int>> _boundedBytes(File file, int maxBytes) async* {
+  static Stream<List<int>> _boundedBytes(
+      File file, int maxBytes, void Function(List<int>)? onBytes) async* {
     if (await file.length() > maxBytes) {
       throw const FormatException('向量索引超过安全同步大小限制（1 GiB）');
     }
@@ -38,6 +43,7 @@ class KnowledgeJsonReader {
       if (received > maxBytes) {
         throw const FormatException('向量索引超过安全同步大小限制（1 GiB）');
       }
+      onBytes?.call(bytes);
       yield bytes;
     }
   }
@@ -198,4 +204,122 @@ class KnowledgeJsonReader {
       await _chunks.cancel();
     }
   }
+}
+
+class _MetadataDigest implements Sink<Digest> {
+  Digest? value;
+  @override
+  void add(Digest data) => value = data;
+  @override
+  void close() {}
+}
+
+/// Verify a copied/legacy index without allocating its text/vector snapshot.
+/// One record is decoded at a time; only IDs and small metadata are retained.
+Future<Map<String, dynamic>?> readKnowledgeIndexMetadata(
+    File file, String bookId) {
+  final path = file.path;
+  return Isolate.run(() async {
+    final input = File(path);
+    final digest = _MetadataDigest();
+    final bytes = sha256.startChunkedConversion(digest);
+    try {
+      final before = await input.stat();
+      if (before.type != FileSystemEntityType.file) return null;
+      final fields = <String, dynamic>{};
+      final ids = <String>{};
+      final seen = <String>{};
+      final arrays = <String>{};
+      var chunksEnded = false;
+      int? dimension;
+      await for (final event
+          in KnowledgeJsonReader(input, onBytes: bytes.add).read()) {
+        switch (event.kind) {
+          case 'field':
+            if (![
+                  'bookId',
+                  'contentHash',
+                  'sourceFingerprint',
+                  'embeddingMode',
+                  'embeddingModelId',
+                  'embeddingDimensions'
+                ].contains(event.key) ||
+                jsonEncode(event.value).length > 4096) {
+              return null;
+            }
+            fields[event.key] = event.value;
+          case 'start':
+            arrays.add(event.key);
+            if (event.key == 'vectors' && !chunksEnded) return null;
+          case 'end':
+            if (event.key == 'chunks') chunksEnded = true;
+          case 'item':
+            final item = event.value;
+            if (item is! Map<String, dynamic>) return null;
+            if (event.key == 'chunks') {
+              final id = item['id'], offset = item['startOffset'] ?? 0;
+              if (id is! String ||
+                  id.length > 4096 ||
+                  !ids.add(id) ||
+                  ids.length > 250000 ||
+                  item['bookId'] != bookId ||
+                  item['chapterId'] is! String ||
+                  item['text'] is! String ||
+                  offset is! int ||
+                  offset < 0) {
+                return null;
+              }
+            } else {
+              final id = item['chunkId'], vector = item['vector'];
+              if (id is! String ||
+                  !ids.contains(id) ||
+                  !seen.add(id) ||
+                  vector is! List ||
+                  vector.isEmpty ||
+                  vector.length > 8192 ||
+                  (dimension != null && vector.length != dimension) ||
+                  vector.any((v) => v is! num || !v.isFinite)) {
+                return null;
+              }
+              dimension = vector.length;
+            }
+        }
+      }
+      if (fields['bookId'] != bookId ||
+          fields['contentHash'] is! String ||
+          fields['sourceFingerprint'] != null &&
+              fields['sourceFingerprint'] is! String ||
+          !arrays.containsAll(['chunks', 'vectors']) ||
+          ids.isEmpty ||
+          (seen.isNotEmpty && seen.length != ids.length) ||
+          (fields['embeddingDimensions'] != null &&
+              fields['embeddingDimensions'] != dimension) ||
+          (fields['embeddingMode'] != null &&
+              (!['builtin', 'local', 'remote']
+                      .contains(fields['embeddingMode']) ||
+                  seen.length != ids.length ||
+                  fields['embeddingModelId'] is! String ||
+                  (fields['embeddingModelId'] as String).trim().isEmpty))) {
+        return null;
+      }
+      final after = await input.stat();
+      if (before.size != after.size ||
+          before.modified != after.modified ||
+          before.changed != after.changed) {
+        return null;
+      }
+      bytes.close();
+      return {
+        ...fields,
+        'chunkCount': ids.length,
+        'vectorCount': seen.length,
+        'size': after.size,
+        'modified': after.modified.microsecondsSinceEpoch,
+        'changed': after.changed.microsecondsSinceEpoch,
+        'indexSha256': digest.value!.toString()
+      };
+    } on Object {
+      return null;
+    }
+  });
 }

@@ -25,9 +25,9 @@ class DecodedConfigTransfer {
 /// Encodes configuration as a short, copyable token inspired by ReadAny's
 /// `readany:<base64-json>` transfer code.
 ///
-/// Modu uses gzip before Base64 so configurations with multiple providers and
-/// API keys remain small enough for a QR code. Base64 is transport encoding,
-/// not encryption; callers must present a secret-data warning to the user.
+/// Modu uses gzip before Base64 to reduce configuration link size. Full backups
+/// can still exceed QR capacity; use files or links instead. Base64 is transport
+/// encoding, not encryption; callers must present a secret-data warning.
 class ConfigTransferCodec {
   const ConfigTransferCodec._();
 

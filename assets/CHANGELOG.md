@@ -2,18 +2,26 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
-## 1.1.9
+## 1.1.10
 
-- Select part or all of an existing highlight or underline to delete the matching complete annotations and duplicate marks.
-- Keep deletion confirmation above the selection toolbar and color controls; restore the tools when cancelling.
-- Answer AI dictionary requests directly from model knowledge, without automatic web lookup or book-content upload.
-- Type the displayed confirmation phrase in the same chat to request Wiktionary, Wikipedia and Baidu Baike lookup with sources.
-- Preserve dictionary context after reopening a conversation; update unchanged bundled prompts while retaining custom edits.
-- Refresh the Chinese and English feature guides with screenshots from version 1.1.9.
+- Add a compact narration toolbar and online speech rates up to 4x, with 3x and 4x steps after 2x.
+- Show reading skills by default, with built-in/custom toggles and mixed ordering; optionally fill a template into the input before sending.
+- Simplify selection AI templates with selected-text/context scope and optional web search; keep AI Knowledge in the selection toolbar only.
+- Fix mobile long-press word selection, including native pointer takeover and older Android WebViews; optionally select a whole paragraph without overriding manual adjustments.
+- Fix a persistent blank reader when opening the contents drawer by safely handling removed widgets' focus contexts.
+- Move font thickness to a 0.5–2.0 slider in 0.1 steps between font size and line spacing; fix font-weight adjustments for nested text and publisher inline styles, preserving headings, emphasis and custom CSS.
+- Add an optional simulated-bold button beside font thickness; text strokes allow fixed-weight fonts to be thickened from 1.1 to 2.0, without changing the text or reading anchors.
+- Preserve unchanged book vectors across upgrades and file migrations; verify and recover legacy indexes locally instead of embedding them again.
+- Switch translation providers inside the translation popup, without reopening it.
+- Simplify global settings migration to files/modu links, retaining credential switches and user prompt edits; clarify database ZIP backup contents and saved locations, and improve bug/feature feedback forms.
 
-- 选中已有高亮或下划线的局部或全部，即可删除相交的完整标注，并清理重复标记。
-- 删除确认不再被工具条和颜色栏遮挡，取消后恢复工具栏。
-- AI 词典优先根据模型已有知识直接回答，不自动联网，不发送书籍正文。
-- 在原对话输入“确认联网搜索”后，才检索维基词典、维基百科和百度百科，并整理来源。
-- 重新打开对话仍保留词典查询上下文；更新未改动的内置提示词，保留用户自定义内容。
-- 更新中英文功能介绍与 1.1.9 界面截图。
+- 新增小型朗读快捷栏，在线朗读最高支持 4 倍速，2 倍后提供 3 倍与 4 倍档位。
+- AI 阅读技能默认显示，内置与自定义技能均可开关、混合排序；可先填入模板，再编辑并手动发送。
+- 划词 AI 提示词精简，支持仅选中文字或结合上下文，可独立勾选联网搜索；AI 知识仅保留在划词工具栏。
+- 修复手机长按自动选词，兼容系统接管触摸和旧版 Android WebView；可选择整段，不覆盖用户手动调整的选区。
+- 修复点击目录时因焦点回调读取已销毁控件而出现持续白屏的问题。
+- 将字体粗细调节移至字体大小与行间距之间，以 0.5–2.0 显示，按 0.1 步进；修复字重被正文嵌套标签和书籍内联样式覆盖的问题，保留标题、强调文字及自定义 CSS。
+- 在字体粗细旁新增“模拟加粗”按钮，默认关闭；通过描边让固定字重字体在 1.1–2.0 范围内逐档加粗，不改动文字与阅读定位。
+- 修复升级或文件迁移后未变更书籍被误判为需要重新向量化的问题；旧索引经本地校验后复用，修复索引状态而不重新生成向量。
+- 翻译弹窗内直接切换翻译服务提供方，无需关闭重开。
+- 全局设置仅保留文件和 modu 链接迁移，保留账号接口独立开关，仅备份用户提示词改动；明确数据库 ZIP 备份内容与保存位置，完善 Bug 和功能建议提交表单。

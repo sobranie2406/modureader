@@ -42,6 +42,7 @@ import 'package:anx_reader/service/book_player/reader_progress_session.dart';
 import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
+import 'package:anx_reader/service/book_player/reader_word_selection.dart';
 import 'package:anx_reader/service/book_player/tts_text_result.dart';
 import 'package:anx_reader/service/battery_level.dart';
 import 'package:anx_reader/service/tts/tts_reader_wait.dart';
@@ -326,9 +327,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         desktopPageInput: ${AnxPlatform.isDesktop},
         keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
+        longPressSelectParagraph: ${Prefs().longPressSelectParagraph},
+        selectionLocale: ${jsonEncode(Prefs().effectiveLocale.toLanguageTag())},
         scrollPagePercent: ${Prefs().scrollPagePercent},
         spacing: ${style.lineHeight},
         fontWeight: ${style.fontWeight},
+        simulateBold: ${style.simulateBold},
         paragraphSpacing: ${style.paragraphSpacing},
         topMargin: ${style.topMargin},
         bottomMargin: ${style.bottomMargin},
@@ -582,6 +586,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   Future<void> ttsStop() async {
     await webViewController.callAsyncJavaScript(
         functionBody: 'return ttsStop()');
+  }
+
+  Future<void> returnToTtsPosition() async {
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody: 'return await window.ttsReturnToPosition()');
+    if (result?.error != null) {
+      throw StateError('TTS position navigation failed: ${result!.error}');
+    }
   }
 
   Future<void> setTtsBackground(bool background) async {
@@ -1013,6 +1025,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   Future<void> setHandler(InAppWebViewController controller) async {
+    controller.addJavaScriptHandler(
+        handlerName: 'onReaderWordBounds',
+        callback: (args) {
+          if (!mounted || !AnxPlatform.isAndroid || args.isEmpty) return null;
+          return ReaderWordSelection.bounds(args.first);
+        });
     controller.addJavaScriptHandler(
         handlerName: 'onReaderChapterState',
         callback: (args) {
@@ -1547,7 +1565,16 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     contextMenu = ContextMenu(
       settings: ContextMenuSettings(hideDefaultSystemContextMenuItems: true),
       onCreateContextMenu: (hitTestResult) async {
-        // webViewController.evaluateJavascript(source: "showContextMenu()");
+        if (!mounted || !_readerReady || !AnxPlatform.isAndroid) {
+          return;
+        }
+        try {
+          await webViewController.evaluateJavascript(
+            source: 'window.onNativeReaderLongPress?.(); void 0;',
+          );
+        } catch (_) {
+          // A chapter may have closed while Android created its selection menu.
+        }
       },
       onHideContextMenu: () {
         // removeOverlay();
