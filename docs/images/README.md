@@ -1,8 +1,14 @@
-# Screenshot provenance / 截图来源
+# Display assets / 展示素材
 
-## Current feature screenshots — 1.1.9 / 当前功能配图
+## Current homepage / 当前首页
 
-The Chinese and English root READMEs use **Mac-only** captures from **Modu 1.1.9+10063**, taken on **2026-10-01**. They are distributed beside the relevant feature descriptions rather than collected into a separate gallery. The app was built from release commit `584a6bb3daa3d30978ccb0599ef809beaef0c9bb`. Computer Use captured the local Release app window without replacing the installed application.
+The English homepage is [`README.md`](../../README.md); the Chinese homepage is [`README_zh.md`](../../README_zh.md). `README_EN.md` retains a link for older bookmarks. The `showcase/` series presents reading/navigation, voice templates, reading skills and selection-tool customization in matching phone layouts. The Chinese page also includes framed vertical reading. Images sit beside their relevant feature descriptions.
+
+当前首页使用 `showcase/` 目录内的中英文手机展示图，统一 iPhone 外框、灵动岛、状态栏、底部横条、背景和阴影。界面以实际手机截图与 2026-10-03 采集的 Modu 窄窗口界面为依据，保留实际功能、控件结构和文案；界面字体按 iOS 系统字体风格呈现，书籍正文保留阅读字体。已移除桌面录屏标记与鼠标指针。阅读内容来自项目原创示例书；不包含私人书架、笔记、对话或账号密钥。图中设置用于功能展示，不代表所有选项的出厂默认值。
+
+## Archived Mac captures — 1.1.9 / Mac 截图归档
+
+The `v1.1.9/macos-zh/` and `v1.1.9/macos-en/` directories contain captures from **Modu 1.1.9+10063**, taken on **2026-10-01**. The app was built from release commit `584a6bb3daa3d30978ccb0599ef809beaef0c9bb`. Computer Use captured the local Release app window without replacing the installed application. These original files remain unchanged as source material.
 
 - `v1.1.9/macos-zh/`: Chinese interface; reading screens use **《阅读，让思考慢下来》**, six chapters and approximately 3,400 Chinese characters. The vertical reading image includes red frames and column rules. [Original Chinese EPUB](../examples/modu-reading-demo.epub).
 - `v1.1.9/macos-en/`: English interface; reading screens use **The Quiet Reader**, six chapters and approximately 2,200 words originally written in English. No vertical reading screenshot is used in the English README. [Original English EPUB](../examples/modu-reading-demo-en.epub).
@@ -11,7 +17,7 @@ Both books were authored for this project, not copied from private books or thir
 
 The screenshots cover horizontal reading, Chinese vertical reading, chapter/page controls, reader styles, selection toolbar customization, AI templates and prompt editors, CSS profiles and visual controls, appearance, language selection, translation engines and global settings transfer. Settings reflect the capture session rather than factory defaults. Screens are uncomposited captures, not generated illustrations; no AI answer was fabricated. No account passwords, API keys or configuration QR codes are shown.
 
-当前中英文首页仅使用上述两个目录内的 Mac 实拍截图，分散在各功能介绍旁。中文阅读图采用六章原创中文书，竖排展示红色边框与分栏线；英文阅读图采用六章原创英文书，不展示竖排。设置画面只展示功能参数和模板，不公开账号密钥、私人笔记或对话。
+上述两个目录保留 Mac 实拍原图。中文阅读图采用六章原创中文书，竖排展示红色边框与分栏线；英文阅读图采用六章原创英文书。设置画面只展示功能参数和模板，不公开账号密钥、私人笔记或对话。
 
 The current Mac set also includes `tts-style-templates.jpg` and `tts-prompt-editor.jpg` in each language directory: actual MiMo template selection and editable narration instructions with shortcut suggestions. Templates were selected in the unsaved draft only; no synthesis request was sent and no credentials were captured. The original system-speech selection and system-following UI language were restored after capture.
 
