@@ -3,6 +3,9 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_zoom.dart';
+import 'package:anx_reader/service/translate/web_view.dart';
+import 'package:anx_reader/widgets/webview/page_zoom_button.dart';
+import 'package:anx_reader/widgets/webview/popup_page_layout.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -140,6 +143,13 @@ void main() {
     expect(
         platform.latestParams!.initialSettings!.javaScriptBridgeEnabled, false);
     expect(platform.latestParams!.initialSettings!.allowFileAccess, false);
+    expect(
+        platform.latestParams!.initialSettings!.disableHorizontalScroll, true);
+    expect(platform.latestParams!.initialSettings!.horizontalScrollBarEnabled,
+        false);
+    expect(
+        platform.latestParams!.initialSettings!.disableVerticalScroll, false);
+    expect(platform.latestParams!.initialSettings!.useWideViewPort, false);
 
     final body = find.byKey(const ValueKey('reader-popup-body'));
     final before = tester.getRect(body);
@@ -267,6 +277,88 @@ void main() {
     await tester.pumpAndSettle();
     expect(native.evaluated.last, selectionSearchZoomScript(90));
     expect(find.text('网页缩放失败，请重试。'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'web translation zoom persists, reapplies on navigation and keeps vertical gestures',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Future<void> show() async {
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: L10n.supportedLocales,
+        localizationsDelegates: L10n.localizationsDelegates,
+        home: const Scaffold(
+            body: SingleChildScrollView(
+                child: WebTranslationView(
+          url: 'https://fanyi.baidu.com/m/trans',
+          text: 'Original text',
+          prefill: '/* seed */',
+        ))),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    await show();
+    final native = _ZoomController();
+    final controller = InAppWebViewController.fromPlatform(platform: native);
+    platform.latestParams!.onWebViewCreated!(controller);
+    final settings = platform.latestParams!.initialSettings!;
+    expect(settings.disableHorizontalScroll, true);
+    expect(settings.horizontalScrollBarEnabled, false);
+    expect(settings.disableVerticalScroll, false);
+    expect(settings.javaScriptBridgeEnabled, false);
+    expect(settings.allowFileAccess, false);
+    expect(platform.latestParams!.initialUserScripts!.single.source,
+        popupPageLayoutScript(100));
+    expect(
+        tester
+            .getRect(find.byKey(const ValueKey('translation-page-zoom')))
+            .bottom,
+        lessThanOrEqualTo(
+            tester.getRect(find.byKey(const ValueKey('web-results'))).top));
+    await tester.tap(find.byTooltip('网页缩放'));
+    await tester.pumpAndSettle();
+    final eighty = find.widgetWithText(CheckedPopupMenuItem<int>, '80%');
+    await tester.ensureVisible(eighty);
+    await tester.tap(eighty);
+    await tester.pumpAndSettle();
+    expect(Prefs().webTranslationZoomPercent, 80);
+    expect(Prefs().selectionSearchZoomPercent, 100);
+    expect(native.evaluated.last, popupPageLayoutScript(80));
+    platform.latestParams!.onLoadStop!(
+        controller, WebUri('https://fanyi.baidu.com/m/trans'));
+    await tester.pumpAndSettle();
+    expect(native.evaluated.take(native.evaluated.length - 1).last,
+        popupPageLayoutScript(80));
+    expect(native.evaluated.last, '/* seed */');
+    await tester.drag(
+        find.byKey(const ValueKey('web-results')), const Offset(0, -150));
+    await tester.pumpAndSettle();
+    expect(platform.scroll.offset, greaterThan(0));
+    final button = tester.widget<PageZoomButton>(
+        find.byKey(const ValueKey('translation-page-zoom')));
+    for (final value in [50, 200, 90]) {
+      button.onChanged(value);
+    }
+    await tester.pumpAndSettle();
+    expect(native.scripts.single.source, popupPageLayoutScript(90));
+    native.failNext = true;
+    button.onChanged(100);
+    await tester.pumpAndSettle();
+    expect(find.text('网页缩放失败，请重试。'), findsOneWidget);
+    button.onChanged(110);
+    await tester.pumpAndSettle();
+    expect(find.text('网页缩放失败，请重试。'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    await show();
+    expect(platform.latestParams!.initialUserScripts!.single.source,
+        popupPageLayoutScript(110));
     expect(tester.takeException(), isNull);
   });
 }

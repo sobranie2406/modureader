@@ -61,4 +61,33 @@ void main() {
     expect(
         selectionSearchZoomScript(80), isNot(contains('flutter_inappwebview')));
   });
+
+  test('translation zoom is independent, persistent and included in backup',
+      () async {
+    expect(Prefs().webTranslationZoomPercent, 100);
+    await Prefs().saveSelectionSearchZoomPercent(70);
+    await Prefs().saveWebTranslationZoomPercent(120);
+    await Prefs().initPrefs();
+    expect(Prefs().webTranslationZoomPercent, 120);
+    expect(Prefs().selectionSearchZoomPercent, 70);
+    final data = await GlobalSettingsTransfer.decode(
+        await GlobalSettingsTransfer.export(Prefs()));
+    expect(data['webTranslationZoomPercent'], {'type': 'int', 'value': 120});
+    await Prefs().saveWebTranslationZoomPercent(100);
+    await GlobalSettingsTransfer.apply(Prefs(), data);
+    expect(Prefs().webTranslationZoomPercent, 120);
+    await expectLater(
+        GlobalSettingsTransfer.apply(Prefs(), {
+          ...data,
+          'webTranslationZoomPercent': {'type': 'int', 'value': 201},
+        }),
+        throwsFormatException);
+    expect(Prefs().webTranslationZoomPercent, 120);
+    await Prefs().saveWebTranslationZoomPercent(999);
+    expect(Prefs().webTranslationZoomPercent, 200);
+    await Prefs().saveWebTranslationZoomPercent(0);
+    expect(Prefs().webTranslationZoomPercent, 50);
+    await Prefs().prefs.setString('webTranslationZoomPercent', 'bad');
+    expect(Prefs().webTranslationZoomPercent, 100);
+  });
 }

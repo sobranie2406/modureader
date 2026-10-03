@@ -103,6 +103,19 @@ class Prefs extends ChangeNotifier {
     return value is int ? value.clamp(50, 200) : 100;
   }
 
+  int get webTranslationZoomPercent {
+    final value = prefs.get('webTranslationZoomPercent');
+    return value is int ? value.clamp(50, 200) : 100;
+  }
+
+  Future<void> saveWebTranslationZoomPercent(int value) async {
+    if (!await prefs.setInt(
+        'webTranslationZoomPercent', value.clamp(50, 200))) {
+      throw StateError('Could not save translation zoom');
+    }
+    notifyListeners();
+  }
+
   Future<void> saveSelectionSearchZoomPercent(int value) async {
     if (!await prefs.setInt(
         'selectionSearchZoomPercent', value.clamp(50, 200))) {

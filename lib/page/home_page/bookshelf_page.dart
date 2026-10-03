@@ -27,6 +27,7 @@ import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
+import 'package:anx_reader/widgets/bookshelf/stop_vectorization_button.dart';
 import 'package:anx_reader/widgets/bookshelf/sync_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/common/tag_chip.dart';
@@ -82,6 +83,8 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         autoVectorizeOnImport: prefs.autoVectorizeOnImport,
         hasIndex: indexService.hasIndex,
         isBookAvailable: (book) => File(book.fileFullPath).existsSync(),
+        shouldContinue: () =>
+            mounted && prefs.vectorModelEnabled && prefs.autoVectorizeOnImport,
       );
       if (added > 0) {
         AnxLog.info('Recovered $added books into the vectorization queue');
@@ -903,12 +906,19 @@ class _KnowledgeQueueBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 5),
+                    Text(
+                        queued > 0
+                            ? '$statusLabel · 排队 $queued 本'
+                            : statusLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 5),
                     LinearProgressIndicator(value: current.progress),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              Text(queued > 0 ? '$statusLabel · 排队 $queued 本' : statusLabel),
+              const StopVectorizationButton(compact: true),
             ],
           ),
         );

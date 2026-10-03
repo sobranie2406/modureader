@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
 
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
@@ -41,6 +42,7 @@ class BookKnowledgeQueueItem {
     this.total = 0,
     this.errorMessage,
     this.finishedAt,
+    this.automatic = false,
   });
 
   final Book book;
@@ -50,6 +52,7 @@ class BookKnowledgeQueueItem {
   final int total;
   final String? errorMessage;
   final DateTime? finishedAt;
+  final bool automatic;
 
   double? get progress {
     final phaseProgress = total > 0 ? (completed / total).clamp(0.0, 1.0) : 0.0;
@@ -82,6 +85,7 @@ class BookKnowledgeQueueItem {
       total: total ?? this.total,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       finishedAt: finishedAt ?? this.finishedAt,
+      automatic: automatic,
     );
   }
 }
@@ -99,23 +103,46 @@ typedef BookKnowledgeIndexWorker = Future<IndexBuildResult> Function(
 /// running several books concurrently. The queue lives outside bookshelf
 /// widgets and therefore continues while the reader route is open.
 class BookKnowledgeIndexQueue extends ChangeNotifier {
-  BookKnowledgeIndexQueue({BookKnowledgeIndexWorker? worker})
-      : _worker = worker ?? _defaultWorker;
+  BookKnowledgeIndexQueue({
+    BookKnowledgeIndexWorker? worker,
+    bool Function()? automaticIndexingAllowed,
+  })  : _worker = worker ?? _defaultWorker,
+        _automaticIndexingAllowed = automaticIndexingAllowed ?? (() => true);
 
   final BookKnowledgeIndexWorker _worker;
+  final bool Function() _automaticIndexingAllowed;
   final LinkedHashMap<int, BookKnowledgeQueueItem> _items = LinkedHashMap();
   final ListQueue<int> _pending = ListQueue();
   final Set<int> _cancelRequested = <int>{};
   final Map<int, Completer<void>> _settled = <int, Completer<void>>{};
   bool _isDraining = false;
   bool _accepting = true;
+  int _automaticGeneration = 0;
+
+  int get automaticGeneration => _automaticGeneration;
+  bool get acceptsAutomatic => _accepting && _automaticIndexingAllowed();
+
+  /// Mark all jobs before awaiting cleanup; a queued job must not sneak in.
+  Future<void> cancelAll() {
+    _automaticGeneration++;
+    final ids = activeItems.map((item) => item.book.id).toList();
+    return Future.wait(ids.map(cancel));
+  }
+
+  Future<void> cancelAutomatic() {
+    _automaticGeneration++;
+    final ids = activeItems
+        .where((item) => item.automatic)
+        .map((item) => item.book.id)
+        .toList();
+    return Future.wait(ids.map(cancel));
+  }
 
   /// Cancel every job before awaiting any one job, so no queued book starts
   /// while the current worker is releasing its reader/model.
   Future<void> pauseAndCancelAll() async {
     _accepting = false;
-    final ids = activeItems.map((item) => item.book.id).toList();
-    await Future.wait(ids.map(cancel));
+    await cancelAll();
   }
 
   void resumeAccepting() => _accepting = true;
@@ -155,15 +182,17 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
   BookKnowledgeQueueItem? itemFor(int bookId) => _items[bookId];
 
   /// Returns false when this book is already queued or running.
-  bool enqueue(Book book) {
-    if (!_accepting) return false;
+  bool enqueue(Book book, {bool automatic = false}) {
+    if (!_accepting || (automatic && !acceptsAutomatic)) return false;
     final existing = _items[book.id];
     if (existing != null && existing.status.isActive) return false;
+    _cancelRequested.remove(book.id);
 
     _items[book.id] = BookKnowledgeQueueItem(
       book: book,
       status: BookKnowledgeQueueStatus.queued,
       requestedAt: DateTime.now(),
+      automatic: automatic,
     );
     _pending.add(book.id);
     _settled[book.id] = Completer<void>();
@@ -236,6 +265,10 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
           _completeSettlement(bookId);
           continue;
         }
+        if (queued.automatic && !acceptsAutomatic) {
+          await cancel(bookId);
+          continue;
+        }
 
         _items[bookId] = queued.copyWith(
           status: BookKnowledgeQueueStatus.extracting,
@@ -251,9 +284,12 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
             (stage, completed, total) {
               _handleProgress(bookId, stage, completed, total);
             },
-            () => _cancelRequested.contains(bookId),
+            () =>
+                _cancelRequested.contains(bookId) ||
+                (queued.automatic && !acceptsAutomatic),
           );
           final wasCancelled = _cancelRequested.contains(bookId) ||
+              (queued.automatic && !acceptsAutomatic) ||
               result.status == IndexBuildStatus.cancelled;
           final latest = _items[bookId] ?? queued;
           _items[bookId] = latest.copyWith(
@@ -327,7 +363,40 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
   }
 }
 
-final bookKnowledgeIndexQueue = BookKnowledgeIndexQueue();
+final bookKnowledgeIndexQueue = BookKnowledgeIndexQueue(
+  automaticIndexingAllowed: () =>
+      Prefs().vectorModelEnabled && Prefs().autoVectorizeOnImport,
+);
+
+/// Also used for imported/synced settings, not just the visible switch.
+void applyVectorizationQueueSettings({
+  Prefs? preferences,
+  BookKnowledgeIndexQueue? queue,
+}) {
+  final prefs = preferences ?? Prefs();
+  final target = queue ?? bookKnowledgeIndexQueue;
+  if (!prefs.vectorModelEnabled) {
+    unawaited(target.cancelAll());
+  } else if (!prefs.autoVectorizeOnImport) {
+    unawaited(target.cancelAutomatic());
+  }
+}
+
+/// User stop is durable: turn automatic indexing off before cancelling work.
+/// Existing committed indexes and downloaded models are never deleted.
+Future<void> stopBookVectorization({
+  Prefs? preferences,
+  BookKnowledgeIndexQueue? queue,
+}) async {
+  final prefs = preferences ?? Prefs();
+  final saved = prefs.prefs.setBool('autoVectorizeOnImport', false);
+  prefs.notifyExternalChange();
+  final stopped = (queue ?? bookKnowledgeIndexQueue).cancelAll();
+  final results = await Future.wait<Object?>([saved, stopped]);
+  if (results.first != true) {
+    throw StateError('Could not save automatic indexing preference');
+  }
+}
 
 /// Adds a newly imported book to the same observable FIFO queue used by the
 /// bookshelf's manual vectorization actions.
@@ -343,7 +412,7 @@ bool enqueueImportedBookForAutomaticIndexing({
       book.isDeleted) {
     return false;
   }
-  return (queue ?? bookKnowledgeIndexQueue).enqueue(book);
+  return (queue ?? bookKnowledgeIndexQueue).enqueue(book, automatic: true);
 }
 
 /// Requeues books whose automatic indexing was interrupted before an index
@@ -355,15 +424,23 @@ Future<int> enqueueMissingBooksForAutomaticIndexing({
   required Future<bool> Function(Book book) hasIndex,
   required bool Function(Book book) isBookAvailable,
   BookKnowledgeIndexQueue? queue,
+  bool Function()? shouldContinue,
 }) async {
   if (!vectorModelEnabled || !autoVectorizeOnImport) return 0;
 
   final targetQueue = queue ?? bookKnowledgeIndexQueue;
+  final generation = targetQueue.automaticGeneration;
+  bool allowed() =>
+      targetQueue.acceptsAutomatic &&
+      targetQueue.automaticGeneration == generation &&
+      (shouldContinue?.call() ?? true);
   var added = 0;
   for (final book in books) {
+    if (!allowed()) break;
     if (book.id <= 0 || book.isDeleted || !isBookAvailable(book)) continue;
     if (await hasIndex(book)) continue;
-    if (targetQueue.enqueue(book)) added++;
+    if (!allowed()) break;
+    if (targetQueue.enqueue(book, automatic: true)) added++;
   }
   return added;
 }

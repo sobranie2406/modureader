@@ -7,6 +7,7 @@ import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:anx_reader/page/settings_page/selection_search.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_zoom.dart';
+import 'package:anx_reader/widgets/webview/popup_page_layout.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -356,6 +357,14 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                 initialUserScripts:
                                     UnmodifiableListView([_zoomScript]),
                                 initialSettings: InAppWebViewSettings(
+                                  userAgent: popupWebUserAgent,
+                                  preferredContentMode:
+                                      UserPreferredContentMode.MOBILE,
+                                  horizontalScrollBarEnabled: false,
+                                  disableHorizontalScroll: true,
+                                  disableVerticalScroll: false,
+                                  useWideViewPort: false,
+                                  loadWithOverviewMode: false,
                                   useShouldOverrideUrlLoading: true,
                                   supportMultipleWindows: true,
                                   javaScriptCanOpenWindowsAutomatically: false,

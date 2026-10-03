@@ -2,6 +2,7 @@ package com.modu.reader
 
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -34,6 +35,29 @@ class MainActivity : AudioServiceActivity() {
         readerKeysActive = false
         readerKeys.reset()
         super.onPause()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // A Bluetooth HID can disappear without delivering key-up. Keep the
+        // existing Flutter surface/engine and discard only the held-key latch.
+        readerKeys.reset()
+        refreshReaderHostState()
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        // onPause disables native interception, even if Dart's cached state
+        // did not change. Ask the current reader to resend its route policy.
+        refreshReaderHostState()
+    }
+
+    private fun refreshReaderHostState() {
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed) {
+                pageKeyChannel?.invokeMethod("hostStateChanged", null)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

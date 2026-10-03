@@ -161,6 +161,63 @@ test('footnote backlinks never suppress the referenced body paragraph', () => {
     <p>后续正文。</p>`)
   assert.deepEqual(all(speech(doc)), ['保留正文结尾。', '后续正文。'])
 })
+for (const paragraphMode of [false, true]) {
+  test(`legacy reciprocal note links retain body text (paragraphMode=${paragraphMode})`, () => {
+    const doc = documentFor(`<p>引言。</p>
+      <p>正文开头<sup><a href="#footnote6" id="note6">[6]</a></sup>正文结尾。</p>
+      <p>下一段。</p><p><a href="#note6" id="footnote6">[6]</a>不应朗读的注释。</p>`)
+    const before = doc.body.innerHTML
+    const tts = new TTS(doc, null, () => null, r => r.toString(), {paragraphMode})
+    assert.equal(tts.start(), '引言。')
+    assert.deepEqual(tts.collectDetails(3, {includeCurrent:true}).map(x => x.text),
+      ['引言。', '正文开头正文结尾。', '下一段。'])
+    assert.equal(tts.next(true), '正文开头正文结尾。')
+    assert.equal(tts.next(true), '下一段。')
+    assert.equal(tts.prev(true), '正文开头正文结尾。')
+    assert.equal(tts.next(true), '下一段。')
+    assert.equal(tts.next(), undefined)
+    assert.equal(doc.body.innerHTML, before)
+  })
+
+  test(`legacy named pairs work without superscripts, regardless of DOM order (${paragraphMode})`, () => {
+    for (const notesFirst of [false, true]) {
+      const body = '<p>保留正文<a id="note6" href="#footnote6">[6]</a>结尾。</p>'
+      const note = '<p><a id="footnote6" href="#note6">[6]</a>隐藏注释。</p>'
+      const doc = documentFor(notesFirst ? note + body : body + note)
+      assert.deepEqual(all(new TTS(doc, null, () => null, null, {paragraphMode})), ['保留正文结尾。'])
+    }
+  })
+}
+
+test('superscript reciprocal pairs infer direction with arbitrary IDs and encoded fragments', () => {
+  const doc = documentFor(`<p>正文<sup><a id="原文" href="#note_1">[1]</a></sup>结尾。</p>
+    <p><a id="note_1" href="#%E5%8E%9F%E6%96%87">[1]</a>注释。</p>`)
+  assert.deepEqual(all(speech(doc)), ['正文结尾。'])
+})
+
+test('untyped return links to explicit references never hide their body paragraphs', () => {
+  for (const attr of ['epub:type="noteref"', 'role="doc-noteref"', 'class="footnote-ref"']) {
+    const doc = documentFor(`<p>正文<a id="note1" href="#footnote1" ${attr}>[1]</a>结尾。</p>
+      <p><a id="footnote1"></a>注释<a href="#note1">[1]</a>。</p>`)
+    assert.deepEqual(all(speech(doc)), ['正文结尾。'])
+  }
+})
+
+test('ordinary superscript and reciprocal body links do not become footnotes', () => {
+  const doc = documentFor(`<p>平方x<sup>2</sup>与<a href="#body2" id="body1">章节乙</a>。</p>
+    <p><a href="#body1" id="body2">章节甲</a>正文。</p>
+    <p><sup><a href="#missing">3</a></sup>数字。</p>`)
+  assert.deepEqual(all(speech(doc)), ['平方x2与章节乙。', '章节甲正文。', '3数字。'])
+})
+
+test('detached XHTML legacy pairs retain narration while suppressing note bodies', () => {
+  const base = documentFor('')
+  const doc = new base.defaultView.DOMParser().parseFromString(`<html xmlns="http://www.w3.org/1999/xhtml"><body>
+    <p>正文<sup><a id="note6" href="#footnote6">[6]</a></sup>结尾。</p>
+    <p><a id="footnote6" href="#note6">[6]</a>注释。</p>
+    </body></html>`, 'application/xhtml+xml')
+  assert.deepEqual(all(speech(doc)), ['正文结尾。'])
+})
 test('detached XML EPUB namespace and multi-token roles exclude chapter notes', () => {
   const base = documentFor('')
   const doc = new base.defaultView.DOMParser().parseFromString(`<html xmlns="http://www.w3.org/1999/xhtml" xmlns:e="http://www.idpf.org/2007/ops"><body>

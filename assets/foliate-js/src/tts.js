@@ -23,29 +23,47 @@ const explicitNote = el => typesOf(el).some(type => noteTypes.has(type))
         .some(role => noteTypes.has(role.replace(/^doc-/, '')))
     || [...el.classList].some(name => /^(?:footnotes?|endnotes?|rearnotes?|noteref|footnote-ref|footnote-backref)(?:[-_]\d+)?$/i.test(name))
 
+const isNoteReference = el => typesOf(el).includes('noteref')
+    || (el.getAttribute('role') ?? '').split(/\s+/).includes('doc-noteref')
+    || [...el.classList].some(name => /^(?:noteref|footnote-ref)(?:[-_]\d+)?$/i.test(name))
+const isNoteMarker = el => /^(?:\[?\d+\]?|[①-⑳*†‡]+|注\d*)$/.test(el.textContent.trim())
+const localLinkTarget = (doc, link) => {
+    const href = link.getAttribute('href') ?? ''
+    if (!href.startsWith('#')) return null
+    try { return doc.getElementById(decodeURIComponent(href.slice(1))) }
+    catch (_) { return null }
+}
+const isNoteBacklink = (doc, link, target) => {
+    if (typesOf(link).includes('backlink')
+        || (link.getAttribute('role') ?? '').split(/\s+/).includes('doc-backlink')
+        || link.classList.contains('footnote-backref')) return true
+    if (!target) return false
+    if (isNoteReference(target)) return true
+    // Older EPUBs have untyped reciprocal links: superscript note6 ->
+    // footnote6, then footnote6 -> note6. The latter points to BODY text.
+    // Determine direction before excluding a target's entire paragraph.
+    // Require a reciprocal numbered pair, not just a note-like target name.
+    if (localLinkTarget(doc, target) !== link || !isNoteMarker(target)) return false
+    if (target.closest('sup') && !link.closest('sup')) return true
+    return /^(?:footnote|endnote|rearnote|fn)[-_.]?\d+$/i.test(link.id)
+        && /^(?:note|noteref|fnref|ref)[-_.]?\d+$/i.test(target.id)
+}
+
 const createTextFilter = doc => {
     const excluded = new WeakSet()
     // Legacy books often use an ordinary numbered link instead of epub:type.
     // Require note-specific evidence; TOC links and ordinary superscripts stay.
     for (const link of doc.querySelectorAll('a[href]')) {
         const href = link.getAttribute('href')
-        const backlink = typesOf(link).includes('backlink')
-            || (link.getAttribute('role') ?? '').split(/\s+/).includes('doc-backlink')
-            || link.classList.contains('footnote-backref')
-        if (backlink) {
+        const target = localLinkTarget(doc, link)
+        if (isNoteBacklink(doc, link, target)) {
             excluded.add(link)
             continue // Its target is BODY text, not a note to suppress.
         }
-        let target = null
-        const hash = href.indexOf('#')
-        if (hash === 0) {
-            try { target = doc.getElementById(decodeURIComponent(href.slice(1))) } catch (_) {}
-        }
-        const marker = /^(?:\[?\d+\]?|[①-⑳*†‡]+|注\d*)$/.test(link.textContent.trim())
+        const marker = isNoteMarker(link)
         const noteTarget = /(?:^|[/#])(?:footnotes?|endnotes?|rearnotes?|notes?|fn)[-_.\d]/i.test(href)
         const knownTarget = target && explicitNote(target)
-            && !typesOf(target).includes('noteref')
-            && !(target.getAttribute('role') ?? '').split(/\s+/).includes('doc-noteref')
+            && !isNoteReference(target)
         if (!explicitNote(link) && !knownTarget && !(marker && noteTarget)) continue
         excluded.add(link)
         if (target) {

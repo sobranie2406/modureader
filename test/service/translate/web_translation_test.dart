@@ -43,17 +43,16 @@ void main() {
           url.host,
           engine == TranslateService.baiduWeb
               ? 'fanyi.baidu.com'
-              : 'fanyi.youdao.com');
+              : 'm.youdao.com');
       expect(url.toString(), isNot(contains('PRIVATE_SELECTION')));
       expect(provider.getConfig(), isEmpty);
       expect(getTranslateService(engine.name), engine);
       expect(provider.prefillScript('text'), isNotNull);
     });
 
-    test('${engine.name} opens the mobile editor directly on Android and iOS',
-        () {
+    test('${engine.name} opens the compact editor on mobile and desktop', () {
       final provider = engine.provider as WebViewTranslateProvider;
-      for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+      for (final platform in TargetPlatform.values) {
         debugDefaultTargetPlatformOverride = platform;
         final url = Uri.parse(provider.getUrl('PRIVATE_SELECTION',
             LangListEnum.auto, LangListEnum.simplifiedChinese));

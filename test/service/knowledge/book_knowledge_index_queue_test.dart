@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   Book book(int id) => Book(
         id: id,
         title: 'Book $id',
@@ -216,6 +219,141 @@ void main() {
     );
     gate.complete();
     await completed;
+  });
+
+  test('turning automatic indexing off cancels automatic jobs, not manual ones',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'vectorModelEnabled': true,
+      'autoVectorizeOnImport': true,
+    });
+    await Prefs().initPrefs();
+    final gate = Completer<void>();
+    final started = <int>[];
+    late bool Function() cancellation;
+    final queue = BookKnowledgeIndexQueue(
+      automaticIndexingAllowed: () => Prefs().autoVectorizeOnImport,
+      worker: (book, progress, isCancelled) async {
+        started.add(book.id);
+        cancellation = isCancelled;
+        if (book.id == 1) await gate.future;
+        return const IndexBuildResult(status: IndexBuildStatus.completed);
+      },
+    );
+    addTearDown(queue.dispose);
+    queue.enqueue(book(1), automatic: true);
+    queue.enqueue(book(2), automatic: true);
+    queue.enqueue(book(3));
+    Prefs().autoVectorizeOnImport = false;
+    applyVectorizationQueueSettings(queue: queue);
+    expect(cancellation(), isTrue);
+    expect(queue.itemFor(2)?.status, BookKnowledgeQueueStatus.cancelled);
+    expect(queue.itemFor(3)?.status, BookKnowledgeQueueStatus.queued);
+    expect(queue.enqueue(book(4), automatic: true), isFalse);
+    gate.complete();
+    await _waitForStatus(queue, 3, BookKnowledgeQueueStatus.completed);
+    expect(started, [1, 3]);
+    expect(queue.itemFor(1)?.status, BookKnowledgeQueueStatus.cancelled);
+    // A formerly queued/cancelled book can be started explicitly again.
+    expect(queue.enqueue(book(2)), isTrue);
+    await _waitForStatus(queue, 2, BookKnowledgeQueueStatus.completed);
+  });
+
+  test(
+      'stop all persists automatic-off, waits for cleanup and survives restart',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'vectorModelEnabled': true,
+      'autoVectorizeOnImport': true,
+    });
+    await Prefs().initPrefs();
+    final gate = Completer<void>();
+    final started = <int>[];
+    late bool Function() cancellation;
+    final queue =
+        BookKnowledgeIndexQueue(worker: (book, progress, cancelled) async {
+      started.add(book.id);
+      cancellation = cancelled;
+      await gate.future;
+      return const IndexBuildResult(status: IndexBuildStatus.completed);
+    });
+    addTearDown(queue.dispose);
+    queue.enqueue(book(1));
+    queue.enqueue(book(2), automatic: true);
+    var settled = false;
+    final stopping =
+        stopBookVectorization(queue: queue).then((_) => settled = true);
+    expect(Prefs().autoVectorizeOnImport, isFalse);
+    expect(cancellation(), isTrue);
+    expect(queue.itemFor(2)?.status, BookKnowledgeQueueStatus.cancelled);
+    expect(settled, isFalse);
+    gate.complete();
+    await stopping;
+    expect(settled, isTrue);
+    expect(started, [1]);
+    expect(queue.activeItems, isEmpty);
+    await Prefs().prefs.reload();
+    final restarted =
+        BookKnowledgeIndexQueue(worker: (book, progress, cancelled) async {
+      fail('Stopped work must not restart');
+    });
+    addTearDown(restarted.dispose);
+    expect(
+        await enqueueMissingBooksForAutomaticIndexing(
+          books: [book(1), book(2)],
+          vectorModelEnabled: Prefs().vectorModelEnabled,
+          autoVectorizeOnImport: Prefs().autoVectorizeOnImport,
+          hasIndex: (_) async => false,
+          isBookAvailable: (_) => true,
+          queue: restarted,
+        ),
+        0);
+  });
+
+  test('stopping invalidates a startup scan suspended in an index check',
+      () async {
+    final gate = Completer<bool>();
+    final queue =
+        BookKnowledgeIndexQueue(worker: (book, progress, cancelled) async {
+      fail('A cancelled startup scan must not enqueue work');
+    });
+    addTearDown(queue.dispose);
+    final recovering = enqueueMissingBooksForAutomaticIndexing(
+      books: [book(1), book(2)],
+      vectorModelEnabled: true,
+      autoVectorizeOnImport: true,
+      hasIndex: (_) => gate.future,
+      isBookAvailable: (_) => true,
+      queue: queue,
+    );
+    await queue.cancelAutomatic();
+    gate.complete(false);
+    expect(await recovering, 0);
+    expect(queue.activeItems, isEmpty);
+  });
+
+  test(
+      'startup scan rechecks current preference after asynchronous index lookup',
+      () async {
+    var enabled = true;
+    final gate = Completer<bool>();
+    final queue =
+        BookKnowledgeIndexQueue(worker: (book, progress, cancelled) async {
+      fail('Disabled automatic work must not be queued');
+    });
+    addTearDown(queue.dispose);
+    final recovering = enqueueMissingBooksForAutomaticIndexing(
+      books: [book(1)],
+      vectorModelEnabled: true,
+      autoVectorizeOnImport: true,
+      shouldContinue: () => enabled,
+      hasIndex: (_) => gate.future,
+      isBookAvailable: (_) => true,
+      queue: queue,
+    );
+    enabled = false;
+    gate.complete(false);
+    expect(await recovering, 0);
   });
 
   test('startup recovery queues only available books missing an index',

@@ -62,6 +62,22 @@ test('hidden annotations are excluded before grouping/length checks, DOM unchang
     assert.equal(doc.body.innerHTML, before)
 })
 
+test('a long paragraph with legacy reciprocal footnotes is spoken completely and in order', () => {
+    const first = '这是原文的前半段。'.repeat(18)
+    const last = '这是原文的后半段。'.repeat(18)
+    const doc = docFor(`<p>引言。</p><p>${first}<sup><a id="note6" href="#footnote6">[6]</a></sup>${last}</p>
+        <p>后续正文。</p><p><a id="footnote6" href="#note6">[6]</a>注释内容。</p>`)
+    const before = doc.body.innerHTML
+    const tts = speech(doc)
+    assert.equal(all(tts).join(''), `引言。${first}${last}后续正文。`)
+    const selected = doc.createRange()
+    selected.selectNodeContents(doc.querySelectorAll('p')[1])
+    const fromSelection = [tts.from(selected, {exactStart:true})]
+    for (let text = tts.next(); text != null; text = tts.next()) fromSelection.push(text)
+    assert.equal(fromSelection.join(''), `${first}${last}后续正文。`)
+    assert.equal(doc.body.innerHTML, before)
+})
+
 test('selected-text start trims only the first group and highlight matches the spoken remainder', () => {
     const doc = docFor('<p>跳过。<b>从这里。再一句。</b>最后一句。</p><p>下一段。</p>')
     const selected = doc.createRange()

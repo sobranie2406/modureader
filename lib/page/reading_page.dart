@@ -253,10 +253,34 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         FocusManager.instance.primaryFocus?.context);
   }
 
-  void _updatePageKeys() {
+  void _updatePageKeys({bool force = false}) {
     if (!mounted) return;
     _pageKeys.update(
-        active: _canUsePageKeys, volume: Prefs().volumeKeyTurnPage);
+        active: _canUsePageKeys,
+        volume: Prefs().volumeKeyTurnPage,
+        force: force);
+  }
+
+  void _refreshReaderHostState() {
+    if (!mounted) return;
+    _updatePageKeys(force: true);
+    _restoreReaderSystemUi();
+  }
+
+  void _restoreReaderSystemUi() {
+    if (!AnxPlatform.isAndroid) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Never hide bars on another route, over an editor/keyboard, or while a
+      // reader panel is open. Do not react to ordinary transient-bar swipes.
+      if (!mounted ||
+          !_canUsePageKeys ||
+          !Prefs().hideStatusBar ||
+          View.of(context).viewInsets.bottom > 0) {
+        return;
+      }
+      hideStatusBar();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
   // late final VolumeKeyBoard _volumeKeyBoard;
   // bool _volumeKeyListenerAttached = false;
@@ -264,11 +288,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   @override
   void initState() {
     _readerFocusNode = FocusNode(debugLabel: 'reading_page_focus');
-    _pageKeys = ReaderPageKeys(onDirection: (direction) {
-      if (_canUsePageKeys) {
-        epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
-      }
-    });
+    _pageKeys = ReaderPageKeys(
+        onHostStateChanged: _refreshReaderHostState,
+        onDirection: (direction) {
+          if (_canUsePageKeys) {
+            epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
+          }
+        });
     FocusManager.instance.addListener(_updatePageKeys);
 
     // Initialize AI panel sizes from persistent storage
@@ -386,6 +412,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         return;
       }
       _focusReaderSurface();
+      _restoreReaderSystemUi();
     });
   }
 
@@ -493,6 +520,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _updateReadingSync();
     switch (state) {
       case AppLifecycleState.resumed:
+        _refreshReaderHostState();
         if (!_readTimeWatch.isRunning) {
           _readTimeWatch.start();
         }

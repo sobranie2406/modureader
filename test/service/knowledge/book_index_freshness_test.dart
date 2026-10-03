@@ -99,4 +99,26 @@ void main() {
     expect(result.status, IndexBuildStatus.cancelled);
     expect(await service.indexFile(book.id).exists(), isFalse);
   });
+
+  test('stopping a rebuild preserves the previously committed index', () async {
+    final store = await service.storeFor(book);
+    await store.save(snapshot());
+    final before = await service.indexFile(book.id).readAsBytes();
+    var cancelled = false;
+    final result = await KnowledgeIndexer(
+      service: KnowledgeSearchService(),
+      store: store,
+    ).build(
+      bookId: '1',
+      chapters: {'one': 'updated index content'},
+      isCancelled: () => cancelled,
+      vectorizeBatch: (chunks) async {
+        cancelled = true;
+        return chunks.map((_) => [1.0]).toList();
+      },
+    );
+    expect(result.status, IndexBuildStatus.cancelled);
+    expect(await service.indexFile(book.id).readAsBytes(), before);
+    expect(await service.hasIndex(book), isTrue);
+  });
 }

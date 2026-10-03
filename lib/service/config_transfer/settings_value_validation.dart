@@ -39,7 +39,9 @@ void validateSettingsValue(String key, dynamic value) {
   if (key == 'scrollPagePercent' && (value < 80 || value > 100)) {
     throw const FormatException('Invalid scroll page percentage');
   }
-  if (key == 'selectionSearchZoomPercent' && (value < 50 || value > 200)) {
+  if ((key == 'selectionSearchZoomPercent' ||
+          key == 'webTranslationZoomPercent') &&
+      (value < 50 || value > 200)) {
     throw const FormatException('Invalid search zoom percentage');
   }
   if (key == 'customPageTurnConfig') {

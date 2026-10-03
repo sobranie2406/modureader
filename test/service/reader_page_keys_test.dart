@@ -17,7 +17,7 @@ void main() {
   tearDown(
       () => messenger.setMockMethodCallHandler(ReaderPageKeys.channel, null));
 
-  Future<void> send(Object direction, [String method = 'turnPage']) async {
+  Future<void> send(Object? direction, [String method = 'turnPage']) async {
     await messenger.handlePlatformMessage(
         ReaderPageKeys.channel.name,
         const StandardMethodCodec()
@@ -65,5 +65,38 @@ void main() {
     bridge.update(active: true, volume: true);
     bridge.dispose();
     expect(calls, isEmpty);
+  });
+
+  test(
+      'native host refresh resends unchanged policy, including blocked readers',
+      () async {
+    var allowed = true;
+    var refreshes = 0;
+    final turns = <int>[];
+    late ReaderPageKeys bridge;
+    bridge = ReaderPageKeys(
+        android: true,
+        onDirection: turns.add,
+        onHostStateChanged: () {
+          refreshes++;
+          bridge.update(active: allowed, volume: false, force: true);
+        });
+    bridge.update(active: true, volume: false);
+    for (var i = 0; i < 3; i++) {
+      await send(null, 'hostStateChanged');
+    }
+    expect(refreshes, 3);
+    expect(calls, hasLength(4));
+    expect(calls.last.arguments, {'active': true, 'volume': false});
+    allowed = false;
+    await send(null, 'hostStateChanged');
+    await send(1);
+    expect(turns, isEmpty);
+    await send(null, 'hostStateChanged');
+    expect(refreshes, 5);
+    expect(calls.last.arguments, {'active': false, 'volume': false});
+    bridge.dispose();
+    await send(null, 'hostStateChanged');
+    expect(refreshes, 5);
   });
 }

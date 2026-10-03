@@ -91,6 +91,8 @@ Future<void> main() async {
   await Prefs().initPrefs();
   await AppBrightness.instance.initialize(Prefs().prefs);
   await applyBundledModelDefaults(Prefs().prefs);
+  Prefs().addListener(applyVectorizationQueueSettings);
+  applyVectorizationQueueSettings();
   HttpOverrides.global = AnxHttpProxyOverrides();
 
   // Initialize desktop window with validated position

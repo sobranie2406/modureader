@@ -30,7 +30,7 @@ vectorModelDownloadSource vectorModelConfig''',
       '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio''',
   'translation':
       '''translateService translateFrom translateTo fullTextTranslateService
-fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection''',
+fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection webTranslationZoomPercent''',
   'webdav':
       '''webdavInfo syncProtocol autoSync onlySyncWhenWifi syncCompletedToast
 readingTimedSync readingSyncMinutes''',

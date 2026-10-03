@@ -4,6 +4,7 @@ import 'package:anx_reader/service/knowledge/embedding_provider.dart';
 import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
 import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:anx_reader/widgets/bookshelf/stop_vectorization_button.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/common/anx_button.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
@@ -41,6 +42,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   @override
   void initState() {
     super.initState();
+    Prefs().addListener(_refreshPreferences);
     final config = VectorModelConfig.fromJson(Prefs().vectorModelConfig);
     _nameController = TextEditingController(text: config.name);
     _modelController = TextEditingController(text: config.modelId);
@@ -60,6 +62,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
 
   @override
   void dispose() {
+    Prefs().removeListener(_refreshPreferences);
     _nameController.dispose();
     _modelController.dispose();
     _endpointController.dispose();
@@ -68,6 +71,10 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     _dimensionController.dispose();
     _localModelStore.close();
     super.dispose();
+  }
+
+  void _refreshPreferences() {
+    if (mounted) setState(() {});
   }
 
   bool get _isChinese => Localizations.localeOf(context).languageCode == 'zh';
@@ -298,8 +305,24 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                   context, '导入后自动向量化', 'Vectorize after import')),
               description: Text(ModuStrings.text(
                   context,
-                  '新导入书籍会在后台排队建立索引；默认关闭，避免意外消耗模型额度。',
-                  'New books are indexed in the background. Disabled by default to avoid unexpected API usage.')),
+                  '新导入书籍会在后台排队建立索引。关闭后停止自动任务及其排队；手动任务不受影响。',
+                  'New books are indexed in the background. Turning this off cancels automatic jobs, including queued ones, but keeps manual jobs.')),
+            ),
+            CustomSettingsTile(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const StopVectorizationButton(),
+                    const SizedBox(height: 8),
+                    Text(ModuStrings.text(
+                        context,
+                        '停止当前和排队中的所有向量化任务，并关闭自动向量化，重启后不会自动续跑。保留已完成的索引和模型；需要时可从书籍菜单重新开始。',
+                        'Stop all running and queued indexing jobs and turn off automatic indexing so they do not restart with the app. Completed indexes and models are kept. Start again from a book’s menu when needed.')),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

@@ -30,6 +30,13 @@ public final class ReaderPageKeysTest {
         keys.reset();
         equal(0, keys.handle(20, 0, 2, 8, true, false, false));
         equal(1, keys.handle(20, 0, 0, 8, true, false, false));
-        System.out.println("ReaderPageKeys: direction, volume opt-in, repeat, key-up, lifecycle and device tests passed");
+        // A disconnected HID may never send key-up and may reuse its device ID.
+        for (int reconnect = 0; reconnect < 10; reconnect++) {
+            keys.reset();
+            equal(0, keys.handle(20, 1, 0, 8, true, false, false));
+            equal(1, keys.handle(20, 0, 0, 8, true, false, false));
+            equal(2, keys.handle(20, 0, 1, 8, true, false, false));
+        }
+        System.out.println("ReaderPageKeys: direction, volume opt-in, repeat, key-up, lifecycle and reconnect tests passed");
     }
 }
