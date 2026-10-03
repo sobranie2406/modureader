@@ -58,324 +58,297 @@ Desktop apps use native installers. Download the installer for your platform, no
 
 ## Features
 
-<table>
-<tr>
-<td width="50%" valign="top"><h3><a href="#reading">Reading & layout</a></h3><p>Multiple formats · Custom fonts · CSS profiles</p></td>
-<td width="50%" valign="top"><h3><a href="#listening">Listening</a></h3><p>Voice templates · Editable prompts · Up to 4×</p></td>
-</tr>
-<tr>
-<td width="50%" valign="top"><h3><a href="#ai">AI reading</a></h3><p>Chapter questions · Custom skills · Follow-ups</p></td>
-<td width="50%" valign="top"><h3><a href="#ai">Selection tools</a></h3><p>Tool switches · Reordering · Custom AI commands</p></td>
-</tr>
-<tr>
-<td width="50%" valign="top"><h3><a href="#reading">Notes & highlights</a></h3><p>Annotations · Markdown export · Links to the book</p></td>
-<td width="50%" valign="top"><h3><a href="#data">Across devices</a></h3><p>WebDAV sync · Database backups · Settings transfer</p></td>
-</tr>
-</table>
+A library for your books, a workspace for your thoughts, and tools you can make your own.
+
+| Module | What you can do |
+| --- | --- |
+| [Library](#library) | Import seven ebook formats, organize folders, pin books and browse a remote library |
+| [Reading & styles](#reading) | Tune typography, switch layouts and apply visual CSS presets |
+| [Custom CSS](#css) | Visual rules, custom code, multiple profiles and visible effects on the page |
+| [Listening](#listening) | Choose a voice, edit narration prompts and listen at up to 4× speed |
+| [AI reading](#ai) | Ask about chapters, customize skills and continue conversations |
+| [Selection tools](#selection) | Toggle and reorder actions; create your own AI commands |
+| [Translation & search](#translation) | Translate in the reader, switch providers and search the web |
+| [Offline dictionaries](#dictionary) | Import your dictionaries and see definitions beside the selected word |
+| [Notes & highlights](#notes) | Capture passages, add comments and export notes with links back to the book |
+| [Reading statistics](#statistics) | Review reading time, trends and per-book progress |
+| [Vector indexing](#vector) | Build local book indexes for semantic search and retrieval-augmented answers |
+| [Sync & database backup](#data) | Sync through WebDAV and export or restore library backups |
+| [Global settings backup](#backup) | Transfer preferences by file or link, with credentials controlled separately |
+
+Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). Detailed options and entry points are in the [settings guide (Chinese)](docs/SETTINGS.md).
+
+<a id="library"></a>
+
+## Your library, your way
+
+Bring EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown books into one library. Search by title, filter by reading status, group books into folders, or pin the ones you want to keep close.
+
+- Select multiple books to create a folder or move them into an existing one.
+- Browse a separate WebDAV library, search and sort files, then download books for offline reading.
+- Import an ANX Reader ZIP backup through the migration entry in Advanced settings.
+
+![Create a folder on iPhone and see the organized book library on Mac](docs/images/showcase/cross-platform/library-en.png)
 
 <details>
-<summary>Full feature list and entry points</summary>
+<summary>Remote library and migration details</summary>
 
-| Area                      | What it does                                                                                                                                                                                                                                                                  | Where to find it                                                                 |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Library and import        | Import EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown (MD); filter by reading status, search, group books and manage tags                                                                                                                                                       | Home → Library; add button or book menu                                          |
-| Remote library            | Browse a separate WebDAV server; sort by name, creation/modification time or size in either direction, search, filter by format and download books                                                                                                                            | Home → Remote library; Settings → Remote library settings                        |
-| Reading and layout        | Chapter navigation, adjacent chapter preloading and paginated/scrolling modes; continuous chapter scrolling for horizontal reflowable books with book scripts disabled; adaptive footnotes at 80% of the reader font size with end padding; rule-based TXT-to-EPUB conversion | Reader; Settings → Reading                                                       |
-| Selection search          | Baidu, Bing, Google, Baidu Baike, Wikipedia and custom engines in a built-in browser                                                                                                                                                                                          | Settings → Selection search; text selection menu                                 |
-| In-book search            | Floating search dialog, selection-style text highlights, previous/next match and current/total counter; return to the original position or close search at the current position                                                                                               | Reader toolbar, between Translation and Bookmarks                                |
-| Highlights and notes      | Highlight text, record thoughts and organize notes by chapter; copy or export Markdown, TXT and CSV                                                                                                                                                                           | Text selection menu; Home → Notes                                                |
-| Mobile quick mark         | Swipe directly across text and release to save a highlight; select across lines, backwards or across paragraphs on the same page                                                                                                                                              | Pen button in the mobile reader; persistent Exit button restores normal gestures |
-| Local dictionaries        | Import, name, enable/disable and delete MDX / StarDict dictionaries; look up selected text offline; no dictionaries bundled                                                                                                                                                   | Settings → Custom dictionaries; text selection menu                              |
-| Reading statistics        | Reading time, trends, heatmap and per-book records                                                                                                                                                                                                                            | Home → Statistics                                                                |
-| AI conversations          | Home quick prompts, in-book questions and chat history; enabled tools access the library, contents, chapters, notes and reading records                                                                                                                                       | Home → AI; reader AI panel                                                       |
-| AI reading skills         | Localized built-in skills; enable/disable, inspect/edit prompts and create custom skills; keep skill shortcuts in chat while showing skill names instead of long prompt messages                                                                                              | AI input area; Settings → AI Reading Skills                                      |
-| Semantic search and RAG   | Combined keyword and vector search, locally stored indexes, background indexing queue and reindexing                                                                                                                                                                          | Book menu; Settings → Embedding Models                                           |
-| Translation               | Free Google translation, AI translation, DeepL/DeepLX, and embedded Baidu/Youdao translation webpages; long selected-text results scroll in an AI-sized popup                                                                                                                 | Settings → Translation; top reader toolbar, next to AI                           |
-| Read aloud                | System speech, Edge TTS, Xiaomi MiMo and compatible online services; voice selection, previews and speech parameters                                                                                                                                                          | Settings → Read Aloud; reader playback controls                                  |
-| Sync and backup           | WebDAV sync for books, notes and reading progress; ZIP database backup export/import with destination guidance; separately enabled encrypted API-key sync                                                                                                                     | Settings → Sync                                                                  |
-| Configuration transfer    | All global settings via files and modu links, with an independent credentials switch                                                                                                                                                                                          | Settings → Advanced → Global settings backup                                     |
-| ANX library migration     | Validate and merge ANX ZIP backups, retaining existing Modu records and creating a pre-import database snapshot                                                                                                                                                               | Settings → Advanced → Import ANX Reader backup                                   |
-| Appearance and tools      | System/dark/light themes, cover display, automatic application of imported fonts, font downloads, app brightness control (auto on the left, slider in the middle, night mode on the right), network and logging options                                                       | Reader brightness button; Settings → Appearance / Reading / Advanced             |
-| Bugs and feature requests | Separate forms for bugs and ideas, with preview before confirmation on GitHub; optional environment info and sanitized diagnostics                                                                                                                                            | Settings → Bug reports and feature requests                                      |
+The remote-library connection is separate from synchronization: it reads and downloads files without uploading or deleting server content. Configure it in Settings → Remote library settings. Anonymous and username/password access are supported; prefer HTTPS and a read-only account. Downloads are one at a time, with a 512 MiB per-file limit and duplicate checks.
+
+ANX backup import validates and merges supported records while retaining existing Modu data and creating a pre-import database snapshot. Read the import screen's compatibility notes before proceeding.
 
 </details>
-
-Reading views feature *The Quiet Reader*, an original English demo book. [Download the demo EPUB](docs/examples/modu-reading-demo-en.epub)
-
-<p align="center"><a href="#reading">Read your way</a> · <a href="#listening">Listening and voice prompts</a> · <a href="#ai">AI reading and custom tools</a> · <a href="#data">Your library, sync and backups</a></p>
 
 <a id="reading"></a>
 
-## Read your way
+## Make every page your own
+
+Adjust fonts, font thickness, line spacing, paragraph spacing and margins. Use separate body and Latin fonts, choose paginated or scrolling reading, and make the page comfortable for your screen.
+
+- Tap the page for chapter/page navigation; drag the progress slider to preview chapter titles.
+- Choose themes and backgrounds, or use dark, OLED and e-ink modes.
+- Manage named CSS profiles with editable presets, visual controls, regex highlights and optional custom code. Enable several profiles together or import/export them.
+
+![Font and spacing controls on iPhone, with the resulting book layout on Mac](docs/images/showcase/cross-platform/styles-en.png)
 
 <details>
-<summary>Reading navigation and annotations</summary>
+<summary>Typography, navigation and CSS details</summary>
 
-Tap the reading area to show the progress slider and previous/next chapter and page controls. Dragging previews the chapter title. Chapter progress shows the chapter ordinal; current-chapter progress shows the current and total pages within that chapter. Select part or all of an existing highlight or underline and choose the trash action to delete the entire overlapping annotation and its comment after confirmation. The confirmation stays above the selection tools and color palette. Common image-marker footnotes are also supported.
+Settings → CSS settings provides 32 named profiles and 13 editable presets. Detailed editing stays in Settings; the reader applies your profiles. See [CSS presets (Chinese)](docs/CSS_PRESETS.md).
+
+Font thickness ranges from 0.5 to 2.0 in 0.1 steps. The optional Simulated bold control can add weight to fixed-weight fonts above 1.0; it cannot make a fixed bold face thinner. PDF and other fixed-layout pages are not re-typeset.
+
+Scrolling page steps can be set from 80% to 100%. Long-press selection can expand to a word or paragraph, then be adjusted with the selection handles. Footnotes open within the reader. Vertical typesetting supports optional frames and column rules for suitable books.
+
+Choose an app language or follow the system in Settings → Appearance. Bundled AI prompts follow that language; your edited prompts keep their original text.
 
 </details>
 
-### Vertical layout and storage
+<a id="css"></a>
 
-Vertical reading offers optional red frames and column rules, with titles on the right and page information on the left. Chinese locales use Chinese numerals. Footnotes use 80% of actual paragraph text size, not the reference marker; popups occupy at most 25% of screen area, with horizontal scrolling for long vertical notes.
+## Your CSS rules, visible on the page
 
-<details>
-<summary>Usage and detailed settings</summary>
+Start with visual presets for colors, spacing and underlines, then add custom CSS when you want finer control. The example below shows **colored dialogue with wavy underlines, highlighted keywords and generous paragraph spacing**.
 
-Android library data migrates to `Android/data/com.modu.reader/files` with verification before opening the library. The old private copy is retained and conflicts stop migration rather than overwrite data. Credentials and preferences remain private. Back up first and upgrade in place without uninstalling or clearing data. OS restrictions still apply to Android/data; this location is not a backup. See the [migration notes (Chinese)](docs/testing/android-app-storage.md).
+![CSS rule controls on iPhone and their reading effects on Mac](docs/images/showcase/cross-platform/css-en.png)
 
-Downloaded embedding models can be deleted in settings unless protected by an active task. Large local indexes use streaming reads with a 1 GiB file limit; practical capacity still depends on available RAM.
-
-</details>
-
-### Separate Chinese and English fonts
-
-Reader styles offer separate Chinese/body and English (letters/numbers) fonts. English follows the body font by default; an independent face covers Latin letters, digits and western punctuation while Chinese text and punctuation retain the body face. This works in reflowable horizontal/vertical text and footnotes. Importing TTF/OTF from the English selector applies it only to English. Fixed-layout books such as PDFs are not re-typeset.
+- 32 named slots and 13 editable presets, with independent switches and combined activation.
+- Visual controls for page typography and layout; regex rules for dialogue and keywords.
+- Edit centrally in Settings and apply from the reader, with per-book activation choices.
+- Import a plain CSS file or a Modu JSON profile; export the current or all nonempty profiles.
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Presets, scope and file exchange</summary>
 
-In the reader's Style panel, **Font thickness** sits between font size and line spacing. It ranges from 0.5 to 2.0 in 0.1 steps, with 1.0 as normal. For fixed-weight fonts, the adjacent **Simulated bold** button adds matching-color text strokes above 1.0; it cannot make a fixed bold face thinner. The option is off by default and is saved and backed up with the reading style.
+Presets cover novels, vertical spacing, images, centered headings, long-form text, English paragraphs, poetry, tables, dialogue colors/wavy lines, keyword/date highlights and heading underlines. Choose all text, headings or body scope; set your own keyword in the rule.
 
-</details>
-
-### Language and appearance
-
-Choose a language or follow the system in Settings → Appearance. Change themes, theme colors, OLED and e-ink modes in the same section. Bundled AI prompts follow the app language; edited prompts retain their original text.
-
-### Custom CSS profiles
-
-Manage 32 named profiles in Settings → CSS settings, with 13 editable presets and visual controls for colors, fonts, spacing, paragraph layout and underlines. Custom CSS and regex highlights remain available, along with independent switches, combined activation and file import/export. Reader controls apply profiles; detailed editing stays in Settings. Existing slots and per-book choices are preserved. See [CSS presets (Chinese)](docs/CSS_PRESETS.md).
-
-### Notes export
-
-Original passages are labeled `原文：【…】`. Markdown additionally highlights note content, and exports include the creation or last-edit time. Reading-position links open the corresponding location in Modu when the book is available on that device.
-
-### Reading and AI tools
-
-Pin books and folders, create folders from selected books or move a selection into an existing folder. Scrolling page steps are adjustable from 80% to 100%. Selection search includes page zoom, and mind maps offer fullscreen zoom/pan and collapsible nodes.
-
-<details>
-<summary>Usage and detailed settings</summary>
-
-AI Knowledge explains meaning, background and related knowledge in the selected text’s language, without adding pronunciation, translations or examples by default. It uses the current model’s knowledge first. Enable online search for the selection command, or type **“Confirm online search”** in the same conversation to retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources. No additional search API key is required.
-
-</details>
-
-### Mobile page-turn controls
-
-In scrolling mode, page-turn taps and shortcuts move by an adjustable 80–100% of the reading viewport (80% by default, leaving 20% overlap). Free scrolling is unchanged. Desktop arrow keys turn pages when the reader is focused; in the AI input field they move the text cursor.
-
-<details>
-<summary>Usage and detailed settings</summary>
-
-Reader styles → More settings → Other includes **Tap-only page turning**, off by default. When enabled in paginated mode, swipes and drags neither turn pages nor trigger pull gestures; taps still work. Turn it off to restore swipe navigation. Text selection, Quick mark and scrolling mode remain available. This mobile-only switch is not shown on desktop.
-
-Chapter and page navigation is available on both desktop and mobile. The navigation panel shows the current chapter title, a progress slider, and separate previous/next chapter and page buttons.
-
-</details>
-
-### Quick marking on mobile
-
-The top-right menu toggle controls whether saving a quick highlight immediately opens the selection menu. It is off by default and remembered on this device.
-
-<details>
-<summary>Usage and detailed settings</summary>
-
-Adjacent same-color highlights without comments can merge across pages within one chapter document. Missing text, intervening images or existing comments keep marks separate.
-
-Open a reflowable ebook and tap the pen button in the reader toolbar to enable Quick mark. No long press is needed: swipe from the beginning of the text you want to capture, then release to save the highlight. It uses your current highlight color and appears in the existing notes list. Marking the same location again preserves any existing comment.
-
-While enabled, swiping over text selects it. Tap text to open the reading controls, or use the persistent Quick mark · Exit button to restore normal page turns and scrolling. The mode starts off each time you enter a book and is not shown on desktop. PDF, scanned images and fixed-layout books are not supported; selection does not automatically continue across pages.
+Page CSS controls layout. Regex highlights style matching text with colors, backgrounds and underlines without changing the book text or annotation positions. JSON preserves visual parameters, expressions and scope. Import only trusted CSS: remote resource URLs may make network requests. See [CSS profiles (Chinese)](docs/CSS_PRESETS.md).
 
 </details>
 
 <a id="listening"></a>
 
-## Listening and voice prompts
+## A voice for every story
 
-### Listening and voice prompt templates
+Listen with system speech, Edge TTS, Xiaomi MiMo, OpenAI-compatible services or DashScope. Start from the current position or selected text, and keep listening across chapters.
 
-Choose system speech, Edge, Xiaomi MiMo, an OpenAI-compatible provider or DashScope in **Settings → Narrate**. Open the reader's narration panel to listen, or select text and choose Read aloud to start there. Narration continues into the next chapter.
+**Start with a template, then make the voice your own.** Choose natural narration, bedtime reading, fiction performance, knowledge explanation, classical recitation or news reading. Edit the description and append suggestions for articulation, pauses, tone and pace.
 
-**Start with a template, then make the voice your own.** MiMo's Preset voices mode combines a selected voice with narration style instructions. Voice design mode uses descriptions of gender, perceived age, timbre, tone and pace to design the voice.
+![Voice prompt settings on iPhone, with passage highlighting and playback on Mac](docs/images/showcase/cross-platform/listening-en.png)
 
-![Narration templates and editable voice prompts on macOS and iOS](docs/images/showcase/cross-platform/listening-en.png)
+- MiMo offers preset voices and voice design through descriptions of timbre, tone and delivery.
+- OpenAI-compatible speech settings offer an instructions switch, templates and an editable prompt.
+- A compact reader toolbar provides play/pause, return to the narration position and read from here.
+- Online narration supports up to 4× playback, with separate 3× and 4× slider steps after 2×.
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Voice prompts and playback details</summary>
 
-| Template type                       | Built-in examples                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------- |
-| Everyday listening and storytelling | Natural Narration, Gentle Bedtime Reading, Fiction Performance          |
-| Content delivery                    | Knowledge Explanation, Classical Recitation, News Reading               |
-| MiMo voice design                   | Gentle female, bright female, steady male, warm male, elder storyteller |
-| OpenAI-compatible descriptions      | Narration styles plus warm/soft, low/steady and bright/light styles     |
-
-Selecting a Description template fills the editable instructions. Click suggestions such as Clear Articulation, Natural Pauses, Relaxed Pace or Restrained Emotion to append them, then choose **Save settings**. For example, Natural Narration starts with:
+Find these controls in Settings → Narrate. Selecting a description template fills the editor; suggestions append text for further editing. For example:
 
 > Read in a natural storytelling style with clear articulation, moderate pauses between sentences, and steady emotion, suitable for long listening sessions.
 
-Add a gentle, friendly tone or clear emphasis on key ideas to personalize it. Instructions guide the voice rather than becoming spoken book text. These are editable Modu descriptions, not additional official voice IDs or voice-cloning presets.
+Descriptions guide delivery; they are not spoken book text or additional official voice IDs. MiMo's rate slider adjusts local playback speed from 0.5–4.0× without regenerating audio. Prompt support depends on the service; instructions are not sent to tts-1 / tts-1-hd and can be disabled for incompatible endpoints.
 
-OpenAI-compatible settings offer a separate **Enable speech instructions** switch, templates and an editor; selecting a template does not change Voice. Enabled instructions add steady narration guidance, as does MiMo. Online narration supports up to 4× speed, with 3× and 4× steps after 2×. MiMo's rate slider changes local playback speed from **0.5–4.0×** on release without regenerating audio; prompt descriptions guide the generated delivery. When using OpenAI-compatible prompts to control pace or pitch, keep the player rate and pitch at 1.0. Instructions are not sent for `tts-1` / `tts-1-hd`, and can be disabled for compatible endpoints that do not support them.
-
-The reader's compact narration toolbar offers return to the narration position, play/pause, read from the current reading position and speech settings.
-
-Edge, MiMo, OpenAI-compatible and DashScope narration groups adjacent sentences within a natural paragraph, splitting long paragraphs. Highlighting and previous/next navigation follow each passage; system speech retains sentence navigation. The first passage is prioritized and later passages are prefetched during playback to reduce pauses. Errors retain the position for retry. Saved listening settings can be transferred through Global settings backup.
-
-</details>
-
-### Translation and read-aloud
-
-Mobile inline images fit the reading area proportionally. Footnote popups resize to content, capped at 25% of the visible reader viewport area; longer notes scroll inside the popup.
-
-<details>
-<summary>Usage and detailed settings</summary>
-
-At a chapter boundary, narration automatically continues with the next chapter's heading and body, skipping empty chapters.
-
-Full-text translation stop controls stay in the toolbar without covering the text. Translate selected text or use the translation button next to AI in the top reader toolbar, with Google translation, AI translation or DeepL/DeepLX. Selected-text results use consistent body text and capped heading sizes; long translations scroll inside a popup sized like AI chat.
+Edge, MiMo, OpenAI-compatible and DashScope synthesis groups neighboring sentences within natural paragraphs, splitting long paragraphs. Highlighting and previous/next controls follow each passage; system speech retains sentence navigation. Upcoming passages are prefetched during playback.
 
 </details>
 
 <a id="ai"></a>
 
-## AI reading and custom tools
+## Turn reading into a conversation
 
-### AI grounded in your reading
+Ask about a passage, summarize a chapter, examine an argument or organize ideas into a mind map. Configure your own AI provider and choose which reading tools it may use.
 
-Reasoning effort is configurable per model, including **Off** for supported models. Full-text translation uses the selected model's parameters. Actual support depends on the provider and model.
+- Built-in and custom reading skills can be enabled, disabled, edited and reordered together.
+- Turn on “fill the input first” to add a chapter range or extra instructions before sending.
+- Continue with follow-up questions in the current conversation or a restored historical conversation.
+- View mind maps full screen, zoom and pan, collapse branches, and export them.
+
+![A chapter-summary prompt on iPhone and its reader AI conversation on Mac](docs/images/showcase/cross-platform/skills-en.png)
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Models, skills and conversation context</summary>
 
-Home AI is intended for library, note and reading-history questions. In-book AI focuses on the current book, chapter or selected text. Home offers quick prompts, while the reader uses enabled reading skills. Their contexts are different: a home-screen question should not automatically be treated as referring to a current chapter.
+Supported protocols include OpenAI-compatible, Claude and Gemini. Configure endpoints, keys and model parameters in Settings → AI settings. Service capabilities and charges depend on the provider.
 
-Add or edit models under Settings → AI Settings → Provider Configuration. Each model can have its own endpoint, model name, API key, temperature, maximum output tokens and number of conversation-history turns. OpenAI-compatible, Claude and Gemini protocols are supported. Presets include OpenAI, Claude, Gemini, DeepSeek, Zhipu GLM and OpenRouter; compatible custom endpoints can also be configured. Model discovery, tool calling and parameter ranges depend on the provider.
+Home AI works with library, notes and reading records. Reader AI works with the current book, chapter or selection. Enabled tools can retrieve chapters, search text and inspect notes; answers depend on the material actually retrieved.
 
-Built-in provider details support restoring defaults: endpoint and parameters reset, saved keys are cleared, and the default enabled state is restored after confirmation. Custom providers can be deleted by swiping the list or from their detail page.
-
-Enable AI tools as needed, including finding books and notes, searching text, reading chapters, inspecting reading records and generating mind maps. AI output can be wrong. Book summaries are limited by the text retrieved, search results and the model's context window; one request is not guaranteed to read an arbitrarily long book in full.
+Common skills include chapter/book summaries, concept explanations, argument analysis, character tracking, quote collection, reading guides and mind maps. Mind maps export as PNG, SVG, Markdown, FreeMind (.mm) or JSON. Completed reader answers return to their first paragraph.
 
 </details>
 
-### Reading skills and custom prompts
+<a id="selection"></a>
 
-Reading skills are visible by default and can be collapsed with a switch; built-in and custom skills can be toggled and reordered together. AI body text has its own font-size setting. Mind maps can be exported as PNG, SVG, Markdown, FreeMind (`.mm`) or JSON.
+## Put your favorite tools at your fingertips
 
-Built-in skill names and prompts follow your selected application language. Enable the draft option to fill the input field before sending, allowing changes such as a chapter range; it is off by default, so clicking a skill sends it immediately. The settings page and AI chat share this option.
+Choose what appears when you select text. Keep useful actions close and hide the ones you do not need.
 
-![AI reading skills and prompt editing on macOS and iOS](docs/images/showcase/cross-platform/skills-en.png)
+- Toggle and drag-sort built-in tools, annotation controls and custom AI commands.
+- Edit command names, icons and prompts; common AI templates start disabled.
+- Choose selected text only or selected text with context, and opt into online search per command.
+- Selection templates are managed separately from reading skills but use the same reader AI dialog.
+
+![Toolbar configuration on iPhone and adjustable text selection on Mac](docs/images/showcase/cross-platform/selection-en.png)
+
+AI Knowledge uses your current model's knowledge first. If further checking is needed, type **“Confirm online search”** in that conversation to retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources. No separate search API key is needed.
+
+<a id="translation"></a>
+
+## Read beyond one language
+
+Translate a selection without leaving the page, choose another provider in the translation popup, or use full-text translation while reading.
+
+- Google translation, AI translation and DeepL/DeepLX.
+- Embedded translation webpages, including Baidu and Youdao.
+- Selection search with Baidu, Bing, Google, Baidu Baike, Wikipedia or a custom engine in the built-in browser.
+
+![Translation provider settings on iPhone and the translated text on Mac](docs/images/showcase/cross-platform/translation-en.png)
+
+Full-text translation's stop action stays in the toolbar rather than covering the book text.
+
+<a id="dictionary"></a>
+
+## Understand a word without losing your place
+
+Select a word and read its definition right beside the book. Imported MDX and StarDict dictionaries work offline, with no AI account required.
+
+![An enabled local dictionary on iPhone and its word definition in the Mac reader](docs/images/showcase/cross-platform/dictionary-en.png)
+
+Name, enable, disable or remove dictionaries in Settings → Custom dictionaries. Results come from your imported dictionary's entries; dictionary files are not bundled. The picture uses an original demonstration entry.
+
+<a id="notes"></a>
+
+## Keep what stays with you
+
+Highlight a passage, underline an idea and add your own thoughts. Review notes by book and chapter, then return to the original passage when you need its context.
+
+- Choose highlight colors and annotation styles.
+- On mobile, use Quick mark to swipe over text and save a highlight.
+- Export Markdown, TXT or CSV with original passages and creation or last-edit times.
+- Reading-position links in exports reopen the corresponding book location in Modu when that book is available.
+
+![Edit a highlight and comment on iPhone, then review saved notes on Mac](docs/images/showcase/cross-platform/notes-en.png)
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Deleting annotations and exporting notes</summary>
 
-Type a follow-up in the current or restored conversation to continue with its existing context. The history clock icon sits immediately to the left of the top-right options menu. Starting a new chat or a new skill/selection task still creates an independent conversation.
+Select part or all of an existing highlight or underline, choose the trash action and confirm to delete the complete overlapping annotation and its comment. The confirmation appears above the toolbar and color palette.
 
-| Skill                | Purpose                                                                |
-| -------------------- | ---------------------------------------------------------------------- |
-| Chapter Summary      | Outline the current chapter's content, plot and themes                 |
-| Book Summary         | Summarize available book content and structure                         |
-| Concept Explanation  | Explain concepts, terminology and abstract ideas                       |
-| Argument Analysis    | Break down claims, reasoning and supporting evidence                   |
-| Character Tracking   | Track character relationships and development                          |
-| Quote Collection     | Extract noteworthy passages from the original text                     |
-| Reading Guide        | Suggest reading approaches, discussion questions and reflection topics |
-| Smart Translation    | Translate content in its book context                                  |
-| Vocabulary Assistant | Explain unfamiliar words, idioms and technical expressions             |
-| Mind Map             | Organize content into a hierarchy                                      |
-
-Open a skill to inspect its prompt, edit and save it, or restore the default. Custom skills appear alongside built-in skills in the reader AI panel. Prompts for recalling previous content, translation/dictionary and full-text translation are managed on the same settings page.
+Exports label passages as “原文：【…】”; Markdown also highlights the note content. Quick mark works with reflowable text, not scanned PDF pages, and has an explicit Exit control to restore normal gestures.
 
 </details>
 
-### Selection toolbar and AI templates
+<a id="statistics"></a>
 
-Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Starting a new selection AI task opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Manually typed follow-ups continue that conversation. Settings backups include user edits to bundled prompts, not duplicate default templates.
+## See your reading take shape
 
-![Selection toolbar and custom AI commands on macOS and iOS](docs/images/showcase/cross-platform/selection-en.png)
+Follow reading time, reading days, streaks and progress through individual books. Switch between periods to see how your habits change.
+
+- Review time trends and the reading heatmap.
+- Explore per-book reading records.
+- Rearrange dashboard cards and keep the metrics you care about.
+
+![Add a statistics card on iPhone and view reading charts on Mac](docs/images/showcase/cross-platform/statistics-en.png)
+
+<a id="vector"></a>
+
+## Find ideas, not just words
+
+Vector indexing turns book passages into searchable representations of their meaning. Combine keyword and semantic search to find relevant text, then let AI use retrieved passages as context for its answer.
+
+1. Choose a local ONNX model or a remote embedding API in Settings → Embedding Models.
+2. Download a local model when needed, then index a book from its menu.
+3. Follow the background indexing task; use the resulting index for retrieval.
+
+![Local embedding settings on iPhone and an AI answer grounded in retrieved passages on Mac](docs/images/showcase/cross-platform/vector-en.png)
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Local models, downloads and privacy</summary>
 
-On Android, the initial long-press selection can expand to a word or paragraph and immediately show draggable handles. Adjust the range freely afterward without triggering automatic matching again.
+| Local model | Languages | Dimensions |
+| --- | --- | --- |
+| all-MiniLM-L6-v2 | English | 384 |
+| BGE Small EN v1.5 | English | 384 |
+| BGE Small ZH v1.5 | Chinese | 512 |
+| Multilingual E5 Small | Multilingual | 384 |
 
-AI Knowledge remains a selection template only. It concisely explains meaning, background and related knowledge in the selected text's language, without adding pronunciation, translations or examples by default. Every selection AI command supports selected text only (the default) or nearby context, plus an independent online-search checkbox. Without online search it uses model knowledge first; explicit confirmation in the same chat can retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources, without another search API key.
+Models and tokenizers are downloaded on demand, not bundled in installers. Choose Hugging Face or the [Gitee model mirror](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1); downloads are checked by size and SHA-256. Verified local models can run offline without an API key.
 
-</details>
+Automatic indexing after import is off by default. Indexes stay local and are not included in WebDAV library sync. Reindex when changing the embedding model. **The chat model and embedding model are separate settings:** one generates answers; the other helps retrieve relevant passages.
 
-### Book indexing and local models
-
-AI text search reuses the same keyword/vector hybrid retrieval. Reading skills retain their chapter, selection or reading scope. Vector indexes stay on each device and are not uploaded or downloaded through WebDAV. Build indexes on each device as needed; existing local indexes are preserved. See the [local index and reading controls guide (Chinese)](docs/INDEX_SYNC_AND_READING_CONTROLS.md).
-
-<details>
-<summary>Usage and detailed settings</summary>
-
-Choose **Index** or **Reindex** from a book's pop-up menu. Books enter a background queue, so you can leave the indexing screen. Check task status and error messages to confirm completion. For automatic indexing of new imports, enable both the embedding model and **Automatically index after import** in Settings → Embedding Models. Automatic indexing is off by default.
-
-| Local ONNX model      | Languages    | Embedding dimensions |
-| --------------------- | ------------ | -------------------- |
-| all-MiniLM-L6-v2      | English      | 384                  |
-| BGE Small EN v1.5     | English      | 384                  |
-| BGE Small ZH v1.5     | Chinese      | 512                  |
-| Multilingual E5 Small | Multilingual | 384                  |
-
-All four models and tokenizers are **downloaded on demand, not bundled in installers**. In Settings → Embedding Models → Model download source, choose [Gitee mirror](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1) or Hugging Face (default), then select Download and use. If the mirror is unavailable, switch to Hugging Face manually; the app never switches sources silently. Downloads are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused; startup and indexing never download missing models automatically. Chinese BGE is selected by default and automatic indexing is off. Remote embedding APIs remain optional. Reindex books after switching models; chat and embedding settings are separate.
-
-Local embedding computation stays on your device. Remote chat, embedding, translation and speech services receive the text needed for their tasks.
+Local embedding computation stays on the device. Remote embedding services receive the text to be indexed; online AI services receive the context used for their answers.
 
 </details>
 
 <a id="data"></a>
 
-## Your library, sync and backups
+## Continue on another device
 
-### WebDAV remote library
+Use your own WebDAV server to sync books, notes, bookmarks and reading progress. Keep a database backup before changing devices or restoring a library.
 
-Enter the full book-directory URL, username and password in Settings → Remote library settings, test the connection and save. Open Home → Remote library to browse. Tap folders to navigate, or use Parent folder and Root to go back. A book's download button downloads and imports it into your local library for offline reading. Downloads show progress, support cancellation and check for duplicates. The limit is 512 MiB per file, with one download at a time; leaving the tab cancels an unfinished download.
+- Automatic sync, Wi-Fi-only controls and optional timed sync during foreground reading.
+- ZIP database backup export/import with a visible save location.
+- Backup includes local books, covers, notes, reading records, AI chat history and general settings.
+- Sensitive service settings are excluded by default; backup export can optionally include them with encryption.
+
+![Sync and backup controls on iPhone, with restored reading progress and annotation on Mac](docs/images/showcase/cross-platform/sync-en.png)
 
 <details>
-<summary>Usage and detailed settings</summary>
+<summary>Restore behavior and sync security</summary>
 
-This connection is separate from WebDAV sync. It only reads and downloads files; it never uploads or deletes server files. Anonymous and username/password access are supported. Prefer HTTPS and a dedicated read-only account. The URL, username and password persist in local app preferences without additional local encryption. Enabling **Sync API keys** includes the library connection in automatic WebDAV sync with AES-256-GCM encryption; devices need the same sync encryption password. Global settings backup can explicitly include account credentials; this export is unencrypted and excludes credentials by default. Clearing the connection propagates to other opted-in devices and removes its saved password, not books or server files.
+Settings → Sync → Database backup exports Modu-Backup-*.zip. Select the ZIP directly when restoring; do not extract it. Import validates then **replaces existing data rather than merging**, so back up the current library first and restart after restoring.
 
-Use Settings → Advanced → Global settings backup to transfer all preferences through settings files or modu links. A separate switch includes accounts, passwords and API configurations and is off by default; when off, import also preserves existing local credentials. Explicit exports containing credentials are unencrypted: keep them private. Import validates before restoring and does not automatically connect to servers.
+Windows saves to the user's Downloads folder; other platforms use the system save destination. Successful export shows the path or filename. Download any books you want included before backing up.
 
-After saving a settings file, a confirmation shows its full location with a copy action. Windows saves to the current user's Downloads folder; other platforms use the location selected in the save dialog.
+WebDAV sync merges records by stable identity and uses the latest reading action, not the furthest progress. Fonts, background images, local dictionaries and vector indexes are not part of library sync. Server compatibility is described in the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md).
+
+Sync API keys is a separate opt-in switch. Sensitive configurations are encrypted with AES-256-GCM and require the same encryption password on every device. This does not encrypt the entire library or replace a trusted server.
 
 </details>
 
-### Sync and key security
+<a id="backup"></a>
 
-Optional timed sync runs only while reading in the foreground, at 1, 2, 3, 5, 10, 15 or 30 minutes, or one hour. It respects automatic-sync and Wi-Fi settings and shows only terminal success/failure feedback.
+## Take your preferences with you
 
-<details>
-<summary>Usage and detailed settings</summary>
+Global settings backup transfers the way you use Modu: appearance, reader layout, CSS profiles, AI skills, selection tools, speech, translation and general preferences.
 
-* WebDAV syncs your library, notes and reading progress in the `modu` folder under the configured endpoint, without a Modu cloud account. See the relevant Release notes for legacy-folder migration.
-* Books, notes, bookmarks and reading positions merge record by record. The latest reading action wins, rather than the furthest progress; new reading-time records are deduplicated and deletions retain markers. Stale reader writes are rejected after sync, and note conflicts retain the draft. Fonts, theme images, local dictionaries and vector indexes are not synced. Reliable ETag servers use conditional writes; other servers use verified immutable record batches. See the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md) for migration and server requirements.
-* **Sync API Keys** is off by default and separate from the main WebDAV switch. Enabling it requires a separate password and acknowledgment of the risks.
-* Sensitive service settings are encrypted with **AES-256-GCM** before being written to the sync database. Other devices need the same password. The password is not synced and cannot be recovered if lost.
-* This does not encrypt all books, notes or the entire backup, and does not replace a trustworthy WebDAV service and a strong password.
-* **Settings files and configuration links are not encrypted** and may contain passwords or API keys. Do not post them in public screenshots, issues or group chats. Configuration transfer is separate from encrypted key sync.
+- Export a settings file or modu link; restore from a file or pasted link.
+- Review the contents before importing.
+- Keep accounts, passwords and API configurations behind an independent switch, **off by default**.
+- Only changes to built-in prompt templates are backed up, alongside your custom templates.
 
-</details>
+![Global settings backup on iPhone and a completed export with its save location on Mac](docs/images/showcase/cross-platform/backup-en.png)
 
-### Database backup
+| Need | Use |
+| --- | --- |
+| Move preferences and custom prompts | Global settings backup |
+| Back up books, notes and reading records | Database backup |
+| Keep reading data aligned across devices | WebDAV sync |
 
-Settings → Sync → Database backup exports `Modu-Backup-*.zip`, including local books, covers, the library database (notes, highlights, bookmarks and reading records), fonts, background images, AI chat history and general settings. Download books you want to transfer first. Service settings and credentials are excluded by default and can optionally be included with encryption in the export dialog.
+Settings files do **not** contain books, notes, chat history, font/background files, dictionaries or downloaded vector models. If you include credentials, the settings file or link contains recoverable plaintext credentials: **keep it private**. QR export is not offered; use a file for a complete settings backup.
 
-<details>
-<summary>Usage and detailed settings</summary>
-
-Windows saves to the current user's Downloads folder, usually `C:\Users\<username>\Downloads`; Mac, Linux and mobile devices use the location selected in the system save dialog. Export confirms the full path or file name with a copy action. Select the ZIP to import without extracting it. Import validates then replaces existing data rather than merging; back up current data first and restart Modu after restoring. This is separate from Global settings backup, which transfers preferences only.
-
-</details>
-
-### Global settings transfer
-
-Transfer appearance, reading layout, CSS, AI skills, speech, translation and general settings together via settings files or `modu:` links. Full settings can exceed QR capacity, so QR export and image import are no longer offered; files are recommended for backups. Accounts, passwords and API keys have a separate switch, off by default. Enabled exports contain recoverable plaintext credentials and must be kept private. Books and notes use library backup or sync rather than the settings file.
+Windows settings exports default to Downloads; other platforms use the selected save destination. The success message shows the saved location and lets you copy it.
 
 ## Getting started
 
