@@ -20,7 +20,7 @@
   <a href="https://github.com/sobranie2406/modureader/issues">问题反馈</a>
 </p>
 
-![阅读与章节导航](docs/images/showcase/reading-zh.png)
+![Mac 与 iPhone 上的阅读与章节导航](docs/images/showcase/cross-platform/reading-zh.png)
 
 > **本地阅读不需要 AI 账号。** AI、在线翻译和在线语音按需配置，费用与可用性取决于所选服务。各版本更新与使用说明见 [Releases](https://github.com/sobranie2406/modureader/releases)。
 
@@ -112,9 +112,7 @@
 
 竖排阅读可选择红色边框和正文分栏线，标题置右、页码置左，中文环境显示中文数字。注释字号按实际段落正文的 80% 计算，不按注释序号计算；弹窗最多占屏幕面积 25%，竖排长注释左右滚动。
 
-<p align="center">
-  <img src="docs/images/showcase/vertical-zh.png" width="480" alt="中文竖排与红色边框">
-</p>
+![Mac 与 iPhone 上的中文竖排与红色边框](docs/images/showcase/cross-platform/vertical-zh.png)
 
 <details>
 <summary>使用说明与详细设置</summary>
@@ -186,7 +184,7 @@ Android 主要书库数据迁移至 `Android/data/com.modu.reader/files`，首�
 
 **先选模板，再按喜好调整声音，无需从零写提示词。** MiMo 的「官方预置音色」模式可选择音色并搭配讲述风格；「文字设计音色」模式则通过性别、年龄感、音色、语气和节奏描述设计声音。
 
-![听书风格模板与自定义语音提示词](docs/images/showcase/listening-zh.png)
+![Mac 与 iPhone 上的听书风格模板与自定义语音提示词](docs/images/showcase/cross-platform/listening-zh.png)
 
 <details>
 <summary>使用说明与详细设置</summary>
@@ -256,7 +254,7 @@ AI 阅读技能默认显示在对话输入区，可通过开关收起；内置�
 
 开启「先填入输入框」后，可在技能模板上补充章节范围等要求，再手动发送；该选项默认关闭，关闭时点击技能直接发送。设置页面中的开关与 AI 对话中的选项保持一致。
 
-![AI 阅读技能与提示词编辑](docs/images/showcase/skills-zh.png)
+![Mac 与 iPhone 上的 AI 阅读技能与提示词编辑](docs/images/showcase/cross-platform/skills-zh.png)
 
 <details>
 <summary>使用说明与详细设置</summary>
@@ -284,7 +282,7 @@ AI 阅读技能默认显示在对话输入区，可通过开关收起；内置�
 
 在「设置 → 划词工具栏」开关和拖动排序内置动作、标注工具及自定义 AI 命令，可调整名称、图标、提示词和显示数量。常用 AI 模板默认关闭，与 AI 阅读技能分开管理；发起新的划词 AI 任务时开启新对话，使用阅读 AI 弹窗，生成结束后回到首段；在该对话输入框内手动追问则延续上下文。设置备份只保存内置提示词的用户改动，不重复保存默认模板。
 
-![划词工具栏与自定义 AI 命令](docs/images/showcase/selection-zh.png)
+![Mac 与 iPhone 上的划词工具栏与自定义 AI 命令](docs/images/showcase/cross-platform/selection-zh.png)
 
 <details>
 <summary>使用说明与详细设置</summary>

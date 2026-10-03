@@ -20,7 +20,7 @@
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
-![Reading and chapter navigation](docs/images/showcase/reading-en.png)
+![Reading and chapter navigation on macOS and iOS](docs/images/showcase/cross-platform/reading-en.png)
 
 > **Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. See [Releases](https://github.com/sobranie2406/modureader/releases) for version updates and usage notes.
 
@@ -200,7 +200,7 @@ Choose system speech, Edge, Xiaomi MiMo, an OpenAI-compatible provider or DashSc
 
 **Start with a template, then make the voice your own.** MiMo's Preset voices mode combines a selected voice with narration style instructions. Voice design mode uses descriptions of gender, perceived age, timbre, tone and pace to design the voice.
 
-![Narration templates and editable voice prompts](docs/images/showcase/listening-en.png)
+![Narration templates and editable voice prompts on macOS and iOS](docs/images/showcase/cross-platform/listening-en.png)
 
 <details>
 <summary>Usage and detailed settings</summary>
@@ -266,7 +266,7 @@ Reading skills are visible by default and can be collapsed with a switch; built-
 
 Built-in skill names and prompts follow your selected application language. Enable the draft option to fill the input field before sending, allowing changes such as a chapter range; it is off by default, so clicking a skill sends it immediately. The settings page and AI chat share this option.
 
-![AI reading skills and prompt editing](docs/images/showcase/skills-en.png)
+![AI reading skills and prompt editing on macOS and iOS](docs/images/showcase/cross-platform/skills-en.png)
 
 <details>
 <summary>Usage and detailed settings</summary>
@@ -294,7 +294,7 @@ Open a skill to inspect its prompt, edit and save it, or restore the default. Cu
 
 Settings → Selection toolbar lets you enable, disable and reorder built-in tools, annotation controls and custom AI commands, with editable labels, icons, prompts and visible-item counts. Common AI templates start disabled and are managed separately from reading skills. Starting a new selection AI task opens a new conversation in the reader AI popup; completed output returns to its first paragraph. Manually typed follow-ups continue that conversation. Settings backups include user edits to bundled prompts, not duplicate default templates.
 
-![Selection toolbar and custom AI commands](docs/images/showcase/selection-en.png)
+![Selection toolbar and custom AI commands on macOS and iOS](docs/images/showcase/cross-platform/selection-en.png)
 
 <details>
 <summary>Usage and detailed settings</summary>

@@ -2,9 +2,9 @@
 
 ## Current homepage / 当前首页
 
-The English homepage is [`README.md`](../../README.md); the Chinese homepage is [`README_zh.md`](../../README_zh.md). `README_EN.md` retains a link for older bookmarks. The `showcase/` series presents reading/navigation, voice templates, reading skills and selection-tool customization in matching phone layouts. The Chinese page also includes framed vertical reading. Images sit beside their relevant feature descriptions.
+The English homepage is [`README.md`](../../README.md); the Chinese homepage is [`README_zh.md`](../../README_zh.md). `README_EN.md` retains a link for older bookmarks. The `showcase/cross-platform/` series pairs a large macOS window behind an overlapping iPhone for each feature: reading/navigation, voice templates, reading skills and selection-tool customization. The Chinese page also includes framed vertical reading. Images sit beside their relevant feature descriptions.
 
-当前首页使用 `showcase/` 目录内的中英文手机展示图，统一 iPhone 外框、灵动岛、状态栏、底部横条、背景和阴影。界面以实际手机截图与 2026-10-03 采集的 Modu 窄窗口界面为依据，保留实际功能、控件结构和文案；界面字体按 iOS 系统字体风格呈现，书籍正文保留阅读字体。已移除桌面录屏标记与鼠标指针。阅读内容来自项目原创示例书；不包含私人书架、笔记、对话或账号密钥。图中设置用于功能展示，不代表所有选项的出厂默认值。
+当前首页使用 `showcase/cross-platform/` 目录内的中英文双端展示图：Mac 窗口在后、iPhone 在前错位叠放，保留两端主要内容，搭配简洁标题、浅色背景与柔和阴影。Mac 部分以归档的实际界面为依据，iPhone 部分沿用已生成的 `showcase/` 手机图作为来源，保留灵动岛、状态栏与底部横条。界面字体采用系统字体风格，书籍正文保留阅读字体；已移除桌面录屏标记与鼠标指针。阅读内容来自项目原创示例书，不包含私人书架、笔记、对话或账号密钥。图中设置用于功能展示，不代表所有选项的出厂默认值。单独的手机图与 Mac 原始截图保留，不覆盖源素材。
 
 ## Archived Mac captures — 1.1.9 / Mac 截图归档
 
