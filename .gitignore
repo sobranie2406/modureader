@@ -106,3 +106,22 @@ google_service_account.json
 /output/
 /output/playwright/
 /.playwright-cli/
+
+# Installers and private diagnostics belong in Releases/local storage, not source.
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.dmp
+*.har
+
+# Retired presentation sources remain local; publish only the current composites.
+/docs/images/Anx-logo.jpg
+/docs/images/main.jpg
+/docs/images/mobile[0-9]*.png
+/docs/images/wide[0-9]*.png
+/docs/images/*-macos.jpg
+/docs/images/zh/
+/docs/images/v1.1.9/
+/docs/images/showcase/*.png
+/fastlane/metadata/android/*/images/

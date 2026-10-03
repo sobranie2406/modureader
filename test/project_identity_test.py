@@ -10,17 +10,23 @@ class ProjectIdentityTest(unittest.TestCase):
     def test_only_current_chinese_and_english_homepages(self):
         self.assertEqual(
             {p.name for p in ROOT.glob("README*.md")},
-            {"README.md", "README_EN.md"},
+            {"README.md", "README_zh.md", "README_EN.md"},
         )
-        for name in ("README.md", "README_EN.md"):
+        for name in ("README.md", "README_zh.md"):
             text = (ROOT / name).read_text()
             self.assertIn("sobranie2406/modureader/releases", text)
             self.assertIn("Anx Reader", text)  # attribution is not stale branding
             self.assertIn("ReadAny", text)
+        # The old English URL remains a small compatibility link, not a third
+        # independent homepage that can drift out of date.
+        redirect = (ROOT / "README_EN.md").read_text()
+        self.assertIn("(README.md)", redirect)
+        self.assertIn("(README_zh.md)", redirect)
+        self.assertLess(len(redirect), 500)
 
     def test_product_docs_do_not_send_users_to_upstream_services(self):
         paths = [ROOT / name for name in (
-            "README.md", "README_EN.md", "SECURITY.md", "PRIVACY.md",
+            "README.md", "README_zh.md", "README_EN.md", "SECURITY.md", "PRIVACY.md",
             "CONTRIBUTING.md", "docs/RELEASING.md", "docs/SETTINGS.md",
             "docs/troubleshooting.md", "docs/issue-triage.md",
         )]
@@ -29,7 +35,7 @@ class ProjectIdentityTest(unittest.TestCase):
             r"github\.com/anxcye/anx-reader/(?:releases|issues)"
             r"|anx\.anxcye\.com|t\.me/AnxReader|id6743196413"
             r"|f-droid\.org/packages/com\.anxcye"
-            r"|README_(?:RU|tr|zh)\.md",
+            r"|README_(?:RU|tr)\.md",
             re.IGNORECASE,
         )
         for path in paths:
