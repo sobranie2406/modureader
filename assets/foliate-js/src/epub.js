@@ -609,8 +609,11 @@ class Resources {
         }
         const idref = $itemref?.getAttribute('idref')
         const index = this.spine.findIndex(item => item.idref === idref)
-        const anchor = doc => CFI.toRange(doc, parts)
-        return { index, anchor }
+        // Fixed/image pages save a spine-only CFI without an indirection.
+        // It means the start of that original section, not an empty text range.
+        const textAnchor = cfi.includes('!')
+        const anchor = textAnchor ? doc => CFI.toRange(doc, parts) : () => 0
+        return { index, anchor, textAnchor }
     }
 }
 
@@ -966,6 +969,15 @@ ${doc.querySelector('parsererror').innerText}`)
                 load: () => this.#loader.loadItem(item),
                 unload: () => this.#loader.unloadItem(item),
                 createDocument: () => this.loadDocument(item),
+                // Independent URLs for image inspection. Releasing a preview
+                // must not unref resources still displayed by the main reader.
+                loadImageDocument: async () => {
+                    const loader = new Loader({ loadText: this.loadText,
+                        loadBlob: uri => Promise.resolve(this.loadBlob(uri)).then(this.#encryption.getDecoder(uri)),
+                        resources: this.resources })
+                    try { return { src: await loader.loadItem(item), release: () => loader.destroy() } }
+                    catch (error) { loader.destroy(); throw error }
+                },
                 size: this.getSize(item.href),
                 cfi: this.resources.cfis[index],
                 linear,

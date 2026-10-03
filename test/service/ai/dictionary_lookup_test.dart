@@ -32,7 +32,8 @@ void main() {
           final system = input.first.contentAsString;
           expect(system, contains('不调用、不等待维基、百度'));
           expect(system, contains('不确定'));
-          expect(system, contains('确认联网搜索'));
+          expect(system, contains('请点击下方的联网搜索按钮'));
+          expect(system, isNot(contains('提示用户输入')));
           expect(system, isNot(contains(dictionaryNeedsSearch)));
           expect(input.map((m) => m.contentAsString).join(),
               isNot(contains('private-')));

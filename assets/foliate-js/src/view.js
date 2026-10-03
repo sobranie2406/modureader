@@ -107,29 +107,7 @@ export class View extends HTMLElement {
       })
     }
 
-    this.isFixedLayout = this.book.rendition?.layout === 'pre-paginated'
-    if (this.isFixedLayout) {
-      await import('./fixed-layout.js')
-      this.renderer = document.createElement('foliate-fxl')
-    } else {
-      await import('./paginator.js')
-      this.renderer = document.createElement('foliate-paginator')
-    }
-    this.renderer.setAttribute('exportparts', 'head,foot,filter')
-    // The renderer survives chapter loads. Bind its background/margin click
-    // once, not once per visible document (which multiplies page turns).
-    this.renderer.addEventListener('click', this.#handleRendererClick)
-    this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
-    this.renderer.addEventListener('activate', e => this.#emit('activate', e.detail))
-    this.renderer.addEventListener('continuous-start', () => {
-      const speaking = this.renderer.getContents().find(x => x.doc === this.tts?.doc)
-      if (speaking) this.renderer.pinTtsSection(speaking.index)
-    })
-    this.renderer.addEventListener('relocate', e => this.#onRelocate(e.detail))
-    this.renderer.addEventListener('create-overlayer', e =>
-      e.detail.attach(this.#createOverlayer(e.detail)))
-    this.renderer.open(book)
-    this.#root.append(this.renderer)
+    await this.#openRenderer(book)
 
     if (book.sections.some(section => section.mediaOverlay)) {
       book.media.activeClass ||= '-epub-media-overlay-active'
@@ -152,12 +130,101 @@ export class View extends HTMLElement {
       })
     }
   }
+  async #openRenderer(book) {
+    this.isFixedLayout = book.rendition?.layout === 'pre-paginated'
+    if (this.isFixedLayout) {
+      await import('./fixed-layout.js')
+      this.renderer = document.createElement('foliate-fxl')
+    } else {
+      await import('./paginator.js')
+      this.renderer = document.createElement('foliate-paginator')
+    }
+    this.renderer.setAttribute('exportparts', 'head,foot,filter')
+    // The renderer survives chapter loads. Bind its background/margin click
+    // once, not once per visible document (which multiplies page turns).
+    this.renderer.addEventListener('click', this.#handleRendererClick)
+    this.renderer.addEventListener('load', e => this.#onLoad(e.detail))
+    this.renderer.addEventListener('activate', e => this.#emit('activate', e.detail))
+    this.renderer.addEventListener('continuous-start', () => {
+      const speaking = this.renderer.getContents().find(x => x.doc === this.tts?.doc)
+      if (speaking) this.renderer.pinTtsSection(speaking.index)
+    })
+    this.renderer.addEventListener('relocate', e => {
+      if (this.#switchingRenderer) this.#pendingRelocate = e.detail
+      else this.#onRelocate(e.detail)
+    })
+    this.renderer.addEventListener('chapter-state', e => this.#emit('chapter-state', e.detail))
+    this.renderer.addEventListener('document-menu', () => this.#emit('document-menu'))
+    this.renderer.addEventListener('create-overlayer', e =>
+      e.detail.attach(this.#createOverlayer(e.detail)))
+    this.renderer.open(book)
+    this.#root.append(this.renderer)
+
+  }
+  #imageBook
+  #switchingRenderer = false
+  #pendingRelocate
+  #rendererSwitchGeneration = 0
+  get imageReading() { return !!this.#imageBook }
+  async setImageReading(enabled, settings = {}, configure = () => {}) {
+    if (this.#switchingRenderer || !this.book.resources) return false
+    if (enabled === this.imageReading) {
+      if (enabled) {
+        if (settings.view) await this.renderer.setPdfView(settings.view)
+        return this.renderer.setPdfLayout(settings.layout, true, settings.position)
+      }
+      return true
+    }
+    this.#switchingRenderer = true
+    const generation = ++this.#rendererSwitchGeneration
+    const checkActive = () => { if (generation !== this.#rendererSwitchGeneration) throw new DOMException('Reader closed', 'AbortError') }
+    this.#pendingRelocate = null
+    const previous = this.renderer, oldFixed = this.isFixedLayout, oldBook = this.#imageBook
+    let nextBook
+    try {
+      if (enabled) {
+        const { createEpubImageBook } = await import('./epub-image-book.js')
+        checkActive()
+        nextBook = createEpubImageBook(this.book)
+      }
+      await this.#openRenderer(nextBook ?? this.book)
+      checkActive()
+      this.renderer.readerActive = previous.readerActive ?? false
+      this.renderer.style.position = 'absolute'
+      this.renderer.style.inset = '0'
+      this.renderer.style.visibility = 'hidden'
+      configure()
+      if (enabled) {
+        if (settings.view) await this.renderer.setPdfView(settings.view)
+        await this.renderer.setPdfLayout(settings.layout, true, settings.position)
+      }
+      const cfi = this.lastLocation?.cfi ?? settings.cfi
+      const target = cfi ? this.resolveNavigation(cfi) : {index:0}
+      if (await this.renderer.goTo(target ?? {index:0}) === false) throw new Error('Image layout failed')
+      checkActive()
+      previous.destroy(); previous.remove(); oldBook?.disposeImageBook()
+      this.#imageBook = nextBook
+      this.renderer.style.visibility = ''
+      this.#switchingRenderer = false
+      if (this.#pendingRelocate) this.#onRelocate({...this.#pendingRelocate,reason:'layout'})
+      return true
+    } catch (error) {
+      console.warn('Image reading layout could not be applied', error)
+      if (this.renderer !== previous) { this.renderer?.destroy(); this.renderer?.remove() }
+      nextBook?.disposeImageBook()
+      this.renderer = previous; this.isFixedLayout = oldFixed
+      if (generation === this.#rendererSwitchGeneration) configure()
+      return false
+    } finally { this.#switchingRenderer = false; this.#pendingRelocate = null }
+  }
   close() {
+    this.#rendererSwitchGeneration++
     // A superseded popup can close while open() is still importing its renderer.
     if (this.renderer) this.initTTS(true)
     this.clearSearch()
     this.renderer?.destroy()
     this.renderer?.remove()
+    this.#imageBook?.disposeImageBook(); this.#imageBook = null
     this.#sectionProgress = null
     this.#tocProgress = null
     this.#pageProgress = null
@@ -191,23 +258,25 @@ export class View extends HTMLElement {
   #emit(name, detail, cancelable) {
     return this.dispatchEvent(new CustomEvent(name, { detail, cancelable }))
   }
-  #onRelocate({ reason, range, index, fraction, size, readingAction }) {
+  #onRelocate({ reason, range, index, fraction, size, readingAction, pdfRegion }) {
     this.#index = index
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
     const cfi = this.getCFI(index, range)
-    const chapterLocation = getChapterLocation(this.renderer, progress.section, { fraction, size })
+    const chapterLocation = pdfRegion
+      ? { current: pdfRegion.panel + 1, total: pdfRegion.total }
+      : getChapterLocation(this.renderer, progress.section, { fraction, size })
 
     const section = progress.section ?? { current: index, total: this.book.sections.length }
-    this.lastLocation = { ...progress, section, tocItem, pageItem, cfi, range, chapterLocation, reason,
+    this.lastLocation = { ...progress, section, tocItem, pageItem, cfi, range, chapterLocation, reason, pdfRegion,
       readingAction: readingAction ?? (reason === 'page' || reason === 'navigation') }
     if (reason === 'snap' || reason === 'page' || reason === 'scroll')
       this.history.replaceState(cfi)
 
     if (cfi && (!this.#lastCfi || cfi !== this.#lastCfi ||
       chapterLocation.current !== this.#lastChapterLocation?.current ||
-      chapterLocation.total !== this.#lastChapterLocation?.total)) {
+      chapterLocation.total !== this.#lastChapterLocation?.total || reason === 'layout' || reason === 'viewport')) {
       this.#lastCfi = cfi
       this.#lastChapterLocation = chapterLocation
       this.#emit('relocate', this.lastLocation)
@@ -340,6 +409,15 @@ export class View extends HTMLElement {
       
       // if the position is not null, it is fixed layout
       if (position) {
+        if (doc.pdfRegion) {
+          if (doc.pdfClientPoint) {
+            this.#emit('click-view', doc.pdfClientPoint(clientX, clientY))
+            return
+          }
+          const rect = doc.defaultView.frameElement.getBoundingClientRect()
+          this.#emit('click-view', { x: rect.left + clientX * scale, y: rect.top + clientY * scale })
+          return
+        }
         clientX *= scale
         clientY *= scale
 
@@ -445,8 +523,8 @@ export class View extends HTMLElement {
     else {
       const parts = CFI.parse(cfi)
       const index = CFI.fake.toIndex((parts.parent ?? parts).shift())
-      const anchor = doc => CFI.toRange(doc, parts)
-      return { index, anchor }
+      const anchor = cfi.includes('!') ? doc => CFI.toRange(doc, parts) : () => 0
+      return { index, anchor, textAnchor: cfi.includes('!') }
     }
   }
   resolveNavigation(target) {

@@ -51,8 +51,8 @@
   "ui_tts_quick_here": {"zh":"从此处朗读","en":"Read from here"},
   "ui_tts_quick_error": {"zh":"朗读操作失败，请重试","en":"Narration action failed. Please retry."},
   "ui_dictionary_web_follow_up": {
-    "zh": "如需联网补查，请在下方输入“确认联网搜索”并发送。",
-    "en": "To check online, type “Confirm online search” below and send."
+    "zh": "如需联网补查，请点击下方的联网搜索按钮。",
+    "en": "To check online, click the “Search online” button below."
   },
   "ui_dictionary_web_confirm_command": {
     "zh": "确认联网搜索",

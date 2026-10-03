@@ -1,4 +1,7 @@
 /* global pdfjsLib */
+import { createPdfAnalysis } from './document-analysis.js'
+import { PageResourceCache, boundedRenderScale } from './page-resource-cache.js'
+import { createPdfRegionRenderer } from './pdf-region-renderer.js'
 
 // https://github.com/mozilla/pdf.js/blob/f04967017f22e46d70d11468dd928b4cdc2f6ea1/web/text_layer_builder.css
 const textLayerBuilderCSS = `
@@ -500,8 +503,9 @@ const renderPage = async (page, getImageBlob) => {
     const appRatio = (innerWidth || 800) / (innerHeight || 600)
     const pdfToAppResolutionRatio = appRatio / naturalPdfRatio
 
-    const scale = getImageBlob ? 600 / naturalPdfSize.width
+    const requestedScale = getImageBlob ? 600 / naturalPdfSize.width
         : Math.min(4, Math.max(0.25, (devicePixelRatio || 1) * pdfToAppResolutionRatio))
+    const scale = boundedRenderScale(naturalPdfSize.width, naturalPdfSize.height, requestedScale)
     const viewport = page.getViewport({ scale })
 
     const canvas = document.createElement('canvas')
@@ -509,8 +513,15 @@ const renderPage = async (page, getImageBlob) => {
     canvas.width = viewport.width
     const canvasContext = canvas.getContext('2d')
     // PDF.js display intent waits for rAF, which a hidden WKWebView may suspend.
-    await page.render({ canvasContext, viewport, intent: 'print' }).promise
-    const blob = await new Promise(resolve => canvas.toBlob(resolve))
+    let blob
+    try {
+        await page.render({ canvasContext, viewport, intent: 'print' }).promise
+        blob = await new Promise(resolve => canvas.toBlob(resolve))
+        if (!blob) throw new Error('PDF page encoding failed')
+    } finally {
+        canvas.width = 0
+        canvas.height = 0
+    }
     if (getImageBlob) return blob
 
     /*
@@ -540,7 +551,7 @@ const renderPage = async (page, getImageBlob) => {
     })
 
     const src = URL.createObjectURL(blob)
-    const url = URL.createObjectURL(new Blob([`
+    const html = new Blob([`
         <!DOCTYPE html>
         <meta charset="utf-8">
         <style>
@@ -557,8 +568,11 @@ const renderPage = async (page, getImageBlob) => {
         <img src="${src}">
         ${container.outerHTML}
         ${div.outerHTML}
-    `], { type: 'text/html' }))
-    return url
+    `], { type: 'text/html' })
+    let url
+    try { url = URL.createObjectURL(html) }
+    catch (error) { URL.revokeObjectURL(src); throw error }
+    return { url, urls: [url, src], bytes: blob.size + html.size }
 }
 
 const makeTOCItem = item => ({
@@ -572,6 +586,10 @@ export const makePDF = async file => {
     const pdf = await pdfjsLib.getDocument({ data }).promise
 
     const book = { rendition: { layout: 'pre-paginated' } }
+    book.documentAnalysis = createPdfAnalysis(pdf, pdfjsLib.OPS)
+    book.regionRenderer = createPdfRegionRenderer(pdf)
+    // Preview/editor requests must not cancel the visible reading surface.
+    book.readingRegionRenderer = createPdfRegionRenderer(pdf)
 
     const info = (await pdf.getMetadata())?.info
     book.metadata = {
@@ -585,7 +603,17 @@ export const makePDF = async file => {
     }))
     book.toc = outline?.length ? outline.map(makeTOCItem) : book.indexToc
 
-    const cache = new Map()
+    const cache = new PageResourceCache()
+    const pendingPages = new Map()
+    let resourceGeneration = 0
+    book.releasePageResources = () => {
+        resourceGeneration++
+        pendingPages.clear()
+        cache.clear()
+        book.documentAnalysis.clear()
+        book.regionRenderer.clear()
+        book.readingRegionRenderer.clear()
+    }
     book.sections = Array.from({ length: pdf.numPages }).map((_, i) => ({
         id: i,
         createDocument: async () => {
@@ -610,10 +638,21 @@ export const makePDF = async file => {
         },
         load: async () => {
             const cached = cache.get(i)
-            if (cached) return cached
-            const url = await renderPage(await pdf.getPage(i + 1))
-            cache.set(i, url)
-            return url
+            if (cached) return cached.url
+            if (pendingPages.has(i)) return pendingPages.get(i)
+            const generation = resourceGeneration
+            const pending = (async () => {
+                const resource = await renderPage(await pdf.getPage(i + 1))
+                if (generation !== resourceGeneration) {
+                    resource.urls.forEach(url => URL.revokeObjectURL(url))
+                    throw new Error('PDF reader closed during rendering')
+                }
+                cache.set(i, resource)
+                return resource.url
+            })()
+            pendingPages.set(i, pending)
+            try { return await pending }
+            finally { if (pendingPages.get(i) === pending) pendingPages.delete(i) }
         },
         size: 1000,
     }))

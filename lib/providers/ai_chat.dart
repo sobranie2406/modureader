@@ -105,7 +105,7 @@ class AiChat extends _$AiChat {
       final original = dictionarySelectionFromRequest(
           _lastReadingRequest ?? entry?.readingRequest);
       if (original == null) {
-        throw StateError('无法找到这段对话原先查询的词语，请重新选词使用 AI 知识后，再输入“确认联网搜索”。');
+        throw StateError('无法找到这段对话原先查询的词语，请重新选词使用 AI 知识后，再点击联网搜索按钮。');
       }
       skillId = aiDictionaryWebSkillId;
       sourceText = original;

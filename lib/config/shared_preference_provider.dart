@@ -54,6 +54,10 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'documentReadingModes',
+  'pdfReadingStates',
+  'documentTypeOverrides',
+  'documentPageLayouts',
   'bookshelfPins',
   'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',
@@ -71,6 +75,10 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'documentReadingModes',
+  'pdfReadingStates',
+  'documentTypeOverrides',
+  'documentPageLayouts',
   'bookshelfPins',
   'ttsNotificationPermissionAsked',
   'bookCustomCssSelections',

@@ -255,11 +255,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void _updatePageKeys({bool force = false}) {
     if (!mounted) return;
+    epubPlayerKey.currentState?.setDocumentReaderActive(_canUsePageKeys);
     _pageKeys.update(
         active: _canUsePageKeys,
         volume: Prefs().volumeKeyTurnPage,
         force: force);
   }
+  void refreshDocumentReaderActivity() => _updatePageKeys();
 
   void _refreshReaderHostState() {
     if (!mounted) return;

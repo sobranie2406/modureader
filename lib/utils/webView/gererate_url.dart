@@ -18,6 +18,7 @@ String generateUrl(
   String? fontPath,
   String? backgroundColor,
   bool? importing,
+  bool inspectDocumentOnImport = false,
   bool isDarkMode = false,
   Map<String, double>? verticalPageInsets,
   Map<String, dynamic>? verticalPageChrome,
@@ -131,6 +132,7 @@ String generateUrl(
 
   Map<String, dynamic> params = {
     'importing': importing,
+    if (importing) 'inspectDocumentOnImport': inspectDocumentOnImport,
     'url': url,
     'initialCfi': cfi,
     'style': style,

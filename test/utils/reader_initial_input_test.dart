@@ -19,6 +19,16 @@ void main() {
   });
   tearDown(() => Server().stop());
 
+  test('body classification is only requested by explicit import metadata work', () {
+    Map<String, String> params({bool importing = false, bool inspect = false}) =>
+        Uri.parse(generateUrl('https://example.test/book.epub', '',
+            fontName: 'serif', fontPath: '',
+            importing: importing, inspectDocumentOnImport: inspect)).queryParameters;
+    expect(params(inspect: true).containsKey('inspectDocumentOnImport'), isFalse);
+    expect(params(importing: true)['inspectDocumentOnImport'], 'false');
+    expect(params(importing: true, inspect: true)['inspectDocumentOnImport'], 'true');
+  });
+
   test('night palette is present on first load and saved palette is restored',
       () {
     final original = Prefs().readTheme;

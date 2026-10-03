@@ -2,6 +2,18 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
+## 1.1.12-preview.4
+
+- Add original-page reading for PDFs and image-based EPUBs, with crop, panel order, zoom, rotation and continuous scrolling.
+- Add automatic edge cropping and image enhancements; save reading layout and view position per book.
+- Classify EPUBs during import only; ordinary books retain their Preview 3 reading menus and settings.
+- Add a Search online action before Regenerate and Copy in AI Knowledge replies, continuing the same conversation without clearing an unsent draft.
+
+- 新增 PDF 和图片 EPUB 原版阅读，支持裁边、分格顺序、缩放、旋转和连续卷轴阅读。
+- 新增自动裁边和图像增强，按书保存版式与视口位置。
+- EPUB 类型仅在导入时判别，普通书籍保持 Preview 3 阅读菜单与设置。
+- AI 知识回答末尾增加联网搜索按钮，位于重新生成和复制之前，沿用当前对话并保留未发送草稿。
+
 ## 1.1.11
 
 - Automatically expand only the initial Android long-press selection; show draggable handles immediately and preserve subsequent manual range adjustments.

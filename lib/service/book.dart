@@ -21,6 +21,7 @@ import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
 import 'package:anx_reader/service/book_formats.dart';
+import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
@@ -447,7 +448,9 @@ Future<void> importBook(File file, WidgetRef ref,
     file = tempFile;
   }
 
-  await getBookMetadata(file, md5: md5);
+  await getBookMetadata(file,
+      md5: md5,
+      inspectDocumentOnImport: extension == 'epub' || extension == 'pdf');
   if (await file.exists()) await file.delete();
   if (onImported != null) {
     onImported();
@@ -531,6 +534,7 @@ Future<void> saveBook(
   String? md5,
   String cover, {
   Book? provideBook,
+  Object? documentReadingMode,
 }) async {
   // Extract original filename (without extension)
   final fileNameWithoutExt = path.basenameWithoutExtension(file.path);
@@ -586,6 +590,13 @@ Future<void> saveBook(
     }
     rethrow;
   }
+  // Persist only after database identity and the final local path are known.
+  // A cache failure must not discard an otherwise successfully imported book.
+  try {
+    await DocumentReadingModeStore(Prefs().prefs).save(book, documentReadingMode);
+  } catch (_) {
+    AnxLog.warning('Imported document classification could not be saved');
+  }
   AnxToast.show(L10n.of(navigatorKey.currentContext!).serviceImportSuccess);
   final queued = enqueueImportedBookForAutomaticIndexing(
     book: book,
@@ -604,6 +615,7 @@ Future<void> getBookMetadata(
   String? md5,
   WidgetRef? ref,
   bool coverOnly = false,
+  bool inspectDocumentOnImport = true,
 }) async {
   final serverFileName = Server().setTempFile(file);
   final result = Completer<Map<String, dynamic>>();
@@ -622,6 +634,9 @@ Future<void> getBookMetadata(
       'http://127.0.0.1:${Server().port}/$serverFileName',
       '',
       importing: true,
+      inspectDocumentOnImport: inspectDocumentOnImport &&
+          !coverOnly &&
+          {'.pdf', '.epub'}.contains(path.extension(file.path).toLowerCase()),
     ))),
     onWebViewCreated: (controller) {
       controller.addJavaScriptHandler(
@@ -683,7 +698,8 @@ Future<void> getBookMetadata(
         metadata['description']?.toString() ?? '',
         md5,
         metadata['cover']?.toString() ?? '',
-        provideBook: book);
+        provideBook: book,
+        documentReadingMode: metadata['documentReadingMode']);
     ref?.read(bookListProvider.notifier).refresh();
   } finally {
     if (!result.isCompleted) fail(StateError('导入已结束'));

@@ -6,17 +6,22 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 const requireDOM = createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`)
 const { JSDOM } = requireDOM('jsdom')
-const loadSource = async name => {
+const sourceUris = new Map()
+const sourceUri = async name => {
+  if (sourceUris.has(name)) return sourceUris.get(name)
   let source = await readFile(new URL(`../assets/foliate-js/src/${name}`, import.meta.url), 'utf8')
-  if (source.includes("'./frame-script-policy.js'")) {
-    const policy = await readFile(new URL('../assets/foliate-js/src/frame-script-policy.js', import.meta.url))
-    source = source.replace("'./frame-script-policy.js'", `'data:text/javascript;base64,${policy.toString('base64')}'`)
+  for (const [, dependency] of source.matchAll(/from '\.\/([^']+)'/g)) {
+    source = source.replaceAll(`'./${dependency}'`, JSON.stringify(await sourceUri(dependency)))
   }
-  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+  const uri = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+  sourceUris.set(name, uri)
+  return uri
 }
+const loadSource = async name => import(await sourceUri(name))
 const { sanitizeBookDocument } = await loadSource('script_policy.js')
 const { makePDF } = await loadSource('pdf.js')
 const { getChapterLocation } = await loadSource('progress.js')
+const { resolveDocumentReadingMode } = await loadSource('document-reading-mode.js')
 
 test('chapter click setup does not multiply renderer background page-turn listeners', async () => {
   const source = await readFile(new URL('../assets/foliate-js/src/view.js', import.meta.url), 'utf8')
@@ -55,6 +60,7 @@ test('Reader.open navigates once and waits for initialization, for new and resum
     let releaseInit
     const ready = new Promise(resolve => { releaseInit = resolve })
     const view = {
+      book: {resources: {}, get sections() { throw Error('reader opening must not inspect body sections') }},
       addEventListener: () => {},
       renderer: {addEventListener() {}, next: () => { events.push('next') }},
       init: async args => { events.push(['init', args.lastLocation]); await ready; events.push('ready') },
@@ -66,7 +72,11 @@ test('Reader.open navigates once and waits for initialization, for new and resum
       setView() {}
       installDesktopInput() {}
       ${openMethod}
-    })`, {getView: async () => view, importing: false, style: {backgroundColor: '#faf8f2'}, setStyle() {}, document: {documentElement: {style: {}}}})
+    })`, {getView: async () => view, importing: false, style: {backgroundColor: '#faf8f2'}, setStyle() {},
+      resolveDocumentReadingMode, callFlutter: async name => {
+        assert.equal(name, 'onPdfReadingSettings')
+        return {mode: 'standard'}
+      }, document: {documentElement: {style: {}}}})
     let completed = false
     const opened = new Reader().open('fixture', cfi).then(() => { completed = true })
     await new Promise(resolve => setImmediate(resolve))

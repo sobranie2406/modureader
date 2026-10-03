@@ -243,6 +243,7 @@ test('real View.close is safe before the asynchronous renderer import completes'
   const View = runInNewContext(`class View {
     #sectionProgress; #tocProgress; #pageProgress; #searchResults; #translator;
     #lastCfi; #lastChapterLocation;
+    #rendererSwitchGeneration = 0; #imageBook;
     history = {clear() {}};
     initTTS() { if (!this.renderer) throw Error('renderer is not ready'); }
     clearSearch() {}

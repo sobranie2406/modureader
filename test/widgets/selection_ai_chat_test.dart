@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:anx_reader/providers/ai_chat.dart';
 import 'package:anx_reader/service/ai/langchain_runner.dart';
@@ -122,7 +123,10 @@ void main() {
       bool popup = false,
       bool selection = false,
       String? sourceContext,
-      bool webSearch = false}) async {
+      bool webSearch = false,
+      Locale locale = const Locale('zh'),
+      Size size = const Size(390, 800)}) async {
+    await tester.runAsync(() => lookupL10n(locale));
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     final directory = Directory.systemTemp.createTempSync('modu-selection-ai-');
@@ -132,7 +136,7 @@ void main() {
       PathProviderPlatform.instance = oldPaths;
       directory.deleteSync(recursive: true);
     });
-    tester.view.physicalSize = const Size(390, 800);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     chat = _Chat();
@@ -154,7 +158,7 @@ void main() {
           aiChatProvider(AiChatScope.reader).overrideWith(() => chat)
         ],
         child: MaterialApp(
-            locale: const Locale('zh'),
+            locale: locale,
             supportedLocales: L10n.supportedLocales,
             localizationsDelegates: const [
               L10n.delegate,
@@ -205,8 +209,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(chat.currentDictionarySelection, '行藏');
     expect(
-        find.byKey(const ValueKey('dictionary-web-follow-up')), findsNothing);
-    expect(find.text('如需联网补查，请在下方输入“确认联网搜索”并发送。'), findsOneWidget);
+        find.byKey(const ValueKey('dictionary-web-follow-up')), findsOneWidget);
+    expect(find.text('如需联网补查，请点击下方的联网搜索按钮。'), findsOneWidget);
     expect(chat.requests, isEmpty);
     final clears = chat.clears;
     await tester.enterText(find.byType(TextField), '确认联网搜索');
@@ -224,6 +228,75 @@ void main() {
     chat.emit('根据检索资料整理的释义。');
     await chat.streams.last.close();
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final locale in [const Locale('zh'), const Locale('en')]) {
+    testWidgets(
+        'online search button retains session, term and draft (${locale.languageCode})',
+        (tester) async {
+      await mount(tester, locale: locale);
+      chat.restoreDictionary();
+      await tester.pumpAndSettle();
+      final button = find.byKey(const ValueKey('dictionary-web-follow-up'));
+      final context = tester.element(button);
+      final regenerate = find.text(L10n.of(context).aiRegenerate);
+      final copy = find.text(L10n.of(context).commonCopy);
+      bool precedes(Finder first, Finder next) {
+        final a = tester.getTopLeft(first);
+        final b = tester.getTopLeft(next);
+        return a.dy < b.dy || (a.dy == b.dy && a.dx < b.dx);
+      }
+
+      expect(precedes(button, regenerate), isTrue);
+      expect(precedes(regenerate, copy), isTrue);
+      await tester.enterText(find.byType(TextField), '尚未发送的追问');
+      final clears = chat.clears;
+      final click = tester.widget<TextButton>(button).onPressed!;
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      click(); // A second tap before the rebuild must not send twice.
+      await tester.pump();
+      expect(chat.requests, hasLength(1));
+      expect(
+          chat.requests.single.message,
+          ModuStrings.value(
+              locale, 'ui_dictionary_web_confirm_command', '确认联网搜索'));
+      expect(chat.currentSessionId, 'restored-dictionary');
+      expect(chat.currentDictionarySelection, '行藏');
+      expect(chat.clears, clears);
+      expect(chat.requests.single.previousCount, 2);
+      expect(chat.requests.single.skill, isNull);
+      expect(chat.requests.single.source, isNull);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          '尚未发送的追问');
+      chat.emit('联网补查后的回答及来源。');
+      await tester.pump();
+      await tester.pump();
+      expect(tester.widget<TextButton>(button).onPressed, isNull);
+      await chat.streams.last.close();
+      await tester.pumpAndSettle();
+      expect(chat.currentSessionId, 'restored-dictionary');
+      expect(find.byKey(const ValueKey('dictionary-web-follow-up')),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets(
+      'no search button in unrelated conversations; narrow reply footer wraps',
+      (tester) async {
+    await mount(tester, size: const Size(280, 800));
+    chat.restore([ChatMessage.humanText('问题'), ChatMessage.ai('普通回答')]);
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const ValueKey('dictionary-web-follow-up')), findsNothing);
+    chat.restoreDictionary();
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const ValueKey('dictionary-web-follow-up')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

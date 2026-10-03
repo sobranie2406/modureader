@@ -10,6 +10,8 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/models/document_reading_mode.dart';
+import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/book_note.dart';
@@ -39,6 +41,10 @@ import 'package:anx_reader/providers/chapter_content_bridge.dart';
 import 'package:anx_reader/providers/current_reading.dart';
 import 'package:anx_reader/providers/sync_database_revision.dart';
 import 'package:anx_reader/service/book_player/reader_progress_session.dart';
+import 'package:anx_reader/service/book_player/document_layout_store.dart';
+import 'package:anx_reader/service/book_player/pdf_reading_state_store.dart';
+import 'package:anx_reader/models/pdf_reading_view.dart';
+import 'package:anx_reader/models/document_page_layout.dart';
 import 'package:anx_reader/service/book_player/reading_appearance.dart';
 import 'package:anx_reader/service/book_player/book_player_server.dart';
 import 'package:anx_reader/service/book_player/quick_mark_service.dart';
@@ -212,6 +218,152 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   void prevPage() {
     webViewController.evaluateJavascript(source: 'prevPage(); void 0;');
+  }
+
+  Future<Map<String, dynamic>> analyzeDocument() async {
+    if (!_readerReady) throw StateError('Reader is not ready');
+    final result = await webViewController.callAsyncJavaScript(
+      functionBody: 'return await window.analyzeReaderDocument();',
+    );
+    if (result?.error != null || result?.value is! Map) {
+      throw StateError('Document inspection failed');
+    }
+    return Map<String, dynamic>.from(result!.value as Map);
+  }
+
+  void cancelDocumentAnalysis() {
+    if (!_readerReady || !mounted) return;
+    unawaited(webViewController
+        .evaluateJavascript(
+            source: 'window.cancelDocumentAnalysis?.(); void 0;')
+        .catchError((_) => null));
+  }
+
+  Future<Map<String, dynamic>> pdfRegionInfo(int? page) => _pdfPreviewCall(
+      'return await window.getPdfRegionInfo(page);', {'page': page});
+
+  Future<Map<String, dynamic>> epubImageInfo(int? page) => _pdfPreviewCall(
+      'return await window.getEpubImageInfo(page);', {'page': page});
+
+  void cancelEpubImageRender({bool close = false}) {
+    if (!_readerReady || !mounted) return;
+    unawaited(webViewController.evaluateJavascript(source: close
+      ? 'window.closeEpubImagePreview?.(); void 0;'
+      : 'window.cancelEpubImageRender?.(); void 0;').catchError((_) => null));
+  }
+
+  bool get isPdfDocument => widget.book.filePath.toLowerCase().endsWith('.pdf');
+  final documentReadingMode = ValueNotifier(DocumentReadingMode.standard);
+  bool get isImageEpub =>
+      documentReadingMode.value == DocumentReadingMode.imageEpub;
+  bool get supportsDocumentImages => documentReadingMode.value.hasDocumentMenu;
+  void setDocumentReaderActive(bool active) {
+    if (!_readerReady || !mounted) return;
+    unawaited(webViewController.evaluateJavascript(
+      source:'window.setDocumentReaderActive?.(${active ? 'true' : 'false'}); void 0;').catchError((_) => null));
+  }
+  bool get pdfPanelReading {
+    if (!supportsDocumentImages) return false;
+    final store = PdfReadingStateStore(Prefs().prefs);
+    return !store.hasSavedMode(cssBookKey) ||
+        store.read(cssBookKey)['enabled'] == true;
+  }
+
+  PdfReadingView get pdfReadingView =>
+      PdfReadingStateStore(Prefs().prefs).readView(cssBookKey);
+
+  Future<void> setPdfReadingView(PdfReadingView view) async {
+    if (!_readerReady || !mounted) throw StateError('Reader is not ready');
+    final previous = pdfReadingView;
+    Future<void> apply(PdfReadingView value) async {
+      if (isImageEpub && !pdfPanelReading) return;
+      final result = await webViewController.callAsyncJavaScript(
+          functionBody: 'return await window.setPdfReadingView(value);',
+          arguments: {'value': value.toJson()});
+      if (result?.error != null || result?.value != true) {
+        throw StateError('PDF viewport could not be applied');
+      }
+    }
+    await apply(view);
+    try {
+      await PdfReadingStateStore(Prefs().prefs)
+          .saveView(cssBookKey, view, enabled: pdfPanelReading);
+    } catch (_) {
+      await apply(previous);
+      rethrow;
+    }
+  }
+
+  Future<void> panPdfReadingView(double dx, double dy) async {
+    if (!_readerReady || !mounted) throw StateError('Reader is not ready');
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody: 'return window.panPdfReadingView(dx, dy);',
+        arguments: {'dx': dx, 'dy': dy});
+    if (result?.error != null || result?.value != true) {
+      throw StateError('PDF viewport could not be moved');
+    }
+  }
+
+  Future<void> setPdfPanelReading(bool enabled) async {
+    if (!_readerReady || !mounted) throw StateError('Reader is not ready');
+    if (!supportsDocumentImages) throw StateError('Original-page mode is unavailable');
+    final previous = pdfPanelReading;
+    final config = DocumentLayoutStore(Prefs().prefs).read(cssBookKey);
+    await _applyPdfLayout(config, enabled);
+    try {
+      await PdfReadingStateStore(Prefs().prefs).setEnabled(cssBookKey, enabled);
+    } catch (_) {
+      await _applyPdfLayout(config, previous);
+      rethrow;
+    }
+  }
+
+  Future<void> savePdfLayout(DocumentLayoutConfig config) async {
+    final store = DocumentLayoutStore(Prefs().prefs);
+    final previous = store.read(cssBookKey);
+    await store.save(cssBookKey, config);
+    try {
+      if (pdfPanelReading && mounted) await _applyPdfLayout(config, true);
+    } catch (_) {
+      await store.save(cssBookKey, previous);
+      rethrow;
+    }
+  }
+
+  Future<void> _applyPdfLayout(
+      DocumentLayoutConfig config, bool enabled) async {
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody:
+            'return await window.setPdfReadingLayout(config, enabled, view);',
+        arguments: {'config': config.toJson(), 'enabled': enabled, 'view': pdfReadingView.toJson()});
+    if (result?.error != null || result?.value != true) {
+      throw StateError('PDF reading layout could not be applied');
+    }
+  }
+
+  Future<Map<String, dynamic>> renderPdfRegion(Map<String, dynamic> request) =>
+      _pdfPreviewCall('return await window.renderPdfRegion(request);',
+          {'request': request});
+
+  Future<Map<String, dynamic>> _pdfPreviewCall(
+      String body, Map<String, dynamic> arguments) async {
+    if (!_readerReady || !mounted) throw StateError('Reader is not ready');
+    final result = await webViewController.callAsyncJavaScript(
+        functionBody: body, arguments: arguments);
+    if (result?.error != null || result?.value is! Map) {
+      throw StateError('PDF preview failed');
+    }
+    return Map<String, dynamic>.from(result!.value as Map);
+  }
+
+  void cancelPdfRegionRender({bool close = false}) {
+    if (!_readerReady || !mounted) return;
+    unawaited(webViewController
+        .evaluateJavascript(
+            source: close
+                ? 'window.closePdfRegionPreview?.(); void 0;'
+                : 'window.cancelPdfRegionRender?.(); void 0;')
+        .catchError((_) => null));
   }
 
   void nextPage() {
@@ -936,7 +1088,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
           _remotePositionPending = true;
           final result = await webViewController.callAsyncJavaScript(
               functionBody: 'return await window.restoreSyncedReadingPosition('
-                  '${jsonEncode(latest.position)});');
+                  '${jsonEncode(latest.position)}, ${!_readerPositionInitialized});');
           if (!mounted) return;
           if (result?.value != true) {
             _syncRefreshRetry?.cancel();
@@ -975,7 +1127,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
 
   bool _readerPositionInitialized = false;
 
-  Future<void> _recordReadingAction(String position, double fraction) async {
+  Future<void> _recordReadingAction(String position, double fraction,
+      {dynamic pdfRegion}) async {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null &&
         lifecycle != AppLifecycleState.resumed &&
@@ -1000,6 +1153,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       }
       widget.book.lastReadPosition = position;
       widget.book.readingPercentage = fraction;
+      if (supportsDocumentImages) {
+        await PdfReadingStateStore(Prefs().prefs).savePosition(
+            cssBookKey, position, pdfRegion,
+            enabled: pdfPanelReading);
+      }
       ref.read(bookListProvider.notifier).refresh();
     } catch (error) {
       AnxLog.warning('Reading action save failed: ${error.runtimeType}');
@@ -1025,6 +1183,26 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   Future<void> setHandler(InAppWebViewController controller) async {
+    controller.addJavaScriptHandler(
+        handlerName: 'onPdfReadingSettings',
+        callback: (_) {
+          if (!mounted) return null;
+          documentReadingMode.value =
+              DocumentReadingModeStore(Prefs().prefs).read(widget.book);
+          // Text EPUB/TXT/other formats must never restore a stale image mode.
+          if (!supportsDocumentImages) return {'mode': 'standard'};
+          final store = PdfReadingStateStore(Prefs().prefs);
+          final state = store.read(cssBookKey);
+          return {
+            ...state,
+            'mode': documentReadingMode.value.storageValue,
+            'enabled': pdfPanelReading,
+            // Explicit note/link navigation must not restore an unrelated panel.
+            if (widget.cfi != null) 'position': null,
+            'layout':
+                DocumentLayoutStore(Prefs().prefs).read(cssBookKey).toJson(),
+          };
+        });
     controller.addJavaScriptHandler(
         handlerName: 'onReaderWordBounds',
         callback: (args) {
@@ -1054,6 +1232,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
             _readerReady = true;
             _readerLoadFailed = false;
           });
+          readingPageKey.currentState?.refreshDocumentReaderActivity();
           // Android can hide system bars while the chapter is still loading.
           // The Flutter frame already uses the new safe area; replay the DOM
           // gutters that could not be applied before the renderer was ready.
@@ -1090,7 +1269,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
               bookCurrentPage == location['bookCurrentPage'] &&
               bookTotalPages == location['bookTotalPages']) {
             if (location['readingAction'] == true) {
-              unawaited(_recordReadingAction(cfi, percentage));
+              unawaited(_recordReadingAction(cfi, percentage,
+                  pdfRegion: location['pdfRegion']));
             }
             return;
           }
@@ -1140,7 +1320,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
               );
           widget.updateParent();
           if (location['readingAction'] == true) {
-            unawaited(_recordReadingAction(cfi, percentage));
+            unawaited(_recordReadingAction(cfi, percentage,
+                pdfRegion: location['pdfRegion']));
           }
           readingPageKey.currentState?.resetAwakeTimer();
         });
@@ -1622,6 +1803,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   @override
   void dispose() {
     _translationSession.stop();
+    documentReadingMode.dispose();
     translationMode.dispose();
     readingProgress.dispose();
     _syncRefreshRetry?.cancel();

@@ -593,6 +593,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
   }
 
   void _sendMessage({
+    String? messageOverride,
     bool isRegenerate = false,
     String? skillId,
     String? sourceText,
@@ -605,14 +606,19 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       return;
     }
 
-    if (inputController.text.trim().isEmpty) return;
-    final message = inputController.text.trim();
+    final message = (messageOverride ?? inputController.text).trim();
+    if (message.isEmpty) return;
     // A typed dictionary follow-up belongs to its saved answer, not to an
     // unsubmitted template or to a later selection in the reader.
     final confirmingDictionarySearch =
         skillId == null && isDictionaryWebConfirmation(message);
-    if (!isRegenerate && confirmingDictionarySearch) _clearPendingTemplate();
     if (!isRegenerate &&
+        confirmingDictionarySearch &&
+        messageOverride == null) {
+      _clearPendingTemplate();
+    }
+    if (!isRegenerate &&
+        !confirmingDictionarySearch &&
         _hasPendingTemplate &&
         (skillId == null || skillId == _pendingSelectionSkill)) {
       skillId ??= _pendingSelectionSkill ??
@@ -623,7 +629,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       webSearch = webSearch || _pendingWebSearch;
       homePromptId ??= _pendingHomePromptId;
       _clearPendingTemplate();
-    } else if (!isRegenerate) {
+    } else if (!isRegenerate && !confirmingDictionarySearch) {
       // A reader-skill chip is a separate task, not the pending toolbar command.
       _clearPendingTemplate();
     }
@@ -636,7 +642,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         (skillId != null || selectionRequest)) {
       ref.read(aiChatProvider(widget.scope).notifier).clear();
     }
-    inputController.clear();
+    // A follow-up action must not overwrite an unsent question or template.
+    if (messageOverride == null) inputController.clear();
     _lastSubmittedSkillId = skillId;
     _lastSubmittedSourceText = _normalizeSourceText(sourceText);
     _lastSubmittedSourceContext = sourceContext;
@@ -1332,6 +1339,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final parsed = parseReasoningContent(content);
     final isLongMessage = content.length > 300;
     final lastAssistantMessage = _getLastAssistantMessage();
+    final canSearchOnline = !isUser &&
+        widget.scope == AiChatScope.reader &&
+        identical(message, lastAssistantMessage) &&
+        content.trim().isNotEmpty &&
+        ref
+                .read(aiChatProvider(widget.scope).notifier)
+                .currentDictionarySelection !=
+            null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -1366,26 +1381,37 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                       ? _buildCollapsibleText(content, isLongMessage)
                       : _buildAssistantTimeline(parsed, isStreaming,
                           replyStartKey: replyStartKey),
-                  if (!isUser &&
-                      identical(message, lastAssistantMessage) &&
-                      !_isStreaming &&
-                      content.trim().isNotEmpty &&
-                      ref
-                              .read(aiChatProvider(widget.scope).notifier)
-                              .currentDictionarySelection !=
-                          null)
+                  if (canSearchOnline && !_isStreaming)
                     Padding(
                       key: const ValueKey('dictionary-web-confirmation-hint'),
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(ModuStrings.text(
                           context,
-                          '如需联网补查，请在下方输入“确认联网搜索”并发送。',
-                          'To check online, type “Confirm online search” below and send.')),
+                          '如需联网补查，请点击下方的联网搜索按钮。',
+                          'To check online, click the “Search online” button below.')),
                     ),
                   if (!isUser)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                    Wrap(
+                      alignment: WrapAlignment.end,
                       children: [
+                        if (canSearchOnline)
+                          TextButton(
+                            key: const ValueKey('dictionary-web-follow-up'),
+                            onPressed: _isStreaming
+                                ? null
+                                : () => _sendMessage(
+                                      messageOverride: ModuStrings.value(
+                                        Localizations.localeOf(context),
+                                        'ui_dictionary_web_confirm_command',
+                                        '确认联网搜索',
+                                      ),
+                                    ),
+                            child: Text(ModuStrings.value(
+                              Localizations.localeOf(context),
+                              'selection_ai_web_search',
+                              '联网搜索',
+                            )),
+                          ),
                         if (identical(message, lastAssistantMessage))
                           TextButton(
                             onPressed: _regenerateLastMessage,
