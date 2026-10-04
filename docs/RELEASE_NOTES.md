@@ -1,5 +1,7 @@
 # Modu 1.2.0 · Stable
 
+Documentation reviewed 2026-10-04. [Current guides](README.md) · [Release assets](https://github.com/sobranie2406/modureader/releases/tag/v1.2.0). This document describes the published release, not uncommitted preview fixes.
+
 ## English
 
 **Modu 1.2.0 (build 10082)** includes all changes since stable **1.1.11**, including the intervening previews.

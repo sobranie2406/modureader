@@ -1,64 +1,64 @@
-# 本地索引与阅读控制
+# Local indexing and reading controls
 
-## 扫描文档开发队列（2026-10-03）
+## Current: Modu 1.2.0+10082
 
-用户已在 Preview 3 发布、代码恢复后明确允许开始 PDF/图片 EPUB 开发。完整规格、约束、实现审查与真实完成矩阵见 [扫描文档开发记录](SCANNED_DOCUMENT_DEVELOPMENT.md)。以 Preview 3 为基线，不恢复已撤销的选词修改；本次只开发和测试，不打包、不发布、不安装。
+Current behavior is based on the Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, not uncommitted application changes. Dated results below are historical; this documentation update did not run application or device tests.
 
-当前已接入按需文档检测、PDF 100%–1500% 局部预览，以及裁边拖框、奇偶页独立编辑、7 种分格/4 种顺序和按书保存。样式内可直接打开 PDF 裁边与分格，并开启正文分格阅读：单页模式前后操作先走区域再走原页，关闭回原版；本机恢复原页内区域，不改变源文件和原页 CFI。正文已接入 100%–1500% 高清局部视口、适屏/适宽、旋转、平移、窗口重绘与视口位置恢复，并增加真正连续跨页的卷轴模式：依分格顺序排列，仅保留附近最多 7 个已提交页面帧，滚出后回收；翻页按钮滚动视口高度的 80%，章节跳转仍按原页。后续保留自动裁边/留白/漫画预设、图片 EPUB 原图适配、五类图像增强、相关阅读设置及设备适配与验收。
+PDF and classified image books have original-page controls for crop/splits, per-page automatic crop, bounded 100%–1500% zoom, rotation, panning, continuous scrolling and image enhancement. Import classification samples at most five body sections for EPUB, MOBI, AZW3 and FB2 and caches the result per book/source fingerprint. Opening a book only reads that result. Uncertain detection falls back to ordinary reading; bookshelf actions allow a manual correction. Ordinary text books retain their normal reader and menus.
 
-2026-10-03 最新范围调整：用户取消 OCR、文字重排、提取与导出，以及扫描文档的书签/搜索/听书/批注专项整合，不再列为待开发。原有搜索、听书、批注、文字层与软件既有备份/导出功能保留，不删除。完整规格的历史阶段记录仅供追溯，后续按更新后的范围执行。
+Text Reflow and OCR Reflow display selectable text directly in the reader for the current original page, or the whole page inside its saved crop boundary. They do not limit recognition to a split cell or zoomed viewport. Only Extract opens the region selector and can fill an editable AI input without sending it. OCR requires an optional local model download; V4 is recommended, V5 uses ModelScope upstream, and V3/V4 use Hugging Face upstream or Gitee mirrors. Crop/enhancement never overwrite source files. E-Ink hardware refresh requires a supported device interface. See the [current scanned-document status and archived milestones](SCANNED_DOCUMENT_DEVELOPMENT.md).
 
-菜单隔离补充：新增原版阅读菜单仅用于 PDF 和自动确认的图片主体 EPUB。识别在导入阶段随元数据解析完成并按书/内容指纹保存；打开书籍只读取结果，不做抽样或后台补检。普通文字 EPUB、未分类的旧 EPUB 及其他书籍保持 Preview 3 菜单；封面/插图、固定版式标记和旧图片模式偏好都不单独触发切换。检测不确定时回退原菜单。首次确认后默认开启新模式，显式关闭仍按书保存。实机测试依用户要求留待以后，不打包、安装或发布。
+The 2026-10-03 decision to cancel OCR, reflow and extraction was superseded by their later implementation before 1.2.0. Whole-book OCR, page export and the proposed comprehensive scanned-document bookmark/search/listening/annotation project were not restored by that decision. Existing reader features remain available within their implemented limits.
 
-## 向量索引仅保存在本机
+## Vector indexes stay on each device
 
-已取消 WebDAV 向量索引同步及设置开关。手动、自动和定时同步均不再上传或下载向量索引，旧开关在启动时移除，也不会随设置备份导入或导出。
+WebDAV vector-index synchronization and its setting have been removed. Manual, automatic and scheduled sync do not upload or download vector indexes. The old setting is removed at startup and cannot be imported or exported in settings backups.
 
-本地向量化、已有索引及 AI 检索保持不变。各设备按需建立自己的索引，语义查询仍需要匹配的向量模型。书籍、笔记、书签和阅读进度的常规同步不受影响，敏感模型配置仍遵循现有 API Key 加密同步设置。
+Local vectorization, existing indexes and AI retrieval remain available. Each device builds its own indexes as needed; semantic queries require the matching embedding model. Normal book, note, bookmark and reading-position synchronization continues. Sensitive model configuration follows the existing encrypted API-key sync setting.
 
-升级不会自动删除本地索引或云端历史文件。如需清理旧云端索引，仅清理所配置 WebDAV 下的 `modu/knowledge-v1`，不要删除书籍目录或同步数据库。尚未升级的设备应先关闭索引同步，否则仍可能再次上传索引。
+Upgrading does not automatically delete local indexes or historical cloud files. If you choose to remove old cloud indexes, limit cleanup to `modu/knowledge-v1` under the configured WebDAV location, preserving book folders and the sync database. Disable index sync on older clients first to prevent them uploading again.
 
-本地大索引仍使用逐条解析，保留单文件 1 GiB、单条记录 2 Mi 字符、25 万片段、8192 维等校验。旧版紧凑或换行 JSON 索引仍可读取。检索仍需将片段和数值向量放入内存；文件上限不是低内存设备的运行保证。
+Large local indexes are parsed record by record, with limits of 1 GiB per file, 2 Mi characters per record, 250,000 chunks and 8192 dimensions. Older compact and newline-delimited JSON indexes remain readable. Retrieval still loads chunks and numeric vectors into memory; the file limit is not a low-memory-device guarantee.
 
-## 快速标记菜单
+## Quick-highlight menu
 
-移动端进入快速标记后，右上角工具栏新增「标记后弹出菜单」按钮，默认关闭，选择在本机记忆。关闭时松手只保存高亮；开启时保存成功后弹出选中菜单，操作的是实际保存（包括跨页合并后）的批注。普通选词菜单不受影响。
+On mobile, quick-highlight mode offers a toolbar toggle to show the selection menu after saving a highlight. It is off by default and remembered locally. When off, releasing the selection only saves the highlight. When on, successful saving opens the menu for the actual saved annotation, including a cross-page merged annotation. Ordinary text-selection menus are unaffected.
 
-## 后台朗读
+## Background narration
 
-Android 媒体通知接入播放/暂停、上一段、下一段和停止。跨章文本加载与可见页面定位分离，朗读不等待页面完成布局；返回前台后补齐高亮。后台朗读位置单独记录。停止时清理播放器的异常不会阻止其余资源清理和下一次启动。
+Android media notifications expose play/pause, previous passage, next passage and stop. Cross-chapter text loading is separate from visible-page positioning, so narration does not wait for page layout; highlighting catches up on returning to the foreground. Background narration has its own saved position. Player cleanup errors during Stop do not prevent the remaining cleanup or the next start.
 
-自动化覆盖跨章导航、后台页面不渲染、停止竞争、播放器清理异常、通知状态，以及快速标记菜单。历史索引传输代码仅保留兼容回归测试，不接入应用同步；另有测试验证旧开关被清除、不能从备份恢复及同步入口不再调用索引传输。长时间锁屏、厂商省电行为及通知交互仍需 Android 真机验证。
+Recorded automated coverage includes cross-chapter navigation, avoiding background page rendering, stop races, player cleanup errors, notification state and the quick-highlight menu. Historical index-transfer code remains only for compatibility regressions and is not connected to app sync. Other regressions check removal of the old switch, rejection during backup restoration and the absence of index-transfer calls from sync. Long lock-screen sessions, vendor power management and notification interaction still need Android device verification.
 
-## 2026-10-03：停止向量化与启动队列
+## Historical: Stop Vectorization and startup queue (2026-10-03)
 
-- 书架后台向量化条提供停止按钮；「设置 → 向量模型」提供同一操作及说明。
-- 「停止向量化」先持久化关闭自动向量化，再取消当前和所有排队任务，等待工作器安全释放资源。重启不会恢复这些自动任务。已完成的索引、模型和书籍不删除；原子保存仍阻止半成品索引覆盖旧索引。
-- 自动任务现在带来源标识。关闭「导入后自动向量化」会取消自动任务及其排队，不取消手动任务；关闭向量模型则取消全部任务。设置导入/同步后的通知也应用同一取消逻辑。
-- 原逻辑只在扫描开始时读取自动开关，而且只关闭开关、不取消内存队列。现在每次异步索引检查前后重新检查开关与扫描代次，停止后的旧扫描不能继续入队。
-- 修复已取消的排队任务残留取消标识，允许用户从书籍菜单再次手动向量化。
-- 本轮仅修改和测试；用户要求暂停打包后，不为这些变更生成安装包。
-- 验证：向量索引、模型、取消、停止按钮、阅读焦点相关 Flutter 回归共 162 项通过，2 项需显式启用的联网测试跳过。新增用例覆盖关闭开关时保留手动任务、停止后重启不恢复、扫描期间停止、取消后手动重试及旧索引字节保持不变。
-- 相关文件的 Dart/Flutter 标准分析无错误/警告；书架文件保留 2 条既有异步 context 提示。当前 SDK 与旧 custom_lint 插件不兼容，标准分析用分析器内存配置绕过该插件，不改动项目分析配置，也不声称插件检查通过。
+- The bookshelf background-vectorization bar and Settings → Vector Model gained Stop Vectorization.
+- Stop first persists automatic vectorization as disabled, then cancels the active task and all queued tasks and waits for safe worker cleanup. Restart does not restore those automatic tasks. Completed indexes, models and books remain; atomic saving prevents partial output replacing an existing index.
+- Automatic tasks gained origin tracking. Disabling automatic vectorization after import cancels automatic tasks and their queue, preserving manual tasks. Disabling the vector model cancels all tasks. Settings import/sync notifications apply the same cancellation rules.
+- The previous scanner read the switch only when scanning began; disabling it did not cancel the in-memory queue. The implementation rechecks both switch and scan generation around every asynchronous index check, preventing a stopped scan from enqueueing later.
+- Cancellation markers on removed queued tasks were fixed so that manual vectorization can be started again from a book menu.
+- At this stage the user had paused packaging; these changes were developed and tested without a new installer.
+- Recorded verification: 162 Flutter regressions passed across indexes, models, cancellation, Stop and reading focus; two opt-in network tests were skipped. Added cases covered preserving manual tasks, no automatic restart after Stop, stopping during scanning, manual retry and byte-for-byte preservation of old indexes.
+- Standard Dart/Flutter analysis reported no errors or warnings in the relevant files; two existing asynchronous-context notices remained in the bookshelf file. The SDK was incompatible with the old custom_lint plugin, so standard analysis bypassed it in memory without changing repository configuration or claiming plugin validation.
 
-## 2026-10-03：汉王蓝牙翻页笔重连修复
+## Historical: Hanvon Bluetooth page-turn pen reconnect (2026-10-03)
 
-### 现场证据与判断
+### Observations
 
-本地调试任务提供的汉王 N10Pro（rk3576_ebook）记录：旧版 1.1.11+10072 在蓝牙笔断开/连接后出现状态栏、界面停止更新；UI 树仍能显示/关闭翻译弹窗，但截图停留在原正文。进程内持续出现 `EGL_BAD_ACCESS` 和 `Could not make the context current to acquire the frame`。
+The local debugging task supplied Hanvon N10Pro (`rk3576_ebook`) logs for `1.1.11+10072`: after Bluetooth pen disconnect/reconnect, the status bar appeared and visible rendering stopped. The UI tree could still open/close a translation dialog while screenshots remained on the old page. Logs repeatedly contained `EGL_BAD_ACCESS` and `Could not make the context current to acquire the frame`.
 
-14:58:38.784 与 14:58:39.505 两次 `Config changes=70`，分别伴随 LaserPen 移除/接入、navigation 从无到 dpad 的变化，随后两次 MainActivity 窗口 relaunch。源码已处理 keyboard/keyboardHidden，但未声明 navigation；这与重连触发 Activity 重建一致。采集开始时已经存在 EGL 错误，所以不能断言本段日志捕获了第一次渲染错误，也不能仅凭源码确认重建是全部 EGL 故障的唯一原因。
+At 14:58:38.784 and 14:58:39.505, `Config changes=70` coincided with LaserPen removal/addition, navigation changing between none and dpad, and two MainActivity window relaunches. The manifest handled keyboard/keyboardHidden but omitted navigation, consistent with HID-triggered Activity recreation. EGL errors were already present when capture began; this log does not establish the first rendering failure or prove Activity recreation was the sole cause.
 
-### 修复与范围
+### Change and validation limits
 
-- 补齐 MainActivity 的 `navigation` 配置声明，保留 Flutter 的配置转发，避免此类 HID 变化重建窗口。参见 [Android configuration changes 说明](https://developer.android.com/guide/topics/manifest/activity-element#config)。
-- 配置变化时清除可能缺少 key-up 的翻页键按下状态；恢复前台后重新同步当前阅读页是否允许处理翻页键，不盲目启用拦截。
-- 原生配置变化/前台恢复/阅读面板关闭后，只在当前可交互阅读页、无输入框或键盘、用户启用隐藏状态栏时恢复系统栏设置；不监听系统栏滑出事件，不影响普通临时状态栏手势。
-- 保留硬件加速与现有 Impeller，没有全局禁用渲染器，没有销毁或重建 FlutterEngine，也没有改动书库、索引和设置数据。
-- 本轮远端没有连接汉王设备。源码检查和回归不能替代本地反复开关蓝牙笔后，确认不再 relaunch、不再新增 EGL 错误且实际画面继续更新。
-- Android 配置/恢复路径契约检查 3 项、纯 Java 翻页键断连重连检查通过；Dart 侧按键/焦点 9 项包含在上述 162 项中。
-- 仅含此阶段修复的 ARM64 预览编译曾完成，但随后用户明确暂停打包；未安装、分发或发布，也不包含后续停止向量化修改。
+- Added MainActivity's `navigation` configuration declaration while retaining Flutter configuration forwarding. See [Android configuration changes](https://developer.android.com/guide/topics/manifest/activity-element#config).
+- Configuration changes clear held page-turn keys that may lack key-up; foreground return resynchronizes whether the current reader permits those keys.
+- Native configuration/foreground recovery and closing a reading panel restore system-bar preferences only for an interactive reader with no focused input/keyboard and hidden-status-bar enabled. Ordinary temporary system-bar gestures remain available.
+- Hardware acceleration and Impeller were retained; no global renderer disablement, FlutterEngine recreation or library/index/settings-data change was introduced.
+- No Hanvon device was connected to the remote development task. Source checks and regressions do not replace repeatedly reconnecting the pen on-device and confirming no relaunch, no new EGL errors and continuing visible rendering.
+- Three Android configuration/recovery contract checks and the pure-Java key disconnect/reconnect check passed. Nine Dart key/focus cases were included in the 162 tests above.
+- An ARM64 preview containing only this stage was compiled before packaging was paused. It was not installed, distributed or released and did not contain the later Stop Vectorization changes.
 
-### 后续安卓预览打包（2026-10-03）
+### Subsequent Android preview packaging (2026-10-03)
 
-用户随后恢复打包并要求发布 GitHub Pre-Release。`1.1.12-preview.3+10075` 纳入上述蓝牙和停止向量化修改，使用独立源码标签 `android-1.1.12-preview.3`，仅提供 Android ARM64 APK 与 SHA-256。签名、7 个原生库的 ARM64/16 KB ELF 对齐、ZIP 对齐及 ONNX JNI 定义核验通过；未安装设备，不改变正式版更新清单。构建命令与摘要见 [本次说明](releases/1.1.12-preview.3.md)。
+The user later resumed packaging and requested a GitHub pre-release. `1.1.12-preview.3+10075`, tagged `android-1.1.12-preview.3`, included the Bluetooth and Stop Vectorization changes and supplied only an Android ARM64 APK and SHA-256. Signing, ARM64/16 KB ELF alignment for seven native libraries, ZIP alignment and ONNX JNI definitions were checked. It was not installed on a device and did not change the stable update manifest. See the [historical preview notes](releases/1.1.12-preview.3.md). Stable 1.2.0 now supersedes that preview baseline.

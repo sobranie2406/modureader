@@ -1,27 +1,35 @@
-# 导出笔记返回原文
+# Return to source text from exported notes
 
-新导出的 Markdown 笔记中，点击原文或“返回默读原文”可唤起默读并打开对应位置。TXT、复制和 CSV 导出也会附上 `modu://read` 链接；是否能直接点击取决于查看软件是否允许自定义协议。
+Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
-原有的 `原文：【…】`、笔记高亮和创建／最后修改时间保持不变。旧导出文件需要重新导出才会获得链接。
+In newly exported Markdown notes, click an excerpt or **Open in Modu** to launch Modu at the corresponding reading position. TXT, copy and CSV exports also include `modu://read` links. Whether they are clickable depends on the viewer's custom-protocol support.
 
-## 匹配规则
+The existing excerpt format (`Excerpt: 【…】` in English), highlights and created/last-modified timestamps are retained. Older exports must be exported again to receive links.
 
-- 通过书籍文件 MD5 匹配同一版本，不依赖本机数据库编号，因此同一文件可以跨设备定位。
-- 旧记录没有 MD5 时，要求书名、作者、创建时间同时匹配。
-- 文件未下载时，询问是否下载；书架中不存在或版本被替换时提示，不自动导入或跳到其他版本。
-- 有多个同文件副本时，让用户选择。
-- 链接不包含书籍内容、账号、密钥或本地文件路径，但包含书名、作者和原文 CFI 位置。
+## Book matching
 
-## 平台接入
+- Links match the same book-file version by MD5, not a local database ID, so an identical file can be located across devices.
+- Older records without MD5 require the title, author and creation time to match together.
+- If the file is not downloaded, Modu asks whether to download it. If the book is missing from the bookshelf or its version has been replaced, Modu reports that instead of importing a book automatically or opening another version.
+- If multiple copies of the same file exist, the user chooses one.
+- Links contain no book text, accounts, keys or local file paths, but do contain the title, author and source CFI position.
 
-Android 使用限定 `modu://read` 的 VIEW intent，iOS/macOS 注册 `modu` 协议。iOS UIScene 显式转交阅读链接，其他文件分享仍使用原处理流程。
+## Platform integration
 
-Windows 安装版在当前用户下注册协议，链接转交给已经打开的窗口。便携版应先通过安装版完成协议注册，且保留对应安装路径。Linux DEB 的桌面入口注册协议并传递 URL，使用现有实例打开。
+Android uses a VIEW intent restricted to `modu://read`; iOS/macOS register the `modu` scheme. iOS UIScene explicitly forwards reading links while other file sharing retains its existing handling.
 
-系统关联和接收端需要安装包含此功能的新版本；纯文本查看器、部分 Markdown 查看器可能禁止自定义协议链接。此时需使用允许外部链接的查看器。书籍原文件未变时 CFI 才能可靠定位。
+Windows installers register the protocol for the current user and forward links to an already-open window. A portable copy requires protocol registration through the installed version first, with that installation path kept available. Linux DEB desktop entries register the protocol and pass URLs to the existing instance.
 
-## 回归
+The receiving app and system association must support this feature. Plain-text viewers and some Markdown viewers block custom-protocol links; use a viewer that allows external links. CFI locations are reliable only while the original book file remains unchanged.
 
-`flutter test --no-pub test/service/notes test/utils/reader_initial_input_test.dart test/widgets/settings/global_settings_export_test.dart`
+Stable distribution provides eight application packages: Android ARM64 and iOS ARM64, plus ARM64/x64 for macOS, Windows and Linux. There is no Android x64 release package. Protocol support does not imply every viewer or device has been tested.
 
-覆盖多段原文链接、特殊字符、格式兼容、书籍匹配、未定位笔记、冷启动缓冲、连续点击及失败恢复；原生入口另由平台构建与配置测试验证。
+## Regression coverage
+
+```sh
+flutter test --no-pub test/service/notes test/utils/reader_initial_input_test.dart test/widgets/settings/global_settings_export_test.dart
+```
+
+Existing coverage includes multiple excerpt links, special characters, format compatibility, book matching, notes without locatable positions, cold-start buffering, repeated clicks and failure recovery. Native entry points were checked separately through platform builds and configuration tests. This documentation update did not rerun those checks.
+
+Implementation: [note export](../lib/service/notes/export_notes.dart).

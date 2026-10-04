@@ -1,209 +1,165 @@
-# 默读功能与设置指南
+# Modu 1.2.0 settings and features
 
-[返回项目首页](../README.md) · [安装与签名说明](RELEASING.md) · [测试范围](TESTING.md)
+English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
 
-本文按当前源码说明，实际安装版本以对应 Release 为准。入口名称按中文界面记录；桌面宽窗口左右分栏，窄窗口可能逐页进入。本文不代表全部平台已完成实机验收。
+For stable **1.2.0+10082**, updated 2026-10-04. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
-## 设置入口一览
+## Settings entry points
 
-点击首页侧栏的「设置」直接进入设置页面。
+Open **Settings** from the home navigation. The app language can follow the system or be selected manually. Built-in prompts have localized defaults; prompts you have edited are not automatically translated or overwritten.
 
-| 分类 | 主要选项 | 用途 |
+| Category | Purpose |
+| --- | --- |
+| Appearance | Theme, colors, OLED / E-Ink, language, covers and navigation |
+| Reading | Fonts, layout, page turning and long-press word/paragraph selection |
+| CSS settings | Named profiles, visual controls, custom CSS and regex highlights |
+| Custom dictionaries | Import and query MDX / StarDict offline |
+| Selection search | In-app browser, search engines and custom URLs |
+| Selection toolbar | Action switches, drag sorting, annotation colors and AI selection templates |
+| AI Settings | Providers, model parameters, display and tool permissions |
+| AI Reading Skills | Visibility, unified sorting, prompts and restoring defaults |
+| Vector Model / Embedding Models | Local or remote embeddings, automatic indexing, downloads and stopping tasks |
+| OCR model | Lightweight recognition models, download sources, selection and deletion |
+| Narrate | Engine, voice, speed and editable narration-style templates |
+| Sync | WebDAV, automatic sync, encrypted credential sync and database backup |
+| Global settings backup | Settings files or modu links, with optional credentials |
+| Remote library settings | Separate WebDAV browsing and book downloads |
+| Translation | Engine, target language, AI and DeepL / DeepLX |
+| Storage / Advanced | Data, cache, TXT chapter splitting, ANX backup import, logs and network |
+| Bug reports and feature requests / About | Reports, project links, licenses and app updates |
+
+## Checking and installing updates
+
+Open **Settings → About Modu → App updates**. Checking and downloading share one source selector, initially GitHub. If a check falls back to Gitee because GitHub is temporarily unavailable, the download source changes with it. Check again after manually changing sources; downloads do not mix sources midway. Finding an update does not automatically download or install it, and a failed check does not interrupt reading.
+
+- **Android:** in-app downloads verify size and SHA-256, then package name, signature and version before opening the system installer. Installation permission is requested only when needed; installation is not silent.
+- **Windows / Linux:** verified in-app downloads open the EXE / DEB for normal installation. Windows needs WebView2; Linux packages target Debian 13.
+- **macOS:** the default browser downloads the DMG. Quit Modu and drag Modu.app onto Applications to replace it. Modu cannot monitor browser completion or claim to have verified that file; compare it with the release's SHA-256 yourself. The disk image contains only the app and Applications shortcut. It is not Apple-notarized.
+- **iOS:** the IPA needs your own valid signing and cannot install itself from the app. Store builds should update through their original store.
+
+Back up and upgrade in place; do not uninstall or clear data first. Opening an installer does not mean installation has finished. See [installation and release instructions](RELEASING.md) for platform requirements.
+
+## Reading ordinary books
+
+Supported formats include EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown. TXT / Markdown are converted on import for reading. The library supports folders, tags, pinning and moving selected books into folders. Download remote books before reading offline or indexing them.
+
+Tap the text to open the bottom panel. Drag the progress slider to preview a chapter title, or use previous chapter, previous page, next page and next chapter. **Chapter progress** means chapter number / chapter count; **progress within the chapter** means current page / pages in that chapter.
+
+**Style** includes font size, **font thickness 0.5–2.0 in 0.1 steps**, simulated bold, line spacing, paragraph spacing, fonts and backgrounds. Actual weight changes depend on the font; try simulated bold with fixed-weight fonts. More reading settings contain side margins and header/footer options. App themes and book backgrounds are separate.
+
+- Import TTF / OTF fonts locally. Successful imports apply immediately; batch imports apply the last successful font. Online font downloads need a connection.
+- Scroll-page movement can be set to 80%–100% of the viewport. Free scrolling is independent of this setting.
+- Long press can match a word or expand to a paragraph. Selection handles remain available to adjust the range after the initial match.
+- Mobile tap-only paging does not disable selection or continuous scrolling. Desktop arrow keys and eligible drags turn pages; selecting or typing is not treated as paging.
+- Reading brightness follows the system by default, with manual 20%–100% adjustment. Android uses window brightness; other platforms dim the app. This preference is local to the device.
+
+## PDF and scanned-image books
+
+PDF uses dedicated original-page controls. EPUB, MOBI, AZW3 and FB2 are classified during import by sampling up to five body sections, for both local and remote imports. Opening a book reads its saved classification rather than waiting for sampling. The bookshelf menu can manually mark a book as scanned or restore ordinary reading.
+
+**Ordinary text books keep their existing menus and styling; PDF-specific settings do not affect them.** Scanned books disable ordinary illustration tap-to-enlarge / long-press actions.
+
+The dedicated panel offers fit-page / fit-width, zoom, rotation, panning, continuous scrolling, crop and panels, and reading order. Original and cropped images adapt to the window and settings; layout is saved per book.
+
+- Automatic cropping detects content bounds per page while retaining useful text, page numbers and footnotes. Use manual crop/panels for difficult layouts.
+- Image enhancement offers ink color, contrast, darkening, whitening, sharpening and scanned watermark fading. Adjust intensity, compare the original or reset. Conservative watermark fading cannot remove every watermark.
+- Processing does not rewrite the source book. Controls follow the app theme; manual / every-N-pages refresh appears only in E-Ink mode and requires a supported device interface.
+- Text reflow uses the page's text layer; OCR reflow recognizes image text. Both process the current page, or the whole cropped page when cropping is enabled, and display the result directly in the reader.
+- Reflowed text supports styling, selection, annotations and AI tools. The PDF panel's gear opens the relevant text-style controls.
+- Only **Extract** asks for a region. Recognition fills an editable AI draft; review and send it yourself. It does not automatically upload the book.
+
+### OCR models
+
+Open **Settings → OCR model**. **PP-OCRv4 Chinese / English** is recommended; v5 mobile Chinese / English, v3 Chinese / English and v3 English are also available. Weights are downloaded on demand, not bundled. Choose upstream or the Gitee mirror: v4 / v3 use Hugging Face upstream, while v5 uses ModelScope.
+
+Cards support download-and-use, selection, verification, cancellation and deletion. Files must pass size and SHA-256 checks before use. Deleting a downloaded model does not delete books. Recognition runs locally and needs no OCR API key. Model choice and source settings can be backed up; model files are not transferred in global settings backups. Review small text, complex columns and poor-quality scans manually.
+
+## CSS and selection tools
+
+**Settings → CSS settings** provides 32 named slots and 13 editable presets. Enable the master switch and desired profiles; multiple profiles can apply together. Each book can follow the default combination or select its own. Profile contents are shared globally, so editing one can affect other books using it.
+
+CSS changes layout; regex highlights style matching text with colors, backgrounds and underlines without rewriting text or annotation positions. Import trusted CSS / JSON only: remote resource URLs can make network requests. New, copied and imported profiles start disabled; imports fill empty slots without silently overwriting profiles.
+
+**Selection toolbar** lets you toggle and drag-sort built-in tools and AI commands, and edit annotation colors, names, icons and prompts. Common AI presets start disabled, including AI Knowledge and Classical Chinese translation. Manage selection templates here, separately from AI Reading Skills; both use the same reader AI dialog.
+
+Each selection command can use **selected text only** (default) or **text with context**, and can opt into online search. AI Knowledge uses the current model's knowledge first. To check further, choose **Online search** below the answer, before Regenerate and Copy. Wiktionary, Wikipedia and Baidu Baike results are summarized with sources by the same model in the same conversation. No extra search API key is required.
+
+## AI configuration, skills and conversations
+
+Add an endpoint, model and API key in **Settings → AI Settings → Provider configuration**, then test the connection. Each configuration keeps its own temperature, maximum output tokens, history depth and reasoning settings. Supported parameters and costs depend on the provider; RPM controls request pacing, not provider limits.
+
+**AI tools** controls the app tools a model may call. A reading-skill prompt does not automatically supply the entire book: available material depends on the selection, accessible chapters and retrieved passages.
+
+**AI Reading Skills** shows skill shortcuts by default. Built-in and custom skills can be enabled, sorted and edited together. Restore their default order or restore deleted built-in skills. **Fill the input with the skill template first** is off by default: off sends immediately, while on fills the draft so you can add a chapter range or instructions before sending. The switch is available in settings and the dialog.
+
+A skill can start a new task conversation. Follow-up questions typed into the current or a restored historical conversation continue with its permitted history. The history entry restores the conversation, not only its question. Completed replies return to their beginning for reading. AI font size is independent; mind maps support full screen, zoom, pan, branch collapse and PNG / SVG / Markdown / FreeMind / JSON export.
+
+Backups store your changes to built-in prompts and your custom templates, not redundant copies of unchanged defaults. Restoring a default replaces its customization. Remote AI receives the actual request text and supplied context; see [Privacy](../PRIVACY.md).
+
+## Vector indexing and semantic retrieval
+
+Open **Settings → Vector Model / Embedding Models**. Embedding models retrieve passages; chat models answer questions. They are configured separately.
+
+Local models include Chinese BGE (default), English BGE, MiniLM and multilingual E5. Download from Hugging Face or Gitee with size and SHA-256 verification. Missing models are not silently downloaded. A remote embeddings API receives indexed passages and queries and may charge for them.
+
+Index / re-index from a book's menu, or enable automatic indexing after import (off by default). Unavailable models or books without local files cannot be queued. If both model and source book are unchanged, an upgrade or replacement package alone should not invalidate a valid index. Changing the model or content requires re-indexing.
+
+**Stop vectorization**, in the library task bar and model settings, disables automatic indexing and cancels active and queued tasks while retaining completed indexes, books and models. Turning off automatic indexing alone cancels automatic tasks without preventing later manual indexing.
+
+**Vector indexes stay local and do not participate in WebDAV sync.** Build an index on each device as needed. Local embeddings do not make a remote chat answer offline: retrieved passages supplied to remote AI still leave the device.
+
+## Dictionaries, search and translation
+
+Import MDX 1/2 or StarDict companion files / ZIP that you are entitled to use. Lookup is offline and uses actual headwords; edit the query when necessary. Two-way lookup depends on the dictionary containing entries in both languages. There is no reverse search through Chinese definitions. Only text is displayed; dictionary scripts and media are not loaded. Dictionaries are not included in library sync or current backups.
+
+Selection search opens results in the in-app browser. Choose a built-in engine or a custom URL containing {query}; results support zoom. The search site receives the query text.
+
+Inline full-text translation supports Google, AI and DeepL / DeepLX. Original + translation or translation-only paragraphs appear on the book page and follow the reading position. This is not a one-click export of an entire translated book. AI translation uses your configured model; DeepL / DeepLX requires the appropriate endpoint configuration.
+
+The selection-translation window can switch providers and also supports Baidu / Youdao webpages. Webpage translation differs from inline paragraph translation; it offers 50%–200% zoom and vertical scrolling. Scans need usable text or OCR/reflow first. Online services receive the text to translate; review their output.
+
+## Narration and style templates
+
+**Settings → Narrate** offers system voices, Edge TTS, DashScope, Xiaomi MiMo and OpenAI-compatible speech. Configure the required endpoint/key, save, fetch voices, select one and test it. System voices and platform support vary; Linux has no system TTS backend.
+
+Editable style templates include natural narration, gentle bedtime reading, fiction performance, knowledge explanation, classical recitation and news reading. OpenAI-compatible services must support the relevant instructions. MiMo offers preset voices or voice design from a description, not voice cloning. Descriptions instruct the model and are not spoken text; results depend on the service.
+
+A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
+
+## WebDAV and the remote library
+
+In **Settings → Sync**, enter the WebDAV parent URL, account and password, test, then enable sync. Data lives in its modu directory; do not append /modu again. Before migrating old anx / Anx directories, stop sync on every device and back up both local and server data. Do not overwrite an existing modu directory.
+
+Sync merges books, notes, bookmarks, folders, tags and reading records by stable identity. The most recent actual reading action determines position, not the furthest progress. Reliable ETag servers primarily use conditional database8.db writes and clean up covered logs; unreliable servers use content-addressed logs and compaction. Failure must not become an empty-library upload; the first compaction still needs to read old logs.
+
+Fonts, backgrounds, local dictionaries and vector indexes are not library-synced. Keep clients on matching versions where possible. A book record on the shelf does not mean its content is downloaded.
+
+Timed sync during reading is off by default. It runs only during foreground reading at the chosen interval, requires WebDAV and automatic sync, and respects Wi-Fi-only settings. Locking or leaving the reader pauses it; missed intervals are not replayed and requests do not overlap.
+
+**Sync API keys** is separate and off by default. It requires an independent password of at least 12 characters; sensitive service settings use AES-256-GCM encryption. The password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
+
+**Remote library settings** configures a separate browse/download connection; it does not modify that library server's files. Configuration is stored locally, and credentials follow their independent transfer switch. This is distinct from library synchronization.
+
+## Two backups and ANX import
+
+| Need | Entry | Contents |
 | --- | --- | --- |
-| 外观 | 系统/深色/浅色模式、主题颜色、OLED/E-INK 模式、语言、封面、导航显示 | 调整应用界面；E-INK 模式不代表对所有墨水屏设备的硬件支持 |
-| 阅读 | 阅读行为、字体下载、字体导入、排版样式 | 调整正文阅读体验；部分固定版式 PDF 不随 EPUB 排版选项重排 |
-| AI 设置 | 服务商、每模型参数、请求频率、面板显示、工具开关、配置迁移 | 配置聊天模型与 AI 的可用工具 |
-| AI 阅读技能 | 内置技能、自定义技能、功能提示词 | 查看和编辑 AI 阅读行为 |
-| 向量模型 | 启用开关、自动索引、本地模型、远程 API | 建立用于语义检索的书籍索引 |
-| 朗读 | 引擎、声音列表、试听、语音参数 | 配置系统或在线 TTS |
-| 同步 | WebDAV、自动同步、API Key 加密同步、配置迁移、本地备份 | 同步阅读数据或迁移设置 |
-| 翻译 | 引擎、目标语言、AI 模型、DeepL 接口 | 配置阅读页翻译 |
-| 自定义字典 | 导入、名称、启停、删除 | 导入 MDX / StarDict，选文离线查词，不内嵌字典 |
-| 存储 | 存储信息、数据文件详情 | 查看占用和本地数据；操作前注意备份 |
-| 高级 | TXT 分章、日志、重复文件、JavaScript、网络 | 排查问题及处理特殊书籍 |
-| 关于 默读 | 版本检查、更新下载、安装、项目链接、许可证 | 位于设置分类最后 |
+| Transfer preferences/prompts | Settings → Global settings backup | JSON / modu link, without books or chats |
+| Back up the local library | Settings → Sync → Database backup | ZIP with local books, covers, fonts, backgrounds, AI history, general settings and database records |
+| Migrate from ANX | Settings → Advanced → Import ANX Reader backup | Validate an ANX ZIP and merge supported books/records |
 
-## 版本检查与更新
+Global settings backup includes appearance, reading layout, CSS, selection tools, prompts, speech, translation and model choices. It excludes font/background/dictionary/model files, books, notes, chats and reading progress. **Accounts, passwords and API keys are excluded by default; including them produces recoverable plaintext JSON / links, not encrypted backups.** Review the import scope first. With the credentials switch off, existing local credentials are preserved. There is no QR transfer; use a file for a complete backup.
 
-每次启动和手动检查均优先读取 GitHub Releases，限时 12 秒（包含重定向和响应正文）。成功后直接使用 GitHub 结果，不再请求 Gitee；只有连接失败、超时或服务不可用时才读取 Gitee 正式版清单，镜像检查限时 8 秒。HTTP 408、429 和 5xx 视为服务暂不可用；其他 HTTP 错误、无效清单、不安全跳转或证书错误直接报告失败，不通过换源掩盖问题。发现新版才提示，不自动下载或安装；网络失败不打断阅读。可在「关于默读 → 版本检查与更新」查看当前版本、最新版本、版本信息来源、检查时间和更新说明，并手动重试。
+Download the books you want to keep before exporting Modu-Backup-*.zip. Service credentials are excluded by default; optional encryption protects the settings section, not all books, notes or chats. Import the ZIP without unpacking it. Restore replaces the current library and backed-up settings rather than merging them. Back up current data first, wait for sync/indexing to finish, then close and reopen after restore.
 
-安装包同样优先从 GitHub 下载，即使版本信息来自镜像；连接失败、超时或服务不可用时清除部分文件，从头改用 Gitee 上同一版本、同一架构的文件。不混合两个来源的部分内容，不降级到旧版本，不跳过大小或 SHA-256 校验。手动取消、本地存储错误、文件校验失败或不安全跳转不会触发另一个下载。两站都不可用时报告失败；镜像清单部署要求见 [更新镜像发布指南](UPDATE_MIRROR.md)。
+Windows exports default to the user's Downloads directory, usually `C:\Users\<username>\Downloads`. Other platforms use the system save destination. Successful export shows the actual location and lets you copy it. If Android returns only a document identifier, find the filename in the selected folder.
 
-下载自动匹配当前应用的系统与运行架构，显示安装包大小和进度，允许取消；关闭更新窗口后下载继续，退出应用会中断下载。重开后再次下载可复用校验通过的完整缓存；中断文件不作为安装包使用，不支持断点续传。版本信息异常、缺少 SHA-256、下载大小或摘要不符时不允许安装。
+ANX import accepts original schema-7 backup ZIPs. It imports downloaded books, covers, notes, progress, time, folders and tags, but not accounts, app settings, AI chats or books with missing content. Files determine identity; repeated import does not duplicate matching records. A local database snapshot is created first. Standalone DB files, encrypted ZIPs and unknown schema versions are unsupported. This is migration, not ongoing cross-app sync.
 
-- Android：下载 APK 后调用系统安装器；首次可能需允许安装此来源，返回后再次点击安装。检查包名、签名和版本，保留原应用数据，不卸载旧版。
-- Windows：打开 EXE，按安装器提示覆盖安装；如要求退出应用，先完成同步再退出。
-- macOS：打开 DMG，退出默读后手动拖到「应用程序」覆盖，当前包未经 Apple 公证。
-- Linux：用系统软件安装器打开 DEB（面向 Debian 13），没有图形安装器时需自行安装下载文件。
-- iOS：提供 IPA 下载和导出，需自行合法签名安装，不能在应用内直接升级。商店构建应回原商店更新，不进行侧载。
+## Data, security and feedback
 
-“已打开安装器”不表示“安装已完成”。不会自动关闭应用、清除书库、降低系统安全设置或安装旧版本。升级后在关于界面核对版本。
+Storage shows usage and can clear regenerable temporary data. Wait for imports, sync and downloads to finish before clearing. Cache cleanup should retain books, notes, chats, downloaded models and completed indexes.
 
-## 1. 导入与阅读
+Advanced contains logs, network and JavaScript options. Enable book scripts and custom CSS only for trusted sources. Distinguish bugs from feature suggestions, include version/platform/reproduction steps, and preview/redact reports before submitting. Do not upload private books, credentials or full databases.
 
-「设置 → 外观 → 显示 → 打开书的动画」控制书架进入阅读器时的动画。关闭后同时禁用页面滑入、封面过渡和入场淡出，退出阅读器也不播放路由过渡；不会改变正文翻页方式。
-
-在「书架」点击添加按钮，选择 EPUB、PDF、MOBI、AZW3、FB2 或 TXT；桌面也提供拖入文件的导入路径。TXT 会经过分章转换后阅读。添加后可通过书籍菜单查看详情、分组、标签、索引或删除操作。
-
-打开书籍后，在阅读工具区查看目录、进度、样式、AI、翻译和朗读入口。选中文字后可进行标注、记笔记及文本操作。书籍菜单和选中文字菜单用途不同。
-
-字体可从本地导入 TTF/OTF，成功导入后自动设为正文字体；在阅读界面导入时立即应用，无需重新打开书籍。一次导入多个字体时应用最后一个成功导入的字体，取消或全部失败不会改变当前字体。在线字体仍从 `fonts.anxcye.com` 获取，首次下载需要网络。应用主题和正文阅读主题是不同的设置范围。
-
-移动端「阅读样式 → 更多设置 → 其他 → 仅点击翻页」默认关闭。开启后分页模式只点击翻页，滑动、拖动不翻页，也不触发上下拉手势；选词、快速标记与滚动阅读模式不受影响。
-
-「滚动翻页」模式下，点击或按键翻页每次移动可视区域的 80%，保留 20% 内容重叠；手动滚轮和连续拖动仍可自由滚动。首次打开书籍及切换章节时，正文等待字体加载并重新排版后再显示；字体失败或等待超过 8 秒时允许回退，避免一直停在空白页。
-
-桌面端在阅读区域使用右/下键翻下一页，左/上键翻上一页。没有选中文字时，向左或向上拖动翻下一页，向右或向下拖动翻上一页；短距离抖动不翻页。拖选文字、输入框编辑和组合键选词不会被当作翻页。AI 面板打开后，点击书页可继续翻页；在 AI 输入框或对话区域操作不会带动书页。
-
-笔记支持复制及 Markdown、TXT、CSV 导出，不将上游其他产品的 HTML、Notion、Obsidian 导出列为默读已有功能。
-
-### 应用亮度
-
-在阅读底部工具栏点击亮度图标，即可用滑块实时调节（20%–100%）。默认跟随系统，拖动滑块会切换为手动模式；重新打开“跟随系统”可恢复。
-
-Android 使用应用窗口亮度，不修改系统全局设置；其他平台只在应用内调暗，100% 表示不额外调暗，不能超过系统亮度。偏好仅保存在本机，不参与 WebDAV 同步或设置备份迁移。
-
-## 2. AI 服务与每模型参数
-
-AI 首页和书内 AI 的技能快捷提示词默认隐藏，可点输入区发送按钮旁的星光图标在对话框内纵向展开或收起，不再横向滑动；选择技能或新建对话时重新收起，保留输入草稿。仅显示技能名称，不展开完整提示词；小屏或大字号下允许纵向滚动，不删除技能或修改提示词配置。
-
-AI 对话右上角菜单可单独调整字号（10～24，默认 14），不跟随书籍字号。会校验异常字号，按 AI 正文字号统一列表及标题比例，并保留系统无障碍字体缩放；流式回复合并高频刷新，结束时补齐最终文本，上翻历史内容后不再强制滚到底部。
-
-AI 生成思维导图后，导图上方的「导出」菜单支持 PNG、SVG、Markdown、FreeMind（.mm）及 JSON。导出完整树，不截取当前缩放或拖动后的可见区域。PNG 为控制内存会缩小超大导图；需保留大图细节时选 SVG，需要继续编辑层级时选 .mm、Markdown 或 JSON。导出保存失败可以重试，取消保存不提示成功。
-
-入口：「设置 → AI 设置 → 供应商配置中心」。新建或编辑一条配置，填写名称、协议、接口地址、模型及 API Key。可获取服务端模型列表，也可填写模型名；模型列表接口并非所有服务都实现。保存前后可做连接测试。
-
-内置、自定义及导入的接口共用官网图标：优先识别服务地址，代理地址再按配置名称或模型名识别。目前包含 OpenAI、Claude、Gemini、DeepSeek、智谱 GLM、OpenRouter、MiniMax、Kimi、千问、硅基流动、小米 MiMo、豆包和 Grok。无法识别时显示通用图标；OpenAI 兼容协议本身不会被当作 OpenAI 品牌。图片随应用保存，显示时不联网；[官网资源来源](../assets/images/providers/SOURCES.md)。
-
-内置供应商详情可恢复默认：重置接口、模型和参数，清空全部已存 API Key、密钥轮转并恢复默认启用状态。确认后立即保存，不能通过取消编辑撤回。自定义供应商可在列表滑动删除，或从详情页删除；删除前有确认。
-
-每个模型配置独立保存：
-
-| 参数 | 作用 | 注意 |
-| --- | --- | --- |
-| 温度 | 控制生成的随机程度 | 模型可能限制或不接受该参数，不宜将高温度等同更准确 |
-| 最大 Token | 限制单次最大输出长度 | 不是整本书的最大长度，也不保证一定生成这么长 |
-| 上下文轮数 | 控制携带的历史对话轮数 | 更多历史通常意味着更多输入与费用 |
-| 推理强度 | 自动、关闭推理或指定强度，按模型独立保存 | 全文翻译遵循所选模型参数；不支持关闭的服务可能拒绝请求，可改回自动 |
-
-需要对同一服务的不同模型使用不同参数时，可分别建立配置。请求频率（RPM）用于控制调用节奏，不能绕过服务商限额。
-
-「AI 显示」控制弹出式/面板等展示形式；「AI 工具」控制模型可调用的应用工具。首页 AI 使用书架等上下文，书内 AI 使用当前阅读上下文。涉及原文时请核对书籍、章节与引用，不把模型回答当作原文。
-
-## 3. AI 阅读技能
-
-入口：「设置 → AI 阅读技能」。十个内置技能为本章总结、全书总结、概念解析、论证分析、人物追踪、金句摘录、阅读指南、智能翻译、词汇助手和思维导图。
-
-- 开关决定技能是否出现在阅读 AI 面板中。
-- 点击技能打开提示词，编辑后保存；取消不保存，恢复默认会替换该技能的自定义提示词。
-- 「新建技能」可添加自定义名称、说明与提示词。
-- 页面下方集中管理 AI 配置测试、回忆前文、翻译与词典、全文翻译等功能提示词，它们不都对应阅读技能按钮。
-
-编辑提示词只是在定义模型的任务，不会自动给它整本书。长书、缺失正文或尚未完成索引时，回答范围会受限制。
-
-## 4. 向量模型与索引队列
-
-入口：「设置 → 向量模型」。先启用向量模型，再选择：
-
-- **本地模型 · 按需下载**：安装包只带模型目录、固定版本与校验信息，不包含权重和分词器。选择「模型下载源」[Gitee 镜像](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1)或 Hugging Face，再点所需模型的「下载并使用」，不需要 API Key。新安装默认 Hugging Face，已保存的来源选择不改变。镜像不可用时可手动切换 Hugging Face，不自动更换来源；下载期间不可切换来源。默认模型为 BGE Small ZH v1.5，另有 MiniLM、BGE EN 和多语言 E5。下载校验完整文件大小与 SHA-256，通过后才显示「已下载」并启用测试推理。旧版已准备到本地的完整模型继续复用。仅有模型目录不会视为下载完成；缺少模型时索引会提示先下载，不会启动隐式下载。保持此设置页打开直到下载完成，离开页面会中断下载并清理临时文件，重试会复用已完成且校验通过的文件。下载不影响既有书籍、笔记或已生成的索引。
-- **远程 API**：填写嵌入接口、模型和密钥并测试连接。必须使用支持 embeddings 的模型，聊天模型不能直接当作向量模型使用。远程索引会将书籍片段发送到该接口，也可能产生费用。
-
-从书架的书籍菜单执行向量化。多本书按后台队列处理；可离开索引界面继续阅读。发生失败时查看错误原因，再重试该书，不要只根据“已排队”认定已完成。
-
-单本和批量向量化均遵守「启用向量模型」总开关，书籍单独指定模型也不能绕过。排队前检查实际选用的模型：本地模型必须下载且校验通过；远程模型必须有有效的接口、模型名和必要的密钥，但无需下载本地模型。执行前会再次检查，模型关闭或不可用时不再退化为纯文本索引，也不会覆盖原有索引。
-
-向量化前检查本地书籍：仅同步了书架记录、尚未下载书籍时，点击向量化会提示先下载，不会加入错误任务，也不会自动下载。批量向量化会跳过缺少本地文件的书籍并显示数量，其余书籍正常排队。下载完成后重新点击向量化即可。
-
-自动索引默认关闭，需要同时满足：启用向量模型、手动开启「导入后自动向量化」、本地资源完整或远程接口配置有效。开关不会补齐远程密钥。首次升级到 build 6326 会切回本地中文模型并关闭自动索引，保留原远程配置；以后可自行更改，不会每次启动重置。切换模型或修改源书内容后，应重新向量化。
-
-本地索引与远程 AI 聊天是分开的：选本地向量模型，并不意味着之后提交给远程 AI 的检索片段不会离开设备。
-
-在「设置 → 同步」可独立开启「同步向量化数据」，默认关闭，各设备单独设置；以实际书籍 SHA-256 匹配，需先下载同一文件，查询仍需对应模型。附件含原文片段且不使用 API Key 加密密码，详见[索引同步与阅读控制](INDEX_SYNC_AND_READING_CONTROLS.md)。
-
-## 本地字典
-
-「设置 → 自定义字典」可导入、命名、重命名、启用/停用及删除字典，选中文字后点击「字典」查询。支持 MDX 1/2 未压缩或 zlib、StarDict 2.4.2/3.0.0 及对应配套文件/ZIP，以纯文本显示释义；无内嵌字典、不联网查询、不参加同步或书库备份。格式限制及导入方式见[本地字典](LOCAL_DICTIONARIES.md)。
-
-## 5. 翻译
-
-入口：「设置 → 翻译」。当前界面提供：
-
-- **Google 翻译（免费）**：不需要 API Key，需要能访问相应网络服务。旧配置内部标识仍兼容 `microsoftFree`，实际不是微软 Azure 翻译。
-- **AI 翻译**：选择 AI 设置中已配置且启用的服务模型，使用其密钥与参数。
-- **DeepL**：配置官方 DeepL 接口或自定义 DeepLX 地址，按相应服务要求填密钥。
-
-选择目标语言后，从阅读页上方 AI 旁的翻译入口或选中文字菜单使用。选文结果与 AI 对话弹窗采用一致尺寸，长译文滚动阅读。设置页统一更新选文与全文翻译引擎；译文仍需结合原文校对。纯图片扫描页没有可提取正文时，不能靠翻译按钮完成 OCR。
-
-## 6. 朗读
-
-入口：「设置 → 朗读」。当前引擎列表为系统语音、Edge TTS、DashScope、Xiaomi MiMo 和 OpenAI 兼容语音。Azure 与旧 Aliyun 引擎已移除；DashScope 是当前列表中的另一个兼容服务条目。
-
-选择引擎后，按需填写接口和密钥，点击「保存设置」，再获取声音列表、选定声音并试听，最后在阅读页开始朗读。语速、音量、音调等效果取决于引擎支持，不是所有服务都接受相同参数。声音选择及阅读面板中的语音参数仍即时保存。
-
-「清除设置」需确认，会清除当前所有朗读服务的密钥、接口和声音选择，并恢复默认语速、音调、音量及系统朗读，不影响 AI、书籍、笔记或同步设置。
-
-可导出已保存配置为二维码或 `modu:` 默读配置链接，在另一设备粘贴链接或选择二维码图片导入。导入会校验整份配置并停止朗读，替换全部朗读设置但不自动播放。导出包含 API Key，不能公开分享；不同设备的系统声音可能需要重新选择。
-
-### Xiaomi MiMo（Beta3）
-
-- 基础 URL 默认为 `https://api.xiaomimimo.com`，接口 `/v1/chat/completions`；基础地址带 `/v1` 时不会重复拼接。填写你自己的 MiMo API Key。
-- 内置音色模型 `mimo-v2.5-tts`：默认 `mimo_default`；可选冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean。
-- 文字设计音色模型 `mimo-v2.5-tts-voicedesign`：必须填写「朗读风格」作为音色描述；此模式不使用内置音色字段，不开启原文智能改写。不支持声音克隆。
-- 支持 MP3/WAV；旧版 AAC/PCM 配置自动改用 MP3。模型名大小写旧默认、空基础地址、旧默认音色和标准旧接口自动兼容，自定义代理地址与密钥保留。
-- 风格、语速和音高通过自然语言指令传递，不能保证精确倍率。MiMo 合成超时为 60 秒；失败会暂停，保留原文位置。
-- 请求格式和配置已通过模拟 HTTP 测试；不代表真实账户权限、额度、网络或设备播放已验收。请在自己的设备上使用测试按钮试听。
-
-依据：[小米官方 TTS 协议](https://mimo.mi.com/static/docs/api/audio/tts.md)。
-
-**本版已知问题：** 尚未选过系统声音的新安装可能报 `No voice selected`。可先获取声音列表并选一个声音；默认回退问题仍待修复。Linux 没有系统 TTS 后端，虽然界面仍显示该选项；不能承诺系统朗读可用。Edge TTS 联网合成测试通过不等于每个平台的实际音频播放均已测试。
-
-## 7. WebDAV、密钥同步与配置迁移
-
-同步使用配置地址下的 `modu` 目录；独立「远程书库」不受影响。沿用旧数据前请暂停所有设备同步并备份，将服务器旧 `anx` / `Anx` 目录改名为 `modu`，全部设备升级后再同步。不要覆盖已有同名目录，也不要在配置地址末尾再加 `/modu`。完整迁移步骤见 1.0.1 Release 说明。
-
-入口：「设置 → 同步」。打开 WebDAV 设置填写地址、账号和密码，在该界面控制启用状态。测试连接成功后再启用同步。同步会对远程数据产生写入，应先使用可信服务并保留备份。
-
-1.0.2 起使用数据库 8 的记录级合并，不再按整库文件时间替换本机数据库。阅读位置采用最近操作，新增时长去重，删除传播标记；字体不参加同步。1.0.5 支持无可靠 ETag 服务的独立记录通道，可靠服务仍使用条件写入。所有客户端应一同升级，详见[同步与迁移说明](WEBDAV_RECORD_SYNC.md)。
-
-### 阅读时定时同步
-
-「设置 → 同步 → 阅读时定时同步」默认关闭，默认间隔 5 分钟。可选 **1、2、3、5、10、15、30 分钟、1 小时**，各设备单独保存。需要先启用 WebDAV 和自动同步，遵循「仅 Wi-Fi」设置，不会开启 API Key 同步。
-
-只在前台书籍阅读页计时；书内笔记弹框和 AI 面板仍属于阅读，切换其他完整页面、退出书籍或锁屏会暂停。进入或恢复阅读后等待完整间隔，不补发锁屏期间的任务；修改间隔立即重新计时。正在同步时不重叠发起，完成后再等待下一间隔。
-
-使用现有双向记录合并，同步已保存的笔记、阅读位置及正常同步内容，并非独立的“仅笔记上传”。尚未保存的编辑草稿不提交，也不会用旧页面位置刷新阅读时间。同步过程中不弹出提示；成功时遵循「同步成功提示」开关，失败显示「同步失败」和具体原因。自动同步预检重试期间不提示，最终失败才提示。离开阅读页会取消尚在等待或预检中的定时请求，不将主动取消视为失败；已经开始的数据写入安全完成，不强行截断。
-
-### API Key 单独加密同步
-
-WebDAV 总开关**不自动开启**「同步 API Key」。若确实需要迁移敏感服务配置：
-
-1. 单独打开「同步 API Key」。
-2. 阅读风险说明，设置并确认至少 12 个字符的独立密码。
-3. 配置以 AES-256-GCM 加密后进入同步数据库。
-4. 其他设备使用相同密码解密。密码不写入同步数据，忘记密码无法恢复密钥。
-
-普通书籍、笔记和全部数据库并非因此自动加密。旧备份或已同步的历史副本也不会因为关闭开关而自动销毁。
-
-### 全局设置迁移
-
-统一入口为「设置 → 高级 → 全局设置备份」，使用 JSON 设置文件或 `modu:` 链接迁移全部设置；不再提供分散的服务配置迁移入口或二维码导入/导出。兼容可解析的旧版 AI、朗读、同步及书库链接；导入前显示实际包含的设置范围。
-
-远程书库设置也通过全局设置备份迁移，账号、密码及 API 配置由独立开关控制，默认关闭，关闭时导入也保留本机凭据。导入不自动连接服务器。点击保存后，地址、用户名和密码留在本机配置中，重启后可继续使用，本地不额外加密。开启「同步 API Key」后，书库配置和密码以独立加密记录跟随自动同步，各设备使用相同同步加密密码。数据库 ZIP 备份勾选「包含服务配置与 API Key（加密）」后也包含书库配置；普通未加密数据库备份排除它。清除连接及密码会同步到其他已开启该开关的设备，不删除书籍；未配置的新设备不会主动清除云端配置。旧版未保存密码的配置需要输入密码并保存一次。远程书库支持按名称、服务器添加/修改时间及大小升降序排列，并可搜索、按格式筛选；服务器未提供的日期显示为未知。
-
-**全局设置 JSON 文件和 `modu:` 链接不是加密备份。** 开启凭据迁移时，包含可还原的账号、服务密码和 API Key；不要公开分享或上传到 GitHub。设置迁移不包含书籍和笔记，与下面的数据库 ZIP 备份不同。
-
-### 数据库备份导出与导入
-
-入口：「设置 → 同步 → 数据库备份」。这里的「数据库备份导出」生成 `Modu-Backup-*.zip`，不仅包含数据库，还包含本机已有的书籍、封面、字体、背景图片、AI 对话历史和一般设置；数据库中包含笔记、高亮、书签、阅读进度/时长、文件夹与标签。需迁移的书籍请先下载到本机。它与「全局设置备份」的 JSON 文件不同。
-
-导出步骤：确认是否包含服务配置与密钥 → 生成 ZIP → 保存。服务配置与凭据默认排除；选择包含时，设置部分使用独立备份密码加密。书籍、笔记和 AI 对话历史不因此自动加密，请妥善保管备份。
-
-Windows 默认保存到当前用户的 Downloads（下载）文件夹，通常为 `C:\Users\<用户名>\Downloads`；若系统重定向了下载目录，以导出成功后显示的实际路径为准。Mac、Linux、Android、iOS 等平台在系统保存窗口选择目标目录。成功后显示完整保存路径并支持复制；Android 文件提供方只返回文档标识时，会提示在所选目录按保存的文件名查找，而不是把文档标识当成本机路径。
-
-导入步骤：选择本功能导出的 ZIP（无需解压）→ 确认覆盖并校验 → 如设置已加密，输入导出时的密码 → 恢复后完全关闭并重新打开默读。恢复会替换现有书库、笔记及备份中的设置，不会合并；操作前先导出当前数据，并等待同步和向量任务结束。损坏、不完整或数据库版本过新的备份会被拒绝；不能把恢复当作无影响的连接测试。
-
-## 8. 安全与问题反馈
-
-「高级」提供日志、网络、JavaScript 和重复文件等选项。电子书脚本只应对可信来源开启；网络选项会影响依赖网络的字体、AI、翻译和语音服务。
-
-在 [Issues](https://github.com/sobranie2406/modureader/issues) 报告问题时写明版本、操作系统及架构、操作步骤、预期和实际结果。只附可公开的合成样例与脱敏日志，不附私人书籍、API Key、WebDAV 凭据或配置二维码。
+[Privacy](../PRIVACY.md) · [Security](../SECURITY.md) · [Contributing](../CONTRIBUTING.md)

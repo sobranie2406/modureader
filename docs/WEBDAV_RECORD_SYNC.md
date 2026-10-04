@@ -1,121 +1,129 @@
-# WebDAV 逐条合并同步
+# WebDAV record-level merge synchronization
 
-本说明对应默读 `1.0.2+10004`、数据库版本 8。此前的本地 `1.0.1+10002` / `10003` 测试包也包含这些修改；GitHub 原 `1.0.1+10001` 安装包不包含记录级合并。发布状态与实际附件以对应 GitHub Release 为准。
+## Current: Modu 1.2.0+10082
 
-## 行为
+This guide describes the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, using sync-container format/database version 8. Uncommitted application changes are outside this baseline. Versioned milestones and test results below are historical, not new release acceptance; this documentation update ran no application, device or live WebDAV tests.
 
-原 Anx Reader 的整库时间比较/替换入口已改为记录级合并。仍以 SQLite 文件作为云端容器，但只传输允许的同步记录，不上传或替换整个应用数据库。
+Books, notes, bookmarks, reading positions and reading-time records merge individually. Book metadata and covers sync first; missing book content downloads when opened, so a visible bookshelf entry is not proof of offline availability. Vector-index synchronization and its switch have been removed; local indexing, retrieval and Stop Vectorization remain available. Fonts, local rendering preferences, downloaded model weights and page reflow caches are not transported as record-database contents. OCR model/source choices may travel through global settings backup, without weights.
 
-| 内容 | 合并规则 |
+PDF/scanned-book controls are separate from ordinary text-book reading. Image-book classification for EPUB, MOBI, AZW3 and FB2 samples at most five body sections during import and saves a local result; remote-library import shares that path, and downloading a missing bookshelf file can populate classification locally. Opening an available book does not resample it. See [scanned-document status](SCANNED_DOCUMENT_DEVELOPMENT.md) and [local indexing](INDEX_SYNC_AND_READING_CONTROLS.md).
+
+The original record-merge release was `1.0.2+10004`. Local `1.0.1+10002`/`10003` test builds already included it; the original GitHub `1.0.1+10001` installer did not. Those package distinctions are preserved as history.
+
+## Merge behavior
+
+The inherited whole-database timestamp/replace workflow was replaced with record-level merging. SQLite remains the cloud container, but only allowed synchronization records are transported; the complete application database is neither uploaded nor replaced.
+
+| Content | Merge rule |
 | --- | --- |
-| 书籍 | 稳定标识关联，元数据按操作时间合并；本机整数 ID 不重排 |
-| 笔记、书签、划线 | 独立标识；同记录按操作时间决定，删除保留墓碑 |
-| 阅读位置 | 独立操作时间，最近一次阅读操作获胜，可以回到较前位置；修改标题、评分不改变位置 |
-| 书籍删除/恢复 | 独立状态记录；离线阅读或编辑元数据不会取消删除；显式重新导入可以恢复 |
-| 新阅读时长 | 每段阅读新增独立记录，按标识去重后由原统计查询汇总 |
-| 分组、标签 | 同步标识关联，并将外键映射到各端本机 ID；字体样式不导出 |
-| AI 设置和 API Key | 延续单独开启、AES-256-GCM 加密的机制；关闭的设备不导出本机设置，也不解密云端密文，但保留已有密文以免删除其他设备的备份 |
-| 字体、主题图片、本机偏好、向量索引 | 不包含在新云端记录数据库中；字体文件和本机字体选择保留在各端。向量索引仅本地使用，不通过 WebDAV 单独传输 |
+| Books | Stable identities link records; metadata follows operation time, preserving local integer IDs |
+| Notes, bookmarks, highlights | Independent identities; operation time resolves the same record, and deletion retains tombstones |
+| Reading position | Independent operation time; the latest reading action wins even when moving backward; title/rating edits do not change position |
+| Book deletion/restoration | Independent lifecycle record; offline reading or metadata edits do not undo deletion, while explicit reimport can restore |
+| New reading duration | Each reading session adds an independent event, deduplicated by identity and aggregated by existing statistics queries |
+| Folders and tags | Sync identities link records; foreign keys map to each device's local IDs; font styles are not exported |
+| AI settings and API keys | Existing separate opt-in AES-256-GCM encryption; disabled devices neither export local settings nor decrypt cloud ciphertext, but preserve ciphertext from other devices |
+| Fonts, theme images, local preferences, vector indexes | Excluded from the record container; local font files/selections stay on each device; indexes are not separately transferred over WebDAV |
 
-时间相同时用持久化的随机操作修订号进行确定性裁决。操作时钟在本机单调递增，并吸收已见过的远端时钟；设备仍应开启系统自动校时。
+Equal timestamps are resolved deterministically using persistent random operation revisions. The local operation clock increases monotonically and absorbs observed remote clocks; devices should still use automatic system time.
 
-## 迁移与限制
+## Migration and limits
 
-1. 先备份所有设备的数据和服务器的 `modu` 目录，暂停旧客户端同步。
-2. 将参与同步的所有设备升级到支持数据库 8 的版本，保持相同 WebDAV 上级目录配置，不要重复添加 `/modu`。
-3. 新客户端首次找不到 `modu/database8.db` 时读取 `modu/database7.db`，在临时副本上迁移，与本机记录合并后创建新的云端数据库。旧文件不覆盖、不删除。
-4. 新数据库出现后不再反复导入旧文件，否则会重复引入旧记录；旧客户端也不应继续写旧库。应用的版本检查会阻止较旧客户端处理更高版本数据库，但已开始的旧上传不能由新客户端远程取消。
-5. 旧库没有每次阅读的原始事件，也没有所有旧删除的历史。旧阅读时长按“同书同日”取两端较大累计值，再加上升级后的独立新事件；**无法精确还原升级前两个端各自新增、但混在累计数中的时长**。已丢失的笔记或删除历史不能凭空恢复。
-6. 旧书籍优先使用已有文件 MD5，缺失时用原书籍相对路径建立标识。原有共享笔记按书籍标识、旧 ID、位置及创建时间迁移；升级后新笔记使用随机稳定标识。无共同历史的独立笔记不会仅因正文相同而被删除或合并。
-7. 上传的是记录容器，不是可以直接覆盖本机 `app_database.db` 的完整应用备份。合并前的本机完整快照仍由“数据库备份管理”提供，最多保留最近三份。恢复旧备份不等于向所有其他设备撤销更新，云端的新记录下次仍会参与合并。
+1. Back up every device and the server's `modu` directory; pause old clients' sync.
+2. Upgrade participating devices to versions supporting database 8. Keep the same WebDAV parent-directory setting without adding another `/modu`.
+3. If `modu/database8.db` is absent, the new client reads `modu/database7.db`, migrates a temporary copy and merges it with local records before creating the new cloud container. The old file is neither overwritten nor deleted. On services without reliable conditional writes, migration uses the compatibility log described below.
+4. Once the new container/log migration exists, the old file is not repeatedly imported. Old clients should no longer write the old database. Version checks stop older clients processing a higher database version, but cannot remotely cancel an upload already started by an old client.
+5. Old databases lack original per-session reading events and complete deletion history. Legacy duration uses the larger same-book/same-day cumulative total from either side, then adds new post-upgrade events. It cannot precisely recover separate pre-upgrade increments embedded in those totals. Lost notes or deletion history cannot be invented.
+6. Legacy books use existing file MD5 when available, otherwise the original relative book path. Shared legacy notes migrate using book identity, old ID, location and creation time; new notes use random stable IDs. Independently created notes without common history are not deleted or merged merely because their text matches.
+7. A sync container is not a full backup that can overwrite local `app_database.db`. Database Backup Management keeps up to three full pre-merge local snapshots. Restoring an old backup does not undo updates on all devices; newer cloud records still participate in the next merge.
 
-## 并发与失败保护
+## Concurrency and failure protection
 
-- 读取数据库文件时保留文件路径，不能添加目录用的末尾 `/`。
-- 只有资源不存在（404）表示缺失；鉴权、网络、服务器及解析失败均终止本次同步，不转为上传空库。
-- 下载前后核对云端元数据；上传使用强 ETag 的 `If-Match`，首次创建使用 `If-None-Match: *`。收到 412 时重新拉取并合并，最多三次，绝不降级为无条件覆盖。
-- 可靠服务继续使用条件请求；新版增加无可靠 ETag 的记录日志通道（见下节）。两种通道均不无条件覆盖已有云端数据库；仅比较最后修改时间不能提供原子并发保护。HTTP 语义依据：[RFC 9110 §13](https://www.rfc-editor.org/rfc/rfc9110.html#section-13)。
-- 同步不会关闭或替换正在使用的本机数据库。合并在 SQLite 事务中执行，失败回滚；本机编辑与同步记录在同一写事务内提交。
-- 上传期间新产生的本机操作会进入后续有限重试；持续变化或竞争导致无法完成时保留数据并提示稍后重试，不宣称成功。
-- 书籍、封面传输失败时不发布新的数据库；同步不再按“当前库没有引用”删除本地或云端文件。删除状态通过墓碑传播；无人引用文件的自动回收暂未实现，以免破坏离线设备或并发上传。用户明确删除书籍时仍删除该设备的本地文件。
-- 相同记录再次同步不重复上传数据库、不生成无意义的新备份。
-- 书籍元数据和封面参与同步；尚未下载的书籍正文在首次打开时下载。书架出现书籍不等于所有书籍正文已经离线可用。
-- 空书库、数据库和封面传输不再强制查找不存在的书籍；失败传输会清除进行中状态，且不标记成功。自动同步也会刷新书架，不依赖调用端传入界面引用。
-- 新容器只允许已知字段，校验数据库完整性、格式版本、相对路径和记录类型。数据库有 64 MiB 限制。密钥单独加密不等于书籍、笔记或整个数据库均加密。
+- Database-file reads keep file paths without a directory trailing slash.
+- Only 404 means absent. Authentication, network, server and parsing failures stop sync rather than uploading an empty database.
+- Remote metadata is checked around downloads. Reliable writes use strong-ETag `If-Match`; initial creation uses `If-None-Match: *`. A 412 triggers another download/merge, with at most three attempts, never an unconditional overwrite.
+- Reliable servers use conditional requests; servers without reliable ETags use the record-log channel. Neither channel unconditionally overwrites an existing cloud database. Last-modified comparisons alone cannot provide atomic concurrency protection. See [RFC 9110 §13](https://www.rfc-editor.org/rfc/rfc9110.html#section-13).
+- Sync does not close or replace the active local database. Merge runs in a SQLite transaction and rolls back on failure; local edits and their sync records commit together.
+- New local operations during upload enter bounded retries. Persistent changes/contention preserve data and report retry later rather than success.
+- Failed book/cover transfers prevent publication of a new database. Sync no longer deletes files simply because the current database does not reference them. Tombstones propagate deletion; automatic unreferenced-file collection is not implemented, to protect offline clients and concurrent uploads. Explicit book deletion still removes that device's local file.
+- Identical records do not repeatedly upload a database or create needless backups.
+- Metadata and covers sync; missing book content downloads on first opening.
+- Empty libraries, databases and cover transfers do not force lookup of nonexistent books. Failed transfers clear in-progress state without marking success. Automatic sync refreshes the bookshelf without requiring a caller-provided UI reference.
+- Containers allow only known fields and validate integrity, format version, relative paths and record types. The database limit is 64 MiB. Encrypting keys does not encrypt books, notes or the entire database.
 
-## 1.0.4 启动恢复与 ETag 兼容调整
+## Historical: 1.0.4 startup recovery and ETag compatibility
 
-- 自动同步在启动或返回前台后延迟约 2 秒，不再在退入后台时新开同步。只读连接预检遇到短暂网络错误时有限重试；持续认证拒绝仍提示检查账号和目录权限。手动同步失败保留明确提示。
-- 数据库 PROPFIND 缺少强 ETag 时，向同一文件发起 HEAD 补查；不使用 PROPFIND 响应本身的 ETag，也不将弱 ETag 或日期当作强 ETag。
-- 仍无法取得有效标识时，有限次重新读取、合并云端数据；不发送无条件覆盖。早期包持续缺失时停止上传；下述新版会改用独立记录通道。
-- 日志区分“记录无变化、无需上传”和“已发布数据库”；再次点击同步成功并不一定表示执行过数据库上传。
-- 只读在线检查可验证当前认证及元数据响应，不能证明手机冷启动网络恢复正常，也不能验证服务器实际执行条件写入的能力。
+- Automatic sync starts approximately two seconds after launch/foreground return, not when entering the background. Read-only connection preflight retries transient network errors within limits; persistent authentication rejection prompts for account/directory checks. Manual failures retain clear messages.
+- When database PROPFIND lacks a strong ETag, HEAD checks the same file. The PROPFIND response's own ETag, weak ETags and dates are not substituted for a strong resource validator.
+- Without a valid validator, the client rereads and merges within limits rather than overwriting unconditionally. Early packages stopped upload if absence persisted; later versions use the independent log channel below.
+- Logs distinguish unchanged records/no upload from published database. Successful sync does not necessarily mean a database upload occurred.
+- Read-only online checks verify authentication and metadata responses, not phone cold-start network recovery or actual conditional-write enforcement.
 
-## 1.0.5 无可靠 ETag 的兼容通道
+## Historical: 1.0.5 compatibility channel without reliable ETags
 
-- 首次需要上传时，在 `modu/.sync-probes/<随机标识>/` 内用合成内容检测：ETag 随内容变化、旧 `If-Match` 返回 412、重复 `If-None-Match: *` 返回 412，且拒绝后内容未改变。探测不使用真实数据库，随后清理自身测试文件。仅不可靠结果缓存 30 秒；每轮需要条件写入时重新验证，不再沿用 15 分钟前的成功结论。认证、网络、服务端故障不作为“不支持”的证据。
-- 通过检测的服务继续对 `database8.db` 条件更新。缺失、弱、不变化的 ETag，或忽略条件请求的服务，使用 `modu/record-log-v1/<散列首位>/<SHA-256>.db`。上传的是发生变化的白名单记录，文件名由完整文件内容决定；并发上传要么使用不同名字，要么写入完全相同内容，不争抢共享清单或数据库。不会向 `database8.db` 降级发送普通 PUT。
-- 每次同步同时读取共享数据库及兼容日志，复用原有时间、稳定标识、删除墓碑、时长去重规则。ETag 恢复后仍读取日志；首次从 `database7.db` 迁移会将旧数据写入新通道，之后不反复导入旧库，旧文件始终保留。
-- 上传前按服务器和账号隔离，在数据库目录内持久保存待发送副本（不放在可被系统清理的缓存目录），上传后读回检查 SHA-256。中断或重启先重放待发送批次；未完成或损坏的远端文件不当作空数据，不确认同步成功。无其他发送端能重传的损坏文件需要恢复，不能盲删。
-- 已校验的不可变批次缓存在本机，避免每次重下历史文件。目录分为 16 个桶并完整处理分页；分页仅允许原服务器、原目录，防止认证信息被转发。坚果云满 750 项但没有下一页信息时停止而不是假定扫描完整。
-- 早期实现不自动删除日志，因此历史文件持续增长。2026-09-28 起改为下述双模式压缩；墓碑仍保留。单批次上限 64 MiB，一次扫描上限 256 MiB / 10000 个批次保持不变。不要自行清空日志目录。
-- **参与同步的所有设备必须升级到包含此实现的版本**，暂停旧版自动同步并先备份。旧客户端不认识日志，只会读旧共享文件，不能保证新旧混用时完整同步。无需同步字体，API Key 和远程书库凭据仍仅按原有独立开关加密同步。
-- 本轮仅进行本地合成数据库与 HTTP 服务回归；尚未在实际坚果云账号上做写入及长期多端验收。此前已停止的全平台构建不包含这次新增实现。
+- Before a required upload, synthetic objects under `modu/.sync-probes/<random-id>/` test that ETags change with content, stale `If-Match` and repeated `If-None-Match: *` return 412, and rejected writes leave content unchanged. Probes do not use real databases and clean up their own files. Only unreliable results are cached for 30 seconds; conditional writes revalidate each required round instead of trusting a 15-minute-old success. Authentication/network/server failures are not evidence of unsupported conditions.
+- Verified servers conditionally update `database8.db`. Missing, weak, unchanged ETags or ignored conditions select `modu/record-log-v1/<first-hash-digit>/<SHA-256>.db`. Changed allowlisted records form content-addressed files: concurrent writers use different names or identical bytes, avoiding a shared manifest/database race. There is no unconditional PUT fallback for `database8.db`.
+- Every sync reads the shared database and compatibility logs using the same clocks, identities, tombstones and duration deduplication. Logs remain readable after ETag support recovers. Migration from `database7.db` writes the old data into the new channel once; the old file remains.
+- Pending batches are persisted in the database directory, outside disposable caches and isolated by server/account, before upload. Uploaded bytes are downloaded and SHA-256-checked. Interrupted/restarted sync replays pending batches. Incomplete/corrupt remote files are not empty data and do not yield success. Corrupt files without another sender able to retransmit require recovery rather than blind deletion.
+- Verified immutable batches are cached locally. Sixteen buckets and full pagination avoid repeated historical downloads. Pagination remains restricted to the original server/directory to prevent credential forwarding. A Jianguoyun listing of 750 items without next-page information stops rather than assuming completeness.
+- Early versions retained all logs; the 2026-09-28 compaction milestone below replaced that policy while retaining tombstones. Limits remain 64 MiB per batch and 256 MiB/10,000 batches per scan. Do not manually empty the log directory.
+- All participating devices must support this implementation; pause old automatic sync and back up first. Old clients do not understand logs and cannot guarantee complete mixed-version synchronization. Font sync is unnecessary; API keys and remote-library credentials still use their separate encrypted opt-in settings.
+- This stage recorded only synthetic local database/HTTP regressions, without actual Jianguoyun writes or long-term multi-device acceptance. The previously stopped all-platform build did not contain this addition.
 
-## 2026-09-28 双模式日志整理
+## Historical: two-mode log compaction (2026-09-28)
 
-模式自动选择，不以“存在 ETag”作为可靠依据，仍通过隔离对象验证强 ETag、旧 `If-Match` 和重复 `If-None-Match` 的拒绝行为。
+Mode is selected automatically by isolated strong-ETag/conditional-write checks, not merely by ETag presence.
 
-1. **可靠 ETag 模式**：以 `database8.db` 为主。即使本机没有新改动，只要发现兼容日志，也将其合并到主库，通过 CAS 写入并下载验证与上传内容完全一致后，删除此次读取且已被主库覆盖的日志。主库在验证前又被更新时，推迟清理。不会为整理另建兼容日志。
-2. **不可靠 ETag 兼容模式**：不无条件覆盖 `database8.db`。读取到至少 64 个批次时，按现有冲突裁决合并记录，生成同格式的内容寻址批次；先持久保存待上传副本，再上传、读回校验 SHA-256，最后删除本次读取的旧批次。新产生、未被读取的并发批次不在删除范围。合并输出超过 64 MiB 时推迟清理，保留旧文件。
+1. Reliable ETag mode uses `database8.db` as the primary container. Compatibility logs are merged even without new local edits. After CAS publication and byte-for-byte download verification, only read logs covered by that database are deleted. If the database changes again before verification, cleanup is deferred. Compaction does not create another compatibility log.
+2. Unreliable ETag mode does not overwrite `database8.db` unconditionally. At 64 or more read batches, records merge under the existing conflict rules into a content-addressed batch. Persist the pending output, upload, read back and verify SHA-256, then delete only the old read batches. Concurrent unread batches are excluded. Output above 64 MiB defers cleanup and keeps the originals.
 
-两种模式都保留记录身份、修订、删除墓碑及去重后的阅读时长，不按文件年龄清理，不删除书籍、封面、系统附属文件、分片目录或旧数据库。离线设备回来时仍能读取当前状态和删除标记；这是合并历史版本，不是清空同步记录。
+Both modes retain identities, revisions, tombstones and deduplicated duration. They do not delete by age or remove books, covers, auxiliary system files, bucket directories or old databases. Offline clients can still read current state and deletions; compaction merges history rather than clearing records.
 
-读取前后检查完整批次名称集合；遇到整理期间的 404 或集合变化，最多重新读取三轮，持续变化则停止本次同步，不把缺失文件当作空数据。所有实际删除只针对已经验证的读取集合，最多四个并行请求。整理失败不回滚已成功的数据同步；日志记录延期原因，下次满足条件时重试。
+The complete batch-name set is checked before and after reading. A 404 or changed set during compaction causes up to three reread rounds; persistent changes stop sync rather than treating missing files as empty. Deletion targets only the verified read set, with at most four parallel requests. Cleanup failure does not undo successful data sync; logs record the deferral and later eligible sync retries.
 
-可靠模式仍检查日志目录，以接收其他设备或临时降级客户端留下的记录。整理后无需反复打开数百个历史数据库，但不承诺彻底取消目录请求。首次整理必须先读完旧记录，还要上传合并结果并逐个删除旧文件；后续同步才会获得主要性能收益。目录无 DELETE 权限时会保留冗余文件。
+Reliable mode still checks logs left by other or temporarily downgraded clients. Compaction reduces repeated opening of historical databases but does not eliminate directory requests. The first compaction must read old records, upload the merge and delete files individually; later sync receives the main performance benefit. Missing DELETE permission leaves redundant files.
 
-建议参与同步的设备一并升级，以获得整理期间的重新读取保护。本次代码测试使用隔离模拟服务器，不操作实际 WebDAV 账号。
+Participants should upgrade together for reread protection. The recorded tests used isolated mock servers, not a live WebDAV account. Entry point: `test/service/sync/log_compaction_test.dart`, covering 700-batch merges, reliable-mode consolidation, offline deletion, concurrent additions/two-device compaction, read races, corrupt uploads, denied deletion and CAS conflicts.
 
-验证入口：`test/service/sync/log_compaction_test.dart`，覆盖 700 批次合并、可靠模式归并、离线删除、并发新增/双端整理、读取竞态、上传损坏、删除拒绝及 CAS 冲突。
+## Historical implementation and verification entry points
 
-## 代码与验证入口
+### Second-resolution ETags and book identities (2026-09-28)
 
-### 2026-09-28 秒级 ETag 与书籍身份修复
+- Isolated probes perform four different equal-length writes within two seconds, reading back bytes and checking ETags each time. At least two writes fall in the same second, exposing size-plus-whole-second validators. Repeated ETags, mismatched bytes or inability to complete the window conservatively select logs; probes do not delay writes to make unreliable validators appear valid.
+- Checked `database8.db` conditional writes remain preferred, with content-addressed logs/compaction as compatibility transport. No server-source changes or data clearing are required.
+- Besides stable IDs, merge checks current content MD5. A matching path merges only when known MD5 values do not conflict. Identical titles or paths with different checksums do not identify the same book. An independently deleted duplicate does not delete another live book.
+- A deterministic canonical identity is selected. Old identities redirect through reserved revision prefix `modu-book-alias-v1:` in `book`, `position` and `life` deletion records, without new database8 fields/record kinds. New clients redirect offline old identities before clock-based merge; old clients understand accompanying tombstones but do not perform the new duplicate detection. Upgrade together.
+- Notes and duration keep independent records; book/tag references point to the retained local book. Progress/folders follow existing conflict rules. Duplicate rows are hidden, preserving files, covers and notes. Tombstones retain old paths to protect restorable content from file maintenance.
+- Remote identity duplicates publish a repair even without manual book edits. Database merge, compaction and offline replay retain redirect evidence.
+- Regression entry points: `test/service/sync/book_identity_merge_test.dart` and `test/service/sync/webdav_capabilities_test.dart`, using synthetic databases/local mock servers rather than a user's remote library.
 
-- 隔离探测必须在两秒内完成四次不同、等长内容的写入，并逐次读回正文及检查 ETag。这个时间窗口保证至少两次写入落在同一秒内，不会因为两次探测刚好跨秒而放过“大小＋整秒时间”校验器。ETag 重复、内容不符或连接太慢无法完成时，保守使用兼容日志；不会延迟写入来让不可靠 ETag 看似正常。
-- 同步仍优先使用经过检查的 `database8.db` 条件写入；兼容通道沿用已有内容寻址日志及批次合并。不要求修改服务端源码，不清空服务器数据。
-- 书籍除稳定 ID 外，也检查当前内容 MD5；相同路径只有在已知 MD5 不冲突时才可合并。书名相同、路径相同但校验值不同，都不作为同一本书自动合并。已独立删除的副本不会借此删除另一条活跃书籍。
-- 合并采用确定性的标准标识；旧标识用 `book`、`position`、`life` 删除记录的保留修订前缀 `modu-book-alias-v1:` 记录重定向，不新增 database8 字段或记录种类。新版收到离线旧标识时，先重定向再按原时钟规则合并；旧客户端能够识别伴随的删除墓碑。参与同步设备仍建议一并升级，旧客户端不会执行新增的重复识别。
-- 笔记和阅读时长保留独立记录，书籍引用和标签关联指向保留的本地书籍；进度、文件夹按原冲突规则裁决。已有重复行只隐藏，不删除书籍文件、封面或笔记；旧路径保留在墓碑中，防止文件维护误删仍可恢复的内容。
-- 即使没有手动编辑书籍，发现云端身份重复也会发布修复。数据库、日志整理、离线旧记录重放均保留重定向证据。
-- 回归入口：`test/service/sync/book_identity_merge_test.dart` 和 `test/service/sync/webdav_capabilities_test.dart`。均使用合成数据库/本地模拟服务器，不直接操作用户的远端书库。
+### Long-lived reader protection (1.0.5)
 
-### 1.0.5 长时间驻留的阅读器保护
+- Locking, backgrounding and closing wait for actual reading operations to persist without refreshing operation time from a cached screen position. Real turns, chapter jumps and user scrolling save progress; layout restoration, font reflow and sync relocation are not new reading.
+- The same database transaction checks the previously observed position version. If sync wrote a newer version, stale-page writes are rejected and the reader relocates from the database. Unchanged saves create no new version; intentional backward reading remains valid.
+- Database sync completion, including successful merge followed by failed upload, refreshes open readers and note lists. Annotation refresh changes visual overlays without invoking bookmark deletion.
+- Note editing retains a snapshot and checks for changes/deletion in the transaction. Conflicts preserve the draft and prompt rather than overwriting newer notes; changing highlight color/type does not restore stale excerpt text.
+- `test/service/sync/suspended_reader_sync_diagnostic_test.dart` changed from failure reproduction to protective regressions for both transports. Script checks cover reading actions/annotation refresh, and widget checks cover note drafts. This stage used no real cloud books and performed no physical E-Ink acceptance.
 
-- 锁屏、退后台和关闭阅读器只等待已发生的阅读操作落库，不再次用屏幕缓存的位置更新时间。真实翻页、目录跳转和有实际输入的滚动才保存进度；布局恢复、字体重排、同步定位不是新的阅读。
-- 阅读操作在同一数据库事务中校验此前看到的位置版本。若同步已经写入新版本，拒绝旧页面回写，并从数据库重新定位；内容不变的保存不产生新版本，主动往回阅读仍然有效。
-- 同步数据库流程结束后（包括合并成功但后续上传失败）通知打开的阅读器与笔记列表刷新。刷新注释只更新视觉覆盖层，不调用删除书签的业务动作。
-- 笔记编辑保留读入时的字段快照，事务内检查当前记录是否变化或被删除。冲突不覆盖新笔记，编辑框保留草稿并提示；改变划线颜色/类型不会顺带恢复旧摘录文本。
-- `test/service/sync/suspended_reader_sync_diagnostic_test.dart` 已从故障复现断言改成保护性回归断言，覆盖可靠 ETag 和无可靠 ETag 两种传输。另有阅读动作/注释刷新脚本测试和笔记编辑草稿保留组件测试。本轮未使用真实云端书籍，也未进行墨水屏实机验收。
+Implementation and regression locations:
 
-- `lib/service/sync/row_sync_store.dart`：稳定 ID、事务触发器、外键映射、白名单与本机合并。
-- `lib/service/sync/row_sync_record.dart`：冲突裁决、删除状态与旧时长合并规则。
-- `lib/service/sync/row_sync_engine.dart`：旧库迁移、同步容器、并发重试。
-- `lib/providers/sync.dart`：实际自动/手动同步入口。
-- `test/service/sync/row_sync_test.dart`：独立数据库、迁移、删除、去重与并发集成测试。
-- `test/service/sync/webdav_error_test.dart`：使用实际 WebDAV 客户端连接本地 HTTP 服务器，验证路径、错误与条件请求。
+- `lib/service/sync/row_sync_store.dart`: stable IDs, transaction triggers, foreign-key mapping, allowlist and local merge.
+- `lib/service/sync/row_sync_record.dart`: conflict resolution, deletion state and legacy duration.
+- `lib/service/sync/row_sync_engine.dart`: legacy migration, containers and concurrency retries.
+- `lib/providers/sync.dart`: automatic/manual sync entry points.
+- `test/service/sync/row_sync_test.dart`: isolated databases, migration, deletion, deduplication and concurrency integration.
+- `test/service/sync/webdav_error_test.dart`: real client against a local HTTP server for paths, errors and conditions.
 
-## 2026-09-10 本地双端验收
+## Historical local two-device acceptance (2026-09-10)
 
-已在用户明确授权、备份电脑数据及云端数据库之后，使用现有 WebDAV 目录完成 macOS ARM64 与 HONOR Magic4 Pro（Android 15/API 35）的实际同步。两端安装的是本地 `1.0.1+10002` 启动修复包，API Key 同步保持关闭。
+After explicit authorization and backups of computer/cloud databases, macOS ARM64 and HONOR Magic4 Pro (Android 15/API 35) synced through the existing WebDAV directory. Both used local `1.0.1+10002` startup-fix builds with API-key sync disabled.
 
-- 修复数据库迁移中异步访问 DAO 引起的重复开库：共享初始化 Future，旧封面修复移到数据库打开完成之后，等待基础目录初始化。新增 5 个初始化/迁移回归测试。
-- 完整自动测试结果：380 通过、2 跳过；包含目标初始化及同步测试 54 项通过。自动测试不等于所有功能均经过真机验证。
-- 手机成功接收 3 本书的书架数据，演示 EPUB 可以下载、打开阅读。
-- 手机将演示书从约 72% 读回约 36%，同步后电脑及云端位置记录一致，验证采用最近操作而不是最远进度。
-- 电脑将演示书切换到第 2 章并保存约 72% 进度，手机接收后书架显示 72%；应用冷启动后仍保留，打开实际进入第 2 章。
-- 连续无修改同步两次，云端 ETag、修改时间、内容散列和阅读时长均未变化。
-- 实测只变更演示书阅读位置和自然产生的阅读时长；未删除真实内容、未修改真实笔记，未测试双端同时编辑或断网竞争。iOS 等其他平台未进行本轮实机验收。
+- Fixed duplicate database opening caused by asynchronous DAO calls during migration: shared the initialization Future, moved old-cover repair after database opening and waited for base-directory initialization. Five initialization/migration regressions were added.
+- Recorded full automated result: 380 passed, two skipped; 54 targeted initialization/sync tests passed. Automation did not establish physical-device validation of every feature.
+- The phone received three bookshelf entries and could download/open the demonstration EPUB.
+- Reading the demo backward from about 72% to 36% on the phone synchronized the same position to computer/cloud, confirming latest-action rather than furthest-progress resolution.
+- The computer saved chapter 2 at about 72%; the phone received 72%, retained it across cold start and actually opened chapter 2.
+- Two unchanged syncs left cloud ETag, modification time, content hash and duration unchanged.
+- Only demo-book position and naturally accumulated reading time changed. No real content was deleted, real notes were not edited, simultaneous editing/offline contention was not tested, and iOS/other platforms were outside this acceptance.
 
-阅读器会根据设备排版重新计算当前页范围和百分比：电脑第 2 章一页、手机三页，打开后显示的百分比可能不同。本次确认的是同步记录一致及实际章节正确，不保证不同屏幕打开后的页内百分比完全一致。大书库性能、所有服务器实现及精细页内定位仍需独立验证。
+Page ranges/percentages are recalculated for each layout: chapter 2 occupied one computer page and three phone pages. This check established matching sync records and the correct chapter, not identical in-page percentages across screens. Large-library performance, every server implementation and fine-grained in-page positioning still require independent verification.

@@ -1,49 +1,38 @@
-# 锁屏跨章等待恢复（2026-09-25）
+# Recovery from chapter waits while locked (2026-09-25)
 
-## 反馈与定位边界
+> Historical record. This preserves the September 25 investigation and September 26 follow-up, including the original verification limits. See the [documentation index](README.md) and the [current settings guide](SETTINGS.md) for Modu 1.2.0+10082. This documentation update did not rerun tests, build packages or retest lock-screen playback.
 
-用户反馈：手机锁屏跨章后没有声音，通知栏仍显示暂停按钮，解锁也不继续。
-未连接原测试手机，尚未复现设备上的触发原因；不能据此断定是系统省电、
-WebView 挂起或音频完成回调丢失。
+## Report and diagnostic limits
 
-检查发现两处可验证的等待缺口：
+The user reported that narration became silent after a chapter transition while the phone was locked. The notification still showed a pause button, and unlocking did not resume playback.
 
-- 原有章节导航超时只覆盖页面导航，不覆盖 EPUB 等格式的离屏文本读取。
-  `createDocument()` 不返回时，串行朗读导航队列会一直等待。
-- 停止操作先等待播放器循环退出，之后才取消阅读器导航；播放器若正在
-  等待该导航，停止也无法及时完成。
+The original test phone was not connected and the device-specific trigger had not been reproduced. This evidence could not establish whether system power saving, a suspended WebView or a lost audio-completion callback caused it.
 
-## 修改
+Inspection found two verifiable gaps in waiting:
 
-- 离屏文本读取每次等待最多 15 秒，超时只重试同一章一次。再次超时向
-  朗读引擎返回错误，不返回书末标记，不跳过章节。
-- 每次读取有独立有效性检查。超时或停止后，迟到结果不能覆盖朗读游标。
-- 停止立即解除导航等待，同时启动播放器停止与阅读器取消，避免互相等待。
-- 重试日志只记录阶段和章节索引，不包含书籍正文。
+- The existing chapter-navigation timeout covered page navigation, but not offscreen text loading for EPUB and similar formats. If `createDocument()` did not return, the serialized narration-navigation queue waited indefinitely.
+- Stop waited for the player loop to exit before cancelling reader navigation. If the player was waiting for that navigation, stop could not finish promptly either.
 
-## 验证
+## Changes
 
-- 246 项阅读器 JavaScript 测试通过，含读取挂起、同章重试、迟到结果、
-  失败后重试、停止后重新开始等回归。
-- 32 项 Flutter 朗读顺序、锁屏控制、手动导航、媒体状态测试通过；包含
-  真实 OnlineTts 循环等待章节时，通过并发取消完成停止的测试。
-- 阅读器资源重新构建成功。Webpack 仍报告已有的 top-level await 兼容性警告。
-- 尚未打包或真机锁屏验收。JavaScript 定时器仍依赖 WebView 执行，测试不
-  等同于证明能够绕过系统冻结；若问题继续，需要设备日志进一步区分读取、
-  WebView 桥接、合成和音频完成等待。
+- Each offscreen text read waits at most 15 seconds and retries the same chapter once after timeout. A second timeout returns an error to the narration engine, not a book-end marker, and does not skip the chapter.
+- Each read has an independent validity check. Results arriving after timeout or stop cannot overwrite the narration cursor.
+- Stop immediately releases navigation waits and starts player stop and reader cancellation concurrently to avoid mutual waiting.
+- Retry logs contain only the phase and chapter index, without book text.
 
-## 9 月 26 日补充：解锁恢复与偶发重读
+## Verification at the time
 
-用户确认使用小米 MiMo、1.1.5 正式版，新增反馈为锁屏停顿后解锁立即恢复、
-偶发重读上一句。此前修改尚未打包，不能把这些反馈视为修复包的回归结果。
+- **246 reader JavaScript tests passed**, including hung reads, same-chapter retry, late results, retry after failure and restarting after stop.
+- **32 Flutter tests passed** for narration ordering, lock-screen controls, manual navigation and media state. These included stopping through concurrent cancellation while a real OnlineTts loop waited for a chapter.
+- Reader assets rebuilt successfully. Webpack still reported the existing top-level-await compatibility warning.
+- Packages and physical-device lock-screen acceptance were not completed. JavaScript timers still depend on WebView execution, so these tests do not prove the implementation can bypass system freezing. If the issue continues, device logs are needed to distinguish text reads, WebView bridging, synthesis and audio-completion waits.
 
-代码仍逐句等待 WebView 推进游标，不能据模拟测试宣称已解决后台 WebView
-挂起。已增加 Dart 侧慢调用诊断：文本收集/推进超过 5 秒时记录阶段、
-生命周期及等待时长，完成时再记录一次；不记录正文、CFI 或凭据，不自动
-重复游标操作，也不更改播放状态。
+## September 26 follow-up: resume on unlock and occasional repeats
 
-另修复一处可导致重读的恢复路径：活跃播放循环已经结束当前音频、正在等待
-下一句或音频数据时，不再向原生播放器发送 resume，避免重启仍保留的旧音频。
-当前句尚未结束时仍正常恢复。该修改不按文本去重，正文中的相同句子仍按顺序读。
-新增测试覆盖跨章等待期间反复暂停/恢复不重启已完成音频，以及未完成句子仍能恢复。
-原设备的锁屏停顿根因仍待真机日志确认。
+The user confirmed Xiaomi MiMo and stable **1.1.5**. The additional report was immediate recovery upon unlocking after a lock-screen pause, with occasional repetition of the previous sentence. The preceding changes had not yet been packaged, so these reports could not be treated as regressions of a fixed package.
+
+Code still waited on WebView cursor advancement sentence by sentence. Mocked tests could not establish that background WebView suspension had been solved. Dart-side slow-call diagnostics were added: text collection/advancement taking more than five seconds records phase, lifecycle and elapsed waiting time, with another entry upon completion. They contain no text, CFI or credentials, do not automatically repeat cursor operations and do not change playback state.
+
+A recovery path that could cause repetition was also fixed: when the active playback loop had finished the current audio and was waiting for the next sentence or audio data, it no longer sent resume to the native player, avoiding restart of retained old audio. An unfinished current sentence still resumed normally. This did not deduplicate by text; identical sentences in the book remained in sequence.
+
+Additional tests covered repeated pause/resume during a chapter wait without restarting completed audio, and resuming an unfinished sentence. The root cause of the original device's lock-screen pauses still required physical-device logs.

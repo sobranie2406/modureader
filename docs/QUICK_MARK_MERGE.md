@@ -1,14 +1,16 @@
-# 移动端快速标记：连续高亮合并
+# Mobile quick marking: merge consecutive highlights
 
-此功能包含在 1.0.1 源码中，安装包与验证范围见对应 GitHub Release。
+Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
-开启快速标记，在上一页划到正文末尾；翻页后从下一页正文开头继续划选。首尾相连、同色且无批注的高亮会自动合并为一条。也支持反向接续、重叠选区和补齐两条高亮之间的文字。无需一根手指一直拖过两页，不会自动翻页。
+Enable quick marking and select through the end of the body text on one page. Turn the page and continue selecting from the start of the next page's body text. Adjacent highlights with the same color and no annotations merge into one. Reverse continuation, overlapping selections and filling the text between two highlights are also supported. You do not need to drag one finger across both pages; this feature does not turn pages automatically.
 
-- 根据正文位置判断连续，不使用文本相似度或屏幕坐标。段落间空白可连接，中间遗漏文字或隔有图片时不连接。
-- 已有批注、不同颜色、下划线和书签保持独立。
-- 同一 EPUB 章节文档内可连续跨多页；跨章节文件、PDF 和固定版式不在本功能范围内。
-- 合并后的内容和定位范围写入数据库，保留第一段标记的 ID、章节和创建时间。不是仅在界面把多条标记拼起来。
-- 在同一个数据库事务内更新和移除被合并的记录；保存失败回滚，保留原标记。保存期间源标记被编辑或删除时，放弃合并并单独保存当前划选。
-- 桌面端不新增快速标记入口。
+- Continuity is determined from source-text positions, not text similarity or screen coordinates. Whitespace between paragraphs can connect selections; omitted text or an intervening image prevents a merge.
+- Highlights with annotations, different colors, underlines and bookmarks remain separate.
+- Selections can span multiple pages within the same EPUB chapter document. Different chapter files, PDF and fixed layouts are outside this feature's scope.
+- The merged text and location range are stored in the database, retaining the first mark's ID, chapter and creation time. The merge is not merely a visual concatenation.
+- Updating and removing merged records happens in one database transaction. A save failure rolls back and preserves the original marks. If a source mark is edited or deleted while saving, merging is abandoned and the current selection is saved separately.
+- Desktop has no new quick-mark entry.
 
-自动化验证覆盖：连续/反向/重叠选区、缺字、图片间隔、批注保护、CFI 编码还原、数据库记录合并、源记录变更和事务失败回滚。尚未在 Android/iOS 真机上验证翻页划选手感。
+Existing automated coverage includes forward/reverse/overlapping selections, missing text, image gaps, annotation protection, CFI decoding, database merges, changed source records and transaction-failure rollback. The original verification did not assess page-turn selection feel on physical Android/iOS devices. This documentation update did not rerun tests or perform that device assessment.
+
+Implementation: [quick-mark service](../lib/service/book_player/quick_mark_service.dart).

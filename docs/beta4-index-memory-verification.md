@@ -1,37 +1,39 @@
-# Beta4 索引内存与退出诊断验证
+# Beta4 index memory and exit diagnostics verification
 
-## 证据与原因边界
+> Historical record for Beta4 build 6331 and the Beta3 report described below; this is not certification of the latest 1.2.0 release. See the [documentation index](README.md).
 
-用户反馈：Beta3，iQOO Neo8 / Android 16，中文 BGE 512 维，EPUB 向量化到一定进度退出；重启显示已索引。没有取得该设备本次退出的系统日志，不能直接判定 LMK/OOM、ONNX native fault 或其它异常。
+## Evidence and root-cause limits
 
-代码检查确认的共用风险：
+User report: Beta3, iQOO Neo8 / Android 16, Chinese BGE with 512 dimensions; EPUB vectorization exited partway through, and a restart showed “Indexed.” System logs for that exit were unavailable, so LMK/OOM, an ONNX native fault or another exception could not be identified directly.
 
-1. 索引提取用后台 WebView 仍沿用普通搜索的 3 分钟缓存，可能让 EPUB 的 JS/DOM/压缩包与后续模型权重和向量同时占用内存。改为专用提取会话，在提取完成/失败/取消后立即 dispose，不影响正常阅读或普通搜索会话。
-2. `FileKnowledgeIndexStore.save` 原先对整个 snapshot `jsonEncode` 再写大字符串。改为标准 JSON 的逐行写入，每行等待 I/O 完成，保留临时文件和最终 rename；不会生成整个文件大小的 JSON 字符串。
-3. 原“已索引”状态读取完整 JSON 并反序列化全部向量；任务完成后刷新标签可能与仍驻留的模型重叠。改为最多 4 KiB 的完成记录，校验书籍指纹、索引文件大小、mtime 和片段/向量数量，不加载向量。旧的小索引只串行迁移一次；大于 4 MiB 的旧索引不后台整本读取，保留文件，手动重建后恢复已验证标签。
-4. Android 通道返回的 Float64List 原先转换成逐元素对象列表，索引任务也一直保留这些对象。现在保留/转换为紧凑 Float64List，不减少精度；恢复索引也用紧凑向量。
-5. 本地 provider 继承了空的 close，依赖 15 秒空闲计时释放模型。新增可等待的 release，在持久化前等待释放，且在结束/异常时兜底释放；释放复用推理串行队列，不在运行中的 session 上并发 close。
-6. 内容哈希不再组装整本 canonical 大字符串，而是流式 UTF-8/SHA-256，测试确认与原算法相同。
+Shared risks confirmed by code inspection:
 
-“重启后已索引”只能说明曾有一个可读索引文件：可能是旧索引，也可能是在本次保存完成后退出，不能单独证明向量任务正常结束。新增构建中标记与崩溃检查点用于区分后续情况，不追溯伪造旧记录。
+1. The background WebView used for index extraction still used the normal search cache of 3 minutes, potentially keeping EPUB JS/DOM/archive data in memory alongside subsequent model weights and vectors. It was replaced with a dedicated extraction session, disposed immediately after extraction completed, failed or was cancelled, without affecting normal reading or search sessions.
+2. `FileKnowledgeIndexStore.save` previously called `jsonEncode` on the entire snapshot and wrote one large string. It was changed to line-by-line standard JSON writing, awaiting I/O for each line and retaining the temporary file and final rename. It no longer generated a JSON string the size of the entire file.
+3. The old “Indexed” status read the full JSON and deserialized all vectors; refreshing the label after task completion could overlap with a resident model. It was replaced with a completion record of at most 4 KiB that checked the book fingerprint, index file size, mtime and chunk/vector counts without loading vectors. Small legacy indexes were migrated serially once. Legacy indexes larger than 4 MiB were not read in full in the background; their files were retained, with the verified label restored after manual rebuilding.
+4. Float64List values returned by the Android channel were previously converted into per-element object lists, which the indexing task retained. Values were now retained/converted as compact Float64List without reducing precision; restored indexes also used compact vectors.
+5. The local provider inherited an empty close and relied on a 15-second idle timer to release the model. An awaitable release was added and awaited before persistence, with fallback release on completion/exception. Release reused the serial inference queue and did not close a running session concurrently.
+6. Content hashing stopped constructing one canonical string for the entire book and instead streamed UTF-8/SHA-256. Tests confirmed compatibility with the original algorithm.
 
-## 主机合成对照
+“Indexed after restart” established only that a readable index file existed. It might have been an old index, or the app might have exited after the current save completed; the label alone could not prove normal vectorization completion. New building markers and crash checkpoints distinguished subsequent cases without fabricating earlier records retrospectively.
 
-运行 `test/native/index_memory_probe.dart` 的两个模式，各用独立 macOS Dart 进程。5,000 片段，每段约 800 字符，512 维合成数值；索引约 43,171,737 / 43,181,764 字节（空白布局略有区别）。不加载 ONNX，不访问真实书籍或密钥。
+## Synthetic host comparison
 
-| 阶段 | 旧保存/标签流程 RSS MiB | 紧凑向量/分行写入/小摘要 RSS MiB |
+Both modes of `test/native/index_memory_probe.dart` ran in separate macOS Dart processes. Each used 5,000 chunks of about 800 characters and 512-dimensional synthetic values; index sizes were about 43,171,737 / 43,181,764 bytes, with a slight whitespace-layout difference. ONNX was not loaded; no real books or keys were accessed.
+
+| Stage | Old save/label flow RSS MiB | Compact vectors/line-by-line writing/small summary RSS MiB |
 | --- | ---: | ---: |
-| 进程起始 | 213.6 | 212.9 |
-| 保留片段与向量 | 284.4 | 241.6 |
-| 保存后 | 491.5 | 248.2 |
-| 刷新标签后 | 592.8 | 248.4 |
+| Process start | 213.6 | 212.9 |
+| Retaining chunks and vectors | 284.4 | 241.6 |
+| After saving | 491.5 | 248.2 |
+| After label refresh | 592.8 | 248.4 |
 
-这证明本地合成场景中减少了保存/标签阶段的内存放大，不证明 Android 真机闪退已彻底解决，也没有测量原生模型权重/EPUB WebView 的内存释放幅度。旧模式恢复向量时用了当前解码器，已较原 Beta3 紧凑；它不是逐字节运行旧发行包。
+This demonstrated reduced memory amplification during save/label stages in the local synthetic scenario. It did not prove that Android device crashes were fully resolved or measure the memory released from native model weights/EPUB WebViews. The old mode restored vectors with the current decoder, already more compact than the original Beta3 implementation; it was not a byte-for-byte execution of the old release package.
 
-## 回归与发布门槛
+## Regressions and release gates
 
-- 新增测试：标准 JSON 可恢复；标签读取不调用完整 load；索引损坏/替换后拒绝旧摘要；小索引迁移、大旧索引不自动载入；缺失、非有限或错误向量不覆盖旧索引；模型释放完成早于 save；释放期间取消及保存期间取消不提交；增量哈希兼容；384/512 维通道保留 Float64List。
-- 本地 Flutter 全量回归 276 项通过、2 项跳过；18 项打包工具测试通过。GitHub Actions 在 Beta4 标签上再运行全量测试、阅读器 JS 和打包验证。
-- 新原生诊断的验证边界见 `crash-feedback-verification.md`。Windows 独立子进程测试和 Apple 原生摘要测试加入桌面构建门槛。
-- 各平台包使用新的 build 6331，从同一 Beta4 标签构建；保留 Android 原签名、四个内嵌模型、对应架构校验、原生安装格式、许可和 SHA-256 校验。
-- 尚未连接原 iQOO Neo8，仍需原 EPUB 真机复测。Beta4 默认不上传日志，用户可选择预览并提交脱敏日志和设备环境。
+- Added tests covered standard JSON restoration; label reads without full load; rejection of stale summaries after index corruption/replacement; small-index migration and no automatic loading of large legacy indexes; missing, non-finite or invalid vectors not overwriting an old index; model release completing before save; cancellation during release/save not committing; incremental hash compatibility; and 384/512-dimensional channels retaining Float64List.
+- Local full Flutter regression: 276 passed, 2 skipped; packaging tool tests: 18 passed. GitHub Actions was to rerun the full suite, reader JS and packaging validation on the Beta4 tag.
+- Verification limits for the new native diagnostics were documented in `crash-feedback-verification.md`. Windows standalone subprocess tests and Apple native summary tests were added to desktop build gates.
+- Packages for all platforms used new build 6331 from the same Beta4 tag, retaining the original Android signature, four bundled models, architecture validation, native installer formats, licenses and SHA-256 checks.
+- The original iQOO Neo8 was still not connected; the original EPUB required device retesting. Beta4 did not upload logs by default. Users could choose to preview and submit redacted logs and device information.

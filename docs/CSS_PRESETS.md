@@ -1,29 +1,33 @@
-# CSS 方案与正则高亮预设
+# CSS profiles and regex highlight presets
 
-入口：设置 → CSS 设置。阅读界面只选择应用方案，参数在设置中统一调整。
+## Current: Modu 1.2.0+10082
 
-## 使用
+This guide describes the Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Open Settings → CSS Settings to edit profiles; the reader selects which profiles apply.
 
-- 提供 13 个模板：横排小说、竖排间距、图片适配、标题居中、长文间距、英文段落、诗词、表格，以及对白变色、对白波浪线、关键词高亮、日期高亮、标题下划线。
-- 共有 32 个命名位置，原有位置保留；新增位置预置模板。支持模块化图形调节颜色、字体、间距、下划线等参数，也可编写自定义 CSS。
-- 点击方案只切换编辑位置。打开「启用当前方案」及顶部总开关才会生效，可同时启用多套；按位置顺序应用，靠后的冲突样式优先（仍遵循 CSS 优先级）。
-- 当前书籍可以使用自己的启用组合，也可跟随默认。方案内容全局共用，编辑会影响使用它的书籍；本书选择不跨设备传输。
-- 删除需确认，会清空该位置并从所有书籍的启用组合中移除。新增、导入、复制均默认停用，避免复用空位时影响其他书籍。
-- 竖排模板只调整间距，书籍阅读方向仍在阅读设置中选择。诗词类名、英文语言标记等取决于书籍结构，可能需要调整选择器。
+## Using profiles
 
-## 文件交换
+- Thirteen templates cover horizontal novels, vertical spacing, image fitting, centered headings, long-form spacing, English paragraphs, poetry, tables, dialogue color, wavy dialogue underlines, keyword highlights, date highlights and heading underlines.
+- There are 32 named slots. Existing slots are retained; additional slots start with templates. Visual controls edit colors, fonts, spacing and underlines, alongside custom CSS.
+- Selecting a profile only changes the editor's current slot. Enable both the profile and the main switch to apply it. Multiple profiles can be enabled; later slots take precedence when declarations conflict, subject to CSS specificity.
+- A book can use its own enabled-profile combination or follow the default. Profile contents are shared globally, so editing affects every book using that profile. Per-book selection is not transferred between devices.
+- Deletion requires confirmation, clears the slot and removes it from every book's enabled set. New, imported and copied profiles start disabled to prevent a reused slot affecting other books.
+- The vertical template changes spacing; choose the book's reading direction separately in reading settings. Poetry classes, English language markers and other selectors depend on the book's structure and may need adjustment.
 
-导入支持普通 `.css` 或默读方案 `.json`，最多 1 MiB。JSON 保留名称、CSS、图形参数、正则表达式和作用范围；可导出当前或全部非空方案。
+These controls style applicable book text and markup. PDF/scanned-page crop and image enhancement are separate display controls; OCR/reflow text uses its own document text-style editor. Ordinary text books retain their normal reading controls.
 
-导入只填空位，空位不足时中止，不自动覆盖。文件不包含书籍 ID、字体文件或背景图片。只导入可信 CSS：启用后其中的远程资源地址可能产生网络请求。
+## File exchange
 
-方案及默认启用组合也包含在全局设置备份中；通过设置文件或 `modu` 链接导入导出。全局设置不再提供二维码备份，完整备份建议使用文件。
+Import plain `.css` or Modu profile `.json` files up to 1 MiB. JSON preserves names, CSS, visual parameters, regex expressions and scope. Export the current profile or all nonempty profiles.
 
-## 正则高亮
+Import fills empty slots only and stops if there are too few; it does not overwrite automatically. Files contain no book IDs, font files or background images. Use trusted CSS: enabled remote-resource URLs can generate network requests.
 
-填写 JavaScript 正则表达式，不加两侧 `/`，以 `gu` 标志匹配。选择全部、标题（h1–h6/heading role）或正文范围。匹配不会跨越段落；同段落内可跨越行内标签。隐藏内容及具有 EPUB/ARIA 注释语义的内容会跳过。
+Profiles and the default enabled set are also included in global settings backups, exchanged as settings files or `modu` links. Global settings no longer provide QR-code backups; files are recommended for complete backups.
 
-代码框填写 CSS **声明**，不是完整选择器，例如：
+## Regex highlighting
+
+Enter a JavaScript regular expression without surrounding `/` characters; matching uses `gu` flags. Choose all text, headings (h1–h6/heading role) or body text. Matches do not cross paragraphs, but can span inline tags within a paragraph. Hidden content and content with EPUB/ARIA annotation semantics are skipped.
+
+The code box takes CSS declarations rather than a full selector:
 
 ```css
 color: #c0392b;
@@ -32,14 +36,18 @@ text-decoration-style: wavy;
 text-decoration-color: #c0392b;
 ```
 
-使用 CSS Custom Highlight API，不分割或包裹正文节点，不改变批注/CFI/朗读定位。仅允许颜色、背景色、下划线类型/颜色/粗细，不支持高亮部分单独改变字体、字号或图片。这与 [Custom Highlight API 的样式限制](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Custom_highlight_API)一致。
+The CSS Custom Highlight API avoids splitting or wrapping body nodes, preserving annotation/CFI/narration positions. Highlight styling supports color, background color and underline style/color/thickness; it does not independently change fonts, font sizes or images inside a match. See the [Custom Highlight API styling limits](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Custom_highlight_API).
 
-需要阅读内核支持 `CSS.highlights`、`Highlight` 和 Worker；不支持时会提示，普通 CSS 仍可使用。没有通过 DOM 包裹文本的兼容降级。
+The reading engine must support `CSS.highlights`, `Highlight` and Worker. Unsupported engines show a notice while ordinary CSS remains available. There is no fallback that wraps text in DOM nodes.
 
-正则放在独立 Worker 执行，超过 1.2 秒停止；每章最多扫描 50 万字符、2 万文本节点、2000 个匹配。异常表达式跳过，超时或达到上限有提示，停用后移除自身高亮，不清除搜索高亮。
+Regex matching runs in a separate Worker and stops after 1.2 seconds. Each chapter is limited to 500,000 characters, 20,000 text nodes and 2000 matches. Invalid expressions are skipped; timeouts and limits produce a notice. Disabling a profile removes its own highlights without clearing search highlights.
 
-## 本次验证
+## Recorded development verification
 
-- Flutter：配置兼容、多套开关、全局导出、文件校验、模板添加及窄屏布局测试。
-- 阅读器：正则匹配、Unicode 空匹配、超时取消、隐藏内容、文本节点保留、清理测试。
-- Playwright：合成章节验证横排/竖排颜色、波浪线、高亮、切章、关闭恢复及复杂正则超时；不使用或上传真实书籍。
+The original implementation record reported:
+
+- Flutter checks for configuration compatibility, multiple switches, global export, file validation, adding templates and narrow layouts.
+- Reader checks for matching, Unicode empty matches, cancellation on timeout, hidden content, preserved text nodes and cleanup.
+- Playwright checks using synthetic chapters for horizontal/vertical colors, wavy underlines, highlights, chapter changes, disabling/restoring and complex-regex timeouts. No private books were used or uploaded.
+
+These are preserved historical results. No new application tests or browser checks were run for this documentation update.

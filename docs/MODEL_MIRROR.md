@@ -1,59 +1,81 @@
-# 按需下载模型镜像
+# On-demand model mirrors
 
-公开仓库：[sobranie2406/modu-models](https://gitee.com/sobranie2406/modu-models)；[模型发行版 models-v1](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1)。
-2026-09-16 已发布 9 个模型/分词器附件、3 份许可证、清单与校验文件，并通过应用下载服务的四模型匿名下载、大小及 SHA-256 校验（包括 E5 分片重组）。新安装默认选择 Hugging Face，已保存的下载源不改变，用户可切换 Gitee。
+## Current: Modu 1.2.0+10082
 
-仅镜像 `assets/models/embeddings/manifest.json` 中固定 revision 的 Xenova ONNX 量化模型及分词器。MiniLM 保留 Apache-2.0，BGE 与 E5 保留原 MIT 许可证、版权及来源，不将其改成默读的 GPL 许可证。
+This guide follows the Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Model weights are optional downloads, not installer assets. The dated checks below are recorded historical results; no new downloads, inference runs or tests were performed for this documentation update.
 
-## 准备
+Public repository: [sobranie2406/modu-models](https://gitee.com/sobranie2406/modu-models). Embedding release: [models-v1](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1).
 
-`python3 scripts/release/model_mirror.py --fetch`
+On 2026-09-16, nine model/tokenizer assets, three licenses, a manifest and checksum file were published. Anonymous downloads of all four embedding models passed the application's size and SHA-256 checks, including E5 shard reassembly. New installations default to Hugging Face; existing source preferences are retained and users can select Gitee.
 
-该命令下载缺失的公开文件，复用 SHA-256 校验通过的缓存，把发布附件生成到 `build/model-mirror`，不上传。不需要重复获取已有且校验完全相同的 HF 文件。
+The mirror contains only the quantized Xenova ONNX models and tokenizers pinned in `assets/models/embeddings/manifest.json`. MiniLM retains Apache-2.0; BGE and E5 retain their MIT licenses, copyrights and provenance rather than becoming GPL-licensed Modu code.
 
-- 附件名称包含模型 ID、上游 40 位 revision 和原文件名。
-- 文件大于 64 MiB 时分片（`.part-01`、`.part-02`）；目前仅 E5 权重需要。分片只拆分字节，不重新压缩、不修改模型。客户端按顺序流式合并，再校验原完整文件 SHA-256；截断、乱序或损坏都不能用于推理。
-- 同时提供 `manifest.json`、`SHA256SUMS` 和三份原始许可证文件。
-- 发布说明注明四个 HF 仓库、revision、尺寸与许可证，上传附件后再发布 Release。Gitee 如需账号安全验证/公开审核，先由账号持有人完成。
-- 逐一验证无需登录的下载入口、重定向及重组后的原始 SHA-256。不能只看上传进度。已确认下载链：Gitee Release → 同仓库 attach_files → `https://foruda.gitee.com/attach_file/`。客户端仅接受对应路径的 HTTPS 地址；平台若引入其他 CDN，核实后再添加精确域名，不能放开任意网站。
+## Preparing embedding assets
 
-## 回归验证
+```sh
+python3 scripts/release/model_mirror.py --fetch
+```
 
-`flutter test --no-pub test/service/knowledge test/widgets/settings/vector_model_download_test.dart`
+This downloads missing public files, reuses SHA-256-verified caches and creates release assets in `build/model-mirror`; it does not upload. Verified identical Hugging Face files do not need to be fetched again.
 
-`python3 test/model_mirror_test.py` 与 `python3 test/release_package_test.py`
+- Asset names include the model ID, upstream 40-character revision and original filename.
+- Files over 64 MiB are split into `.part-01`, `.part-02`, etc.; currently only E5 weights require this. Splitting preserves the original bytes without recompression. The client streams parts in order, then verifies the original full-file SHA-256. Truncated, reordered or corrupt weights cannot be used for inference.
+- Include `manifest.json`, `SHA256SUMS` and the three original license files.
+- Release notes identify all four Hugging Face repositories, revisions, sizes and licenses. Upload assets before publishing the release. Any Gitee account verification or public-review requirement is handled by the account owner.
+- Verify public downloads, redirects and the reassembled original SHA-256. The recorded chain is Gitee Release → same-repository attach_files → `https://foruda.gitee.com/attach_file/`. The client accepts only the corresponding HTTPS paths; any new CDN needs verification and a precise allowlist entry.
 
-真实下载校验默认跳过，显式运行（消耗约 218 MB 流量，临时副本会自动清理）：
+## Verification commands (not run for this update)
 
-`flutter test --no-pub --dart-define=MODU_VERIFY_MODEL_MIRROR=true test/service/knowledge/model_mirror_live_test.dart`
+```sh
+flutter test --no-pub test/service/knowledge test/widgets/settings/vector_model_download_test.dart
+python3 test/model_mirror_test.py
+python3 test/release_package_test.py
+```
 
-## 构建与迁移
+Live checks are skipped by default. The opt-in embedding check uses approximately 218 MB of traffic and cleans up its temporary copies:
 
-`pubspec.yaml` 仅声明模型 manifest，不声明权重目录。发布检查拒绝携带权重/分词器的旧缓存产物。CI 的模型文件仅用于独立原生推理测试：Android 在测试 APK，Windows/macOS 通过本机测试服务器下载；不移除四模型推理检查。
+```sh
+flutter test --no-pub --dart-define=MODU_VERIFY_MODEL_MIRROR=true test/service/knowledge/model_mirror_live_test.dart
+```
 
-升级不会删除已下载的模型；相同大小及 SHA-256 的旧文件继续使用。默认自动索引仍关闭，模型缺失只提示下载，不能暗中下载四个模型。更换下载源不改变模型 revision、维度或索引格式。
+## Builds and migration
 
-## 轻量 OCR（独立于向量模型）
+`pubspec.yaml` declares the embedding manifest, not the weights directory. Release validation rejects stale artifacts containing weights/tokenizers. CI model files serve separate native inference checks: Android uses a test APK; Windows/macOS download from a local test server. The four-model inference checks are retained.
 
-设置 → OCR 模型可选择模型与下载源。推荐优先下载并使用 v4，默认 v4、上游来源；v5 仅为可选模型，不自动切换已有选择。仅主动下载选中的模型，识别在本机进行。模型选择及下载源纳入全局设置备份，不包含模型权重。旧 v4 缓存路径保持不变，切换来源复用通过 SHA-256 校验的文件。
+Upgrading preserves downloaded models; files with the same size and SHA-256 remain usable. Automatic indexing is off by default. Missing models prompt for a download rather than silently fetching all four. Changing source does not change revisions, dimensions or index format. Vector indexes are local and do not synchronize through WebDAV; local vectorization, retrieval and Stop Vectorization remain available.
 
-| 模型 | 检测 + 识别下载大小 | 上游 |
-| --- | --- | --- |
-| PP-OCRv4 中英文（默认） | 14.9 MiB | Hugging Face |
-| PP-OCRv5 中英文轻量版 | 20.5 MiB | ModelScope |
-| PP-OCRv3 中英文 | 12.5 MiB | Hugging Face |
-| PP-OCRv3 英文 | 10.9 MiB | Hugging Face |
+## Lightweight OCR, separate from embedding models
 
-2026-10-04 已发布 [ocr-v1](https://gitee.com/sobranie2406/modu-models/releases/tag/ocr-v1)，包含 8 个模型文件和 4 个来源、许可证、清单及校验附件。不替换 `models-v1`。四套 Gitee 模型和 v5 上游已通过应用下载服务的匿名下载、字节大小及 SHA-256 校验，四模型均通过 Mac 原生推理检查。
+Settings → OCR Model selects the model and download source. V4 is the recommended default with upstream selected; V5 is optional and does not replace an existing selection automatically. Only a model explicitly requested by the user is downloaded, and recognition runs locally. Model/source choices are included in global settings backups; weights are not. The old V4 cache path is preserved, and switching sources reuses files that pass SHA-256 verification.
 
-精确文件、revision 和校验值见 `lib/service/ocr/ocr_models.dart`。v3/v4 固定 Hugging Face revision，v5 固定 RapidOCR 分发版本 v3.9.2 及官方 SHA-256。模型沿用 Apache-2.0，不修改原字节、不重新训练。没有下载 GitHub 权重的入口：这几套 ONNX 的实际分发源是 Hugging Face / ModelScope，界面如实显示。
+| Model | Detection + recognition download | Upstream | Alternative |
+| --- | --- | --- | --- |
+| PP-OCRv4 Chinese/English (recommended) | 14.9 MiB | Hugging Face | Gitee |
+| PP-OCRv5 Chinese/English mobile | 20.5 MiB | ModelScope | Gitee |
+| PP-OCRv3 Chinese/English | 12.5 MiB | Hugging Face | Gitee |
+| PP-OCRv3 English | 10.9 MiB | Hugging Face | Gitee |
 
-准备附件：`python3 scripts/release/ocr_model_mirror.py --source <已下载原模型目录>`，输出至 `build/ocr-model-mirror`。脚本不上传；每个输入文件按原始文件名存放，大小或 SHA 不匹配会拒绝复制。
+Download size is not peak inference memory. Cards show size, actual upstream/mirror, verification state and progress; users can download/use, switch, reverify, cancel or confirm deletion of that model's local files. Deletion is restricted to its listed model/temporary files and preserves books, recognized text, reflow caches and other models. Downloads, deletion and inference are coordinated to avoid concurrent file use.
 
-真实下载校验（默认跳过，显式执行约 80 MiB）：
+On 2026-10-04, [ocr-v1](https://gitee.com/sobranie2406/modu-models/releases/tag/ocr-v1) was published with eight model files and four provenance/license/manifest/checksum assets, without replacing `models-v1`. Recorded checks verified anonymous downloads, byte lengths and SHA-256 for all four Gitee model sets and the V5 upstream files, plus Mac native inference for all four models. These are historical checks, not all-platform accuracy or performance guarantees.
 
-`flutter test --no-pub --dart-define=MODU_VERIFY_OCR_MIRROR=true test/service/ocr_model_live_test.dart`
+Exact files, revisions and checksums are in `lib/service/ocr/ocr_models.dart` at the release commit. V3/V4 pin a Hugging Face revision; V5 pins RapidOCR distribution `v3.9.2` and its official SHA-256. Models retain Apache-2.0 and their original bytes; they are not retrained. There is no GitHub-weights source option for these ONNX files: their actual upstream distributors are Hugging Face and ModelScope.
 
-常规回归：`flutter test --no-pub test/service/ocr_model_store_test.dart test/widgets/settings/ocr_model_test.dart test/service/config_transfer`
+Prepare OCR assets with:
 
-下载器只接受指定来源的 HTTPS 重定向，失败不会暗中换源。识别 CPU 线程数上限 2；v5 更大的字表对应输入宽度及输出张量上限，避免单行推理输出无界增长。
+```sh
+python3 scripts/release/ocr_model_mirror.py --source <downloaded-original-model-directory>
+```
+
+Output goes to `build/ocr-model-mirror` without uploading. Inputs use the original filenames; mismatched size or SHA-256 prevents copying.
+
+Opt-in live verification uses approximately 80 MiB; routine regressions are separate:
+
+```sh
+flutter test --no-pub --dart-define=MODU_VERIFY_OCR_MIRROR=true test/service/ocr_model_live_test.dart
+flutter test --no-pub test/service/ocr_model_store_test.dart test/widgets/settings/ocr_model_test.dart test/service/config_transfer
+```
+
+The downloader accepts only HTTPS redirects allowed for the selected source and does not silently switch on failure. Recognition uses at most two CPU threads. V5's larger alphabet has corresponding input-width and output-tensor limits to bound single-line inference output.
+
+In 1.2.0, Text Reflow/OCR Reflow process the current page or its whole saved crop directly into the reader. Only Extract opens region selection and can populate an editable AI draft without sending. See [scanned-document status](SCANNED_DOCUMENT_DEVELOPMENT.md) for current scope and earlier cancellation/restoration history.

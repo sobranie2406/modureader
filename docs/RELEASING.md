@@ -1,68 +1,72 @@
-# 发布与安装说明
+# Building, releasing and installing Modu
 
-本项目来源于 Anx Reader (MIT) 和 ReadAny (GPL-3.0-or-later)，是独立修改版本。许可证保留在应用包中；对应版本的源码、NOTICE 及来源说明通过 Release 链接提供，不单独发布 notices ZIP。
+Single-edition guide in English. Reviewed against stable **1.2.0+10082**, 2026-10-04.
 
-## 构建
+Modu is an independently modified derivative of Anx Reader (MIT) and ReadAny (GPL-3.0-or-later). Packages retain licenses; each release links its corresponding source, NOTICE and attribution. No separate notices ZIP is distributed.
 
-固定 SDK：Flutter 3.47.2。先运行 flutter pub get、flutter gen-l10n 和 build_runner。CI 使用各平台原生 runner，Windows ARM64 使用 scripts/release/windows-arm64-sdk.mjs 对 CI SDK 的宿主识别做显式兼容补丁，再验证生成文件的 PE 架构。
-分词器使用 third_party/hf_tokenizers 中保留原始 Rust 实现的兼容版本；移动端通过 Rust target 和 Flutter 提供的 NDK / Apple SDK 交叉编译，不使用假分词器替代。
+## Build toolchain
 
-当前源码修正：Android Rust 链接显式设置 16 KB 最大/通用页对齐，打包时检查每个原生库的 ELF LOAD 段及 APK ZIP 对齐。macOS/iOS 构建需追加 `--build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"`，把 `0.1.0-beta.1` 转为合法的 `0.1.0` 营销版本，构建号仍来自 pubspec 的 `+` 后数字；打包时再次校验。预发布标记保留在包文件名和 Release 中。
+Use the SDK pinned in [.github/flutter-version](../.github/flutter-version): Flutter 3.47.2 for 1.2.0. Run flutter pub get, flutter gen-l10n and build_runner before building. CI uses native platform runners. Windows ARM64 applies scripts/release/windows-arm64-sdk.mjs to accommodate host identification in the CI SDK, then verifies output PE architecture.
 
-Windows 封装从 Visual Studio 当前工具链的 Redist 目录复制对应架构的 app-local VC++ CRT DLL，并核验架构、记录版本和哈希到 `WINDOWS-RUNTIME.txt`。不从第三方 DLL 网站下载，不安装到系统目录，不要求管理员权限。构建机必须有该架构的 VC++ Redist 文件；缺失时打包失败。Microsoft 运行库受其自身分发条款约束，不属于应用 GPL 源码。
+The tokenizer retains its original Rust implementation in third_party/hf_tokenizers. Mobile targets cross-compile with the corresponding Rust target and Flutter NDK / Apple SDK; do not substitute a fake tokenizer.
 
-以上修正随 build 6326 重新构建；原 build 6325 下载缓存不包含这些修复。
+Android Rust links with 16 KB maximum/common page alignment; packaging checks ELF LOAD segments and APK ZIP alignment for native libraries. macOS/iOS builds append --build-name using the output of scripts/release/verify_mobile.py --apple-build-name, converting a prerelease marketing version such as 0.1.0-beta.1 to a valid 0.1.0. The build number still comes from pubspec's + suffix; packaging verifies it. Filenames/releases retain preview identifiers. These packaging corrections originally entered build 6326; old build 6325 caches do not contain them.
 
-安装包不内嵌模型权重和分词器，仅保留固定版本及 SHA-256 清单。用户在「设置 → 向量模型」选择 Hugging Face（默认）或 Gitee 按需下载，已校验旧模型继续复用。CI 使用 `python3 scripts/release/bundle_models.py` 获取独立原生推理测试夹具，不使用 `--install-assets`；正式包验证拒绝权重资源，Android 夹具只在测试 APK，桌面测试经本机服务器下载后离线推理。模型镜像与分片校验步骤见 docs/MODEL_MIRROR.md，许可证与来源见 UPSTREAM.md 和 LICENSES。
+Windows packaging copies architecture-matched app-local VC++ CRT DLLs from the current Visual Studio Redist directory, verifies architecture and records versions/hashes in WINDOWS-RUNTIME.txt. Do not download DLLs from unofficial sites or install them into system directories. Missing redistributables fail packaging. Microsoft's redistribution terms apply separately from the app's GPL source.
 
-Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBackend-FDO、libwpe、epoxy、GStreamer 及音频插件；不同发行版可能需要自行从源码构建。Windows 需要 Microsoft Edge WebView2 Runtime。
+Embedding and OCR weights are **not bundled**. Packages contain pinned metadata and SHA-256 manifests; users download models on demand. Existing verified local models can be reused. CI obtains isolated inference fixtures with scripts/release/bundle_models.py, without --install-assets. Production package checks reject bundled embedding weights. Android fixtures belong only in test APKs; desktop tests download from a local test server before offline inference. See [model mirrors](MODEL_MIRROR.md), [UPSTREAM](../UPSTREAM.md) and LICENSES for source and license details.
 
-## 各平台安装方式
+Linux packages target Debian 13 (trixie) and require GTK3, WPE WebKit 2.0, WPEBackend-FDO, libwpe, epoxy, GStreamer and audio plugins. Other distributions may require source builds. Windows needs Microsoft Edge WebView2 Runtime.
 
-- macOS：下载对应处理器的 `.dmg`，打开后将 `Modu.app` 拖到 `Applications`。ARM64 对应 Apple Silicon，x64 对应 Intel。
-- macOS 安装盘固定只展示 `Modu.app` 和 `Applications` 拖放快捷入口，不展示说明文档等其他文件。许可证、来源记录等保留在应用内部 `Contents/Resources/Distribution`，封装后重新签名并校验；今后的 Mac 包均沿用此布局。
-- Windows：下载对应处理器的 `-setup.exe`，运行安装向导。默认仅为当前用户安装，可选桌面快捷方式；在系统“已安装的应用”中卸载。当前源码生成的安装器随应用附带 VC++ CRT，但仍需要系统 Microsoft Edge WebView2 Runtime，不自动下载 WebView2。旧 beta.1 包还需要单独安装 VC++ Redistributable。
-- Linux：下载 `.deb`，在 Debian 13 中执行 `sudo apt install ./Modu-版本-linux-架构.deb`，由 APT 安装所需系统依赖；从应用菜单或 `modureader` 命令启动。卸载使用 `sudo apt remove modureader`，不会主动清除个人书库。x64 对应 Debian amd64，ARM64 对应 arm64。不宣称兼容其他发行版。
-- Android：安装对应 ABI 的 `.apk`，更新时沿用同一专用签名。
-- iOS：下载 `.ipa`，需自行合法签名后安装，详见下节。文件名不含签名状态后缀，实际签名状态仍以 Release 说明为准。
+## Installation
 
-检查与下载共用一个「更新来源」选项，默认优先 GitHub。GitHub 检查失败时，检查与下载来源一起切换为 Gitee；手动修改来源后须重新检查，不在下载过程中切换来源。macOS 安装包交由默认浏览器下载，不再写入应用沙盒缓存；浏览器接手后的下载状态无法由应用监测，不显示“下载完成”或“SHA-256 校验通过”。其他平台维持应用内下载与校验流程。
+| Platform | Installation and requirements |
+| --- | --- |
+| macOS | Open the processor-matched DMG and drag Modu.app to Applications. ARM64 is Apple Silicon; x64 is Intel. |
+| Windows | Run the matching -setup.exe. Installation defaults to the current user with an optional desktop shortcut; uninstall through installed apps. VC++ CRT is included; WebView2 is required and not automatically downloaded. |
+| Linux | On Debian 13, run sudo apt install ./Modu-VERSION-linux-ARCH.deb. Start from the app menu or modureader command. sudo apt remove modureader does not actively clear the personal library. x64 corresponds to amd64; ARM64 to arm64. |
+| Android | Install the ARM64 APK. Updates must retain the same project signing key. Android x64 is not distributed. |
+| iOS | The ARM64 IPA requires iOS 16+ and your own valid signing for the app and Share Extension. It cannot be installed directly without signing. |
 
-若旧版应用内更新后出现“应用程序 Modu 无法打开”，且系统日志指出文件由 Modu 创建并缺少用户同意，请通过浏览器从官方发布页重新下载 DMG，再覆盖安装；不要复用旧的应用内缓存。无需清除书库，不应关闭系统安全保护或在更新代码中删除隔离标记。这项修复不等于 Apple Developer ID 签名或公证。
+Mac disk images expose **only Modu.app and the Applications shortcut**. Attribution and licenses remain inside Contents/Resources/Distribution; packaging re-signs and verifies the app afterward. Other installers likewise keep necessary documents inside app resources/install directories rather than placing separate documentation packages in the release.
 
-桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。今后全平台 Release 仅上传 8 个程序包及各自 SHA-256（共 16 个附件）：Android ARM64、iOS ARM64，以及 macOS/Windows/Linux 各自的 ARM64 与 x64。Android x64 仅用于内部模拟器回归，不封装、不上传、不进入更新清单；历史发行版不因此删除。各平台安装界面不额外摆放文档或独立许可包，必要许可证与来源说明保留在应用资源或安装目录内部。macOS / iOS 文件名省略 `unnotarized` / `unsigned`，不代表获得签名或公证。
+Check and download share one update-source selector, initially GitHub. A check falling back to Gitee switches the whole workflow. Check again after manual changes; do not switch sources during downloading. macOS downloads go to the default browser, not the app's sandbox cache; the app cannot report browser completion or hash verification. Other platforms retain in-app downloads and verification.
 
-## 签名
+If an older in-app macOS update reports that Modu cannot open and system logs indicate creation without user consent, download the official DMG again through a browser and replace the app. Do not reuse the old in-app cache, clear the library, disable system protection or strip quarantine in update code. This workaround is not Developer ID signing or notarization.
 
-- Android 使用本项目专用签名密钥；密钥不提交 Git。CI 使用 ANDROID_KEYSTORE_BASE64、ANDROID_KEYSTORE_PASSWORD、ANDROID_KEY_ALIAS 三个 Secrets。重建/更新 APK 必须沿用同一密钥。android/key.properties 可按 Gradle 的 storeFile/storePassword/keyAlias/keyPassword 配置。
-- macOS 包仅作 ad-hoc 签名，没有 Apple Developer ID 公证。不要关闭整个系统的安全保护；可自行审查源码并本地构建/签名。
-- Windows 首版安装器和应用没有商业 Authenticode 签名；请核对下载来源和 SHA-256。
-- iOS IPA 要求 iOS 16 或更新版本，是 ARM64 真机应用容器，**没有分发签名、不能直接安装**。需用自己的开发者账号和合法配置为主应用及 Share Extension 签名。没有 x64 iPhone 安装包，也没有 App Store / TestFlight 发布。
+## Package layout and signatures
 
-## 发布流程
+Native installers are generated by scripts/release/native_installers.py. Windows uses pinned, SHA-256-verified Inno Setup 6.7.3; the installer engine architecture and packaged app architecture are distinct. Linux uses dpkg-deb and desktop-file-validate. macOS uses hdiutil and read-only mounts to verify signatures, architecture and layout.
 
-### 文档分工
+Full releases contain **eight packages and eight SHA-256 files (16 assets)**: Android ARM64, iOS ARM64, and ARM64/x64 for macOS, Windows and Linux. Android x64 is an internal emulator target only: do not package it, upload it or add it to update manifests. This policy does not delete historical releases. Omitting unsigned/unnotarized filename suffixes does not confer signing or notarization.
 
-- `README.md` 为英文首页，`README_zh.md` 为中文首页，`README_EN.md` 保留旧英文入口跳转；只介绍当前版本的功能、使用入口、截图和安装入口，并保留必要的安装与隐私安全提醒。
-- 项目首页只维护以上中文、英文两份 README；不保留冒充默读介绍的上游多语言首页。依赖目录内的 README 与许可证仍按其原作者要求保留。
-- Release 说明集中列出功能更新、修复、版本号与下载入口；测试明细保存在项目验证记录中，不在首页逐版累积。必要的安装与安全提醒仍须保留。
-- 功能发生变化时直接更新中英文 README 的功能描述，不添加“Beta X 新增/修复”段落。
-- `docs/RELEASE_NOTES.md` 用于准备当前发布的说明；发布后修改说明应同步到对应 Release。历史版本的说明保留在各自 Release 中，不覆盖为新版内容。
-- 从 **1.2.0** 开始，正式版和预发布版的发布说明统一 **英文在前、简体中文在后**，使用独立的 `English` 与 `简体中文` 章节。GitHub 与 Gitee 发布时保持此顺序；不重排 1.2.0 之前的历史说明。更新说明不得删除原有安装提醒、校验和或源码链接。
+- Android uses a dedicated project key, never committed to Git. CI secrets are ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS. Gradle's local key.properties supports storeFile/storePassword/keyAlias/keyPassword. Rebuilds and updates retain the same key.
+- macOS packages use ad-hoc signing, without Apple Developer ID notarization. Do not disable system-wide security; inspect source and build/sign locally if preferred.
+- Windows installers/apps have no commercial Authenticode signature. Verify the source and SHA-256.
+- iOS releases have no distribution signature and no App Store/TestFlight distribution. Sign the app and Share Extension with your own valid account/profiles. There is no x64 iPhone package.
 
-### 发布步骤
+Linux packages include the ONNX Runtime 1.22.0 shared library omitted by an older plugin layout. patchelf makes library lookup relative to installation paths rather than CI paths. Pinned official runtime downloads are hash-checked, with provenance in LINUX-RUNTIME.txt and licenses retained. Historical repackaging fixed distribution, not app business code.
 
-1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
-2. 可先运行 Modu Packages，targets 选择 all、release_tag 填正式标签（例如 v1.0.4）；GitHub Actions 并行生成各平台制品，全部校验通过后才创建对应源码的标签与 Release。也兼容直接推送本仓库版本标签触发构建；既有标签不得指向不同源码。
-3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
-4. 各包内部保留 LICENSE、NOTICE，桌面程序内部保留 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 8 个程序包及各自 SHA-256，不再上传 Android x64 或独立许可 ZIP，不发布缺包的正式版本。
-5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
-6. 按 `docs/UPDATE_MIRROR.md` 将同一批原始安装包发布到 Gitee，逐包核对 SHA-256 后更新清单。Gitee **每次先删除旧应用 Release 和附件，再创建并上传新版发行版**，只保留最新版；开始删除前确认 GitHub 正式包已齐全且旧版仍可下载。本机保留这批原始包以便重试，清理期间镜像会短暂不可用，不得提前发布未验证的新清单。不清理独立模型仓库，不删除 Git 标签、分支或源码。GitHub 保留 1.1.0 起的历史发行版及所有对应源码标签。
+## Documentation conventions
 
-当前使用 `.github/workflows/build.yaml`、`pr-check.yml` 及 `scripts/release/`。旧上游独立打包和商店发布工作流已移除；Fastlane 文件仅为历史开发模板，不是默读现行分发入口，不表示已上架或获得签名服务。
+- README.md is the English homepage; README_zh.md is the Chinese homepage. README_EN.md redirects the legacy English entry. Describe current features, entry points, screenshots and installation without accumulating per-preview change sections.
+- SETTINGS, PRIVACY, CONTRIBUTING and SECURITY have English defaults and separate _zh editions, with reciprocal language links. Other current guides use English when maintained as a single edition.
+- [Documentation index](README.md) distinguishes current guides from historical releases/test evidence. Historical versions, test counts and limits remain historical; third-party originals and licenses are preserved.
+- Update both homepages and paired user documents when functionality changes. User guide screenshots show actual layout; pair phone settings with Mac results and separate English/Chinese content.
+- docs/RELEASE_NOTES.md prepares the current release description. Published changes must also update the corresponding release, not overwrite an older release with a new version's text.
+- Starting with **1.2.0**, stable and preview notes use **English first, 简体中文 second**, in separate sections on both GitHub and Gitee. Do not reorder older versions or remove installation warnings, checksums or source links.
 
-历史压缩包迁移可手动运行 `Native desktop installers` 工作流：校验现有附件与标签源码身份后，仅重新封装安装器，不重新编译应用、不移动既有标签。`INSTALLER-SOURCE.txt` 单独记录安装脚本提交和原始附件校验和。此迁移流程依赖旧附件仍在 Release；迁移完成后的新版本直接使用常规构建流程。
+## Release procedure
 
-Linux 封装还会补齐原插件漏打包的 ONNX Runtime 1.22.0 实体共享库，并用 `patchelf` 将 ELF 库搜索路径改为相对安装目录，避免依赖 CI 构建机路径。微软官方运行库下载经过固定 SHA-256 校验；来源与修改记录见包内 `LINUX-RUNTIME.txt`，原始许可仍随包提供。这是运行库分发修正，不是业务代码重新编译。
+1. Update pubspec.yaml and release notes; run relevant security checks and regression tests. Distinguish builds, automated checks and device validation.
+2. Run Modu Packages with selected targets and the intended release tag, or push an authorized version tag. CI builds platform assets in parallel; create the source tag/release only after verification. Never retarget an existing tag to different source.
+3. Failed targets must not produce apparently successful assets. Fix and rebuild them; a release asset proves production, not full device acceptance.
+4. Retain LICENSE/NOTICE inside packages and SOURCE.txt inside desktop installations. Publish hashes and the exact tagged source. Prerelease tags create prereleases. A full stable release must verify all eight packages; scoped previews publish only the requested targets.
+5. Do not run upstream store publishing, Telegram notification or signing-service workflows.
+6. Mirror the identical original packages following [UPDATE_MIRROR.md](UPDATE_MIRROR.md). On Gitee, confirm deletion authority and that GitHub retains the old release, then delete only the old app release/assets before uploading the new release. Verify every hash before updating the manifest. Retain local packages for retries; do not publish an unverified manifest. Do not delete model mirrors, source, tags or branches. GitHub retains release history from 1.1.0 onward.
 
-对应源码： https://github.com/sobranie2406/modureader 。依赖的固定版本、源地址、许可见锁文件及 UPSTREAM.md；发行包自带 Flutter 生成的第三方许可汇总。
+Current automation is .github/workflows/build.yaml, pr-check.yml and scripts/release/. Fastlane/store files are historical templates, not Modu's distribution path.
+
+The historical Native desktop installers workflow can repackage existing assets after verifying their hashes and tag identity, without recompiling the app or moving tags. INSTALLER-SOURCE.txt records packaging-script source and original hashes. This requires old assets to remain available; new releases use the normal build workflow.
+
+[Source repository](https://github.com/sobranie2406/modureader) · [Settings](SETTINGS.md) · [Privacy](../PRIVACY.md) · [Upstream](../UPSTREAM.md)

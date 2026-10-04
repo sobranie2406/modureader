@@ -1,58 +1,47 @@
-# Android 本地推理与震动移除检查（2026-09-05）
+# Android local inference and haptics removal checks (2026-09-05)
 
-## 问题与证据边界
+> Historical record of the Beta1-era checks and Debug package described below; this is not certification of the latest 1.2.0 release. See the [documentation index](README.md).
 
-用户报告小米 15 Ultra 点击四个内嵌模型的“测试推理”均闪退；
-尚无 Android 版本、崩溃堆栈或连接的真机，不能确认该手机的最终根因。
+## Problem and evidence limits
 
-四个模型共用 flutter_onnxruntime 1.8.4 的 Android 原生库，插件原来固定
-ONNX Runtime 1.23.0。上游报告 1.23.x 在部分 ARM Android 设备上因
-CPU 指令识别错误发生 SIGILL；Dart 的异常捕获不能拦截这类进程崩溃。
+A user reported that tapping “Test inference” for each of the four bundled models crashed the app on a Xiaomi 15 Ultra.
+The Android version, crash stack and a connected device were unavailable, so the final root cause on that phone could not be confirmed.
 
-- 原生崩溃记录：<https://github.com/microsoft/onnxruntime/issues/27282>
-- 后续报告与修复确认：<https://github.com/microsoft/onnxruntime/issues/27884>
-- SME1/SME2 区分修正：<https://github.com/microsoft/onnxruntime/pull/25760>
+All four models shared the Android native library from flutter_onnxruntime 1.8.4, which originally pinned ONNX Runtime 1.23.0.
+Upstream reports described SIGILL on some ARM Android devices with 1.23.x due to incorrect CPU instruction detection; Dart exception handling cannot intercept such process crashes.
 
-## 本轮修改
+- Native crash report: <https://github.com/microsoft/onnxruntime/issues/27282>
+- Follow-up reports and fix confirmation: <https://github.com/microsoft/onnxruntime/issues/27884>
+- SME1/SME2 distinction fix: <https://github.com/microsoft/onnxruntime/pull/25760>
 
-- 只将 Android 的 onnxruntime-android 固定到 1.24.3，保持 CPU 推理及现有
-  单会话串行调度，Apple/Windows/Linux 的运行库版本不变。
-- 曾尝试 1.24.4，但 Maven Central 没有 Android 构件，构建失败后未保留此配置。
-  对比上游 1.24.3 与 1.24.4，后者未修改 CPU 检测或 MLAS；1.24.3 已有
-  SME1/SME2 修正且有正式 Android 构件。许可证随实际版本更新。
-- 删除震动服务、开发者震动测试页、相关设置及 16 种语言文案，删除两个震动插件。
-- 禁用底栏反馈，用 Manifest 合并规则阻止依赖重新引入 VIBRATE 权限；
-  Android Activity 关闭 DecorView 触觉反馈，覆盖 Flutter 框架长按反馈路径。
-  不修改系统输入法自己的震动设置。
-- CocoaPods 重新生成锁文件以移除震动插件，并使锁文件与现有 Flutter 插件一致；
-  Apple ONNX 仍为 1.23.0，未升级 Apple 运行库。
+## Changes in this round
 
-## 已验证
+- Pinned only Android's onnxruntime-android to 1.24.3, retaining CPU inference and the existing single-session serial scheduling. Apple/Windows/Linux runtime versions were unchanged.
+- Tried 1.24.4, but Maven Central had no Android artifact; the build failed and that configuration was not retained. Comparing upstream 1.24.3 and 1.24.4 showed no CPU detection or MLAS changes in the latter; 1.24.3 already contained the SME1/SME2 fix and had an official Android artifact. Licenses were updated to match the actual version.
+- Removed the vibration service, developer vibration test page, related settings and strings in 16 languages, and two vibration plugins.
+- Disabled bottom-navigation feedback and used Manifest merger rules to prevent dependencies from reintroducing the VIBRATE permission. The Android Activity disabled DecorView haptic feedback, covering Flutter's long-press feedback path. The system keyboard's own vibration settings were unchanged.
+- Regenerated CocoaPods lockfiles to remove the vibration plugins and align them with the existing Flutter plugins. Apple ONNX remained at 1.23.0; the Apple runtime was not upgraded.
 
-- Flutter 全量测试：205 通过、2 跳过（需要显式开启的联网测试）。
-- 最终版本配置的平台回归检查：3 通过。
-- 阅读器 JavaScript 回归：10 通过；发布打包脚本测试：18 通过。
-- Gradle debugRuntimeClasspath：1.23.0 被规则替换为 1.24.3。
-- 1.24.3 官方 AAR 内 ARM64 / x86_64 的 ONNX 及 JNI 库：64 位架构、16 KB
-  ELF LOAD 对齐检查通过。
-- Android ARM64 Debug APK 构建成功，7 个原生库架构及 16 KB ELF 对齐通过；
-  APK zipalign 16 KB 检查、v2 签名校验通过。
-- ONNX 和 JNI 的合并输入与官方 1.24.3 AAR 完全一致，APK 内库与构建去符号后的
-  输出完全一致。AAR 与最终 APK 不应直接按全文件哈希比较，因为构建会剥离符号。
-- APK 包含全部四个 ONNX 模型及新版许可证，最终权限列表不含 VIBRATE。
+## Verified
 
-本地测试包：`build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk`（约 246 MiB）。
-SHA-256：`4569628afae1ac88c20e2c814101a7d4db7fc09ee7057fdc61c5bc1a47efbf1f`。
-这是 Debug 签名，不是正式更新包，不能保证覆盖安装已有 Beta1；不要为安装它直接
-卸载现有应用而丢失书籍、笔记或设置。未重新构建或发布正式签名版本。
+- Full Flutter suite: 205 passed, 2 skipped (network tests requiring explicit enablement).
+- Platform regression checks for the final version configuration: 3 passed.
+- Reader JavaScript regressions: 10 passed; release packaging script tests: 18 passed.
+- Gradle debugRuntimeClasspath: the rule replaced 1.23.0 with 1.24.3.
+- ONNX and JNI libraries for ARM64 / x86_64 in the official 1.24.3 AAR passed 64-bit architecture and 16 KB ELF LOAD alignment checks.
+- Android ARM64 Debug APK built successfully; architecture and 16 KB ELF alignment checks passed for 7 native libraries. APK zipalign 16 KB checks and v2 signature validation passed.
+- ONNX and JNI merge inputs matched the official 1.24.3 AAR exactly; libraries in the APK matched the build's stripped outputs exactly. Whole-file hashes of the AAR libraries and final APK libraries should not be compared directly because the build strips symbols.
+- The APK contained all four ONNX models and updated licenses; the final permission list did not include VIBRATE.
 
-## 真机验收仍待执行
+Local test package: `build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk` (about 246 MiB).
+SHA-256: `4569628afae1ac88c20e2c814101a7d4db7fc09ee7057fdc61c5bc1a47efbf1f`.
+This was Debug-signed, not an official update package, and could not be guaranteed to install over an existing Beta1. Do not uninstall the existing app merely to install it and lose books, notes or settings. No officially signed version was rebuilt or published.
 
-1. 保留现有应用数据，在使用相同正式签名的测试版本中逐个测试中文 BGE、英文 BGE、
-   MiniLM 和 E5，记录实际输出维数及是否闪退。
-2. 对书籍排队向量化，同时打开其他书籍阅读；确认完成、取消、重新向量化均正常。
-3. 检查底栏切换、统计卡片、长按菜单与文字选择不再触发应用震动。
-4. 若仍闪退，采集复现时的 Android crash buffer，区分 SIGILL、SIGSEGV、
-   Java 异常和系统低内存终止后再作针对性修复。日志分享前应去除私人信息。
+## Device acceptance still pending
 
-本轮不等同于真机修复验收，不会自动提交代码或替换 GitHub Beta1 发布包。
+1. Preserve existing app data and test Chinese BGE, English BGE, MiniLM and E5 individually in a test version with the same official signature. Record actual output dimensions and whether the app crashes.
+2. Queue book vectorization while reading other books; verify completion, cancellation and re-vectorization.
+3. Check that bottom-navigation switching, statistics cards, long-press menus and text selection no longer trigger app vibration.
+4. If crashes persist, collect the Android crash buffer during reproduction and distinguish SIGILL, SIGSEGV, Java exceptions and system low-memory termination before applying a targeted fix. Remove private information before sharing logs.
+
+This round did not constitute acceptance of the fix on a device and did not automatically commit code or replace the GitHub Beta1 release package.

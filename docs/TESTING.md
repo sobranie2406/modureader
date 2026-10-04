@@ -1,30 +1,48 @@
-# 测试范围
+# Testing policy and historical evidence
 
-首个公开 Beta 前的基线：Flutter 161 项通过、2 项需要显式联网启用的测试跳过；JavaScript 8 项通过；发行架构校验 4 项通过。
-合成 PDF / EPUB 测试夹具位于 docs/qa/2026-09-05/full-audit/fixtures，均不含私人资料。
+> Current testing policy applies to 1.2.0. Historical records below concern the pre-public-Beta baseline and 0.1.0-beta.1 checks stated there; they are not certification of the latest 1.2.0 release. See the [documentation index](README.md).
 
-macOS 真实界面覆盖正常/密码/损坏 PDF 导入、自动索引及重新向量化、PDF 目录/页码、EPUB 正文显示、原生全屏与返回，以及部分设置和加密提示。
-没有据此宣称所有 AI、TTS、翻译、脚注、备份恢复、长期队列或所有平台已验收。
-CI 编译结果与设备运行结果应分开记录。不要把空安装包或仅有 workflow 配置视作成功。
+## Current testing policy for 1.2.0
 
-Linux CI 发现并修复了平台识别遗漏及相关目录/数据库分支。原生打包独立核验 ELF/PE/Mach-O 架构；Android 比对专用签名证书指纹；macOS 验证 ad-hoc 签名；Linux 检查动态库链接。以上不代表所有平台的交互功能均已实机测试。
+Released baseline: Modu **1.2.0+10082**, source revision [77dc238f](https://github.com/sobranie2406/modureader/tree/77dc238fb2ae2ce02455bd80c500ee9fd140f219). Released-version facts in this overview refer to that revision. Use the publishing repository and this source revision to identify the release; an identically named upstream tag is not the same product.
 
-## 2026-09-05 发布包复查
+Record the exact source revision, version/build, platform, architecture, commands, results and skipped tests for each verification run. Historical counts below remain evidence of their original runs and must not be presented as current totals.
 
-- 本机重新执行 Flutter 业务测试 163 项通过，包含显式启用的 Edge TTS MP3 合成与免费 Google 翻译联网测试；JavaScript 8 项通过，打包检查 5 项通过。联网测试使用固定合成文本，没有使用私人书籍或付费 API Key。
-- macOS ARM64 发布包实际启动成功，确认版本为 0.1.0-beta.1；设置分类、十个 AI 阅读技能、提示词预览弹窗、四个本地向量模型目录均可打开。README 中两张截图来自这个发布包。
-- 同一发布包通过文件选择器导入合成 PDF，实际显示英文、中文正文及图像页，并完成翻页。该书自动索引进入失败状态，当时所选本地模型未下载；不把导入成功当作向量化成功。未覆盖本轮 EPUB、密码/损坏 PDF 或全部阅读操作。
-- 单独增加的新安装系统朗读探针复现 `No voice selected for TtsService.system`：未选择声音时业务方法在调用原生 speak 前失败。此项不包含在前述 163 项既有通过测试中，仍待修复。
-- 源码和插件清单确认 Linux 系统 TTS 没有实现，但设置仍显示并默认选择它；尚未完成 Linux 实机验证，不由此推断在线 TTS 也不可用。
-- Windows、Linux、Android、iOS 的发布包尚未完成全功能 GUI 验收。macOS 的局部通过同样不代表付费 AI、真实模型推理、音频播放、WebDAV 服务端和破坏性备份恢复已全量验收。
+The released revision's quality workflow, [pr-check.yml](https://github.com/sobranie2406/modureader/blob/77dc238fb2ae2ce02455bd80c500ee9fd140f219/.github/workflows/pr-check.yml), runs Flutter analysis and tests, the native inference worker lifecycle regression, Python release/package and project checks, and reader JavaScript regressions. Its [package workflow](https://github.com/sobranie2406/modureader/blob/77dc238fb2ae2ce02455bd80c500ee9fd140f219/.github/workflows/build.yaml) adds native build and package validation. Report analyzer/plugin failures, warnings and skipped network or device tests explicitly; a configured workflow or successful compilation alone is not runtime acceptance.
 
-## 原生安装器复查（2026-09-05）
+Keep automated checks, browser fixtures, installer/signature/architecture checks and installed-device acceptance separate. Use synthetic books and test credentials, and enable live network tests explicitly. Verify affected behavior on the relevant native platforms before claiming device acceptance; browser or host-only checks cannot establish that result.
 
-[工作流 33953107529](https://github.com/sobranie2406/modureader/actions/runs/33953107529) 的六个桌面目标全部通过，打包单元测试增至 10 项。
+For 1.2.0, the distribution scope is eight packages: Android ARM64, iOS ARM64, and ARM64/x64 for macOS, Windows and Linux, each with SHA-256. Android x64 remains an internal emulator target. The [release and installation instructions at 77dc238f](https://github.com/sobranie2406/modureader/blob/77dc238fb2ae2ce02455bd80c500ee9fd140f219/docs/RELEASING.md) record that release's package, signing and source requirements; consult the [maintained instructions](RELEASING.md) for subsequent policy changes. Fastlane metadata is a historical development template rather than a current distribution path.
 
-- macOS x64 / ARM64：生成 DMG、磁盘映像完整性检查、只读挂载、Applications 拖放链接、应用深层 ad-hoc 签名、原生架构和源码记录检查。
-- Windows x64 / ARM64：在对应架构临时 CI 系统中实际执行 EXE 静默安装，检查程序和 DLL 架构，执行卸载，并检查安装目录外的合成文件保留。修正了 ARM64 测试等待卸载器自身清理的竞态。
-- Linux x64 / ARM64：在 Debian 13 容器中用 APT 实际安装 DEB 及系统依赖，检查菜单入口、ELF 架构、主程序和包内共享库的动态链接，再实际卸载。
-- 上述 Linux 检查发现并修正了原压缩包漏装 ONNX Runtime 实体库以及插件依赖 CI 绝对路径的问题；新 DEB 补齐同版本官方库并使用相对 RPATH。旧 tar.gz 不再作为应用下载入口。
+This overview states policy; it does not report a new test run, package build or 1.2.0 certification.
 
-这些是安装器与运行依赖验证，不等于 Windows / Linux 全功能 GUI 验收，也不意味着前述 TTS 业务问题已修复。此次没有重新编译应用业务代码；Android / iOS 安装包没有改动。
+## Historical evidence: testing scope
+
+Baseline before the first public Beta: Flutter 161 passed, 2 tests requiring explicit network enablement skipped; JavaScript 8 passed; release architecture validation 4 passed.
+Synthetic PDF / EPUB fixtures are in docs/qa/2026-09-05/full-audit/fixtures and contain no private data.
+
+Actual macOS UI checks covered normal/password-protected/corrupt PDF imports, automatic indexing and re-vectorization, PDF contents/page numbers, EPUB body display, native fullscreen and return, and selected settings and encryption prompts.
+These checks did not establish acceptance of all AI, TTS, translation, footnotes, backup restoration, long-running queues or all platforms.
+CI compilation results and device runtime results must be recorded separately. An empty package or workflow configuration alone must not be treated as success.
+
+Linux CI identified and fixed missing platform detection and the related directory/database branches. Native packaging separately verified ELF/PE/Mach-O architectures; Android checked the dedicated signing certificate fingerprint; macOS verified ad-hoc signing; Linux checked dynamic library linkage. These checks did not mean that all platforms' interactive features had been tested on devices.
+
+### Release package review (2026-09-05)
+
+- Local Flutter business tests were rerun: 163 passed, including explicitly enabled live Edge TTS MP3 synthesis and free Google translation tests; JavaScript 8 passed; packaging checks 5 passed. Network tests used fixed synthetic text, with no private books or paid API keys.
+- The macOS ARM64 release package launched successfully and was confirmed as version 0.1.0-beta.1. Settings categories, ten AI reading skills, prompt-preview dialogs and the catalog of four local vector models opened successfully. Two README screenshots came from this release package.
+- The same release package imported a synthetic PDF through the file picker, displayed English and Chinese body text and image pages, and completed page turns. Automatic indexing of that book failed because the selected local model had not been downloaded; successful import was not treated as successful vectorization. This round did not cover EPUB, password-protected/corrupt PDF or all reading operations.
+- A separately added fresh-install system-narration probe reproduced `No voice selected for TtsService.system`: without a selected voice, the business method failed before calling native speak. This probe was not included in the preceding 163 existing passing tests and still required a fix.
+- Source and plugin inventories confirmed that Linux system TTS was not implemented, although settings still displayed and selected it by default. Linux device verification was incomplete; this did not imply that online TTS was also unavailable.
+- Windows, Linux, Android and iOS release packages had not completed full GUI acceptance. Partial macOS success likewise did not establish complete acceptance of paid AI, real model inference, audio playback, WebDAV servers or destructive backup restoration.
+
+### Native installer review (2026-09-05)
+
+All six desktop targets in [workflow 33953107529](https://github.com/sobranie2406/modureader/actions/runs/33953107529) passed; packaging unit tests increased to 10.
+
+- macOS x64 / ARM64: DMG generation, disk-image integrity checks, read-only mounting, the Applications drag-and-drop link, deep ad-hoc application signing, native architecture and source-record checks.
+- Windows x64 / ARM64: actual silent EXE installation in temporary CI systems of the corresponding architecture, application and DLL architecture checks, uninstallation, and checks that synthetic files outside the installation directory were retained. A race in the ARM64 test's wait for the uninstaller to clean itself up was fixed.
+- Linux x64 / ARM64: actual APT installation of the DEB and system dependencies in Debian 13 containers, checks of the menu entry, ELF architecture and dynamic linkage of the main executable and bundled shared libraries, followed by actual uninstallation.
+- These Linux checks identified and fixed a missing physical ONNX Runtime library in the original archive and a plugin dependency on absolute CI paths. The new DEB included the same-version official library and used relative RPATH. The old tar.gz was no longer offered as the application download entry.
+
+These were installer and runtime-dependency checks, not full Windows / Linux GUI acceptance, and did not mean that the TTS business issues above had been fixed. Application business code was not recompiled in this round; Android / iOS packages were unchanged.

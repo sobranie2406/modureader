@@ -1,334 +1,378 @@
-# 扫描 PDF / 图片 EPUB 开发规格与完成矩阵
+# Scanned-document development and release status
 
-## 授权、基线与证据
+## Current: Modu 1.2.0+10082
 
-- 2026-10-03 用户在本任务确认「现在允许」开发；基线为已发布 `android-1.1.12-preview.3`（`e13dd334`）。允许修改代码和开发文档，不打包、不发布、不安装。
-- 已撤销的选词翻页修改不恢复。该问题单独记录：旧 `book.js` 的页底 `selectionchange` 自动跨页计时器未在松手/取消时结束；本地汉王快照还发现跨列选区。尚不能将两个快照视为完整的同一次事件链。
-- 参考来源：本机 USB 连接汉王 N10Pro 内置阅读器 `hanvon.aebr.hvreader` 的界面与只读接口调研（2026-10-03）。参考入口、分组、顺序、模式联动，以 Modu 自有组件实现；不引入汉王 APK、专有 .so 或反编译源码。
-- 分工：本任务维护源码、文档及自动化；本机任务采集日志、执行汉王实机验收。下述菜单调查结果不等于 Modu 已实现或已验收。
+This section describes the stable Modu release, using the publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Uncommitted application changes are not evidence for this guide. The dated development records below are translated in full, preserving their milestones and test results; no tests were run as part of this documentation update.
 
-### 当前范围：按需本地 OCR 与提取恢复（2026-10-04）
+The 2026-10-03 cancellation of OCR, reflow and extraction was an earlier scope decision. Later development restored and implemented on-demand local OCR, reader reflow and extraction before the stable release. Earlier statements such as “cancelled”, “pending”, “Preview 3 only” and “not packaged or released” describe their recorded stages, not the current release. Whole-book OCR, page-image export and the proposed comprehensive scanned-document integration project are not implied by that restoration.
 
-用户本轮明确要求恢复区域识别、按需下载 OCR 模型和提取至 AI。此授权覆盖下文历史取消记录中的对应项目；没有恢复整本 OCR、页面导出及扫描文档功能整合专项。
+### Formats and classification
 
-- 仅 PDF / 导入确认的图片 EPUB 底部工具栏新增「提取」。普通文字书、书架和全局设置不增加扫描功能。根据后续用户要求恢复 PDF 面板齿轮，用于 OCR / 提取后文字的样式，而非原图样式。
-- OCR 样式齿轮在文档版式及提取/重排面板共用同一个编辑器：字体、字号、字体粗细、行间距、字间距、侧边距、两端对齐，提供即时样例预览、应用、取消及恢复默认。按书保存到独立 `documentTextStyles`，不写普通书 BookStyle，不切换原版阅读模式，不触发 OCR 或修改提取原文及 AI 草稿。现有重排文字应用后立即更新，关闭重开沿用保存值。
-- 汉王 07 / 14 参考：原页预览、区域识别 / 整页识别、可拖动框及四角手柄、本地识别、停止、提取。以响应式黑白原生组件实现，不复用专有代码、不放无实现的云识别按钮。
-- 优先提取当前所选页/区域的已有文字层；无文字时提示下载 PP-OCRv4 中英文移动模型；也可手动强制 OCR。版本、文件大小和 SHA-256 固定，下载到私有应用支持目录，不作为安装资产、不开机恢复或后台整书任务。14.9 MiB 是模型下载量，不是内存峰值。
-- 识别工作运行在独立 Dart isolate，Android 原生推理使用专用后台串行队列；单次最多 2MP、检测最长边 960、最多 300 个文字区。停止后丢弃结果并关闭模型会话，已下载的有效模型保留供下次离线使用。
-- 「文字重排」是当前页/选区横排文字预览，可调字号、行距、切回原版；不改变原书，不冒充完整分页引擎或多栏/表格语义重建。复杂多栏选单栏，竖排和倒置页面本轮不保证识别。
-- 「提取至 AI 输入框」打开现有 AI 对话，填入提取原文，保留会话，不自动发送。重排预览的合行不会改写 AI 草稿原文。原书页及模型下载不传给 AI 服务，只有用户后续点击发送才发送输入框内容。
-- 下文旧阶段、旧菜单表及「已取消」记录保留为历史证据；冲突时以本节为准。其他 Preview 3 隔离要求继续有效。
-- 本轮验证：55 项 Flutter、79 项 JS 回归通过，覆盖普通书菜单隔离、模型按需下载交互、文字层优先、强制 OCR、区域手柄、取消丢弃、跨页重排与 320/844/1024/1440 宽布局。私有真实书页截图核对手机与桌面版式。
-- 独立 macOS 原生验证入口通过真实下载、两文件 SHA-256 校验、识别中取消并再次识别；英文灰底样张约 0.7 秒，真实中文扫描页约 2.9 秒（本机单次开发构建样本，不是全平台性能保证）。Android arm64 Kotlin 编译通过；没有连接安卓设备做实机验收。本轮不生成安装包、不安装、不发布。
+- PDFs use the document reading controls. EPUB, MOBI, AZW3 and FB2 use them when import classification or a manual bookshelf override identifies an image book. Ordinary text books, including books with covers or illustrations, retain their normal reader and menus; PDF controls do not apply to them.
+- Import classification samples at most five body sections, excluding known covers, contents and non-body sections. It uses image/text evidence rather than a filename extension or fixed-layout flag alone. Results are stored per book and source fingerprint; opening a book reads that classification without new sampling or hashing. Uncertain or failed detection falls back to ordinary reading. Bookshelf actions can set a scanned image book or restore ordinary reading; replacing the source invalidates the old decision.
+- Local import and remote-library import share classification. Downloading a missing bookshelf file through WebDAV can populate its local classification without adding another book, changing progress or starting vectorization. Older unclassified image books can be corrected manually.
 
-### 历史范围调整（2026-10-03，第六阶段之后）
+### Original-page reading
 
-用户明确取消 OCR、文字重排、提取与导出，以及扫描文档的功能整合专项（书签/搜索/听书/批注定位统一）。这些项目从后续开发和验收范围移除，不是暂缓，也不计作待完成工作。
+The document panel provides 100%–1500% visible-region zoom, fit-page/fit-width, rotation, panning, single-page and continuous-scroll reading. Crop and split editing supports page/book/odd-even scopes, seven split layouts and reading order. Per-page automatic crop uses each page's own bounds and saved safety margin; uncertain pages retain the full page. Split navigation advances within the original page before moving to the next one. Original page identity and reading position are retained.
 
-保留原版 PDF/图片 EPUB 阅读、检测、缩放、旋转、单页/卷轴、裁边/分格、图像增强、相关阅读设置与设备适配。保留软件原有的搜索、听书、批注、复制和备份/导出等能力及已有文字层，不因本次缩减范围删除。第一至第六阶段记录是历史证据，其中提到的旧后续计划以本节和最新依赖顺序为准。
+Image processing includes text darkening, contrast, darkening, bleaching, sharpening and conservative scanned-watermark fading. Crop and enhancement alter display and saved reading settings; they never overwrite the PDF or image-book source file. Watermark fading can leave marks or affect light artwork, so compare with the original. It does not reconstruct obscured text. Rendering and caches are bounded, but their pixel/file budgets are not guarantees of total process memory use.
 
-## 1. 目标与格式
+### OCR, reader reflow and Extract
 
-### 汉王实机视觉参考（2026-10-04 接收）
+- OCR models are optional downloads, not bundled weights or automatic startup downloads. V4 Chinese/English is recommended (14.9 MiB); V5 Chinese/English is optional (20.5 MiB, upstream ModelScope); V3 Chinese/English (12.5 MiB) and V3 English (10.9 MiB), like V4, use Hugging Face upstream. Gitee mirrors are available. Pinned size and SHA-256 checks apply; source failure does not silently change the selected source. See [model downloads](MODEL_MIRROR.md).
+- Text Reflow and OCR Reflow put selectable text directly into the reading area. They process the current original page, or the whole current page within its saved crop boundary. A split cell, zoom or visible viewport does not narrow that range. Text Reflow prefers an existing text layer and uses local OCR when needed; OCR Reflow forces recognition. Returning to the original page preserves its location.
+- Only Extract opens the region-selection editor; it also offers whole-page extraction. Extracted text can be placed in the existing AI conversation's editable input without sending it. Sending requires the user's action. Reflow formatting does not rewrite the extraction draft. OCR runs locally; page images and model downloads are not sent to the AI service by extraction.
+- The shared document text-style editor controls font, size, weight, line/letter spacing, margins and justification. Per-book styles and page reflow caches are separate from ordinary book styles and source files. Reflow annotations use original-page/text-version/range anchors rather than pretending to be original-page EPUB CFIs.
+- Stop cancels the current recognition and discards its result; valid downloaded models remain for offline reuse. Work is page-based with bounded input and inference, not an automatically resumed whole-book task. Complex columns, vertical text, tables and inverted pages are not guaranteed to reconstruct faithfully.
 
-15 张原始截图及配套 XML 已保存到 [参考资源目录](references/hanvon-pdf/README.txt)，可通过 [截图浏览索引](references/hanvon-pdf/index.html) 对照。
-接收 ZIP SHA-256：`749adaccf95022fe5b0d760867cb0437ddfcb48f1b97ac237b7d34aa3d6f9b21`；15 张 PNG 均已逐项匹配 [manifest](references/hanvon-pdf/manifest.json)。
+### E-Ink and local indexing
 
-| 界面 | 参考 | 本轮采用范围 |
+Document refresh controls require E-Ink mode and a supported Android device refresh interface. Unsupported devices cannot perform the hardware action; the app does not simulate a full refresh or promise firmware waveform modes. Manual refresh and every-N-original-pages refresh are subject to capability and foreground/focus checks. No new physical-device acceptance is claimed here.
+
+Vector indexes remain local. WebDAV vector-index synchronization and its setting are removed, while local indexing, retrieval and Stop Vectorization remain available. See [indexing and reading controls](INDEX_SYNC_AND_READING_CONTROLS.md).
+
+### Release status and evidence limits
+
+Stable `1.2.0+10082` supersedes the Android-only Preview 3/4 development baselines. Its release matrix has eight packages: Android ARM64, iOS ARM64, and ARM64/x64 for macOS, Windows and Linux; there is no Android x64 package. See [update mirror guidance](UPDATE_MIRROR.md) for source selection and the macOS browser-download boundary.
+
+Historical test counts, build checks, device observations and performance samples below remain evidence of those stages only. They are not new release-wide testing, proof of every E-Ink device, or a claim that private book pages are published. Current public artwork rules are in [display assets](images/README.md).
+
+## Archived development specification and milestones (2026-10-03–04)
+
+The following specification and records are translated in full from the development document. Their scope decisions, proposed menus, matrices and stage-specific “current” labels are historical; the 1.2.0 release status above takes precedence. The older matrix is not the stable release completion matrix. Translation preserves recorded testing evidence without claiming new tests.
+
+## Historical scanned PDF / image EPUB specification and completion matrix
+
+## Authorization, baseline and evidence
+
+- On 2026-10-03, the user confirmed “development is now allowed”; the baseline was published `android-1.1.12-preview.3` (`e13dd334`). Code/development-document changes were authorized, without packaging, publishing or installation.
+- The reverted selection/page-turn change was not restored. Its separate issue record noted that the old `book.js` bottom-of-page `selectionchange` auto-turn timer did not finish on release/cancel; local Hanvon snapshots also showed selections crossing columns. The two snapshots could not yet establish a complete single event sequence.
+- Reference: UI and read-only interface research on the USB-connected Hanvon N10Pro built-in reader `hanvon.aebr.hvreader` (2026-10-03). Entry points, groups, order and mode interactions informed Modu's own components; no Hanvon APK, proprietary .so or decompiled source was introduced.
+- Responsibilities: this task maintained source, documents and automation; the local task collected logs and performed Hanvon device acceptance. The menu observations below do not establish Modu implementation or acceptance.
+
+### Scope at the restoration stage: on-demand local OCR and extraction (2026-10-04)
+
+The user explicitly restored region recognition, optional OCR-model downloads and extraction into AI. This superseded the corresponding historical cancellations below, without restoring whole-book OCR, page export or the comprehensive scanned-document integration project.
+
+- Extract was added only to the PDF/import-confirmed image EPUB bottom toolbar. Ordinary text books, the bookshelf and global settings did not gain scanning controls at this stage. A later user request restored the PDF panel gear for OCR/extracted-text styles rather than original-image styling.
+- The document-layout and extraction/reflow panels shared one OCR text-style editor: font, size, weight, line/letter spacing, side margins and justification, with live sample preview, Apply, Cancel and Reset. Per-book `documentTextStyles` were separate from ordinary BookStyle. Applying did not switch original-page mode, start OCR, change extracted source text or rewrite AI drafts. Existing reflow updated immediately, and reopening reused saved values.
+- Hanvon references 07/14 informed original-page preview, region/whole-page recognition, draggable frame/four corner handles, local recognition, Stop and Extract. Responsive native black-and-white components were used, without proprietary code or unimplemented cloud-recognition buttons.
+- Extraction preferred the selected page/region's existing text layer. Missing text prompted downloading PP-OCRv4 Chinese/English mobile weights; forced OCR was also available. Versions, sizes and SHA-256 were pinned. Files went to private application support, not installer assets, startup recovery or whole-book background tasks. The 14.9 MiB figure was download size, not peak memory.
+- Recognition ran in a separate Dart isolate; Android native inference used a dedicated serial background queue. Each job had a 2MP input limit, detection long-edge limit of 960 and at most 300 text regions. Stop discarded results and closed model sessions while retaining verified weights for offline reuse.
+- At this stage Text Reflow was a horizontal current-page/selected-region text preview with size/line-spacing controls and return to original. It did not alter the book or claim full pagination or semantic multi-column/table reconstruction. Complex columns required selecting one column; vertical/inverted pages were not guaranteed.
+- Extract to AI Input opened the existing conversation, filled original extracted text, retained the conversation and did not send automatically. Reflow line joining did not rewrite the AI draft. Neither book-page images nor model downloads went to the AI service; only a subsequent Send action transmitted input.
+- Earlier stages/menu tables/cancellation entries remained historical evidence. This restoration scope took precedence at that time, while other Preview 3 isolation requirements remained.
+- Recorded verification: 55 Flutter and 79 JS regressions passed for ordinary-book menu isolation, optional model downloads, text-layer preference, forced OCR, region handles, cancellation/result discard, cross-page reflow and widths 320/844/1024/1440. Private real-book screenshots checked phone/desktop layouts.
+- A separate macOS native check covered actual downloads, both SHA-256 checks, cancellation during recognition and retry. A gray-background English sample took about 0.7 seconds; a real Chinese scan took about 2.9 seconds, each a single local development-build sample rather than a cross-platform guarantee. Android ARM64 Kotlin compiled; no Android device was connected for acceptance. No installers were generated, installed or published at this stage.
+
+### Historical scope reduction (2026-10-03, after stage six)
+
+The user cancelled OCR, text reflow, extraction/export and comprehensive scanned-document bookmark/search/listening/annotation positioning. At that stage these were removed from development/acceptance, not deferred or counted as pending.
+
+Original PDF/image EPUB reading, detection, zoom, rotation, single-page/scroll, crop/splits, enhancement, related preferences and device adaptation remained. Existing search, listening, annotations, copying, backup/export and text layers were retained. Stages one through six remained history, with older plans subject to this scope and the then-latest dependency order.
+
+## 1. Historical goals and formats
+
+### Hanvon device visual references (received 2026-10-04)
+
+Fifteen original screenshots and accompanying XML were saved only in the local `references/hanvon-pdf/` directory, with `README.txt`, a screenshot index `index.html` and `manifest.json`. These private reference assets are not publishable, are not tracked in Git and remain local only. The historical filenames below identify the design evidence; they are not repository download links.
+Received ZIP SHA-256: `749adaccf95022fe5b0d760867cb0437ddfcb48f1b97ac237b7d34aa3d6f9b21`; all 15 PNGs matched the local `manifest.json`.
+
+| UI | Reference | Scope adopted at that stage |
 | --- | --- | --- |
-| 阅读工具栏 | [01](references/hanvon-pdf/01-pdf-menu-open.png) | 上方正文保留、底部面板展开 |
-| 原版版式 | [02](references/hanvon-pdf/02-pdf-layout-open.png) | 左侧标签对齐、横向分组、黑白高对比、选中项反白 |
-| 独立裁边 | [03](references/hanvon-pdf/03-pdf-study-crop.png) | 独立预览、遮罩、拖动框、取消/保存 |
-| 五项增强 | [04](references/hanvon-pdf/04-pdf-enhance.png) | 每项数值、减、滑杆、加、恢复默认 |
-| 重排/间距/OCR | [05](references/hanvon-pdf/05-pdf-reflow-panel.png)、[06](references/hanvon-pdf/06-pdf-spacing-panel.png)、[07](references/hanvon-pdf/07-pdf-ocr-panel.png) | 历史参考；用户已取消，不新增入口或实现 |
-| 更多设置 | [08](references/hanvon-pdf/08-pdf-more-settings.png)、[09](references/hanvon-pdf/09-pdf-more-bottom.png) | 详细设置与主面板分层 |
-| 翻页/超屏选项 | [10](references/hanvon-pdf/10-pdf-page-turn-options.png)、[11](references/hanvon-pdf/11-pdf-oversize-options.png) | 接现有原版阅读行为 |
-| OCR 方向 | [12](references/hanvon-pdf/12-pdf-ocr-options.png) | 已取消，仅留参考 |
-| 刷新 | [13](references/hanvon-pdf/13-pdf-refresh-menu.png) | 仅支持设备接口时显示，不加占位 |
-| 提取 | [14](references/hanvon-pdf/14-pdf-extract-menu.png) | 已取消，仅留参考 |
-| 顶部更多 | [15](references/hanvon-pdf/15-pdf-study-extra.png) | 只参考层级，不扩展专项功能 |
+| Reader toolbar | `01-pdf-menu-open.png` | Keep text above an expanded bottom panel |
+| Original-page layout | `02-pdf-layout-open.png` | Left-aligned labels, horizontal groups, monochrome contrast and inverted selected options |
+| Separate crop editor | `03-pdf-study-crop.png` | Preview, mask, draggable frame, Cancel/Save |
+| Five enhancements | `04-pdf-enhance.png` | Value, minus, slider, plus and reset for each |
+| Reflow/spacing/OCR | `05-pdf-reflow-panel.png`, `06-pdf-spacing-panel.png`, `07-pdf-ocr-panel.png` | Historical reference; cancelled at this stage, with no new entry/implementation |
+| More settings | `08-pdf-more-settings.png`, `09-pdf-more-bottom.png` | Separate detailed settings from the main panel |
+| Page-turn/oversize options | `10-pdf-page-turn-options.png`, `11-pdf-oversize-options.png` | Connect existing original-page reading behavior |
+| OCR direction | `12-pdf-ocr-options.png` | Cancelled then; reference only |
+| Refresh | `13-pdf-refresh-menu.png` | Only with supported device interfaces, no placeholders |
+| Extract | `14-pdf-extract-menu.png` | Cancelled then; reference only |
+| Top More menu | `15-pdf-study-extra.png` | Reference hierarchy only, without expanding the project |
 
-已亲自查看 02、03、04 原图。本轮沿用 PDF/图片 EPUB 快捷专用面板入口；齿轮内原有样式和普通文字书菜单仍保持 Preview 3。参考包中的 development-spec.txt 是历史材料，冲突时以本文「当前范围调整」及用户直接指令为准。截图正文不复制到产品，截图不充当不可交互 UI，不对外发布参考资源。
+Original images 02/03/04 were inspected directly at that stage. Dedicated PDF/image EPUB quick-panel entry points were retained; existing gear styles and ordinary-book menus stayed at Preview 3. The reference package's `development-spec.txt` was historical material; scope decisions and direct user instructions took precedence. Screenshot text was not copied into the product, screenshots did not substitute for interactive UI, and reference assets were not publicly published.
 
-增强 PDF 原版阅读，自动识别扫描 PDF 和以扫描页图片为主体的 EPUB，接入同一套原图阅读与显示处理引擎。PDF 和图片 EPUB 均保留原版页面，不新增文字重排或 OCR。文字 EPUB 仍走原阅读器。检测结果可见且可手动纠正，混合文件逐页/章节处理，不强制栅格化文字章节或整本转换 PDF。
+The then-goal was improved original-page PDF reading and automatic recognition of scanned PDFs/image-dominant EPUBs through a shared image/display engine. Original pages were retained without new reflow/OCR under that reduced scope; text EPUBs kept their original reader. Detection was visible/manually correctable, and mixed documents were handled per page/chapter without forced text rasterization or whole-book PDF conversion.
 
-## 2. 入口与菜单顺序
+## 2. Historical entry points and menu order
 
-点击正文中央显示顶部、底部操作栏，再点正文关闭并回到沉浸阅读。
+Tapping the center of the text showed top/bottom bars; tapping again returned to immersive reading.
 
-2026-10-03 菜单隔离要求：PDF 自动使用新增原版阅读菜单；EPUB 仅在正文图片证据确认后使用新增菜单，不能仅凭 `.epub` 后缀或固定版式元数据启用。普通文字 EPUB、TXT、Markdown、MOBI/AZW 等其他书籍继续使用 Preview 3 阅读菜单，不显示文档检测、图片原图、裁边/分格与增强入口。旧的每书图片模式设置不能覆盖这条格式边界。
+The 2026-10-03 isolation requirement applied the new menu automatically to PDFs and only to EPUBs confirmed by body-image evidence, not extension/fixed-layout metadata alone. Ordinary text EPUB, TXT, Markdown, MOBI/AZW and other books retained Preview 3 menus, without detection, original-image, crop/split or enhancement entries. Old per-book image-mode preferences could not override that boundary. Later multi-format support is recorded below.
 
-导入 EPUB 时在已有元数据解析流程内，本机分散抽样最多 5 个正文章节，排除已知封面、目录和非线性章节；至少 60% 抽样章节必须具有可测的主体图片覆盖证据。文字章节仅做轻量文本检查，不解码图片。检测设有 4 秒总期限，与封面读取并行，失败、超时或证据不足保存为原菜单；不联网、OCR 或全书转换。分类按书及内容指纹保存，打开书籍只读缓存，禁止触发抽样、图片检测或重新计算文件哈希。旧 EPUB 没有分类时保留 Preview 3 菜单，可通过重新导入识别；旧 PDF 直接按既有文件类型显示新菜单，无须分析页面。首次识别成功默认开启原版阅读，已经明确关闭的每书设置保留。恢复封面和 TXT/Markdown 转 EPUB 不启动该检测。
+EPUB import sampled at most five dispersed body chapters during existing metadata parsing, excluding known covers, contents and nonlinear chapters. At least 60% needed measurable dominant-image coverage. Text chapters received lightweight text checks without image decoding. Detection had a four-second total deadline, parallel to cover loading, with original-menu fallback for failure, timeout or insufficient evidence; no network, OCR or full conversion. Per-book/content-fingerprint classification was cached; opening did not sample, inspect images or recalculate file hashes. Old unclassified EPUBs kept Preview 3 menus and could be reimported; old PDFs selected the new menu by file type without analysis. First confirmed detection enabled original-page reading by default while preserving explicit opt-out. Cover recovery and TXT/Markdown conversion did not run detection.
 
-- 保留已有阅读导航与可用动作，不另做扫描文档的查找、听书、书签、批注专项整合。
-- 本专项新增或调整的入口限于版式、裁边/分格、图像增强、阅读显示设置和支持设备的刷新控制；不添加提取、OCR、重排或页面导出入口。
+- Existing navigation/actions remained without dedicated scanned-document search/listening/bookmark/annotation integration.
+- New/changed entries at that stage were limited to layout, crop/splits, enhancement, display settings and supported-device refresh; no Extract, OCR, reflow or page-export entry.
 
-保持原始页码及已有阅读位置兼容；按钮存在不计为完成，不展示无实现的占位功能。
+Original page numbers/positions remained compatible. A button's presence did not count as completion; unimplemented placeholders were excluded.
 
-## 3. 原版「版式」面板顺序
+## 3. Historical original-page Layout panel order
 
-1. 缩放：当前比例、减号、滑杆、加号；100%-1500%。高倍必须局部/分块渲染，不允许生成 15 倍整页巨图。
-2. 模式：单页/卷轴，适应屏幕/适应屏宽/论文。论文模式按栏/区域顺序阅读，前后操作先跳区域，末区域才跳下一原页，不等同适宽。
-3. 裁边：自动裁边、裁边留白减/数值/加、漫画、自定义。参考留白范围 0-20，汉王现场 3；单位未确认，不能标称毫米。
-4. 对比度概览：文字加黑、对比度、加黑、漂白、锐化，展示数值并进入统一增强面板。
-5. 旋屏：竖屏、右转 90 度、左转 90 度。
-6. 更多设置。只提供原版阅读，不显示原版/重排/OCR 重排切换。
+1. Zoom: value, minus, slider, plus; 100%–1500%. High magnification required region/tile rendering, not a 15× full-page bitmap.
+2. Mode: single page/scroll, fit screen/width/paper. Paper mode followed columns/regions before moving to the next original page, rather than merely fitting width.
+3. Crop: automatic crop, safety-margin minus/value/plus, comic and custom. The reference margin range was 0–20, with 3 on the Hanvon device; units were unconfirmed and could not be labelled millimeters.
+4. Enhancement overview: text darkening, contrast, darkening, bleaching and sharpening, with values and a shared enhancement panel.
+5. Rotation: portrait, right 90°, left 90°.
+6. More settings. Under this historical scope only original-page reading was offered, without original/reflow/OCR-reflow switching.
 
-## 4. 裁边与分格
+## 4. Crop and splits
 
-独立预览页：常规/奇偶页、数量、图上可拖动裁边框、重置/取消/确定。「数量」为单页、水平双格、垂直双格、四格、水平六格、垂直六格、九格。双格及多格提供对应横向左至右/右至左、纵向左右顺序；垂直双格从上至下。保存归一化裁剪矩形与分格顺序，绑定文档、原始页，支持单页/全书/奇偶页范围。奇偶两套裁边独立预览、保存。漫画为裁边/分格预设，不冒充文字重排。取消不保存，重置可回原图，绝不覆盖源文件。
+A separate preview offered regular/odd-even mode, count, draggable frame, Reset/Cancel/Confirm. Counts: single, horizontal two, vertical two, four, horizontal six, vertical six and nine. Multi-cell layouts had corresponding horizontal left-to-right/right-to-left and vertical column orders; vertical two followed top-to-bottom. Normalized rectangles/order were tied to document/original page with page/book/odd-even scopes. Odd/even crops were independently previewed/saved. Comic was a crop/split preset, not text reflow. Cancel saved nothing; reset restored the original and never overwrote source files.
 
-## 5. 图像增强
+## 5. Image enhancement
 
-独立面板每行有数值、加减、滑杆、恢复默认；顶部返回版式。分别实现：
+Each row in a separate panel had value, minus/plus, slider and Reset, with return to Layout above:
 
-- 文字加黑 0-15：原页图像的笔画增强。
-- 对比度 -100 至 100：对比度映射。
-- 加黑 0-100：gamma/暗部增强。
-- 漂白 0-200：背景净化。
-- 锐化 0-100：边缘锐化。
+- Text darkening 0–15: stroke enhancement on the page image.
+- Contrast −100 to 100: contrast mapping.
+- Darkening 0–100: gamma/shadow enhancement.
+- Bleaching 0–200: background cleanup.
+- Sharpening 0–100: edge sharpening.
 
-汉王部分 Android 14 黑白设备默认加黑 5 不照搬到全部设备。算法必须不同，保留细线、图片。滑动请求合并、缩略预览优先、稳定后精细渲染，后台可取消，不能阻塞 UI。
+The default darkening value 5 on some Hanvon Android 14 monochrome devices was not applied to every device. Algorithms had to be distinct and preserve thin lines/images. Slider requests were coalesced, thumbnails rendered first, refinement occurred after settling, and background work was cancellable without blocking UI.
 
-## 6. 已取消的重排与 OCR
+## 6. Reflow/OCR cancellation at that stage
 
-按最新要求，不开发文字重排、OCR 重排、本地/云端 OCR 引擎、模型下载管理或识别任务。继续使用文件本身已有的文字层；识别文件是否包含文字层不等于执行 OCR，不受本次取消影响。
+Under the reduced scope, text/OCR reflow, local/cloud OCR backends, model management and recognition tasks were not developed. Existing file text layers remained usable; detecting their presence was not OCR and was outside the cancellation. Later restoration/implementation superseded this restriction.
 
-## 7. 更多设置
+## 7. Historical More settings specification
 
-翻页：左右、左右反向、上下、全屏后翻；自动翻页；进度显示页码/百分比/不显示；章节名、时间电量；隐藏页眉页脚；文档边界线、页面分割线；去水印/页面净化；大于屏幕时点击翻页/滚屏；上滑显示菜单（与上下滑动翻页互斥，卷轴/放大状态不生效）；256 灰阶平滑。批注、摘抄等现有功能保持，不新增扫描专项操作或 OCR 设置。
+Options covered left/right, reversed left/right, up/down and full-screen-next page turns; auto-turn; page/percentage/no progress; chapter/time/battery; hiding headers/footers; document/page borders; watermark hiding/page cleanup; tap-turn/scroll when oversized; swipe-up menus mutually exclusive with vertical swipe-turn and inactive in scroll/zoom mode; and 256-gray smoothing. Existing annotations/excerpts stayed, without dedicated scanning/OCR settings at this stage.
 
-按上下文显示，区分通用偏好与每书覆盖。非阅读页不强制沉浸，输入法、系统手势正常。硬件能力项不以无效开关占位。
+Contextual options distinguished global preferences and per-book overrides. Non-reader screens did not force immersion; keyboard/system gestures remained normal. Unsupported hardware options were not meaningless switches.
 
-## 8. 刷新与已取消的提取/导出
+## 8. Historical refresh and extraction/export cancellation
 
-- 刷新：普通/清晰/快速/极速，每 N 页全刷（现场 50），能力探测并使用设备接口。普通设备不出现无效硬件模式。应用抖动不宣称增加屏幕原生灰阶。
-- 取消本专项的区域截图、区域/整页识别、原始页/处理页/OCR 文本导出；软件既有笔记导出、设置及数据库备份等功能保持不变。
+- Proposed refresh choices were normal/clear/fast/fastest plus full refresh every N pages (50 on the observed device), contingent on capability probing and real interfaces. Ordinary devices would not show ineffective modes. App dithering did not imply increased native screen gray levels.
+- Region screenshots, region/whole-page recognition and original/processed-page/OCR-text export were cancelled at this stage. Existing note export, settings/database backup remained. Recognition/extraction were later restored as recorded below; page export was not.
 
-## 9. 自动识别
+## 9. Detection specification
 
-PDF 综合文字有效字符/坐标、页面尺寸、主图覆盖，区分文字、扫描、带 OCR 层扫描、混合、空白/封面。分散抽样初判，按页校正，不能仅看首页或任意文字存在。
+PDF analysis combined effective text/coordinates, page size and dominant-image coverage to distinguish text, scans, scans with OCR layers, mixed, blank and cover pages. Dispersed initial sampling and per-page correction avoided judging from the first page or any text alone.
 
-EPUB 按 OPF spine 而非文件名顺序分析正文 XHTML/SVG 图片、实际文本量与图像覆盖；排除封面、目录、装饰图，处理 img、SVG image、大图分片、混合章节。固定版式不必然是扫描。统一提供原始页、页面图像、已有文字和坐标，不生成 OCR 内容；保留 spine 索引、文档内顺序和资源定位。
+EPUB analysis followed OPF spine rather than filenames, considering XHTML/SVG images, actual text and coverage; excluding covers/contents/decorations; handling img, SVG image, large-image pieces and mixed chapters. Fixed layout did not prove a scan. A shared source exposed original pages/images/existing text/coordinates without generating OCR, retaining spine index, document order and resource location.
 
-## 10. 处理引擎与安全边界
+## 10. Processing engine and boundaries
 
-管线：解析/类型识别 → 页/区域解码渲染 → 坐标/裁边/分格 → 增强/净化 → 原版显示 → 缓存/位置。
+Pipeline: parsing/type detection → page/region decoding/rendering → coordinates/crop/splits → enhancement/cleanup → original-page display → cache/position.
 
-先审查复用现有 PDF.js 组件，必要时再评估 PDFium/pdfrx；必须符合 Flutter、Android ARM64、macOS 约束与许可并实际接入后端，不止抽象接口。不再评估或引入 OCR 后端。汉王 HVPdfInterface/libhvpdfparser.so 仅用于理解功能边界，不引入专有实现。
+Existing PDF.js was reviewed first; PDFium/pdfrx were alternatives only if needed and compatible with Flutter, Android ARM64, macOS and licenses, with an actual backend rather than interfaces alone. OCR backends were excluded at that historical stage. Hanvon HVPdfInterface/`libhvpdfparser.so` informed boundaries only; proprietary implementation was not imported.
 
-去水印须区分 PDF 对象显示过滤与扫描浅色背景净化，非万能算法；只改显示/副本，支持关闭对照，不一律涂白/阈值化破坏正文图表。无法分离者保留。
+Watermark handling distinguished PDF-object display filtering from light-background scan cleanup. It was not universal removal: only display/copies changed, original comparison remained available, and blanket whitening/thresholding could not destroy text/figures. Inseparable content stayed.
 
-分块渲染、相邻预取、有界缓存；缓存键含文档身份、原页、裁边、旋转、比例和实际增强参数。后台有取消、进度、恢复；打开书不自动全书处理、上传或向量化。坐标链可逆，保留已有文字选择和定位，不新增扫描文档批注/搜索/听书统一适配；句柄、线程生命周期稳定，兼容 HID 重连。
+Tiled rendering, adjacent prefetch and bounded caches used document identity, original page, crop, rotation, scale and actual enhancement parameters. Background work supported cancellation/progress/recovery. Opening did not automatically process/upload/vectorize the entire book. Reversible coordinates retained existing selection/location without the cancelled comprehensive annotation/search/listening adaptation. Handle/thread lifecycles had to remain stable across HID reconnects.
 
-## 11. 验收与完成矩阵
+## 11. Historical acceptance and completion matrix
 
-必测：文字/纯扫描/带文字层扫描/混合 PDF、空白/封面、双栏论文、中文竖排、漫画；SVG 包装/非文件名顺序图片 EPUB、图封面文字 EPUB、混合 EPUB。
+Required samples: text/pure-scan/text-layer-scan/mixed PDF, blank/cover, two-column papers, Chinese vertical text and comics; SVG-wrapped/non-filename-order image EPUB, text EPUB with an image cover and mixed EPUB.
 
-验证识别/手动纠正、区域顺序、奇偶裁边、取消重置、持久化、原图恢复、原页坐标、已有文字层兼容、高倍缩放内存、长文档流畅性、蓝牙笔重连全屏与弹窗。图像增强、硬件刷新与汉王实机效果单独验收；取消项目不纳入剩余验收项。
+Checks covered detection/manual correction, region order, odd/even crops, cancel/reset, persistence, original restoration, original coordinates, text layers, high-zoom memory, long documents and Bluetooth-pen reconnect with full screen/dialogs. Enhancement, hardware refresh and Hanvon visual effects had separate acceptance. Then-cancelled items were excluded from remaining work.
 
-| 模块 | 入口 | 真实引擎 | 持久化 | 自动化 | 实机 |
+| Module | Entry | Engine | Persistence | Automation | Physical device |
 | --- | --- | --- | --- | --- | --- |
-| PDF 原版阅读（基线） | 已有 | PDF.js | 原阅读位置 | 既有回归 | 本轮未测 |
-| PDF 分页识别/文字与坐标 | 样式内按需检测已接入 | PDF.js 实际 operator/text 数据；覆盖与文字框 | 每书类型标记已接入，页证据内存 LRU | 真实 PDF 样本测试通过 | 待测 |
-| 图片 EPUB 检测/手动纠正 | 同一检测面板 | spine 顺序、img/SVG 引用和文本初判；实际图像覆盖仍待接入 | 每书类型标记/恢复自动已接入 | 初判、顺序、持久化测试通过 | 待测 |
-| 局部缩放/有界缓存 | 独立预览与正文分格模式均支持 100%–1500%；正文增加适屏/适宽/旋转/双指和滚轮平移 | PDF.js 可见区域精细渲染，窗口变化重绘；原阅读、正文 ROI、独立预览缓存隔离 | 正文按书保存比例/朝向/适应方式，原页签名匹配时恢复归一化视口；独立预览不改位置 | 坐标/取消/像素对比/真实 PDF 入口及控件测试通过 | 待测 |
-| 裁边/分格/论文/漫画 | 样式内 PDF 裁边与分格、正文分格阅读开关 | 可拖动裁边、奇偶独立草稿、7 种分格/4 种顺序，正文适屏区域阅读/跨页/原版切换；自动裁边/漫画预设待开发 | 按书布局及本机区域位置保存；单页 > 奇偶 > 全书；布局变更使旧区域编号失效 | 模型、编辑、持久化、导航、取消/失败回归及真实 PDF 入口检查通过 | 待测 |
-| 连续跨页卷轴 | 正文 PDF 控件提供单页/连续卷轴 | 原页及分格连续排列；附近最多 7 个已提交帧，滚动补页/回收，保留原文字层与可见区域高清图 | 按书保存模式与归一化位置，旧数据默认单页；不参与全局设置备份 | 前后补页、回收、失败重试、关闭取消、窗口变化、模式切换及真实 PDF 入口检查通过 | 待测 |
-| 五类增强/净化 | 待开发 | 待接入 | 待开发 | 待新增 | 待测 |
-| 刷新能力/更多设置 | 待开发 | 需设备能力探测 | 待开发 | 待新增 | 待测 |
+| Original PDF baseline | Existing | PDF.js | Original reading position | Existing regressions | Not tested at this stage |
+| PDF page analysis/text/coordinates | On-demand detection in Style | Actual PDF.js operators/text, coverage and boxes | Per-book type markers; page-evidence memory LRU | Real PDF samples passed | Pending then |
+| Image EPUB detection/manual correction | Same panel | Spine/img/SVG/text candidate analysis; actual coverage pending then | Type markers/restore automatic | Candidate/order/persistence checks passed | Pending then |
+| Local zoom/bounded cache | Preview/split reader 100%–1500%, fit/rotation/two-finger/wheel pan | Visible-region PDF.js refinement/window redraw; separate original/reader ROI/preview caches | Per-book scale/orientation/fit; normalized viewport restored for matching page signature; preview does not alter position | Coordinates/cancellation/pixels/real entry/control checks passed | Pending then |
+| Crop/splits/paper/comic | Style crop/split editor and split-reading switch | Draggable frame, separate odd/even drafts, seven layouts/four orders, fit-region navigation/original switch; auto-crop/comic preset pending then | Local per-book layout/region; page > odd/even > book; changes invalidate old region index | Model/editor/persistence/navigation/cancel/failure and real PDF entry checks passed | Pending then |
+| Continuous scrolling | Single/continuous reader controls | Sequential pages/regions, at most seven nearby committed frames, add/recycle on scroll, retained text layer/refinement | Per-book mode/normalized position; legacy default single; outside global backup | Prepend/append/recycle/retry/close/window/mode/real-entry checks passed | Pending then |
+| Five enhancements/cleanup | Pending then | Pending then | Pending then | Pending then | Pending then |
+| Refresh/more settings | Pending then | Device probing needed | Pending then | Pending then | Pending then |
 
-已移出矩阵：文字重排、本地/云 OCR、提取与页面导出、扫描文档书签/搜索/听书/批注专项整合。以下为范围调整前后的历史实现记录，不将其中旧「待开发」描述视为重新授权。
+Removed from this matrix at that stage: reflow, local/cloud OCR, extraction/page export and comprehensive scanned bookmark/search/listening/annotation integration. The following records span scope changes; old pending descriptions are not renewed authorization.
 
-### 首轮代码审查
+### Initial source review
 
-已有 `assets/foliate-js/src/pdf.js` 使用本地打包 PDF.js，提供原页渲染和文字提取；目前整页画布、Blob URL 无界 Map，未发现可直接复用的本地 OCR 后端。先复用 PDF.js 实现逐页识别与坐标数据，再按矩阵推进，不重做现有图书存储。
+Existing `assets/foliate-js/src/pdf.js` used bundled local PDF.js for page rendering/text extraction, then with whole-page canvases and unbounded Blob-URL Maps. No directly reusable local OCR backend was found. PDF.js would first provide per-page analysis/coordinates, then the matrix would proceed without rebuilding book storage.
 
-### 首阶段实现（2026-10-03）
+### Stage one (2026-10-03)
 
-- 阅读设置「样式 → 文档类型检测」接入真实 JS 引擎。仅用户打开面板时抽样，最多 5 个分散页/章节；不会因打开书而启动 OCR/联网/索引。取消阻止后续阶段和页面继续分析，PDF.js 已发出的单个解析请求完成后丢弃结果。
-- PDF 分析实际文字、坐标、旋转、图像 operator 的变换堆栈和面积并集。文字框归一化并保留四角；已有文字层不伪造 OCR 置信度（`null`）。`image-with-text` 不声称一定由 OCR 产生。裁剪/斜旋转/不支持的图像组保守标记不确定，不作强判。
-- EPUB 从原有 sections（OPF spine）分散取样，保持文档和图片引用顺序，排除已知 cover/toc landmark 与非正文。没有实际渲染覆盖证据时只报告「图片章节候选」，未完成扫描 EPUB 自动接入统一阅读模式。
-- 每书类型纠正保存于本机 `documentTypeOverrides`，可恢复自动。明确提示该标记暂不切换阅读模式；不混入全局设置导入导出，不覆盖另一设备的文档标记。跨设备每书配置同步尚未接入。
-- 原 PDF 图片缓存改为 LRU：最多 8 页、编码 Blob 目标 24 MiB；允许保留最近两页的当前跨页图，即使这两页合计超出目标，防止加载右页时提前撤销左页 URL。此指标不是进程总内存限制。
-- 单次整页画布上限 4,194,304 像素、单边 4096；绘制/编码后释放画布，缓存淘汰同时回收 HTML 与图片 URL；关闭阅读器释放资源并使旧异步结果失效。**这不是 1500% 分块缩放实现**，原版缩放交互暂未改变。
-- 新增 11 项 JS 引擎/生命周期测试，包含内存生成的原创新 PDF 经项目内置 PDF.js 实际解析；连同阅读进度、样式、朗读、选词既有测试共 147 项通过。Flutter 检测界面、类型存储和全局设置回归共 25 项通过；不将它们视作汉王或 Android 原生 WebView 验收。
-- 依据 PDF 技能进行了真实页面视觉检查，Playwright 隔离浏览器检查项目原有 3 页公开测试 PDF：原版第一页及第二跨页（中文文字+图片页）正常，检测返回实际文字数量和图像面积。测试页曾因自身覆盖 `display:flex` 出现错误排布，修正的是忽略目录中的测试页 CSS，未借此改动正式阅读布局。
-- 标准 Dart 分析未见错误/警告，新文件无诊断；`epub_player.dart` 有 9 条既有缺少大括号提示。Flutter 分析 CLI 在中文路径的 LSP 消息遇到编码错误，改用分析服务器旧协议和内存配置绕过不兼容旧 custom_lint，不更改仓库分析配置，不宣称插件检查通过。Webpack 成功，保留既有 3 条异步语法目标警告。
-- 未打包、未安装、未发布，Preview 3 标签/附件保持不变。裁边分格、五类增强、文字/OCR 重排、OCR 引擎、导出和硬件刷新仍待实现，不能将本阶段视为完整规格完成。
+- Style → Document Type Detection connected the real JS engine. Opening that panel sampled at most five dispersed pages/chapters; opening a book did not start OCR/network/indexing. Cancel stopped subsequent stages/pages and discarded the result of an already-issued PDF.js parse.
+- PDF analysis used actual text, coordinates, rotation, image-operator transform stacks and area unions. Normalized text boxes kept all four corners. Existing layers had no invented OCR confidence (`null`); `image-with-text` did not prove OCR origin. Cropped/skewed/unsupported image groups were conservatively uncertain.
+- EPUB sampled existing OPF-spine sections while retaining document/image order and excluding known cover/toc landmarks/non-body sections. Without rendered coverage it reported image-chapter candidates, not completed automatic image EPUB integration.
+- Local `documentTypeOverrides` saved per-book corrections/restore automatic, explicitly without changing reading mode then. It stayed outside global settings transfers and did not overwrite another device's markers. Per-book cross-device config sync was not integrated.
+- PDF images gained LRU limits of eight pages and a 24 MiB encoded-Blob target, allowing the two most recent spread images to exceed that target to avoid revoking the left page while loading the right. This was not total process memory.
+- Whole-page canvases were limited to 4,194,304 pixels/4096 per side and released after rendering/encoding; eviction released HTML/image URLs, closing released resources and invalidated old async work. This was not 1500% tiled zoom; original zoom interaction was unchanged then.
+- Eleven JS engine/lifecycle tests were added, including actual bundled PDF.js parsing of an original in-memory PDF. With existing progress/style/narration/selection checks, 147 JS tests passed; Flutter detection/storage/global-settings regressions passed 25. These did not establish Hanvon or native Android WebView acceptance.
+- The recorded PDF-skill visual check and isolated Playwright browser used the existing original public three-page PDF. The first page/second spread (Chinese text plus image) displayed correctly; detection returned real text counts/image areas. Incorrect layout caused by the test page's own `display:flex` override was fixed only in ignored test-page CSS, without changing production layout.
+- Standard Dart analysis found no errors/warnings or new-file diagnostics; `epub_player.dart` retained nine missing-brace notices. Flutter analysis CLI encountered LSP encoding errors in the Chinese path; legacy analysis-server protocol/in-memory configuration bypassed incompatible old custom_lint without changing repository config or claiming plugin validation. Webpack succeeded with three existing async-syntax target warnings.
+- No packaging/installation/publication occurred; Preview 3 tag/assets stayed. Crop/splits, five enhancements, text/OCR reflow, OCR backend, export and hardware refresh were still pending then, so this was not complete specification delivery.
 
-### 第二阶段：局部渲染与坐标模型（2026-10-03）
+### Stage two: local rendering and coordinates (2026-10-03)
 
-- 用户要求继续按开发文档推进，仍沿用“不打包、不发布、不安装”范围。没有修改版本号、Preview 3 标签、远端发行版或选词逻辑。
-- 新增 `document-regions.js`：基于原页正常朝向的归一化坐标；额外 0/90/180/270 度旋转、裁边局部坐标均有逆变换；不以屏幕像素作为批注永久位置。实现单页/水平双格/垂直双格/四格/水平六格/垂直六格/九格，横向或纵向优先、左右顺序。原始页索引始终不变；单页覆盖优先于对应奇偶页，再优先于全书设置。**本轮只接通该模型测试，尚未提供拖框、分格应用及保存界面。**
-- 新增 `pdf-region-renderer.js`，使用现有 PDF.js 的 viewport + render transform 真正绘制可见矩形。100%–1500% 预览不是把低分辨率整页图片放大，也不创建 15 倍整页画布。单次输出最多 2,097,152 像素、单边 2048；渲染和编码串行持有一个画布，结束/失败/取消均释放尺寸。PDF.js 内部源图解码和对象解析仍有自身内存开销，不把画布上限宣称为进程内存上限。
-- 局部缓存按当前文档实例隔离，键包含原页、可见区域、附加旋转、渲染比例、输出尺寸；最多 4 项、8 MiB 编码图像。尚无增强/OCR，因此不制造无效的算法参数；未来接入这些模块时必须扩充缓存键。快速请求中止旧 RenderTask，未开始的过时请求不创建画布；关闭预览或阅读器使未完成结果失效并清空局部缓存。不增加后台 OCR、网络上传或全书预取。
-- Flutter 实际入口为「样式 → 文档类型检测 → PDF 局部预览」，仅真实 PDF 检测结果出现按钮。首次打开定位当前原始页；提供缩放滑杆/加减、放大后拖动、右转、恢复原图、前后原页、失败重试及关闭。输入合并间隔 90ms，忽略过时桥接回复，窗口尺寸变化会重新请求。此处是独立临时图像预览，**不是替换原阅读器，不支持在预览图上选择文字或批注，也不修改正式阅读进度、原文件和原批注**。
-- 新增 12 项 JS 模型/渲染生命周期测试，连同第一阶段和既有阅读进度、样式、朗读、触控及选词回归共 **159 项通过**。Flutter 新增 4 项预览用例及 1 项 PDF/EPUB 入口显隐用例，检测、预览、类型存储及全局设置回归共 **30 项通过**。覆盖快速更新、过时回复、错误重试、关闭中请求、移动端窄屏、缩放范围、拖动边界、旋转和原始页索引。
-- 按 PDF / Playwright 技能完成隔离 Chromium 中的真实引擎校验：使用仓库既有原创 3 页测试 PDF，对实际非空文字区域在 0/90/180/270 度分别进行局部渲染与整页对应裁图逐像素比较，四向最大通道差均为 0。300% 中英文和 1500% 局部图已目视检查；1500% 测试输出为 1130×1600，而非整页巨图。临时测试页和截图在忽略的 `output/playwright/` 中，不作为 Android WebView 或汉王实机验收。
-- Dart 标准分析新增文件无诊断、修改文件无错误/警告，`epub_player.dart` 仍为原有 9 条大括号提示；沿用第一阶段的旧协议分析方式，不改项目 lint 配置。Webpack 已更新内置 JS，保持 3 条既有目标环境警告。未生成或安装测试包。
-- 下一阶段接入裁边框编辑、奇偶双配置、分格预览与确认/取消、按文档保存；再接入正式区域导航和图片 EPUB 页面源。五类增强、重排/OCR、导出和硬件刷新仍不标记完成。
+- Continued under the user's development-document instruction without packaging/publication/installation, version/tag/remote-release changes or selection-logic changes.
+- Added `document-regions.js` with normalized original-orientation coordinates and invertible extra 0/90/180/270° rotation/crop transforms, avoiding screen pixels as permanent annotation positions. Seven layouts and horizontal/vertical/left/right orders retained original page indices; page overrides took precedence over odd/even and whole book. Only model tests were connected then, without drag/apply/save UI.
+- Added `pdf-region-renderer.js` using real PDF.js viewport/render transforms. Preview at 100%–1500% neither stretched low-resolution pages nor created 15× whole canvases. Output was bounded at 2,097,152 pixels/2048 per side, with one serial render/encode canvas released on completion/failure/cancel. PDF.js source decoding/object overhead remained, so this was not a process-memory limit.
+- Instance-isolated caches keyed original page, visible rectangle, extra rotation, scale and output size, limited to four entries/8 MiB. Enhancement/OCR were not yet present, so no fictitious parameters were used; future integration required more keys. Rapid updates cancelled old RenderTasks, stale unstarted work created no canvas, and closing invalidated work/cleared caches. No background OCR/upload/whole-book prefetch was added.
+- Style → Detection → PDF Local Preview appeared only for actual PDF results. It started at the current original page and offered zoom/minus/plus, pan, right rotation, original reset, previous/next page, retry/close. Inputs coalesced at 90 ms; stale bridge replies were ignored and window changes requested new images. This separate temporary preview neither replaced the reader nor supported selecting/annotating its image or changed progress/source/annotations.
+- Twelve JS model/lifecycle tests brought the total to 159; four Flutter preview tests plus one PDF/EPUB visibility case brought detection/preview/storage/global-settings tests to 30. Cases covered rapid updates, stale replies, retry, close during request, narrow screens, zoom/pan bounds, rotation and original page indices.
+- Recorded PDF/Playwright checks used isolated Chromium and the original three-page PDF. Region images at all four rotations matched corresponding whole-page crops pixel-for-pixel, maximum channel difference 0. Chinese/English 300% and local 1500% images were inspected; the latter output was 1130×1600, not a whole-page giant. Temporary pages/images in ignored `output/playwright/` were not native Android/Hanvon acceptance.
+- Standard analysis had no new diagnostics/errors/warnings; nine existing brace notices and three Webpack target warnings remained. Legacy analysis protocol was retained without changing lint config. No test installer was generated/installed.
+- The then-next stage was crop-frame/odd-even editing, split preview/confirm/cancel and per-document saving, followed by reader region navigation/image EPUB sources. Enhancement, reflow/OCR, export and hardware refresh were not marked complete.
 
-### 第三阶段：裁边分格编辑与本地保存（2026-10-03）
+### Stage three: crop/split editing and local saving (2026-10-03)
 
-- 入口为「样式 → 文档类型检测 → PDF 局部预览 → 裁边与分格」。新增实际 PDF 原页预览、四角拖框和框内移动，提供 7 种分格与 4 种编号顺序；按原页归一化坐标保存，不覆盖原文件、不标称毫米。
-- 常规模式支持当前原页/全书，奇偶模式保留两套独立草稿，并预览对应的真实原页。确定才保存，取消/返回丢弃草稿，重置当前草稿为原图单页。全书应用清除较细范围覆盖；奇偶应用仅清除对应奇偶范围的单页覆盖，不影响另一组。奇偶模式只保存本次改动的组，没有改动时保存当前组。
-- 新增 `DocumentLayoutStore`，配置以 `documentPageLayouts` 按书保存在本机。串行写入防止同时保存不同书籍时丢失配置；失败回滚偏好缓存并保留编辑草稿供重试。损坏的整份配置拒绝覆盖，避免静默清空。该键不参与全局设置导入导出，跨设备每书同步另行接入。
-- 局部预览应用已保存布局，支持前后区域、跨原页区域导航、旋转、100%–1500% 缩放和原图对照。区域坐标与旋转后视口映射仍使用原始页索引。**本阶段应用范围是独立 PDF 局部预览；正式阅读器、正式进度、文字选择和批注没有切换为分格模式，区域退出后的位置恢复尚未实现。**
-- 修复测试发现的两处问题：裁边角柄超出父容器命中区域导致看得见但拖不动；跨页加载失败后重试错误地回到旧页。四角均增加容器内命中空间，重试保留实际请求的目标原页和区域方向。手机控制项增加可见滚动条，桌面控制项靠上排列。
-- 相关 Flutter 回归共 **48 项通过**，覆盖几何、范围覆盖、并发保存、写入失败、取消和过时回复、四角拖动、横竖屏窄窗、区域导航及全局设置隔离。既有 JS 阅读/朗读/选词及文档模型回归 **159 项通过**；没有改动选词逻辑。
-- 按 PDF 技能用仓库原创测试 PDF 原页栅格检查实际 Flutter 编辑界面，390×844 和 1100×760 两种窗口的裁边、编号、遮罩、控件及滚动提示已目视检查；独立视觉测试 1 项通过。截图使用真实编辑控件和原页栅格，但不等同于 Android 原生 WebView 联调或汉王实机验收，临时文件保留在忽略的 `output/` 中。
-- Dart 标准分析无新增错误/警告；沿用既有旧协议检查方式，不改变项目 lint 配置。开发文档与完成矩阵同步更新；没有打包、安装、发布或更改 Preview 3。
+- Style → Detection → PDF Local Preview → Crop and Splits added a real original-page preview, four draggable corners/frame movement, seven layouts and four numbered orders. Original-page normalized coordinates were saved, without source overwrite or millimeter claims.
+- Regular mode supported current page/whole book; odd/even mode retained independent drafts and real-page previews. Only Confirm saved; Cancel/Back discarded drafts and Reset restored the current draft to an original single page. Whole-book application cleared finer overrides. Odd/even application cleared page overrides only for that parity; only changed groups were saved, or the current group if neither changed.
+- New `DocumentLayoutStore` saved local per-book `documentPageLayouts`. Serialized writes prevented simultaneous-book data loss; failures rolled back preference caches and kept drafts for retry. A corrupt full configuration was not overwritten/cleared silently. The key stayed outside global settings transfer; cross-device book config remained separate work.
+- Preview applied saved layouts with previous/next region, cross-page navigation, rotation, 100%–1500% zoom and original comparison, retaining original indices through rotation. This still applied only to a separate preview, not the reader/progress/selection/annotations; restoring position after leaving a region was not implemented.
+- Tests found/fixed corners visible outside parent hit areas but undraggable, and failed cross-page retry returning to the old page. Handles gained internal hit space; retry retained the actual target page/direction. Phone controls gained visible scrollbars; desktop controls aligned near the top.
+- Recorded regressions: 48 Flutter cases for geometry, override scopes, concurrent saving, write failures, cancellation/stale replies, all corners, narrow portrait/landscape, navigation and global-settings isolation; 159 existing JS reader/narration/selection/document cases. Selection logic was unchanged.
+- The PDF-skill visual check used the original PDF raster with actual Flutter editor components at 390×844 and 1100×760, inspecting crop, numbers, mask, controls and scrolling hints. One separate visual test passed. This was not native Android WebView/Hanvon acceptance; temporary output remained ignored.
+- Standard analysis had no new errors/warnings using the existing legacy protocol, with no lint-config change. Documentation/matrix updated without packaging, installation, publication or Preview 3 changes.
 
-### 第四阶段：正文分格阅读与区域位置（2026-10-03）
+### Stage four: split reading and region position (2026-10-03)
 
-- PDF 阅读的「样式」增加「按裁边与分格阅读」开关及「PDF 裁边与分格」直接入口，不再必须先运行检测。默认关闭；打开后正文使用本书已保存的裁边、奇偶规则、分格及顺序，关闭返回同一原页的原版跨页显示。编辑保存失败或正文应用失败保留旧配置，可重试。
-- `FixedLayout` 接入原页内区域导航。下一页先进入下一分格，最后一格才进入下一原页；上一页反向进入上一原页末格；目录/原页跳转仍以原页索引定位。沿用既有按钮、点击区域及桌面键盘通路。当前为适应屏幕的单区域阅读；**正文 100%–1500% 控件、卷轴模式和完整扫描菜单仍待接入，高倍缩放目前仍在局部预览内**。
-- 显示图使用独立 `readingRegionRenderer` 重新渲染可见裁边区域，不把整页低清图简单放大。它与编辑预览的取消/缓存独立，单次画布仍受 2,097,152 像素/单边 2048 限制；两个局部引擎各自有 4 项/8 MiB 编码缓存，不将其总和宣称为进程内存上限。原页 HTML/文字层仍复用原有有界整页缓存，暂未消除首次进入该页时的整页底图生成。
-- 保留 PDF 原文字层和链接 DOM 顺序及原页 CFI，仅改变图片来源和视口变换。视口内点击按 iframe 真实变换换算，文字 CFI 定位选择包含目标的分格；目标被裁边排除时临时显示完整原页，不改保存的裁边配置。PDF 新建批注/搜索叠加层仍沿用既有能力边界，不将本次导航适配称为完整扫描批注支持。
-- `pdfReadingStates` 按书保存本机开关、原页 CFI、区域索引和布局签名；仅在正式阅读进度写入被接受后补记区域。重开要求 CFI、原页、签名和索引均匹配；改变裁边/分格/顺序后从该页第一格开始，防止旧编号指向另一块。初次同步握手不抹掉已经恢复的同页区域，后续远端跳转不强套本地旧位置。此键排除于全局设置导入导出；跨设备区域同步未接入。
-- 候选页面先加载、渲染、解码成功才替换可见帧并报告位置；失败保留旧帧和位置，重试使用请求的目标，关闭/过时任务不得覆盖现有页。修复 iframe 重挂载会丢失已设置图片的问题；原版切换也采用候选帧提交。真实入口检查另外发现固定版式无 `writingMode` 导致文字处理异常，改为安全读取，没有恢复已撤销的选词修改。
-- 自动化：相关 Flutter **51 项通过**；JS **167 项通过**，其中新增 3 项区域顺序/恢复模型和 5 项正式渲染器导航/失败/过时结果/定位回归。渲染器 Node 测试仅模拟 jsdom 不支持的 shadow-root iframe 加载，不冒充 PDF 像素渲染验收。Dart 标准分析没有新增诊断，`epub_player.dart` 仍有 9 条既有大括号提示。
-- 按 PDF/Playwright 技能在隔离 Chromium 中使用仓库原创 3 页 PDF，验证真实 `FixedLayout` 12 项断言、正式 `index.html` → `book.js` 的恢复与桥接事件、初次/后续同步区别、同页区域进度、文字目标在裁边内/外的定位、原版跨页切换。已目视检查 1100×800 和 390×844 正文截图；这不是 Android 原生 WebView、汉王或触摸/蓝牙笔实机验收。临时 QA 文件位于忽略的 `output/`。
-- 内置 JS bundle 已重新生成，保留 3 条既有 Webpack 目标环境警告。没有打包、安装、发布、修改版本号或 Preview 3 标签；开发文档与矩阵同步更新。
+- PDF Style added Read with Crop and Splits and a direct editor entry without requiring detection. Initially off, it applied saved crops/parity/layout/order to the reader; disabling returned to the same original page's spread. Failed editing/application preserved the old config for retry.
+- `FixedLayout` navigated regions before original pages, reversing into the prior page's last region. Contents/page jumps retained original indices and existing buttons/tap zones/desktop keys. This was fit-screen single-region reading; reader 100%–1500%, scrolling and complete scan menus remained pending, with high zoom only in preview then.
+- A separate `readingRegionRenderer` rerendered visible crops rather than stretching low-resolution pages. Reader/preview cancellation and four-entry/8 MiB caches were separate; each canvas retained the 2,097,152-pixel/2048-side limit, not total memory. Original HTML/text reused the bounded whole-page cache; first entry still generated a whole-page base image.
+- Original text/link DOM order and CFI remained, with image-source/viewport transformation only. Iframe clicks used real transforms; text CFI selected its containing region. A cropped-out target temporarily showed the full page without modifying saved crop. Existing PDF annotation/search overlay limits remained; navigation work was not comprehensive scanned annotation support.
+- Per-book local `pdfReadingStates` retained enabled state, original CFI, region index and layout signature only after accepted progress saves. Reopen required matching CFI/page/signature/index. Layout/order changes started at the page's first region. Initial sync handshake preserved restored same-page regions; later remote jumps did not force old local positions. The key stayed outside global backup; cross-device region sync was absent.
+- Candidate pages replaced visible frames/reported positions only after loading, rendering and decoding. Failure kept old frames/position, retry kept target and close/stale work could not overwrite. Iframe remount image loss was fixed; original switching also used candidate commits. Real entry checks found missing fixed-layout `writingMode` and added safe reads without restoring the reverted selection change.
+- Recorded automation: 51 Flutter and 167 JS passed, adding three region-order/restore cases and five reader navigation/failure/stale/location cases. Node tests simulated shadow-root iframe loading unsupported by jsdom, not PDF pixel acceptance. No new analysis diagnostics; nine existing brace notices remained.
+- PDF/Playwright checks in isolated Chromium used the original three-page PDF: 12 real `FixedLayout` assertions, production `index.html` → `book.js` restore/bridge events, initial/later sync, same-page region progress, text targets inside/outside crops and original-spread switching. Screenshots at 1100×800/390×844 were inspected, not Android/Hanvon/touch/Bluetooth device acceptance. Temporary QA output stayed ignored.
+- Bundled JS was regenerated with three existing Webpack target warnings. No packaging, installation, publication, version or Preview 3 tag changes; documents/matrix updated.
 
-### 第五阶段：正文高倍视口与旋转（2026-10-03）
+### Stage five: high-zoom reader viewport and rotation (2026-10-03)
 
-- 在「样式 → 按裁边与分格阅读」开启后显示正文控件：100%–1500% 滑杆与加减、适应屏幕/屏宽、左右转 90°、恢复适屏、四向移动。比例以适应方式为基准，适宽默认从区域顶端进入；不把倍率当绝对纸张物理尺寸。关闭分格模式仍回原版，未改默认模式。
-- 新增 `pdf-reading-viewport.js` 统一计算裁边、旋转、视口与原页仿射变换。高倍仅请求可见源区域，单次高清画布仍限制 2,097,152 像素及单边 2048。保留有界底图供移动时即时显示，100ms 合并后覆上高清区域；高清失败保留底图，下次移动/调整重试，不让白屏代替当前页。窗口尺寸变化重新计算和精细渲染。
-- 原文字/链接节点保留原顺序；精细图像追加在正文节点末尾、禁用命中，避免改变旧 CFI 路径。图片与文字共同旋转。修复固定版式点击和选词工具栏在 90°/270° 下只按缩放计算造成的错位，工具栏位置现在按四角映射；不宣称已经完成所有 PDF 批注叠层适配。
-- 正文双指平移，桌面滚轮平移；单指保留现有选择和翻页操作。双指手势从进入到两指全部离开均拦截，包含先放开一指后继续移动及尾随点击，防止手势尾部误触翻页。提供四向按钮作为替代入口。未加入捏合缩放，也未恢复已撤销的选词自动翻页修改。
-- `pdfReadingStates` 增加按书视口参数与原页归一化中心；写入校验、串行合并、失败回滚和全局备份隔离沿用原实现。恢复中心需要匹配原页与裁边/分格签名；翻到新区域回该区域起点，文字定位则围绕原文字目标。视口移动通过既有正式位置受理通路补记，不改变原页 CFI 编码。
-- 回归：**54 项 Flutter、178 项 JS 通过**，新增覆盖四向旋转矩阵、1500% 可见区域、适宽边界、窗口尺寸与中心、工具栏四角映射、双指尾部拦截、旧精细图失效、视口并发保存与控件失败恢复。Dart 标准分析新文件无诊断，既有 `epub_player.dart` 9 条 INFO 保留；不宣称旧 custom_lint 插件通过。
-- 按 PDF/Playwright 技能，用仓库原创 PDF 在正式 `index.html` 与 Flutter 模拟桥接中验证 0/90/180/270°、1500%、滚轮不跨原页、位置事件及 1100×800/390×844 窗口重绘，四向读取原文字层成功。1100×800 下 1500% 精细图实际为 1100×799，并非整页放大位图；截图位于忽略的 `output/`。Flutter 控件另用真实组件做手机宽度截图检查。这些不是安卓原生 WebView 或汉王实机验收。
-- 本轮完成单区域视口操作，**连续跨页卷轴模式仍待开发**，不能用区域内平移代替该功能。图片 EPUB、自动裁边、图像增强、重排/OCR、导出和硬件刷新仍按下列顺序推进。内置 JS 已重建；不打包、安装、发布、推送或更改 Preview 3。
+- With crop/split reading enabled, reader controls provided 100%–1500% slider/minus/plus, fit screen/width, left/right 90° rotation, fit reset and four-direction movement. Zoom was relative to the fit mode; fit width started at the region top, not an absolute physical paper size. Disabling returned to original without changing the default.
+- `pdf-reading-viewport.js` unified crop/rotation/viewport/original-page affine transforms. High zoom requested only visible source rectangles within 2,097,152 pixels/2048 per side. A bounded base image displayed immediately during movement, followed by refinement after 100 ms coalescing. Failure retained the base and later adjustment retried rather than blanking the page. Window changes recalculated/refined.
+- Text/link node order stayed. A noninteractive fine-image layer appended after body nodes preserved CFI paths; image/text rotated together. Fixed-layout clicks/selection-toolbar positions at 90°/270° were fixed through four-corner mapping rather than scale alone, without claiming complete PDF overlay adaptation.
+- Two-finger pan and desktop-wheel pan retained single-finger selection/page turns. Two-finger input was intercepted until both fingers left, including one-finger tails/following clicks, to prevent accidental page turns. Direction buttons offered an alternative. Pinch zoom and reverted automatic selection turns were not added.
+- `pdfReadingStates` added per-book viewport settings/normalized original-page center with validation, serialized merge, rollback and global-backup isolation. Restore required matching page/layout signature; new regions started at their beginning and text jumps centered on the target. Existing accepted-position saves retained viewport movement without changing original CFI encoding.
+- Recorded regressions: 54 Flutter, 178 JS passed for rotations, 1500% visible rectangles, fit-width bounds, window/center, toolbar corners, gesture tails, stale fine images, concurrent viewport saving and control recovery. New-file analysis was clean; nine existing INFO notices remained. Old custom_lint validation was not claimed.
+- PDF/Playwright checks used the original PDF through production `index.html` and a Flutter bridge simulation for all four rotations, 1500%, wheel pan without crossing pages, position events and 1100×800/390×844 redraw. Original text-layer reads worked in all rotations. At 1100×800, the 1500% fine image was 1100×799, not a full-page enlarged bitmap. Ignored output retained screenshots; real Flutter phone-width controls were also checked. These were not Android WebView/Hanvon device checks.
+- Single-region viewport operations were complete then; continuous scrolling remained pending rather than equating pan with scrolling. Image EPUB, automatic crop, enhancement, reflow/OCR, export and refresh followed the then-plan. JS rebuilt without packaging, installation, publication, pushing or Preview 3 changes.
 
-### 第六阶段：连续跨页卷轴（2026-10-03）
+### Stage six: continuous scrolling across pages (2026-10-03)
 
-- 在正文 PDF 控件中增加「单页 / 连续卷轴」，仅在开启「按裁边与分格阅读」时使用。沿原页及已保存的分格顺序连续排列，可同时看见相邻页；不是到页底后瞬间换页。旧设置默认单页，恢复适屏保留所选模式。前后翻页按钮滚动视口高度的 80%，章节跳转仍以原页定位。
-- 新增 `pdf-scroll-layout.js` 与 `pdf-scroll-reader.js`。当前附近最多保留 7 个已提交页面帧；接近边缘时补页，远端页面回收，向前插页/移除旧页补偿滚动位置，保护当前页和正在选择文字的页面。候选切换期间可以短暂存在额外帧；该上限不是整个进程的内存限制，也不限制 PDF.js 自身解析资源。
-- 保留原文字层、链接、原页编号和 CFI。滚动先使用有界底图，100ms 合并后逐一精细渲染可见源矩形；高倍不生成整页巨图，单画布和局部缓存沿用既有限额。手势进行时即可预取邻页，不等停止后才补页；长按/已有选区不强行转为单指滚动。未接入惯性模拟、捏合缩放或恢复已撤销的自动选词翻页。
-- 加载失败保留当前内容并停止该方向的自动重试，用户重试后再补页。模式切换先准备候选阅读器，失败恢复原模式；关闭后丢弃未完成加载。已宣布加载的旧帧不会在失败恢复时重复注册监听；后台补页不因位置未变反复发送重定位通知。
-- 按书保存单页/卷轴模式和原页坐标，跨模式仍定位同一原页。修复窗口大小变化后用新窗口反算旧位置导致的漂移：滚动时记录原页中心，重排后再恢复；滚动条占用宽度纳入实际视口。所有设置仍为本机每书配置，不混入全局设置备份，不改原文件。
-- 回归 **55 项 Flutter、187 项 JS 通过**。新增覆盖模式默认值/保存、单页与卷轴切换、四向旋转与高倍可见区域、向前补页位置、七帧回收、失败重试、关闭时异步加载、分格顺序、触摸选择保护和窗口变化。标准 Dart 分析无新增诊断；既有 9 条大括号 INFO 及 3 条 Webpack 目标环境警告保留。
-- 按 PDF / Playwright 技能检查真实页面：正式 `index.html` → `book.js` 入口载入原创三页 PDF，验证卷轴恢复、跨页 CFI/位置事件、章节跳转与切回单页；目视检查 1100×800 和 390×844 截图。另将这三页测试源重复映射为 50 个逻辑页，来回滚动验证已提交帧不超过 7 个、页序连续及尺寸变化；这是窗口压力检查，不是不同内容的 50 页 PDF 解码性能验收。原生安卓触摸、蓝牙笔和汉王设备仍待实机验收。
-- 内置 JS bundle 已重新生成。未打包、安装、发布、推送或修改版本号，Preview 3 标签及远端附件保持不变。
+- Reader PDF controls added single/continuous modes when crop/split reading was enabled. Original pages/splits formed a genuinely continuous sequence with adjacent pages visible, rather than instantaneous bottom-of-page switching. Old data defaulted to single; fit reset kept mode. Buttons moved 80% of viewport height and chapter jumps used original pages.
+- `pdf-scroll-layout.js`/`pdf-scroll-reader.js` kept at most seven nearby committed frames, adding near edges, recycling distant frames and compensating scroll when prepending/removing. Current/selected frames were protected; candidate switching could temporarily add frames. This was not process-memory or PDF.js-resource limitation.
+- Original text, links, numbering and CFI stayed. Bounded base images preceded serial visible-region refinement after 100 ms; no high-zoom whole-page bitmap. Neighbor prefetch could start during gestures. Long presses/selections were not forced into single-finger scroll. No inertia simulation, pinch zoom or reverted selection auto-turn was added.
+- Failure retained content and stopped directional automatic retry until user retry. Mode changes prepared candidates first and rolled back on failure; close discarded incomplete loads. Previously announced frames did not duplicate listeners during recovery; background loading did not resend location events when unchanged.
+- Per-book mode/original coordinates restored the same original page across modes. Window-resize drift from using the new viewport to infer the old location was fixed by recording original-page center then restoring it; scrollbar width was accounted for. Preferences remained local/outside global backup, without source changes.
+- Recorded regressions: 55 Flutter, 187 JS passed for defaults/saving, mode changes, rotations/high zoom, prepending, seven-frame recycling, retry/close, split order, selection protection and resize. No new standard-analysis diagnostics; nine brace INFOs and three Webpack warnings remained.
+- PDF/Playwright production-entry checks on the original three-page PDF covered scroll restore, cross-page CFI/position, chapter jumps and single-mode return; 1100×800/390×844 screenshots were inspected. Mapping the same three test sources to 50 logical pages checked seven-frame limits, sequence and resize through back-and-forth scrolling. This was window stress, not decoding performance for 50 distinct pages. Android touch/Bluetooth/Hanvon acceptance remained pending.
+- JS regenerated without packaging, installation, publication, pushing or version changes. Preview 3 tag/remote assets stayed.
 
-### 后续依赖顺序
+### Historical dependency order after stage six
 
-以下为第六阶段结束时的历史顺序；菜单自动分流与导入时识别以本节后「菜单隔离补充」及第 2 节最新要求为准，不得恢复打开书籍时的自动抽样。
+This was the order at stage-six completion. Menu routing/import detection followed the later isolation supplement and section 2; opening-time automatic sampling was not to be restored.
 
-1. 在现有裁边/奇偶/分格编辑与按书保存基础上补齐自动裁边、留白调节和漫画预设。
-2. 接入 EPUB 实际图片尺寸/覆盖和同一原图页面源适配，保留混合章节及原文字 EPUB 行为。
-3. 实现五种独立图像增强算法、取消/合并预览、处理前后对照；不做处理页导出。
-4. 补齐保留范围内的原版阅读设置、界面与硬件刷新能力探测，进行原生触摸/蓝牙笔、长文档及完整保留样本矩阵验收。
+1. Complete automatic crop, margins and comic presets on the existing crop/parity/split editor/storage.
+2. Integrate actual EPUB image dimensions/coverage and shared original-image sources while preserving mixed chapters/text EPUB.
+3. Implement five distinct enhancement algorithms, cancellable/coalesced preview and original comparison, without processed-page export.
+4. Complete retained original-page preferences, UI/hardware capability probing and native touch/Bluetooth/long-document/sample-matrix acceptance.
 
-OCR、文字重排、提取与导出、扫描文档功能整合专项均已取消，不再排入开发队列。发布仍须另有用户授权。
+OCR, reflow, extraction/export and comprehensive scan integration were cancelled at that time, outside the queue; publication still required separate authorization. The later restoration below superseded the corresponding OCR/reflow/extraction cancellations.
 
-### 菜单隔离补充：导入时识别（2026-10-03）
+### Menu isolation supplement: import-time classification (2026-10-03)
 
-- 审查发现：先前 `isImageEpub` 仅判断 EPUB 后缀，导致普通文字 EPUB 也显示图片工具；文档检测入口还对全部格式显示。现改为读取导入分类，全部新入口统一受 PDF/已确认图片 EPUB 条件控制，其他书籍的样式控件与 Preview 3 保持一致，阅读/其他设置页面未改动。
-- 识别接入 `getBookMetadata` 的导入 WebView，与封面读取并行；随 `onMetadata` 返回分类，在书籍成功入库后写入本机 `documentReadingModes`。结果包含书籍身份、既有文件指纹和格式版本，不随全局设置迁移。重新导入更新分类，文件指纹改变时旧分类失效。
-- 阅读入口只做本地偏好读取，不抽样、不计算哈希、不补检。未分类的旧 EPUB 保持原菜单；PDF 无须页面分析即可选择原版菜单。首次有效分类默认启用新模式，用户明确关闭的偏好继续保留。
-- TXT/Markdown 转换、恢复封面不运行正文抽样。导入检测超时或失败保留原菜单，不影响有效书籍入库。原文件及内容不修改、不上传。
-- 本次相关回归：207 项 JS、51 项 Flutter 通过；标准 Dart 分析无错误/警告（保留原有提示），内置 JS 重建通过，仍有 3 条既有目标环境警告。隔离 Chromium 使用原创 EPUB，验证导入分类、缓存打开、无缓存不检测、封面恢复与带图封面的文字书；不等同原生设备验收。按用户要求，未实机测试、打包、安装或发布。
+- Review found `isImageEpub` only checked the EPUB extension, exposing image tools to ordinary books, while detection appeared for every format. Import classification then gated new entries to PDF/confirmed image EPUB; other styles stayed at Preview 3 and other reading-settings pages were unchanged.
+- Detection joined the import WebView's `getBookMetadata` flow parallel to cover reading. `onMetadata` returned classification, saved to local `documentReadingModes` after successful import, including book identity, existing fingerprint and format version. It did not travel with global settings. Reimport updated it; changed fingerprints invalidated old classification.
+- Reading only loaded preferences, without sampling/hash/rechecks. Unclassified EPUBs retained old menus; PDFs needed no analysis to choose original-page menus. First valid classification enabled the new mode while retaining explicit opt-out.
+- TXT/Markdown conversion and cover recovery did not sample. Timeout/failure kept original menus without blocking valid imports; sources/content were neither modified nor uploaded.
+- Recorded regressions: 207 JS, 51 Flutter passed; standard analysis had no errors/warnings apart from existing notices; bundled JS rebuilt with three target warnings. Isolated Chromium used original EPUB fixtures for import classification, cached opening, no-cache/no-detection, cover recovery and text books with image covers. No physical-device acceptance, testing, packaging, installation or publication occurred in that stage.
 
-### 汉王参考版式调整（2026-10-04）
+### Hanvon-inspired panel layout (2026-10-04)
 
-- 参考资源已接收、校验并落地，见第 1 节截图索引。截图仅作本地设计资料，不随产品打包，不上传公开仓库。
-- PDF/确认图片 EPUB 的底部快捷面板使用独立黑白高对比主题。分组为缩放、模式、裁边、版式、五项增强概览、旋屏；宽屏左侧标签对齐，窄屏及放大字体自动换行，不横向滚动。
-- 阅读页只对文档样式面板放宽至最高 1100 逻辑像素，并限制在屏幕高度的 62%；上方正文继续可见。响应式文档面板不参与 IntrinsicHeight 测量，避免 LayoutBuilder 固有尺寸异常。普通文字书保留原先 600 宽度与布局路径。
-- 裁边、留白、漫画和论文分栏仍在独立预览中修改并确认，未增加无效快捷开关。关闭原版区域阅读后仍可进入裁边预览。
-- 五项增强面板从底部展开，保留正文上方区域；每项名称、当前值、减、滑杆、加、恢复默认，窄屏恢复按钮使用带提示图标。返回/取消不保存，确认调用现有存储及渲染；原图不修改。
-- 预览返回后刷新增强参数概览；保留异步失败提示、重复操作禁用及预览取消。齿轮内 StyleSettings 与 Preview 3 文件逐字一致。
-- 51 项 Flutter 回归通过，涵盖 320×740、844×390、1024×1366、1440×900 与大字体布局、控件引擎调用、增强滚动可达性/保存/取消、裁边及普通书隔离。阅读页分析无问题；阅读控件目录仅有既有 info 提示。本轮没有实机测试、打包、安装或发布。
+- Reference assets were received/verified/saved as indexed in section 1. They stayed local, outside product packaging/public uploads.
+- PDF/confirmed image EPUB bottom quick panels used a separate high-contrast monochrome theme, grouping zoom, mode, crop, layout, five-enhancement overview and rotation. Wide-screen labels aligned left; narrow/large-font layouts wrapped without horizontal scrolling.
+- Only document style panels widened up to 1100 logical pixels, capped at 62% screen height with text visible above. Responsive panels avoided IntrinsicHeight measurement to prevent LayoutBuilder intrinsic-size errors. Ordinary-book layouts retained the previous 600-width path.
+- Crop/margins/comic/paper columns remained in a separate confirmed preview, without ineffective quick toggles. Crop preview remained accessible after original-region reading was disabled.
+- The bottom enhancement panel kept text above it and value/minus/slider/plus/reset per row; narrow resets used tooltip icons. Back/Cancel did not save; Confirm used existing store/rendering without altering original images.
+- Returning from preview refreshed the overview, retaining async error messages, duplicate-action disabling and cancellation. Gear StyleSettings remained byte-identical to Preview 3 at this stage.
+- Recorded 51 Flutter regressions passed for 320×740, 844×390, 1024×1366, 1440×900/large fonts, engine calls, enhancement reachability/save/cancel, crop and ordinary-book isolation. Reader-page analysis was clean and reader-control directories retained existing INFOs. No device checks, packaging, installation or publication occurred.
 
-### 增强实际效果核验（2026-10-04）
+### Visual/pixel verification of enhancement (2026-10-04)
 
-- 移除 PDF/图片 EPUB 专用快捷面板的齿轮入口；普通文字书入口及 Preview 3 的高级样式面板不改。
-- 按 PDF 视觉验证流程渲染用户提供的扫描书第 30 页，并制作灰底、浅字、细线、彩色块、模糊边缘样本。逐项目视及像素比较：文字加黑扩展暗色笔画、对比度拉开灰阶、加黑降低中间调、漂白提亮浅色纸张、锐化强化边缘，均有实际效果。纯白纸面漂白变化很小是预期行为；所有参数为零时像素不变。
-- 参考 OpenCV 的[形态学局部最小值](https://docs.opencv.org/4.13.0/db/df6/tutorial_erosion_dilatation.html)与[卷积锐化](https://opencv.org/blog/image-filtering-using-convolution-in-opencv/)核对现有算法，没有引入新依赖或复制第三方代码。
-- 隔离 Chromium 使用项目自带 PDF.js 和真实 Canvas、图片 EPUB 页面源，分别验证原图、五项单独增强、组合增强和重置，共 16 组；输出与预期逐像素一致，重置回到原图。图片 EPUB 使用原创图像章节夹具；这不是原生安装包的端到端验收。
-- 新增参数语义/强度、渲染源像素不变、缓存重置、正式单页/卷轴及后续页参数传递、五行增减/单项重置/全部重置测试。51 项 JS 和 28 项 Flutter 回归通过。私有书页、对照图及临时测试脚本仅保留在已忽略的 output 目录，不上传；本轮不打包、不安装、不发布。
+- The dedicated PDF/image EPUB quick-panel gear was removed at this stage; ordinary-book gear/Preview 3 advanced styles were unchanged. The later OCR-style gear restoration is recorded above.
+- The PDF visual-verification workflow rendered page 30 of a user-supplied scan and synthetic gray-background/light-text/thin-line/color/blur samples. Inspection/pixel comparison showed stroke expansion, contrast separation, darker midtones, lighter paper and sharpened edges. Minimal bleaching on pure-white paper was expected; all-zero parameters preserved pixels.
+- Existing algorithms were checked against OpenCV [morphological local minima](https://docs.opencv.org/4.13.0/db/df6/tutorial_erosion_dilatation.html) and [convolution sharpening](https://opencv.org/blog/image-filtering-using-convolution-in-opencv/), without new dependencies/copied third-party code.
+- Isolated Chromium with bundled PDF.js, real Canvas and image EPUB sources checked original, five individual/combined enhancements and Reset across 16 groups. Pixels matched expectations and reset restored originals. The image EPUB used an original fixture, not native-installer end-to-end acceptance.
+- Tests added parameter semantics/intensity, unchanged source pixels, cache reset, single/scroll/later-page parameter propagation and five-row increment/individual/all reset. Recorded 51 JS and 28 Flutter passed. Private pages/comparisons/scripts stayed in ignored `output`, without packaging, installation or publication.
 
-### 逐页自动裁边（2026-10-04）
+### Per-page automatic crop (2026-10-04)
 
-- 自动裁边由一次性裁框改为持久化模式。启用默认选择全书；每个原页独立识别有效内容边界，再按该页分格顺序阅读，单页/卷轴模式共用规则。奇偶页范围和手动单页覆盖继续有效。
-- 编辑器增加“逐页自动裁边”开关；留白随模式保存，重新打开编辑器重新预览当前原页。拖动裁框切换手动模式，确认前均为草稿。
-- 根据纸张亮色估计背景，仅排除局限于外围且连到页边的长黑边/扫描框，保留细线、脚注和页码；空白页、满版图及不确定边界保留完整原页，识别失败不复用上一页裁框。
-- 检测使用独立、低分辨率页面源，不与正文清晰度渲染争抢取消信号；仅缓存至多 64 组逐页边界坐标，不编码检测 PNG，不增加 OCR 依赖。原文 DOM/CFI、源文件与普通文字书界面不改。
-- 87 项 JS、35 项 Flutter 回归通过；既有扫描页栅格样本从 `uncertain-border` 恢复为有效内容边界。未打包、安装或发布。
+- Automatic crop became persistent rather than a one-time rectangle. Enabling defaulted to whole-book scope; each original page computed its own content bounds, shared by single/scroll and split order. Parity scopes/manual page overrides stayed.
+- The editor added Per-page Automatic Crop, retaining margins and repreviewing the current page when reopened. Dragging switched to manual; all changes stayed drafts until confirmation.
+- Bright-paper background estimation excluded only long peripheral dark borders/scan frames connected to the edge, retaining thin lines, footnotes and numbering. Blank/full-bleed/uncertain pages kept full bounds; failure never reused the previous page's crop.
+- A separate low-resolution source avoided competing with reader refinement cancellation. At most 64 coordinate-bound groups were cached, without detection PNG encoding, OCR dependencies, DOM/CFI/source/ordinary-menu changes.
+- Recorded 87 JS and 35 Flutter regressions passed; the existing raster scan sample changed from `uncertain-border` to valid content bounds. No packaging, installation or publication occurred.
 
-### 阅读区内文字 / OCR 重排（2026-10-04）
+### Text/OCR reflow inside the reader (2026-10-04)
 
-- PDF / 已确认图片 EPUB 的“文字重排”“OCR 重排”直接切换阅读区内容，不打开提取或范围选择弹窗。文字重排优先读取文字层，缺少文字时使用本地 OCR；OCR 重排强制识别。
-- 处理当前原页；启用裁边时复用该页手动/逐页自动裁边的完整边界。分格、视口缩放和拖动不会将重排范围缩成当前可见小格。切换原页后重新取得对应裁边；只有“提取文字”进入区域选择界面。
-- 重排文字复用现有划词菜单，保留用户的工具开关、顺序、自定义 AI 模板、上下文选项及高亮/下划线删除流程。原页 WebView 保持挂载，隐藏期间暂停原页自动翻页；返回原页保留原页定位。
-- 重排标注使用独立的原页 + 文字版本 + UTF-16 范围锚点，不作为 EPUB CFI 发送给原页渲染器。笔记回跳/导出链接识别这种锚点；文字版本不一致时不强行套用旧标注。
-- 本机按书籍、原页、模式、OCR 模型版本、裁边范围与水印选项缓存结果，保存不可变文字版本供已有笔记定位。缓存不是书籍源文件，也不加入设置同步；缺失时按页重建并核对文字版本。
-- 文字样式在阅读区直接生效；保留返回原页、前后原页、停止识别和模型设置入口。未下载模型时明确提示，不后台下载、不预先识别全书，不自动发送 AI。划词朗读读取选中文字，不误读隐藏原页。
-- 普通文字书仍走原有阅读界面和菜单；本轮不打包、不安装、不发布。
+- Text Reflow/OCR Reflow for PDF/confirmed image EPUB directly replaced reading-area content, without extraction/range dialogs. Text Reflow preferred existing layers and used local OCR when missing; OCR Reflow forced recognition.
+- Processing used the current original page and, when cropping was enabled, that page's complete manual/automatic crop boundary. Split cells, viewport zoom and panning did not shrink scope to the visible cell. Moving pages resolved that page's crop; only Extract opened region selection.
+- Reflow reused existing selection menus, user tool switches/order, custom AI templates, context options and highlight/underline deletion. The original WebView stayed mounted with auto-turn paused while hidden; return retained original positioning.
+- Annotations used original-page + text-version + UTF-16 range anchors, never masquerading as original EPUB CFIs. Note jumps/export links recognized these anchors; mismatched text versions did not force old annotations.
+- Local caches keyed book/page/mode/OCR-model-version/crop/watermark options and retained immutable text versions for notes. They were not source files or settings-sync content; missing results were reconstructed per page and text versions checked.
+- Styles applied directly in the reading area, with return/previous/next page, Stop and model settings. Missing models prompted explicitly rather than background downloading, whole-book preprocessing or automatic AI sending. Selection narration read selected reflow text rather than hidden original content.
+- Ordinary books retained their original reader/menu. No packaging, installation or publication occurred at this stage.
 
-### 扫描页水印增强（2026-10-04）
+### Scanned-page watermark enhancement (2026-10-04)
 
-- 原有 `hideWatermarks` 仅在 PDF 的可选内容组名称匹配 `watermark` / `水印` 时隐藏该组，不识别已烧录到扫描图片中的水印；独立图层开关继续保留。
-- 现有五项图像增强面板新增第六项“扫描水印减淡”，0–100，默认 0 关闭。预览、原图对照、增减、单项恢复、全部恢复、确认/取消与其他增强共用流程；兼容旧配置，未包含该字段按 0 处理。
-- 新增本地栅格算法：估计浅色纸张，按灰度/颜色取得候选掩膜，保护深色文字及相邻抗锯齿像素，按连通区域尺寸排除小号浅字、细线和大面积实色块，再将候选区域向纸张颜色减淡。处理顺序在加黑、锐化等增强前，避免先放大水印；PDF、图片 EPUB、单页与卷轴模式复用同一实现。
-- 这是保守启发式处理，不是语义水印识别或被遮文字重建。浅色大标题/插图仍可能误判，深色、复杂背景和叠字水印可能残留；界面明确提示对照原图。无需模型下载、Python、OpenCV 或新增运行时依赖，不修改 PDF/EPUB 源文件或文字层。
-- 处理沿用最多 2,097,152 像素的渲染预算，分批让出事件循环，支持取消；完成前不提交修改，渲染缓存包含去水印强度。本机 Node 合成 1200×1600 扫描样本单项处理约 176 ms，仅代表该样本和运行环境。
-- 参考：ScanTailor Advanced 的前景/背景分离思路、pdf-watermark-remover 的颜色/阈值掩膜流程，以及 OpenCV 的掩膜修补文档；未复制上述项目代码，未引入整套修补库或生成式图像模型。
-  - https://github.com/4lex4/scantailor-advanced
-  - https://github.com/banatibalazs/pdf-watermark-remover
-  - https://docs.opencv.org/4.13.0/df/d3d/tutorial_py_inpainting.html
+- Existing `hideWatermarks` hid optional PDF content groups whose names matched `watermark` or the Chinese watermark label, not marks baked into images. The separate layer toggle remained.
+- The five-enhancement panel gained a sixth control, Scanned Watermark Fading, 0–100/default 0 off. Preview/original comparison, increments, individual/all resets and Confirm/Cancel shared the existing flow; missing legacy fields defaulted to 0.
+- The local raster algorithm estimated light paper, built grayscale/color masks, protected dark text/adjacent antialiasing and filtered connected components to exclude small light text, thin lines and large solid blocks before fading candidates toward paper color. Processing preceded darkening/sharpening and was shared by PDF/image EPUB/single/scroll.
+- This conservative heuristic was neither semantic watermark recognition nor obscured-text reconstruction. Light large headings/artwork could be mistaken; dark/complex/overlapping marks could remain, with an original-comparison notice. No model, Python, OpenCV or runtime dependency was required, and sources/text layers stayed unchanged.
+- Processing retained the 2,097,152-pixel rendering budget, yielded in batches and supported cancellation, committing only complete output. Cache keys included fading strength. A synthetic 1200×1600 Node sample took about 176 ms for this control alone, specific to that sample/environment.
+- References informed foreground/background separation, color/threshold masks and masked repair; no referenced code, entire repair library or generative model was imported:
+  - [ScanTailor Advanced](https://github.com/4lex4/scantailor-advanced)
+  - [pdf-watermark-remover](https://github.com/banatibalazs/pdf-watermark-remover)
+  - [OpenCV masked inpainting](https://docs.opencv.org/4.13.0/df/d3d/tutorial_py_inpainting.html)
 
-### E-Ink 文档刷新工具栏（2026-10-04）
+### E-Ink document refresh toolbar (2026-10-04)
 
-- PDF / 图片 EPUB 的阅读面板增加汉王式紧凑刷新分组：立即刷新、每 N 原页自动刷新，±1 / ±10 调节。0 为关闭（默认），范围 1–100；只在 E-Ink 模式开启时显示，关闭即时隐藏并取消待执行刷新，普通文字书菜单不变。
-- 根据原页位置及 `readingAction` 计数；首次载入、同页分格/缩放、样式重排、同步定位不累计，跨页跳转计一次。连续翻页合并请求，等页面稳定后触发；菜单遮挡、后台、原页隐藏重排时停止自动刷新，手动成功后重新计数。
-- Android 能力探测绑定 `android.os.EinkManager` / `eink` 服务的 `sendOneFullFrame()` 单次接口；调用还要求 Activity 已恢复且有窗口焦点。不写系统属性、不申请特权、不修改持久刷新波形，不以 Flutter 重绘或闪黑白模拟硬件全刷。接口缺失/受限时禁用并提示系统刷新入口，失败不显示成功。
-- 此适配不等同于所有汉王固件支持；实际刷新波形由设备固件决定，普通/清晰/快速/极速模式未在接口未经验证时伪造。无连接墨水屏设备，本轮验证限于自动化与编译；不打包、不安装、不发布。
-- 页数偏好纳入全局设置备份/恢复及数值校验，硬件能力探测结果不备份。
-- 接口参考：[KOReader RK35xxEPDController](https://github.com/koreader/android-luajit-launcher/blob/master/app/src/main/java/org/koreader/launcher/epd/rockchip/RK35xxEPDController.kt)，独立编写接口绑定，未复制实现或引入厂商二进制。
+- PDF/image EPUB panels gained compact Hanvon-inspired Refresh Now and every-N-original-pages controls with ±1/±10. Zero was off/default; range 1–100. The group appeared only with E-Ink mode enabled; disabling hid it/cancelled pending refresh, preserving ordinary-book menus.
+- Original-page transitions/`readingAction` drove counting. Initial load, same-page splits/zoom, style reflow and sync relocation did not count; a cross-page jump counted once. Rapid turns coalesced and waited for a stable page. Panels/background/hidden originals during reflow stopped automatic refresh; successful manual refresh reset counts.
+- Android probing bound `android.os.EinkManager`/`eink` service's one-shot `sendOneFullFrame()`, requiring resumed Activity/window focus. It did not set system properties, request privileges, change persistent waveforms or simulate hardware refresh through Flutter repaint/black-white flashing. Missing/restricted interfaces disabled the action with system-refresh guidance; failures did not claim success.
+- This did not establish support for every Hanvon firmware. Firmware determined actual waveforms; unverified normal/clear/fast/fastest modes were not fabricated. No E-Ink device was connected; recorded verification was automation/compilation only, without packaging/installation/publication.
+- The page-count preference joined global settings backup/restore and validation; hardware-capability results did not.
+- Interface reference: [KOReader RK35xxEPDController](https://github.com/koreader/android-luajit-launcher/blob/master/app/src/main/java/org/koreader/launcher/epd/rockchip/RK35xxEPDController.kt). The binding was independently written without copied implementation/vendor binaries.
 
-### 多格式扫描书与导入识别（2026-10-04）
+### Multi-format image books and import classification (2026-10-04)
 
-- EPUB、MOBI、AZW3、FB2 统一支持导入时最多抽样五个正文分节识别图片书；MOBI/KF8/FB2 借用解析器已解析的图片资源，排除封面/目录证据。分类保存后，打开书籍只读取结果，不重新抽样。
-- 远程书库入库复用本地导入识别；WebDAV 下载已有书架条目时补充本地识别结果，不重复建书、不修改进度、不触发新向量化。
-- 书架菜单提供“设为扫描图片书籍”和“恢复普通书籍阅读”。手动判定优先于同一源文件的自动结果，文件替换后失效；扫描模式使用文档阅读菜单及原页裁边/增强，普通文字书保留原界面。
-- 扫描模式主阅读区不绑定图片单击预览、长按图片选项和图片脚注操作，JS 事件出口及 Flutter 图片桥接均增加拦截；点击继续交给原有翻页/阅读菜单。普通文字书中的插图行为不变。
-- 25 项 JS 与 37 项 Flutter 针对性回归通过，覆盖分类持久化、手动恢复、远程书库界面、扫描页图片事件和普通插图行为。本轮不打包、不发布。
+- EPUB, MOBI, AZW3 and FB2 shared image-book detection at import with at most five body sections. MOBI/KF8/FB2 reused already-parsed image resources, excluding cover/contents evidence. Opening read the saved result without new sampling.
+- Remote-library import reused local classification; WebDAV downloads for existing bookshelf entries populated local results without duplicate books, position changes or new vectorization.
+- Bookshelf actions Set as Scanned Image Book and Restore Ordinary Reading were added. Manual decisions overrode automatic results for the same source and expired on replacement. Scan mode used document menus/crop/enhancement; ordinary text books retained their interface.
+- Scan reading did not bind image single-click preview, long-press options or image-footnote actions. JS event exits and Flutter image bridges intercepted those paths, leaving taps to existing page/menu behavior. Ordinary illustrations were unchanged.
+- Recorded 25 JS and 37 Flutter targeted regressions passed for classification persistence/manual restoration, remote-library UI, scan image events and ordinary illustrations. No packaging/publication occurred.
 
-### 自动裁边的文字边界修正（2026-10-04）
+### Automatic crop text-boundary correction (2026-10-04)
 
-- 将固定纸色差阈值改为局部明暗对比与连通笔画边界，避免纸张泛黄、装订渐变阴影撑大裁框；支持较暗纸张，保留纯黑/不确定满版页的原页回退。
-- 过滤内缩扫描框、外围断续细边线及孤立小噪点；靠近有效内容的小标点继续保留，页眉、页码、脚注、细分隔线和插图参与内容边界。默认留白与手动裁边规则不改。
-- 共用栅格算法覆盖 PDF 与扫描图片书，原页独立计算与缓存，不依赖 OCR、不新增模型或全书分析；分批取消和 2MP 检测预算保持有效。
-- 用用户提供的扫描 PDF 第 20、50、51、100 个原页作本地抽样对照，并检查裁后图。第 51 页旧框几乎覆盖整页，修正后去掉左侧断边和四周空白，保留页眉及脚注。用户书页只保留在忽略的本地诊断目录，不加入仓库。
+- A fixed paper-color-difference threshold was replaced with local contrast/connected-stroke bounds to avoid yellow paper/binding gradients inflating crops. Dark paper was supported, retaining full-page fallback for pure-black/uncertain full-bleed pages.
+- Inset scan frames, peripheral broken thin borders and isolated noise were filtered; small punctuation near content stayed. Headers, page numbers, footnotes, thin separators and artwork contributed to bounds. Default margins/manual rules remained.
+- The shared raster algorithm covered PDF/scanned image books with independent per-page computation/cache, without OCR/models/whole-book analysis. Batched cancellation and 2MP detection remained.
+- Original pages 20/50/51/100 of the user's PDF were locally compared before/after crop. Page 51's old bounds nearly covered the full page; corrected bounds removed the broken left border/outer space while retaining header/footnotes. Private pages stayed in ignored local diagnostics, outside the repository.
 
-### OCR 模型卡片与本地删除（2026-10-04）
+### OCR model cards and local deletion (2026-10-04)
 
-- OCR 设置复用 BGE 页的设置分组、下载源入口、模型卡片、推荐/当前标记和按钮样式，列出全部轻量模型，默认推荐 V4。每张卡片显示大小、实际上游/镜像、校验状态及下载进度，支持下载并使用、切换、重新校验与取消。
-- 卡片内可确认删除本机该模型（包括未完成/损坏文件），不删除书籍、重排缓存、已识别文字或其他模型，不改变模型选择。删除后回到按需下载状态。
-- 文件删除只针对清单中的模型文件及临时文件，不递归删除目录；识别任务、下载与删除互斥，失败后重新检查状态。下载期间同步/导入的新选择不会被旧下载完成回调覆盖。
+- OCR settings reused BGE settings groups, source selection, cards, recommended/current badges and buttons, listing all lightweight models with V4 recommended. Cards displayed size, actual upstream/mirror, verification state/progress, download/use, switching, reverification and cancellation.
+- Confirmed deletion removed only that model's local incomplete/corrupt files, preserving books, reflow caches, recognized text, other models and selection. Afterwards it returned to optional-download state.
+- Only manifest-listed model/temporary files were deleted, never recursively removing directories. Recognition/download/deletion were mutually exclusive, with state rechecks after failure. A completed older download could not overwrite a selection changed through settings import/sync during download.
 
-### 图片书识别、裁边入口与窗口缩放修复（2026-10-04）
+### Image-book detection, crop entry and window resizing (2026-10-04)
 
-- 修复固定尺寸漫画图的假阴性：650×904 的完整单页图片不能拿 1000×1200 检测 iframe 的空白区域作覆盖率分母。无可见文字且可安全渲染的页面以图片集合的实际边界建立坐标，保留分片顺序和内部间距；小装饰图、带文字页面、未知绘制效果仍保守处理。
-- 扫描图片书的“裁边与分格”与 PDF 共用直接编辑入口，确认/取消直接返回菜单；若当前页确有文字或不支持的排版，保留原文并允许显式选择相邻页，不自动跳过章节。
-- 移除扫描图底图样式强制 `inset:0!important` 对裁边坐标的覆盖。单页、滚动阅读的高清补绘层有独立标记，不再被隐藏原始插图的规则一并隐藏。
-- 原图和裁边后的区域按实际窗口、适应页面/适应宽度及用户倍率计算；窗口变化重新适配。普通文字书不进入该渲染适配器，导入抽样上限仍为五个分节，打开书籍不重新检测。旧的误判缓存可通过书架“设为扫描图片书籍”修正，新导入使用修正后的检测。
-- 77 项 JS、41 项 Flutter 相关测试通过。以本地两份 AZW3 漫画验证自动分类、图片显示与裁边；真实浏览器检查原图/裁图 × 三种窗口 × 两种适应方式 × 两种倍率共 24 组，以及滚动阅读的窗口缩放和高清层可见性。诊断书页只保存在忽略的本地目录，不加入仓库。Dart 标准分析通过（分析进程内屏蔽无法启动的既有 custom_lint 插件，未修改项目配置）；阅读器 JS 已重建。
+- Fixed false negatives for fixed-size comic pages: a complete 650×904 image could not use empty space in a 1000×1200 detection iframe as its coverage denominator. Safely renderable pages without visible text used actual image-union bounds, retaining tile order/internal spacing. Decorations, text-bearing pages and unknown rendering effects stayed conservative.
+- Image-book Crop and Splits shared PDF's direct editor, returning to the menu on Confirm/Cancel. Text/unsupported layouts retained original content and allowed explicit adjacent-page selection, without skipping chapters automatically.
+- Removed forced `inset:0!important` base-image styling that overrode crop coordinates. Fine-image layers in single/scroll readers gained separate markers so original-illustration hiding did not hide them too.
+- Originals/cropped regions fitted actual window, page/width mode and user zoom, recalculating on resize. Ordinary text books did not enter the adapter; import remained limited to five sections and opening did not redetect. Older false-negative caches could be corrected through the bookshelf action; new imports used the fixed detector.
+- Recorded 77 JS and 41 Flutter tests passed. Two private AZW3 comics checked classification/display/crop. Real-browser checks covered original/cropped × three windows × two fit modes × two zooms (24 groups), plus scroll resizing/fine-layer visibility. Private diagnostics stayed ignored. Standard Dart analysis passed with the incompatible existing custom_lint disabled only in analyzer memory, without config changes; reader JS rebuilt.
 
-### MOBI6 图片记录引用识别修复（2026-10-04）
+### MOBI6 image-record reference detection (2026-10-04)
 
-- 旧式 MOBI 的原始正文以 `img[recindex]` 引用图片记录，解析器加载章节后才生成 `src`。导入检测此前仅查找 `src`/`href`，将这类图片页误当成空白页；现在将有效正整数记录号纳入候选，再由原有加载器解码、核对尺寸、可见性及覆盖率，不凭记录号直接判为扫描书。
-- 导入仍最多抽样五个分节，打开书籍不重新检测；含正文的插图书、无效记录和加载失败保持普通书籍回退。已保存的旧分类不静默改写，可在书架菜单手动设为扫描图片书籍。
-- 用本地 255 分节的 MOBI 漫画复现并验证修复后分类为扫描图片书，实际图片页可渲染并进入图片阅读器；48 项相关 JS 测试通过，阅读器 JS 已重建。原书及诊断截图不加入仓库，本轮未重新打包。
+- Legacy MOBI raw body referenced `img[recindex]`, with `src` generated only after section loading. Earlier import checks for `src`/`href` treated these pages as blank. Valid positive record indices became candidates, then the existing loader decoded/checked dimensions, visibility and coverage; record IDs alone did not establish a scan.
+- Import still sampled at most five sections; opening did not redetect. Text-bearing illustrated books, invalid records/load failures retained ordinary fallback. Existing classifications were not silently rewritten; manual bookshelf correction remained available.
+- A private 255-section MOBI comic reproduced the issue and then classified/displayed through the image reader. Recorded 48 related JS tests passed and JS rebuilt. Source books/screenshots were not added; no new packaging occurred at this stage.
 
-### 官方候选资料链接
+### Official candidate documentation
 
-- https://mozilla.github.io/pdf.js/api/
-- https://pub.dev/packages/pdfrx
-- https://pub.dev/packages/pdfrx_engine
-- https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html
+- [PDF.js API](https://mozilla.github.io/pdf.js/api/)
+- [pdfrx](https://pub.dev/packages/pdfrx)
+- [pdfrx_engine](https://pub.dev/packages/pdfrx_engine)
+- [OpenCV thresholding](https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html)

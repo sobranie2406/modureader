@@ -1,49 +1,48 @@
-# 朗读漏标题 / 跳章节修复（2026-09-06）
+# Narration missing headings / skipping chapters (2026-09-06)
 
-## 对照来源
+> Historical record. This preserves the investigation, local test results and later Beta3 inclusion recorded at the time; it is not a new test of Modu 1.2.0+10082. See the [documentation index](README.md) and the [current settings guide](SETTINGS.md). No tests, builds or device checks were repeated for this documentation update.
 
-按 ReadAny 理解用户提到的“Reader Annie”，核对其官方源码提交
-`021137eb3dbb398096193ee7b6819e665a281d32`：
+## Comparison source
 
-- [朗读会话管理](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/core/src/stores/tts-store.ts)：使用会话编号忽略停止后的迟到回调，只在自然播放结束时通知完成。
-- [Foliate 朗读提取](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/foliate-js/tts.js)：标题属于文本块；不应把普通链接文字整体当成需要跳过的注释。
-- [播放游标](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/core/src/tts/playback-cursor.ts)：按实际播放位置更新游标，而不是按合成请求进度更新。
+The user's “Reader Annie” reference was interpreted as ReadAny. Its official source was reviewed at commit `021137eb3dbb398096193ee7b6819e665a281d32`:
 
-本次针对默读 Flutter / WebView 调用链修复，并非直接替换成 ReadAny 的播放器。
+- [Narration session management](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/core/src/stores/tts-store.ts): session IDs ignore late callbacks after stop; completion is reported only after natural playback completion.
+- [Foliate narration extraction](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/foliate-js/tts.js): headings are text blocks; ordinary link text should not all be treated as annotations to skip.
+- [Playback cursor](https://github.com/codedogQBY/ReadAny/blob/021137eb3dbb398096193ee7b6819e665a281d32/packages/core/src/tts/playback-cursor.ts): the cursor follows actual playback position rather than synthesis-request progress.
 
-## 已定位的问题
+The fixes targeted Modu's Flutter/WebView call chain; they did not directly replace it with ReadAny's player.
 
-1. `initTts()` 已由 JavaScript `from()` 选中第一句，却丢弃其返回值；系统朗读随后调用 `next()`，再次前进，漏读标题/首句。
-2. 文本过滤器跳过全部本地链接，包含返回目录链接的章节标题也被过滤。
-3. Android 原生开始回调负责预入队，完成回调又推进游标；停止、恢复和章节加载交错时没有会话隔离。
-4. 在线朗读预取可能跨越游标切章时刻，却仍用“排除当前句”的参数，漏掉下一章标题；以文字哈希去重还会漏掉没有 CFI 的重复段落。
-5. 在线合成失败或返回空音频被标记为静音并自动继续，连续失败可能表现为整章被跳过。
-6. 上/下一章按钮没有等待停止完成，切章后又调用上一/下一句，产生额外推进。
-7. 章节结束依赖互相递归调用；空章或书末没有严格终止条件，导航失败也没有清楚地传回 Dart。
+## Identified problems
 
-## 修复原则
+1. JavaScript `from()` selected the first sentence in `initTts()`, but its return value was discarded. System narration then called `next()`, advancing again and skipping the heading/first sentence.
+2. The text filter skipped all local links, including chapter headings linked back to the table of contents.
+3. Android's native start callback pre-enqueued text while completion callbacks also advanced the cursor. Stop, resume and chapter loading lacked session isolation.
+4. Online prefetch could cross a chapter transition while still excluding the current sentence, skipping the next heading. Text-hash deduplication also skipped repeated paragraphs without CFI.
+5. Synthesis failures or empty audio were marked silent and automatically skipped; consecutive failures could appear as a skipped chapter.
+6. Previous/next chapter buttons did not await stop, then also invoked previous/next sentence after changing chapter, causing extra advancement.
+7. Chapter completion depended on mutual recursion. Empty chapters and book end lacked strict termination, and navigation failures were not clearly returned to Dart.
 
-- 初始化直接返回当前句，不再多走一次。保留普通链接和 H1–H6；仅过滤明确的脚注引用、回注标记、隐藏文本及 ruby 注音等。
-- 系统语音以单条等待完成的播放循环推进，Android 关闭旧的双回调入队方式。
-- 使用会话编号屏蔽停止后的异步结果；章节加载中暂停时，恢复保留已定位的新章首句。
-- 在线语音只在稳定的播放游标处补充有序批次，在播放完成后推进；不再按文本去重。
-- 合成、播放或导航失败暂停并展示错误，重试保留当前位置，不用静音代替失败。
-- 章节导航串行化、空章有界处理、到书末停止；手动切章不再追加一次句子跳转。
-- 原生媒体控制状态跟随真实播放结束/失败状态，避免书末仍显示正在播放。
+## Fix principles
 
-## 验证与边界
+- Initialization returns the current sentence directly, without another advance. Ordinary links and H1–H6 are retained; only explicit footnote references, back-reference marks, hidden text, ruby pronunciation annotations and similar non-body content are filtered.
+- System speech uses a loop that waits for each utterance to finish. Android's old dual-callback enqueue path is disabled.
+- Session IDs suppress asynchronous results after stop. Pausing during chapter loading preserves the located first sentence of the new chapter on resume.
+- Online speech adds ordered batches only at a stable playback cursor and advances after playback completes; it no longer deduplicates by text.
+- Synthesis, playback or navigation failures pause and show an error. Retry preserves position rather than substituting silence.
+- Chapter navigation is serialized; empty-chapter handling is bounded; book end stops playback. Manual chapter changes do not add an extra sentence jump.
+- Native media controls follow actual playback completion/failure, preventing a playing state at book end.
 
-本轮最终结果：215 项 Flutter 测试通过、2 项联网测试跳过；19 项 JavaScript
-测试通过；1 项 macOS 原生系统语音集成测试通过；Android ARM64 Debug 构建成功。
-本机 custom_lint 分析插件仍有运行环境错误，不能宣称完整静态分析通过。
+## Verification and limits at the time
 
-- JavaScript 回归覆盖文本标题、链接标题、脚注、当前范围初始化、单句章节、空章、书末、双请求和停止取消。
-- Dart 使用真实 `SystemTts` / `OnlineTts` 类与可控的原生/音频接口，验证顺序、错误重试和异步交错，而不是只检查源码字符串。
-- macOS 原生系统语音集成测试实际完成三个测试句，包括两个标题，并验证原生完成后的游标顺序；未读取私人书库。窗口前台激活失败，因此不宣称进行了界面操作验收。
-- Android ARM64 构建用于验证可编译/打包，不等同于 Android 真机听读验收。
-- 没有用户原始问题书籍，没有新增 OCR：图片形式的标题、纯扫描 PDF 或文件本身缺失的文字不在这次文本提取修复范围。
+Final results for that round: **215 Flutter tests passed, two network tests skipped; 19 JavaScript tests passed; one macOS native system-speech integration test passed; Android ARM64 Debug build succeeded.** The local custom_lint analysis plugin still had a runtime-environment error, so full static analysis was not established.
 
-复测命令：
+- JavaScript coverage included text headings, linked headings, footnotes, current-range initialization, single-sentence chapters, empty chapters, book end, dual requests and cancellation after stop.
+- Dart tests used real `SystemTts` / `OnlineTts` classes with controllable native/audio interfaces to check ordering, error retry and asynchronous interleaving, rather than checking source strings only.
+- The macOS native speech integration test actually completed three test sentences, including two headings, and verified cursor order after native completion. It did not read private books. Foreground window activation failed, so UI acceptance was not claimed.
+- The Android ARM64 build established compilation/packaging, not listening acceptance on a physical Android device.
+- The original problem book was unavailable. No OCR was added in this fix; image-only headings, purely scanned PDFs and text absent from the file were outside this text-extraction fix.
+
+Commands recorded for retesting:
 
 ```sh
 flutter test --no-pub
@@ -51,4 +50,4 @@ MODU_JSDOM_ROOT=/path/to/jsdom-fixture node --test test/reader_business.test.mjs
 flutter test integration_test/tts_reader_test.dart -d macos --dart-define=MODU_NATIVE_TTS_TEST=true
 ```
 
-上述验证在本地修复阶段完成。应用户后续发布要求，修复纳入 Beta3（build 6329）；不替换 Beta2 安装包。正式分发状态以 GitHub Release 和对应 CI 结果为准。
+The verification above occurred during local fixing. At the user's later release request, the fixes were included in **Beta3 (build 6329)** without replacing Beta2 packages. Distribution status was subject to the corresponding GitHub Release and CI results.

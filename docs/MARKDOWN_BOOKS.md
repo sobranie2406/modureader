@@ -1,14 +1,18 @@
-# Markdown 书籍
+# Markdown books
 
-书架添加、桌面拖入、系统分享和替换书籍支持 `.md`、`.markdown`（不区分大小写）。WebDAV 远程书库的“仅书籍”包含 Markdown，也可选择 MD 单独筛选。
+Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
-使用 UTF-8 编码。导入时在后台转换为 EPUB，后续使用现有阅读器、笔记、朗读和书库同步流程，不需要接收设备再次转换。不会修改选择的原始文档；导入流程会清理其临时副本。
+Bookshelf import, desktop drag-and-drop, system sharing and book replacement accept `.md` and `.markdown` (case-insensitive). Remote WebDAV library's books-only filter includes Markdown, with an MD-only filter also available.
 
-- 根据一级标题提取书名，没有一级标题则使用文件名。
-- 根据一级至六级标题生成分层目录，支持 `#` 标题和下划线式标题。代码块里的 `#` 不会成为章节。
-- 保留粗体、斜体、删除线、引用、有序/无序列表、表格、代码块、链接及基本静态 HTML。标题锚点链接在分章后仍可跳转。
-- 支持内嵌 Base64 PNG、JPEG、GIF、WebP 图片。单文件导入不自动读取相邻文件夹；相对路径图片显示替代说明，网络图片显示可点击链接，不自动下载。如需完整图文资源，可先打包为 EPUB。
-- 不执行 Markdown 内的脚本，不保留事件处理器、iframe、外部样式和危险链接。不执行 Mermaid、LaTeX 或其他 Markdown 扩展程序。
-- 单个文件上限 64 MiB；空白文件会提示导入失败。原文无标题且很长时按内容块分章，避免拆坏表格或代码块。
+Use UTF-8. Import converts Markdown to EPUB in the background, then uses the existing reader, notes, narration and library-sync workflows. Receiving devices do not convert it again. The selected original document is not modified; import cleans up its temporary copy.
 
-解析使用 Dart 官方维护的 [markdown](https://pub.dev/packages/markdown) 库，生成内容经过白名单清理并序列化为 XHTML。
+- The first level-one heading supplies the title; otherwise the filename is used.
+- Headings at levels one through six form a hierarchical table of contents. Both `#` and underline-style headings are supported; `#` inside code blocks does not create a chapter.
+- Bold, italics, strikethrough, block quotes, ordered/unordered lists, tables, code blocks, links and basic static HTML are preserved. Heading-anchor links still work after splitting into chapters.
+- Embedded Base64 PNG, JPEG, GIF and WebP images are supported. Single-file import does not read adjacent folders automatically. Relative-path images show fallback descriptions; network images become clickable links and are not downloaded automatically. Package complete text/image resources as EPUB if needed.
+- Scripts are not executed. Event handlers, iframes, external styles and unsafe links are removed. Mermaid, LaTeX and other Markdown extension programs are not executed.
+- A file is limited to 64 MiB; blank files fail import. Long text without headings is divided at content-block boundaries to avoid breaking tables or code blocks.
+
+Parsing uses the Dart-maintained [markdown](https://pub.dev/packages/markdown) library. Generated content is sanitized with an allowlist and serialized as XHTML.
+
+Implementation: [Markdown-to-EPUB converter](../lib/service/convert_to_epub/markdown/convert_from_markdown.dart). This documentation update reviewed source behavior without running imports or tests.

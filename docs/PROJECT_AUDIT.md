@@ -1,38 +1,50 @@
-# 项目归属与文档清理记录
+# Project identity and documentation cleanup record
 
-本页前半部分记录较早的项目归属清理：GitHub 主分支（起点 `8021c97c`）的已跟踪文件、首页说明、应用文案与配置、商店元数据、发布脚本，以及当时五份 GitHub Release 说明。当前首页与素材规则以末尾的 2026-10-03 更新为准。
+## Current: Modu 1.2.0+10082
 
-## 已处理
+The current product baseline is the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Current guides must describe that release rather than uncommitted application changes. The homepage is English `README.md` with a separate Chinese `README_zh.md`; `README_EN.md` redirects the old English address. Single-version guides use English, while dated historical records retain their evidence and version boundaries.
 
-- 根目录只维护 `README.md`（中文）和 `README_EN.md`（英文）。删除仍含上游品牌、下载、反馈、赞助和不一致许可描述的俄文/土耳其文首页，以及重复的中文跳转页。
-- 修正排障设置路径和日志提交流程；不再要求删除文件名空格或公开未经检查的完整日志。补充独立远程书库说明。
-- 重写中英文商店文字草稿，删除“完美支持”等宣传和未维护的俄文草稿；明确不代表上架。Fastlane 参考及其历史图片不作为当前 Modu 宣传材料。
-- 将上游版本史归档到 `docs/upstream/anx-reader-changelog.md`；应用读取的 `assets/CHANGELOG.md` 只包含默读当前摘要，详细历史变更仍在各 Release。
-- 修正问题处理示例指向本仓库，说明现有自动化的真实范围，不额外启用上游策略。
-- 移除九个不使用的上游打包/商店发布工作流，保留当前完整构建、质量检查及历史原生封装流程。
-- 移除已禁用的内购页面、状态和服务、商品编号及上游隐私/条款入口；移除插件及 Apple 原生锁文件中的对应依赖。阅读不再经过内购判断。
-- 安全文档不再把整个项目称为 Beta；版本标签、签名条件、安全审计和实际测试范围分别说明。
+Current document reading includes PDF and classified image books, optional local OCR, current-page/cropped-whole-page reader reflow and Extract's region editor/editable AI input. The earlier OCR cancellation was superseded by later implementation. Ordinary text books retain their normal reader. Vector indexes stay local; Stop Vectorization remains available. Release guidance uses eight installers, excluding Android x64, GitHub-first checking and the same resolved download source, with browser DMG downloads on macOS rather than an in-app file-hash claim. See the [scanned-document status](SCANNED_DOCUMENT_DEVELOPMENT.md), [indexing guide](INDEX_SYNC_AND_READING_CONTROLS.md) and [update mirror](UPDATE_MIRROR.md).
 
-## 有意保留
+The current homepage set contains 33 images, following later documented expansion of the nine-image set retained on 2026-10-03. Current imagery preserves actual Mac layout, places phone configuration in the foreground and Mac results behind it, uses white PDF pages, and separates EN/ZH artwork. These are display/provenance requirements, not new app or device verification. See [display assets](images/README.md).
 
-- `LICENSE`、`NOTICE`、`LICENSES/`、`UPSTREAM.md` 和依赖自身的 README、版权及来源。
-- Dart 内部包名 `anx_reader`、旧数据迁移路径和脱敏堆栈规则，不能仅凭字符串命中就全局替换。
-- 用户明确要求保留的 `fonts.anxcye.com` 字体服务。
-- 已固定版本的第三方依赖真实仓库地址；这些不是默读下载或反馈入口。
-- 上游限定的维护任务保护条件；本次不改变已有问题处理策略。
-- 原始截图和历史素材的来源，见 `docs/images/README.md`、`fastlane/metadata/README.md`。当前首页不使用上游产品截图冒充默读界面。
+No new tests, builds, device checks or full security audit were performed for this documentation update. The records below describe earlier work and do not move tags or alter published assets.
 
-## 验证与版本边界
+## Historical identity cleanup
 
-新增 `test/project_identity_test.py` 并接入质量检查：限定首页语言、拒绝错误下载/反馈链接、检查当前更新摘要、阻止内购与旧发布入口回归，并确认许可和字体服务仍保留。
+The original audit covered tracked files on the GitHub main branch from `8021c97c`, homepage text, app/configuration copy, store metadata, release scripts and the five GitHub release descriptions then present.
 
-本次修改主分支，不移动已发布的标签、不覆盖安装包、不重写历史提交。历史标签的自动源码归档仍反映当时的文件；不能把本次源码清理描述成已安装在用户设备上的更新。
+### Completed at that stage
 
-## 2026-10-03：当前源码素材清理
+- Maintained only Chinese `README.md` and English `README_EN.md` at the root. Removed Russian/Turkish homepages containing upstream branding/download/feedback/sponsorship links and inconsistent license wording, plus a duplicate Chinese redirect. This historical language arrangement was superseded by the 2026-10-03 change below.
+- Corrected troubleshooting setting paths and log submission: no requirement to remove filename spaces or publish unchecked complete logs. Added separate remote-library guidance.
+- Rewrote Chinese/English store-copy drafts, removed unsupported promotional claims and unmaintained Russian drafts, and clarified that drafts do not indicate store publication. Fastlane references and historical images were not current Modu promotional assets.
+- Archived upstream version history in `docs/upstream/anx-reader-changelog.md`; app-facing `assets/CHANGELOG.md` contains the current Modu summary, with detailed history in individual releases.
+- Pointed issue-handling examples to this repository and documented the actual automation scope without enabling additional upstream policies.
+- Removed nine unused upstream packaging/store-release workflows, retaining the current complete build, quality checks and historical native repackaging workflow.
+- Removed disabled in-app-purchase pages/state/services, product IDs, upstream privacy/terms links, the plugin and corresponding Apple native-lockfile dependencies. Reading no longer passes through purchase checks.
+- Stopped calling the whole project Beta in security documentation; explained tags, signing, security audits and actual test scope separately.
 
-- 首页改为 `README.md` 英文、`README_zh.md` 中文，`README_EN.md` 仅保留旧地址跳转；同步更新首页身份回归检查。
-- 从当前 Git 跟踪中移除 105 张旧宣传图、历史截图及中间手机渲染图，以及 19 个废弃商店图片符号链接，共 67,867,671 字节（约 64.7 MiB）。本地源素材和 Git 历史保留。
-- 保留 `docs/images/showcase/cross-platform/` 的九张现用图片、素材来源说明和原创示例书。
-- 保留 PDF/EPUB 回归测试夹具、应用实际引用的阅读器构建资源、Windows 构建脚本引用的运行库、第三方依赖以及全部许可证。
-- 当前跟踪树未发现 APK/AAB/IPA/DMG 安装包、崩溃转储、构建缓存目录或常见私钥/令牌格式命中；这是文件与模式筛查，不是完整历史或二进制秘密审计。
-- 新增旧素材及安装包/诊断文件忽略规则；不改写 Git 历史，不删除 Release、标签、分支或本地书库。
+### Deliberately retained
+
+- `LICENSE`, `NOTICE`, `LICENSES/`, `UPSTREAM.md` and dependencies' own READMEs, copyright and provenance.
+- Internal Dart package name `anx_reader`, old-data migration paths and sanitized stack rules; string matches alone do not justify global replacement.
+- The user-requested `fonts.anxcye.com` font service.
+- Real repositories for pinned third-party dependencies, which are not Modu download/feedback destinations.
+- Upstream-scoped maintenance-task protections, without changing existing issue policy.
+- Original screenshot/historical-asset provenance in `docs/images/README.md` and `fastlane/metadata/README.md`. Upstream screenshots were not republished as current Modu UI.
+
+### Recorded verification and version boundary
+
+`test/project_identity_test.py` was added to quality checks to constrain homepage languages, reject incorrect download/feedback links, check the current changelog summary, prevent purchase/old-release-entry regressions and confirm license/font-service preservation.
+
+This cleanup changed main-branch source without moving released tags, overwriting installers or rewriting commits. Historical tag source archives still show their original files; source cleanup is not an update already installed on users' devices.
+
+## Historical source-asset cleanup (2026-10-03)
+
+- Changed the homepage arrangement to English `README.md` and Chinese `README_zh.md`, retaining `README_EN.md` as an old-address redirect and updating identity regressions.
+- Removed 105 old promotional images, historical screenshots and intermediate phone renders, plus 19 obsolete store-image symlinks, from current Git tracking: 67,867,671 bytes (about 64.7 MiB). Local source assets and Git history were retained.
+- Retained the nine then-current `docs/images/showcase/cross-platform/` images, provenance documentation and original example books. The current 33-image set reflects later expansion; it does not change this historical count.
+- Retained PDF/EPUB regression fixtures, reader build resources used by the app, runtimes referenced by Windows build scripts, third-party dependencies and all licenses.
+- The then-tracked tree showed no APK/AAB/IPA/DMG installers, crash dumps, build-cache directories or common private-key/token-pattern matches. This was file/pattern screening, not a complete history or binary-secret audit.
+- Added ignore rules for retired assets and installer/diagnostic files without rewriting Git history or deleting releases, tags, branches or the local library.

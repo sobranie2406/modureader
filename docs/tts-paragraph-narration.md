@@ -1,23 +1,27 @@
-# 在线朗读按段合成
+# Online narration in paragraph groups
 
-## 行为
+Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
-- Edge、MiMo、OpenAI 兼容和 DashScope 在线朗读使用同一套分组；系统朗读保留逐句模式。
-- 仅合并同一个 DOM 段落内相邻的句子，每组最多 4 句、240 个 UTF-16 单元。不跨标题、列表项或章节。
-- 超长句优先按后半段的逗号、分号、冒号、空白切分，否则按长度拆分；不拆开 Unicode 代理对。隐藏注释和编号仍不进入合成文本。
-- 一组对应一份音频和原文真实 Range/CFI。高亮整组，“上一段/下一段”移动一组，不使用估算的逐句时间戳，也不切割返回的音频。
-- 选中文字后“朗读”从选中位置开始，首组只合成其余内容；之后继续下一组。手动返回首组时读完整组。
-- 暂停恢复仍使用当前音频；锁屏下的章节推进沿用不依赖页面排版的阅读器通道。
+## Behavior
 
-## 请求和边界
+- Edge, MiMo, OpenAI-compatible and DashScope online narration share the same grouping. System speech retains sentence-by-sentence playback.
+- Only adjacent sentences in the same DOM paragraph are grouped, with at most four sentences and 240 UTF-16 code units per group. Groups do not cross headings, list items or chapters.
+- Long sentences are split preferentially at a comma, semicolon, colon or whitespace in the latter half, otherwise by length. Unicode surrogate pairs are not split. Hidden annotations and numbering remain excluded from synthesis text.
+- Each group maps to one audio item and an actual source Range/CFI. The whole group is highlighted; previous/next segment moves one group. The implementation does not estimate sentence timestamps or split returned audio.
+- Selecting text and choosing narration starts at the selection. The first group synthesizes only the remainder, then continues to the next group. Manually returning to that first group reads it in full.
+- Pause/resume keeps the current audio. Chapter advancement while locked uses the reader channel that does not depend on page layout. It still requires WebView execution; this does not guarantee progress while the system suspends the WebView.
 
-- 保持所选音色及描述，沿用稳定语速提示；不支持提示词的 API 不强行加入字段。API 仍可能在不同组之间产生声音变化，本实现不保证模型输出完全一致。
-- 最多缓存 4 个播放组，首组优先请求，后续最多 2 个并发请求。不等待后续组就可播放首组。
-- 手动跳转或停止会取消对旧合成结果的等待，迟到的音频或错误不再影响播放。底层 HTTP 请求可能仍完成，取消等待不保证免除服务端计费。
-- 未增加流式解码。尤其 MiMo 文字设计音色不能把完整结果的兼容流式包装当作低延迟音频流；目前使用限长分组和预取。
+## Requests and boundaries
 
-## 回归
+- The selected voice and description are retained with stable narration-rate instructions. Unsupported APIs do not receive forced prompt fields. The API may still vary the voice between groups; identical model output is not guaranteed.
+- At most four playback groups are cached. The first group has request priority; later groups use at most two concurrent requests. Playback can begin before later groups are ready.
+- Manual navigation or stop cancels waiting for old synthesis results. Late audio or errors no longer affect playback. The underlying HTTP request may still finish; cancelling a wait does not guarantee avoidance of server charges.
+- Streaming decoding was not added. In particular, MiMo text-designed voices must not treat a compatibility streaming wrapper around a complete result as a low-latency audio stream. The implementation uses bounded groups and prefetching.
 
-- `test/reader_tts_paragraph.test.mjs`：分段边界、长度、隐藏内容、选中起点、准确高亮、跨章及切换引擎。
-- `test/service/tts/tts_paragraph_playback_test.dart`：首组优先、播放顺序、慢请求跳转、迟到成功/错误、暂停恢复及前后按组定位。
-- 测试不发送书籍文本到真实语音接口；实际音色连贯性和设备后台播放仍需安装包试听验证。
+## Regression coverage
+
+- `test/reader_tts_paragraph.test.mjs`: paragraph boundaries, length limits, hidden content, selection start, accurate highlights, chapter transitions and engine switching.
+- `test/service/tts/tts_paragraph_playback_test.dart`: first-group priority, playback order, navigation during slow requests, late success/error, pause/resume and movement by groups.
+- Tests do not send book text to live speech APIs. Actual voice continuity and device background playback still require listening checks with installed packages; this documentation update did not perform them or rerun tests.
+
+Implementation: [reader grouping](../assets/foliate-js/src/tts.js), [online playback](../lib/service/tts/online_tts.dart). Related historical investigations: [reader regression](tts-reader-regression.md), [background chapter recovery](tts-background-chapter-recovery.md), [rate recovery](TTS_RATE_RECOVERY.md).
