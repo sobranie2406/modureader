@@ -1,4 +1,24 @@
-# 默读 / Modu 1.2.0 正式版
+# Modu 1.2.0 · Stable
+
+## English
+
+**Modu 1.2.0 (build 10082)** includes all changes since stable **1.1.11**, including the intervening previews.
+
+- Dedicated PDF and scanned-book controls: cropping, panel order, zoom, rotation, panning, fit modes and continuous scrolling, with per-book layout and position persistence.
+- Per-page automatic content cropping, image enhancements and conservative scanned watermark fading, without modifying source books. Original and cropped pages adapt to the window.
+- Import-time image-book detection for EPUB, MOBI, AZW3 and FB2, including remote imports; fixed-size comics and legacy MOBI image records are now recognized correctly. Manual bookshelf overrides are available. Ordinary text books retain their existing menus and styling.
+- On-demand local OCR: recommended PP-OCRv4, optional v5 mobile and v3 models, upstream/Gitee sources and local deletion. Reflow the current page directly in the reader, use selection actions on recognized text, or extract a region into an editable AI draft.
+- An online-search action in AI Knowledge replies continues the same conversation; a Classical Chinese translation selection template is included.
+- Fix narration skipping ordinary paragraphs mistaken for footnote backlinks. Improve Android Bluetooth page-turner lifecycle handling, battery alignment, simulated-bold controls, and web search/translation popup layout; web translation supports persistent 50%–200% zoom.
+- Stop active and queued vector indexing while retaining completed indexes. Disabling automatic indexing cancels automatic tasks without preventing later manual indexing.
+- E-Ink-only manual and periodic refresh controls on supported hardware. Refreshed bilingual documentation pairs phone settings with Mac feature results.
+- Eight packages: Android ARM64, iOS ARM64, and ARM64/x64 for macOS, Windows and Linux, each with SHA-256. Android x64 is no longer distributed. Mac disk images contain only the app and the Applications shortcut.
+
+Back up and upgrade in place. Android retains its signing key; macOS is not notarized, Windows requires WebView2, Linux packages target Debian 13, and iOS requires your own valid signing. Gitee receives identical GitHub packages; source and licenses remain available at the version tag.
+
+---
+
+## 简体中文
 
 版本：**1.2.0+10082**。以下汇总 **1.1.11 正式版至 1.2.0** 的功能变化，包含期间预览版的改进。
 
@@ -52,19 +72,3 @@
 - GitHub 保留历史发行版及源码标签；Gitee 使用同一批安装包，替换旧应用发行版，不影响独立模型镜像。
 
 [对应源码](https://github.com/sobranie2406/modureader/tree/v1.2.0) · [1.1.11 至 1.2.0 源码差异](https://github.com/sobranie2406/modureader/compare/v1.1.11...v1.2.0) · [安装与构建说明](https://github.com/sobranie2406/modureader/blob/v1.2.0/docs/RELEASING.md)
-
-## English
-
-**Modu 1.2.0 (build 10082)** includes all changes since stable **1.1.11**, including the intervening previews.
-
-- Dedicated PDF and scanned-book controls: cropping, panel order, zoom, rotation, panning, fit modes and continuous scrolling, with per-book layout and position persistence.
-- Per-page automatic content cropping, image enhancements and conservative scanned watermark fading, without modifying source books. Original and cropped pages adapt to the window.
-- Import-time image-book detection for EPUB, MOBI, AZW3 and FB2, including remote imports; fixed-size comics and legacy MOBI image records are now recognized correctly. Manual bookshelf overrides are available. Ordinary text books retain their existing menus and styling.
-- On-demand local OCR: recommended PP-OCRv4, optional v5 mobile and v3 models, upstream/Gitee sources and local deletion. Reflow the current page directly in the reader, use selection actions on recognized text, or extract a region into an editable AI draft.
-- An online-search action in AI Knowledge replies continues the same conversation; a Classical Chinese translation selection template is included.
-- Fix narration skipping ordinary paragraphs mistaken for footnote backlinks. Improve Android Bluetooth page-turner lifecycle handling, battery alignment, simulated-bold controls, and web search/translation popup layout; web translation supports persistent 50%–200% zoom.
-- Stop active and queued vector indexing while retaining completed indexes. Disabling automatic indexing cancels automatic tasks without preventing later manual indexing.
-- E-Ink-only manual and periodic refresh controls on supported hardware. Refreshed bilingual documentation pairs phone settings with Mac feature results.
-- Eight packages: Android ARM64, iOS ARM64, and ARM64/x64 for macOS, Windows and Linux, each with SHA-256. Android x64 is no longer distributed. Mac disk images contain only the app and the Applications shortcut.
-
-Back up and upgrade in place. Android retains its signing key; macOS is not notarized, Windows requires WebView2, Linux packages target Debian 13, and iOS requires your own valid signing. Gitee receives identical GitHub packages; source and licenses remain available at the version tag.
