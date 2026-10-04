@@ -1,8 +1,14 @@
 # Modu changelog
 
-Details and downloads: https://github.com/sobranie2406/modureader/releases
+Current stable baseline: **1.2.0+10082**. Reviewed 2026-10-04.
+
+[Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
+
+Older sections retain their original version scope; they are not current acceptance reports.
 
 ## 1.2.0
+
+### English
 
 - Read PDFs and scanned image books with dedicated crop, panel order, zoom, rotation and continuous-scroll controls, while ordinary text books retain their reading menus.
 - Detect image books during import across EPUB, MOBI, AZW3 and FB2; fix fixed-size comic pages and legacy MOBI image record references, with a manual bookshelf override.
@@ -11,6 +17,8 @@ Details and downloads: https://github.com/sobranie2406/modureader/releases
 - Add E-Ink-only refresh controls, improve battery alignment and simulated-bold controls, and add a Classical Chinese translation selection template.
 - Search online from an AI Knowledge answer, stop queued vector indexing, and improve narration continuity and web translation/search popup layout and zoom.
 - Simplify macOS installers to the app and Applications shortcut; publish eight platform packages without Android x64.
+
+### 简体中文
 
 - PDF 与扫描图片书使用专用裁边、分格、缩放、旋转及卷轴阅读菜单，普通文字书保留原阅读界面。
 - EPUB、MOBI、AZW3、FB2 在导入时识别图片书，修复固定尺寸漫画和旧式 MOBI 图片编号漏识别，并支持书架手动切换。
