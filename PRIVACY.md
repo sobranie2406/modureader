@@ -1,23 +1,78 @@
-# 隐私与网络行为
+# Privacy and network behavior
 
-书籍、阅读进度、笔记和 AI 历史默认存储在本机。请自行备份重要资料。
+English · [简体中文](PRIVACY_zh.md) · [Home](README.md) · [Settings guide](docs/SETTINGS.md)
 
-- 每次启动会通过 HTTPS 优先请求默读 Gitee 镜像的正式版清单，再尝试核对 GitHub 最新版本，防止镜像滞后；镜像不可用时回退 GitHub，GitHub 不可用时可使用有效的镜像清单。相应服务会接收到常规网络信息（如 IP 地址及固定的 Modu-Updater 请求标识），不发送书籍、笔记、账号密钥或设备唯一标识。检查失败不影响阅读，可在「设置 → 关于默读 → 版本检查与更新」重试。安装包仅在主动点击下载后优先从 Gitee 获取；镜像缺失、网络失败或校验失败时回退同一版本的 GitHub 安装包及其官方资源 CDN，取消下载不会触发回退。所有来源都必须通过相同的大小与 SHA-256 校验，安装前还需主动确认。Android 仅按需申请此来源的安装权限，并额外检查包名、签名及版本，不静默安装。
+For **Modu 1.2.0+10082**, updated 2026-10-04. This document explains storage and network behavior. Third-party services have their own privacy policies.
 
-- 使用远程 AI、嵌入或翻译服务时，相关提示词、文本或书籍片段会发送到所选服务商。请确认你有权发送这些内容。
-- Edge TTS 及在线语音服务会接收待朗读文本；模型和字体下载会访问相应提供方。
-- 本地 RAG 模型不内嵌在安装包中，由用户选择 Gitee 镜像或 Hugging Face 按需下载固定版本模型与分词器，会消耗流量，所选服务及其下载基础设施可见网络请求及 IP；模型下载请求不包含书籍、提示词或 API Key，不携带 Gitee 登录凭据。下载完成后校验文件大小与 SHA-256，之后本地向量计算无需联网。启动或索引不会自动下载缺少的模型，也不会自动更换用户选择的下载源。
-- WebDAV 仅在配置并启用后同步。书籍、笔记、阅读位置与时长按记录合并，删除保留标记；字体、主题图片、本机偏好和本地字典不参加书库同步。本地向量索引同步已取消，索引与模型文件不随书库同步。API Key 同步默认关闭，是独立开关；启用时要求独立加密密码并显示风险提示。
-- 「远程书库」是独立的 WebDAV 连接，仅浏览和下载，不修改书库服务器文件。地址、用户名和密码保存在本机应用偏好设置中，不额外加密，重启后仍保留。开启「同步 API Key」后，整项书库配置使用相同同步加密密码，以 AES-256-GCM 加密写入 WebDAV 同步数据库；各设备须开启该开关并输入相同加密密码。全局设置备份默认排除账号、密码和 API Key，主动选择包含时可导出书库配置，导出不加密。清除连接会删除密码并随加密同步传递，不删除书籍；未配置的新设备不会主动清除云端配置。请保护设备访问权限。在“全局设置备份”中迁移书库配置，**账号和密码默认不导出，需主动选择包含**。导出的文件、代码和二维码未加密，不要公开分享；导入前校验并确认，不自动连接服务器。Basic 认证不等于加密，推荐 HTTPS；明确允许 HTTP 会有凭据和传输内容被窃听的风险。
-- 自定义字典由用户主动导入，仅在本机解析和查询；释义按纯文本显示，不加载字典内的远程资源或脚本。字典不随书库同步，也不进入现有设置或书库备份。
-- 本地备份默认排除服务凭据；明确选择包含时，对设置进行 AES-256-GCM 加密。书籍、笔记和 AI 历史不因此整体加密。
-- 丢失加密密码不能恢复受保护的密钥。不要把配置代码、二维码、备份或日志公开上传。
-- 本仓库和发行包不包含开发者的私人书库、服务 Key、WebDAV 配置或 AI 历史。
-- 各平台会在本机保留有限的诊断记录（最近 16 条、文件约 30 KB 上限），仅包含异常类型、应用代码位置、版本、时间和向量任务的阶段/计数。不记录异常消息、书名、正文、用户文件路径、密钥或账号；这些记录不进入 WebDAV 同步。
-- 「提交 Bug」中的崩溃日志默认不附带。勾选后可预览本地记录及当前平台可用的原生诊断，不附带原始内存转储。Android 读取系统退出原因、内存采样和故障线程摘要；iOS/macOS 接收 Apple MetricKit 的诊断，仅在本机额外保存最多 3 份、32 KB 内的脱敏摘要；Windows 在未处理原生异常时保存一份小型堆栈摘要并在下次启动恢复（不生成 minidump）。原生摘要只包含数值错误码、可用的时间/版本、最多 32 帧的公开模块名、模块内偏移及二进制版本标识，不包含设备 UUID、任意函数名、异常附带文本、寄存器或内存。
-- Linux 仅在勾选后使用系统 `coredumpctl info` 读取当前程序路径对应、最近 7 天内最新的一份系统记录，内存读取上限 256 KiB、5 秒超时；只提取信号与堆栈偏移。不运行调试器、不提取 core 文件、不扫描其他程序、不启用系统转储或申请管理员权限。原始系统输出不落盘、不放入报告。
-- Apple 报告可能延迟送达，Linux 取决于 systemd-coredump 的配置、记录保留情况和读取权限。系统强杀、资源耗尽、损坏的堆栈及其他组件的异常处理都可能使记录缺失。操作系统自行保留的诊断受系统设置管理，默读不更改这些设置。未读到堆栈不能证明没有发生崩溃。
-- 设备环境仅包含可用的操作系统版本、机型、架构、内存与默读版本，不附带设备名称、主机名、序列号、IMEI、Android ID、硬件 UUID 或系统产品 ID。可取消附带运行环境。
-- 「预览并提交」会先展示完整报告，确认后复制到剪贴板，再由用户粘贴并提交到 GitHub；也可主动点击「复制报告」自行处理。不会自动上传，也不将诊断文本塞入 URL。GitHub Issue 提交后公开可见，剪贴板也可能被其他软件读取，请再次检查。
+## Local data and scanned books
 
-第三方服务适用其各自隐私政策。网络代理说明以应用设置为准；WebView 与外部浏览器使用系统网络设置。
+Books, progress, notes, bookmarks, reading time and AI history are stored locally by default. Back up important data yourself. This repository and its release packages contain no developer private library, service keys, WebDAV configuration or AI history.
+
+Import-time scanned-book detection, PDF/image-book cropping, panels, image enhancement, scanned watermark fading, text extraction and OCR run locally. These actions do not automatically upload or rewrite source books. Reflow appears in the reader; **Extract** fills an editable AI draft. Sending that draft then uses your selected AI service.
+
+Custom dictionaries are imported, parsed and queried locally. Definitions are text-only: scripts, external CSS, images, audio and remote dictionary resources are not loaded. Dictionaries are excluded from library sync and current settings/database backups.
+
+Custom CSS can contain remote resource URLs and make network requests when enabled. Use book JavaScript, external links and webpage content only from trusted sources.
+
+## AI, translation, search and narration
+
+Remote AI receives the actual prompt, conversation history and selected text, chapters or retrieved passages needed for the task. Selection templates default to selected text only; you may enable context. Reading skills and app tools supply different source scopes for their tasks. Editing a prompt does not automatically send the whole book.
+
+AI Knowledge uses the current model's existing knowledge first. Enabling a template's online option or choosing **Online search** beneath an answer queries Wiktionary, Wikipedia and Baidu Baike. Those sites receive the search term; retrieved results are sent to the same AI model for a sourced summary. No separate search API key is required. Context chosen for the template can still enter the AI request.
+
+Selection search, custom search engines and Baidu / Youdao webpage translation send query or translation text to their respective sites. Embedded WebViews and external browsers use the system network environment; sites may use cookies and other browser data under their own policies.
+
+Google, DeepL / DeepLX and AI translation receive text to translate. Inline full-text translation likewise sends the paragraphs being translated. Edge TTS and online speech services receive narration text and relevant voice/style instructions. Whether system speech uses a network depends on the chosen system engine. Ensure you are entitled to send the content and understand the provider's retention, pricing and privacy rules.
+
+## Model and font downloads
+
+Embedding and OCR weights are not bundled. Users download pinned files on demand from upstream or Gitee. Embedding models and OCR v4 / v3 use Hugging Face upstream; OCR v5 uses ModelScope. Downloads consume data and expose requests/IP addresses to the service and its download infrastructure, but do not include books, prompts, API keys or Gitee login credentials.
+
+Files must pass size and SHA-256 checks. Starting the app or indexing does not silently download missing models or change your selected source. Prepared local OCR and embeddings do not need to upload book text. Remote embeddings APIs receive indexing passages and retrieval queries. Even with local embeddings, passages subsequently supplied to remote chat AI leave the device.
+
+Font downloads contact the font service, currently including fonts.anxcye.com. Importing a local font does not send its file to that service.
+
+## Update checks and downloads
+
+Startup and manual checks share a source selector, initially GitHub. When GitHub is temporarily unavailable, a check can fall back to Gitee and change the subsequent download source with it. Check again after manually changing sources. Services receive IP addresses, normal request metadata and a fixed Modu-Updater identifier, not books, notes, account secrets or unique device identifiers. Failed checks do not interrupt reading.
+
+Packages download only after your request. Except for macOS browser downloads, in-app downloads require matching size and SHA-256 checks. Android also checks package name, signature and version and requests system installation confirmation; it does not install silently. Modu cannot confirm completion or verification of a macOS browser download; compare the release checksum yourself.
+
+## WebDAV and remote libraries
+
+WebDAV sync runs only after configuration and enablement. Your server receives synchronized books, covers, notes, bookmarks, folders, tags, positions and reading time. Records merge by stable identity and retain deletion markers. Fonts, backgrounds, device preferences and dictionaries are not library-synced. **Vector-index sync has been removed**; indexes and model files stay local.
+
+**Sync API keys** is separate from the WebDAV master switch and off by default. It requires an independent password and encrypts sensitive service settings with AES-256-GCM. The password is not stored in sync data. This does not encrypt all books, notes or the whole database. Disabling the switch does not automatically destroy old cloud data, backups or copies on other devices. Lost passwords cannot recover protected keys.
+
+**Remote library** uses a separate WebDAV connection for browsing/downloading and does not modify that server's library files. Its URL, username and password are kept in local preferences without additional encryption; protect access to your device. With key sync enabled, library configuration can be encrypted using the same independent sync password. Clearing a connection can propagate configuration removal, not book deletion; an unconfigured new device does not proactively clear cloud configuration.
+
+Use HTTPS. Basic authentication is not transport encryption; explicitly choosing HTTP risks interception of credentials and content.
+
+## Settings transfer and database backups
+
+**Global settings backup** excludes accounts, passwords and API keys by default. Opting in produces JSON files or modu links containing **recoverable plaintext credentials**, not encrypted backups. The sync encryption password is never exported. Review the import scope; with credentials excluded, existing local credentials are preserved. Import does not automatically connect to a remote library.
+
+Global settings include custom CSS, URLs and prompts, which can contain information you entered; do not embed secrets in them. Only edits to built-in prompts and custom templates are stored, not duplicate defaults. Settings transfer excludes books, notes, AI history, dictionaries and font/background/model files. There is no QR transfer.
+
+Database ZIP backups include locally available books, covers, notes, reading records, fonts, backgrounds, AI history and general settings. Service configuration is excluded by default. If included, AES-256-GCM protects the settings section, **not the whole ZIP, books, notes or chats**. Restore replaces the library rather than merging it. Keep files/passwords private; do not publish settings links, backups or logs.
+
+ANX Reader backup import validates and merges supported books/records locally. It does not inspect another app's private database or import ANX accounts, keys or app configuration. Protect the local pre-import database snapshot too.
+
+## Diagnostics and issue reports
+
+Platforms retain limited local diagnostics: the latest 16 entries, approximately 30 KB maximum. These contain exception type, app code location, version, time and indexing phase/counts, not exception messages, titles, book text, user file paths, keys or accounts. They are not WebDAV-synced.
+
+Bug reports exclude crash diagnostics by default. Opting in allows you to preview local records and available platform-native summaries, not raw memory dumps:
+
+- **Android:** system exit reasons, memory samples and fault-thread summaries.
+- **iOS / macOS:** Apple MetricKit diagnostics, with at most three additional sanitized summaries and a 32 KB size limit.
+- **Windows:** one small stack summary for an unhandled native exception, recovered on the next launch; no minidump is generated.
+- **Linux:** only after opt-in, coredumpctl info reads the latest record for this app from the last seven days, with a 256 KiB read cap and five-second timeout. Only signals and stack offsets are extracted. No debugger, core extraction, scanning of other apps, enabling system dumps or administrator request occurs. Raw system output is neither saved nor included in reports.
+
+Native summaries contain numeric error codes, available times/versions and up to 32 frames of public module names, module-relative offsets and binary version identifiers. They exclude device UUIDs, arbitrary function names, exception payload text, registers and memory. Apple reports may arrive late; Linux depends on system configuration, retention and permissions. Force-stops, resource exhaustion or damaged stacks may leave no record. An unconfirmed previous session does not prove a crash; a missing record does not prove the absence of one. Modu does not change operating-system diagnostic retention settings.
+
+Optional environment details contain available OS version, model, architecture, memory and app version, not device/host names, serial numbers, IMEI, Android ID, hardware UUID or system product ID.
+
+**Preview and submit** shows the complete report, copies it after confirmation and lets you paste it into GitHub yourself. You can also choose Copy report. Diagnostics are not automatically uploaded or embedded in URLs. **GitHub issues are public, and other apps may read the clipboard.** Review the report again before submission.
+
+[Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)

@@ -16,7 +16,8 @@
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>下载最新版</b></a> ·
   <a href="https://gitee.com/sobranie2406/modureader/releases">Gitee 镜像</a> ·
   <a href="#features">功能一览</a> ·
-  <a href="docs/SETTINGS.md">设置指南</a> ·
+  <a href="docs/SETTINGS_zh.md">设置指南</a> ·
+  <a href="docs/README.md">文档目录</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">问题反馈</a>
 </p>
 
@@ -78,7 +79,7 @@
 | [同步与数据库备份](#data) | WebDAV 同步、书库 ZIP 备份与恢复 |
 | [全局设置备份与导出](#backup) | 文件与链接迁移设置，账号密钥独立控制 |
 
-展示使用原创示例内容，不包含个人书库。可下载 [《阅读，让思考慢下来》](docs/examples/modu-reading-demo.epub) 体验。完整参数与入口见[设置指南](docs/SETTINGS.md)。
+展示使用原创示例内容，不包含个人书库。可下载 [《阅读，让思考慢下来》](docs/examples/modu-reading-demo.epub) 体验。完整参数与入口见[设置指南](docs/SETTINGS_zh.md)。
 
 <a id="scanned-books"></a>
 
@@ -416,7 +417,7 @@ Windows 设置文件默认保存至 Downloads（下载）文件夹，其他平�
 2. 在书架添加电子书，打开后即可阅读；不使用 AI 时无需填写任何 API Key。
 3. 需要 AI 时，在「设置 → AI 设置」配置模型，并先做连接测试。
 4. 需要语义检索时，在「设置 → 向量模型」按需下载本地模型（默认中文 BGE），再从已下载书籍的菜单建立索引；也可配置远程向量接口。
-5. 按需选择翻译、朗读与同步服务。详细操作、参数含义和安全注意事项见[设置指南](docs/SETTINGS.md)。
+5. 按需选择翻译、朗读与同步服务。详细操作、参数含义和安全注意事项见[设置指南](docs/SETTINGS_zh.md)。
 
 ## 问题反馈
 
@@ -442,7 +443,7 @@ flutter test --concurrency 1
 # 在对应宿主平台运行：
 flutter build macos --release --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
 # Android 的 release 签名先按 docs/RELEASING.md 配置
-flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
+flutter build apk --release --target-platform android-arm64 --split-per-abi
 ```
 
 完整可复现的构建/打包步骤以 [.github/workflows/build.yaml](.github/workflows/build.yaml) 和 scripts/release 为准。
@@ -470,4 +471,4 @@ ReadAny 的版权与许可保留在 [LICENSES/ReadAny-GPL-3.0-or-later.txt](LICE
 固定上游提交、修改范围和第三方归属见 [UPSTREAM.md](UPSTREAM.md)、[NOTICE](NOTICE)。
 分发二进制时请保留许可、注明修改，并提供对应版本的完整源码与构建脚本。
 
-[隐私说明](PRIVACY.md) · [安全报告](SECURITY.md) · [参与贡献](CONTRIBUTING.md)
+[隐私说明](PRIVACY_zh.md) · [安全报告](SECURITY_zh.md) · [参与贡献](CONTRIBUTING_zh.md)

@@ -1,9 +1,13 @@
-# 安全报告
+# Security reporting
 
-请使用 [最新发布版本](https://github.com/sobranie2406/modureader/releases/latest) 并保留本地备份。本项目尚未接受独立安全审计；正式版标签不等于安全认证。
+English · [简体中文](SECURITY_zh.md) · [Home](README.md)
 
-请使用仓库 Security → Report a vulnerability 私密报告漏洞；如该入口暂不可用，可先创建不含利用细节或敏感资料的 issue 请求私下联系。
-不要在公开 issue 上传服务密钥、私人书籍、完整数据库、对话、签名密钥或含凭据的二维码。
+Reviewed for Modu 1.2.0 on 2026-10-04.
 
-请说明受影响版本、平台/架构、最小复现、影响范围；安全测试使用合成数据。
-签名与加密不代表代码经过安全审计。未签名/未公证包的限制见 docs/RELEASING.md。
+Use the [latest release](https://github.com/sobranie2406/modureader/releases/latest) and keep local backups. Modu has not undergone an independent security audit; a stable release is not a security certification.
+
+Report vulnerabilities privately through the repository's **Security → Report a vulnerability** entry. If unavailable, open an issue without exploit details or sensitive data to request a private contact route.
+
+Do not upload service keys, private books, complete databases, conversations, signing keys or credential-bearing settings links/files to a public issue.
+
+Include affected versions, platform/architecture, a minimal reproduction and impact. Use synthetic data for security tests. Signing and encryption do not imply a code audit. See [installation and signing](docs/RELEASING.md) and [Privacy](PRIVACY.md).

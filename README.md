@@ -16,7 +16,8 @@
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>Download</b></a> ·
   <a href="https://gitee.com/sobranie2406/modureader/releases">Gitee mirror</a> ·
   <a href="#features">Features</a> ·
-  <a href="docs/SETTINGS.md">Settings guide (Chinese)</a> ·
+  <a href="docs/SETTINGS.md">Settings guide</a> ·
+  <a href="docs/README.md">Documentation</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
@@ -50,7 +51,7 @@ Settings → Appearance lets you choose an app language or follow the system. Bu
 Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
 Download the installer and its SHA-256 file from [Releases](https://github.com/sobranie2406/modureader/releases), choosing your system and architecture.
 
-Desktop apps use native installers. Download the installer for your platform, not GitHub's automatically generated source archive. Licenses are included in each package. See [Release and installation instructions (Chinese)](docs/RELEASING.md).
+Desktop apps use native installers. Download the installer for your platform, not GitHub's automatically generated source archive. Licenses are included in each package. See [Release and installation instructions](docs/RELEASING.md).
 
 </details>
 
@@ -78,7 +79,7 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | [Sync & database backup](#data) | Sync through WebDAV and export or restore library backups |
 | [Global settings backup](#backup) | Transfer preferences by file or link, with credentials controlled separately |
 
-Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). Detailed options and entry points are in the [settings guide (Chinese)](docs/SETTINGS.md).
+Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). Detailed options and entry points are in the [settings guide](docs/SETTINGS.md).
 
 <a id="scanned-books"></a>
 
@@ -169,7 +170,7 @@ Adjust fonts, font thickness, line spacing, paragraph spacing and margins. Use s
 <details>
 <summary>Typography, navigation and CSS details</summary>
 
-Settings → CSS settings provides 32 named profiles and 13 editable presets. Detailed editing stays in Settings; the reader applies your profiles. See [CSS presets (Chinese)](docs/CSS_PRESETS.md).
+Settings → CSS settings provides 32 named profiles and 13 editable presets. Detailed editing stays in Settings; the reader applies your profiles. See [CSS presets](docs/CSS_PRESETS.md).
 
 Font thickness ranges from 0.5 to 2.0 in 0.1 steps. The optional Simulated bold control can add weight to fixed-weight fonts above 1.0; it cannot make a fixed bold face thinner. PDF and other fixed-layout pages are not re-typeset.
 
@@ -197,7 +198,7 @@ Start with visual presets for colors, spacing and underlines, then add custom CS
 
 Presets cover novels, vertical spacing, images, centered headings, long-form text, English paragraphs, poetry, tables, dialogue colors/wavy lines, keyword/date highlights and heading underlines. Choose all text, headings or body scope; set your own keyword in the rule.
 
-Page CSS controls layout. Regex highlights style matching text with colors, backgrounds and underlines without changing the book text or annotation positions. JSON preserves visual parameters, expressions and scope. Import only trusted CSS: remote resource URLs may make network requests. See [CSS profiles (Chinese)](docs/CSS_PRESETS.md).
+Page CSS controls layout. Regex highlights style matching text with colors, backgrounds and underlines without changing the book text or annotation positions. JSON preserves visual parameters, expressions and scope. Import only trusted CSS: remote resource URLs may make network requests. See [CSS profiles](docs/CSS_PRESETS.md).
 
 </details>
 
@@ -378,7 +379,7 @@ Settings → Sync → Database backup exports Modu-Backup-*.zip. Select the ZIP 
 
 Windows saves to the user's Downloads folder; other platforms use the system save destination. Successful export shows the path or filename. Download any books you want included before backing up.
 
-WebDAV sync merges records by stable identity and uses the latest reading action, not the furthest progress. Fonts, background images, local dictionaries and vector indexes are not part of library sync. Server compatibility is described in the [sync guide (Chinese)](docs/WEBDAV_RECORD_SYNC.md).
+WebDAV sync merges records by stable identity and uses the latest reading action, not the furthest progress. Fonts, background images, local dictionaries and vector indexes are not part of library sync. Server compatibility is described in the [sync guide](docs/WEBDAV_RECORD_SYNC.md).
 
 Sync API keys is a separate opt-in switch. Sensitive configurations are encrypted with AES-256-GCM and require the same encryption password on every device. This does not encrypt the entire library or replace a trusted server.
 
@@ -413,7 +414,7 @@ Windows settings exports default to Downloads; other platforms use the selected 
 2. Add an ebook to the library and open it. No API key is required if you do not use AI.
 3. To use AI, configure a model in Settings → AI Settings and test the connection.
 4. For semantic search, download a local model in Settings → Embedding Models (Chinese BGE is the default), then index a downloaded book from its menu. You can also configure a remote embedding endpoint.
-5. Choose translation, read-aloud and sync services as needed. See the [Settings guide (Chinese)](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
+5. Choose translation, read-aloud and sync services as needed. See the [Settings guide](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
 
 ## Feedback
 
@@ -464,4 +465,4 @@ Anx Reader's MIT copyright and license are preserved in [LICENSES/Anx-Reader-MIT
 ReadAny's copyright and license are preserved in [LICENSES/ReadAny-GPL-3.0-or-later.txt](LICENSES/ReadAny-GPL-3.0-or-later.txt).
 See [UPSTREAM.md](UPSTREAM.md) and [NOTICE](NOTICE) for pinned upstream revisions, modification scope and third-party attribution. When distributing binaries, retain the licenses, identify your modifications and provide the complete corresponding source and build scripts for that version.
 
-[Privacy (Chinese)](PRIVACY.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)

@@ -1,10 +1,15 @@
-# 参与贡献
+# Contributing
 
-感谢关注默读。项目来源于 Anx Reader 和 ReadAny；请保留原作者归属。
+English · [简体中文](CONTRIBUTING_zh.md) · [Home](README.md)
 
-- 提交问题前检查重复 issue，提供平台、CPU 架构、版本和最小复现步骤。
-- 不要上传 API Key、WebDAV 密码、私人书籍、对话历史或未经脱敏的日志。
-- PR 请说明修改目的、测试结果、平台限制；新增业务行为应有回归测试。
-- 使用仓库固定的 Flutter 版本，先生成本地化及 build_runner 代码，再运行测试。
-- 提交贡献表示你有权按本项目 GPL-3.0-or-later 条件提供该贡献；引入第三方代码需保留其许可证。
-- 发布请遵循 docs/RELEASING.md。正式版与预发布是版本标签分类；必须分别说明签名、公证与实际验收范围，不将编译成功等同于完整真机验证。
+Reviewed for Modu 1.2.0 on 2026-10-04. Modu derives from Anx Reader and ReadAny; preserve upstream attribution.
+
+- Search existing issues before reporting a bug. Include version, OS, CPU architecture, reproduction steps, expected and actual behavior. Use the feature-request template for new capabilities.
+- Do not upload API keys, WebDAV passwords, private books, chat history or unsanitized logs. Security vulnerabilities follow [Security](SECURITY.md), not public bug reports.
+- Explain a pull request's purpose, test results and platform limitations. Add regression coverage for new behavior.
+- Use the pinned Flutter version, generate localization and build_runner code, then run the relevant tests. See [release/build instructions](docs/RELEASING.md).
+- Contributions must be yours to provide under GPL-3.0-or-later. Preserve third-party licenses and copyright notices.
+- Keep current user guides aligned with the released version. English is the default; core user documents also have Chinese editions. Singleton guides use English. Retain historical evidence and third-party originals.
+- Separate compilation, automated checks and actual device testing. Report signing/notarization accurately; a successful build does not establish complete device validation.
+
+[Documentation](docs/README.md) · [Privacy](PRIVACY.md) · [Upstream attribution](UPSTREAM.md)

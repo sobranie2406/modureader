@@ -1,7 +1,7 @@
 # Upstream sources
 
 Modu is an independently modified GPL-3.0-or-later derivative application.
-本项目来源于 **Anx Reader** 和 **ReadAny（Reader Any）**，感谢原作者及贡献者。
+It derives from **Anx Reader** and **ReadAny (Reader Any)**. Thank you to their authors and contributors.
 It is not affiliated with, endorsed by, or an official release of either upstream.
 
 ## Anx Reader
@@ -27,17 +27,16 @@ hybrid RAG, ONNX models and background indexing queue; translation and TTS servi
 encrypted opt-in credential sync and backups; local-file access restrictions;
 PDF import/navigation fixes; multi-platform release packaging. See git history.
 
-## Bundled offline embedding models
+## On-demand embedding models
 
-The four quantized ONNX models and tokenizer files are bundled in installers.
-Exact Xenova repository revisions, file sizes and SHA-256 hashes are pinned in
-`assets/models/embeddings/manifest.json`. The app prepares the selected model
-offline on first use and verifies its size and hash. No weight modifications
-are made by Modu. A manual repair download is available if packaged assets are
-missing. Before building locally, run
-`python3 scripts/release/bundle_models.py --install-assets` to fetch verified files into
-`build/model-test-fixtures` and stage production assets. CI performs the same
-staging step; packaging rejects missing or corrupt weights and tokenizers.
+Reviewed for Modu 1.2.0 on 2026-10-04. Embedding weights and tokenizer files are
+not bundled in production installers. Pinned upstream revisions, file sizes and
+SHA-256 hashes are recorded in `assets/models/embeddings/manifest.json`.
+Users choose Hugging Face or Gitee and download verified files on demand.
+Prepared models run locally; Modu does not modify their weights. Missing models
+are not silently downloaded. CI uses `scripts/release/bundle_models.py` for
+isolated inference fixtures, not production asset installation. See
+[model mirrors](docs/MODEL_MIRROR.md) and [Privacy](PRIVACY.md).
 
 - MiniLM: https://huggingface.co/Xenova/all-MiniLM-L6-v2; original model
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2, Apache-2.0.
@@ -53,6 +52,16 @@ staging step; packaging rejects missing or corrupt weights and tokenizers.
   https://huggingface.co/intfloat/multilingual-e5-small, MIT.
   License preserved in `LICENSES/E5-Embedding-MIT.txt`, from
   https://github.com/microsoft/unilm/blob/master/LICENSE.
+
+## On-demand OCR models
+
+PP-OCRv4 Chinese/English is recommended; v5 mobile Chinese/English, v3
+Chinese/English and v3 English are available. The catalog pins revisions,
+file sizes and SHA-256 in `lib/service/ocr/ocr_models.dart`. v4/v3 originate
+from SWHL/RapidOCR on Hugging Face; v5 uses RapidAI/RapidOCR on ModelScope.
+Gitee provides mirrors of the same files. Models download only on request;
+recognition runs locally. The PaddleOCR Apache-2.0 license is preserved in
+LICENSES/PaddleOCR-Apache-2.0.txt; model provenance is also recorded in NOTICE.
 
 ## Vendored libraries
 
