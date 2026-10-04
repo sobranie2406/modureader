@@ -1,10 +1,12 @@
-# Historical store assets / 历史商店素材
+# Historical store assets
+
+> Historical development templates and metadata drafts, including the cleanup recorded on 2026-10-03, rather than a current distribution path. No release version is specified here; these assets do not certify the latest 1.2.0 release. See the [documentation index](../../docs/README.md).
 
 These Fastlane metadata drafts are not used by the current Modu GitHub release workflow. They do not establish an App Store, Play Store or F-Droid listing, signing sponsorship, or support for all upstream features.
 
 The unused upstream screenshot links were removed from the tracked tree on 2026-10-03. Do not restore them as Modu marketing assets. Current Modu interface examples are linked in the root README and use the project's original demo book.
 
-此目录只维护中文、英文文字草稿，不能据此认定已上架。上游遗留截图链接已于 2026-10-03 从当前源码移除，原素材可通过 Git 历史找回。
+This directory retains only Chinese and English text drafts; their presence does not establish a store listing. The original removed assets remain recoverable through Git history.
 
-Current documentation: [中文](../../README_zh.md) · [English](../../README.md)
+Current documentation: [Chinese](../../README_zh.md) · [English](../../README.md)
 Downloads: https://github.com/sobranie2406/modureader/releases
