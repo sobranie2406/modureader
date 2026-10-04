@@ -1,20 +1,22 @@
-# 连续滚动章末停顿与重复翻页回归
+# Continuous scrolling chapter-end pauses and repeated page-turn regression
 
-2026-09-14，针对 1.0.7 预览版反馈。仅修改源码与阅读器资源，未重新打包或发布。
+> Historical record of the 2026-09-14 source checks concerning the 1.0.7 preview; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
 
-## 原因与修改
+2026-09-14, in response to 1.0.7 preview feedback. Only source and reader assets were changed; no package was rebuilt or published.
 
-- 原预排版条件仅看距窗口边界的距离。长章节开头不会准备邻章，快速滑到章末可能先碰到已加载内容的边界。现在进入章节后即后台准备前后邻章，再按视口补齐短章节；原有数量、文本大小限制仍保留。
-- 原 `View.#handleClick` 每处理一个章节都会给长期存在的 renderer 再绑定一个 click 回调。执行旧代码加载三个文档后，一次边缘点击产生三次 `click-view`。现在 renderer 的回调只在创建时绑定一次，章节内点击仍各自处理。
-- 连续模式原先在一次翻页中两次报告阅读位置，并在无法滚动时另行跳章。现在先确保目标位置的内容存在，再执行一个相对原文档计算的 80% 视口位移，最后报告位置。向前补章不改变这一次位移的基准。
-- 遇到为 TTS 保留但隐藏的邻章时，复用其原文档并恢复到连续区域，不重新加载或重置朗读游标。
+## Causes and changes
 
-## 验证范围
+- The old pre-layout condition considered only distance to the window boundary. At the beginning of a long chapter it did not prepare adjacent chapters, so a fast scroll to the end could hit the boundary of loaded content. The change prepared preceding/following chapters in the background on chapter entry, then filled short chapters according to viewport coverage. Existing count and text-size limits were retained.
+- The old `View.#handleClick` added another click callback to the long-lived renderer for every chapter it processed. Loading three documents with the old code made one edge click produce three `click-view` events. Renderer callbacks were changed to bind once at creation; clicks within each chapter still had their own handling.
+- Continuous mode previously reported reading position twice during one page turn and jumped chapters separately when scrolling was unavailable. The change first ensured content existed at the target, then performed one 80% viewport movement calculated relative to the original document, and finally reported position. Prepending chapters did not change that movement's reference point.
+- A neighboring chapter hidden but retained for TTS reused its original document and returned to the continuous area without reloading or resetting the narration cursor.
 
-- 阅读器回归 125 项通过；包含长章节首次预加载、邻章移出视口、未缓存边界双向翻页、重复点击注册与 TTS 文档恢复。
-- 发布/项目规范回归 43 项通过。
-- Chromium 合成书籍：下一章露出底部约 2 像素，以及完全移出视口约 25 像素，两种位置各实际点击一次边缘目标，均只有一次 `click-view` 和 512 像素位移（640 像素视口的 80%）。
-- Chromium 原生滚轮一次移动 800 像素跨到第 3 章；TTS 游标仍先返回第 2 章正文，完成后返回第 3 章标题。此为实际 DOM 上的文本游标检查，不是声音播放验收。
-- 阅读器脚本资源重新构建通过；保留既有三个构建警告。
+## Verification scope
 
-未用安卓真机验证手指惯性滚动。超大章节、图片/字体解码或设备过慢仍可能等待，不能据此承诺所有设备跨章绝无停顿。
+- Reader regressions: 125 passed, including first preload of long chapters, adjacent chapters outside the viewport, bidirectional paging at uncached boundaries, duplicate click registration and TTS document restoration.
+- Release/project policy regressions: 43 passed.
+- Chromium synthetic book: with the next chapter visible by about 2 pixels at the bottom, and completely outside the viewport by about 25 pixels, one actual click on the edge target at each position produced only one `click-view` and a 512-pixel movement (80% of the 640-pixel viewport).
+- One native Chromium wheel movement of 800 pixels crossed into chapter 3. The TTS cursor still returned chapter 2 body text first, then chapter 3's title on completion. This was a text-cursor check on actual DOM, not voice-playback acceptance.
+- Reader script assets rebuilt successfully, retaining the three existing build warnings.
+
+Finger-driven inertial scrolling was not verified on an Android device. Very large chapters, image/font decoding or slow devices could still cause waits; these results did not promise pause-free chapter transitions on all devices.

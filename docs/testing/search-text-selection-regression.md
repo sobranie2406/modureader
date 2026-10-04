@@ -1,5 +1,7 @@
 # Search text-range regression
 
+> Historical record of the 2026-09-15 source checks described below. No release version was specified; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
+
 ## Change
 
 Search results now paint the actual chapter DOM ranges with CSS custom

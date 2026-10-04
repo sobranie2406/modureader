@@ -1,5 +1,7 @@
 # Windows indexing responsiveness
 
+> Historical record concerning 1.0.6 and the 1.0.7 release attempt described below; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
+
 ## Cause and implementation
 
 The 1.0.6 dependency lock selects flutter_onnxruntime 1.8.4. Its Windows method

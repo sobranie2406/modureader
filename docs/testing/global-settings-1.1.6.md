@@ -1,27 +1,29 @@
-# 1.1.6 全局设置迁移验证
+# 1.1.6 global settings migration verification
 
-最终交互：只提供全局设置文件、二维码和 modu 链接导入导出，不提供功能模块选择。账号、密码和 API 配置由独立开关控制，默认关闭，导入和导出均生效。旧版单项链接仍兼容，确认页按实际字段说明影响范围。
+> Historical record for 1.1.6 and the 2026-09-26 checks described below; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
 
-## 检查范围
+Final interaction: import/export of global settings through a file, QR code or modu link only, with no feature-module selection. Accounts, passwords and API configuration were controlled by a separate switch, off by default, applying to both import and export. Legacy individual links remained compatible; the confirmation page described the affected scope from the actual fields.
 
-内部按外观、阅读、CSS、选词搜索、AI、技能、向量、朗读、翻译、同步、远程书库、笔记、统计、网络和高级设置建立归属表，用于完整性与隔离回归，不增加面向用户的模块操作入口。
+## Check scope
 
-- 文件、压缩链接、实际 PNG 二维码的编解码往返。
-- 保留书籍、进度、本机字体、背景文件、存储路径、每书选择及同步加密密码。
-- 导入前校验嵌套类型、CSS 参数、翻页区域、供应商模型和正则分章规则。
-- 凭据开关关闭时不导出敏感容器，导入时也不覆盖目标设备凭据。
-- 格式 2 显式记录默认值；仅清除白名单配置，不能清除凭据、本机文件或任意偏好。
-- 格式 1 按旧规则只恢复实际存在的值；旧版 AI/TTS/WebDAV/书库链接仍可读取。
-- 补齐书摘内置背景编号、远程书库显示偏好、阅读背景的模糊度/透明度/对齐参数。
-- 同步相关设置导入后保持关闭，需本机手动开启。
-- 自生成密集二维码的定位器失败样例，采用纯二维码解码作为后备。
+An internal ownership table covered appearance, reading, CSS, text-selection search, AI, skills, vectors, narration, translation, sync, remote library, notes, statistics, network and advanced settings. It supported completeness and isolation regressions without adding user-facing module controls.
 
-## 自动化结果（2026-09-26）
+- Encode/decode round trips for files, compressed links and actual PNG QR codes.
+- Preservation of books, progress, local fonts, background files, storage paths, per-book choices and the sync encryption password.
+- Validation of nested types, CSS parameters, page-turn regions, provider models and regex chapter rules before import.
+- With the credentials switch off, export excluded sensitive containers and import did not overwrite credentials on the target device.
+- Format 2 explicitly recorded defaults; only allowlisted configuration could be cleared, not credentials, local files or arbitrary preferences.
+- Format 1 restored only present values under the old rules; legacy AI/TTS/WebDAV/library links remained readable.
+- Added omitted built-in excerpt-background IDs, remote-library display preferences and reading-background blur/opacity/alignment parameters.
+- Imported synchronization settings remained disabled until manually enabled on the device.
+- A generated dense QR-code example with failed finder-pattern detection used pure QR decoding as a fallback.
 
-- 配置迁移与界面专项：123 项通过。
-- 完整 Flutter 回归：1226 项通过，7 项按测试条件跳过。
-- 阅读器 JavaScript：259 项通过。
-- Python 发布与项目检查：57 项通过。
-- 静态分析无错误；原有提示不作为发布阻断。
+## Automated results (2026-09-26)
 
-测试仅使用合成配置与测试凭据。字体和字典等本机资源不属于此设置格式；任意自定义 CSS、提示词和网址的文本内容仍由用户检查，不应放入私密凭据。
+- Configuration migration and targeted UI tests: 123 passed.
+- Full Flutter regression: 1226 passed, 7 skipped according to test conditions.
+- Reader JavaScript: 259 passed.
+- Python release and project checks: 57 passed.
+- Static analysis had no errors; existing informational findings were not release blockers.
+
+Tests used only synthetic configurations and test credentials. Local resources such as fonts and dictionaries were outside this settings format. Users still needed to review text in arbitrary custom CSS, prompts and URLs and should not embed private credentials there.

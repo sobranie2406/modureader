@@ -1,39 +1,41 @@
-# 连续滚动 Android ARM64 预览
+# Continuous scrolling Android ARM64 preview
 
-版本：1.0.7-preview.1+10019。基于 1.0.6，仅发布 Android ARM64 APK，不替换全平台正式版。
+> Historical record for 1.0.7-preview.1+10019, based on 1.0.6; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
 
-## 功能范围
+Version: 1.0.7-preview.1+10019. Based on 1.0.6, this release provided only an Android ARM64 APK and did not replace the stable release for all platforms.
 
-- 选择阅读设置中的滚动模式后，横排、流式排版书籍的相邻章节提前排版，并放入同一个滚动区域；向前插入章节时补偿当前位置。
-- 缓存通常最多保留 9 个章节视图；短章节按屏幕覆盖范围预载。大于 2 MiB 的章节不做后台排版，前台仍可打开；章节声明的文本大小预算为 8 MiB（不等于进程内存上限）。前台导航及正在朗读的文档可能暂时额外保留。
-- 分页、PDF/固定版式、竖排以及允许书籍 JavaScript 的阅读保留原路径。开启书籍脚本时不会提前执行相邻章节脚本。
-- 预排版不触发朗读，不主动请求 AI/翻译，不创建阅读位置记录；章节实际可见后才初始化交互。
-- 仅在连续模式分离屏幕当前位置与 TTS 游标：屏幕读到后章时，语音仍读完原章，再从下一章标题续读，保持跳过非正文章节的原规则。高亮 CFI 使用固定的朗读章节标识。
-- 在书架、目录或模式切换等场景仍沿用原应用的停止/暂停策略；没有修改任何在线服务的合成接口或声音参数。
+## Feature scope
 
-## 验证
+- In scrolling mode, adjacent chapters of horizontal, reflowable books were laid out in advance within one scroll area. Prepending chapters compensated the current position.
+- The cache normally retained at most 9 chapter views; short chapters were preloaded according to viewport coverage. Chapters larger than 2 MiB were not laid out in the background but could still open in the foreground. The declared chapter-text budget was 8 MiB, not a process memory limit. Foreground navigation and the active narration document could temporarily retain additional views.
+- Pagination, PDF/fixed-layout, vertical writing and reading with book JavaScript enabled retained their existing paths. Enabling book scripts did not execute adjacent chapters' scripts in advance.
+- Pre-layout did not trigger narration, proactively request AI/translation or create reading-position records. Interactions initialized only once a chapter became visible.
+- Only continuous mode separated the current screen position from the TTS cursor. When the screen reached a later chapter, narration still finished the original chapter, then continued from the next chapter's title, retaining existing rules for skipping non-body chapters. Highlight CFIs used a fixed narration-chapter identifier.
+- Bookshelf, contents and mode-switching scenarios retained the app's existing stop/pause policies. No online service synthesis interfaces or voice parameters were changed.
 
-- 阅读器自动回归：120 项通过，新增缓存边界、等距淘汰抖动、连续性、资源所有权转交、关闭/加载失败与 TTS 游标隔离测试。
-- Flutter 全量：667 项通过，5 项跳过；包括系统及在线 TTS 的章末续读、暂停恢复回归。
-- 真实 Chromium、WebKit 浏览器合成书籍：初始第 2 章不会被前向预加载拉回；静止时不循环加载；滚动到第 5 章后 TTS 仍按第 2 章标题、正文两句、第 3 章标题推进；远跳目录后原朗读文档保留，返回时不重新加载。
-- Chromium：正向至书末、反向至书首、9 章窗口上限、分页/滚动互切及当前文档复用；使用鼠标滚轮检查原生滚动。
-- 安装包静态校验：版本号 10019、默读原发布签名、仅 ARM64 原生库、16 KB 页对齐、ONNX JNI 入口、四个内嵌模型及阅读器代码一致性均通过。发布/项目规范测试 40 项通过。
+## Verification
 
-本次没有连接 Android 真机，未对具体手机的帧率、长时间内存峰值或真实声音播放做验收。浏览器及模拟 TTS 游标通过，不代表所有机型/语音供应商绝对无问题。
+- Reader automated regressions: 120 passed, including new cache-boundary, equal-distance eviction thrashing, continuity, resource-ownership transfer, close/load-failure and TTS cursor-isolation tests.
+- Full Flutter suite: 667 passed, 5 skipped, including system and online TTS chapter-end continuation and pause/resume regressions.
+- Synthetic books in actual Chromium and WebKit browsers: initial chapter 2 was not pulled backward by preceding-chapter preloading; loading did not loop while stationary. After scrolling to chapter 5, TTS still advanced through the chapter 2 title, two body sentences and the chapter 3 title. A distant contents jump retained the original narration document, with no reload on return.
+- Chromium: forward to the book end, backward to the beginning, the 9-chapter window limit, switching between pagination/scrolling and current-document reuse; native scrolling checked with the mouse wheel.
+- Static package validation passed for build number 10019, Modu's original release signature, ARM64-only native libraries, 16 KB page alignment, ONNX JNI entry points, four bundled models and reader-code consistency. Release/project policy tests: 40 passed.
 
-超大章节、解码缓慢的图片、快速连续跳转或首次字体加载仍可能等待；不承诺任何书籍都绝对零停顿。原生跨 iframe 的选词不能一次拖选跨章节；本次目标是连续阅读，不改变该选词限制。
+No Android device was connected in this round. Device-specific frame rates, long-running memory peaks and real voice playback were not accepted. Browser and simulated TTS cursor success did not guarantee flawless operation on every device/voice provider.
 
-## 测试建议
+Very large chapters, slow image decoding, rapid repeated navigation or first-time font loading could still cause waits; zero pauses for every book were not promised. Native selection across iframes cannot drag-select across chapters in one gesture. This change targeted continuous reading and did not alter that selection limitation.
 
-升级前备份；使用原默读专用签名，保留书架与设置覆盖安装。进入书籍，将翻页方式设为滚动，测试：
+## Suggested tests
 
-1. 在短章节小说上向前/向后连续滚动，观察有没有重复、跳章及位置突然变化。
-2. 从章末开始朗读，检查下一章标题和首句；播放时手动滚动到后章，再暂停/恢复。
-3. 保存笔记，关闭重开并同步，核对阅读位置和笔记归属。
-4. 修改字号、旋转屏幕，并在滚动/分页之间切换。
+Back up before upgrading. The package used Modu's original dedicated signature, allowing installation over the existing app while preserving the library and settings. Open a book, set page turning to scrolling, and test:
 
-没有改动 WebDAV 协议或数据库结构。发现问题可在设置中提交反馈，并选择预览后附带脱敏诊断信息。
+1. Scroll continuously forward/backward in a novel with short chapters; check for repetition, skipped chapters and sudden position changes.
+2. Start narration at a chapter end; check the next chapter's title and first sentence. Scroll manually into a later chapter while playing, then pause/resume.
+3. Save a note, close and reopen the book, and sync; check reading position and note ownership.
+4. Change font size, rotate the screen, and switch between scrolling/pagination.
 
-## 源码与许可
+The WebDAV protocol and database schema were unchanged. Problems could be reported through Settings, optionally previewing and attaching redacted diagnostics.
 
-本项目基于 [Anx Reader](https://github.com/Anxcye/anx-reader) 和 [ReadAny](https://github.com/codedogQBY/ReadAny)，以 GPL-3.0-or-later 发布，保留上游许可和署名。APK 内含许可文件；此发布标签下的 Source code 附件对应本次构建源码。
+## Source and licenses
+
+This project is based on [Anx Reader](https://github.com/Anxcye/anx-reader) and [ReadAny](https://github.com/codedogQBY/ReadAny), released under GPL-3.0-or-later with upstream licenses and attribution retained. The APK included license files; the Source code attachment under this release tag corresponded to the build's source.

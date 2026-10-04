@@ -1,34 +1,28 @@
-# Android 应用数据目录迁移
+# Android app data directory migration
 
-Android 默认数据根目录使用 `getExternalStorageDirectory()`，通常为
-`内部存储/Android/data/com.modu.reader/files`。不增加共享用户目录，不扫描
-`内部存储/Fonts`，现有字体导入/下载方式不变（仍在数据根目录的 `font/` 下）。
+> Historical record of the source changes and local checks described below. No release version was specified; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
 
-首次启动时，在数据库打开、WebDAV 同步、阅读器及 TTS 启动前迁移：
+The default Android data root used `getExternalStorageDirectory()`, typically
+`内部存储/Android/data/com.modu.reader/files` (“Internal storage/Android/data/com.modu.reader/files”). No shared user directory was added and
+`内部存储/Fonts` (“Internal storage/Fonts”) was not scanned. Existing font import/download methods were unchanged, with fonts still under `font/` in the data root.
 
-- 旧 `app_flutter` 全部数据：书籍、封面、字体、背景、AI 历史、索引、模型、字典等。
-- 旧私有 `databases` 目录及数据库 WAL/SHM 一同迁移到新根目录的 `databases/`。
-- 逐文件流式 SHA-256 校验；临时文件完成后才重命名发布。
-- 同名不同内容时停止，不覆盖任一端。空间不足或中断可以重试，已验证文件可复用。
-- 两端迁移回执写入后才允许应用继续启动。此后不再读取旧数据库；新目录丢失时
-  停止启动并提示重试，不能偷偷回退到旧进度或创建空书库。
-- 原私有数据暂保留为一次性恢复副本，不继续写入，不自动清除。
+On first launch, migration ran before database opening, WebDAV synchronization, the reader and TTS:
 
-系统 SharedPreferences、密钥、安全设置、崩溃诊断及缓存仍在 Android 管理的私有
-区域。迁移不是无根权限访问所有设置的功能。应用数据根目录会在设置 → 存储显示。
-Android/data 仍可能被系统/文件管理器限制访问；本修改不绕过系统权限，也不新增
-存储权限。卸载应用会删除应用专属目录；备份应继续使用应用的导出功能。
+- All data from the old `app_flutter`: books, covers, fonts, backgrounds, AI history, indexes, models, dictionaries and more.
+- The old private `databases` directory, including database WAL/SHM files, moved to `databases/` under the new root.
+- Each file was verified with streaming SHA-256; temporary files were renamed into place only after completion.
+- Same-name files with different contents stopped migration without overwriting either side. Insufficient space or interruption could be retried, reusing verified files.
+- App startup continued only after migration receipts were written at both ends. The old database was no longer read afterward. If the new directory was lost, startup stopped and prompted a retry rather than silently reverting to old progress or creating an empty library.
+- Original private data was retained temporarily as a one-time recovery copy, with no further writes or automatic cleanup.
 
-自动测试覆盖迁移、重启、中断恢复、冲突、目标丢失、符号链接、平台目录不可用，
-并用真实 SQLite WAL 验证笔记和阅读位置保留。发布前仍需 Android 真机升级验证，
-包括已有书库/模型、读取自定义字体、导出/还原、WebDAV 同步及空间不足后重试。
+System SharedPreferences, keys, security settings, crash diagnostics and caches remained in Android-managed private storage. Migration did not provide root-free access to all settings. Settings → Storage displayed the app data root.
+Android/data could still be restricted by the system/file manager; this change neither bypassed system permissions nor added storage permissions. Uninstalling the app deletes its app-specific directories; backups should continue to use the app's export feature.
 
-## 本次本地验证
+Automated tests covered migration, restart, interrupted recovery, conflicts, missing destinations, symbolic links and unavailable platform directories. Real SQLite WAL tests verified preservation of notes and reading positions. Android device upgrade verification was still required before release, including existing libraries/models, custom-font reading, export/restore, WebDAV sync and retries after insufficient space.
 
-- 迁移、启动错误页、数据库初始化、备份、字体与 AI 历史存储：48 项通过，
-  1 项私人字体样本测试跳过。
-- 同步与模型存储/删除回归：268 项通过，1 项跳过。
-- Android ARM64 `flutter build bundle --debug --no-pub` 成功；这是 Dart/资源编译，
-  不等于 APK 完整构建或真机升级验证。本次未安装、发布，也未迁移真实用户数据。
-- Dart 分析未报告本次代码的编译错误；环境中的 custom_lint 插件仍因
-  `pub is not an AOT snapshot` 无法运行，不能视为完整 lint 检查通过。
+## Local verification in this round
+
+- Migration, startup error page, database initialization, backup, fonts and AI history storage: 48 passed, 1 private-font sample test skipped.
+- Sync and model storage/deletion regressions: 268 passed, 1 skipped.
+- Android ARM64 `flutter build bundle --debug --no-pub` succeeded. This was Dart/asset compilation, not a complete APK build or device upgrade verification. No app was installed or published and no real user data was migrated in this round.
+- Dart analysis reported no compilation errors in the changed code. The environment's custom_lint plugin still failed to run with `pub is not an AOT snapshot`; this was not a complete passing lint check.

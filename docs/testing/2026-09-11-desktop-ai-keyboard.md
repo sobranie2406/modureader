@@ -1,5 +1,7 @@
 # macOS AI panel keyboard regression
 
+> Historical record for the local 1.0.2+10008 build and the verification described below; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
+
 Local ARM64 build: 1.0.2+10008. No public release was created.
 
 ## Causes and fixes

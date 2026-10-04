@@ -1,5 +1,7 @@
 # Sync and reader regression checks
 
+> Historical record of the 2026-09-11 source checks described below, while 1.0.2+10008 remained installed; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
+
 Source changes only; no new native package was built, installed or published.
 
 ## Changes

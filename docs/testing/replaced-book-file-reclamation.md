@@ -1,26 +1,28 @@
-# 替换书籍后的 WebDAV 文件回收
+# WebDAV file reclamation after book replacement
 
-## 行为
+> Historical record of the 2026-09-16 verification and 2026-09-20 added regressions described below. No release version was specified; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
 
-- `BookDao.updateBook` 在更新文件路径的同一个 SQLite 事务内记录旧路径、旧 MD5 和稳定书籍标识；阅读进度与笔记不变。
-- 正常数据库合并、发布以及书籍文件同步完成后执行回收；不能放进 `syncFiles`，因为它也在数据库发布前调用。向量索引同步已取消，不再影响 EPUB 回收。
-- 只处理有明确替换记录的书籍文件。读取本地和云端最新合并记录（包括无可靠 ETag 服务使用的不可变日志），保护所有仍被引用的文件，包括回收站书籍。
-- 必须验证云端新版 EPUB 的 MD5、旧文件的 MD5，并回读校验旧文件的回收副本。慢传输后重新核对全部书籍引用及删除/恢复记录，发现相关变化则延后；无关笔记、阅读位置、时长变化不再让回收一直延期。
-- 缺少本地证据时，从通过哈希及数据库格式校验的云端不可变日志补回：仅接受同一稳定书籍标识、较早操作时钟、不同路径且 MD5 有效的历史记录。完整扫描成功后才保存证据，随后仍执行最新两端引用和文件内容校验。不会根据目录文件名和大小猜测替换关系；没有任何可信历史记录的旧文件仍保留。
-- 旧文件移出 `modu/data/file`，副本位于 `modu/replaced-files-v1/<旧路径SHA256>/<内容SHA256>/<原文件名>`。需要恢复时可将该副本复制回 `modu/data/file/<原文件名>`。
-- 这是**可恢复的回收，不是永久删除，也不会释放回收副本占用的云端空间**。旧版本客户端没有回收确认协议；数据库检查与文件删除也不是跨文件原子事务，因此保留恢复副本，不承诺杜绝最后一刻的并发引用。
-- 不清理无法证明来源的历史文件，不按相同书名猜测文件归属。旧记录缺少有效 MD5、文件大小未知或超过 512 MiB 时跳过；每次同步最多尝试 3 个符合条件的文件，后续同步继续。
-- 本地替换证据保留，便于断网重试、切换同步目标或处理离线设备重新上传旧文件；不会把这些本地维护表加入跨设备同步格式。
-- 回收失败不使已完成的书籍/笔记同步失败，下次同步可以重试。
+## Behavior
 
-## 回归
+- `BookDao.updateBook` recorded the old path, old MD5 and stable book identifier in the same SQLite transaction that updated the file path. Reading progress and notes were unchanged.
+- Reclamation ran after normal database merge, publication and book-file synchronization. It could not be placed in `syncFiles`, which was also called before database publication. Vector-index synchronization had been removed and no longer affected EPUB reclamation.
+- Only book files with explicit replacement records were processed. The latest merged local and remote records, including immutable logs used by servers without reliable ETag, protected all still-referenced files, including books in the recycle bin.
+- The remote new EPUB's MD5 and old file's MD5 had to be verified, and the recovery copy of the old file read back and checked. After slow transfers, all book references and delete/restore records were rechecked; relevant changes deferred reclamation. Unrelated note, reading-position or duration changes no longer caused indefinite deferral.
+- Missing local evidence could be recovered from remote immutable logs that passed hash and database-format validation. Only historical records with the same stable book identifier, an earlier operation clock, a different path and a valid MD5 were accepted. Evidence was saved only after a successful full scan, followed by validation of the latest references on both sides and file contents. Replacement relationships were not guessed from directory filenames or sizes; old files with no trustworthy historical records were retained.
+- Old files moved out of `modu/data/file`; recovery copies were stored at `modu/replaced-files-v1/<旧路径SHA256>/<内容SHA256>/<原文件名>` (placeholders: old-path SHA256, content SHA256, original filename). For recovery, copy that file back to `modu/data/file/<原文件名>` (original filename).
+- This was **recoverable reclamation, not permanent deletion, and did not free the remote space occupied by recovery copies**. Older clients had no reclamation acknowledgement protocol, and database checks and file deletion were not atomic across files. Recovery copies were therefore retained; last-moment concurrent references could not be ruled out.
+- Historical files of unproven origin were not cleaned up, and ownership was not guessed from matching book titles. Records lacking valid MD5, with unknown file size or with files larger than 512 MiB were skipped. Each sync attempted at most 3 eligible files; later syncs continued the work.
+- Local replacement evidence was retained for offline retries, switching sync targets and handling offline devices reuploading old files. These local maintenance tables were not added to the cross-device sync format.
+- Reclamation failure did not fail completed book/note synchronization; later syncs could retry.
 
-`test/service/sync/replaced_book_files_test.dart` 使用真实临时 SQLite 和内存 WebDAV，覆盖可靠 ETag / 无 ETag、连续替换、尚未发布、缺失/损坏新版、其他书籍引用、回收副本损坏、删除失败重试、并发修改、事务回滚、真实 DAO 接入、路径限制与旧文件重传。
+## Regressions
 
-`test/service/sync/webdav_capabilities_test.dart` 使用本机 HTTP 服务器，额外覆盖中文、空格、`#`、`%` 和字面量 `%2F` 文件名的精确删除，避免把文件名当作 URL 片段或目录。
+`test/service/sync/replaced_book_files_test.dart` used real temporary SQLite and in-memory WebDAV, covering reliable ETag / no ETag, successive replacements, unpublished changes, missing/corrupt new files, references from other books, corrupt recovery copies, delete-failure retries, concurrent modification, transaction rollback, actual DAO integration, path restrictions and old-file reuploads.
 
-新增回归（2026-09-20）：模拟旧版未记账的连续替换、另一设备从云端日志补回证据；回收期间新增笔记/更新进度仍能完成；新增本地引用、云端恢复旧文件及删除当前书籍仍阻止回收；索引同步调用顺序不得位于回收之前。
+`test/service/sync/webdav_capabilities_test.dart` used a local HTTP server and additionally covered exact deletion of filenames containing Chinese characters, spaces, `#`, `%` and literal `%2F`, preventing filenames from being interpreted as URL fragments or directories.
 
-本轮未连接真实 WebDAV，未迁移现有历史文件，未打包或发布。
+Added regressions (2026-09-20): successive replacements unrecorded by older versions and another device recovering evidence from remote logs; completion despite new notes/progress updates during reclamation; blocking reclamation on new local references, remote restoration of an old file or deletion of the current book; and ensuring index-sync calls did not precede reclamation.
 
-验证结果（2026-09-16）：完整 Flutter 测试 707 项通过、5 项跳过；本机 HTTP WebDAV 测试 15 项通过。静态分析的额外 custom_lint 插件因无法获取依赖未完成，不计为完整静态检查通过。
+No real WebDAV connection was used, existing historical files were not migrated, and no package was built or published in this round.
+
+Verification results (2026-09-16): full Flutter suite 707 passed, 5 skipped; local HTTP WebDAV tests 15 passed. The additional custom_lint static-analysis plugin could not complete because dependencies were unavailable; this was not recorded as complete static-analysis success.

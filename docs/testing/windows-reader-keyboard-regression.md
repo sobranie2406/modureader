@@ -1,5 +1,7 @@
 # Windows reader keyboard regression
 
+> Historical record concerning Windows 1.0.6 and the 2026-09-15 checks described below; this is not certification of the latest 1.2.0 release. See the [documentation index](../README.md).
+
 ## Report and code findings
 
 Reported against Windows 1.0.6: arrows and the enabled Ctrl+[ / Ctrl+]
