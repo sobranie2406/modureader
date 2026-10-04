@@ -34,14 +34,14 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 | -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows  | x64, ARM64              | EXE installer with shortcuts and an uninstaller; no commercial code signature; requires WebView2 Runtime                                    |
 | Linux    | x64, ARM64              | DEB for Debian 13 (trixie); install with APT to resolve system dependencies                                                                 |
-| Android  | x86\_64, arm64-v8a      | APK signed with the project's dedicated key; verify the download source before installing                                                   |
+| Android  | arm64-v8a              | APK signed with the project's dedicated key; verify the download source before installing                                                   |
 | macOS    | x64, ARM64              | DMG; drag the app to Applications; unnotarized, not an App Store release                                                                    |
 | iOS      | ARM64 devices           | iOS 16+; IPA has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
 
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.1.11** — Adjustable handles immediately after automatic selection, without repeated snapping; fixes for missing AI answer endings and blank historical answers; follow-up questions in current and restored reader conversations.
+**Latest release: 1.2.0** — Dedicated PDF and scanned-book reading, automatic cropping, image enhancements, on-demand OCR and inline text reflow; ordinary text books keep their familiar reading controls.
 
 Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
 
@@ -64,6 +64,7 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | --- | --- |
 | [Library](#library) | Import seven ebook formats, organize folders, pin books and browse a remote library |
 | [Reading & styles](#reading) | Tune typography, switch layouts and apply visual CSS presets |
+| [PDF, scanned books & OCR](#scanned-books) | Crop pages, enhance scans and reflow recognized text in the reader |
 | [Custom CSS](#css) | Visual rules, custom code, multiple profiles and visible effects on the page |
 | [Listening](#listening) | Choose a voice, edit narration prompts and listen at up to 4× speed |
 | [AI reading](#ai) | Ask about chapters, customize skills and continue conversations |
@@ -77,6 +78,16 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | [Global settings backup](#backup) | Transfer preferences by file or link, with credentials controlled separately |
 
 Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). Detailed options and entry points are in the [settings guide (Chinese)](docs/SETTINGS.md).
+
+<a id="scanned-books"></a>
+
+## Original pages, easier to read
+
+PDFs and scanned image books have dedicated crop, panel-order, zoom, rotation and continuous-scroll controls. Automatic cropping follows each page's content; original and cropped images fit the window. Adjust contrast, whitening, sharpening and scanned watermark fading while comparing with the original.
+
+EPUB, MOBI, AZW3 and FB2 image books are identified during import, not every time you open them. You can also change the classification in the bookshelf menu. Ordinary text books retain their familiar controls.
+
+Download a lightweight OCR model in Settings → OCR models; PP-OCRv4 is recommended, with v5 and v3 alternatives and upstream/Gitee sources. Reflow a page directly in the reader for selection actions, notes and AI, or extract a region into an editable AI draft. Recognition runs locally; models are downloaded only when requested.
 
 <a id="library"></a>
 

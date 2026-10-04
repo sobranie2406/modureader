@@ -165,10 +165,18 @@ export function analyzeEpubSection(doc, {index, href, excluded = false} = {}) {
     for (const el of clone.querySelectorAll('script,style,nav,rt,rp,[hidden],[aria-hidden="true"]')) el.remove();
     const text = clone.textContent.replace(/\s+/gu,' ').trim();
     const characters = [...text].length;
-    const images = Array.from(clone.querySelectorAll('img,image')).map((el,order) => ({
-        order, resource: el.getAttribute('src') ?? el.getAttribute('href') ?? el.getAttribute('xlink:href'),
-        width: el.getAttribute('width'), height: el.getAttribute('height'),
-    })).filter(image => image.resource);
+    const images = Array.from(clone.querySelectorAll('img,image')).map((el,order) => {
+        // MOBI6 stores images as record references before loadSection resolves
+        // them to local blobs. This is only a candidate, never scan evidence:
+        // decoded size, visibility and coverage are still checked by inspect().
+        const recindex = el.localName === 'img' ? el.getAttribute('recindex')?.trim() : null;
+        const record = recindex && /^\d+$/.test(recindex) &&
+            Number.isSafeInteger(Number(recindex)) && Number(recindex) > 0
+            ? `mobi:recindex:${Number(recindex)}` : null;
+        return {order,
+            resource: el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('xlink:href') || record,
+            width: el.getAttribute('width'), height: el.getAttribute('height')};
+    }).filter(image => image.resource);
     // Intrinsic dimensions/CSS coverage require a rendered page; do not treat
     // a cover or a single decorative icon as a proven scanned chapter.
     const kind = excluded ? 'illustrated' : characters >= 80 ? 'text'

@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Klasik Çince",
+  "selection_custom-preset-classical-chinese_prompt": "{selection} içindeki Klasik Çinceyi anlaşılır ve doğal modern Çinceye çevir. Anlamı, adları, yerleri ve paragrafları koru. Yalnızca çeviriyi ver; belirsizlikleri ayrıntı uydurmadan kısaca belirt.",
   "ui_reader_simulated_bold": "Yapay kalın",
   "ui_reader_simulated_bold_help": "Metin konturuyla kalınlık ekler. 1.0 özgün görünümü korur; 1.1–2.0 kalınlığı artırır. Sabit kalın yazı tipi inceltilemez.",
   "ui_reader_boldness": "Yazı tipi kalınlığı",

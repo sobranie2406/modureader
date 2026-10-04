@@ -1,4 +1,5 @@
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/service/ocr/document_reflow_store.dart';
 
 /// A versioned, data-only reference. Never includes credentials or file paths.
 class ReadingLink {
@@ -19,8 +20,7 @@ class ReadingLink {
   static final _controls = RegExp(r'[\x00-\x1f\x7f]');
   static bool validCfi(String value) =>
       value.length <= 8192 &&
-      value.startsWith('epubcfi(') &&
-      value.endsWith(')') &&
+      ((value.startsWith('epubcfi(') && value.endsWith(')')) || DocumentReflowAnchor.parse(value) != null) &&
       !_controls.hasMatch(value);
 
   static String? forBook(Book book, String cfi) {

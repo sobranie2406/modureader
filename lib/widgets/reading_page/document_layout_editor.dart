@@ -39,7 +39,7 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
   int _previewPage = 0, _generation = 0;
   double _aspect = 1;
   MemoryImage? _image;
-  double _autoMargin = 3;
+  double get _autoMargin => _layout.autoMargin * 100;
   bool _detecting = false;
   String? _cropNotice;
   final _controlsScroll = ScrollController();
@@ -107,7 +107,9 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
         'rotation': 0,
         'region': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
         'width': 1000,
-        'height': 1200
+        'height': 1200,
+        if (_layout.autoCrop) 'analyzeCrop': true,
+        if (_layout.autoCrop) 'margin': _layout.autoMargin,
       });
       if (!mounted || generation != _generation) return;
       final data = result['dataUrl'] as String;
@@ -117,6 +119,15 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
       final image = MemoryImage(
           base64Decode(data.substring('data:image/png;base64,'.length)));
       setState(() {
+        if (_layout.autoCrop) {
+          final detection = result['cropDetection'];
+          _draft[_scope] = DocumentPageLayout.fromJson({
+            ..._layout.toJson(),
+            'crop': detection is Map && detection['detected'] == true
+                ? detection['crop']
+                : {'x': 0, 'y': 0, 'width': 1, 'height': 1},
+          });
+        }
         _image = image;
         _aspect = w / h;
         _previewPage = page;
@@ -143,6 +154,17 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
 
   Future<void> _autoCrop() async {
     if (_busy || _failed || _saving || _detecting) return;
+    // The automatic action defaults to the whole document. Individual manual
+    // page/parity overrides remain available through the scope selector.
+    if (!_paired &&
+        _scope == DocumentLayoutScope.current &&
+        !_layout.autoCrop) {
+      final current = _layout;
+      setState(() {
+        _scope = DocumentLayoutScope.all;
+        _draft[_scope] = current;
+      });
+    }
     final generation = ++_generation, scope = _scope, page = _previewPage;
     setState(() {
       _detecting = true;
@@ -160,23 +182,30 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
       });
       if (!mounted || generation != _generation || scope != _scope) return;
       final detection = result['cropDetection'];
-      if (detection is! Map || detection['crop'] is! Map)
+      if (detection is! Map || detection['crop'] is! Map) {
         throw const FormatException('Invalid crop result');
-      final crop = DocumentPageLayout.fromJson(
-          {..._layout.toJson(), 'crop': detection['crop']});
+      }
+      final crop = DocumentPageLayout.fromJson({
+        ..._layout.toJson(),
+        'crop': detection['crop'],
+        'autoCrop': true,
+        'autoMargin': _autoMargin / 100
+      });
       _change(crop);
       setState(() => _cropNotice = detection['detected'] == true
-          ? tr('已识别当前预览页边界，请检查后确定。全书/奇偶页会共用此裁边框。',
-              'Detected this preview page. Review before confirming. Whole-document/parity scopes share this crop box.')
+          ? tr('已识别当前页。确定后，所选范围内的每一页都会独立识别并自动裁边，不会共用当前裁边框。',
+              'Current page detected. After confirming, each page in the selected scope is detected and cropped independently.')
           : tr('空白、满版或边界不明确，保留完整原页，可手动调整。',
               'Blank, full-bleed or uncertain border. Keeping the full page; adjust manually if needed.'));
     } catch (_) {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _cropNotice = tr('自动裁边失败，原草稿未改动，请重试。',
             'Auto crop failed. Draft unchanged. Please retry.'));
+      }
     } finally {
-      if (mounted && generation == _generation)
+      if (mounted && generation == _generation) {
         setState(() => _detecting = false);
+      }
     }
   }
 
@@ -250,7 +279,13 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
               ? (r.bottom + dy).clamp(r.top + minH, 1.0)
               : r.bottom);
     }
-    _change(_layout.copyWith(crop: rect));
+    _change(_layout.copyWith(crop: rect, autoCrop: false));
+    setState(() => _cropNotice = null);
+  }
+
+  void _setMargin(double value, {bool refresh = false}) {
+    _change(_layout.copyWith(autoMargin: value.clamp(0, 20) / 100));
+    if (refresh && _layout.autoCrop) _autoCrop();
   }
 
   Widget _controls() => Scrollbar(
@@ -310,6 +345,23 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                     : (scope) {
                         if (scope != null) _switchScope(scope);
                       }),
+            SwitchListTile.adaptive(
+                key: const ValueKey('auto-crop-enabled'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(tr('逐页自动裁边', 'Per-page auto crop')),
+                subtitle: Text(tr('开启时默认应用全书；每页独立识别。拖动裁边框切换为手动裁边。',
+                    'Enabling defaults to the whole document; detects each page independently. Drag the box to switch to manual cropping.')),
+                value: _layout.autoCrop,
+                onChanged: _saving || _busy || _failed || _detecting
+                    ? null
+                    : (value) {
+                        if (value) {
+                          _autoCrop();
+                        } else {
+                          _change(_layout.copyWith(autoCrop: false));
+                          setState(() => _cropNotice = null);
+                        }
+                      }),
             OutlinedButton.icon(
                 key: const ValueKey('auto-crop'),
                 onPressed: _saving || _busy || _failed || _detecting
@@ -324,10 +376,9 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
             Row(children: [
               IconButton(
                   tooltip: tr('减少留白', 'Less margin'),
-                  onPressed: _saving || _detecting
+                  onPressed: _saving || _detecting || _busy || _failed
                       ? null
-                      : () => setState(
-                          () => _autoMargin = (_autoMargin - 1).clamp(0, 20)),
+                      : () => _setMargin(_autoMargin - 1, refresh: true),
                   icon: const Icon(Icons.remove)),
               Expanded(
                   child: Slider(
@@ -336,20 +387,22 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                       min: 0,
                       max: 20,
                       divisions: 20,
-                      onChanged: _saving || _detecting
+                      onChanged: _saving || _detecting || _busy || _failed
                           ? null
-                          : (value) => setState(() => _autoMargin = value))),
+                          : (value) => _setMargin(value),
+                      onChangeEnd: _saving || _detecting || _busy || _failed
+                          ? null
+                          : (value) => _setMargin(value, refresh: true))),
               IconButton(
                   tooltip: tr('增加留白', 'More margin'),
-                  onPressed: _saving || _detecting
+                  onPressed: _saving || _detecting || _busy || _failed
                       ? null
-                      : () => setState(
-                          () => _autoMargin = (_autoMargin + 1).clamp(0, 20)),
+                      : () => _setMargin(_autoMargin + 1, refresh: true),
                   icon: const Icon(Icons.add)),
             ]),
             Text(
-                tr('调整留白后再次点击自动裁边；确定之前可拖框修正。',
-                    'Tap Auto crop after changing the margin; adjust the box before confirming.'),
+                tr('留白用于保护页码、脚注和文字边缘。自动模式随翻页识别；手动拖框后只使用固定裁边。',
+                    'Margin protects page numbers, footnotes and text edges. Automatic mode detects each page; dragging the box uses a fixed manual crop.'),
                 style: Theme.of(context).textTheme.bodySmall),
             if (_cropNotice != null) Text(_cropNotice!),
             Wrap(spacing: 8, children: [

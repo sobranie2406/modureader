@@ -286,12 +286,12 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: node scripts/release/android-signing.mjs --from-env
-      - name: Build signed APKs
+      # x64 is built only for the emulator regression, never packaged/uploaded.
+      - name: Build arm64 APK and internal x64 emulator fixture
         run: flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
       - name: Verify signatures and package
         run: |
           python3 scripts/release/package.py android arm64
-          python3 scripts/release/package.py android x64
       - name: Build release instrumentation (never packaged in the app)
         run: cd android && ./gradlew app:assembleReleaseAndroidTest -Ptarget-platform=android-arm64,android-x64 -Psplit-per-abi=true
       - name: Enable emulator KVM in isolated runner
@@ -314,8 +314,8 @@ jobs:
         with:
           name: modu-android
           path: |
-            dist-release/*.apk
-            dist-release/*.sha256
+            dist-release/*-android-arm64.apk
+            dist-release/*-android-arm64.apk.sha256
           if-no-files-found: error
           retention-days: 14
 

@@ -1,4 +1,4 @@
-import { adjacentPanel, readingRegions, layoutSignature } from './pdf-reading-layout.js'
+import { adjacentPanel, readingRegions, layoutSignature, resolveReadingRegions } from './pdf-reading-layout.js'
 import { scrollPagePlan, scrollVisibleRegion, scrollSourcePoint } from './pdf-scroll-layout.js'
 
 const GAP = 16, MAX_FRAMES = 7
@@ -63,7 +63,7 @@ export class PdfScrollReader {
                 if (rect) {
                     center = { x: (rect.left + Math.min(1, rect.width / 2)) / e.width,
                         y: (rect.top + rect.height / 2) / e.height }
-                    const regions = readingRegions(this.layout, page)
+                    const regions = e.regions
                     const found = regions.findIndex(r => center.x >= r.x && center.x < r.x + r.width &&
                         center.y >= r.y && center.y < r.y + r.height)
                     e.fallback = found < 0
@@ -105,7 +105,10 @@ export class PdfScrollReader {
             e.nativeText = e.iframe.contentDocument.documentElement.dataset.documentImage === 'false'
             e.fallback = e.nativeText
             e.panel = e.nativeText ? 0 : panel
-            e.crop = readingRegions(this.layout, page, this.book)[e.panel]
+            e.regions = e.nativeText ? readingRegions(null, page) :
+                await resolveReadingRegions(this.layout, page, this.book,
+                    {hideWatermarks: this.view.display?.hideWatermarks, active: () => !this.destroyed})
+            e.crop = e.regions[e.panel]
             if (!e.crop) throw new Error('Invalid PDF panel')
             return e
         } catch (error) { e.element.remove(); throw error }
@@ -313,6 +316,7 @@ export class PdfScrollReader {
                 if (!active() || !this.entries.includes(e)) return
                 url = URL.createObjectURL(result.blob)
                 const img = e.iframe.contentDocument.createElement('img')
+                img.dataset.documentDetail = ''
                 img.src = url; img.alt = ''
                 Object.assign(img.style, { position: 'absolute', pointerEvents: 'none', zIndex: '1',
                     left: `${region.x * e.width}px`, top: `${region.y * e.height}px`,

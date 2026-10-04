@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Chinês clássico",
+  "selection_custom-preset-classical-chinese_prompt": "Traduza o chinês clássico de {selection} para chinês moderno claro e natural. Preserve o sentido, os nomes, os lugares e os parágrafos. Apresente apenas a tradução; indique brevemente as ambiguidades sem inventar detalhes.",
   "ui_reader_simulated_bold": "Negrito simulado",
   "ui_reader_simulated_bold_help": "Adiciona espessura com um contorno. 1.0 mantém o original; 1.1–2.0 aumenta a espessura. Uma fonte em negrito fixa não pode ficar mais fina.",
   "ui_reader_boldness": "Espessura da fonte",

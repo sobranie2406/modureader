@@ -13,14 +13,14 @@ export function imageEpubFromEvidence(pages) {
 // sections, create documents, decode images, or call the sampling detector.
 export function resolveDocumentReadingMode(book, persistedMode) {
     if (book.documentAnalysis && book.readingRegionRenderer) return 'pdf'
-    return book.resources && persistedMode === 'image-epub' ? 'image-epub' : 'standard'
+    return (book.resources || book.imageDocumentSource) && persistedMode === 'image-epub' ? 'image-epub' : 'standard'
 }
 
 export async function detectDocumentReadingMode(book, {
     signal, timeoutMs = 4000, createSource,
 } = {}) {
     if (book.documentAnalysis && book.readingRegionRenderer) return 'pdf'
-    if (!book.resources || !book.sections?.length) return 'standard'
+    if (!(book.resources || book.imageDocumentSource) || !book.sections?.length) return 'standard'
     const controller = new AbortController()
     const abort = () => controller.abort()
     signal?.addEventListener('abort', abort, { once: true })
@@ -28,8 +28,19 @@ export async function detectDocumentReadingMode(book, {
     let source, timer
     const work = async () => {
         const active = controller.signal
+        const excluded = new Set()
+        // Kindle/FB2 guides use filepos/FID/numeric links, not EPUB spine hrefs.
+        if (book.imageDocumentSource) for (const item of book.landmarks ?? []) {
+            if (!item.type?.some(type => ['cover', 'toc'].includes(type))) continue
+            checkCancelled(active)
+            try {
+                const target = await book.resolveHref?.(item.href)
+                if (Number.isInteger(target?.index)) excluded.add(target.index)
+            } catch (_) { /* malformed optional guide must not abort import */ }
+        }
+        checkCancelled(active)
         const body = book.sections.map((section, index) => ({ section, index }))
-            .filter(({ section }) => section.linear !== 'no' && !book.landmarks?.some(item =>
+            .filter(({ section, index }) => !excluded.has(index) && section.linear !== 'no' && !book.landmarks?.some(item =>
                 item.type?.some(type => ['cover', 'toc'].includes(type)) &&
                 item.href?.split('#')[0] === section.id))
         const evidence = []

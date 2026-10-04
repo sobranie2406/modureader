@@ -18,8 +18,6 @@ void main() {
     for (final path in [
       'book.txt',
       'book.md',
-      'book.mobi',
-      'book.azw3',
       'book.cbz'
     ]) {
       for (final mode in ['pdf', 'image-epub', 'standard', null]) {
@@ -29,6 +27,11 @@ void main() {
     }
     expect(DocumentReadingMode.fromDetection('book.EPUB', 'image-epub'),
         DocumentReadingMode.imageEpub);
+    for (final path in ['book.MOBI', 'book.azw3', 'book.fb2']) {
+      expect(DocumentReadingMode.fromDetection(path, 'image-epub'), DocumentReadingMode.imageEpub);
+      expect(DocumentReadingMode.fromDetection(path, 'standard'), DocumentReadingMode.standard);
+      expect(DocumentReadingMode.fromDetection(path, null), DocumentReadingMode.standard);
+    }
     expect(DocumentReadingMode.fromDetection('book.PDF', 'pdf'),
         DocumentReadingMode.pdf);
     expect(
@@ -69,7 +72,7 @@ void main() {
     expect(find.byType(PdfReadingControls), findsNothing);
     for (final label in [
       'Document type inspection',
-      'EPUB image pages',
+      'Scanned image pages',
       'PDF crop and panels',
       'Read cropped panels'
     ]) {

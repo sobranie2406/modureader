@@ -20,6 +20,7 @@ import 'package:anx_reader/page/settings_page/selection_search.dart';
 import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
 import 'package:anx_reader/page/settings_page/css_settings.dart';
 import 'package:anx_reader/page/settings_page/vector_model.dart';
+import 'package:anx_reader/page/settings_page/ocr_model.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/settings/about.dart';
 import 'package:flutter/cupertino.dart';
@@ -195,6 +196,13 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                   ModuStrings.text(
                       context, '本地或远程嵌入模型', 'Local or remote embeddings'),
                 ],
+              },
+              {
+                "title": ModuStrings.text(context, 'OCR 模型', 'OCR model'),
+                "icon": Icons.document_scanner_outlined,
+                "sections": const OcrModelSettings(),
+                "subtitles": [ModuStrings.text(context, '文字识别、模型下载与下载源',
+                    'Text recognition, models and download sources')],
               },
               {
                 "title": L10n.of(context).settingsNarrate,

@@ -35,6 +35,31 @@ class FailingPrefs implements SharedPreferences {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+      'automatic mode and margin persist per scope; legacy layouts stay manual',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = DocumentLayoutStore(await SharedPreferences.getInstance());
+    final config = DocumentLayoutConfig(
+        all: cropped.copyWith(autoCrop: true, autoMargin: .05),
+        pages: {2: cropped});
+    await store.save('auto', config);
+    final restored = store.read('auto');
+    expect(restored.forPage(0).autoCrop, true);
+    expect(restored.forPage(1).autoMargin, .05);
+    expect(restored.forPage(2).autoCrop, false);
+    expect(DocumentPageLayout.fromJson(cropped.toJson()).autoCrop, false);
+    for (final invalid in [
+      {'autoCrop': 1},
+      {'autoMargin': '3'},
+      {'autoMargin': .3},
+      {'autoMargin': double.nan}
+    ]) {
+      expect(
+          () => DocumentPageLayout.fromJson({...cropped.toJson(), ...invalid}),
+          throwsFormatException);
+    }
+  });
   test('seven grids tile the crop; row/column and RTL orders match JS contract',
       () {
     for (final grid in DocumentPageLayout.grids.entries) {

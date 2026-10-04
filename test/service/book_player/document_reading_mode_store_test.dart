@@ -80,4 +80,21 @@ void main() {
     });
     expect(Prefs().prefs.getString(DocumentReadingModeStore.key), previous);
   });
+  for (final extension in ['epub', 'mobi', 'azw3', 'fb2']) {
+    test('$extension automatic detection and manual correction persist without reimport', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final store = DocumentReadingModeStore(prefs);
+      final book = Book.mock().copyWith(filePath: 'a.$extension', md5: 'a');
+      await store.save(book, 'image-epub');
+      expect(store.read(book), DocumentReadingMode.imageEpub);
+      await store.setScanned(book, false);
+      await store.save(book, 'image-epub');
+      expect(store.read(book), DocumentReadingMode.standard);
+      await store.setScanned(book, true);
+      await store.save(book, 'standard');
+      expect(DocumentReadingModeStore(prefs).read(book), DocumentReadingMode.imageEpub);
+      expect(store.read(book.copyWith(md5: 'replacement')), DocumentReadingMode.standard);
+      expect(book.readingPercentage, Book.mock().readingPercentage);
+    });
+  }
 }

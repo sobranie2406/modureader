@@ -79,6 +79,8 @@ def notices(folder, platform):
 
 
 def package(platform, arch, version):
+    if platform == 'android' and arch != 'arm64':
+        raise ValueError('Android x64 is an internal test target, not a release artifact')
     name = f"Modu-{version}-{platform}-{arch}"
     stage = OUT / "staging" / name
     if stage.exists():

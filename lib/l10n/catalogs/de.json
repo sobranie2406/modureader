@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Klassisches Chinesisch",
+  "selection_custom-preset-classical-chinese_prompt": "Übersetze das klassische Chinesisch in {selection} in klares, natürliches modernes Chinesisch. Bewahre Bedeutung, Namen, Orte und Absätze. Gib nur die Übersetzung aus; kennzeichne Mehrdeutigkeiten kurz, ohne Details zu erfinden.",
   "ui_reader_simulated_bold": "Fett simulieren",
   "ui_reader_simulated_bold_help": "Mit einer Textkontur verstärken. 1.0 erhält das Original; 1.1–2.0 erhöht die Stärke. Feste Fettschriften können nicht dünner werden.",
   "ui_reader_boldness": "Schriftstärke",

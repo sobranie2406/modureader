@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "한문 번역",
+  "selection_custom-preset-classical-chinese_prompt": "{selection}의 한문을 자연스럽고 이해하기 쉬운 현대 중국어로 번역하세요. 원뜻, 인명, 지명과 문단을 유지하고 번역문만 제시하세요. 모호한 부분은 간단히 밝히고 내용을 지어내지 마세요.",
   "ui_reader_simulated_bold": "모의 굵게",
   "ui_reader_simulated_bold_help": "글자 윤곽선으로 굵기를 더합니다. 1.0은 원래 굵기이며 1.1–2.0은 단계적으로 더 굵게 합니다. 고정 굵은 글꼴을 가늘게 할 수는 없습니다.",
   "ui_reader_boldness": "글자 굵기",

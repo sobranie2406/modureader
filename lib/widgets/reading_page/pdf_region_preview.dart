@@ -21,10 +21,11 @@ class PdfRegionPreview extends StatefulWidget {
     required this.close,
     this.initialLayout = const DocumentLayoutConfig(),
     this.saveLayout,
+    this.startWithLayoutEditor = false,
     this.imageEpub = false,
     this.initialEnhancement = const DocumentEnhancement(),
     this.saveEnhancement,
-  });
+  }) : assert(!startWithLayoutEditor || saveLayout != null);
 
   final Future<Map<String, dynamic>> Function(int? page) info;
   final Future<Map<String, dynamic>> Function(Map<String, dynamic>) render;
@@ -32,6 +33,9 @@ class PdfRegionPreview extends StatefulWidget {
   final VoidCallback close;
   final DocumentLayoutConfig initialLayout;
   final Future<void> Function(DocumentLayoutConfig)? saveLayout;
+
+  /// Open the editor in this route, without a preview route underneath it.
+  final bool startWithLayoutEditor;
   final bool imageEpub;
   final DocumentEnhancement initialEnhancement;
   final Future<void> Function(DocumentEnhancement)? saveEnhancement;
@@ -141,7 +145,7 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
   }
 
   void _scheduleRender() {
-    if (_editing) return;
+    if (_editing || widget.startWithLayoutEditor) return;
     _timer?.cancel();
     final generation = ++_generation;
     widget.cancelRender();
@@ -251,8 +255,9 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
   }
 
   Future<void> _editLayout() async {
-    if (_editing || _loadingPage || _unsupported || widget.saveLayout == null)
+    if (_editing || _loadingPage || _unsupported || widget.saveLayout == null) {
       return;
+    }
     _editing = true;
     _generation++;
     _timer?.cancel();
@@ -286,6 +291,63 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
   @override
   Widget build(BuildContext context) {
     String tr(String zh, String en) => ModuStrings.text(context, zh, en);
+    if (widget.startWithLayoutEditor) {
+      if (!_loadingPage && !_failed && !_unsupported) {
+        return DocumentLayoutEditor(
+            initial: _layout,
+            page: _page,
+            total: _total,
+            info: widget.info,
+            render: widget.render,
+            cancelRender: widget.cancelRender,
+            save: widget.saveLayout!);
+      }
+      // Resolve the current original page first; no intermediate preview render
+      // or additional navigation is needed. Loading is cancellable/retryable.
+      return Dialog.fullscreen(
+          child: SafeArea(
+              child: Column(children: [
+        Row(children: [
+          IconButton(
+              tooltip: tr('关闭', 'Close'),
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context)),
+          Expanded(
+              child: Text(tr('裁边与分格', 'Crop and panels'),
+                  style: Theme.of(context).textTheme.titleLarge)),
+        ]),
+        Expanded(
+            child: Center(
+                child: _failed || _unsupported
+                    ? Column(mainAxisSize: MainAxisSize.min, children: [
+                        Text(_unsupported
+                            ? tr('本页包含文字或暂不支持的图片排版，请返回原文或选择其他页。',
+                                'This page contains text or an unsupported image layout. Return to the original reader or select another page.')
+                            : tr('预览失败，原文件未改动。',
+                                'Preview failed. The source is unchanged.')),
+                        TextButton(
+                            onPressed: () => _loadPage(_requestedPage),
+                            child: Text(tr('重试', 'Retry'))),
+                        if (_unsupported)
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(
+                                tooltip: tr('上一原页', 'Previous original page'),
+                                onPressed: _page > 0
+                                    ? () => _loadPage(_page - 1)
+                                    : null,
+                                icon: const Icon(Icons.chevron_left)),
+                            Text('${_page + 1} / $_total'),
+                            IconButton(
+                                tooltip: tr('下一原页', 'Next original page'),
+                                onPressed: _page + 1 < _total
+                                    ? () => _loadPage(_page + 1)
+                                    : null,
+                                icon: const Icon(Icons.chevron_right)),
+                          ]),
+                      ])
+                    : const CircularProgressIndicator())),
+      ])));
+    }
     return Dialog.fullscreen(
       child: SafeArea(
         child: Column(children: [
@@ -297,7 +359,7 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
             Expanded(
                 child: Text(
                     widget.imageEpub
-                        ? tr('图片 EPUB 原图', 'EPUB image pages')
+                        ? tr('扫描图片原图', 'Scanned image pages')
                         : tr('PDF 局部预览', 'PDF region preview'),
                     style: Theme.of(context).textTheme.titleMedium)),
             if (widget.saveLayout != null)

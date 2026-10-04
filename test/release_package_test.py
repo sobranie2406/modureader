@@ -12,6 +12,7 @@ import zipfile
 import os
 import subprocess
 import textwrap
+import shutil
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
@@ -83,7 +84,8 @@ class ReleaseAssetSetTest(unittest.TestCase):
         names = [f'Modu-1.0.0-{platform}-{arch}{suffix}'
                  for platform, suffix in [('android', '.apk'), ('linux', '.deb'),
                                           ('windows', '-setup.exe'), ('macos', '.dmg')]
-                 for arch in ('x64', 'arm64')]
+                 for arch in ('x64', 'arm64')
+                 if platform != 'android' or arch == 'arm64']
         names += ['Modu-1.0.0-ios-arm64.ipa']
         for name in names:
             data = b'synthetic packaging test'
@@ -91,11 +93,11 @@ class ReleaseAssetSetTest(unittest.TestCase):
             (folder / (name + '.sha256')).write_text(f'{hashlib.sha256(data).hexdigest()}  {name}\n')
         return names
 
-    def test_all_nine_packages_are_required_without_notices(self):
+    def test_all_eight_packages_are_required_without_notices(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             names = self.fixture(folder)
-            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 9)
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 8)
             (folder / names[0]).unlink()
             with self.assertRaisesRegex(ValueError, 'missing='):
                 validate_release_assets(folder, 'v1.0.0')
@@ -106,6 +108,16 @@ class ReleaseAssetSetTest(unittest.TestCase):
             names = self.fixture(folder)
             (folder / names[0]).write_bytes(b'altered')
             with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
+                validate_release_assets(folder, 'v1.0.0')
+
+    def test_android_x64_cannot_be_packaged_or_published(self):
+        with self.assertRaisesRegex(ValueError, 'internal test target'):
+            release_package.package('android', 'x64', '1.0.0')
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.fixture(folder)
+            (folder / 'Modu-1.0.0-android-x64.apk').write_bytes(b'test only')
+            with self.assertRaisesRegex(ValueError, 'unexpected='):
                 validate_release_assets(folder, 'v1.0.0')
 
     def test_stale_notices_attachment_is_rejected(self):
@@ -350,6 +362,34 @@ class NativeInstallerTest(unittest.TestCase):
             native.checksum(path)
             self.assertEqual(path.with_suffix('.deb.sha256').read_bytes(),
                              f'{hashlib.sha256(b"native package").hexdigest()}  package.deb\n'.encode())
+
+    def test_macos_install_window_only_contains_app_and_applications(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle, stage = root / 'bundle', root / 'image'
+            (bundle / 'Modu.app/Contents/Resources').mkdir(parents=True)
+            for name in ('LICENSE', 'NOTICE', 'SOURCE.txt', 'INSTALL.md'):
+                (bundle / name).write_text(name)
+            (bundle / 'LICENSES').mkdir()
+            (bundle / 'LICENSES/OCR.txt').write_text('OCR license')
+            (bundle / 'unrelated.txt').write_text('not an install item')
+            calls = []
+
+            def fake_command(*args):
+                calls.append(args)
+                if args[0] == 'ditto':
+                    shutil.copytree(args[1], args[2])
+                return ''
+
+            with patch.object(native, 'command', side_effect=fake_command):
+                native.prepare_macos_image(bundle, stage)
+            self.assertEqual({p.name for p in stage.iterdir()}, {'Modu.app', 'Applications'})
+            self.assertEqual(os.readlink(stage / 'Applications'), '/Applications')
+            notices = stage / 'Modu.app/Contents/Resources/Distribution'
+            self.assertEqual((notices / 'SOURCE.txt').read_text(), 'SOURCE.txt')
+            self.assertEqual((notices / 'LICENSES/OCR.txt').read_text(), 'OCR license')
+            self.assertFalse((bundle / 'Modu.app/Contents/Resources/Distribution').exists())
+            self.assertEqual(calls[-1][:4], ('codesign', '--verify', '--deep', '--strict'))
 
     def test_only_installed_uninstaller_engine_can_have_different_architecture(self):
         with tempfile.TemporaryDirectory() as directory:

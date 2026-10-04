@@ -181,6 +181,28 @@ function imageView(touch) {
   return { view: new View(), timers };
 }
 
+for (const touch of [false, true]) test(`scanned document ${touch ? 'touch' : 'mouse'} images keep page taps, never preview`, () => {
+  const dom = fixture(), doc = dom.window.document, {view, timers} = imageView(touch);
+  view.scannedImageDocument = true;
+  const actions = [];
+  view.addEventListener('click-image', () => actions.push('preview'));
+  view.addEventListener('image-footnote', () => actions.push('note'));
+  view.install(doc);
+  let clicks = 0;
+  doc.addEventListener('click', () => clicks++);
+  for (const img of doc.querySelectorAll('img')) {
+    img.dispatchEvent(new dom.window.Event('touchstart', {bubbles:true}));
+    img.dispatchEvent(new dom.window.MouseEvent('click', {bubbles:true,cancelable:true}));
+    const menu = new dom.window.Event('contextmenu', {bubbles:true,cancelable:true});
+    img.dispatchEvent(menu);
+    assert.equal(menu.defaultPrevented, true);
+  }
+  assert.equal(clicks, doc.querySelectorAll('img').length);
+  assert.equal(timers.length, 0);
+  assert.deepEqual(actions, []);
+  dom.window.close();
+});
+
 for (const touch of [false, true]) test(`${touch ? 'mobile' : 'desktop'} note click opens annotation, never preview or reader menu`, () => {
   const dom = fixture(), doc = dom.window.document, { view, timers } = imageView(touch);
   const notes = [], previews = [];

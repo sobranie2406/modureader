@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Chinois classique",
+  "selection_custom-preset-classical-chinese_prompt": "Traduisez le chinois classique de {selection} en chinois moderne clair et naturel. Conservez le sens, les noms, les lieux et les paragraphes. Donnez uniquement la traduction ; signalez brièvement les ambiguïtés sans inventer de détails.",
   "ui_reader_simulated_bold": "Gras simulé",
   "ui_reader_simulated_bold_help": "Épaissir les lettres par un contour. 1.0 conserve l’original ; 1.1–2.0 augmente l’épaisseur. Une police grasse fixe ne peut pas être affinée.",
   "ui_reader_boldness": "Épaisseur de police",

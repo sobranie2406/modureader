@@ -80,6 +80,39 @@ void main() {
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
     expect(saved.single.forPage(0).crop, const Rect.fromLTWH(.1, .2, .8, .6));
+    expect(saved.single.all!.autoCrop, true);
+    expect(saved.single.forPage(5).autoCrop, true);
+    expect(saved.single.forPage(5).autoMargin, .05);
+  });
+  testWidgets(
+      'reopening auto layout detects current page; drag switches to manual',
+      (tester) async {
+    final saved = <DocumentLayoutConfig>[];
+    await openEditor(tester,
+        initial: const DocumentLayoutConfig(
+            all: DocumentPageLayout(autoCrop: true, autoMargin: .07)),
+        save: (value) async => saved.add(value),
+        render: (request) async => {
+              'dataUrl': fixture.pixel,
+              if (request['analyzeCrop'] == true)
+                'cropDetection': {
+                  'detected': true,
+                  'crop': {'x': .1, 'y': .2, 'width': .8, 'height': .6}
+                }
+            });
+    expect(draft(tester).autoCrop, true);
+    expect(draft(tester).crop, const Rect.fromLTWH(.1, .2, .8, .6));
+    expect(
+        tester.widget<Slider>(find.byKey(const ValueKey('crop-margin'))).value,
+        closeTo(7, 1e-9));
+    await tester.drag(
+        find.byKey(const ValueKey('crop-tl')), const Offset(15, 15));
+    await tester.pumpAndSettle();
+    expect(draft(tester).autoCrop, false);
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    expect(saved.single.forPage(0).autoCrop, false);
+    expect(saved.single.forPage(1).autoCrop, true);
   });
   testWidgets('switching scope during automatic detection discards late crop',
       (tester) async {

@@ -125,3 +125,6 @@ google_service_account.json
 /docs/images/v1.1.9/
 /docs/images/showcase/*.png
 /fastlane/metadata/android/*/images/
+
+# Private device reference captures may contain book text; keep them local.
+/docs/references/hanvon-pdf/

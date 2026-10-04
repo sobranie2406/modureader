@@ -35,6 +35,21 @@ test('rotated wheel panning follows screen direction instead of original page ax
     const center=G.panPdfViewport(plan,100,0);
     near(center.x,plan.center.x);assert.ok(center.y<plan.center.y);
 });
+test('original and cropped scans fit the current window and retain user zoom on resize', () => {
+    for(const crop of [{x:0,y:0,width:1,height:1},{x:.1,y:.2,width:.8,height:.6}])
+    for(const [width,height] of [[320,640],[900,400],[1440,900]])
+    for(const fit of ['screen','width'])
+    for(const zoom of [1,2]) {
+        const p=G.pdfViewport({pageWidth:650,pageHeight:904,width,height,crop,view:{fit,zoom}});
+        const expected=(fit==='width'?width/(650*crop.width):Math.min(width/(650*crop.width),height/(904*crop.height)))*zoom;
+        near(p.scale,expected);
+        assert.ok(p.width<=width+1e-7 && p.height<=height+1e-7);
+        if(fit==='screen' && zoom===1){
+            near(p.sourceRegion.width,crop.width);near(p.sourceRegion.height,crop.height);
+        }
+        if(fit==='width')near(p.width,width);
+    }
+});
 test('invalid view parameters rejected and snapshots are isolated', () => {
     for(const view of [{zoom:0},{zoom:16},{zoom:NaN},{rotation:45},{fit:'invalid'}])
         assert.throws(()=>G.pdfViewport({...base,view}));

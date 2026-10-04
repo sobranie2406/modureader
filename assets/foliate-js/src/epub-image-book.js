@@ -4,6 +4,7 @@ import { createEpubImageSource } from './epub-image-source.js'
 // source archive. Mixed/text sections retain their HTML, not a screenshot.
 export function createEpubImageBook(book) {
     const source = createEpubImageSource(book), readingSource = createEpubImageSource(book), entries = new Map()
+    const cropSource = createEpubImageSource(book)
     const nativeTextPages = new Set()
     let generation = 0
     const release = entry => {
@@ -34,9 +35,14 @@ export function createEpubImageBook(book) {
                 const result = await source.render({page:index, width:1000, height:1500})
                 image = URL.createObjectURL(result.blob)
                 // Keep all original nodes for source CFIs; only hide their paint.
-                style.textContent += 'body img,body svg{visibility:hidden!important}[data-document-base]{visibility:visible!important;position:absolute!important;inset:0!important;margin:0!important;padding:0!important;border:0!important;max-width:none!important;max-height:none!important}'
+                // The reader positions cropped/base and high-resolution detail
+                // rasters in source coordinates. An !important inset would
+                // override those offsets; hiding all later images also hides
+                // the detail raster on window resize/zoom.
+                style.textContent += 'body img,body svg{visibility:hidden!important}[data-document-base],[data-document-detail]{visibility:visible!important;position:absolute!important;margin:0!important;padding:0!important;border:0!important;max-width:none!important;max-height:none!important}'
                 const img = doc.createElement('img'); img.dataset.documentBase = ''; img.src = image
                 img.style.width = `${info.width}px`; img.style.height = `${info.height}px`
+                img.style.left = '0'; img.style.top = '0'
                 img.alt = ''; doc.body.append(img)
             }
             doc.head.append(style)
@@ -57,9 +63,9 @@ export function createEpubImageBook(book) {
     return {
         ...book, rendition:{...book.rendition,layout:'pre-paginated',spread:'none'},
         sections:book.sections.map((section,index)=>({...section,load:()=>load(index)})),
-        readingRegionRenderer:readingSource, nativeTextPages,
+        readingRegionRenderer:readingSource, cropRegionRenderer:cropSource, nativeTextPages,
         disposeImageBook() {
-            generation++; source.clear(); readingSource.clear()
+            generation++; source.clear(); readingSource.clear(); cropSource.clear()
             for (const item of entries.values()) release(item)
             entries.clear()
         },

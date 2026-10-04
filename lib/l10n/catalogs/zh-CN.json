@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "文言文翻译",
+  "selection_custom-preset-classical-chinese_prompt": "将 {selection} 中的文言文译成通顺易懂的现代汉语，保留原意、人名地名和段落。只给译文；有歧义时简要注明，不编造。",
   "ui_reader_simulated_bold": "模拟加粗",
   "ui_reader_simulated_bold_help": "用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。",
   "ui_reader_boldness": "字体粗细",

@@ -2,6 +2,8 @@
 
 const moduCatalogs = <String, Map<String, String>>{
   "ar": {
+    "selection_custom-preset-classical-chinese_name": "ترجمة الصينية الكلاسيكية",
+    "selection_custom-preset-classical-chinese_prompt": "ترجم النص الصيني الكلاسيكي في {selection} إلى صينية حديثة واضحة وطبيعية. حافظ على المعنى والأسماء والأماكن والفقرات. قدم الترجمة فقط، مع توضيح موجز لمواضع الغموض دون اختلاق تفاصيل.",
     "ui_reader_simulated_bold": "تغليظ محاكى",
     "ui_reader_simulated_bold_help": "إضافة سماكة بحدود الحروف. 1.0 يحافظ على الأصل، و1.1–2.0 يزيد السماكة تدريجيًا. لا يمكن تخفيف خط عريض ثابت.",
     "ui_reader_boldness": "سماكة الخط",
@@ -884,6 +886,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "في وضع الصفحات، عطّل التنقل بالسحب وإيماءات السحب العمودي. أوقف هذا الخيار للسماح بالسحب. لا يتغير تحديد النص أو التظليل السريع أو وضع التمرير.",
   },
   "de": {
+    "selection_custom-preset-classical-chinese_name": "Klassisches Chinesisch",
+    "selection_custom-preset-classical-chinese_prompt": "Übersetze das klassische Chinesisch in {selection} in klares, natürliches modernes Chinesisch. Bewahre Bedeutung, Namen, Orte und Absätze. Gib nur die Übersetzung aus; kennzeichne Mehrdeutigkeiten kurz, ohne Details zu erfinden.",
     "ui_reader_simulated_bold": "Fett simulieren",
     "ui_reader_simulated_bold_help": "Mit einer Textkontur verstärken. 1.0 erhält das Original; 1.1–2.0 erhöht die Stärke. Feste Fettschriften können nicht dünner werden.",
     "ui_reader_boldness": "Schriftstärke",
@@ -1766,6 +1770,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "Im Seitenmodus werden Wisch-, Zieh- und Auf-/Abziehgesten zum Navigieren deaktiviert. Ausschalten, um durch Wischen umzublättern. Textauswahl, Schnellmarkierung und Scroll-Lesemodus bleiben unverändert.",
   },
   "en": {
+    "selection_custom-preset-classical-chinese_name": "Classical Chinese",
+    "selection_custom-preset-classical-chinese_prompt": "Translate the Classical Chinese in {selection} into clear, natural modern Chinese. Preserve the meaning, names, places and paragraphs. Give only the translation; briefly note ambiguities without inventing details.",
     "ui_reader_simulated_bold": "Simulated bold",
     "ui_reader_simulated_bold_help": "Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner.",
     "ui_reader_boldness": "Font thickness",
@@ -2648,6 +2654,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "In page mode, disable swipe navigation and pull gestures. Turn off to allow swipes. Text selection, quick mark and scrolling mode are unchanged.",
   },
   "es": {
+    "selection_custom-preset-classical-chinese_name": "Chino clásico",
+    "selection_custom-preset-classical-chinese_prompt": "Traduce el chino clásico de {selection} al chino moderno claro y natural. Conserva el sentido, los nombres, los lugares y los párrafos. Da solo la traducción; señala brevemente las ambigüedades sin inventar detalles.",
     "ui_reader_simulated_bold": "Negrita simulada",
     "ui_reader_simulated_bold_help": "Añade grosor con un contorno. 1.0 conserva el original; 1.1–2.0 aumenta el grosor. Una fuente negrita fija no puede hacerse más fina.",
     "ui_reader_boldness": "Grosor de fuente",
@@ -3530,6 +3538,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "En modo paginado, desactiva la navegación al deslizar, arrastrar y tirar hacia arriba o abajo. Desactiva la opción para permitir pasar páginas deslizando. La selección de texto, el marcado rápido y el modo de lectura por desplazamiento no cambian.",
   },
   "fr": {
+    "selection_custom-preset-classical-chinese_name": "Chinois classique",
+    "selection_custom-preset-classical-chinese_prompt": "Traduisez le chinois classique de {selection} en chinois moderne clair et naturel. Conservez le sens, les noms, les lieux et les paragraphes. Donnez uniquement la traduction ; signalez brièvement les ambiguïtés sans inventer de détails.",
     "ui_reader_simulated_bold": "Gras simulé",
     "ui_reader_simulated_bold_help": "Épaissir les lettres par un contour. 1.0 conserve l’original ; 1.1–2.0 augmente l’épaisseur. Une police grasse fixe ne peut pas être affinée.",
     "ui_reader_boldness": "Épaisseur de police",
@@ -4412,6 +4422,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "En mode paginé, désactive la navigation par balayage, glissement et gestes de traction vers le haut ou le bas. Désactivez l’option pour autoriser le balayage. La sélection de texte, le marquage rapide et la lecture par défilement restent inchangés.",
   },
   "it": {
+    "selection_custom-preset-classical-chinese_name": "Cinese classico",
+    "selection_custom-preset-classical-chinese_prompt": "Traduci il cinese classico di {selection} in cinese moderno chiaro e naturale. Mantieni significato, nomi, luoghi e paragrafi. Fornisci solo la traduzione; segnala brevemente le ambiguità senza inventare dettagli.",
     "ui_reader_simulated_bold": "Grassetto simulato",
     "ui_reader_simulated_bold_help": "Aggiunge spessore con un contorno. 1.0 mantiene l’originale; 1.1–2.0 aumenta lo spessore. Un carattere grassetto fisso non può essere assottigliato.",
     "ui_reader_boldness": "Spessore carattere",
@@ -5294,6 +5306,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "In modalità pagina, disattiva la navigazione a scorrimento e i gesti di trascinamento verticale. Disattiva l'opzione per consentire lo scorrimento. Selezione del testo, evidenziazione rapida e modalità di lettura a scorrimento restano invariate.",
   },
   "ja": {
+    "selection_custom-preset-classical-chinese_name": "漢文の現代語訳",
+    "selection_custom-preset-classical-chinese_prompt": "{selection} の漢文を自然で分かりやすい現代中国語に訳してください。意味、人名、地名、段落を保持し、訳文のみを示してください。曖昧な箇所には短い注記を付け、推測で補わないでください。",
     "ui_reader_simulated_bold": "擬似太字",
     "ui_reader_simulated_bold_help": "文字の輪郭で太さを追加します。1.0 は元の太さ、1.1–2.0 は段階的に太くします。固定の太字を細くすることはできません。",
     "ui_reader_boldness": "太さ",
@@ -6176,6 +6190,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "有効にするとページモードでスワイプやドラッグによるページ移動、上下のプル操作を無効にします。オフでスワイプ移動を許可します。文字選択、クイックマーク、スクロール読書モードには影響しません。",
   },
   "ko": {
+    "selection_custom-preset-classical-chinese_name": "한문 번역",
+    "selection_custom-preset-classical-chinese_prompt": "{selection}의 한문을 자연스럽고 이해하기 쉬운 현대 중국어로 번역하세요. 원뜻, 인명, 지명과 문단을 유지하고 번역문만 제시하세요. 모호한 부분은 간단히 밝히고 내용을 지어내지 마세요.",
     "ui_reader_simulated_bold": "모의 굵게",
     "ui_reader_simulated_bold_help": "글자 윤곽선으로 굵기를 더합니다. 1.0은 원래 굵기이며 1.1–2.0은 단계적으로 더 굵게 합니다. 고정 굵은 글꼴을 가늘게 할 수는 없습니다.",
     "ui_reader_boldness": "글자 굵기",
@@ -7058,6 +7074,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "켜면 페이지 모드에서 밀기나 드래그로 페이지를 넘기거나 위아래 당기기 동작을 할 수 없습니다. 끄면 밀어서 넘길 수 있습니다. 글 선택, 빠른 표시, 스크롤 읽기 모드에는 영향을 주지 않습니다.",
   },
   "pt": {
+    "selection_custom-preset-classical-chinese_name": "Chinês clássico",
+    "selection_custom-preset-classical-chinese_prompt": "Traduza o chinês clássico de {selection} para chinês moderno claro e natural. Preserve o sentido, os nomes, os lugares e os parágrafos. Apresente apenas a tradução; indique brevemente as ambiguidades sem inventar detalhes.",
     "ui_reader_simulated_bold": "Negrito simulado",
     "ui_reader_simulated_bold_help": "Adiciona espessura com um contorno. 1.0 mantém o original; 1.1–2.0 aumenta a espessura. Uma fonte em negrito fixa não pode ficar mais fina.",
     "ui_reader_boldness": "Espessura da fonte",
@@ -7940,6 +7958,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "No modo de páginas, desativa a navegação por deslizamento e os gestos de puxar. Desative a opção para permitir deslizamentos. A seleção de texto, a marcação rápida e o modo de rolagem permanecem inalterados.",
   },
   "ro": {
+    "selection_custom-preset-classical-chinese_name": "Chineză clasică",
+    "selection_custom-preset-classical-chinese_prompt": "Traduce chineza clasică din {selection} în chineză modernă clară și naturală. Păstrează sensul, numele, locurile și paragrafele. Oferă doar traducerea; semnalează pe scurt ambiguitățile fără a inventa detalii.",
     "ui_reader_simulated_bold": "Aldin simulat",
     "ui_reader_simulated_bold_help": "Adaugă grosime prin contur. 1.0 păstrează originalul; 1.1–2.0 mărește grosimea. Un font aldin fix nu poate fi subțiat.",
     "ui_reader_boldness": "Grosime font",
@@ -8822,6 +8842,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "În modul paginat, dezactivează navigarea prin glisare și gesturile de tragere verticală. Dezactivează opțiunea pentru a permite glisarea. Selecția textului, marcarea rapidă și modul de derulare rămân neschimbate.",
   },
   "ru": {
+    "selection_custom-preset-classical-chinese_name": "Классический китайский",
+    "selection_custom-preset-classical-chinese_prompt": "Переведи классический китайский текст {selection} на ясный и естественный современный китайский. Сохрани смысл, имена, названия мест и абзацы. Дай только перевод; кратко отметь неоднозначности, не выдумывая подробностей.",
     "ui_reader_simulated_bold": "Имитация жирного",
     "ui_reader_simulated_bold_help": "Утолщение обводкой текста. 1.0 сохраняет оригинал; 1.1–2.0 увеличивает толщину. Фиксированный жирный шрифт нельзя сделать тоньше.",
     "ui_reader_boldness": "Толщина шрифта",
@@ -9704,6 +9726,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "При включении в страничном режиме отключаются перелистывание свайпом, перетаскиванием и жесты вытягивания вверх/вниз. Выключите для свайпов. Выделение текста, быстрые отметки и режим прокрутки не меняются.",
   },
   "tr": {
+    "selection_custom-preset-classical-chinese_name": "Klasik Çince",
+    "selection_custom-preset-classical-chinese_prompt": "{selection} içindeki Klasik Çinceyi anlaşılır ve doğal modern Çinceye çevir. Anlamı, adları, yerleri ve paragrafları koru. Yalnızca çeviriyi ver; belirsizlikleri ayrıntı uydurmadan kısaca belirt.",
     "ui_reader_simulated_bold": "Yapay kalın",
     "ui_reader_simulated_bold_help": "Metin konturuyla kalınlık ekler. 1.0 özgün görünümü korur; 1.1–2.0 kalınlığı artırır. Sabit kalın yazı tipi inceltilemez.",
     "ui_reader_boldness": "Yazı tipi kalınlığı",
@@ -10586,6 +10610,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "Sayfa modunda kaydırarak gezinmeyi ve çekme hareketlerini devre dışı bırakır. Kaydırmaya izin vermek için kapatın. Metin seçimi, hızlı işaretleme ve kaydırma modu değişmez.",
   },
   "zh-CN": {
+    "selection_custom-preset-classical-chinese_name": "文言文翻译",
+    "selection_custom-preset-classical-chinese_prompt": "将 {selection} 中的文言文译成通顺易懂的现代汉语，保留原意、人名地名和段落。只给译文；有歧义时简要注明，不编造。",
     "ui_reader_simulated_bold": "模拟加粗",
     "ui_reader_simulated_bold_help": "用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。",
     "ui_reader_boldness": "字体粗细",
@@ -11468,6 +11494,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "开启后，分页模式下滑动、拖动不翻页，也不触发上下拉手势；关闭后可滑动翻页。不影响选词、快速标记和滚动阅读模式。",
   },
   "zh-LZH": {
+    "selection_custom-preset-classical-chinese_name": "文言今譯",
+    "selection_custom-preset-classical-chinese_prompt": "譯 {selection} 之文言為明白流暢之現代漢語，存原意、人名、地名及段落。惟出譯文；義有歧者略注，勿杜撰。",
     "ui_reader_simulated_bold": "擬加粗",
     "ui_reader_simulated_bold_help": "以描邊增粗。1.0 如初，1.1–2.0 逐級加粗；固定粗體不可變細。",
     "ui_reader_boldness": "字體粗細",
@@ -12350,6 +12378,8 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "啟用後，分頁模式之滑動、拖動不翻頁，亦不觸上下拉手勢；閉之可滑動翻頁。不涉選詞、快速標記及滾動閱讀模式。",
   },
   "zh-TW": {
+    "selection_custom-preset-classical-chinese_name": "文言文翻譯",
+    "selection_custom-preset-classical-chinese_prompt": "將 {selection} 中的文言文譯成通順易懂的現代漢語，保留原意、人名地名和段落。只給譯文；有歧義時簡要註明，不編造。",
     "ui_reader_simulated_bold": "模擬加粗",
     "ui_reader_simulated_bold_help": "用描邊附加加粗。1.0 為原樣，1.1–2.0 逐檔加粗；不能將固定粗體變細。",
     "ui_reader_boldness": "字體粗細",

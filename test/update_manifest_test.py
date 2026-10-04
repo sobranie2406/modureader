@@ -14,7 +14,8 @@ class UpdateManifestTest(unittest.TestCase):
         names = [f"Modu-1.0.9-{platform}-{arch}{suffix}"
                  for platform, suffix in [("android", ".apk"), ("macos", ".dmg"),
                                           ("linux", ".deb"), ("windows", "-setup.exe")]
-                 for arch in ("arm64", "x64")]
+                 for arch in ("arm64", "x64")
+                 if platform != "android" or arch == "arm64"]
         names.append("Modu-1.0.9-ios-arm64.ipa")
         return dict(tag_name=tag, draft=False, prerelease=False, body="Changes",
                     upload_url="must not be copied", private_field="must not be copied",
@@ -27,7 +28,7 @@ class UpdateManifestTest(unittest.TestCase):
     def test_preserves_only_public_required_metadata_and_all_architectures(self):
         manifest = create_manifest(self.fixture())
         self.assertEqual(manifest["modu_update_schema"], 1)
-        self.assertEqual(len(manifest["assets"]), 9)
+        self.assertEqual(len(manifest["assets"]), 8)
         self.assertEqual(manifest["assets"][0]["digest"], "sha256:" + "a" * 64)
         self.assertNotIn("must not be copied", str(manifest))
         self.assertEqual(manifest["tag_name"], "v1.0.9")

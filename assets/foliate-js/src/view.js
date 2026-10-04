@@ -167,7 +167,7 @@ export class View extends HTMLElement {
   #rendererSwitchGeneration = 0
   get imageReading() { return !!this.#imageBook }
   async setImageReading(enabled, settings = {}, configure = () => {}) {
-    if (this.#switchingRenderer || !this.book.resources) return false
+    if (this.#switchingRenderer || !(this.book.resources || this.book.imageDocumentSource)) return false
     if (enabled === this.imageReading) {
       if (enabled) {
         if (settings.view) await this.renderer.setPdfView(settings.view)
@@ -319,6 +319,14 @@ export class View extends HTMLElement {
 
   #handleImage(doc) {
     for (const img of doc.querySelectorAll('img')) {
+      // Scanned pages are the reading surface. Do not install picture actions,
+      // including desktop click or touch long-press preview handlers.
+      if (this.scannedImageDocument && !doc.__isFootNote) {
+        img.draggable = false
+        img.style.webkitTouchCallout = 'none'
+        img.addEventListener('contextmenu', e => e.preventDefault())
+        continue
+      }
       if (imageFootnoteText(img) !== null) {
         // A short tap opens the annotation on touch devices as well as desktop.
         // Do not start image-preview long press or bubble into page/menu actions.

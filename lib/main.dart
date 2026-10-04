@@ -83,6 +83,7 @@ Future<void> main() async {
       'MiniLM embedding model': 'LICENSES/MiniLM-Embedding-Apache-2.0.txt',
       'BGE embedding models': 'LICENSES/BGE-Embedding-MIT.txt',
       'E5 embedding model': 'LICENSES/E5-Embedding-MIT.txt',
+      'PP-OCRv4 / RapidOCR models': 'LICENSES/PaddleOCR-Apache-2.0.txt',
     }.entries) {
       yield LicenseEntryWithLineBreaks(
           [entry.key], await rootBundle.loadString(entry.value));

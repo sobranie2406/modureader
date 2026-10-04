@@ -43,8 +43,11 @@ def deb_version(version, build_number=None):
 def verify_payload(bundle, platform, arch, installed=False):
     if arch not in ('x64', 'arm64'):
         raise ValueError(arch)
+    notice_root = bundle
+    if platform == 'macos' and not (bundle / 'SOURCE.txt').is_file():
+        notice_root = bundle / 'Modu.app/Contents/Resources/Distribution'
     for notice in ('LICENSE', 'NOTICE', 'SOURCE.txt'):
-        if not (bundle / notice).is_file():
+        if not (notice_root / notice).is_file():
             raise ValueError(f'Missing source/license notice: {notice}')
     if platform == 'macos':
         app = bundle / 'Modu.app'
@@ -82,14 +85,30 @@ def verify_payload(bundle, platform, arch, installed=False):
                 raise ValueError(f'Mislabeled PE payload: {path}')
 
 
+def prepare_macos_image(bundle, stage):
+    # Keep the install window focused on drag-to-install. Legal/source records
+    # remain accessible inside the application, not alongside its icon.
+    stage.mkdir(parents=True)
+    app = stage / 'Modu.app'
+    command('ditto', bundle / 'Modu.app', app)
+    notices = app / 'Contents/Resources/Distribution'
+    notices.mkdir(parents=True, exist_ok=True)
+    for name in ('LICENSE', 'NOTICE', 'SOURCE.txt', 'UPSTREAM.md', 'PRIVACY.md',
+                 'INSTALL.md', 'INSTALLER-SOURCE.txt'):
+        if (bundle / name).is_file():
+            shutil.copy2(bundle / name, notices / name)
+    if (bundle / 'LICENSES').is_dir():
+        shutil.copytree(bundle / 'LICENSES', notices / 'LICENSES', dirs_exist_ok=True)
+    # Adding bundled notices changes the resource seal: sign only the copy.
+    command('codesign', '--force', '--deep', '--sign', '-',
+            '--preserve-metadata=entitlements', app)
+    command('codesign', '--verify', '--deep', '--strict', app)
+    (stage / 'Applications').symlink_to('/Applications', target_is_directory=True)
+
+
 def build_dmg(bundle, arch, version, output, work):
     stage = work / 'image'
-    command('ditto', bundle, stage)
-    (stage / 'Applications').symlink_to('/Applications', target_is_directory=True)
-    (stage / 'READ-ME-FIRST.txt').write_text(
-        'Modu / 默读\n将 Modu.app 拖到 Applications 安装。\n'
-        '此版本没有 Apple Developer ID 公证。请勿关闭系统安全保护。\n'
-        'Drag Modu.app to Applications. This release is not notarized.\n', encoding='utf-8')
+    prepare_macos_image(bundle, stage)
     result = output / f'Modu-{version}-macos-{arch}.dmg'
     command('hdiutil', 'create', '-volname', f'Modu {version} {arch}', '-srcfolder', stage,
             '-format', 'UDZO', '-fs', 'HFS+', result)
@@ -101,7 +120,9 @@ def build_dmg(bundle, arch, version, output, work):
         verify_payload(mount, 'macos', arch)
         if os.readlink(mount / 'Applications') != '/Applications':
             raise ValueError('Missing Applications drag target')
-        if (mount / 'SOURCE.txt').read_bytes() != (bundle / 'SOURCE.txt').read_bytes():
+        if {p.name for p in mount.iterdir() if not p.name.startswith('.')} != {'Modu.app', 'Applications'}:
+            raise ValueError('macOS install window must contain only the app and Applications shortcut')
+        if (mount / 'Modu.app/Contents/Resources/Distribution/SOURCE.txt').read_bytes() != (bundle / 'SOURCE.txt').read_bytes():
             raise ValueError('Source provenance changed')
     finally:
         command('hdiutil', 'detach', mount)

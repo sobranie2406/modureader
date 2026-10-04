@@ -132,3 +132,14 @@ test('EPUB uses actual text and ordered img/SVG references; cover alone does not
     assert.equal(images.kind,'image-candidate'); assert.deepEqual(images.images.map(i=>i.resource),['z.png','a.png']);
     assert.equal(analyzeEpubSection(doc('<img src="cover.jpg">'),{excluded:true}).kind,'illustrated');
 });
+test('MOBI6 record images are candidates, never positive scan evidence without decoded geometry', () => {
+    const {JSDOM}=createRequire(`${process.env.MODU_JSDOM_ROOT ?? '/private/tmp/modu-119-js-tests'}/package.json`)('jsdom');
+    const dom=new JSDOM('<img recindex="00192" width="900" height="1358"><img recindex=" 00034 "><img src="blob:decoded" recindex="59"><img recindex="0"><img recindex="-1"><img recindex="abc"><img recindex="1e2"><img recindex="9007199254740993"><img><div hidden><img recindex="20"></div>');
+    try {
+        const result=analyzeEpubSection(dom.window.document);
+        assert.equal(result.kind,'image-candidate');
+        assert.equal(result.coverageUncertain,true);
+        assert.deepEqual(result.images.map(i=>i.resource),['mobi:recindex:192','mobi:recindex:34','blob:decoded']);
+        assert.deepEqual(result.images.map(i=>i.order),[0,1,2]);
+    } finally {dom.window.close()}
+});

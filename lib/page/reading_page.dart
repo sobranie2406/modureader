@@ -51,6 +51,12 @@ import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
+import 'package:anx_reader/widgets/reading_page/document_extraction_panel.dart';
+import 'package:anx_reader/service/ocr/document_text_style.dart';
+import 'package:anx_reader/service/ocr/document_reflow_store.dart';
+import 'package:anx_reader/widgets/reading_page/document_reflow_reader.dart';
+import 'package:anx_reader/widgets/context_menu/context_menu.dart';
+import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/widgets/reading_page/toc_widget.dart';
 import 'package:anx_reader/widgets/common/axis_flex.dart';
 import 'package:flutter/cupertino.dart';
@@ -88,6 +94,59 @@ final epubPlayerKey = GlobalKey<EpubPlayerState>();
 
 class ReadingPageState extends ConsumerState<ReadingPage>
     with WidgetsBindingObserver, TickerProviderStateMixin, RouteAware {
+  final _reflowKey = GlobalKey<DocumentReflowReaderState>();
+  bool? _reflowOcr;
+  DocumentReflowAnchor? _reflowAnchor;
+  DocumentReflowReaderState? get reflowReader => _reflowKey.currentState;
+  bool get isReflowReading => _reflowOcr != null;
+
+  Future<void> openReflowAnchor(DocumentReflowAnchor anchor) async {
+    if (isReflowReading && reflowReader != null) {
+      await reflowReader!.navigate(anchor);
+      return;
+    }
+    _reflowAnchor = anchor;
+    await openDocumentExtraction(reflow: true, forceOcr: anchor.ocr);
+  }
+
+  Future<void> closeDocumentReflow() async {
+    if (!isReflowReading) return;
+    reflowReader?.cancelLoading();
+    epubPlayerKey.currentState?.removeOverlay();
+    await audioHandler.stop();
+    if (!mounted) return;
+    setState(() { _reflowOcr = null; _reflowAnchor = null; });
+    _restoreReaderFocusAfterPanel();
+  }
+
+  Widget _buildDocumentReflow() {
+    final player = epubPlayerKey.currentState!;
+    final styles = DocumentTextStyleStore(Prefs().prefs);
+    return DocumentReflowReader(
+      key: _reflowKey, store: DocumentReflowStore(player.cssBookKey),
+      forceOcr: _reflowOcr!, anchor: _reflowAnchor,
+      initialStyle: styles.read(player.cssBookKey), saveStyle: (value) => styles.save(player.cssBookKey, value),
+      info: player.documentReflowInfo,
+      extractText: player.extractDocumentText,
+      render: (request) => player.renderPdfRegion({...request, if(player.isImageEpub) 'source':'epub'}),
+      cancelRender: () { if(player.isImageEpub) { player.cancelEpubImageRender(); } else { player.cancelPdfRegionRender(); } },
+      onClose: closeDocumentReflow, clearMenu: player.removeOverlay,
+      selectionInvalidated: player.reflowSelectionInvalidated,
+      onPageChanged: player.goToDocumentPage,
+      loadNotes: () => bookNoteDao.selectBookNotesByBookId(player.book.id),
+      onSelection: (anchor,text,contextText,rect,ids) async {
+        if (!mounted || !isReflowReading) return;
+        final box = epubPlayerKey.currentContext?.findRenderObject();
+        if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
+        final origin = box.localToGlobal(Offset.zero);
+        await showContextMenu(context,
+            (rect.left-origin.dx)/box.size.width, (rect.top-origin.dy)/box.size.height,
+            (rect.right-origin.dx)/box.size.width, (rect.bottom-origin.dy)/box.size.height,
+            text, anchor.encode(), null, false, Axis.horizontal,
+            contextText: contextText, annotationIds: ids);
+      },
+    );
+  }
   static const empty = SizedBox.shrink();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late Book _book;
@@ -261,6 +320,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         volume: Prefs().volumeKeyTurnPage,
         force: force);
   }
+
   void refreshDocumentReaderActivity() => _updatePageKeys();
 
   void _refreshReaderHostState() {
@@ -878,6 +938,63 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     return configuredReadingSkillChips(Localizations.localeOf(context));
   }
 
+  Future<void> openDocumentExtraction(
+      {bool reflow = false, bool forceOcr = false}) async {
+    final player = epubPlayerKey.currentState;
+    if (player == null || !player.supportsDocumentImages) return;
+    final bookKey = player.cssBookKey;
+    hideBottomBar();
+    if (reflow) {
+      await audioHandler.stop();
+      if (!mounted || epubPlayerKey.currentState?.cssBookKey != bookKey) return;
+      player.removeOverlay();
+      if (isReflowReading && reflowReader != null) {
+        await reflowReader!.setMode(forceOcr);
+      } else {
+        setState(() => _reflowOcr = forceOcr);
+      }
+      _updatePageKeys();
+      return;
+    }
+    final textStyles = DocumentTextStyleStore(Prefs().prefs);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => DocumentExtractionPanel(
+        initialTextStyle: textStyles.read(bookKey),
+        saveTextStyle: (style) => textStyles.save(bookKey, style),
+        forceOcr: forceOcr,
+        info: player.isImageEpub ? player.epubImageInfo : player.pdfRegionInfo,
+        extractText: player.extractDocumentText,
+        render: (request) => player.renderPdfRegion({
+          ...request,
+          if (player.isImageEpub) 'source': 'epub',
+        }),
+        cancelRender: () {
+          if (player.isImageEpub) {
+            player.cancelEpubImageRender();
+          } else {
+            player.cancelPdfRegionRender();
+          }
+        },
+      ),
+    );
+    if (!mounted || epubPlayerKey.currentState?.cssBookKey != bookKey) return;
+    if (text == null || text.trim().isEmpty) {
+      _restoreReaderFocusAfterPanel();
+      return;
+    }
+    // Open the familiar chat with a draft. Preserve the conversation and do not
+    // transmit recognized book content until the user explicitly presses Send.
+    // Repeated extraction of the same text must also refill an existing editor;
+    // widget initial-value equality alone would otherwise skip this update.
+    if (_aiChat != null) aiChatKey.currentState?.setReaderSourceText(text);
+    await showAiChat(
+        content: text,
+        sourceText: text,
+        sendImmediate: false,
+        newConversation: false);
+  }
+
   Future<void> showAiChat({
     String? content,
     String? sourceText,
@@ -1137,7 +1254,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                   builder: (context) => SafeArea(
                     top: false,
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 600),
+                      constraints: BoxConstraints(
+                          maxWidth: _currentPage is StyleWidget &&
+                                  epubPlayerKey.currentState
+                                          ?.supportsDocumentImages ==
+                                      true
+                              ? 1100
+                              : 600),
                       padding: EdgeInsets.only(
                         bottom: AnxPlatform.isMobile ? 16 : 0,
                       ),
@@ -1146,54 +1269,74 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                           final content = identical(_currentPage, empty)
                               ? ProgressWidget(epubPlayerKey: epubPlayerKey)
                               : _currentPage;
-                          return IntrinsicHeight(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Expanded(child: content),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
+                          final documentStyle = content is StyleWidget &&
+                              epubPlayerKey
+                                      .currentState?.supportsDocumentImages ==
+                                  true;
+                          final panel = Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Expanded(child: content),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.toc),
+                                    onPressed: tocHandler,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(EvaIcons.edit),
+                                    onPressed: noteHandler,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.color_lens),
+                                    onPressed: () {
+                                      styleHandler(setState);
+                                    },
+                                  ),
+                                  IconButton(
+                                    tooltip: L10n.of(context).readingBrightness,
+                                    icon:
+                                        const Icon(Icons.brightness_6_outlined),
+                                    onPressed: () {
+                                      setState(() {
+                                        _currentPage = BrightnessWidget(
+                                          controller: AppBrightness.instance,
+                                          onNightModeChanged: () =>
+                                              epubPlayerKey.currentState
+                                                  ?.refreshReadingTheme(),
+                                        );
+                                      });
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(EvaIcons.headphones),
+                                    onPressed: ttsHandler,
+                                  ),
+                                  if (epubPlayerKey.currentState
+                                          ?.supportsDocumentImages ==
+                                      true)
                                     IconButton(
-                                      icon: const Icon(Icons.toc),
-                                      onPressed: tocHandler,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(EvaIcons.edit),
-                                      onPressed: noteHandler,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.color_lens),
-                                      onPressed: () {
-                                        styleHandler(setState);
-                                      },
-                                    ),
-                                    IconButton(
-                                      tooltip:
-                                          L10n.of(context).readingBrightness,
+                                      tooltip: ModuStrings.text(
+                                          context, '提取', 'Extract'),
                                       icon: const Icon(
-                                          Icons.brightness_6_outlined),
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage = BrightnessWidget(
-                                            controller: AppBrightness.instance,
-                                            onNightModeChanged: () =>
-                                                epubPlayerKey.currentState
-                                                    ?.refreshReadingTheme(),
-                                          );
-                                        });
-                                      },
+                                          Icons.document_scanner_outlined),
+                                      onPressed: () => openDocumentExtraction(),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(EvaIcons.headphones),
-                                      onPressed: ttsHandler,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ],
                           );
+                          // Document rows use responsive LayoutBuilders. Bound
+                          // this panel explicitly rather than requesting their
+                          // intrinsic height, and leave the page visible above.
+                          return documentStyle
+                              ? SizedBox(
+                                  height:
+                                      MediaQuery.sizeOf(context).height * .62,
+                                  child: panel)
+                              : IntrinsicHeight(child: panel);
                         },
                       ),
                     ),
@@ -1296,6 +1439,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                                   onPressed: _changingQuickMark
                                                       ? null
                                                       : _toggleQuickMark)))),
+                                if (isReflowReading && epubPlayerKey.currentState != null)
+                                  Positioned.fill(child: PointerInterceptor(child: _buildDocumentReflow())),
                                 if (_isResizingAiChat)
                                   SizedBox.expand(
                                     child: Container(

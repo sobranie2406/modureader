@@ -38,7 +38,7 @@ httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn longPre
       key: 'bool',
     for (final key
         in '''themeColor awakeTime pageTurningType aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
-readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex scrollPagePercent selectionSearchZoomPercent webTranslationZoomPercent'''
+readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex scrollPagePercent selectionSearchZoomPercent webTranslationZoomPercent eInkRefreshPages'''
             .split(RegExp(r'\s+')))
       key: 'int',
     for (final key
@@ -51,7 +51,7 @@ pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize aiPanelWidth aiPan
         in '''locale themeMode readStyle readTheme annotationType annotationColor ttsService
 pageTurnStyle translateService translateFrom translateTo fullTextTranslateService fullTextTranslateFrom
 fullTextTranslateTo translationAiService readingRules chapterSplitCustomRules chapterSplitSelectedRuleId
-selectedAiService vectorModelMode vectorLocalModelId vectorModelDownloadSource vectorModelConfig aiProviders
+selectedAiService vectorModelMode vectorLocalModelId vectorModelDownloadSource vectorModelConfig aiProviders ocrModelId ocrModelDownloadSource
 userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnConfig bookshelfFolderStyle
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl

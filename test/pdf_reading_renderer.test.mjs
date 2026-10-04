@@ -78,6 +78,48 @@ test('formal renderer commits panel locations, returns to source page and retain
         assert.equal(h.events.at(-1).pdfRegion,null);
     } finally {h.close()}
 });
+test('single-page turns use independently detected bounds, and failed detection shows original', async () => {
+    const h=harness(), detections=[], rendered=[];
+    const boxes=[{x:.1,y:.2,width:.8,height:.6},{x:.2,y:.1,width:.6,height:.8}];
+    try {
+        h.renderer.book.cropRegionRenderer={render:async request=>{
+            detections.push(request);
+            if(request.page===2)throw Error('scan failed');
+            return {cropDetection:{detected:true,crop:boxes[request.page]}};
+        }};
+        h.source.render=async request=>{rendered.push(request);return {blob:new Blob(['png'])}};
+        await h.renderer.setPdfLayout({version:1,all:{autoCrop:true,autoMargin:.05},pages:{}},true);
+        await h.renderer.goTo({index:0});await h.renderer.next();await h.renderer.next();
+        for(let page=0;page<3;page++) {
+            const r=rendered.find(x=>x.page===page);
+            const {x,y,width,height}=r.region;
+            assert.deepEqual({x,y,width,height},boxes[page]??{x:0,y:0,width:1,height:1});
+        }
+        assert.deepEqual(detections.map(x=>x.page),[0,1,2]);
+        assert.ok(detections.every(x=>x.margin===.05));
+        await h.renderer.prev();assert.equal(detections.length,3,'return uses this page’s cached coordinates');
+        assert.equal(h.renderer.getContents()[0].doc.querySelector('.textLayer').textContent,'Original text');
+    } finally {h.close()}
+});
+test('scroll loads crop each original page and preserve text-section fallback', async () => {
+    const {PdfScrollReader}=await import(scrollReader);
+    const calls=[],elements=[];
+    const book={sections:[0,1,2].map(()=>({load:async()=>html})),nativeTextPages:new Set([2]),
+        cropRegionRenderer:{render:async r=>{calls.push(r.page);return {cropDetection:{detected:true,
+            crop:{x:r.page===0?.1:.2,y:.1,width:r.page===0?.8:.6,height:.8}}}}}};
+    const flow=new PdfScrollReader({book,layout:{version:1,all:{autoCrop:true},pages:{}},view:{},
+        createFrame:async page=>{
+            const iframe=document.createElement('iframe');iframe.src=html;
+            if(page===2)iframe.contentDocument.documentElement.dataset.documentImage='false';
+            const element=document.createElement('div');elements.push(element);
+            return {index:page,element,iframe,width:600,height:800};
+        }});
+    try {
+        const a=await flow.load({page:0,panel:0}),b=await flow.load({page:1,panel:0}),c=await flow.load({page:2,panel:0});
+        assert.equal(a.crop.x,.1);assert.equal(b.crop.x,.2);assert.equal(c.crop.width,1);
+        assert.equal(c.fallback,true);assert.deepEqual(calls,[0,1]);
+    } finally {flow.destroy();elements.forEach(el=>el.remove())}
+});
 test('render failure preserves committed frame/location and retry uses intended target', async () => {
     const h=harness();
     try {
@@ -197,6 +239,38 @@ test('pending detail cannot append to an obsolete frame after page navigation', 
         await new Promise(r=>setTimeout(r,0));
         assert.equal(h.renderer.index,2);
         assert.equal(h.renderer.getContents()[0].doc.querySelectorAll('img').length,1);
+    } finally {h.close()}
+});
+test('all enhancements reach formal single-page and scroll renders, next page and reset', async () => {
+    const h=harness(),requests=[];
+    const waitForRender=async()=>{
+        for(let i=0;i<50 && !requests.length;i++) await new Promise(r=>setTimeout(r,10));
+    };
+    const render=h.source.render;
+    h.source.render=async request=>{requests.push(request);return render(request)};
+    try {
+        await h.renderer.setPdfLayout({version:1,all:{preset:'single'},pages:{}},true);
+        await h.renderer.goTo({index:0});
+        for(const mode of ['single','scroll']){
+            await h.renderer.setPdfView({mode});
+            for(const key of ['ink','contrast','darken','whiten','sharpen','watermark']){
+                requests.length=0;
+                assert.equal(await h.renderer.setPdfView({mode,enhancement:{[key]:10}}),true);
+                await waitForRender();
+                assert.ok(requests.length>0,mode+' '+key+' repaints');
+                assert.ok(requests.every(r=>r.enhancement[key]===10));
+            }
+            requests.length=0;
+            await h.renderer.goTo({index:2});
+            await waitForRender();
+            assert.ok(requests.length>0);
+            assert.ok(requests.every(r=>r.enhancement.watermark===10));
+            requests.length=0;
+            assert.equal(await h.renderer.setPdfView({mode,enhancement:{}}),true);
+            await waitForRender();
+            assert.ok(requests.length>0);
+            assert.ok(requests.every(r=>Object.values(r.enhancement).every(v=>v===0)));
+        }
     } finally {h.close()}
 });
 test('two-finger gesture stays captured until both fingers lift; single finger stays available', async () => {

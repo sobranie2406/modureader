@@ -39,7 +39,7 @@ Future<void> showContextMenu(
       bookId: playerKey.book.id,
       content: annoContent,
       cfi: annoCfi,
-      chapter: playerKey.chapterTitle,
+      chapter: playerKey.selectionChapterTitle,
       type: type,
       color: color,
       createTime: DateTime.now(),
@@ -122,7 +122,7 @@ Future<void> showContextMenu(
   playerKey.removeOverlay();
 
   void onClose() {
-    playerKey.webViewController.evaluateJavascript(source: 'clearSelection()');
+    playerKey.clearReaderSelection();
     playerKey.removeOverlay();
   }
 

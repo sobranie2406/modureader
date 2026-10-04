@@ -16,6 +16,7 @@ class MainActivity : AudioServiceActivity() {
     private var pageKeyChannel: MethodChannel? = null
     private var readerKeysActive = false
     private var readerVolumeKeys = false
+    private var refreshHostResumed = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val imeVisible = Build.VERSION.SDK_INT >= 30 &&
@@ -32,6 +33,7 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onPause() {
+        refreshHostResumed = false
         readerKeysActive = false
         readerKeys.reset()
         super.onPause()
@@ -47,6 +49,7 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onPostResume() {
         super.onPostResume()
+        refreshHostResumed = true
         // onPause disables native interception, even if Dart's cached state
         // did not change. Ask the current reader to resend its route policy.
         refreshReaderHostState()
@@ -75,6 +78,17 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val einkRefresh = EinkRefresh(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            "com.modu.reader/eink_refresh").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "supported" -> result.success(einkRefresh.supported())
+                "refresh" -> result.success(
+                    refreshHostResumed && hasWindowFocus() && !isFinishing &&
+                        !isDestroyed && einkRefresh.request())
+                else -> result.notImplemented()
+            }
+        }
         readerKeysActive = false
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
             "com.modu.reader/word_selection").setMethodCallHandler { call, result ->
@@ -130,6 +144,9 @@ class MainActivity : AudioServiceActivity() {
         }
         if (!flutterEngine.plugins.has(LocalEmbeddingPlugin::class.java)) {
             flutterEngine.plugins.add(LocalEmbeddingPlugin())
+        }
+        if (!flutterEngine.plugins.has(LocalOcrPlugin::class.java)) {
+            flutterEngine.plugins.add(LocalOcrPlugin())
         }
 
         val updateInstaller = AppUpdateInstaller(this)

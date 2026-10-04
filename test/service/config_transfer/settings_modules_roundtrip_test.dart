@@ -16,6 +16,7 @@ void main() {
     'trueDarkMode': true,
     'pageTurnStyle': 'scroll',
     'scrollPagePercent': 93,
+    'eInkRefreshPages': 10,
     'longPressSelectParagraph': true,
     'readStyle':
         BookStyle(fontSize: 1.8, fontFamily: 'source-only', simulateBold: true)
@@ -41,6 +42,8 @@ void main() {
     'readAnySkillOrder': <String>['custom:first', 'builtin:mindmap'],
     'readAnySkillPrompts': '{"summary":"Summarize briefly"}',
     'vectorModelEnabled': false,
+    'ocrModelId': 'ppocr-v5-mobile-1',
+    'ocrModelDownloadSource': 'gitee',
     'vectorModelConfig': '{"apiKey":"test-only-secret","dimensions":512}',
     'ttsRate': 1.2,
     'ttsService': 'xiaomi',

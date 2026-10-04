@@ -21,6 +21,7 @@ def create_manifest(release):
         for platform, suffix in [("android", ".apk"), ("macos", ".dmg"),
                                  ("linux", ".deb"), ("windows", "-setup.exe")]
         for arch in ("arm64", "x64")
+        if platform != "android" or arch == "arm64"
     } | {f"Modu-{version}-ios-arm64.ipa"}
     assets = []
     seen = set()
@@ -41,7 +42,7 @@ def create_manifest(release):
         assets.append(dict(name=name, state="uploaded", size=size,
                            digest=digest.lower(), browser_download_url=url))
     if seen != names:
-        raise ValueError("All nine verified platform installers are required")
+        raise ValueError("All eight verified platform installers are required")
     return dict(modu_update_schema=1, tag_name=tag, draft=False,
                 prerelease=False,
                 body=release.get("body") if isinstance(release.get("body"), str) else "",

@@ -2,6 +2,7 @@
 import { createPdfAnalysis } from './document-analysis.js'
 import { PageResourceCache, boundedRenderScale } from './page-resource-cache.js'
 import { createPdfRegionRenderer } from './pdf-region-renderer.js'
+import { extractPdfText } from './document-text-extraction.js'
 
 // https://github.com/mozilla/pdf.js/blob/f04967017f22e46d70d11468dd928b4cdc2f6ea1/web/text_layer_builder.css
 const textLayerBuilderCSS = `
@@ -588,8 +589,10 @@ export const makePDF = async file => {
     const book = { rendition: { layout: 'pre-paginated' } }
     book.documentAnalysis = createPdfAnalysis(pdf, pdfjsLib.OPS)
     book.regionRenderer = createPdfRegionRenderer(pdf)
+    book.extractPageText = request => extractPdfText(pdf, request)
     // Preview/editor requests must not cancel the visible reading surface.
     book.readingRegionRenderer = createPdfRegionRenderer(pdf)
+    book.cropRegionRenderer = createPdfRegionRenderer(pdf)
 
     const info = (await pdf.getMetadata())?.info
     book.metadata = {
@@ -613,6 +616,7 @@ export const makePDF = async file => {
         book.documentAnalysis.clear()
         book.regionRenderer.clear()
         book.readingRegionRenderer.clear()
+        book.cropRegionRenderer.clear()
     }
     book.sections = Array.from({ length: pdf.numPages }).map((_, i) => ({
         id: i,

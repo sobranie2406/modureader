@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:anx_reader/widgets/reading_page/pdf_region_preview.dart';
 import 'package:anx_reader/models/document_page_layout.dart';
+import 'package:anx_reader/widgets/reading_page/document_layout_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +16,100 @@ Future<void> ready(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+      'direct image editor preserves text pages and permits explicit navigation to image pages',
+      (tester) async {
+    final pages = <int?>[], rendered = <int>[];
+    await tester.pumpWidget(MaterialApp(
+        home: PdfRegionPreview(
+      imageEpub: true,
+      startWithLayoutEditor: true,
+      saveLayout: (_) async {},
+      info: (page) async {
+        pages.add(page);
+        return {...info(page), 'imageOnly': page == 3};
+      },
+      render: (request) async {
+        rendered.add(request['page'] as int);
+        return {'dataUrl': pixel};
+      },
+      cancelRender: () {},
+      close: () {},
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byType(DocumentLayoutEditor), findsNothing);
+    expect(find.text('3 / 6'), findsOneWidget);
+    expect(rendered, isEmpty);
+    expect(pages, [null], reason: 'Never silently skip a text chapter');
+    await tester.tap(find.byTooltip('Next original page'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DocumentLayoutEditor), findsOneWidget);
+    expect(find.text('Original preview page 4 / 6'), findsOneWidget);
+    expect(rendered, [3]);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+      'direct editor retries metadata and renders only the editor image',
+      (tester) async {
+    var fail = true, renders = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: PdfRegionPreview(
+            startWithLayoutEditor: true,
+            saveLayout: (_) async {},
+            info: (page) async {
+              if (fail) throw StateError('injected');
+              return info(page);
+            },
+            render: (_) async {
+              renders++;
+              return {'dataUrl': pixel};
+            },
+            cancelRender: () {},
+            close: () {})));
+    await tester.pumpAndSettle();
+    expect(find.text('Retry'), findsOneWidget);
+    expect(renders, 0);
+    fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DocumentLayoutEditor), findsOneWidget);
+    expect(renders, 1);
+    expect(find.byKey(const ValueKey('pdf-region-viewport')), findsNothing);
+  });
+  testWidgets(
+      'closing direct editor while metadata loads ignores late completion',
+      (tester) async {
+    final pending = Completer<Map<String, dynamic>>();
+    var closes = 0, renders = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => Scaffold(
+                body: TextButton(
+                    child: const Text('Open'),
+                    onPressed: () => showDialog<DocumentLayoutConfig>(
+                        context: context,
+                        builder: (_) => PdfRegionPreview(
+                            startWithLayoutEditor: true,
+                            saveLayout: (_) async {},
+                            info: (_) => pending.future,
+                            render: (_) async {
+                              renders++;
+                              return {'dataUrl': pixel};
+                            },
+                            cancelRender: () {},
+                            close: () => closes++)))))));
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    pending.complete(info(null));
+    await tester.pumpAndSettle();
+    expect(closes, 1);
+    expect(renders, 0);
+    expect(find.byType(DocumentLayoutEditor), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
       'failed next-page lookup retries the requested page instead of returning to old page',
       (tester) async {

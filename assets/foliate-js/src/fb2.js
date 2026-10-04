@@ -311,10 +311,12 @@ export const makeFB2 = async blob => {
         })
 
     const idMap = new Map()
+    book.imageDocumentSource = true
     book.sections = sectionData.map((section, index) => {
         const { ids, load, createDocument, size, linear } = section
         for (const id of ids) if (id) idMap.set(id, index)
-        return { id: index, load, createDocument, size, linear }
+        return { id: index, load, createDocument, size, linear,
+            loadImageDocument: async () => ({src: await load(), release() {}}) }
     })
 
     book.toc = sectionData.map(({ title, titles }, index) => {

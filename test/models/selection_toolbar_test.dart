@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
@@ -17,10 +18,10 @@ void main() {
   const own = SelectionToolbarItem('custom-own', 'aiCommand',
       name: '改写', icon: 'note', prompt: '请改写 {selection}');
 
-  test('all six templates start disabled; native actions remain enabled', () {
+  test('all seven templates start disabled; native actions remain enabled', () {
     const config = SelectionToolbarConfig();
     config.validate();
-    expect(config.items.where((i) => i.isCustom), hasLength(6));
+    expect(config.items.where((i) => i.isCustom), hasLength(7));
     expect(
         config.items.where((i) => i.isCustom).every((i) => !i.enabled), true);
     expect(config.availableItems().map((i) => i.id),
@@ -162,7 +163,55 @@ void main() {
             name: '命令$i', prompt: '解释'),
     ]);
     config.restoreDefaults().validate();
-    expect(config.restoreDefaults().items, hasLength(38));
+    expect(config.restoreDefaults().items, hasLength(39));
+  });
+
+  test('classical translation preset quotes selection and omits bundled text',
+      () {
+    final preset = SelectionToolbarConfig.templateItems
+        .singleWhere((item) => item.id == 'custom-preset-classical-chinese');
+    expect(preset.localizedName(const Locale('zh', 'CN')), '文言文翻译');
+    expect(preset.promptForSelection('学而时习之'), contains('"学而时习之"'));
+    expect(
+        preset.localizedPrompt(const Locale('en')), contains('modern Chinese'));
+    expect(preset.toJson(), {'id': preset.id, 'action': 'aiCommand'});
+    final edited = preset.copyWith(
+        enabled: true,
+        prompt: '逐句翻译 {selection}',
+        scope: SelectionAiScope.context,
+        webSearch: true);
+    expect(SelectionToolbarItem.fromJson(edited.toJson()).toJson(),
+        edited.toJson());
+  });
+
+  test('older settings gain only new preset and preserve edits and deletions',
+      () {
+    const id = 'custom-preset-classical-chinese';
+    final old = const SelectionToolbarConfig().copyWith(items: [
+      own,
+      ...SelectionToolbarConfig.initialItems.reversed
+          .where((item) => item.id != id && item.id != 'custom-preset-summary')
+          .map((item) =>
+              item.id == 'copy' ? item.copyWith(enabled: false) : item),
+    ]);
+    final raw = jsonDecode(old.encode()) as Map<String, dynamic>;
+    raw.remove('templateRevision');
+    final migrated = SelectionToolbarConfig.decode(jsonEncode(raw));
+    expect(migrated.items.take(old.items.length).map((item) => item.toJson()),
+        old.items.map((item) => item.toJson()));
+    expect(migrated.items.last.id, id);
+    expect(migrated.items.last.enabled, false);
+    expect(migrated.items.any((item) => item.id == 'custom-preset-summary'),
+        false);
+    expect(SelectionToolbarConfig.decode(migrated.encode()).encode(),
+        migrated.encode());
+    final deleted = migrated.copyWith(
+        items: migrated.items.where((item) => item.id != id).toList());
+    expect(
+        SelectionToolbarConfig.decode(deleted.encode())
+            .items
+            .any((item) => item.id == id),
+        false);
   });
 
   test('global file, modu link and QR restore all toolbar parameters',

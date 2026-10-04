@@ -1,6 +1,6 @@
 import { bookFrameSandbox } from './frame-script-policy.js'
 import { adjacentPanel, readingRegions, restoredPanel, layoutSignature,
-    validateReadingLayout } from './pdf-reading-layout.js'
+    validateReadingLayout, resolveReadingRegions } from './pdf-reading-layout.js'
 import { normalizePdfView, pdfViewport, panPdfViewport } from './pdf-reading-viewport.js'
 import { normalizeDocumentDisplay, attachDocumentGestures } from './document-reading-options.js'
 import { PdfScrollReader } from './pdf-scroll-reader.js'
@@ -186,6 +186,7 @@ export class FixedLayout extends HTMLElement {
             if (!active()) return
             url = URL.createObjectURL(result.blob)
             const img = frame.iframe.contentDocument.createElement('img')
+            img.dataset.documentDetail = ''
             img.src = url
             img.alt = ''
             Object.assign(img.style, { position: 'absolute', pointerEvents: 'none', zIndex: '1',
@@ -253,7 +254,7 @@ export class FixedLayout extends HTMLElement {
     async #showPdfPanel(page, panel, reason, anchor, center) {
         if (this.#destroyed || page < 0 || page >= this.book.sections.length) return false
         if (this.#pdfView.mode === 'scroll') return this.#showPdfScroll(page, panel, reason, anchor, center)
-        const regions = readingRegions(this.#pdfLayout, page)
+        let regions = readingRegions(this.#pdfLayout, page)
         let crop = regions[panel], fallback = false
         if (!crop) return false
         const generation = ++this.#pdfGeneration
@@ -271,6 +272,12 @@ export class FixedLayout extends HTMLElement {
             if (!active()) return false
             const nativeText = frame.iframe.contentDocument.documentElement.dataset.documentImage === 'false'
             if (nativeText) { crop = {x:0,y:0,width:1,height:1}; panel = 0; fallback = true }
+            else {
+                regions = await resolveReadingRegions(this.#pdfLayout, page, this.book,
+                    {hideWatermarks: this.#pdfView.display?.hideWatermarks, active})
+                if (!active()) return false
+                crop = regions[panel]
+            }
             // Search/note CFIs keep their original text nodes. Locate the target
             // before cropping; never land on a different invisible panel.
             if (typeof anchor === 'function' && !nativeText) {

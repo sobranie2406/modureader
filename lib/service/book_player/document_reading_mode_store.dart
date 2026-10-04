@@ -36,19 +36,38 @@ class DocumentReadingModeStore {
         entry['source'] != _source(book)) {
       return DocumentReadingMode.standard;
     }
+    if (DocumentReadingMode.supportsImageBook(book.filePath) &&
+        entry['scannedOverride'] is bool) {
+      return entry['scannedOverride'] == true
+          ? DocumentReadingMode.imageEpub : DocumentReadingMode.standard;
+    }
     return DocumentReadingMode.fromDetection(book.filePath, entry['mode']);
   }
 
   Future<void> save(Book book, Object? detection) {
     final mode = DocumentReadingMode.fromDetection(book.filePath, detection);
+    return _write(book, mode: mode.storageValue);
+  }
+
+  Future<void> setScanned(Book book, bool enabled) {
+    if (!DocumentReadingMode.supportsImageBook(book.filePath)) {
+      throw ArgumentError('Unsupported image-book container');
+    }
+    return _write(book, scannedOverride: enabled);
+  }
+
+  Future<void> _write(Book book, {String? mode, bool? scannedOverride}) {
     final identity = customCssBookKey(book), source = _source(book);
     final operation = _writes.then((_) async {
       final previous = prefs.getString(key);
       final entries = _read();
+      final old = entries[identity];
       entries[identity] = {
+        if (old is Map && old['version'] == 1 && old['source'] == source) ...old,
         'version': 1,
         'source': source,
-        'mode': mode.storageValue
+        if (mode != null) 'mode': mode,
+        if (scannedOverride != null) 'scannedOverride': scannedOverride,
       };
       try {
         if (!await prefs.setString(key, jsonEncode(entries))) {

@@ -1,4 +1,6 @@
 import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/models/document_reading_mode.dart';
+import 'package:anx_reader/widgets/reading_page/document_style_widget.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -65,6 +67,21 @@ class StyleWidgetState extends State<StyleWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final player = widget.epubPlayerKey.currentState;
+    if (player == null) return _textBookStyle(context);
+    return ValueListenableBuilder<DocumentReadingMode>(
+      valueListenable: player.documentReadingMode,
+      builder: (context, mode, _) => mode.hasDocumentMenu
+          ? DocumentStyleWidget(
+              key: ValueKey(player.cssBookKey),
+              player: player,
+              openReflow: (forceOcr) => readingPageKey.currentState
+                  ?.openDocumentExtraction(reflow: true, forceOcr: forceOcr))
+          : _textBookStyle(context),
+    );
+  }
+
+  Widget _textBookStyle(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: SingleChildScrollView(
@@ -292,6 +309,9 @@ class StyleWidgetState extends State<StyleWidget> {
   }
 
   Row fontWeightSlider() {
+    final colors = Theme.of(context).colorScheme;
+    final enabled = !Prefs().useBookStyles;
+    final selected = bookStyle.simulateBold;
     return Row(
       children: [
         IconAndText(
@@ -330,16 +350,31 @@ class StyleWidgetState extends State<StyleWidget> {
             toggled: bookStyle.simulateBold,
             enabled: !Prefs().useBookStyles,
             child: SizedBox(
-              width: 80,
+              width: 108,
               child: TextButton(
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  backgroundColor: bookStyle.simulateBold
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : null,
-                  foregroundColor: bookStyle.simulateBold
-                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                      : null,
+                  minimumSize: const Size(48, 48),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  side: BorderSide(
+                    color: !enabled
+                        ? colors.onSurface.withValues(alpha: 0.12)
+                        : selected
+                            ? colors.primary
+                            : colors.outlineVariant,
+                    width: selected && enabled ? 1.5 : 1,
+                  ),
+                  backgroundColor: selected ? colors.primaryContainer : null,
+                  foregroundColor: selected
+                      ? colors.onPrimaryContainer
+                      : colors.onSurfaceVariant,
+                  disabledBackgroundColor:
+                      colors.onSurface.withValues(alpha: 0.04),
+                  disabledForegroundColor:
+                      colors.onSurface.withValues(alpha: 0.38),
                 ),
                 onPressed: Prefs().useBookStyles
                     ? null
@@ -350,10 +385,24 @@ class StyleWidgetState extends State<StyleWidget> {
                             ?.changeStyle(bookStyle);
                         Prefs().saveBookStyleToPrefs(bookStyle);
                       },
-                child: Text(
-                  ModuStrings.text(context, '模拟加粗', 'Simulated bold'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        ModuStrings.text(context, '模拟加粗', 'Simulated bold'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

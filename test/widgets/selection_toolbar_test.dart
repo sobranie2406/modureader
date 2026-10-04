@@ -235,7 +235,8 @@ void main() {
   for (final id in [
     'ai',
     'custom-preset-dictionary',
-    'custom-preset-explain'
+    'custom-preset-explain',
+    'custom-preset-classical-chinese'
   ]) {
     testWidgets('$id exposes independent scope and optional online search',
         (tester) async {
@@ -276,6 +277,31 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('enabled classical translation dispatches from selection toolbar',
+      (tester) async {
+    final preset = SelectionToolbarConfig.templateItems.singleWhere(
+        (item) => item.id == 'custom-preset-classical-chinese');
+    SelectionToolbarItem? selected;
+    final config = SelectionToolbarConfig(items: [
+      preset.copyWith(enabled: true),
+      ...SelectionToolbarConfig.initialItems.where((item) => item.id != preset.id),
+    ]);
+    await tester.pumpWidget(app(SelectionActionToolbar(
+      items: config.availableItems(),
+      visibleCount: 5,
+      axis: Axis.horizontal,
+      maxExtent: 600,
+      onAction: (item) => selected = item,
+      onSettings: () {},
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('文言文翻译'), findsOneWidget);
+    await tester.tap(key('selection-action-${preset.id}'));
+    expect(selected?.id, preset.id);
+    expect(selected?.promptForSelection('学而时习之'), contains('现代汉语'));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
       'small screen and enlarged text retain all settings without overflow',

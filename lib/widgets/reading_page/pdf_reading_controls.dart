@@ -3,6 +3,7 @@ import 'package:anx_reader/models/pdf_reading_view.dart';
 import 'package:anx_reader/widgets/reading_page/document_enhancement_panel.dart';
 import 'package:anx_reader/models/document_enhancement.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
 
 /// Formal reader controls, separate from the temporary crop preview.
 class PdfReadingControls extends StatefulWidget {
@@ -12,11 +13,15 @@ class PdfReadingControls extends StatefulWidget {
       required this.save,
       required this.pan,
       this.watermarkAvailable = false,
+      this.cropControls,
+      this.layoutControls,
       this.preview,
       this.cancelPreview});
   final Future<Map<String, dynamic>> Function(Map<String, dynamic>)? preview;
   final VoidCallback? cancelPreview;
   final bool watermarkAvailable;
+  final Widget? cropControls;
+  final Widget? layoutControls;
   final PdfReadingView initial;
   final Future<void> Function(PdfReadingView) save;
   final Future<void> Function(double, double) pan;
@@ -31,6 +36,16 @@ class _PdfReadingControlsState extends State<PdfReadingControls> {
   late double _autoSeconds = _view.display.autoSeconds.toDouble();
   bool _busy = false;
   String? _error;
+
+  @override
+  void didUpdateWidget(covariant PdfReadingControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_busy) {
+      _view = widget.initial;
+      _zoom = _view.zoom;
+      _autoSeconds = _view.display.autoSeconds.toDouble();
+    }
+  }
 
   Future<void> _apply(PdfReadingView next) async {
     setState(() {
@@ -73,130 +88,154 @@ class _PdfReadingControlsState extends State<PdfReadingControls> {
     Widget button(IconData icon, String label, VoidCallback action) =>
         IconButton(
             tooltip: label, onPressed: _busy ? null : action, icon: Icon(icon));
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(spacing: 8, children: [
-          ChoiceChip(
-              label: Text(text('单页', 'Single page')),
-              selected: _view.mode == 'single',
-              onSelected:
-                  _busy ? null : (_) => _apply(_view.copyWith(mode: 'single'))),
-          ChoiceChip(
-              label: Text(text('连续卷轴', 'Continuous scroll')),
-              selected: _view.mode == 'scroll',
-              onSelected:
-                  _busy ? null : (_) => _apply(_view.copyWith(mode: 'scroll'))),
-        ]),
-        Text(text('原版正文缩放', 'Original page zoom')),
-        Row(children: [
-          button(
-              Icons.remove,
-              text('缩小', 'Zoom out'),
-              () => _apply(
-                  _view.copyWith(zoom: (_view.zoom - .25).clamp(1.0, 15.0)))),
-          Expanded(
-              child: Slider(
-                  value: _zoom,
-                  min: 1,
-                  max: 15,
-                  divisions: 56,
-                  label: '${(_zoom * 100).round()}%',
-                  onChanged:
-                      _busy ? null : (value) => setState(() => _zoom = value),
-                  onChangeEnd: _busy
-                      ? null
-                      : (value) => _apply(_view.copyWith(zoom: value)))),
-          Text('${(_zoom * 100).round()}%'),
-          button(
-              Icons.add,
-              text('放大', 'Zoom in'),
-              () => _apply(
-                  _view.copyWith(zoom: (_view.zoom + .25).clamp(1.0, 15.0)))),
-        ]),
+    Widget choices(Map<String, String> options, String selected,
+            ValueChanged<String> change) =>
         Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
+          spacing: 0,
+          runSpacing: 4,
+          children: [
+            for (final option in options.entries)
               ChoiceChip(
-                  label: Text(text('适应屏幕', 'Fit screen')),
-                  selected: _view.fit == 'screen',
-                  onSelected: _busy
-                      ? null
-                      : (_) => _apply(_view.copyWith(fit: 'screen', zoom: 1))),
-              ChoiceChip(
-                  label: Text(text('适应屏宽', 'Fit width')),
-                  selected: _view.fit == 'width',
-                  onSelected: _busy
-                      ? null
-                      : (_) => _apply(_view.copyWith(fit: 'width', zoom: 1))),
-              button(
-                  Icons.rotate_left,
-                  text('左转 90°', 'Rotate left'),
-                  () => _apply(
-                      _view.copyWith(rotation: (_view.rotation + 270) % 360))),
-              Text('${_view.rotation}°'),
-              button(
-                  Icons.rotate_right,
-                  text('右转 90°', 'Rotate right'),
-                  () => _apply(
-                      _view.copyWith(rotation: (_view.rotation + 90) % 360))),
-              TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _apply(PdfReadingView(
-                          mode: _view.mode,
-                          enhancement: _view.enhancement,
-                          display: _view.display)),
-                  child: Text(text('恢复适屏', 'Reset view'))),
-            ]),
-        Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-          Text(text('移动视口', 'Move viewport')),
-          button(
-              Icons.arrow_back, text('向左', 'Move left'), () => _pan(-160, 0)),
-          button(
-              Icons.arrow_upward, text('向上', 'Move up'), () => _pan(0, -160)),
-          button(Icons.arrow_downward, text('向下', 'Move down'),
-              () => _pan(0, 160)),
-          button(Icons.arrow_forward, text('向右', 'Move right'),
-              () => _pan(160, 0)),
-        ]),
-        Text(
-            _view.mode == 'scroll'
-                ? text('滑动或滚轮连续阅读；长按选择文字。翻页按钮滚动一屏的大部分，章节跳转仍按原页定位。',
-                    'Swipe or scroll across pages; long-press to select text. Page buttons move most of one screen; chapter navigation uses original pages.')
-                : text('正文支持双指平移或鼠标滚轮；单指仍可选择文字。比例以当前适应方式为基准。',
-                    'Pan with two fingers or the mouse wheel; one finger still selects text. Zoom is relative to the fit mode.'),
-            style: Theme.of(context).textTheme.bodySmall),
+                selectedColor: Theme.of(context).colorScheme.primary,
+                checkmarkColor: Theme.of(context).colorScheme.onPrimary,
+                label: Text(option.value,
+                    style: TextStyle(
+                        color: selected == option.key
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface)),
+                selected: selected == option.key,
+                onSelected: _busy ? null : (_) => change(option.key),
+              ),
+          ],
+        );
+    Future<void> enhance() async {
+      if (_busy || widget.preview == null) return;
+      final result = await showDialog<DocumentEnhancement>(
+        context: context,
+        builder: (_) => DocumentEnhancementPanel(
+          bottomPanel: true,
+          initial: _view.enhancement,
+          render: widget.preview!,
+          cancelRender: widget.cancelPreview ?? () {},
+          save: (value) => widget.save(_view.copyWith(enhancement: value)),
+        ),
+      );
+      if (mounted && result != null) {
+        setState(() => _view = _view.copyWith(enhancement: result));
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        DocumentControlRow(
+          label: text('缩放', 'Original page zoom'),
+          child: Row(children: [
+            Text('${(_zoom * 100).round()}%'),
+            button(
+                Icons.remove,
+                text('缩小', 'Zoom out'),
+                () => _apply(
+                    _view.copyWith(zoom: (_view.zoom - .25).clamp(1.0, 15.0)))),
+            Expanded(
+                child: Slider(
+              value: _zoom,
+              min: 1,
+              max: 15,
+              divisions: 56,
+              label: '${(_zoom * 100).round()}%',
+              onChanged: _busy ? null : (v) => setState(() => _zoom = v),
+              onChangeEnd:
+                  _busy ? null : (v) => _apply(_view.copyWith(zoom: v)),
+            )),
+            button(
+                Icons.add,
+                text('放大', 'Zoom in'),
+                () => _apply(
+                    _view.copyWith(zoom: (_view.zoom + .25).clamp(1.0, 15.0)))),
+          ]),
+        ),
+        DocumentControlRow(
+          label: text('模式', 'Mode'),
+          child: Wrap(spacing: 16, runSpacing: 6, children: [
+            choices({
+              'single': text('单页', 'Single page'),
+              'scroll': text('连续卷轴', 'Continuous scroll')
+            }, _view.mode, (v) => _apply(_view.copyWith(mode: v))),
+            choices({
+              'screen': text('适应屏幕', 'Fit screen'),
+              'width': text('适应屏宽', 'Fit width')
+            }, _view.fit, (v) => _apply(_view.copyWith(fit: v, zoom: 1))),
+          ]),
+        ),
+        if (widget.cropControls != null)
+          DocumentControlRow(
+              label: text('裁边', 'Crop'), child: widget.cropControls!),
+        if (widget.layoutControls != null)
+          DocumentControlRow(
+              label: text('版式', 'Layout'), child: widget.layoutControls!),
         if (widget.preview != null)
-          ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.tune),
-              title: Text(text('图像增强', 'Image enhancement')),
-              subtitle: Text(text('文字加黑、对比度、加黑、漂白、锐化',
-                  'Stroke strength, contrast, darken, whitening and sharpen')),
-              onTap: _busy
-                  ? null
-                  : () async {
-                      final result = await showDialog<DocumentEnhancement>(
-                          context: context,
-                          builder: (_) => DocumentEnhancementPanel(
-                              initial: _view.enhancement,
-                              render: widget.preview!,
-                              cancelRender: widget.cancelPreview ?? () {},
-                              save: (value) => widget
-                                  .save(_view.copyWith(enhancement: value))));
-                      if (mounted && result != null) {
-                        setState(
-                            () => _view = _view.copyWith(enhancement: result));
-                      }
-                    }),
+          DocumentControlRow(
+            label: text('图像增强', 'Image enhancement'),
+            child: Wrap(spacing: 4, runSpacing: 4, children: [
+              for (final entry in {
+                'ink': text('文字加黑', 'Stroke strength'),
+                'contrast': text('对比度', 'Contrast'),
+                'darken': text('加黑', 'Darken'),
+                'whiten': text('漂白', 'Paper whitening'),
+                'sharpen': text('锐化', 'Sharpen'),
+                'watermark': text('扫描水印减淡', 'Scan watermark fading'),
+              }.entries)
+                OutlinedButton(
+                  onPressed: _busy ? null : enhance,
+                  child: Text(
+                      '${entry.value} ${_view.enhancement.toJson()[entry.key]!.round()}'),
+                ),
+            ]),
+          ),
+        DocumentControlRow(
+          label: text('旋屏', 'Rotation'),
+          child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+            button(
+                Icons.rotate_left,
+                text('左转 90°', 'Rotate left'),
+                () => _apply(
+                    _view.copyWith(rotation: (_view.rotation + 270) % 360))),
+            Text('${_view.rotation}°'),
+            button(
+                Icons.rotate_right,
+                text('右转 90°', 'Rotate right'),
+                () => _apply(
+                    _view.copyWith(rotation: (_view.rotation + 90) % 360))),
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _apply(PdfReadingView(
+                        mode: _view.mode,
+                        enhancement: _view.enhancement,
+                        display: _view.display)),
+                child: Text(text('恢复适屏', 'Reset view'))),
+          ]),
+        ),
         if (_error != null)
           Text(_error!,
               style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ExpansionTile(
             title: Text(text('更多原版阅读设置', 'More original-page settings')),
             children: [
+              DocumentControlRow(
+                label: text('移动视口', 'Move viewport'),
+                child: Wrap(children: [
+                  button(Icons.arrow_back, text('向左', 'Move left'),
+                      () => _pan(-160, 0)),
+                  button(Icons.arrow_upward, text('向上', 'Move up'),
+                      () => _pan(0, -160)),
+                  button(Icons.arrow_downward, text('向下', 'Move down'),
+                      () => _pan(0, 160)),
+                  button(Icons.arrow_forward, text('向右', 'Move right'),
+                      () => _pan(160, 0)),
+                ]),
+              ),
               for (final entry in {
                 'border': text('页面边界线', 'Page border'),
                 if (widget.watermarkAvailable)

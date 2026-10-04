@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io' as io;
+import 'package:anx_reader/service/book.dart' show getBookMetadata;
+import 'package:anx_reader/models/document_reading_mode.dart';
 import 'package:anx_reader/service/sync/sync_feedback.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
@@ -611,6 +613,16 @@ class Sync extends _$Sync {
       final remotePath = SyncPaths.data(book.filePath);
       final localPath = getBasePath(book.filePath);
       await downloadFile(remotePath, localPath, expectedMd5: book.md5);
+      if (DocumentReadingMode.supportsImageBook(book.filePath)) {
+        try {
+          await getBookMetadata(io.File(localPath),
+              book: book, classificationOnly: true);
+        } catch (_) {
+          // Advisory detection cannot turn a successful download into a failure.
+          AnxLog.warning(
+              'Downloaded book classification unavailable; manual mode remains available');
+        }
+      }
       await ref.read(bookListProvider.notifier).refresh();
     } catch (e) {
       AnxToast.show(

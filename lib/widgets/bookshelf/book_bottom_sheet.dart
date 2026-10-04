@@ -7,6 +7,10 @@ import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/models/document_reading_mode.dart';
+import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
+import 'package:anx_reader/service/book_player/pdf_reading_state_store.dart';
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'package:anx_reader/page/book_detail.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/providers/book_list.dart';
@@ -37,6 +41,7 @@ import 'package:path/path.dart' as p;
 
 enum BookAction {
   details,
+  scanned,
   pin,
   vectorize,
   vectorModel,
@@ -334,6 +339,28 @@ class BookBottomSheet extends ConsumerWidget {
                 case BookAction.vectorize:
                   await queueBookForVectorization(book);
                   break;
+                case BookAction.scanned:
+                  try {
+                    final store = DocumentReadingModeStore(Prefs().prefs);
+                    final enabled = store.read(book) != DocumentReadingMode.imageEpub;
+                    if (enabled) {
+                      await PdfReadingStateStore(Prefs().prefs)
+                          .setEnabled(customCssBookKey(book), true);
+                    }
+                    await store.setScanned(book, enabled);
+                    ref.read(bookListProvider.notifier).refresh();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ModuStrings.text(context,
+                          '阅读类型已保存，下次打开书籍时生效',
+                          'Reading type saved. Applies when you reopen the book.'))));
+                    }
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ModuStrings.text(context, '阅读类型保存失败，请重试',
+                          'Could not save reading type. Please retry.'))));
+                    }
+                  }
+                  break;
                 case BookAction.vectorModel:
                   await showBookEmbeddingModelDialog(context, book);
                   break;
@@ -354,6 +381,11 @@ class BookBottomSheet extends ConsumerWidget {
             itemBuilder: (context) => [
               entry(BookAction.details, Icons.info_outline,
                   ModuStrings.text(context, '书籍详情', 'Book details')),
+              if (DocumentReadingMode.supportsImageBook(book.filePath))
+                entry(BookAction.scanned, Icons.document_scanner_outlined,
+                    DocumentReadingModeStore(Prefs().prefs).read(book) == DocumentReadingMode.imageEpub
+                        ? ModuStrings.text(context, '恢复普通书籍阅读', 'Use standard book reading')
+                        : ModuStrings.text(context, '设为扫描图片书籍', 'Set as scanned image book')),
               entry(
                   BookAction.pin,
                   pinned ? Icons.push_pin : Icons.push_pin_outlined,

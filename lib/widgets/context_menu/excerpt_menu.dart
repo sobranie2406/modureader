@@ -157,7 +157,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
       content: resolvedContent,
       cfi: existingNote?.cfi ?? widget.annoCfi,
       chapter:
-          existingNote?.chapter ?? epubPlayerKey.currentState!.chapterTitle,
+          existingNote?.chapter ?? epubPlayerKey.currentState!.selectionChapterTitle,
       type: resolvedType,
       color: resolvedColor,
       readerNote: existingNote?.readerNote,
@@ -444,7 +444,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         final player = epubPlayerKey.currentState;
         if (player == null) return;
         final book = player.book;
-        final chapter = player.chapterTitle;
+        final chapter = player.selectionChapterTitle;
         widget.onClose();
         if (!popupContext.mounted) return;
         ExcerptShareService.showShareExcerpt(

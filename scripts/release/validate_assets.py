@@ -13,6 +13,8 @@ def validate(directory, tag):
     for platform, extension in [('android', '.apk'), ('linux', '.deb'),
                                 ('windows', '-setup.exe'), ('macos', '.dmg')]:
         for arch in ('x64', 'arm64'):
+            if platform == 'android' and arch == 'x64':
+                continue
             expected.add(f'Modu-{version}-{platform}-{arch}{extension}')
     expected.add(f'Modu-{version}-ios-arm64.ipa')
     files = {p.name for p in Path(directory).iterdir() if p.is_file()}

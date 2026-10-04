@@ -32,9 +32,15 @@ void validateSettingsValue(String key, dynamic value) {
     'themeMode': ['system', 'light', 'dark'],
     'vectorModelMode': ['builtin', 'remote'],
     'vectorModelDownloadSource': ['huggingFace', 'gitee'],
+    'ocrModelDownloadSource': ['upstream', 'gitee'],
+    'ocrModelId': ['ppocr-v4-mobile-1', 'ppocr-v5-mobile-1', 'ppocr-v3-mobile-1', 'ppocr-v3-english-mobile-1'],
   };
   if (choices.containsKey(key) && !choices[key]!.contains(value)) {
     throw const FormatException('Unknown setting choice');
+  }
+  if (key == 'eInkRefreshPages' &&
+      (value is! int || value < 0 || value > 100)) {
+    throw const FormatException('Invalid E-Ink refresh interval');
   }
   if (key == 'scrollPagePercent' && (value < 80 || value > 100)) {
     throw const FormatException('Invalid scroll page percentage');

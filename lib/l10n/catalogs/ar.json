@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "ترجمة الصينية الكلاسيكية",
+  "selection_custom-preset-classical-chinese_prompt": "ترجم النص الصيني الكلاسيكي في {selection} إلى صينية حديثة واضحة وطبيعية. حافظ على المعنى والأسماء والأماكن والفقرات. قدم الترجمة فقط، مع توضيح موجز لمواضع الغموض دون اختلاق تفاصيل.",
   "ui_reader_simulated_bold": "تغليظ محاكى",
   "ui_reader_simulated_bold_help": "إضافة سماكة بحدود الحروف. 1.0 يحافظ على الأصل، و1.1–2.0 يزيد السماكة تدريجيًا. لا يمكن تخفيف خط عريض ثابت.",
   "ui_reader_boldness": "سماكة الخط",

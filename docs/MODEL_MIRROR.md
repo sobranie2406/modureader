@@ -32,3 +32,28 @@
 `pubspec.yaml` 仅声明模型 manifest，不声明权重目录。发布检查拒绝携带权重/分词器的旧缓存产物。CI 的模型文件仅用于独立原生推理测试：Android 在测试 APK，Windows/macOS 通过本机测试服务器下载；不移除四模型推理检查。
 
 升级不会删除已下载的模型；相同大小及 SHA-256 的旧文件继续使用。默认自动索引仍关闭，模型缺失只提示下载，不能暗中下载四个模型。更换下载源不改变模型 revision、维度或索引格式。
+
+## 轻量 OCR（独立于向量模型）
+
+设置 → OCR 模型可选择模型与下载源。推荐优先下载并使用 v4，默认 v4、上游来源；v5 仅为可选模型，不自动切换已有选择。仅主动下载选中的模型，识别在本机进行。模型选择及下载源纳入全局设置备份，不包含模型权重。旧 v4 缓存路径保持不变，切换来源复用通过 SHA-256 校验的文件。
+
+| 模型 | 检测 + 识别下载大小 | 上游 |
+| --- | --- | --- |
+| PP-OCRv4 中英文（默认） | 14.9 MiB | Hugging Face |
+| PP-OCRv5 中英文轻量版 | 20.5 MiB | ModelScope |
+| PP-OCRv3 中英文 | 12.5 MiB | Hugging Face |
+| PP-OCRv3 英文 | 10.9 MiB | Hugging Face |
+
+2026-10-04 已发布 [ocr-v1](https://gitee.com/sobranie2406/modu-models/releases/tag/ocr-v1)，包含 8 个模型文件和 4 个来源、许可证、清单及校验附件。不替换 `models-v1`。四套 Gitee 模型和 v5 上游已通过应用下载服务的匿名下载、字节大小及 SHA-256 校验，四模型均通过 Mac 原生推理检查。
+
+精确文件、revision 和校验值见 `lib/service/ocr/ocr_models.dart`。v3/v4 固定 Hugging Face revision，v5 固定 RapidOCR 分发版本 v3.9.2 及官方 SHA-256。模型沿用 Apache-2.0，不修改原字节、不重新训练。没有下载 GitHub 权重的入口：这几套 ONNX 的实际分发源是 Hugging Face / ModelScope，界面如实显示。
+
+准备附件：`python3 scripts/release/ocr_model_mirror.py --source <已下载原模型目录>`，输出至 `build/ocr-model-mirror`。脚本不上传；每个输入文件按原始文件名存放，大小或 SHA 不匹配会拒绝复制。
+
+真实下载校验（默认跳过，显式执行约 80 MiB）：
+
+`flutter test --no-pub --dart-define=MODU_VERIFY_OCR_MIRROR=true test/service/ocr_model_live_test.dart`
+
+常规回归：`flutter test --no-pub test/service/ocr_model_store_test.dart test/widgets/settings/ocr_model_test.dart test/service/config_transfer`
+
+下载器只接受指定来源的 HTTPS 重定向，失败不会暗中换源。识别 CPU 线程数上限 2；v5 更大的字表对应输入宽度及输出张量上限，避免单行推理输出无界增长。

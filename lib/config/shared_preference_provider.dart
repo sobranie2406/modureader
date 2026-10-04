@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:core';
+import 'package:anx_reader/service/ocr/ocr_models.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
 
 import 'package:anx_reader/enums/ai_prompts.dart';
@@ -711,6 +712,16 @@ class Prefs extends ChangeNotifier {
     return prefs.getBool('trueDarkMode') ?? false;
   }
 
+  int get eInkRefreshPages =>
+      (prefs.getInt('eInkRefreshPages') ?? 0).clamp(0, 100);
+
+  Future<void> setEInkRefreshPages(int value) async {
+    if (!await prefs.setInt('eInkRefreshPages', value.clamp(0, 100))) {
+      throw StateError('Could not save refresh interval');
+    }
+    notifyListeners();
+  }
+
   set eInkMode(bool status) {
     prefs.setBool('eInkMode', status);
     notifyListeners();
@@ -1101,6 +1112,43 @@ class Prefs extends ChangeNotifier {
 
   String get vectorLocalModelId =>
       prefs.getString('vectorLocalModelId') ?? 'bge-small-zh-v1.5';
+
+  String get ocrModelId =>
+      OcrModels.byId(prefs.getString('ocrModelId') ?? '').id;
+  String get ocrModelDownloadSource =>
+      prefs.getString('ocrModelDownloadSource') == 'gitee'
+          ? 'gitee'
+          : 'upstream';
+
+  Future<void> saveOcrModelSettings(
+      {required String model, required String source}) async {
+    if (!OcrModels.all.any((m) => m.id == model) ||
+        !['upstream', 'gitee'].contains(source)) {
+      throw const FormatException('Unsupported OCR model or download source');
+    }
+    final previousModel = prefs.getString('ocrModelId');
+    final previousSource = prefs.getString('ocrModelDownloadSource');
+    try {
+      if (!await prefs.setString('ocrModelId', model) ||
+          !await prefs.setString('ocrModelDownloadSource', source)) {
+        throw StateError('Could not save OCR model settings');
+      }
+    } catch (_) {
+      for (final entry in {
+        'ocrModelId': previousModel,
+        'ocrModelDownloadSource': previousSource,
+      }.entries) {
+        if (entry.value == null) {
+          await prefs.remove(entry.key);
+        } else {
+          await prefs.setString(entry.key, entry.value!);
+        }
+      }
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
 
   String get vectorModelDownloadSource =>
       prefs.getString('vectorModelDownloadSource') == 'gitee'

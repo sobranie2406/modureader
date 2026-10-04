@@ -2,6 +2,24 @@
 
 Details and downloads: https://github.com/sobranie2406/modureader/releases
 
+## 1.2.0
+
+- Read PDFs and scanned image books with dedicated crop, panel order, zoom, rotation and continuous-scroll controls, while ordinary text books retain their reading menus.
+- Detect image books during import across EPUB, MOBI, AZW3 and FB2; fix fixed-size comic pages and legacy MOBI image record references, with a manual bookshelf override.
+- Apply per-page automatic content cropping and image enhancements, including conservative scanned watermark fading; fit original and cropped pages to the window.
+- Download lightweight OCR models on demand, with V4 recommended, selectable sources and local deletion; reflow page text directly in the reader or extract a selected region into AI chat.
+- Add E-Ink-only refresh controls, improve battery alignment and simulated-bold controls, and add a Classical Chinese translation selection template.
+- Search online from an AI Knowledge answer, stop queued vector indexing, and improve narration continuity and web translation/search popup layout and zoom.
+- Simplify macOS installers to the app and Applications shortcut; publish eight platform packages without Android x64.
+
+- PDF 与扫描图片书使用专用裁边、分格、缩放、旋转及卷轴阅读菜单，普通文字书保留原阅读界面。
+- EPUB、MOBI、AZW3、FB2 在导入时识别图片书，修复固定尺寸漫画和旧式 MOBI 图片编号漏识别，并支持书架手动切换。
+- 按页自动识别内容边界裁边，提供图像增强与扫描水印减淡，原图和裁图随窗口与设置自动适配。
+- 轻量 OCR 模型按需下载，推荐 V4，支持来源选择与本地删除；整页文字直接接入阅读区重排，区域提取结果可填入 AI 对话。
+- 增加仅在 E-Ink 模式显示的刷新工具，改善页眉电量对齐和模拟加粗按钮，新增文言文翻译划词模板。
+- AI 知识回答支持按钮联网补查，支持停止队列向量化，改善朗读连续性及网页翻译、搜索弹窗排版与缩放。
+- Mac 安装盘仅展示应用与 Applications 快捷入口，全平台提供八个安装包，不再发布安卓 x64。
+
 ## 1.1.12-preview.4
 
 - Add original-page reading for PDFs and image-based EPUBs, with crop, panel order, zoom, rotation and continuous scrolling.

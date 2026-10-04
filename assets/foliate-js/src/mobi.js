@@ -659,6 +659,7 @@ const getIndent = el => {
 }
 
 class MOBI6 {
+    imageDocumentSource = true
     parser = new DOMParser()
     serializer = new XMLSerializer()
     #resourceCache = new Map()
@@ -702,6 +703,9 @@ class MOBI6 {
             id: index,
             load: () => this.loadSection(section),
             createDocument: () => this.createDocument(section),
+            // Borrow the parser-owned resource URLs; a preview must not revoke
+            // images still used by the reader. destroy() owns their lifetime.
+            loadImageDocument: async () => ({ src: await this.loadSection(section), release() {} }),
             size: section.end - section.start,
         }))
 
@@ -923,6 +927,7 @@ const getPageSpread = properties => {
 }
 
 class KF8 {
+    imageDocumentSource = true
     parser = new DOMParser()
     serializer = new XMLSerializer()
     #cache = new Map()
@@ -1006,6 +1011,7 @@ class KF8 {
                 id: index,
                 load: () => this.loadSection(section),
                 createDocument: () => this.createDocument(section),
+                loadImageDocument: async () => ({ src: await this.loadSection(section), release() {} }),
                 size: section.length,
                 pageSpread: pageSpreads.get(index),
             }) : ({ linear: 'no' }))

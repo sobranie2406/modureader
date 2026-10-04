@@ -4,6 +4,11 @@ enum DocumentReadingMode {
   pdf,
   imageEpub;
 
+  // Keep the legacy enum/storage identifier for existing EPUB preferences.
+  // These decoded HTML containers now share the same scanned-image reader.
+  static bool supportsImageBook(String path) =>
+      RegExp(r'\.(epub|mobi|azw3|fb2)$', caseSensitive: false).hasMatch(path);
+
   bool get hasDocumentMenu => this != standard;
 
   String get storageValue => switch (this) {
@@ -15,7 +20,7 @@ enum DocumentReadingMode {
   static DocumentReadingMode fromDetection(String path, Object? detection) {
     final file = path.toLowerCase();
     if (file.endsWith('.pdf') && detection == 'pdf') return pdf;
-    if (file.endsWith('.epub') && detection == 'image-epub') return imageEpub;
+    if (supportsImageBook(file) && detection == 'image-epub') return imageEpub;
     return standard;
   }
 }

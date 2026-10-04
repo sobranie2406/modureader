@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Chino clásico",
+  "selection_custom-preset-classical-chinese_prompt": "Traduce el chino clásico de {selection} al chino moderno claro y natural. Conserva el sentido, los nombres, los lugares y los párrafos. Da solo la traducción; señala brevemente las ambigüedades sin inventar detalles.",
   "ui_reader_simulated_bold": "Negrita simulada",
   "ui_reader_simulated_bold_help": "Añade grosor con un contorno. 1.0 conserva el original; 1.1–2.0 aumenta el grosor. Una fuente negrita fija no puede hacerse más fina.",
   "ui_reader_boldness": "Grosor de fuente",

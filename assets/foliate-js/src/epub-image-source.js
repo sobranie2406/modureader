@@ -16,6 +16,21 @@ const boundedWait = async (promise, signal) => {
 const exclusion = (book, section) => section.linear === 'no' || book.landmarks?.some(item =>
     item.type?.some(type => ['cover', 'toc'].includes(type)) && item.href?.split('#')[0] === section.id)
 
+// The measuring iframe is not the original page size. Kindle comic pages often
+// contain one fixed-size raster smaller than that iframe. Use the visible image
+// envelope for text-free pages, preserving gaps/order between image fragments.
+// Mixed text and unsupported painting keep their original conservative geometry.
+export function imagePageGeometry({width, height, characters, images}, supported = true) {
+    if (!supported || characters !== 0 || !images.length || images.some(i =>
+        ![i.x, i.y, i.width, i.height].every(Number.isFinite) || i.width <= 0 || i.height <= 0))
+        return {width, height, images}
+    const left = Math.min(...images.map(i => i.x)), top = Math.min(...images.map(i => i.y))
+    const right = Math.max(...images.map(i => i.x + i.width))
+    const bottom = Math.max(...images.map(i => i.y + i.height))
+    return {width: right - left, height: bottom - top,
+        images: images.map(i => ({...i, x: i.x - left, y: i.y - top}))}
+}
+
 export function imageSectionEvidence({page, href, width, height, characters, images, excluded = false}) {
     // Union area, not a sum: overlapping SVG fragments must not inflate coverage.
     const boxes = images.map(i => ({x:Math.max(0,i.x), y:Math.max(0,i.y),
@@ -147,8 +162,10 @@ export function createEpubImageSource(book) {
             }
             const width=Math.max(1000,rendered.documentElement.scrollWidth)
             const height=Math.max(1,...images.map(i=>i.y+i.height),rendered.body.scrollHeight)
-            const evidence=imageSectionEvidence({page:index,href:section.id,width,height,
-                characters:[...text.replace(/\s/g,'')].length,images,excluded:exclusion(book,section)})
+            const characters=[...text.replace(/\s/g,'')].length
+            const geometry=imagePageGeometry({width,height,characters,images},!unsupported)
+            const evidence=imageSectionEvidence({page:index,href:section.id,...geometry,
+                characters,excluded:exclusion(book,section)})
             if(unsupported){evidence.imageOnly=false;evidence.coverageUncertain=true;if(!evidence.reliableText&&!evidence.excluded)evidence.kind='image-candidate'}
             const item={...evidence,release}
             check(signal);cache.set(index,item);retained=true
@@ -190,6 +207,7 @@ export function createEpubImageSource(book) {
                 if(request.analyzeCrop)cropDetection=await detectContentCrop(pixels,{signal,margin:request.margin??.03})
                 if(hasEnhancement(enhancement)){await enhanceImage(pixels,enhancement,{signal});ctx.putImageData(pixels,0,0)}
             }
+            if(request.detectionOnly&&cropDetection){check(signal);return {page:request.page,width:plan.width,height:plan.height,cropDetection}}
             const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Encoding failed')),'image/png'))
             check(signal);return {blob,page:request.page,width:plan.width,height:plan.height,cropDetection}
         }finally{canvas.width=0;canvas.height=0}

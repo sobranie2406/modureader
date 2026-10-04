@@ -450,7 +450,7 @@ Future<void> importBook(File file, WidgetRef ref,
 
   await getBookMetadata(file,
       md5: md5,
-      inspectDocumentOnImport: extension == 'epub' || extension == 'pdf');
+      inspectDocumentOnImport: {'epub', 'pdf', 'mobi', 'azw3', 'fb2'}.contains(extension));
   if (await file.exists()) await file.delete();
   if (onImported != null) {
     onImported();
@@ -615,8 +615,12 @@ Future<void> getBookMetadata(
   String? md5,
   WidgetRef? ref,
   bool coverOnly = false,
+  bool classificationOnly = false,
   bool inspectDocumentOnImport = true,
 }) async {
+  if (classificationOnly && (book == null || coverOnly)) {
+    throw ArgumentError('Classification requires an existing book');
+  }
   final serverFileName = Server().setTempFile(file);
   final result = Completer<Map<String, dynamic>>();
   void fail(Object error) {
@@ -636,7 +640,8 @@ Future<void> getBookMetadata(
       importing: true,
       inspectDocumentOnImport: inspectDocumentOnImport &&
           !coverOnly &&
-          {'.pdf', '.epub'}.contains(path.extension(file.path).toLowerCase()),
+          {'.pdf', '.epub', '.mobi', '.azw3', '.fb2'}
+              .contains(path.extension(file.path).toLowerCase()),
     ))),
     onWebViewCreated: (controller) {
       controller.addJavaScriptHandler(
@@ -674,6 +679,13 @@ Future<void> getBookMetadata(
   try {
     await webview.run();
     final metadata = await metadataFuture;
+    if (classificationOnly) {
+      // Downloaded bookshelf entries already have their identity and progress.
+      // Only attach local evidence; never import a duplicate or enqueue indexing.
+      await DocumentReadingModeStore(Prefs().prefs)
+          .save(book!, metadata['documentReadingMode']);
+      return;
+    }
     if (coverOnly) {
       final cover = metadata['cover']?.toString() ?? '';
       if (book == null || cover.isEmpty) {

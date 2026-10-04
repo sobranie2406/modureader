@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Cinese classico",
+  "selection_custom-preset-classical-chinese_prompt": "Traduci il cinese classico di {selection} in cinese moderno chiaro e naturale. Mantieni significato, nomi, luoghi e paragrafi. Fornisci solo la traduzione; segnala brevemente le ambiguità senza inventare dettagli.",
   "ui_reader_simulated_bold": "Grassetto simulato",
   "ui_reader_simulated_bold_help": "Aggiunge spessore con un contorno. 1.0 mantiene l’originale; 1.1–2.0 aumenta lo spessore. Un carattere grassetto fisso non può essere assottigliato.",
   "ui_reader_boldness": "Spessore carattere",

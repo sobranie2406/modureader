@@ -5,11 +5,18 @@ class DocumentPageLayout {
   const DocumentPageLayout(
       {this.crop = const Rect.fromLTWH(0, 0, 1, 1),
       this.preset = 'single',
-      this.order = 'row-ltr'});
+      this.order = 'row-ltr',
+      this.autoCrop = false,
+      this.autoMargin = .03});
 
   final Rect crop;
   final String preset;
   final String order;
+
+  /// The stored crop is only an editor preview when automatic mode is active.
+  /// The reader detects each original page independently before splitting it.
+  final bool autoCrop;
+  final double autoMargin;
   static const grids = <String, (int, int)>{
     'single': (1, 1),
     'horizontal2': (2, 1),
@@ -31,16 +38,26 @@ class DocumentPageLayout {
         crop.right > 1 + 1e-9 ||
         crop.bottom > 1 + 1e-9 ||
         !grids.containsKey(preset) ||
-        !orders.contains(order)) {
+        !orders.contains(order) ||
+        !autoMargin.isFinite ||
+        autoMargin < 0 ||
+        autoMargin > .2) {
       throw const FormatException('Invalid document page layout');
     }
   }
 
-  DocumentPageLayout copyWith({Rect? crop, String? preset, String? order}) =>
+  DocumentPageLayout copyWith(
+          {Rect? crop,
+          String? preset,
+          String? order,
+          bool? autoCrop,
+          double? autoMargin}) =>
       DocumentPageLayout(
           crop: crop ?? this.crop,
           preset: preset ?? this.preset,
-          order: order ?? this.order);
+          order: order ?? this.order,
+          autoCrop: autoCrop ?? this.autoCrop,
+          autoMargin: autoMargin ?? this.autoMargin);
 
   List<Rect> get regions {
     validate();
@@ -76,7 +93,9 @@ class DocumentPageLayout {
         'height': crop.height
       },
       'preset': preset,
-      'order': order
+      'order': order,
+      if (autoCrop) 'autoCrop': true,
+      if (autoCrop || autoMargin != .03) 'autoMargin': autoMargin,
     };
   }
 
@@ -87,7 +106,9 @@ class DocumentPageLayout {
     final r = value['crop'] as Map;
     if (!['x', 'y', 'width', 'height'].every((key) => r[key] is num) ||
         value['preset'] is! String ||
-        value['order'] is! String) {
+        value['order'] is! String ||
+        (value.containsKey('autoCrop') && value['autoCrop'] is! bool) ||
+        (value.containsKey('autoMargin') && value['autoMargin'] is! num)) {
       throw const FormatException('Invalid layout fields');
     }
     final result = DocumentPageLayout(
@@ -97,7 +118,9 @@ class DocumentPageLayout {
             (r['width'] as num).toDouble(),
             (r['height'] as num).toDouble()),
         preset: value['preset'],
-        order: value['order']);
+        order: value['order'],
+        autoCrop: value['autoCrop'] == true,
+        autoMargin: (value['autoMargin'] as num?)?.toDouble() ?? .03);
     result.validate();
     return result;
   }

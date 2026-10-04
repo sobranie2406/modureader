@@ -23,3 +23,13 @@ On-demand model downloads use unmodified Xenova quantized ONNX exports and token
 Sentence Transformers MiniLM (Apache-2.0), BAAI BGE (MIT), and Microsoft E5 (MIT).
 See UPSTREAM.md, assets/models/embeddings/manifest.json and LICENSES for exact
 sources, pinned revisions, checksums and the original license texts.
+
+Optional OCR downloads use unmodified PP-OCRv3/v4/v5 mobile detection and recognition
+ONNX models exported by RapidOCR/SWHL from PaddleOCR (Apache-2.0).
+The models are not bundled in the installer. Source and pinned revision:
+https://huggingface.co/SWHL/RapidOCR/tree/1cfba2e90fc938db55889873735088de210cc173/PP-OCRv4
+https://www.modelscope.cn/models/RapidAI/RapidOCR (v5: v3.9.2, pinned SHA-256)
+https://github.com/PaddlePaddle/PaddleOCR
+See lib/service/ocr/ocr_models.dart for SHA-256 checksums and byte lengths,
+and LICENSES/PaddleOCR-Apache-2.0.txt for the license. Modu's lightweight
+pre/postprocessing and UI integration are independently implemented.

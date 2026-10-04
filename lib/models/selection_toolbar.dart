@@ -155,6 +155,12 @@ class SelectionToolbarConfig {
         name: 'AI 翻译',
         icon: 'translate',
         prompt: '翻译 {selection}：英文译成中文，中文译成英文；其他语言译成当前界面语言。保留原意和段落，只给译文。'),
+    SelectionToolbarItem('custom-preset-classical-chinese', 'aiCommand',
+        enabled: false,
+        name: '文言文翻译',
+        icon: 'translate',
+        prompt:
+            '将 {selection} 中的文言文译成通顺易懂的现代汉语，保留原意、人名地名和段落。只给译文；有歧义时简要注明，不编造。'),
     SelectionToolbarItem('custom-preset-polish', 'aiCommand',
         enabled: false,
         name: '润色',
@@ -240,7 +246,7 @@ class SelectionToolbarConfig {
   void validate() {
     if (visibleCount < 1 ||
         visibleCount > 8 ||
-        items.length > 38 ||
+        items.length > initialItems.length + 24 ||
         items
                 .where((i) =>
                     i.isCustom && !templateItems.any((p) => p.id == i.id))
@@ -296,6 +302,7 @@ class SelectionToolbarConfig {
     validate();
     return jsonEncode({
       'version': 1,
+      'templateRevision': 1,
       'enabled': enabled,
       'visibleCount': visibleCount,
       'items': items.map((i) => i.toJson()).toList(),
@@ -310,17 +317,28 @@ class SelectionToolbarConfig {
         raw['version'] != 1 ||
         raw['enabled'] is! bool ||
         raw['visibleCount'] is! int ||
+        (raw.containsKey('templateRevision') &&
+            (raw['templateRevision'] is! int || raw['templateRevision'] < 0)) ||
         raw['items'] is! List ||
         raw['annotations'] is! List ||
         raw['colors'] is! List ||
         (raw['colors'] as List).any((c) => c is! String)) {
       throw const FormatException('Invalid toolbar configuration');
     }
+    final items =
+        (raw['items'] as List).map(SelectionToolbarItem.fromJson).toList();
+    // Add newly shipped presets to older configurations without restoring
+    // deleted older presets or changing user edits/order. A saved revision
+    // ensures an intentionally deleted new preset stays deleted afterward.
+    if ((raw['templateRevision'] ?? 0) < 1 &&
+        !items.any((item) => item.id == 'custom-preset-classical-chinese')) {
+      items.add(templateItems
+          .singleWhere((item) => item.id == 'custom-preset-classical-chinese'));
+    }
     final config = SelectionToolbarConfig(
         enabled: raw['enabled'],
         visibleCount: raw['visibleCount'],
-        items: List<SelectionToolbarItem>.unmodifiable(
-            (raw['items'] as List).map(SelectionToolbarItem.fromJson)),
+        items: List<SelectionToolbarItem>.unmodifiable(items),
         annotations: List<SelectionToolbarItem>.unmodifiable(
             (raw['annotations'] as List).map(SelectionToolbarItem.fromJson)),
         colors:

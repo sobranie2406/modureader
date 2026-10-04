@@ -113,6 +113,12 @@ export const createPdfRegionRenderer = (pdf, {
                         canvasContext.putImageData(pixels, 0, 0)
                     }
                 }
+                // Per-page reading only needs coordinates, not an encoded PNG
+                // retained in another image cache. The canvas is freed below.
+                if (request.detectionOnly && cropDetection) {
+                    check(controller.signal)
+                    return {page: pageNumber, width: plan.width, height: plan.height, cropDetection}
+                }
                 const blob = await encode(canvas)
                 check(controller.signal)
                 if (version !== generation) throw abortError()

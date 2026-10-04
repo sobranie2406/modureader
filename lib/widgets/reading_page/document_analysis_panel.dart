@@ -145,8 +145,8 @@ class _DocumentAnalysisPanelState extends State<DocumentAnalysisPanel> {
                 OutlinedButton.icon(
                     onPressed: widget.previewImages,
                     icon: const Icon(Icons.image_outlined),
-                    label: Text(ModuStrings.text(context, '图片 EPUB 原图 · 裁边与增强',
-                        'EPUB image pages · crop and enhance'))),
+                    label: Text(ModuStrings.text(context, '扫描图片原图 · 裁边与增强',
+                        'Scanned image pages · crop and enhance'))),
               if (_result!['format'] == 'pdf' && widget.previewPdf != null)
                 OutlinedButton.icon(
                   onPressed: widget.previewPdf,

@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "文言今譯",
+  "selection_custom-preset-classical-chinese_prompt": "譯 {selection} 之文言為明白流暢之現代漢語，存原意、人名、地名及段落。惟出譯文；義有歧者略注，勿杜撰。",
   "ui_reader_simulated_bold": "擬加粗",
   "ui_reader_simulated_bold_help": "以描邊增粗。1.0 如初，1.1–2.0 逐級加粗；固定粗體不可變細。",
   "ui_reader_boldness": "字體粗細",

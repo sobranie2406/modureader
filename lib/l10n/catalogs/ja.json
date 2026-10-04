@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "漢文の現代語訳",
+  "selection_custom-preset-classical-chinese_prompt": "{selection} の漢文を自然で分かりやすい現代中国語に訳してください。意味、人名、地名、段落を保持し、訳文のみを示してください。曖昧な箇所には短い注記を付け、推測で補わないでください。",
   "ui_reader_simulated_bold": "擬似太字",
   "ui_reader_simulated_bold_help": "文字の輪郭で太さを追加します。1.0 は元の太さ、1.1–2.0 は段階的に太くします。固定の太字を細くすることはできません。",
   "ui_reader_boldness": "太さ",

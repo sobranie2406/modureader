@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:anx_reader/models/document_reading_mode.dart';
+import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -357,6 +359,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(bookshelfPinsProvider),
         isNot(contains(bookPinKey(book))));
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('book menu can set scanned mode and restore standard without changing progress', (tester) async {
+    await mount(tester);
+    final position = book.lastReadPosition;
+    final store = DocumentReadingModeStore(Prefs().prefs);
+    await tester.tap(find.byTooltip('书籍操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('设为扫描图片书籍'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('book-action-scanned')));
+    await tester.pumpAndSettle();
+    expect(store.read(book), DocumentReadingMode.imageEpub);
+    await tester.tap(find.byTooltip('书籍操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('恢复普通书籍阅读'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('book-action-scanned')));
+    await tester.pumpAndSettle();
+    expect(store.read(book), DocumentReadingMode.standard);
+    expect(book.lastReadPosition, position);
     expect(tester.takeException(), isNull);
   });
 

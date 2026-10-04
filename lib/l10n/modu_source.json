@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": {"zh": "文言文翻译", "en": "Classical Chinese"},
+  "selection_custom-preset-classical-chinese_prompt": {"zh": "将 {selection} 中的文言文译成通顺易懂的现代汉语，保留原意、人名地名和段落。只给译文；有歧义时简要注明，不编造。", "en": "Translate the Classical Chinese in {selection} into clear, natural modern Chinese. Preserve the meaning, names, places and paragraphs. Give only the translation; briefly note ambiguities without inventing details."},
   "ui_reader_simulated_bold": {"zh":"模拟加粗","en":"Simulated bold"},
   "ui_reader_simulated_bold_help": {"zh":"用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。","en":"Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner."},
   "ui_reader_boldness": {"zh":"字体粗细","en":"Font thickness"},

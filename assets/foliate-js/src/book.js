@@ -17,6 +17,7 @@ import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
 import { installSmartSelection, isInitialSmartSelection } from './smart-selection.js'
 import { analyzeEpubSection, samplePageIndices, summarizePages, checkCancelled } from './document-analysis.js'
+import { resolveReflowRegion } from './pdf-reading-layout.js'
 import { selectionAnnotationIds } from './selection-annotations.js'
 import { Overlayer } from './overlayer.js'
 import { collapse, compare, fromRange, toRange } from './epubcfi.js'
@@ -1165,6 +1166,7 @@ class Reader {
     this.setView(this.view)
     const settings = await callFlutter('onPdfReadingSettings')
     const documentMode = resolveDocumentReadingMode(this.view.book, settings?.mode)
+    this.view.scannedImageDocument = documentMode === 'image-epub'
     if (documentMode === 'image-epub') {
       if (settings?.enabled) await this.view.setImageReading(true, {...settings,cfi}, () => setStyle())
     }
@@ -1243,6 +1245,7 @@ class Reader {
       })
     })
     view.addEventListener('click-image', async e => {
+      if (view.scannedImageDocument) return
       // console.log('click-image', e.detail.img.src)
       const blobUrl = e.detail.img.src
       const blob = await fetch(blobUrl).then(r => r.blob())
@@ -2038,7 +2041,7 @@ window.setDocumentReaderActive = active => { if (reader?.view?.renderer) reader.
 window.setPdfReadingView = value => reader?.view?.renderer?.setPdfView?.(value) ?? false
 window.panPdfReadingView = (dx, dy) => reader?.view?.renderer?.panPdfView?.(dx, dy) ?? false
 window.setPdfReadingLayout = async (config, enabled, view) => {
-  if (reader?.view?.book?.resources) return reader.view.setImageReading(enabled,
+  if (reader?.view?.book?.resources || reader?.view?.book?.imageDocumentSource) return reader.view.setImageReading(enabled,
     {layout:config,view}, () => setStyle())
   const renderer = reader?.view?.renderer
   if (!renderer?.setPdfLayout) return false
@@ -2047,16 +2050,17 @@ window.setPdfReadingLayout = async (config, enabled, view) => {
 // Explicit preview session: no edits to sections, source files, CFIs or the
 // main reader's position. Closing invalidates pending bridge encodings too.
 let pdfRegionSession = 0
-let epubImageSource, epubImageBook
+let epubImageSource, epubImageBook, epubReflowCropBook
 const getEpubImageSource = async () => {
   const book = reader?.view?.book
-  if (!book?.sections || book.documentAnalysis || !book.resources) throw new Error('An EPUB document is required')
+  if (!book?.sections || book.documentAnalysis || !(book.resources || book.imageDocumentSource)) throw new Error('An image-book document is required')
   if (epubImageBook !== book || !epubImageSource) {
     epubImageSource?.clear()
     const { createEpubImageSource } = await import('./epub-image-source.js')
     if (book !== reader?.view?.book) throw new DOMException('Book changed', 'AbortError')
     epubImageBook = book
     epubImageSource = createEpubImageSource(book)
+    epubReflowCropBook = {cropRegionRenderer: epubImageSource}
   }
   return epubImageSource
 }
@@ -2079,6 +2083,17 @@ window.getPdfRegionInfo = async page => {
   return source.info(page ?? (Number.isInteger(current) && current >= 0 ? current : 0))
 }
 window.cancelPdfRegionRender = () => reader?.view?.book?.regionRenderer?.cancel()
+window.getDocumentReflowInfo = async (page, config, enabled, imageEpub, hideWatermarks) => {
+  const book = reader?.view?.book, session = pdfRegionSession
+  const info = await (imageEpub ? window.getEpubImageInfo(page) : window.getPdfRegionInfo(page))
+  if (info.imageOnly === false) return info
+  const active = () => book === reader?.view?.book && session === pdfRegionSession
+  if (!active()) throw new DOMException('Document changed', 'AbortError')
+  const region = await resolveReflowRegion(config, info.page,
+    imageEpub ? epubReflowCropBook : book, {enabled, hideWatermarks, active})
+  if (!active()) throw new DOMException('Document changed', 'AbortError')
+  return {...info, region, hideWatermarks}
+}
 window.renderPdfRegion = async request => {
   const book = reader?.view?.book, session = pdfRegionSession
   const source = request.source === 'epub' ? await getEpubImageSource() : book?.regionRenderer
@@ -2094,6 +2109,14 @@ window.renderPdfRegion = async request => {
     throw new DOMException('PDF preview closed', 'AbortError')
   return { dataUrl, page: result.page, width: result.width, height: result.height,
     ...(result.cropDetection ? {cropDetection:result.cropDetection} : {}) }
+}
+window.extractDocumentText = async request => {
+  const book = reader?.view?.book
+  if (!book) throw new Error('No document')
+  const result = book.extractPageText
+    ? await book.extractPageText(request) : {text:'',page:request.page,source:'image'}
+  if (book !== reader?.view?.book) throw new DOMException('Document changed','AbortError')
+  return result
 }
 // Detailed inspection is user-requested. Automatic menu classification happens
 // during import only; opening an existing book never samples its body.
@@ -2118,7 +2141,7 @@ window.analyzeReaderDocument = async () => {
         item.type?.some(type => ['cover', 'toc'].includes(type)) &&
         item.href?.split('#')[0] === section.id)
       let evidence = analyzeEpubSection(doc, {index,href:section.id,excluded})
-      if (!excluded && evidence.images.length && evidence.characters < 80 && book.resources) {
+      if (!excluded && evidence.images.length && evidence.characters < 80 && (book.resources || book.imageDocumentSource)) {
         try { evidence = await (await getEpubImageSource()).inspect(index, {signal}) }
         catch (error) { checkCancelled(signal); /* keep uncertain evidence for unsupported layouts */ }
       }
@@ -2155,6 +2178,11 @@ window.retryReaderChapter = () => reader.view.renderer.retryNavigation?.()
   .catch(error => console.error(error))
 
 window.goToCfi = cfi => reader.view.goTo(cfi)
+window.goToDocumentOriginalPage = async page => {
+  if (!Number.isInteger(page) || page < 0 || page >= reader.view.book.sections.length) return false
+  const result = await reader.view.goTo({index:page}, {recordHistory:false})
+  return result !== false && result != null
+}
 // Search has its own origin/previous/next controls, not a history entry per hit.
 window.goToSearchResult = async cfi => !!(await reader.view.goTo(cfi, { recordHistory: false }))
 

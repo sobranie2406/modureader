@@ -9,7 +9,7 @@ bottomNavigatorShowStatistics bottomNavigatorShowAI sortField sortOrder''',
       '''readStyle readTheme hideStatusBar readerFullscreen autoHideBottomBar
 awakeTime pageTurningType pageTurnStyle readingRules chapterSplitCustomRules
 chapterSplitSelectedRuleId autoAdjustReadingTheme readingNightMode volumeKeyTurnPage
-keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn longPressSelectParagraph scrollPagePercent showMenuOnHover showActionLabels
+keyboardShortcutTurnPage swapPageTurnArea tapOnlyPageTurn longPressSelectParagraph scrollPagePercent showMenuOnHover showActionLabels eInkRefreshPages
 useBookStyles pageTurnMode customPageTurnConfig readingInfo showTextUnderIconButton
 pageHeaderMargin pageHeaderLeftMargin pageHeaderRightMargin pageHeaderFontSize
 pageFooterMargin pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize
@@ -26,6 +26,7 @@ codeHighlightTheme enabledAiTools''',
   'vector':
       '''vectorModelEnabled autoVectorizeOnImport vectorModelMode vectorLocalModelId
 vectorModelDownloadSource vectorModelConfig''',
+  'ocr': 'ocrModelId ocrModelDownloadSource',
   'tts':
       '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio''',
   'translation':

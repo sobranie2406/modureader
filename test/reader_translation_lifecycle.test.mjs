@@ -103,7 +103,9 @@ test('a chapter container with an inline heading is not treated as one paragraph
 test('opening a book does not restore translation consent and stop remains available',async()=>{
   const player=await readFile(new URL('../lib/page/book_player/epub_player.dart',import.meta.url),'utf8');
   assert.doesNotMatch(player,/setTranslationMode\(\s*Prefs\(\)\.getBookTranslationMode/);
-  assert.match(player,/void dispose\(\) \{\s*_translationSession.stop\(\)/);
+  const dispose = player.match(/void dispose\(\) \{([^}]+)\}/)?.[1];
+  assert.ok(dispose, 'Reader must have a disposal hook');
+  assert.match(dispose, /_translationSession\.stop\(\);[\s\S]*super\.dispose\(\);/);
   const panel=await readFile(new URL('../lib/widgets/reading_page/translation_widget.dart',import.meta.url),'utf8');
   assert.match(panel,/onPressed: _stopTranslation/);
   assert.doesNotMatch(panel,/setBookTranslationMode\(widget.bookId, _displayMode\)/);

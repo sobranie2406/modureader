@@ -4,21 +4,24 @@ class DocumentEnhancement {
       this.contrast = 0,
       this.darken = 0,
       this.whiten = 0,
-      this.sharpen = 0});
-  final double ink, contrast, darken, whiten, sharpen;
+      this.sharpen = 0,
+      this.watermark = 0});
+  final double ink, contrast, darken, whiten, sharpen, watermark;
   static const limits = <String, (double, double)>{
     'ink': (0, 15),
     'contrast': (-100, 100),
     'darken': (0, 100),
     'whiten': (0, 200),
     'sharpen': (0, 100),
+    'watermark': (0, 100),
   };
   Map<String, double> toJson() => {
         'ink': ink,
         'contrast': contrast,
         'darken': darken,
         'whiten': whiten,
-        'sharpen': sharpen
+        'sharpen': sharpen,
+        'watermark': watermark
       };
   bool get enabled => toJson().values.any((v) => v != 0);
   factory DocumentEnhancement.fromJson(dynamic value) {
@@ -40,7 +43,8 @@ class DocumentEnhancement {
         contrast: fields['contrast']!,
         darken: fields['darken']!,
         whiten: fields['whiten']!,
-        sharpen: fields['sharpen']!);
+        sharpen: fields['sharpen']!,
+        watermark: fields['watermark']!);
   }
   DocumentEnhancement withValue(String key, double value) {
     if (!limits.containsKey(key)) throw ArgumentError.value(key);

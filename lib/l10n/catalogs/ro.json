@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Chineză clasică",
+  "selection_custom-preset-classical-chinese_prompt": "Traduce chineza clasică din {selection} în chineză modernă clară și naturală. Păstrează sensul, numele, locurile și paragrafele. Oferă doar traducerea; semnalează pe scurt ambiguitățile fără a inventa detalii.",
   "ui_reader_simulated_bold": "Aldin simulat",
   "ui_reader_simulated_bold_help": "Adaugă grosime prin contur. 1.0 păstrează originalul; 1.1–2.0 mărește grosimea. Un font aldin fix nu poate fi subțiat.",
   "ui_reader_boldness": "Grosime font",

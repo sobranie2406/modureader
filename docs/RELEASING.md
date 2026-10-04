@@ -20,6 +20,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 ## 各平台安装方式
 
 - macOS：下载对应处理器的 `.dmg`，打开后将 `Modu.app` 拖到 `Applications`。ARM64 对应 Apple Silicon，x64 对应 Intel。
+- macOS 安装盘固定只展示 `Modu.app` 和 `Applications` 拖放快捷入口，不展示说明文档等其他文件。许可证、来源记录等保留在应用内部 `Contents/Resources/Distribution`，封装后重新签名并校验；今后的 Mac 包均沿用此布局。
 - Windows：下载对应处理器的 `-setup.exe`，运行安装向导。默认仅为当前用户安装，可选桌面快捷方式；在系统“已安装的应用”中卸载。当前源码生成的安装器随应用附带 VC++ CRT，但仍需要系统 Microsoft Edge WebView2 Runtime，不自动下载 WebView2。旧 beta.1 包还需要单独安装 VC++ Redistributable。
 - Linux：下载 `.deb`，在 Debian 13 中执行 `sudo apt install ./Modu-版本-linux-架构.deb`，由 APT 安装所需系统依赖；从应用菜单或 `modureader` 命令启动。卸载使用 `sudo apt remove modureader`，不会主动清除个人书库。x64 对应 Debian amd64，ARM64 对应 arm64。不宣称兼容其他发行版。
 - Android：安装对应 ABI 的 `.apk`，更新时沿用同一专用签名。
@@ -29,7 +30,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 
 若旧版应用内更新后出现“应用程序 Modu 无法打开”，且系统日志指出文件由 Modu 创建并缺少用户同意，请通过浏览器从官方发布页重新下载 DMG，再覆盖安装；不要复用旧的应用内缓存。无需清除书库，不应关闭系统安全保护或在更新代码中删除隔离标记。这项修复不等于 Apple Developer ID 签名或公证。
 
-桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。Release 仅上传 9 个程序包及各自 SHA-256；许可证通过内嵌资源与对应版本的仓库链接提供。macOS / iOS 文件名省略 `unnotarized` / `unsigned`，不代表获得签名或公证。
+桌面制品通过 `scripts/release/native_installers.py` 生成。Windows 使用固定版本且校验 SHA-256 的 Inno Setup 6.7.3；安装器引擎与应用架构是两个概念，包内程序按 x64 / ARM64 原生构建并校验。Linux 依赖 `dpkg-deb` 和 `desktop-file-validate`；macOS 使用系统 `hdiutil`，生成后只读挂载并校验应用签名与架构。今后全平台 Release 仅上传 8 个程序包及各自 SHA-256（共 16 个附件）：Android ARM64、iOS ARM64，以及 macOS/Windows/Linux 各自的 ARM64 与 x64。Android x64 仅用于内部模拟器回归，不封装、不上传、不进入更新清单；历史发行版不因此删除。各平台安装界面不额外摆放文档或独立许可包，必要许可证与来源说明保留在应用资源或安装目录内部。macOS / iOS 文件名省略 `unnotarized` / `unsigned`，不代表获得签名或公证。
 
 ## 签名
 
@@ -53,7 +54,7 @@ Linux 包面向 Debian 13 (trixie)，运行需 GTK3、WPE WebKit 2.0、WPEBacken
 1. 更新 pubspec.yaml 和发布说明，运行安全扫描与回归测试。
 2. 可先运行 Modu Packages，targets 选择 all、release_tag 填正式标签（例如 v1.0.4）；GitHub Actions 并行生成各平台制品，全部校验通过后才创建对应源码的标签与 Release。也兼容直接推送本仓库版本标签触发构建；既有标签不得指向不同源码。
 3. 失败的目标不产生冒充成功的附件；修复后重新构建。最终 release 的附件才表示已产出。
-4. 各包保留 LICENSE、NOTICE，桌面包附 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 9 个程序包及各自 SHA-256，不再上传独立许可 ZIP，不发布缺包的正式版本。
+4. 各包内部保留 LICENSE、NOTICE，桌面程序内部保留 SOURCE.txt；Release 发布校验和与对应标签源码。带预发布后缀的标签标记为 prerelease；`v1.0.0` 等正式标签发布为正式版。发布前必须校验全部 8 个程序包及各自 SHA-256，不再上传 Android x64 或独立许可 ZIP，不发布缺包的正式版本。
 5. 不运行上游 App Store、Play Store、Telegram 通知或签名服务流程。
 6. 按 `docs/UPDATE_MIRROR.md` 将同一批原始安装包发布到 Gitee，逐包核对 SHA-256 后更新清单。Gitee **每次先删除旧应用 Release 和附件，再创建并上传新版发行版**，只保留最新版；开始删除前确认 GitHub 正式包已齐全且旧版仍可下载。本机保留这批原始包以便重试，清理期间镜像会短暂不可用，不得提前发布未验证的新清单。不清理独立模型仓库，不删除 Git 标签、分支或源码。GitHub 保留 1.1.0 起的历史发行版及所有对应源码标签。
 

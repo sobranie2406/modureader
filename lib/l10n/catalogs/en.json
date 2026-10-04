@@ -1,4 +1,6 @@
 {
+  "selection_custom-preset-classical-chinese_name": "Classical Chinese",
+  "selection_custom-preset-classical-chinese_prompt": "Translate the Classical Chinese in {selection} into clear, natural modern Chinese. Preserve the meaning, names, places and paragraphs. Give only the translation; briefly note ambiguities without inventing details.",
   "ui_reader_simulated_bold": "Simulated bold",
   "ui_reader_simulated_bold_help": "Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner.",
   "ui_reader_boldness": "Font thickness",

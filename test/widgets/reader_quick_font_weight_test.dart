@@ -40,10 +40,13 @@ void main() {
   });
 
   Future<void> show(WidgetTester tester,
-      {Locale locale = const Locale('en'), double scale = 1}) async {
+      {Locale locale = const Locale('en'),
+      double scale = 1,
+      Brightness brightness = Brightness.light}) async {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(MaterialApp(
       navigatorKey: navigatorKey,
+      theme: ThemeData(brightness: brightness),
       locale: locale,
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
@@ -161,9 +164,19 @@ void main() {
     expect(tester.getCenter(simulated()).dy,
         closeTo(tester.getCenter(weight()).dy, 1));
     expect(Prefs().bookStyle.simulateBold, isFalse);
+    expect(
+        find.descendant(
+            of: simulated(),
+            matching: find.byIcon(Icons.radio_button_unchecked)),
+        findsOneWidget);
+    expect(tester.getSize(simulated()).height, greaterThanOrEqualTo(48));
     await tester.tap(simulated());
     await tester.pumpAndSettle();
     expect(Prefs().bookStyle.simulateBold, isTrue);
+    expect(
+        find.descendant(
+            of: simulated(), matching: find.byIcon(Icons.check_circle)),
+        findsOneWidget);
     expect(tester.widget<Semantics>(simulated()).properties.toggled, isTrue);
     // Switching modes does not silently change the slider or other styles.
     expect(tester.widget<Slider>(weight()).value, 1.0);
@@ -213,4 +226,26 @@ void main() {
     expect(Prefs().bookStyle.simulateBold, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  for (final brightness in Brightness.values) {
+    testWidgets('simulation has outlined and selected states in $brightness',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await show(tester, scale: 1.5, brightness: brightness);
+      final button =
+          find.descendant(of: simulated(), matching: find.byType(TextButton));
+      final theme = Theme.of(tester.element(button)).colorScheme;
+      var style = tester.widget<TextButton>(button).style!;
+      expect(style.side!.resolve({})!.color, theme.outlineVariant);
+      expect(tester.getSize(weight()).width, greaterThanOrEqualTo(100));
+      await tester.tap(simulated());
+      await tester.pumpAndSettle();
+      style = tester.widget<TextButton>(button).style!;
+      expect(style.side!.resolve({})!.color, theme.primary);
+      expect(style.backgroundColor!.resolve({}), theme.primaryContainer);
+      expect(tester.widget<Semantics>(simulated()).properties.toggled, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
