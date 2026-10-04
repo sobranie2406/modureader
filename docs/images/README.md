@@ -1,25 +1,23 @@
-# Display assets / 展示素材
+# Display assets
 
-## Current homepage / 当前首页
+## Current: Modu 1.2.0+10082
 
-The English homepage is [README.md](../../README.md); the Chinese homepage is [README_zh.md](../../README_zh.md). README_EN.md keeps the previous English URL working.
+Feature claims follow the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, not uncommitted application changes. The English homepage is [README.md](../../README.md); the Chinese homepage is [README_zh.md](../../README_zh.md). `README_EN.md` keeps the previous English URL working.
 
-The 33 images in `showcase/cross-platform/` are the current homepage set. A macOS window sits behind an overlapping iPhone, with a clear headline, a light backdrop and soft shadows. Each major feature has its own image beside its description; the Chinese page also includes framed vertical reading.
+The 33 images in `showcase/cross-platform/` are the current homepage set, including later documentation artwork for the stable features. A macOS window sits behind an overlapping foreground iPhone, with a clear headline, light backdrop and soft shadows. Each major feature has its own image beside its description; Chinese artwork also includes framed vertical reading.
 
-当前首页使用 33 张双端展示图，按功能分散在中英文介绍中。图像以实际界面和代码支持的功能为依据，经内置图像生成工具排版与重绘；iPhone 保留灵动岛、状态栏和底部横条，界面使用 iOS 风格字体。已移除桌面录屏标记和鼠标指针。
+Artwork uses actual interfaces and code-supported behavior as its basis, with composition/redrawing by the built-in image-generation tool. It is composed showcase imagery rather than an untouched device capture. Preserve the actual Mac interface structure and control relationships; replace private content only inside that layout. The iPhone retains its Dynamic Island, status bar, bottom home indicator and iOS-style typography. Desktop recording markers and mouse cursors are removed.
 
-Every feature pair uses **iPhone configuration → Mac result**. Keep these roles fixed: the phone shows controls or an editing step, while the larger Mac window shows what those controls produce. Preserve the actual Mac interface structure; replace private content only within that structure.
+Every feature pair uses phone configuration → Mac result. The phone stays in the foreground and shows controls or editing; the larger Mac window shows the resulting behavior. Keep EN and ZH as separate localized assets (`*-en` and `*-zh`), matching labels, prose and language-specific examples. Do not mix the two languages into a single showcase panel.
 
-功能配图统一为 **手机设置 → Mac 效果**，不交换设备角色。Mac 保留实际界面的布局与控件关系，隐私内容仅在原有框架内替换。
-
-| Assets | Configuration | Visible result |
+| Assets | Phone configuration | Mac result |
 | --- | --- | --- |
 | `library-*` | Create a folder for selected books | Books organized into a folder |
 | `styles-*` | Font, thickness and spacing | Comfortable book typography |
-| `scanned-pdf-*` | Original-page crop preview, per-page automatic crop and safety margin | The same page enlarged after its outer margins are cropped |
-| `ocr-*` | On-demand lightweight OCR model cards | Reflowed page text with selection handles and the reader toolbar |
+| `scanned-pdf-*` | Original-page crop preview, per-page automatic crop and safety margin | The same page enlarged after cropping its outer margins |
+| `ocr-*` | Optional OCR model cards, with V4 recommended and actual model sources | Current-page reflowed text with selection handles and reader toolbar |
 | `css-*` | Visual CSS and highlight rules | Colored dialogue, wavy underlines and keyword highlights |
-| `listening-*` | Narration template and voice description | Current passage highlighting and compact playback controls |
+| `listening-*` | Narration template and voice description | Passage highlighting and compact playback controls |
 | `skills-*` | A chapter-summary prompt | A reader AI answer and follow-up input |
 | `selection-*` | Custom AI action and scope | Selection handles, toolbar and annotation controls |
 | `translation-*` | Full-text engine, target language and bilingual display | Multiple inline translated paragraphs: English–Spanish for EN, English–Chinese for ZH |
@@ -27,20 +25,24 @@ Every feature pair uses **iPhone configuration → Mac result**. Keep these role
 | `notes-*` | Highlight and comment editing | Saved book notes |
 | `statistics-*` | Add a dashboard card | Reading charts and records |
 | `vector-*` | Local embedding model | An AI answer citing retrieved chapter excerpts |
-| `sync-*` | Sync and database backup | Restored reading progress and annotation |
-| `backup-*` | Global settings export | Export completion with the saved file location |
+| `sync-*` | Record sync and database backup | Restored reading progress and annotation, without vector-index transfer |
+| `backup-*` | Global settings export | Export completion and saved file location |
 
-The opening `reading-*` banners and `vertical-zh` show reading layouts directly. PDF and OCR layouts were checked against the local Mac app; their pages use original demonstration prose. Crop settings show the original page and crop rectangle, while the Mac shows the cropped reading result. OCR artwork illustrates selectable reflow, not a measured recognition-accuracy claim. Only the selected final assets are tracked; prompt drafts and discarded variants stay outside the published source tree.
+The opening `reading-*` banners and `vertical-zh` show reading layouts directly. PDF and OCR layouts were previously checked against the local Mac app and use original demonstration prose. PDF page surfaces must be white in both language variants, including the phone's original-page preview and Mac reading result; device backdrops can remain light. Crop settings show the original page and rectangle while the Mac shows that page's cropped result, without implying source-file overwrite.
 
-Reading examples use the original demonstration books [《阅读，让思考慢下来》](../examples/modu-reading-demo.epub) and [The Quiet Reader](../examples/modu-reading-demo-en.epub), with additional original sample passages and dictionary definitions written for the artwork. Book source and redistribution terms are in [examples/README.md](../examples/README.md). Statistics, notes, retrieval excerpts and AI answers are illustrative demo data, not private account data or performance benchmarks. No private bookshelf, notes, AI conversation or credentials are included. Settings shown illustrate the features, not necessarily factory defaults.
+OCR artwork shows Text Reflow/OCR Reflow directly in the reader for the current original page or its whole saved crop. It must not depict a region-selection popup as the reflow reader: only Extract opens that editor and can fill an editable AI input without automatically sending. Model downloads are optional; V4 is recommended, V5 upstream is ModelScope, and V3/V4 upstream is Hugging Face, with Gitee alternatives. Artwork is not an OCR accuracy measurement. Ordinary text books retain their normal controls; E-Ink refresh claims apply only to supported devices.
 
-## Source archive / 来源归档
+Only selected final assets are tracked; prompt drafts and discarded variants remain outside the published source tree. This update edits documentation only: it does not create or alter screenshots, rerun Mac layout checks or claim new application/device tests.
 
-The source images were removed from the current tracked tree on 2026-10-03 to avoid shipping unused, duplicate or upstream marketing material. They remain recoverable in [the previous Git revision](https://github.com/sobranie2406/modureader/tree/dae8ecc4ef7ac34cfe252f8039008716d5cee6ff/docs/images), and local working copies are ignored rather than deleted:
+Reading examples use the original [Chinese demonstration book](../examples/modu-reading-demo.epub) and [The Quiet Reader](../examples/modu-reading-demo-en.epub), plus original sample passages and dictionary definitions written for artwork. Source/redistribution terms are in [example books](../examples/README.md). Statistics, notes, retrieval excerpts and AI answers are illustrative data, not private accounts or performance benchmarks. No private bookshelf, notes, AI conversation or credentials are included. Settings illustrate features and are not necessarily factory defaults.
 
-- `showcase/*.png`: the previous iPhone-only renders used to compose the current artwork.
-- `v1.1.9/`: Android and Mac Modu 1.1.9+10063 captures from 2026-10-01, including the original demonstration books and settings screens.
-- The seven older `*-macos.jpg` files: Modu 1.1.1+10033 captures from 2026-09-21, including the then-approved vertical-reading example.
-- `Anx-logo.jpg`, `main.jpg`, `wide*.png`, `mobile*.png` and `zh/`: inherited Anx Reader marketing assets, not current Modu UI.
+## Historical source archive
 
-这些旧素材已撤出当前源码，但本地副本及 Git 历史仍保留，便于恢复或继续设计。不要将上游截图作为默读当前界面重新发布。各依赖的许可证、版权声明和来源文档不属于本次素材清理范围。
+Source images were removed from the current tracked tree on 2026-10-03 to avoid shipping unused, duplicate or upstream marketing material. They remain recoverable in [the previous Git revision](https://github.com/sobranie2406/modureader/tree/dae8ecc4ef7ac34cfe252f8039008716d5cee6ff/docs/images), and local copies are ignored rather than deleted:
+
+- `showcase/*.png`: previous iPhone-only renders used to compose the current artwork.
+- `v1.1.9/`: Android and Mac Modu `1.1.9+10063` captures from 2026-10-01, including original demo books/settings.
+- Seven older `*-macos.jpg` files: Modu `1.1.1+10033` captures from 2026-09-21, including the then-approved vertical-reading example.
+- `Anx-logo.jpg`, `main.jpg`, `wide*.png`, `mobile*.png` and `zh/`: inherited Anx Reader promotional assets, not current Modu UI.
+
+These retired assets retain local copies and Git history for recovery/design work. Do not republish upstream screenshots as current Modu. Dependencies' licenses, copyrights and provenance are outside this asset-cleanup scope.
