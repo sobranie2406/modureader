@@ -3,7 +3,7 @@
 </p>
 <h1 align="center">Modu Reader</h1>
 <p align="center">
-  <a href="README_zh.md">Simplified Chinese</a> · <a href="README.md">English</a>
+  <a href="README_zh.md">简体中文</a> · <a href="README.md">English</a>
 </p>
 <p align="center">An open-source, cross-platform reader for ebooks, PDFs and scanned books. Crop and enhance original pages, recognize text with on-device OCR, read with full-text translation, listen aloud and explore your books with AI. Keep notes and reading progress together with WebDAV sync.</p>
 
