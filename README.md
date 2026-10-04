@@ -1,11 +1,11 @@
 <p align="center">
   <img src="assets/icon/modu-app-icon.png" width="96" alt="Modu app icon">
 </p>
-<h1 align="center">Modu Reader · 默读</h1>
+<h1 align="center">Modu Reader</h1>
 <p align="center">
-  <a href="README_zh.md">简体中文</a> · <a href="README.md">English</a>
+  <a href="README_zh.md">Simplified Chinese</a> · <a href="README.md">English</a>
 </p>
-<p align="center">Modu is an open-source AI ebook reader built with Flutter. It brings books, notes, reading progress and AI conversations together: read first, then ask questions about the current chapter. For semantic search, index your books using local models or a remote embedding service.</p>
+<p align="center">An open-source, cross-platform reader for ebooks, PDFs and scanned books. Crop and enhance original pages, recognize text with on-device OCR, read with full-text translation, listen aloud and explore your books with AI. Keep notes and reading progress together with WebDAV sync.</p>
 
 <p align="center">
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><img src="https://img.shields.io/github/v/release/sobranie2406/modureader?style=flat-square&amp;color=356858" alt="Latest release"></a>
@@ -16,7 +16,7 @@
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>Download</b></a> ·
   <a href="https://gitee.com/sobranie2406/modureader/releases">Gitee mirror</a> ·
   <a href="#features">Features</a> ·
-  <a href="docs/SETTINGS.md">Settings guide (中文)</a> ·
+  <a href="docs/SETTINGS.md">Settings guide (Chinese)</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
@@ -64,12 +64,13 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | --- | --- |
 | [Library](#library) | Import seven ebook formats, organize folders, pin books and browse a remote library |
 | [Reading & styles](#reading) | Tune typography, switch layouts and apply visual CSS presets |
-| [PDF, scanned books & OCR](#scanned-books) | Crop pages, enhance scans and reflow recognized text in the reader |
+| [PDF & scanned books](#scanned-books) | Crop margins, set panel order and enhance original pages |
+| [On-device OCR](#ocr) | Download lightweight models, reflow recognized text and extract passages for AI |
 | [Custom CSS](#css) | Visual rules, custom code, multiple profiles and visible effects on the page |
 | [Listening](#listening) | Choose a voice, edit narration prompts and listen at up to 4× speed |
 | [AI reading](#ai) | Ask about chapters, customize skills and continue conversations |
 | [Selection tools](#selection) | Toggle and reorder actions; create your own AI commands |
-| [Translation & search](#translation) | Translate in the reader, switch providers and search the web |
+| [Full-text translation & search](#translation) | Read inline translations, switch display modes and search selected text |
 | [Offline dictionaries](#dictionary) | Import your dictionaries and see definitions beside the selected word |
 | [Notes & highlights](#notes) | Capture passages, add comments and export notes with links back to the book |
 | [Reading statistics](#statistics) | Review reading time, trends and per-book progress |
@@ -83,11 +84,54 @@ Screens use original demo content rather than a personal library. Try [The Quiet
 
 ## Original pages, easier to read
 
-PDFs and scanned image books have dedicated crop, panel-order, zoom, rotation and continuous-scroll controls. Automatic cropping follows each page's content; original and cropped images fit the window. Adjust contrast, whitening, sharpening and scanned watermark fading while comparing with the original.
+Keep the original layout of a PDF or scanned image book while making the page fit your screen. Dedicated reading controls replace text-book typography settings only for PDFs and books classified as scans.
+
+- **Crop the margins:** automatic cropping detects content bounds on each page; adjust the safety margin or drag a crop rectangle manually.
+- **Read in the right order:** split a page into panels, set their order, rotate the page and choose single-page or continuous-scroll reading.
+- **See the details:** fit the page to the screen or its width, zoom in, and enhance stroke strength, contrast, darkening, paper whitening or sharpness.
+- **Compare with the original:** preview changes and optionally fade scanned watermarks. Crop and enhancement settings do not rewrite the source book.
+
+![PDF crop settings on iPhone and an enlarged, cropped original page in the Mac reader](docs/images/showcase/cross-platform/scanned-pdf-en.png)
 
 EPUB, MOBI, AZW3 and FB2 image books are identified during import, not every time you open them. You can also change the classification in the bookshelf menu. Ordinary text books retain their familiar controls.
 
-Download a lightweight OCR model in Settings → OCR models; PP-OCRv4 is recommended, with v5 and v3 alternatives and upstream/Gitee sources. Reflow a page directly in the reader for selection actions, notes and AI, or extract a region into an editable AI draft. Recognition runs locally; models are downloaded only when requested.
+<details>
+<summary>Image processing and e-ink controls</summary>
+
+Automatic crop settings can apply throughout the book, with bounds detected separately for each page. Keep a little margin to protect footnotes and page numbers. Scanned watermark fading is image processing, not guaranteed reconstruction of text hidden beneath a watermark; always compare the result with the original.
+
+The menu follows the app theme. E-ink-only refresh controls appear when E-INK mode is enabled; hardware refresh support depends on the device. Ordinary text ebooks retain their normal reading menus and styles.
+
+</details>
+
+<a id="ocr"></a>
+
+## Turn scans into readable text
+
+Go beyond an image of the page. Recognize text locally, then read the result **inside the reader**, with adjustable typography, selection tools, highlights, notes and AI actions.
+
+![Lightweight OCR model settings on iPhone and selectable reflowed text in the Mac reader](docs/images/showcase/cross-platform/ocr-en.png)
+
+1. In **Settings → OCR models**, choose a model and download source. **PP-OCRv4 Chinese / English** is the recommended starting point.
+2. Open the PDF/scanned-book menu. **Text reflow** uses an available text layer; **OCR reflow** recognizes the current page image. Reflow uses the current page or its cropped area, without an extra region-selection step.
+3. Select words in the reflowed text to copy, translate, annotate or ask AI. The style gear adjusts the recognized text, not the original scan or other books.
+4. For a specific passage, choose **Extract**, select a region and send its text to an **editable AI draft**. Review it before sending.
+
+<details>
+<summary>Lightweight models, offline use and limitations</summary>
+
+| Model | Download size | Use |
+| --- | --- | --- |
+| PP-OCRv4 Chinese / English | About 14.9 MiB | Recommended general choice |
+| PP-OCRv5 Chinese / English | About 20.5 MiB | Newer mobile model |
+| PP-OCRv3 Chinese / English | About 12.5 MiB | Smaller alternative |
+| PP-OCRv3 English | About 10.9 MiB | Lightweight English recognition |
+
+Models are downloaded on demand, not bundled in the installer. Choose the upstream host or Gitee mirror; downloads are checked by size and SHA-256. Delete a downloaded model from its card to reclaim space without deleting books or recognized text.
+
+OCR runs on the device after download and needs no API key. Sending extracted text to an online AI provider is a separate action. Recognition quality depends on scan clarity, language and layout; check names, numbers and complex columns against the original. OCR does not automatically index the entire book or rewrite the source PDF.
+
+</details>
 
 <a id="library"></a>
 
@@ -222,21 +266,23 @@ Choose what appears when you select text. Keep useful actions close and hide the
 
 ![Toolbar configuration on iPhone and adjustable text selection on Mac](docs/images/showcase/cross-platform/selection-en.png)
 
-AI Knowledge uses your current model's knowledge first. If further checking is needed, type **“Confirm online search”** in that conversation to retrieve Wiktionary, Wikipedia and Baidu Baike material for the same model to summarize with sources. No separate search API key is needed.
+AI Knowledge uses your current model's knowledge first. If further checking is needed, use **Online search** beneath the answer, before Regenerate and Copy, to retrieve Wiktionary, Wikipedia and Baidu Baike material in the same conversation. The same model summarizes the results with sources. No separate search API key is needed.
 
 <a id="translation"></a>
 
 ## Read beyond one language
 
-Translate a selection without leaving the page, choose another provider in the translation popup, or use full-text translation while reading.
+Read translated paragraphs **directly on the book page**, rather than in a separate selection popup. Choose **Original + translation** for inline bilingual reading, or **Translation only** for a continuous translated view.
+
+![Full-text translation controls on iPhone and English–Spanish inline bilingual reading on Mac](docs/images/showcase/cross-platform/translation-en.png)
+
+Open the reader's translation controls, choose an engine and target language, then translate the current reading content. Translation follows the reading position; this is not a one-click export of a translated copy of the entire book. The stop action stays in the toolbar rather than covering the text.
 
 - Google translation, AI translation and DeepL/DeepLX.
-- Embedded translation webpages, including Baidu and Youdao.
+- Selection translation also offers embedded webpages, including Baidu and Youdao; these are separate from inline full-text translation.
 - Selection search with Baidu, Bing, Google, Baidu Baike, Wikipedia or a custom engine in the built-in browser.
 
-![Translation provider settings on iPhone and the translated text on Mac](docs/images/showcase/cross-platform/translation-en.png)
-
-Full-text translation's stop action stays in the toolbar rather than covering the book text.
+The English showcase uses English–Spanish paragraphs; the [Chinese showcase](README_zh.md#translation) uses English–Chinese paragraphs and a Chinese interface. Online translation sends the requested text to the selected provider.
 
 <a id="dictionary"></a>
 
@@ -266,7 +312,7 @@ Highlight a passage, underline an idea and add your own thoughts. Review notes b
 
 Select part or all of an existing highlight or underline, choose the trash action and confirm to delete the complete overlapping annotation and its comment. The confirmation appears above the toolbar and color palette.
 
-Exports label passages as “原文：【…】”; Markdown also highlights the note content. Quick mark works with reflowable text, not scanned PDF pages, and has an explicit Exit control to restore normal gestures.
+Exports distinguish the original passage from your comments; Markdown also highlights the note content. Quick mark works with reflowable text, not scanned PDF images, and has an explicit Exit control to restore normal gestures.
 
 </details>
 
@@ -392,7 +438,7 @@ flutter test --concurrency 1
 # Run on the appropriate host platform:
 flutter build macos --release --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
 # Configure Android release signing as described in docs/RELEASING.md first.
-flutter build apk --release --target-platform android-arm64,android-x64 --split-per-abi
+flutter build apk --release --target-platform android-arm64 --split-per-abi
 ```
 
 See [.github/workflows/build.yaml](.github/workflows/build.yaml) and scripts/release for the complete build and packaging procedure. The Dart package name remains `anx_reader` for compatibility with existing imports. The user-facing brand and application ID are Modu / `com.modu.reader`.
