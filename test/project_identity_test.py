@@ -26,8 +26,9 @@ class ProjectIdentityTest(unittest.TestCase):
 
     def test_product_docs_do_not_send_users_to_upstream_services(self):
         paths = [ROOT / name for name in (
-            "README.md", "README_zh.md", "README_EN.md", "SECURITY.md", "PRIVACY.md",
-            "CONTRIBUTING.md", "docs/RELEASING.md", "docs/SETTINGS.md",
+            "README.md", "README_zh.md", "README_EN.md", "SECURITY.md", "SECURITY_zh.md",
+            "PRIVACY.md", "PRIVACY_zh.md", "CONTRIBUTING.md", "CONTRIBUTING_zh.md",
+            "docs/RELEASING.md", "docs/SETTINGS.md", "docs/SETTINGS_zh.md",
             "docs/troubleshooting.md", "docs/issue-triage.md",
         )]
         paths += list((ROOT / "fastlane/metadata/android").glob("*/*.txt"))
@@ -42,9 +43,19 @@ class ProjectIdentityTest(unittest.TestCase):
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertIsNone(prohibited.search(path.read_text()))
         privacy = (ROOT / "PRIVACY.md").read_text()
-        self.assertNotIn("不进入设置导出或同步", privacy)
-        self.assertIn("账号和密码默认不导出", privacy)
-        self.assertIn("代码和二维码未加密", privacy)
+        self.assertIn("excludes accounts, passwords and API keys by default", privacy)
+        self.assertIn("recoverable plaintext credentials", privacy)
+        self.assertIn("There is no QR transfer", privacy)
+        privacy_zh = (ROOT / "PRIVACY_zh.md").read_text()
+        self.assertIn("默认排除账号、密码和 API Key", privacy_zh)
+        self.assertIn("可还原明文凭据", privacy_zh)
+        self.assertIn("不提供二维码迁移", privacy_zh)
+        for name in ("PRIVACY", "SECURITY", "CONTRIBUTING", "docs/SETTINGS"):
+            english = (ROOT / f"{name}.md").read_text()
+            chinese = (ROOT / f"{name}_zh.md").read_text()
+            basename = Path(name).name
+            self.assertIn(f"({basename}_zh.md)", english)
+            self.assertIn(f"({basename}.md)", chinese)
 
     def test_current_changelog_is_modu_not_upstream_version_history(self):
         version = re.search(r"^version:\s*(\S+)", (ROOT / "pubspec.yaml").read_text(),
