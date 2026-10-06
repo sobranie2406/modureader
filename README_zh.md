@@ -25,14 +25,13 @@
 
 ## 交流与反馈
 
-欢迎关注 Modu 默读频道并加入讨论群：
+欢迎关注 Modu 默读频道，并加入 Telegram 讨论群或 QQ 交流群：
 
-| 交流入口 | 内容与用途 | 地址 |
+| 交流入口 | 内容与用途 | 地址／群号 |
 | --- | --- | --- |
 | **Modu 默读 · Telegram 频道** | 新版本发布、更新说明与项目动态 | [https://t.me/Modureader](https://t.me/Modureader) |
 | **Modu 默读 · Telegram 讨论群** | 阅读交流、使用答疑、问题反馈与功能建议 | [https://t.me/ModuReaderDiscussion](https://t.me/ModuReaderDiscussion) |
-
-欢迎加入 **Modu 默读交流反馈 QQ 群：1009765685**。在 QQ 搜索群号申请加入。
+| **Modu 默读 · QQ 交流群** | 中文阅读交流、使用答疑与问题反馈 | **1009765685** — 在 QQ 搜索群号申请加入 |
 
 问题与功能建议优先通过 [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) 提交；不方便使用 GitHub 时，可填写[在线反馈表](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)。每条反馈只描述一个问题或建议，并提供默读版本、系统与设备、复现步骤和预期结果。请勿提交密钥、密码、私人书籍或未脱敏日志。
 

@@ -25,14 +25,13 @@
 
 ## Community and feedback
 
-Connect with the Modu Reader community on Telegram:
+Connect with the Modu Reader community on Telegram or QQ:
 
-| Community | What you will find | Address |
+| Community | What you will find | Address / group number |
 | --- | --- | --- |
 | **Modu Reader · Telegram channel** | New releases, changelogs and project updates | [https://t.me/Modureader](https://t.me/Modureader) |
 | **Modu Reader · Telegram discussion group** | Reading discussions, help using the app, bug reports and feature suggestions | [https://t.me/ModuReaderDiscussion](https://t.me/ModuReaderDiscussion) |
-
-Join the **Modu Reader QQ group: 1009765685** (Chinese-language discussion). Search for the group number in QQ to request to join.
+| **Modu Reader · QQ group** | Chinese-language discussion, help using the app and feedback | **1009765685** — search for the group number in QQ to request to join |
 
 Please submit bugs and feature requests through [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose). If you cannot use GitHub, use the [feedback form](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h). Describe one issue or idea per report and include the Modu version, OS and device, reproduction steps and expected behavior. Do not share keys, passwords, private books or unredacted logs.
 
