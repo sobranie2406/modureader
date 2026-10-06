@@ -18,13 +18,19 @@
   <a href="#features">Features</a> ·
   <a href="docs/SETTINGS.md">Settings guide</a> ·
   <a href="docs/README.md">Documentation</a> ·
-  <a href="https://t.me/Modureader">Telegram</a> ·
+  <a href="https://t.me/Modureader">Telegram channel</a> ·
+  <a href="https://t.me/ModuReaderDiscussion">Telegram group</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
 ## Community and feedback
 
-Follow the [Modu Reader Telegram channel](https://t.me/Modureader).
+Connect with the Modu Reader community on Telegram:
+
+| Community | What you will find | Address |
+| --- | --- | --- |
+| **Modu Reader · Telegram channel** | New releases, changelogs and project updates | [https://t.me/Modureader](https://t.me/Modureader) |
+| **Modu Reader · Telegram discussion group** | Reading discussions, help using the app, bug reports and feature suggestions | [https://t.me/ModuReaderDiscussion](https://t.me/ModuReaderDiscussion) |
 
 Join the **Modu Reader QQ group: 1009765685** (Chinese-language discussion). Search for the group number in QQ to request to join.
 
