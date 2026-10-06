@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/database.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:anx_reader/service/sync/row_sync_engine.dart';
+import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../service/sync/row_sync_test.dart' show MemorySyncClient, bookRow;
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.root);
@@ -75,6 +78,69 @@ void main() {
     expect(reopened.isOpen, isTrue);
     expect(await reopened.query('tb_notes'), isEmpty);
   });
+
+  for (final atomic in [true, false]) {
+    test(
+        'two fresh installs bootstrap and keep syncing new books (atomic=$atomic)',
+        () async {
+      final phone = await DBHelper().database;
+      var tablet = await databaseFactoryFfi.openDatabase(
+          '${root.path}/tablet.db',
+          options: OpenDatabaseOptions(
+              version: currentDbVersion,
+              onCreate: (db, version) =>
+                  DBHelper().onUpgradeDatabase(db, 0, version)));
+      final client = MemorySyncClient()..atomic = atomic;
+      final phoneCache = await Directory('${root.path}/phone-sync').create();
+      final tabletCache = await Directory('${root.path}/tablet-sync').create();
+      Future<void> sync(Database db, Directory cache) async {
+        await RowSyncEngine(
+                store: RowSyncStore(db), client: client, cache: cache)
+            .synchronize();
+      }
+
+      Future<void> expectBooks(Database db, int count) async {
+        expect(await db.query('tb_books', where: 'is_deleted=0'),
+            hasLength(count));
+      }
+
+      try {
+        // No legacy import or pre-seeded books before installing sync triggers.
+        expect(await phone.query('tb_books'), isEmpty);
+        expect(await tablet.query('tb_books'), isEmpty);
+        expect(client.files, isEmpty);
+        await phone.insert(
+            'tb_books', bookRow(1, md5: 'phone-first')..remove('id'));
+        await sync(phone, phoneCache);
+        await sync(tablet, tabletCache);
+        await expectBooks(tablet, 1);
+        expect(File('${root.path}/file/phone-first.epub').existsSync(), isFalse,
+            reason:
+                'metadata creates an undownloaded book without local bytes');
+        await tablet.close();
+        tablet =
+            await databaseFactoryFfi.openDatabase('${root.path}/tablet.db');
+        await sync(tablet, tabletCache);
+        await expectBooks(tablet, 1);
+        await tablet.insert(
+            'tb_books', bookRow(2, md5: 'tablet-second')..remove('id'));
+        await sync(tablet, tabletCache);
+        await sync(phone, phoneCache);
+        await expectBooks(phone, 2);
+        await phone.insert(
+            'tb_books', bookRow(3, md5: 'phone-third')..remove('id'));
+        await sync(phone, phoneCache);
+        await sync(tablet, tabletCache);
+        await expectBooks(tablet, 3);
+        expect(
+            sameSyncRecords(await RowSyncStore(phone).snapshot(),
+                await RowSyncStore(tablet).snapshot()),
+            isTrue);
+      } finally {
+        await tablet.close();
+      }
+    });
+  }
 
   Future<void> legacy(int version) async {
     final db = await databaseFactoryFfi.openDatabase(getPath());

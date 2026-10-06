@@ -8,7 +8,7 @@ const {normalizeEnhancement,enhanceImage,detectContentCrop}=await import(process
 const renderer=uri((await source('pdf-region-renderer'))
  .replace("'./document-image-processing.js'",JSON.stringify(processing))
  .replace("'./document-regions.js'",JSON.stringify(uri(await source('document-regions')))));
-const {createPdfRegionRenderer}=await import(renderer);
+const {createPdfRegionRenderer,createDocumentCanvas,encodeDocumentCanvas}=await import(renderer);
 const {imageSectionEvidence,imagePageGeometry}=await import(uri((await source('epub-image-source'))
  .replace("'./document-image-processing.js'",JSON.stringify(processing))
  .replace("'./pdf-region-renderer.js'",JSON.stringify(renderer))));
@@ -23,6 +23,71 @@ function markedPage(color=[210,210,210]) {
  rect(image,190,180,20,25,210); // solid illustration fill
  return image;
 }
+test('Android document encoding is bounded and lossless; other platforms stay async',async()=>{
+ const saved=Object.getOwnPropertyDescriptor(globalThis,'navigator');
+ const documentSaved=Object.getOwnPropertyDescriptor(globalThis,'document');
+ try {
+  const setAgent=userAgent=>Object.defineProperty(globalThis,'navigator',{configurable:true,value:{userAgent}});
+  setAgent('Mozilla/5.0 (Linux; Android 15)');
+  const bytes=new Uint8Array([137,80,78,71,0,255,128]);
+  let sync=0,async=0;
+  const canvas={width:900,height:900,toDataURL(type){assert.equal(type,'image/png');sync++;return 'data:image/png;base64,'+Buffer.from(bytes).toString('base64')},toBlob(callback,type){assert.equal(type,'image/png');async++;callback(new Blob([bytes],{type}))}};
+  Object.defineProperty(globalThis,'document',{configurable:true,value:{createElement:tag=>{assert.equal(tag,'canvas');return canvas}}});
+  assert.equal(createDocumentCanvas(),canvas);
+  const blob=await encodeDocumentCanvas(canvas);
+  assert.equal(blob.type,'image/png');assert.deepEqual(new Uint8Array(await blob.arrayBuffer()),bytes);
+  assert.equal(sync,1);assert.equal(async,0);
+  canvas.width=2048;canvas.height=2048;await encodeDocumentCanvas(canvas);
+  canvas.width=2049;canvas.height=1;await encodeDocumentCanvas(canvas);
+  assert.equal(sync,1);assert.equal(async,2);
+  canvas.width=900;canvas.height=900;
+  setAgent('Mozilla/5.0 Macintosh');await encodeDocumentCanvas(canvas);
+  assert.equal(sync,1);assert.equal(async,3);
+  let offscreenCalls=0;
+  await encodeDocumentCanvas({convertToBlob:async options=>{assert.equal(options.type,'image/png');offscreenCalls++;return blob}});
+  assert.equal(offscreenCalls,1);
+  setAgent('Android');canvas.toDataURL=()=> 'data:,';
+  await assert.rejects(encodeDocumentCanvas(canvas),/encoding failed/);
+  delete canvas.toDataURL;canvas.toBlob=callback=>callback(null);
+  await assert.rejects(encodeDocumentCanvas(canvas),/encoding failed/);
+ } finally {
+  if(saved)Object.defineProperty(globalThis,'navigator',saved);else delete globalThis.navigator;
+  if(documentSaved)Object.defineProperty(globalThis,'document',documentSaved);else delete globalThis.document;
+ }
+});
+test('text paper cleanup whitens uneven tinted paper while retaining dark strokes', async()=>{
+ const image=raster(256,320);
+ for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++) {
+  const v=Math.round(210+25*x/image.width-10*y/image.height);
+  image.data.set([v+8,v,v-10,255],(y*image.width+x)*4);
+ }
+ for(let y=40;y<280;y+=20)rect(image,30,y,180,2,45);
+ const before=image.data.slice();
+ await enhanceImage(image,{paperMode:'text',whiten:200});
+ let total=0,count=0;
+ for(let y=5;y<315;y+=10)for(let x=10;x<245;x+=10) {
+  const p=(y*image.width+x)*4;
+  total+=image.data[p];count++;
+  assert.equal(image.data[p],image.data[p+2],'paper colour removed');
+ }
+ assert.ok(total/count>248);
+ assert.deepEqual(image.data.slice((40*256+40)*4,(40*256+40)*4+3),new Uint8ClampedArray([45,45,45]));
+ assert.notDeepEqual(image.data,before);
+});
+test('colour preservation and zero strength do not alter coloured art',async()=>{
+ for(const mode of ['preserve','text']) {
+  const image=raster(50,50);image.data.set([200,80,60,255],0);
+  const before=image.data.slice();await enhanceImage(image,{paperMode:mode,whiten:0});
+  assert.deepEqual(image.data,before);
+ }
+ const image=raster(50,50);image.data.set([200,80,60,255],0);
+ await enhanceImage(image,{paperMode:'preserve',whiten:200});
+ assert.deepEqual(Array.from(image.data.slice(0,4)),[200,80,60,255]);
+ assert.throws(()=>normalizeEnhancement({paperMode:'unknown'}));
+ const cancelled=raster(500,500,215),before=cancelled.data.slice(),controller=new AbortController();
+ const pending=enhanceImage(cancelled,{paperMode:'text',whiten:200},{signal:controller.signal});controller.abort();
+ await assert.rejects(pending,{name:'AbortError'});assert.deepEqual(cancelled.data,before);
+});
 test('scan cleanup removes pale gray and colored components but keeps dark ink and small print',async()=>{
  for(const color of [[210,210,210],[220,160,170],[155,195,230]]) {
   const image=markedPage(color),before=image.data.slice();
@@ -274,6 +339,27 @@ test('PDF raster cache keys include enhancement and crop margin; clear frees pix
  const detection=await source.render({...request,analyzeCrop:true,detectionOnly:true,margin:.05});
  assert.equal(detection.blob,undefined);assert.ok(detection.cropDetection.crop.width<1);assert.equal(rendered,4,'no PNG encoded for reading detection');
  assert.ok(canvases.every(c=>c.width===0&&c.height===0));source.clear();
+});
+test('editor reuses one immutable raster across enhancements and original comparison',async()=>{
+ let renders=0;
+ const original=raster(20,20,220);rect(original,8,3,2,12,50);
+ const before=original.data.slice();
+ const page={getViewport:({scale,rotation=0})=>({width:20*scale,height:20*scale,scale,rotation}),
+  render:({canvasContext})=>{renders++;canvasContext.putImageData({...original,data:before.slice()});return {promise:Promise.resolve(),cancel(){}}}};
+ const renderer=createPdfRegionRenderer({numPages:2,getPage:async()=>page},{cacheRaster:true,
+  createCanvas:()=>{const c={width:0,height:0};c.getContext=()=>({
+   getImageData:()=>({...original,data:c.data.slice()}),
+   putImageData:p=>{c.data=p.data.slice()}});return c},encode:async c=>new Blob([c.data])});
+ for(const enhancement of [{},{whiten:200},{contrast:20},{darken:15},{sharpen:40},{ink:2},{}]) {
+  const result=await renderer.render({page:0,width:20,height:20,enhancement});
+  const expected={...original,data:before.slice()};await enhanceImage(expected,enhancement);
+  assert.deepEqual(new Uint8ClampedArray(await result.blob.arrayBuffer()),expected.data);
+ }
+ assert.equal(renders,1,'slider changes do not rasterize PDF again');
+ await renderer.render({page:1,width:20,height:20});assert.equal(renders,2);
+ await renderer.render({page:0,width:20,height:20,enhancement:{contrast:21}});assert.equal(renders,3,'only one raw page is retained');
+ renderer.clear();await renderer.render({page:0,width:20,height:20});assert.equal(renders,4);
+ assert.deepEqual(original.data,before);
 });
 test('watermark filtering changes only named OCGs and never original visibility',async()=>{
  const configs=[],renders=[];

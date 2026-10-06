@@ -64,6 +64,9 @@ export class FixedLayout extends HTMLElement {
     #pdfDetailGeneration = 0
     #pdfDetailTimer
     #pdfDetailUrl
+    #pdfPrefetchTimer
+    #pdfPrefetchGeneration = 0
+    #pdfPrefetchBusy = false
     #pdfScroll
     #destroyed = false
     #autoTimer
@@ -157,6 +160,37 @@ export class FixedLayout extends HTMLElement {
     #cancelPdfDetail() {
         clearTimeout(this.#pdfDetailTimer)
         this.#pdfDetailGeneration++
+        clearTimeout(this.#pdfPrefetchTimer)
+        this.#pdfPrefetchGeneration++
+        if (this.#pdfPrefetchBusy) {
+            this.book?.readingRegionRenderer?.cancel()
+            this.book?.cropRegionRenderer?.cancel()
+            this.#pdfPrefetchBusy = false
+        }
+    }
+    #schedulePdfPrefetch() {
+        clearTimeout(this.#pdfPrefetchTimer)
+        const page = this.#pdfPage + 1, generation = ++this.#pdfPrefetchGeneration
+        // Only native PDFs opt in. Never probe ordinary ebook chapters here.
+        if (!this.book?.sections[page]?.loadFrame || this.#pdfScroll || !this.#pdfEnabled) return
+        const active = () => !this.#destroyed && !this.#pdfBusy && this.#pdfEnabled &&
+            generation === this.#pdfPrefetchGeneration
+        this.#pdfPrefetchTimer = setTimeout(async () => {
+            if (!active() || !this.readerActive) return
+            this.#pdfPrefetchBusy = true
+            try {
+                const regions = await resolveReadingRegions(this.#pdfLayout, page, this.book,
+                    {hideWatermarks: this.#pdfView.display?.hideWatermarks, active})
+                if (!active()) return
+                const bounds = this.getBoundingClientRect()
+                await this.book.readingRegionRenderer.render({page, region: regions[0],
+                    enhancement: this.#pdfView.enhancement,
+                    hideWatermarks: this.#pdfView.display?.hideWatermarks,
+                    width: Math.max(1, bounds.width * (devicePixelRatio || 1)),
+                    height: Math.max(1, bounds.height * (devicePixelRatio || 1))})
+            } catch (_) { /* Optional: a failed prefetch must never change the visible page. */ }
+            finally { if (generation === this.#pdfPrefetchGeneration) this.#pdfPrefetchBusy = false }
+        }, 800)
     }
     #schedulePdfDetail(record = false) {
         this.#cancelPdfDetail()
@@ -170,6 +204,14 @@ export class FixedLayout extends HTMLElement {
     async #refreshPdfDetail() {
         const frame = this.#center, plan = this.#pdfPlan
         if (!frame?.crop || !plan || this.#pdfBusy || !this.#pdfEnabled || frame.iframe.contentDocument.documentElement.dataset.documentImage === 'false') return
+        const density = plan.scale * (devicePixelRatio || 1)
+        // The initial cropped raster already covers the whole crop. Do not
+        // render/encode it again at essentially the same screen resolution.
+        if (frame.raster && frame.raster.width / frame.crop.width >= frame.width * density - 2 &&
+            frame.raster.height / frame.crop.height >= frame.height * density - 2) {
+            this.#schedulePdfPrefetch()
+            return
+        }
         const generation = ++this.#pdfDetailGeneration
         const active = () => !this.#destroyed && this.#pdfEnabled &&
             frame === this.#center && generation === this.#pdfDetailGeneration
@@ -205,7 +247,10 @@ export class FixedLayout extends HTMLElement {
         } catch (_) {
             // Keep the bounded base raster visible; later movement/resize retries.
             if (active()) this.dispatchEvent(new CustomEvent('pdf-detail', { detail: { state: 'failed' } }))
-        } finally { if (url) URL.revokeObjectURL(url) }
+        } finally {
+            if (url) URL.revokeObjectURL(url)
+            if (active()) this.#schedulePdfPrefetch()
+        }
     }
     #attachPdfPan(doc) {
         doc.addEventListener('wheel', event => {
@@ -266,7 +311,8 @@ export class FixedLayout extends HTMLElement {
         let frame, url
         const active = () => !this.#destroyed && generation === this.#pdfGeneration
         try {
-            const src = await this.book.sections[page].load()
+            const section = this.book.sections[page]
+            const src = await (section.loadFrame ? section.loadFrame() : section.load())
             if (!active()) return false
             frame = await this.#createFrame('center', { index: page, src }, true)
             if (!active()) return false
@@ -310,6 +356,7 @@ export class FixedLayout extends HTMLElement {
                 width: Math.max(1, bounds.width * (devicePixelRatio || 1)),
                 height: Math.max(1, bounds.height * (devicePixelRatio || 1)) })
             if (!active()) return false
+            frame.raster = {width: result.width, height: result.height}
             url = URL.createObjectURL(result.blob)
             const img = frame.iframe.contentDocument.querySelector('[data-document-base]') ?? frame.iframe.contentDocument.querySelector('img')
             img.src = url

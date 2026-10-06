@@ -4,6 +4,32 @@ import { normalizeEnhancement, hasEnhancement, enhanceImage, detectContentCrop }
 const abortError = () => new DOMException('PDF region request cancelled', 'AbortError')
 const check = signal => { if (signal.aborted) throw abortError() }
 
+const androidWebView = () => /Android/i.test(globalThis.navigator?.userAgent ?? '')
+// Some Android WebViews defer BOTH toBlob and convertToBlob for seconds. Use
+// a bounded, lossless synchronous encoder there; other platforms stay async.
+export const createDocumentCanvas = () => !androidWebView() && typeof OffscreenCanvas === 'function'
+    ? new OffscreenCanvas(1, 1) : document.createElement('canvas')
+export const encodeDocumentCanvas = async canvas => {
+    // Never block the UI with unbounded full-resolution page encoding. Region
+    // rendering already caps its output at 2MP. No lossy JPEG conversion.
+    if (androidWebView() && typeof canvas.toDataURL === 'function' &&
+        canvas.width > 0 && canvas.height > 0 &&
+        canvas.width <= 2048 && canvas.height <= 2048 &&
+        canvas.width * canvas.height <= 2097152) {
+        const data = canvas.toDataURL('image/png')
+        const prefix = 'data:image/png;base64,'
+        if (!data.startsWith(prefix)) throw new Error('PDF region encoding failed')
+        const binary = atob(data.slice(prefix.length))
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        return new Blob([bytes], {type: 'image/png'})
+    }
+    return typeof canvas.convertToBlob === 'function'
+        ? canvas.convertToBlob({type: 'image/png'})
+        : new Promise((resolve, reject) => canvas.toBlob(blob =>
+            blob ? resolve(blob) : reject(new Error('PDF region encoding failed')), 'image/png'))
+}
+
 // A virtual full-page viewport, but ONLY the requested visible rectangle gets
 // a bitmap. High zoom must never allocate a full-page high-resolution canvas.
 export const regionRenderPlan = (page, { region = FULL_PAGE, rotation = 0,
@@ -29,11 +55,14 @@ export const regionRenderPlan = (page, { region = FULL_PAGE, rotation = 0,
 }
 
 export const createPdfRegionRenderer = (pdf, {
-    createCanvas = () => document.createElement('canvas'),
-    encode = canvas => new Promise((resolve, reject) => canvas.toBlob(blob =>
-        blob ? resolve(blob) : reject(new Error('PDF region encoding failed')), 'image/png')),
+    createCanvas = createDocumentCanvas,
+    encode = encodeDocumentCanvas,
+    cacheRaster = false,
 } = {}) => {
     let current, tail = Promise.resolve(), generation = 0
+    // Editor only: one immutable unprocessed raster, <= 2MP / 8MiB. Changing
+    // enhancement parameters must not decode/rasterize the PDF again.
+    let originalRaster
     const cache = new Map()
     let cacheBytes = 0
     const watermarkGroups = async () => {
@@ -42,7 +71,7 @@ export const createPdfRegionRenderer = (pdf, {
             /watermark|水印/i.test(group.name ?? '')).map(([id, group]) => ({id, name:group.name}))
     }
     const cancel = () => current?.abort()
-    const clear = () => { generation++; cancel(); cache.clear(); cacheBytes = 0 }
+    const clear = () => { generation++; cancel(); cache.clear(); cacheBytes = 0; originalRaster = null }
     const info = async (page = 0) => {
         if (!Number.isInteger(page) || page < 0 || page >= pdf.numPages)
             throw new RangeError('PDF page out of bounds')
@@ -75,7 +104,9 @@ export const createPdfRegionRenderer = (pdf, {
                 throw new RangeError('Crop detection requires an unrotated full page')
             const key = JSON.stringify([pageNumber, plan.region, plan.rotation,
                 plan.viewport.scale, plan.width, plan.height, enhancement, request.analyzeCrop === true, request.margin ?? .03,
-                request.hideWatermarks === true])
+                request.hideWatermarks === true, request.detectionOnly === true])
+            const rasterKey = JSON.stringify([pageNumber, plan.region, plan.rotation,
+                plan.viewport.scale, plan.width, plan.height, request.hideWatermarks === true])
             if (cache.has(key)) {
                 const result = cache.get(key)
                 cache.delete(key); cache.set(key, result)
@@ -89,6 +120,9 @@ export const createPdfRegionRenderer = (pdf, {
                 canvas.width = plan.width; canvas.height = plan.height
                 const canvasContext = canvas.getContext('2d')
                 if (!canvasContext) throw new Error('PDF canvas unavailable')
+                const cachedRaster = cacheRaster && originalRaster?.key === rasterKey ? originalRaster.pixels : null
+                if (cachedRaster) canvasContext.putImageData(cachedRaster, 0, 0)
+                else {
                 let optionalContentConfigPromise
                 if (request.hideWatermarks === true && pdf.getOptionalContentConfig) {
                     // Fresh config per render: never mutate original-page or
@@ -103,6 +137,9 @@ export const createPdfRegionRenderer = (pdf, {
                     transform: plan.transform, intent: 'print', background: 'rgb(255,255,255)' })
                 await task.promise
                 check(controller.signal)
+                if (cacheRaster) originalRaster = {key: rasterKey,
+                    pixels: canvasContext.getImageData(0, 0, plan.width, plan.height)}
+                }
                 let cropDetection
                 if (request.analyzeCrop || hasEnhancement(enhancement)) {
                     const pixels = canvasContext.getImageData(0, 0, plan.width, plan.height)

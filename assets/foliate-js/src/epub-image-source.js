@@ -1,4 +1,4 @@
-import { regionRenderPlan } from './pdf-region-renderer.js'
+import { regionRenderPlan, encodeDocumentCanvas } from './pdf-region-renderer.js'
 import { normalizeEnhancement, hasEnhancement, enhanceImage, detectContentCrop } from './document-image-processing.js'
 
 const aborted = () => new DOMException('Image document closed', 'AbortError')
@@ -208,7 +208,7 @@ export function createEpubImageSource(book) {
                 if(hasEnhancement(enhancement)){await enhanceImage(pixels,enhancement,{signal});ctx.putImageData(pixels,0,0)}
             }
             if(request.detectionOnly&&cropDetection){check(signal);return {page:request.page,width:plan.width,height:plan.height,cropDetection}}
-            const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Encoding failed')),'image/png'))
+            const blob=await encodeDocumentCanvas(canvas)
             check(signal);return {blob,page:request.page,width:plan.width,height:plan.height,cropDetection}
         }finally{canvas.width=0;canvas.height=0}
     })

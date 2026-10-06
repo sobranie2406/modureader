@@ -304,6 +304,11 @@ export class View extends HTMLElement {
     for (const a of doc.querySelectorAll('a[href]'))
       a.addEventListener('click', e => {
         e.preventDefault()
+        // Some scanned EPUB/Kindle pages wrap their image in a link to the
+        // original picture. It is still a page tap, not picture navigation.
+        // Keep text links and footnote popups on the normal link path.
+        if (this.scannedImageDocument && !doc.__isFootNote &&
+          e.target.closest?.('img, svg')) return
         e.stopPropagation()
         const href_ = a.getAttribute('href')
         const href = section?.resolveHref?.(href_) ?? href_
@@ -321,7 +326,8 @@ export class View extends HTMLElement {
     for (const img of doc.querySelectorAll('img')) {
       // Scanned pages are the reading surface. Do not install picture actions,
       // including desktop click or touch long-press preview handlers.
-      if (this.scannedImageDocument && !doc.__isFootNote) {
+      if (!doc.__isFootNote && (this.scannedImageDocument ||
+        img.hasAttribute('data-document-base'))) {
         img.draggable = false
         img.style.webkitTouchCallout = 'none'
         img.addEventListener('contextmenu', e => e.preventDefault())

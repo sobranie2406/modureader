@@ -61,12 +61,12 @@ void main() {
         '解释 ${jsonEncode(source)} / ${jsonEncode(source)}');
   });
 
-  test('all AI commands default to selection only and no network', () {
+  test('all AI commands default to context and no network', () {
     for (final item
         in SelectionToolbarConfig.initialItems.where((i) => i.isAi)) {
-      expect(item.scope, SelectionAiScope.selection);
+      expect(item.scope, SelectionAiScope.context);
       expect(item.webSearch, false);
-      expect(item.toJson().containsKey('scope'), false);
+      expect(item.toJson()['scope'], 'context');
       expect(item.toJson().containsKey('webSearch'), false);
     }
   });
@@ -87,7 +87,30 @@ void main() {
           'name': own.name,
           'prompt': own.prompt
         }).scope,
+        SelectionAiScope.context);
+  });
+
+  test('explicit selection-only survives save, restore and legacy import', () {
+    final selected = own.copyWith(scope: SelectionAiScope.selection);
+    expect(selected.toJson()['scope'], 'selection');
+    expect(SelectionToolbarItem.fromJson(selected.toJson()).scope,
         SelectionAiScope.selection);
+    final defaults = const SelectionToolbarConfig();
+    final legacy = jsonDecode(defaults.encode()) as Map;
+    for (final item in legacy['items'] as List) {
+      (item as Map).remove('scope');
+    }
+    final restored = SelectionToolbarConfig.decode(jsonEncode(legacy));
+    expect(
+        restored.items
+            .where((i) => i.isAi)
+            .every((i) => i.scope == SelectionAiScope.context),
+        true);
+    expect(
+        restored.items
+            .where((i) => !i.isAi)
+            .every((i) => i.scope == SelectionAiScope.selection),
+        true);
   });
 
   test('invalid scopes and network flags are rejected', () {
@@ -111,7 +134,8 @@ void main() {
     final template = SelectionToolbarConfig.templateItems.first;
     final entry =
         (raw['items'] as List).firstWhere((i) => i['id'] == template.id) as Map;
-    expect(entry, {'id': template.id, 'action': template.action});
+    expect(entry,
+        {'id': template.id, 'action': template.action, 'scope': 'context'});
     expect(
         SelectionToolbarConfig.decode(defaults.encode())
             .items
@@ -129,6 +153,7 @@ void main() {
     expect(changed, {
       'id': template.id,
       'action': template.action,
+      'scope': 'context',
       'enabled': true,
       'prompt': '解释 {selection} 的意思',
     });
@@ -174,7 +199,8 @@ void main() {
     expect(preset.promptForSelection('学而时习之'), contains('"学而时习之"'));
     expect(
         preset.localizedPrompt(const Locale('en')), contains('modern Chinese'));
-    expect(preset.toJson(), {'id': preset.id, 'action': 'aiCommand'});
+    expect(preset.toJson(),
+        {'id': preset.id, 'action': 'aiCommand', 'scope': 'context'});
     final edited = preset.copyWith(
         enabled: true,
         prompt: '逐句翻译 {selection}',

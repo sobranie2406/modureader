@@ -1,6 +1,92 @@
 part of 'webdav_client.dart';
 
 extension _WebdavSyncSupport on WebdavClient {
+  bool _isSyncDirectory(String path) {
+    final clean = path.replaceFirst(RegExp(r'/$'), '');
+    return path.endsWith('/') ||
+        {SyncPaths.root, SyncPaths.books, SyncPaths.covers, SyncPaths.recordLog}
+            .contains(clean) ||
+        RegExp('^${SyncPaths.recordLog}/[0-9a-f]\$').hasMatch(clean);
+  }
+
+  // Do not enable Dio's automatic redirects: WebDAV needs to retain PROPFIND,
+  // its XML body and Depth, and credentials must never cross origins. Only a
+  // known directory's trailing slash may change; files and writes stay exact.
+  Future<Response> _propfindWithDirectoryRedirect(String path,
+      {required String body,
+      required bool directory,
+      bool depthOne = false}) async {
+    final seen = <String>{};
+    var target = path;
+    var redirected = false;
+    while (true) {
+      late Response response;
+      try {
+        response = await _client.c.req(_client, 'PROPFIND', target, data: body,
+            optionsHandler: (options) {
+          options.followRedirects = false;
+          options.validateStatus = (_) => true;
+          options.headers!['depth'] = depthOne ? '1' : '0';
+          options.headers!['content-type'] = 'application/xml;charset=UTF-8';
+          options.headers!['accept'] = 'application/xml,text/xml';
+          options.responseType = ResponseType.plain;
+        });
+      } on DioException catch (e) {
+        final status = e.response?.statusCode;
+        if (status == null || status < 300 || status >= 400) rethrow;
+        response = e.response!;
+      }
+      if (response.statusCode == 207) {
+        if (redirected) {
+          // A redirect to a resource-level 404 is not an empty cloud either.
+          final xml = XmlDocument.parse(response.data as String);
+          if (xml.findAllElements('response', namespace: 'DAV:').any((entry) =>
+              RegExp(r'\s404(?:\s|$)').hasMatch(
+                  entry.getElement('status', namespace: 'DAV:')?.innerText ??
+                      ''))) {
+            throw const FormatException('WebDAV 重定向后的目录不存在，已停止同步');
+          }
+        }
+        return response;
+      }
+      if (redirected && response.statusCode == 404) {
+        // readProps/safeReadDir interpret a genuine initial 404 as absence.
+        // Never let a broken Location silently create an empty cloud library.
+        throw const FormatException('WebDAV 重定向后的目录不存在，已停止同步');
+      }
+      final current = response.requestOptions.uri;
+      seen.add(current.toString());
+      final location = response.headers.value('location');
+      Uri? next;
+      try {
+        if (location != null && location.trim().isNotEmpty)
+          next = current.resolve(location);
+      } catch (_) {/* malformed redirects remain a visible HTTP error */}
+      String withoutSlash(Uri uri) => uri.path.replaceFirst(RegExp(r'/$'), '');
+      if (!directory ||
+          ![301, 302, 307, 308].contains(response.statusCode) ||
+          next == null ||
+          !['http', 'https'].contains(next.scheme) ||
+          next.origin != current.origin ||
+          next.userInfo.isNotEmpty ||
+          next.hasFragment ||
+          next.query != current.query ||
+          next.path == current.path ||
+          withoutSlash(next) != withoutSlash(current) ||
+          seen.contains(next.toString()) ||
+          seen.length >= 3) {
+        throw DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            type: DioExceptionType.badResponse);
+      }
+      AnxLog.info(
+          'WebDAV directory redirect normalized: HTTP ${response.statusCode}, depth=${depthOne ? 1 : 0}');
+      redirected = true;
+      target = next.toString();
+    }
+  }
+
   Future<bool> _probeAtomicSyncWrites() async {
     final folder = '${SyncPaths.root}/.sync-probes/${const Uuid().v4()}';
     final target = '$folder/database8.db';
@@ -70,8 +156,10 @@ extension _WebdavSyncSupport on WebdavClient {
 
   Future<List<RemoteFile>> _readCompleteSyncDirectory(String path) async {
     final endpoint = Uri.parse(_config['url'] as String);
+    final directoryPath =
+        path.replaceFirst(RegExp(r'^/+'), '').replaceFirst(RegExp(r'/+$'), '');
     final rootPath =
-        '${endpoint.path.replaceFirst(RegExp(r'/$'), '')}/${_safeEncodePath(path).replaceFirst(RegExp(r'^/'), '')}/';
+        '${endpoint.path.replaceFirst(RegExp(r'/+$'), '')}/${_safeEncodePath(directoryPath)}/';
     final root = endpoint.replace(
         path: Uri.decodeFull(rootPath), query: null, fragment: null);
     Uri next = root;
@@ -86,21 +174,11 @@ extension _WebdavSyncSupport on WebdavClient {
           seen.length > 1000) {
         throw const FormatException('WebDAV 分页地址无效，已停止同步');
       }
-      final response = await _client.c.req(_client, 'PROPFIND', next.toString(),
-          data: '<d:propfind xmlns:d="DAV:"><d:prop>'
-              '<d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>',
-          optionsHandler: (options) {
-        options.followRedirects = false;
-        options.headers!['depth'] = '1';
-        options.headers!['content-type'] = 'application/xml';
-        options.responseType = ResponseType.plain;
-      });
-      if (response.statusCode != 207) {
-        throw DioException(
-            requestOptions: response.requestOptions,
-            response: response,
-            type: DioExceptionType.badResponse);
-      }
+      final response = await _propfindWithDirectoryRedirect(next.toString(),
+          directory: true,
+          depthOne: true,
+          body: '<d:propfind xmlns:d="DAV:"><d:prop>'
+              '<d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>');
       final xml = response.data as String;
       if (xml.length > 8 * 1024 * 1024) {
         throw const FormatException('WebDAV 目录响应过大');
@@ -149,7 +227,7 @@ extension _WebdavSyncSupport on WebdavClient {
             .toList();
         entries[name] = RemoteFile(
             name: name,
-            path: '$path/$name',
+            path: '$directoryPath/$name',
             isDir: directory,
             size: sizes.isEmpty ? null : int.tryParse(sizes.first.innerText));
         if (entries.length > 10000) throw const FormatException('同步目录超过安全限制');

@@ -5,6 +5,7 @@ import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/sync_status.dart';
 import 'package:anx_reader/providers/sync.dart';
+import 'package:anx_reader/service/sync/webdav_request_policy.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -46,11 +47,19 @@ class SyncStatus extends _$SyncStatus {
   int _refreshGeneration = 0;
   List<Book> allBooksInBookShelf = [];
   @override
-  Future<SyncStatusModel> build() async {
+  Future<SyncStatusModel> build() => _buildStatus();
+
+  Future<SyncStatusModel> _buildStatus({List<String>? remoteFileNames}) async {
     final books = await _listAllBooksInBookShelf();
     allBooksInBookShelf = books;
     final allBooksInBookShelfIds = books.map((e) => e.id).toList();
-    final remoteFiles = await _listRemoteFiles(books);
+    final remoteFiles = remoteFileNames == null
+        ? await _listRemoteFiles(books)
+        : books
+            .where((book) =>
+                remoteFileNames.contains(book.filePath.split('/').last))
+            .map((book) => book.id)
+            .toList();
     final localFiles = await _listLocalFiles(books);
 
     final localOnly =
@@ -83,9 +92,10 @@ class SyncStatus extends _$SyncStatus {
     );
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({List<String>? remoteFileNames}) async {
     final generation = ++_refreshGeneration;
-    final next = await AsyncValue.guard(build);
+    final next = await AsyncValue.guard(
+        () => _buildStatus(remoteFileNames: remoteFileNames));
     if (generation == _refreshGeneration) state = next;
   }
 
@@ -110,11 +120,12 @@ class SyncStatus extends _$SyncStatus {
       try {
         return await core();
       } catch (e) {
+        if (isWebdavBusy(e)) rethrow;
         AnxLog.info(
-            'Webdav: Failed to list remote files: $e try again $count/$maxCount');
+            'Webdav: Failed to list remote files: ${e.runtimeType} try again $count/$maxCount');
         count++;
         if (count >= maxCount) {
-          AnxLog.info('Webdav: Failed to list remote files: $e');
+          AnxLog.info('Webdav: Failed to list remote files: ${e.runtimeType}');
           throw StateError('无法读取云端书籍列表，请检查网络和 WebDAV 权限');
         }
       }

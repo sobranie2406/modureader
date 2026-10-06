@@ -1,10 +1,26 @@
 # Modu changelog
 
-Current stable baseline: **1.2.0+10082**. Reviewed 2026-10-04.
+Current stable baseline: **1.2.1+10086**. Updated 2026-10-06.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.2.1
+
+### English
+
+- Repair converted TXT / Markdown checksums without changing book identities; improve new-device WebDAV synchronization and legacy database compatibility.
+- Recognize Jianguoyun, coalesce automatic sync, persist rolling request budgets and server cooldowns, and reduce duplicate listing/authentication/maintenance requests while retaining conflict and integrity checks.
+- Improve PDF/scanned-page rendering, tap-to-turn and paper whitening; default selection AI to context with a selected-text-only option.
+- Add the QQ community number and original invitation code to About and feedback.
+
+### 简体中文
+
+- 修复 TXT／Markdown 转换后校验不一致，保留书籍身份；改善新设备 WebDAV 同步及旧数据库兼容。
+- 自动识别坚果云，合并自动同步，持久化访问预算及冷却，减少重复扫描、认证和维护请求，保留防冲突及完整性校验。
+- 优化 PDF／扫描版渲染、点击翻页和纸张增白；划词 AI 默认结合上下文，保留仅选中文字选项。
+- 关于及反馈界面增加 QQ 群号和原始入群二维码。
 
 ## 1.2.0
 

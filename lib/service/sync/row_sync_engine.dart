@@ -96,6 +96,7 @@ class RowSyncEngine {
       this.durableDirectory,
       this.beforePublish,
       this.beforeMerge,
+      this.afterMerge,
       this.maxAttempts = 3,
       this.validatorRetryDelay = const Duration(seconds: 1)});
   final RowSyncStore store;
@@ -104,6 +105,7 @@ class RowSyncEngine {
   final Directory? durableDirectory;
   final Future<void> Function()? beforePublish;
   final Future<void> Function()? beforeMerge;
+  final Future<void> Function()? afterMerge;
   final int maxAttempts;
   final Duration validatorRetryDelay;
   static final remotePath = SyncPaths.database('database8.db');
@@ -195,7 +197,22 @@ class RowSyncEngine {
           await beforeMerge?.call();
           backedUp = true;
         }
-        final merged = await store.merge(remoteRecords);
+        var merged = await store.merge(remoteRecords);
+        // Metadata-only local migrations run after learning remote replacements
+        // and before the unchanged fast path. Publish the repaired snapshot in
+        // this same sync, without resurrecting an obsolete local book file.
+        if (afterMerge != null) {
+          await afterMerge!();
+          merged = await store.snapshot();
+        }
+        // Counts only: enough to distinguish an empty metadata view from a
+        // successful merge without exposing titles, paths, accounts or keys.
+        int bookRecords(List<RowSyncRecord> records) =>
+            records.where((r) => r.kind == 'book' && !r.deleted).length;
+        AnxLog.info('Sync metadata: attempt=${attempt + 1}, '
+            'localBooks=${bookRecords(local)}, remoteBooks=${bookRecords(remoteRecords)}, '
+            'mergedBooks=${bookRecords(merged)}, checkpoint=${metadata != null}, '
+            'journalRecords=${journal.length}');
         if ((remote != null || journal.isNotEmpty) &&
             !repairsRemoteIdentity &&
             sameSyncRecords(merged, remoteRecords)) {

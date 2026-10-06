@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:anx_reader/l10n/generated/L10n_en.dart';
+import 'package:anx_reader/l10n/generated/L10n_zh.dart';
 
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/sync/sync_feedback.dart';
@@ -8,6 +10,20 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('batch download summaries do not swap successes and failures', () {
+    expect(bookDownloadSummary(L10nZhCn(), success: 0, failed: 10),
+        '书籍文件下载完成，0成功，10失败');
+    expect(bookDownloadSummary(L10nEn(), success: 3, failed: 7),
+        'Books downloaded, 3 success, 7 failed');
+    expect(bookDownloadSummary(L10nZhCn(), success: 10, failed: 0),
+        '书籍文件下载完成，10成功，0失败');
+  });
+  test('integrity failure explains source-device recovery without deletion',
+      () {
+    expect(bookIntegrityFailureMessage(chinese: true), contains('保留本地书籍'));
+    expect(bookIntegrityFailureMessage(chinese: true), contains('请勿删除'));
+    expect(bookIntegrityFailureMessage(chinese: false), contains('then retry'));
+  });
   const secret = 'private-book-and-api-key';
   DioException httpError(int status) {
     final request = RequestOptions(
@@ -26,6 +42,19 @@ void main() {
   test('success is a terminal, concise localized message', () {
     expect(syncSuccessMessage(chinese: true), '同步成功');
     expect(syncSuccessMessage(chinese: false), 'Sync successful');
+  });
+  test('redirect failures explain the path issue without disclosing addresses',
+      () {
+    for (final code in [301, 302, 303, 307, 308]) {
+      expect(
+          syncFailureMessage(httpError(code), chinese: true), contains('重定向'));
+      expect(syncFailureMessage(httpError(code), chinese: false),
+          isNot(contains(secret)));
+    }
+    expect(
+        syncFailureMessage(const FormatException('WebDAV 重定向后的目录不存在'),
+            chinese: true),
+        contains('不要删除云端数据'));
   });
 
   for (final entry in {

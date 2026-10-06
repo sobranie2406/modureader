@@ -52,7 +52,7 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.2.0** — Dedicated PDF and scanned-book reading, automatic cropping, image enhancements, on-demand OCR and inline text reflow; ordinary text books keep their familiar reading controls.
+**Latest release: 1.2.1** — Improved WebDAV sync and Jianguoyun request handling, PDF/scanned-page performance and whitening, context-aware selection AI, and QQ community access.
 
 Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
 

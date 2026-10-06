@@ -437,6 +437,7 @@ void _showImportDialog(
 Future<void> importBook(File file, WidgetRef ref,
     {void Function()? onImported}) async {
   String? md5 = await MD5Service.calculateFileMd5(file.path);
+  String? sourceMd5;
 
   final extension =
       path.extension(file.path).replaceFirst('.', '').toLowerCase();
@@ -444,13 +445,20 @@ Future<void> importBook(File file, WidgetRef ref,
     final tempFile = isMarkdownExtension(extension)
         ? await convertFromMarkdown(file)
         : await convertFromTxt(file);
+    sourceMd5 = md5;
+    md5 = await MD5Service.calculateFileMd5(tempFile.path);
+    if (md5 == null) {
+      throw const FileSystemException('Cannot verify converted book');
+    }
     file.deleteSync();
     file = tempFile;
   }
 
   await getBookMetadata(file,
       md5: md5,
-      inspectDocumentOnImport: {'epub', 'pdf', 'mobi', 'azw3', 'fb2'}.contains(extension));
+      sourceMd5: sourceMd5,
+      inspectDocumentOnImport:
+          {'epub', 'pdf', 'mobi', 'azw3', 'fb2'}.contains(extension));
   if (await file.exists()) await file.delete();
   if (onImported != null) {
     onImported();
@@ -534,6 +542,7 @@ Future<void> saveBook(
   String? md5,
   String cover, {
   Book? provideBook,
+  String? sourceMd5,
   Object? documentReadingMode,
 }) async {
   // Extract original filename (without extension)
@@ -561,7 +570,7 @@ Future<void> saveBook(
   await file.copy(filePath);
   dbCoverPath = cover.isEmpty ? '' : await saveImageToLocal(cover, dbCoverPath);
   if (md5 != null) {
-    provideBook ??= await bookDao.getBookByMd5(md5);
+    provideBook ??= await bookDao.getBookByMd5(sourceMd5 ?? md5);
   }
 
   Book book = Book(
@@ -579,7 +588,7 @@ Future<void> saveBook(
       updateTime: DateTime.now());
 
   try {
-    book.id = await bookDao.insertBook(book);
+    book.id = await bookDao.insertBook(book, sourceMd5: sourceMd5);
   } catch (_) {
     // Only remove newly created staging artifacts; never the imported source.
     final copied = File(filePath);
@@ -593,7 +602,8 @@ Future<void> saveBook(
   // Persist only after database identity and the final local path are known.
   // A cache failure must not discard an otherwise successfully imported book.
   try {
-    await DocumentReadingModeStore(Prefs().prefs).save(book, documentReadingMode);
+    await DocumentReadingModeStore(Prefs().prefs)
+        .save(book, documentReadingMode);
   } catch (_) {
     AnxLog.warning('Imported document classification could not be saved');
   }
@@ -613,6 +623,7 @@ Future<void> getBookMetadata(
   File file, {
   Book? book,
   String? md5,
+  String? sourceMd5,
   WidgetRef? ref,
   bool coverOnly = false,
   bool classificationOnly = false,
@@ -711,6 +722,7 @@ Future<void> getBookMetadata(
         md5,
         metadata['cover']?.toString() ?? '',
         provideBook: book,
+        sourceMd5: sourceMd5,
         documentReadingMode: metadata['documentReadingMode']);
     ref?.read(bookListProvider.notifier).refresh();
   } finally {

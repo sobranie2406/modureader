@@ -38,6 +38,37 @@ void change(WidgetTester tester, String key, double value) => tester
     .widget<Slider>(find.byKey(ValueKey('enhancement-$key')))
     .onChanged!(value);
 void main() {
+  testWidgets(
+      'paper mode is opt-in, persists with zero strength and previews before saving',
+      (tester) async {
+    final saved = <DocumentEnhancement>[], requests = <Map<String, dynamic>>[];
+    await open(tester,
+        save: (v) async => saved.add(v),
+        render: (r) async {
+          requests.add(r);
+          return {'dataUrl': fixture.pixel};
+        });
+    expect(DocumentEnhancement.fromJson({}).paperMode, 'preserve');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clean text scan paper').last);
+    await tester.pumpAndSettle();
+    expect(requests.last['enhancement']['paperMode'], 'text');
+    expect(saved, isEmpty);
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    expect(saved.single.paperMode, 'text');
+    expect(saved.single.enabled, false);
+    expect(
+        PdfReadingView.fromJson(
+                PdfReadingView(enhancement: saved.single).toJson())
+            .enhancement
+            .paperMode,
+        'text');
+    expect(saved.single.withValue('whiten', 150).paperMode, 'text');
+    expect(() => DocumentEnhancement.fromJson({'paperMode': 'invalid'}),
+        throwsFormatException);
+  });
   testWidgets('every row previews, increments, decrements, resets and saves',
       (tester) async {
     final requests = <Map<String, dynamic>>[], saved = <DocumentEnhancement>[];
@@ -109,6 +140,10 @@ void main() {
       expect(previewSize.height,
           greaterThanOrEqualTo(size.height < 480 ? 72 : size.height * .20));
       expect(previewSize.width, lessThanOrEqualTo(size.width));
+      await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('enhancement-ink')), 80,
+          scrollable: find.descendant(
+              of: find.byType(ListView), matching: find.byType(Scrollable)));
       change(tester, 'ink', 3);
       await tester.pumpAndSettle();
       for (final key in DocumentEnhancement.limits.keys) {
@@ -166,12 +201,15 @@ void main() {
     change(tester, 'watermark', 70);
     await tester.pumpAndSettle();
     expect(requests.last['enhancement']['watermark'], 70);
+    final renderCount = requests.length;
     await tester.tap(find.text('Compare original'));
     await tester.pumpAndSettle();
-    expect(requests.last['enhancement']['watermark'], 0);
+    expect(requests.length, renderCount, reason: 'original preview is cached');
+    expect(find.text('Show enhanced'), findsOneWidget);
     await tester.tap(find.text('Show enhanced'));
     await tester.pumpAndSettle();
     expect(requests.last['enhancement']['watermark'], 70);
+    expect(requests.length, renderCount, reason: 'enhanced preview is cached');
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
     expect(saved.single.watermark, 70);
@@ -196,13 +234,16 @@ void main() {
     expect(zoom.maxScale, 4);
     zoom.transformationController!.value = Matrix4.diagonal3Values(2, 2, 1);
     await tester.pump();
+    final renderCount = requests.length;
     await tester.tap(find.text('Compare original'));
     await tester.pumpAndSettle();
-    expect(requests.last['enhancement']['ink'], 0);
+    expect(requests.length, renderCount);
+    expect(find.text('Show enhanced'), findsOneWidget);
     expect(zoom.transformationController!.value.getMaxScaleOnAxis(), 2);
     await tester.tap(find.text('Show enhanced'));
     await tester.pumpAndSettle();
     expect(requests.last['enhancement']['ink'], 8);
+    expect(requests.length, renderCount);
     expect(zoom.transformationController!.value.getMaxScaleOnAxis(), 2);
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();

@@ -28,6 +28,8 @@ class DocumentEnhancementPanel extends StatefulWidget {
 class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
   late DocumentEnhancement _draft = widget.initial;
   Uint8List? _bytes;
+  Uint8List? _originalPreview, _enhancedPreview;
+  String? _enhancedKey;
   Timer? _timer;
   int _generation = 0;
   bool _busy = true, _failed = false, _saving = false, _original = false;
@@ -40,10 +42,24 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
     _schedule();
   }
 
-  void _schedule() {
+  void _schedule({bool comparison = false}) {
     _timer?.cancel();
     widget.cancelRender();
     final generation = ++_generation;
+    final key = jsonEncode(_draft.toJson());
+    final cached = _original
+        ? _originalPreview
+        : (_enhancedKey == key ? _enhancedPreview : null);
+    if (comparison && cached != null) {
+      _image?.evict();
+      setState(() {
+        _bytes = cached;
+        _image = MemoryImage(cached);
+        _busy = false;
+        _failed = false;
+      });
+      return;
+    }
     setState(() {
       _busy = true;
       _failed = false;
@@ -65,6 +81,11 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
         }
         final bytes =
             base64Decode(url.substring('data:image/png;base64,'.length));
+        if (_original || !_draft.enabled) _originalPreview = bytes;
+        if (!_original) {
+          _enhancedKey = key;
+          _enhancedPreview = bytes;
+        }
         _image?.evict();
         setState(() {
           _bytes = bytes;
@@ -156,8 +177,8 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                 MediaQuery.sizeOf(context).height < 480
                             ? 72
                             : (MediaQuery.sizeOf(context).height *
-                                    (widget.bottomPanel ? .22 : .36))
-                                .clamp(96.0, 420.0),
+                                    (widget.bottomPanel ? .28 : .42))
+                                .clamp(96.0, 520.0),
                         child: Stack(fit: StackFit.expand, children: [
                           if (_bytes != null)
                             InteractiveViewer(
@@ -178,7 +199,7 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                             ? null
                             : () {
                                 setState(() => _original = !_original);
-                                _schedule();
+                                _schedule(comparison: true);
                               },
                         child: Text(_original
                             ? tr('查看增强', 'Show enhanced')
@@ -187,6 +208,37 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                         child: ListView(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             children: [
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            key: ValueKey('paper-mode-${_draft.paperMode}'),
+                            initialValue: _draft.paperMode,
+                            decoration: InputDecoration(
+                                labelText: tr('漂白策略', 'Whitening strategy')),
+                            items: [
+                              DropdownMenuItem(
+                                  value: 'preserve',
+                                  child: Text(
+                                      tr('漫画保色', 'Preserve comic colours'),
+                                      overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(
+                                  value: 'text',
+                                  child: Text(
+                                      tr('文字扫描净底', 'Clean text scan paper'),
+                                      overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: _saving
+                                ? null
+                                : (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _draft = _draft.withPaperMode(value);
+                                      _original = false;
+                                    });
+                                    _schedule();
+                                  },
+                          ),
+                          Text(tr('选择策略后调整漂白强度；文字净底会淡化纸色，也可能影响浅色插图，请对照原图。',
+                              'Adjust whitening strength after selecting a strategy. Text cleanup removes paper colour and may alter pale illustrations; compare the original.')),
                           for (final entry
                               in DocumentEnhancement.limits.entries)
                             DocumentControlRow(
@@ -205,7 +257,7 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                   SizedBox(
                                       width: 36,
                                       child: Text(
-                                          '${_draft.toJson()[entry.key]!.round()}',
+                                          '${_draft.values[entry.key]!.round()}',
                                           textAlign: TextAlign.center)),
                                   IconButton(
                                       tooltip: tr('减少', 'Decrease'),
@@ -213,7 +265,7 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                           ? null
                                           : () => _change(
                                               entry.key,
-                                              (_draft.toJson()[entry.key]! - 1)
+                                              (_draft.values[entry.key]! - 1)
                                                   .clamp(entry.value.$1,
                                                       entry.value.$2)),
                                       icon: const Icon(Icons.remove)),
@@ -221,7 +273,7 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                       child: Slider(
                                           key: ValueKey(
                                               'enhancement-${entry.key}'),
-                                          value: _draft.toJson()[entry.key]!,
+                                          value: _draft.values[entry.key]!,
                                           min: entry.value.$1,
                                           max: entry.value.$2,
                                           divisions:
@@ -236,7 +288,7 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                           ? null
                                           : () => _change(
                                               entry.key,
-                                              (_draft.toJson()[entry.key]! + 1)
+                                              (_draft.values[entry.key]! + 1)
                                                   .clamp(entry.value.$1,
                                                       entry.value.$2)),
                                       icon: const Icon(Icons.add)),

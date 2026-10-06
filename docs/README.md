@@ -1,6 +1,6 @@
 # Modu documentation
 
-Current documentation baseline: **stable 1.2.0+10082**, reviewed 2026-10-04.
+Current documentation baseline: **stable 1.2.1+10086**, updated 2026-10-06.
 
 [English homepage](../README.md) · [中文首页](../README_zh.md)
 
@@ -25,6 +25,7 @@ Other guides are maintained as a single English edition. Release notes from 1.2.
 - [AI reasoning parameters](AI_REASONING_CONTROL.md)
 - [Local indexing and reading controls](INDEX_SYNC_AND_READING_CONTROLS.md)
 - [WebDAV record sync and migration](WEBDAV_RECORD_SYNC.md)
+- [WebDAV request budgets, cooldowns and maintenance](development/webdav-request-policy.md)
 - [ANX Reader backup import](ANX_BACKUP_IMPORT.md)
 - [Local dictionaries](LOCAL_DICTIONARIES.md)
 - [Markdown books](MARKDOWN_BOOKS.md)

@@ -62,6 +62,7 @@ class PdfReadingView {
         'rotation': rotation,
         'mode': mode,
         'display': display.toJson(),
-        if (enhancement.enabled) 'enhancement': enhancement.toJson()
+        if (enhancement.enabled || enhancement.paperMode != 'preserve')
+          'enhancement': enhancement.toJson()
       };
 }

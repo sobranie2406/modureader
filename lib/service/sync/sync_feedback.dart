@@ -1,7 +1,20 @@
 import 'dart:io';
+import 'package:anx_reader/l10n/generated/L10n.dart';
+
 import 'package:dio/dio.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/webdav_request_policy.dart';
+
+String bookDownloadSummary(L10n l10n,
+        {required int success, required int failed}) =>
+    l10n.webdavBatchDownloadFinishedReport(failed, success);
+
+String bookIntegrityFailureMessage({required bool chinese}) => chinese
+    ? '下载文件校验失败。若此书由 TXT 或 Markdown 导入，请先在保留本地书籍的设备上升级并同步，再重试。请勿删除原书或释放其本地文件。'
+    : 'Book integrity check failed. For books imported from TXT or Markdown, '
+        'update and sync a device that still has the local book, then retry. '
+        'Do not delete or release that local copy.';
 
 enum SyncFailureCode {
   disabled,
@@ -23,6 +36,20 @@ String syncSuccessMessage({required bool chinese}) =>
 String syncFailureMessage(Object error, {required bool chinese}) {
   String text(String zh, String en) => chinese ? zh : en;
   String reason;
+  if (error is DioException && error.error is WebdavRequestBudgetExceeded) {
+    final seconds =
+        int.tryParse(error.response?.headers.value('retry-after') ?? '') ?? 60;
+    final minutes = (seconds / 60).ceil();
+    return text('同步已暂缓：本机坚果云请求预算已用完，请约 $minutes 分钟后重试。本机改动已保留；重启或立即同步不会跳过保护。',
+        'Sync deferred: this device\'s Jianguoyun request budget is exhausted. Retry in about $minutes minute(s). Local changes are retained; restarting or Sync now does not bypass this protection.');
+  }
+  if (error is DioException && error.error is WebdavCoolingDown) {
+    final seconds =
+        int.tryParse(error.response?.headers.value('retry-after') ?? '') ?? 60;
+    final minutes = (seconds / 60).ceil();
+    return text('同步已暂缓：服务器限流或暂时不可用，请约 $minutes 分钟后再试。本机改动已保留。',
+        'Sync deferred: the server is rate-limited or unavailable. Retry in about $minutes minute(s). Local changes are retained.');
+  }
   if (error is SyncFeedbackFailure) {
     reason = switch (error.code) {
       SyncFailureCode.disabled =>
@@ -52,6 +79,8 @@ String syncFailureMessage(Object error, {required bool chinese}) {
   } else if (error is DioException && error.response?.statusCode != null) {
     final status = error.response!.statusCode!;
     reason = switch (status) {
+      >= 300 && < 400 => text('服务器返回了无法安全跟随的重定向，请检查 WebDAV 地址及目录路径；不要删除云端数据。',
+          'The server returned a redirect that cannot be followed safely. Check the WebDAV address and directory path; do not delete remote data.'),
       401 || 403 => text('账号或目录访问被拒绝，请检查账号、密码和权限。',
           'Account or directory access denied. Check credentials and permissions.'),
       404 => text('远程目录或文件不存在，请检查同步路径。',
@@ -80,7 +109,10 @@ String syncFailureMessage(Object error, {required bool chinese}) {
         'Local file access failed. Check free space and file permissions.');
   } else if (error is FormatException) {
     final message = error.message;
-    if (message.contains('阅读位置')) {
+    if (message.contains('WebDAV 重定向')) {
+      reason = text('WebDAV 重定向后的目录不可用，已停止同步；请检查服务地址，不要删除云端数据。',
+          'The redirected WebDAV directory is unavailable. Sync stopped; check the server address and do not delete remote data.');
+    } else if (message.contains('阅读位置')) {
       reason = text('阅读位置数据无效，请更新所有设备后重试。',
           'Invalid reading-position data. Update all devices and retry.');
     } else if (message.contains('分页') || message.contains('截断')) {

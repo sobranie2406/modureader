@@ -2,7 +2,7 @@
 
 English · [简体中文](PRIVACY_zh.md) · [Home](README.md) · [Settings guide](docs/SETTINGS.md)
 
-For **Modu 1.2.0+10082**, updated 2026-10-04. This document explains storage and network behavior. Third-party services have their own privacy policies.
+For **Modu 1.2.1+10086**, updated 2026-10-06. This document explains storage and network behavior. Third-party services have their own privacy policies.
 
 ## Local data and scanned books
 
@@ -16,7 +16,7 @@ Custom CSS can contain remote resource URLs and make network requests when enabl
 
 ## AI, translation, search and narration
 
-Remote AI receives the actual prompt, conversation history and selected text, chapters or retrieved passages needed for the task. Selection templates default to selected text only; you may enable context. Reading skills and app tools supply different source scopes for their tasks. Editing a prompt does not automatically send the whole book.
+Remote AI receives the actual prompt, conversation history and selected text, chapters or retrieved passages needed for the task. Selection templates default to text with context; you may choose selected text only. Explicit scope choices are preserved. Reading skills and app tools supply different source scopes for their tasks. Editing a prompt does not automatically send the whole book.
 
 AI Knowledge uses the current model's existing knowledge first. Enabling a template's online option or choosing **Online search** beneath an answer queries Wiktionary, Wikipedia and Baidu Baike. Those sites receive the search term; retrieved results are sent to the same AI model for a sourced summary. No separate search API key is required. Context chosen for the template can still enter the AI request.
 
@@ -39,6 +39,8 @@ Startup and manual checks share a source selector, initially GitHub. When GitHub
 Packages download only after your request. Except for macOS browser downloads, in-app downloads require matching size and SHA-256 checks. Android also checks package name, signature and version and requests system installation confirmation; it does not install silently. Modu cannot confirm completion or verification of a macOS browser download; compare the release checksum yourself.
 
 ## WebDAV and remote libraries
+
+To reduce requests, the app stores request-budget timestamps, server cooldowns and maintenance schedules locally under hashed account filenames. These policy files contain no passwords, book text or full server URLs and are not library-synced. Jianguoyun request limits are per device/account; other devices and applications can still consume the same server quota.
 
 WebDAV sync runs only after configuration and enablement. Your server receives synchronized books, covers, notes, bookmarks, folders, tags, positions and reading time. Records merge by stable identity and retain deletion markers. Fonts, backgrounds, device preferences and dictionaries are not library-synced. **Vector-index sync has been removed**; indexes and model files stay local.
 

@@ -1,6 +1,11 @@
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 
+class BookFileIntegrityException extends FormatException {
+  const BookFileIntegrityException()
+      : super('Downloaded book checksum or size is invalid');
+}
+
 /// Publish a complete file once; parallel callers share the same transfer.
 class LocalBookDownload {
   final Map<String, Future<void>> _pending = {};
@@ -41,8 +46,7 @@ class LocalBookDownload {
       final temporary = File('${staging.path}/book');
       await download(temporary);
       if (!await _valid(temporary, expected)) {
-        throw const FormatException(
-            'Downloaded book checksum or size is invalid');
+        throw const BookFileIntegrityException();
       }
       await temporary.rename(target.path);
     } finally {

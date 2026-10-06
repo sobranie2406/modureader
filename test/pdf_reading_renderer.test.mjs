@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
+import {runInNewContext} from 'node:vm';
 const require = createRequire(`${process.env.MODU_JSDOM_ROOT || '/private/tmp/modu-119-js-tests'}/package.json`);
 const {JSDOM} = require('jsdom');
 const dom = new JSDOM('<!doctype html><body></body>', {url:'https://reader.test/', resources:'usable'});
@@ -31,7 +32,7 @@ await import(uri((await source('fixed-layout'))
     .replace("'./pdf-reading-viewport.js'", JSON.stringify(viewport))
     .replace("'./pdf-scroll-reader.js'", JSON.stringify(scrollReader))));
 const config = {version:1,all:{preset:'four'},pages:{}};
-const html = 'data:text/html,' + encodeURIComponent('<meta name="viewport" content="width=600,height=800"><img><div class="textLayer"><span>Original text</span></div>');
+const html = 'data:text/html,' + encodeURIComponent('<meta name="viewport" content="width=600,height=800"><img data-document-base><div class="textLayer"><span>Original text</span></div>');
 function harness() {
     const renderer = document.createElement('foliate-fxl'); document.body.append(renderer);
     const events = [];renderer.addEventListener('relocate', e => events.push(e.detail));
@@ -76,6 +77,103 @@ test('formal renderer commits panel locations, returns to source page and retain
         await h.renderer.setPdfLayout(config,false);
         assert.equal(h.renderer.pdfReading,false);assert.equal(h.renderer.index,0);
         assert.equal(h.events.at(-1).pdfRegion,null);
+    } finally {h.close()}
+});
+
+test('PDF formal single-page path uses text frame without the redundant full-page raster', async () => {
+    const h=harness();let frames=0,full=0;
+    for(const section of h.renderer.book.sections) {
+        section.load=async()=>{full++;return html};
+        section.loadFrame=async()=>{frames++;return html};
+    }
+    try {
+        await h.renderer.setPdfLayout({version:1,pages:{}},true);
+        await h.renderer.goTo({index:0});await h.renderer.next();
+        assert.equal(frames,2);assert.equal(full,0);
+        assert.equal(h.renderer.getContents()[0].doc.querySelector('.textLayer').textContent,'Original text');
+        await h.renderer.setPdfLayout({version:1,pages:{}},false);
+        assert.equal(full,1,'ordinary fixed-layout fallback still uses original page');
+    } finally {h.close()}
+});
+
+test('ordinary fixed-layout books never invoke the PDF frame optimization', async () => {
+    const h=harness();let frames=0,full=0;
+    h.renderer.book.readingRegionRenderer=undefined;
+    for(const section of h.renderer.book.sections) {
+        section.load=async()=>{full++;return html};
+        section.loadFrame=async()=>{frames++;throw new Error('PDF-only frame')};
+    }
+    try {
+        assert.equal(await h.renderer.setPdfLayout(config,true),false);
+        await h.renderer.goTo({index:0});await h.renderer.next();
+        assert.equal(frames,0);assert.ok(full>=2);assert.equal(h.renderer.pdfReading,false);
+    } finally {h.close()}
+});
+
+test('native PDF prefetch warms only the next page without relocating and stops on close', async () => {
+    const h=harness(), rendered=[];
+    for(const section of h.renderer.book.sections) section.loadFrame=async()=>html;
+    h.source.render=async request=>{rendered.push(request.page);return {blob:new Blob(['png']),width:600,height:800}};
+    try {
+        await h.renderer.setPdfLayout({version:1,pages:{}},true);
+        await h.renderer.goTo({index:0});
+        const events=h.events.length;
+        await new Promise(resolve=>setTimeout(resolve,1100));
+        assert.deepEqual(rendered,[0,1],'no redundant detail raster; only one prefetched page');
+        assert.equal(h.renderer.index,0);assert.equal(h.events.length,events);
+        await h.renderer.next();
+        h.close();
+        const count=rendered.length;
+        await new Promise(resolve=>setTimeout(resolve,1100));
+        assert.equal(rendered.length,count,'close cancels delayed prefetch');
+    } finally {if(h.renderer.isConnected)h.close()}
+});
+
+test('pending PDF prefetch yields to foreground navigation and cannot commit stale pages', async()=>{
+    const h=harness(); let pending, cancelled=0;
+    for(const section of h.renderer.book.sections) section.loadFrame=async()=>html;
+    h.source.cancel=()=>{if(pending){cancelled++;pending();pending=null}};
+    h.source.render=async request=>{
+        if(request.page===1)await new Promise(resolve=>pending=resolve);
+        return {blob:new Blob(['png']),width:600,height:800};
+    };
+    try {
+        await h.renderer.setPdfLayout({version:1,pages:{}},true);await h.renderer.goTo({index:0});
+        await new Promise(resolve=>setTimeout(resolve,1100));assert.ok(pending);
+        await h.renderer.goTo({index:2});
+        assert.equal(cancelled,1);assert.equal(h.renderer.index,2);
+        assert.equal(h.events.at(-1).index,2);
+    } finally {h.close()}
+});
+for (const scanned of [false, true]) test(`${scanned ? 'scanned ebook' : 'PDF'} image clicks navigate the real renderer, including replacement frames`, async () => {
+    const viewSource=await source('view');
+    const handlers=viewSource.slice(viewSource.indexOf('  #handleLinks('),viewSource.indexOf('  async addAnnotation('));
+    const h=harness(), clicks=[];
+    let navigation=Promise.resolve();
+    const View=runInNewContext(`class View {
+        #emit(type,detail) { emit(type,detail); return false; }
+        install(doc) { this.#handleLinks(doc,0); this.#handleClick(doc); this.#handleImage(doc); }
+        ${handlers}
+    }; View`,{window:{innerWidth:800,isFootNoteOpen:()=>false},imageFootnoteText:()=>null,
+        setTimeout,clearTimeout,console,emit:(type,detail)=>{
+            clicks.push(type);
+            // Same normalized left/right routing as the host, using the actual
+            // crop/scale transform attached by the fixed-layout renderer.
+            if(type==='click-view') navigation=detail.x>400?h.renderer.next():h.renderer.prev();
+        }});
+    const view=new View();view.book=h.renderer.book;view.scannedImageDocument=scanned;
+    h.renderer.addEventListener('load',e=>view.install(e.detail.doc));
+    try {
+        await h.renderer.setPdfLayout({version:1,all:{preset:'single'},pages:{}},true);
+        await h.renderer.goTo({index:0});
+        for(const [x,expected] of [[550,1],[550,2],[50,1],[50,0]]) {
+            const doc=h.renderer.getContents()[0].doc;
+            doc.querySelector('img').dispatchEvent(new doc.defaultView.MouseEvent('click',
+                {bubbles:true,cancelable:true,clientX:x,clientY:400}));
+            await navigation;
+            assert.equal(h.renderer.index,expected);
+        }
+        assert.deepEqual(clicks,Array(4).fill('click-view'),'no preview and no duplicate turns');
     } finally {h.close()}
 });
 test('single-page turns use independently detected bounds, and failed detection shows original', async () => {

@@ -370,8 +370,7 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
       ? widget.item!.icon
       : (widget.item?.action ?? 'ai');
   late String _skillId = widget.item?.skillId ?? 'selection_toolbar';
-  late SelectionAiScope _scope =
-      widget.item?.scope ?? SelectionAiScope.selection;
+  late SelectionAiScope _scope = widget.item?.scope ?? SelectionAiScope.context;
   late bool _webSearch = widget.item?.webSearch ?? false;
   String? _error;
   bool get ai => widget.item == null || widget.item!.isAi;

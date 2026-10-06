@@ -4,6 +4,7 @@ import 'package:anx_reader/models/reading_position_snapshot.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/replaced_book_files.dart';
+import 'package:anx_reader/service/sync/converted_book_checksum.dart';
 import 'package:anx_reader/utils/reading_progress.dart';
 
 class BookDao extends BaseDao {
@@ -70,7 +71,11 @@ class BookDao extends BaseDao {
     return insert(table, book.toMap());
   }
 
-  Future<int> insertBook(Book book) => save(book);
+  Future<int> insertBook(Book book, {String? sourceMd5}) {
+    if (book.id != -1 || sourceMd5 == null) return save(book);
+    return transaction((txn) =>
+        ConvertedBookChecksum.insert(txn, book.toMap(), sourceMd5: sourceMd5));
+  }
 
   Future<void> updateBook(Book book) async {
     book.updateTime = DateTime.now();
@@ -186,12 +191,14 @@ class BookDao extends BaseDao {
   }
 
   Future<Book?> getBookByMd5(String md5) {
-    return querySingle(
-      table,
-      mapper: Book.fromDb,
-      where: 'file_md5 = ?',
-      whereArgs: [md5],
-    );
+    // Converted books retain their source identity while file_md5 checks the
+    // actual EPUB. The same import must still find the original shelf entry.
+    return rawQuerySingle('''SELECT b.* FROM tb_books b
+      LEFT JOIN $syncRecordsTable r ON r.kind='book' AND r.local_id=b.id
+      WHERE lower(b.file_md5)=? OR r.sync_id=?
+      ORDER BY b.is_deleted ASC, b.id ASC LIMIT 1''',
+        arguments: [md5.toLowerCase(), 'md5:${md5.toLowerCase()}'],
+        mapper: Book.fromDb);
   }
 
   Future<List<Book>> searchBooks(String keyword) async {

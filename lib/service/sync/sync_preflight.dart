@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:anx_reader/service/sync/webdav_request_policy.dart';
 
 typedef SyncDelay = Future<void> Function(Duration);
 
@@ -38,12 +39,13 @@ class AutoSyncStartGate {
     _pendingGeneration = null;
   }
 
-  Future<bool> wait(bool Function() enabled) async {
+  Future<bool> wait(bool Function() enabled,
+      {Duration duration = const Duration(seconds: 2)}) async {
     if (_pendingGeneration != null || !enabled()) return false;
     final generation = _generation;
     _pendingGeneration = generation;
     try {
-      await _delay(const Duration(seconds: 2));
+      await _delay(duration);
       return generation == _generation && enabled();
     } finally {
       if (_pendingGeneration == generation) _pendingGeneration = null;
@@ -70,6 +72,8 @@ class SyncPreflight {
         return enabled();
       } catch (error) {
         if (!enabled()) return false;
+        // Respect the shared server cooldown; never immediately probe again.
+        if (isWebdavBusy(error)) rethrow;
         // Confirm a startup auth rejection once; do not label it "offline"
         // or repeatedly hammer a server with invalid credentials.
         final retry = automatic &&

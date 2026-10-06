@@ -2,6 +2,7 @@ import 'package:anx_reader/enums/sync_protocol.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:path_provider/path_provider.dart';
 
 class SyncClientFactory {
   static final SyncClientFactory _instance = SyncClientFactory._internal();
@@ -24,6 +25,7 @@ class SyncClientFactory {
           url: config['url'] ?? '',
           username: config['username'] ?? '',
           password: config['password'] ?? '',
+          policyStateDirectory: getApplicationSupportDirectory,
         );
       case SyncProtocol.ftp:
         throw UnimplementedError('FTP client not implemented yet');

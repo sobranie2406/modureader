@@ -189,7 +189,7 @@ class _PdfReadingControlsState extends State<PdfReadingControls> {
                 OutlinedButton(
                   onPressed: _busy ? null : enhance,
                   child: Text(
-                      '${entry.value} ${_view.enhancement.toJson()[entry.key]!.round()}'),
+                      '${entry.value} ${_view.enhancement.values[entry.key]!.round()}'),
                 ),
             ]),
           ),

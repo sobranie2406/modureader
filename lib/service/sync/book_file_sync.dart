@@ -11,6 +11,7 @@ Future<void> syncBookFiles({
   required Set<String> listedPaths,
   required File Function(String relativePath) localFile,
   required Future<void> Function(String localPath, String remotePath) upload,
+  void Function(String relativePath)? onRemotePresent,
 }) async {
   for (final path in currentPaths.toSet()) {
     final remotePath = SyncPaths.data(path);
@@ -27,6 +28,7 @@ Future<void> syncBookFiles({
       }
       // Book replacements have unique paths. Match the existing sync policy
       // for present files; never assume a weak/missing ETag means absence.
+      onRemotePresent?.call(path);
       continue;
     }
     await upload(local.path, remotePath);

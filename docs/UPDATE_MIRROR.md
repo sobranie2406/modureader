@@ -1,8 +1,8 @@
 # Application update mirror
 
-## Current: Modu 1.2.0+10082
+## Current: Modu 1.2.1+10086
 
-This guide describes the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. It documents release procedures and client behavior, not a new upload, cleanup or live verification. No application tests or installer downloads were performed for this documentation update.
+This guide describes the Modu publishing repository's `v1.2.1` release procedure and client behavior. A mirror is current only after all eight installers and their checksums have been verified and its manifest updated.
 
 A single Update Source option controls both checking and downloading. Each fresh app launch starts with GitHub preferred. A GitHub check that fails because of connection, timeout, TLS/certificate or HTTP request errors falls back to the fixed HTTPS Gitee manifest and switches the source for the whole workflow:
 
@@ -22,7 +22,7 @@ Successful GitHub checks use GitHub metadata and downloads. A check resolved thr
 | Windows | ARM64, x64 | setup EXE |
 | Linux | ARM64, x64 | DEB |
 
-There are eight installers in total. Android x64 is excluded from the 1.2.0 release matrix and update manifest.
+There are eight installers in total. Android x64 is excluded from the release matrix and update manifest.
 
 ### macOS browser downloads
 

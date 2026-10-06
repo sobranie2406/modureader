@@ -1,6 +1,7 @@
 import 'package:anx_reader/service/feedback/bug_report.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
+import 'package:anx_reader/widgets/settings/qq_community.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -303,6 +304,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
               Text(_tr(
                   '填写问题并预览后，前往默读 GitHub 仓库确认提交（需要 GitHub 账号）。截图可在 GitHub 页面添加。',
                   'Describe and preview your report, then confirm it in the Modu GitHub repository (GitHub account required). Attach screenshots on GitHub.')),
+              const SizedBox(height: 12),
+              const QqCommunity(),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,

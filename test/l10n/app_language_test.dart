@@ -146,8 +146,12 @@ void main() {
             name: item.localizedName(locale),
             prompt: item.localizedPrompt(locale),
             enabled: true);
-        expect(localized.toJson(),
-            {'id': item.id, 'action': item.action, 'enabled': true});
+        expect(localized.toJson(), {
+          'id': item.id,
+          'action': item.action,
+          if (item.isAi) 'scope': item.scope.name,
+          'enabled': true,
+        });
         final imported = SelectionToolbarItem.fromJson(localized.toJson());
         expect(imported.localizedName(locale), localized.name);
         expect(imported.localizedPrompt(locale), localized.prompt);

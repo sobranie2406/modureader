@@ -5,7 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'row_sync_test.dart' show fixture, noteRow;
+import 'row_sync_test.dart' show fixture, noteRow, bookRow;
 
 void main() {
   sqfliteFfiInit();
@@ -164,6 +164,21 @@ void main() {
     expect(props?.size, 3);
   });
 
+  test('complete directory listing normalizes trailing slashes exactly once',
+      () async {
+    directories.add('/library/modu/data/file');
+    files['/library/modu/data/file/test.epub'] = [1, 2];
+    for (final path in [
+      'modu/data/file',
+      'modu/data/file/',
+      '/modu/data/file//'
+    ]) {
+      final entries = await client.readSyncDirectory(path);
+      expect(entries.single.path, 'modu/data/file/test.epub');
+      expect(calls.last, 'PROPFIND /library/modu/data/file');
+    }
+  });
+
   test('ordinary book listing includes replacement on second page', () async {
     directories.add('/library/modu/data/file');
     files['/library/modu/data/file/old.epub'] = [1];
@@ -254,6 +269,57 @@ void main() {
             files.containsKey('/library/modu/database8.db'), value == 'strong');
         expect(files.keys.any((p) => p.contains('/record-log-v1/')),
             value != 'strong');
+      } finally {
+        await a.close();
+        await b.close();
+        await temp.delete(recursive: true);
+      }
+    });
+  }
+
+  for (final value in ['none', 'weak', 'ignored', 'strong']) {
+    test(
+        'empty HTTP cloud and independent new devices discover subsequent books: $value',
+        () async {
+      mode = value;
+      final temp =
+          await Directory.systemTemp.createTemp('modu-http-bootstrap-');
+      final a = await fixture(install: false);
+      final b = await fixture(install: false);
+      final secondClient = WebdavClient(
+          url: 'http://127.0.0.1:${server.port}/library',
+          username: 'test',
+          password: 'test');
+      try {
+        for (final db in [a, b]) {
+          await db.delete('tb_books');
+          await db.transaction(RowSyncStore.install);
+        }
+        final ca = await Directory('${temp.path}/phone').create();
+        final cb = await Directory('${temp.path}/tablet').create();
+        Future<void> sync(
+            Database db, WebdavClient connection, Directory cache) async {
+          await RowSyncEngine(
+                  store: RowSyncStore(db), client: connection, cache: cache)
+              .synchronize();
+        }
+
+        expect(files, isEmpty);
+        await a.insert(
+            'tb_books', bookRow(1, md5: 'phone-first')..remove('id'));
+        await sync(a, client, ca);
+        await sync(b, secondClient, cb);
+        expect(await b.query('tb_books', where: 'is_deleted=0'), hasLength(1));
+        await b.insert(
+            'tb_books', bookRow(2, md5: 'tablet-second')..remove('id'));
+        await sync(b, secondClient, cb);
+        await sync(a, client, ca);
+        expect(await a.query('tb_books', where: 'is_deleted=0'), hasLength(2));
+        await a.insert(
+            'tb_books', bookRow(3, md5: 'phone-third')..remove('id'));
+        await sync(a, client, ca);
+        await sync(b, secondClient, cb);
+        expect(await b.query('tb_books', where: 'is_deleted=0'), hasLength(3));
       } finally {
         await a.close();
         await b.close();

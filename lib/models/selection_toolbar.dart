@@ -13,9 +13,13 @@ class SelectionToolbarItem {
       this.name = '',
       this.icon = '',
       this.prompt = '',
-      this.scope = SelectionAiScope.selection,
+      SelectionAiScope? scope,
       this.webSearch = false,
-      this.skillId = 'selection_toolbar'});
+      this.skillId = 'selection_toolbar'})
+      : scope = scope ??
+            (action == 'ai' || action == 'aiCommand'
+                ? SelectionAiScope.context
+                : SelectionAiScope.selection);
 
   final String id, action, name, icon, prompt, skillId;
   final bool enabled;
@@ -75,7 +79,9 @@ class SelectionToolbarItem {
   Map<String, Object> toJson() => {
         'id': id,
         'action': action,
-        if (scope != SelectionAiScope.selection) 'scope': scope.name,
+        // Explicit scope keeps the selection-only choice stable across default
+        // changes and older clients that interpreted a missing scope differently.
+        if (isAi) 'scope': scope.name,
         if (webSearch) 'webSearch': true,
         if (enabled != (_defaultItem?.enabled ?? true)) 'enabled': enabled,
         if (!_isDefaultName && name != (_defaultItem?.name ?? '')) 'name': name,
@@ -105,9 +111,11 @@ class SelectionToolbarItem {
         name: raw['name'] ?? defaults?.name ?? '',
         icon: raw['icon'] ?? defaults?.icon ?? '',
         prompt: raw['prompt'] ?? defaults?.prompt ?? '',
-        scope: raw['scope'] == 'context'
-            ? SelectionAiScope.context
-            : SelectionAiScope.selection,
+        scope: raw['scope'] == null
+            ? null
+            : raw['scope'] == 'context'
+                ? SelectionAiScope.context
+                : SelectionAiScope.selection,
         webSearch: raw['webSearch'] == true,
         skillId: raw['skillId'] ?? defaults?.skillId ?? 'selection_toolbar');
   }

@@ -8,7 +8,6 @@ import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/remote_file.dart';
 import 'package:anx_reader/models/sync_state_model.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/book_notes.dart';
@@ -21,11 +20,15 @@ import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/replaced_book_files.dart';
 import 'package:anx_reader/service/sync/local_book_download.dart';
+import 'package:anx_reader/service/sync/converted_book_checksum.dart';
 import 'package:anx_reader/service/sync/book_file_sync.dart';
+import 'package:anx_reader/service/sync/sync_asset_listing.dart';
+import 'package:anx_reader/service/sync/sync_maintenance_schedule.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/database_sync_manager.dart';
@@ -62,6 +65,10 @@ class Sync extends _$Sync {
   bool _pendingAutomatic = false;
   SyncDirection? _pendingManualDirection;
   final _autoStart = AutoSyncStartGate();
+  SyncClientBase? _automaticClient;
+  Object? _automaticPolicy;
+  SyncClientBase? _remoteListClient;
+  Future<List<String>>? _remoteBookListing;
 
   bool get _chineseFeedback {
     final context = navigatorKey.currentContext;
@@ -159,14 +166,38 @@ class Sync extends _$Sync {
   }) async {
     if (shouldStart != null && (!shouldStart() || _syncRunning)) return;
     final automatic = trigger == SyncTrigger.auto;
+    final scheduledClient = _syncClient;
+    final policy =
+        scheduledClient is WebdavClient ? scheduledClient.requestPolicy : null;
+    if (automatic && !_autoSyncAllowed) return;
+    try {
+      await policy?.prepare();
+    } catch (error) {
+      AnxToast.show(syncFailureMessage(error, chinese: _chineseFeedback));
+      return;
+    }
+    if (!identical(_automaticClient, scheduledClient) ||
+        !identical(_automaticPolicy, policy)) {
+      // A pending long delay for the old account must not swallow the first
+      // automatic trigger after changing server/account.
+      _autoStart.invalidate();
+      _automaticClient = scheduledClient;
+      _automaticPolicy = policy;
+    }
     if (automatic) {
       if (!_autoSyncAllowed) return;
       if (_syncRunning) {
         _pendingAutomatic = true;
         return;
       }
-      if (!await _autoStart
-          .wait(() => _autoSyncAllowed && (shouldStart?.call() ?? true))) {
+      if (!await _autoStart.wait(
+          () =>
+              _autoSyncAllowed &&
+              identical(scheduledClient, _syncClient) &&
+              (scheduledClient is! WebdavClient ||
+                  identical(policy, scheduledClient.requestPolicy)) &&
+              (shouldStart?.call() ?? true),
+          duration: policy?.automaticDelay ?? const Duration(seconds: 2))) {
         return;
       }
     } else {
@@ -180,6 +211,8 @@ class Sync extends _$Sync {
     _syncRunning = true;
     try {
       if (!(shouldStart?.call() ?? true)) return;
+      policy?.syncStarted();
+      await policy?.persist();
       await _syncData(direction, ref,
           trigger: trigger, shouldStart: shouldStart);
     } catch (e) {
@@ -291,20 +324,30 @@ class Sync extends _$Sync {
     changeState(state.copyWith(isSyncing: true));
 
     try {
-      await syncDatabase(direction);
+      final assetListing = SyncAssetListing(client);
+      await syncDatabase(direction, assetListing: assetListing);
 
-      await syncFiles();
+      await syncFiles(assetListing: assetListing);
+      await this
+          .ref
+          .read(syncStatusProvider.notifier)
+          .refresh(remoteFileNames: assetListing.bookNames);
 
       // Reclaim only after database publication and book transfer.
       // This is recoverable maintenance; failure does not undo a good sync.
       try {
-        final reclaimed = await ReplacedBookFiles(
-          store: RowSyncStore(await DBHelper().database),
-          client: client,
-          cache: await getAnxCacheDir(),
-          durableDirectory: await getAnxDataBasesDir(),
-        ).reclaim();
-        AnxLog.info('Replaced-book cleanup: reclaimed=$reclaimed');
+        final durableDirectory = await getAnxDataBasesDir();
+        final reclaimed = await SyncMaintenanceSchedule(durableDirectory).run(
+            client,
+            () async => ReplacedBookFiles(
+                  store: RowSyncStore(await DBHelper().database),
+                  client: client,
+                  cache: await getAnxCacheDir(),
+                  durableDirectory: durableDirectory,
+                ).reclaim());
+        if (reclaimed != null) {
+          AnxLog.info('Replaced-book cleanup: reclaimed=$reclaimed');
+        }
       } catch (error) {
         AnxLog.warning('Replaced-book cleanup deferred: ${error.runtimeType}');
       }
@@ -330,7 +373,7 @@ class Sync extends _$Sync {
     }
   }
 
-  Future<void> syncFiles() async {
+  Future<void> syncFiles({SyncAssetListing? assetListing}) async {
     final client = _syncClient;
     if (client == null) return;
 
@@ -339,22 +382,19 @@ class Sync extends _$Sync {
     List<String> currentCover =
         (await bookDao.getCurrentCover()).where((p) => p.isNotEmpty).toList();
 
-    List<String> remoteBooksName = [];
-    List<String> remoteCoversName = [];
-
-    List<RemoteFile> remoteBooks = await client.safeReadDir(SyncPaths.books);
-    remoteBooksName = List.generate(
-        remoteBooks.length, (index) => 'file/${remoteBooks[index].name!}');
-
-    List<RemoteFile> remoteCovers = await client.safeReadDir(SyncPaths.covers);
-    remoteCoversName = List.generate(
-        remoteCovers.length, (index) => 'cover/${remoteCovers[index].name!}');
+    final listing = assetListing ?? SyncAssetListing(client);
+    if (!identical(listing.client, client)) {
+      throw StateError('Sync client changed during asset synchronization');
+    }
+    final remoteBooksName = await listing.read(SyncPaths.books, currentBooks);
+    final remoteCoversName = await listing.read(SyncPaths.covers, currentCover);
 
     // Sync cover files
     for (var file in currentCover) {
       if (!remoteCoversName.contains(file) &&
           io.File(getBasePath(file)).existsSync()) {
         await uploadFile(getBasePath(file), SyncPaths.data(file));
+        listing.uploaded(file);
       }
       if (!io.File(getBasePath(file)).existsSync() &&
           remoteCoversName.contains(file)) {
@@ -366,19 +406,28 @@ class Sync extends _$Sync {
     await syncBookFiles(
       client: client,
       currentPaths: currentBooks,
-      listedPaths: remoteBooksName.toSet(),
+      listedPaths: remoteBooksName,
+      onRemotePresent: listing.uploaded,
       localFile: (path) => io.File(getBasePath(path)),
-      upload: (local, remote) => uploadFile(local, remote),
+      upload: (local, remote) async {
+        await uploadFile(local, remote);
+        listing.uploaded(remote.substring('${SyncPaths.root}/data/'.length));
+      },
     );
 
     // Do not garbage-collect by absence: an offline/concurrent device can
     // still reference these files. Deletions are synchronized as tombstones;
     // Explicit replacements are reclaimed separately, AFTER successful sync,
     // with verified recovery copies. Unknown historical files remain untouched.
-    ref.read(syncStatusProvider.notifier).refresh();
+    if (assetListing == null) {
+      await ref
+          .read(syncStatusProvider.notifier)
+          .refresh(remoteFileNames: listing.bookNames);
+    }
   }
 
-  Future<void> syncDatabase(SyncDirection direction) async {
+  Future<void> syncDatabase(SyncDirection direction,
+      {SyncAssetListing? assetListing}) async {
     final client = _syncClient;
     if (client == null) return;
     // Existing upload/download callers now converge records safely in both
@@ -389,8 +438,13 @@ class Sync extends _$Sync {
         client: client,
         cache: await getAnxCacheDir(),
         durableDirectory: await getAnxDataBasesDir(),
-        beforePublish: syncFiles,
+        beforePublish: () => syncFiles(assetListing: assetListing),
         beforeMerge: _createMergeBackup,
+        afterMerge: () async {
+          await ConvertedBookChecksum(await DBHelper().database)
+              .repairLocalBooks(
+                  localFile: (path) => io.File(getBasePath(path)));
+        },
       ).synchronize();
       AnxLog.info('Row sync database outcome: ${outcome.name}');
       await _restoreAiSettingsAfterDatabaseDownload();
@@ -517,9 +571,21 @@ class Sync extends _$Sync {
   Future<List<String>> listRemoteBookFiles() async {
     final client = _syncClient;
     if (client == null) return [];
-
-    final remoteFiles = await client.safeReadDir(SyncPaths.books);
-    return remoteFiles.map((e) => e.name!).toList();
+    // Share only an in-flight request, never a cached snapshot: a later sync
+    // must still see changes made by other devices.
+    if (identical(client, _remoteListClient) && _remoteBookListing != null) {
+      return _remoteBookListing!;
+    }
+    final pending = client
+        .safeReadDir(SyncPaths.books)
+        .then((files) => files.map((e) => e.name!).toList());
+    _remoteListClient = client;
+    _remoteBookListing = pending;
+    try {
+      return await pending;
+    } finally {
+      if (identical(_remoteBookListing, pending)) _remoteBookListing = null;
+    }
   }
 
   Future<void> downloadBook(Book book) async {
@@ -599,10 +665,10 @@ class Sync extends _$Sync {
       }
     }
 
-    AnxLog.info(L10n.of(navigatorKey.currentContext!)
-        .webdavBatchDownloadFinishedReport(successCount, failCount));
-    AnxToast.show(L10n.of(navigatorKey.currentContext!)
-        .webdavBatchDownloadFinishedReport(successCount, failCount));
+    final summary = bookDownloadSummary(L10n.of(navigatorKey.currentContext!),
+        success: successCount, failed: failCount);
+    AnxLog.info(summary);
+    AnxToast.show(summary);
   }
 
   Future<void> _downloadBook(Book book) async {
@@ -625,8 +691,9 @@ class Sync extends _$Sync {
       }
       await ref.read(bookListProvider.notifier).refresh();
     } catch (e) {
-      AnxToast.show(
-          L10n.of(navigatorKey.currentContext!).bookSyncStatusDownloadFailed);
+      AnxToast.show(e is BookFileIntegrityException
+          ? bookIntegrityFailureMessage(chinese: _chineseFeedback)
+          : L10n.of(navigatorKey.currentContext!).bookSyncStatusDownloadFailed);
       AnxLog.severe('Failed to download book\n$e');
       rethrow;
     }

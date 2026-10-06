@@ -363,16 +363,16 @@ void main() {
   test('cleanup is wired after database publication and ordinary file sync',
       () {
     final source = File('lib/providers/sync.dart').readAsStringSync();
-    final publish = source.indexOf('await syncDatabase(direction);');
-    final files = source.indexOf('await syncFiles();', publish);
-    final cleanup = source.indexOf('await ReplacedBookFiles(', files);
+    final publish = source.indexOf('await syncDatabase(direction,');
+    final files = source.indexOf('await syncFiles(assetListing:', publish);
+    final cleanup = source.indexOf('SyncMaintenanceSchedule(', files);
     final completion = source.indexOf('imageCache.clear();', files);
     expect(publish, greaterThan(0));
     expect(files, greaterThan(publish));
     expect(cleanup, greaterThan(files));
     expect(cleanup, lessThan(completion));
     expect(
-        source.substring(source.indexOf('Future<void> syncFiles()'),
+        source.substring(source.indexOf('Future<void> syncFiles('),
             source.indexOf('Future<void> syncDatabase(')),
         isNot(contains('.reclaim()')));
   });

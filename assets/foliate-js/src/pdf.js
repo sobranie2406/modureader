@@ -1,7 +1,7 @@
 /* global pdfjsLib */
 import { createPdfAnalysis } from './document-analysis.js'
 import { PageResourceCache, boundedRenderScale } from './page-resource-cache.js'
-import { createPdfRegionRenderer } from './pdf-region-renderer.js'
+import { createPdfRegionRenderer, createDocumentCanvas, encodeDocumentCanvas } from './pdf-region-renderer.js'
 import { extractPdfText } from './document-text-extraction.js'
 
 // https://github.com/mozilla/pdf.js/blob/f04967017f22e46d70d11468dd928b4cdc2f6ea1/web/text_layer_builder.css
@@ -497,7 +497,7 @@ const annotationLayerBuilderCSS = `
 }
 `
 
-const renderPage = async (page, getImageBlob) => {
+const renderPage = async (page, getImageBlob, frameOnly = false) => {
 
     const naturalPdfSize = page.getViewport({ scale: 1 })
     const naturalPdfRatio = naturalPdfSize.width / naturalPdfSize.height
@@ -509,19 +509,21 @@ const renderPage = async (page, getImageBlob) => {
     const scale = boundedRenderScale(naturalPdfSize.width, naturalPdfSize.height, requestedScale)
     const viewport = page.getViewport({ scale })
 
-    const canvas = document.createElement('canvas')
+    let blob
+    if (!frameOnly) {
+    const canvas = createDocumentCanvas()
     canvas.height = viewport.height
     canvas.width = viewport.width
     const canvasContext = canvas.getContext('2d')
     // PDF.js display intent waits for rAF, which a hidden WKWebView may suspend.
-    let blob
     try {
         await page.render({ canvasContext, viewport, intent: 'print' }).promise
-        blob = await new Promise(resolve => canvas.toBlob(resolve))
+        blob = await encodeDocumentCanvas(canvas)
         if (!blob) throw new Error('PDF page encoding failed')
     } finally {
         canvas.width = 0
         canvas.height = 0
+    }
     }
     if (getImageBlob) return blob
 
@@ -551,10 +553,13 @@ const renderPage = async (page, getImageBlob) => {
         },
     })
 
-    const src = URL.createObjectURL(blob)
+    // The formal PDF reader supplies the only visible bitmap. Its frame still
+    // retains exactly the same text/annotation DOM and original coordinates.
+    const src = frameOnly ? 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' : URL.createObjectURL(blob)
     const html = new Blob([`
         <!DOCTYPE html>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=${viewport.width},height=${viewport.height}">
         <style>
         :root {
             --scale-factor: ${scale};
@@ -566,14 +571,14 @@ const renderPage = async (page, getImageBlob) => {
         ${textLayerBuilderCSS}
         ${annotationLayerBuilderCSS}
         </style>
-        <img src="${src}">
+        <img data-document-base src="${src}" width="${viewport.width}" height="${viewport.height}">
         ${container.outerHTML}
         ${div.outerHTML}
     `], { type: 'text/html' })
     let url
     try { url = URL.createObjectURL(html) }
-    catch (error) { URL.revokeObjectURL(src); throw error }
-    return { url, urls: [url, src], bytes: blob.size + html.size }
+    catch (error) { if (!frameOnly) URL.revokeObjectURL(src); throw error }
+    return { url, urls: frameOnly ? [url] : [url, src], bytes: (blob?.size ?? 0) + html.size }
 }
 
 const makeTOCItem = item => ({
@@ -588,7 +593,7 @@ export const makePDF = async file => {
 
     const book = { rendition: { layout: 'pre-paginated' } }
     book.documentAnalysis = createPdfAnalysis(pdf, pdfjsLib.OPS)
-    book.regionRenderer = createPdfRegionRenderer(pdf)
+    book.regionRenderer = createPdfRegionRenderer(pdf, {cacheRaster: true})
     book.extractPageText = request => extractPdfText(pdf, request)
     // Preview/editor requests must not cancel the visible reading surface.
     book.readingRegionRenderer = createPdfRegionRenderer(pdf)
@@ -609,6 +614,25 @@ export const makePDF = async file => {
     const cache = new PageResourceCache()
     const pendingPages = new Map()
     let resourceGeneration = 0
+    const loadPage = async (i, frameOnly = false) => {
+        const key = frameOnly ? `frame:${i}` : i
+        const cached = cache.get(key)
+        if (cached) return cached.url
+        if (pendingPages.has(key)) return pendingPages.get(key)
+        const generation = resourceGeneration
+        const pending = (async () => {
+            const resource = await renderPage(await pdf.getPage(i + 1), false, frameOnly)
+            if (generation !== resourceGeneration) {
+                resource.urls.forEach(url => URL.revokeObjectURL(url))
+                throw new Error('PDF reader closed during rendering')
+            }
+            cache.set(key, resource)
+            return resource.url
+        })()
+        pendingPages.set(key, pending)
+        try { return await pending }
+        finally { if (pendingPages.get(key) === pending) pendingPages.delete(key) }
+    }
     book.releasePageResources = () => {
         resourceGeneration++
         pendingPages.clear()
@@ -640,24 +664,8 @@ export const makePDF = async file => {
             append()
             return doc
         },
-        load: async () => {
-            const cached = cache.get(i)
-            if (cached) return cached.url
-            if (pendingPages.has(i)) return pendingPages.get(i)
-            const generation = resourceGeneration
-            const pending = (async () => {
-                const resource = await renderPage(await pdf.getPage(i + 1))
-                if (generation !== resourceGeneration) {
-                    resource.urls.forEach(url => URL.revokeObjectURL(url))
-                    throw new Error('PDF reader closed during rendering')
-                }
-                cache.set(i, resource)
-                return resource.url
-            })()
-            pendingPages.set(i, pending)
-            try { return await pending }
-            finally { if (pendingPages.get(i) === pending) pendingPages.delete(i) }
-        },
+        load: () => loadPage(i),
+        loadFrame: () => loadPage(i, true),
         size: 1000,
     }))
     book.sections[0].pageSpread = 'right'

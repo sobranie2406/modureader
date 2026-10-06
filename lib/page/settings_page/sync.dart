@@ -15,6 +15,7 @@ import 'package:anx_reader/main.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/service/sync/ai_settings_sync.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
+import 'package:anx_reader/service/sync/webdav_request_policy.dart';
 import 'package:anx_reader/utils/save_file_to_download.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:anx_reader/utils/get_path/databases_path.dart';
@@ -103,6 +104,13 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                 }),
             SettingsTile.switchTile(
                 title: Text(L10n.of(context).settingsSyncAutoSync),
+                description: isJianguoyunWebdav(
+                        Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ?? '')
+                    ? Text(ModuStrings.text(
+                        context,
+                        '已识别坚果云：自动同步至少间隔 10 分钟，期间改动合并同步。本机同账号每滚动 30 分钟最多发出 480 次请求，预算和服务器冷却在重启后保留。“立即同步”只跳过自动同步间隔，不跳过请求预算或冷却。其他设备和应用仍可能占用服务端额度。',
+                        'Jianguoyun detected: automatic syncs are at least 10 minutes apart and changes are batched. This device allows up to 480 requests per account in a rolling 30-minute window. The budget and server cooldown survive restarts. Sync now bypasses only the automatic interval, not the budget or cooldown. Other devices and apps may still use the server quota.'))
+                    : null,
                 leading: const Icon(Icons.sync),
                 initialValue: Prefs().autoSync,
                 enabled: Prefs().webdavStatus,

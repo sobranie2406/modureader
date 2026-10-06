@@ -13,6 +13,39 @@ DioException responseError(int code) {
 }
 
 void main() {
+  for (final code in [429, 503]) {
+    test('automatic preflight does not hammer a busy server ($code)', () async {
+      var calls = 0;
+      await expectLater(
+          SyncPreflight(delay: (_) async {
+            fail('Busy responses must not be retried immediately');
+          }).run(
+              automatic: true,
+              enabled: () => true,
+              networkReady: () async => true,
+              probe: () async {
+                calls++;
+                throw responseError(code);
+              }),
+          throwsA(isA<DioException>()));
+      expect(calls, 1);
+    });
+  }
+
+  test('provider delay coalesces and can be cancelled by manual sync',
+      () async {
+    final timer = Completer<void>();
+    final gate = AutoSyncStartGate(delay: (duration) {
+      expect(duration, const Duration(minutes: 10));
+      return timer.future;
+    });
+    final pending =
+        gate.wait(() => true, duration: const Duration(minutes: 10));
+    expect(await gate.wait(() => true), isFalse);
+    gate.invalidate();
+    timer.complete();
+    expect(await pending, isFalse);
+  });
   test('automatic starts delay, coalesce, and yield to a manual request',
       () async {
     final timer = Completer<void>();

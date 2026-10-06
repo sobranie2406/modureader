@@ -170,13 +170,13 @@ void main() {
             .widget<DropdownButtonFormField<SelectionAiScope>>(
                 key('toolbar-ai-scope'))
             .initialValue,
-        SelectionAiScope.selection);
+        SelectionAiScope.context);
     expect(tester.widget<CheckboxListTile>(key('toolbar-ai-web-search')).value,
         false);
     await tester.ensureVisible(key('toolbar-ai-scope'));
     await tester.tap(key('toolbar-ai-scope'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('结合上下文').last);
+    await tester.tap(find.text('仅选中文字').last);
     await tester.pumpAndSettle();
     await tester.ensureVisible(key('toolbar-ai-web-search'));
     await tester.tap(key('toolbar-ai-web-search'));
@@ -184,7 +184,8 @@ void main() {
     await tester.tap(key('toolbar-editor-save'));
     await tester.pumpAndSettle();
     expect(Prefs().selectionToolbar.items.last.name, '校对');
-    expect(Prefs().selectionToolbar.items.last.scope, SelectionAiScope.context);
+    expect(
+        Prefs().selectionToolbar.items.last.scope, SelectionAiScope.selection);
     expect(Prefs().selectionToolbar.items.last.webSearch, true);
     final ownId = Prefs().selectionToolbar.items.last.id;
     await reveal(tester, key('toolbar-restore'));
@@ -250,7 +251,7 @@ void main() {
               .widget<DropdownButtonFormField<SelectionAiScope>>(
                   key('toolbar-ai-scope'))
               .initialValue,
-          SelectionAiScope.selection);
+          SelectionAiScope.context);
       expect(
           tester.widget<CheckboxListTile>(key('toolbar-ai-web-search')).value,
           false);
@@ -280,12 +281,13 @@ void main() {
 
   testWidgets('enabled classical translation dispatches from selection toolbar',
       (tester) async {
-    final preset = SelectionToolbarConfig.templateItems.singleWhere(
-        (item) => item.id == 'custom-preset-classical-chinese');
+    final preset = SelectionToolbarConfig.templateItems
+        .singleWhere((item) => item.id == 'custom-preset-classical-chinese');
     SelectionToolbarItem? selected;
     final config = SelectionToolbarConfig(items: [
       preset.copyWith(enabled: true),
-      ...SelectionToolbarConfig.initialItems.where((item) => item.id != preset.id),
+      ...SelectionToolbarConfig.initialItems
+          .where((item) => item.id != preset.id),
     ]);
     await tester.pumpWidget(app(SelectionActionToolbar(
       items: config.availableItems(),

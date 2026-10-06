@@ -8,9 +8,12 @@ export const normalizeEnhancement = (value = {}) => {
         if (!Number.isFinite(n) || n < min || n > max) throw new RangeError('Invalid enhancement: ' + key)
         result[key] = n
     }
+    const mode = value.paperMode ?? 'preserve'
+    if (!['preserve', 'text'].includes(mode)) throw new RangeError('Invalid paper mode')
+    if (mode !== 'preserve') result.paperMode = mode
     return result
 }
-export const hasEnhancement = value => Object.values(normalizeEnhancement(value)).some(n => n !== 0)
+export const hasEnhancement = value => Object.values(normalizeEnhancement(value)).some(n => typeof n === 'number' && n !== 0)
 const check = signal => { if (signal?.aborted) throw new DOMException('Image processing cancelled', 'AbortError') }
 const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 const clamp = n => Math.max(0, Math.min(255, n))
@@ -108,6 +111,42 @@ async function fadeScanWatermarks(image, strength, signal) {
     return output
 }
 
+// Small per-tile paper histogram: estimate illumination without OCR or another
+// full-size bitmap. Interpolate tile centres to avoid seams on uneven scans.
+async function paperField(data, width, height, signal) {
+    const size = 64, cols = Math.ceil(width / size), rows = Math.ceil(height / size)
+    const levels = new Float32Array(cols * rows)
+    for (let ty = 0; ty < rows; ty++) {
+        await pause(); check(signal)
+        for (let tx = 0; tx < cols; tx++) {
+            const histogram = new Uint32Array(256)
+            let count = 0
+            for (let y = ty * size; y < Math.min(height, (ty + 1) * size); y += 2)
+                for (let x = tx * size; x < Math.min(width, (tx + 1) * size); x += 2) {
+                    const p = (y * width + x) * 4
+                    if (data[p + 3] < 250) continue
+                    histogram[Math.round((data[p] + data[p + 1] + data[p + 2]) / 3)]++
+                    count++
+                }
+            let sum = 0, paper = 255
+            for (let n = 0; count && n < 256; n++) {
+                sum += histogram[n]
+                if (sum >= count * .85) { paper = n; break }
+            }
+            levels[ty * cols + tx] = Math.max(160, paper)
+        }
+    }
+    return (x, y) => {
+        const gx = Math.max(0, Math.min(cols - 1, x / size - .5))
+        const gy = Math.max(0, Math.min(rows - 1, y / size - .5))
+        const x0 = Math.floor(gx), y0 = Math.floor(gy)
+        const x1 = Math.min(cols - 1, x0 + 1), y1 = Math.min(rows - 1, y0 + 1)
+        const a = gx - x0, b = gy - y0
+        return (levels[y0 * cols + x0] * (1-a) + levels[y0 * cols + x1] * a) * (1-b) +
+            (levels[y1 * cols + x0] * (1-a) + levels[y1 * cols + x1] * a) * b
+    }
+}
+
 export async function enhanceImage(image, value, {signal} = {}) {
     validate(image); check(signal)
     const options = normalizeEnhancement(value)
@@ -120,15 +159,24 @@ export async function enhanceImage(image, value, {signal} = {}) {
         check(signal); image.data.set(data); return image
     }
     const output = new Uint8ClampedArray(data.length)
+    const paper = options.paperMode === 'text' && options.whiten
+        ? await paperField(data, width, height, signal) : null
     const lut = new Uint8ClampedArray(256), gain = 2 ** (options.contrast / 50)
     for (let i = 0; i < 256; i++) lut[i] = clamp(255 * (clamp((i - 128) * gain + 128) / 255) ** (1 + options.darken / 70))
     for (let y = 0; y < height; y++) {
         if (y % 48 === 0) { await pause(); check(signal) }
         for (let x = 0; x < width; x++) {
             const p = (y * width + x) * 4
-            const channels = [data[p], data[p + 1], data[p + 2]]
-            const neutral = Math.max(...channels) - Math.min(...channels) < 24
-            let minimum = (channels[0] + channels[1] + channels[2]) / 3
+            const r = data[p], g = data[p + 1], b = data[p + 2]
+            const neutral = Math.max(r, g, b) - Math.min(r, g, b) < 24
+            const luma = (r + g + b) / 3
+            let minimum = luma
+            const background = paper?.(x, y)
+            // Text mode deliberately removes paper colour. Dark strokes stay
+            // untouched; faint print/illustrations should be checked in preview.
+            const clean = background ? Math.min(255, luma * 255 / Math.max(150, background - 6)) : 0
+            const paperAmount = background ? Math.min(1, options.whiten / 200) *
+                Math.max(0, Math.min(1, (luma - 90) / 70)) : 0
             if (options.ink && neutral) {
                 for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
                     const q = (Math.max(0, Math.min(height - 1, y + dy)) * width + Math.max(0, Math.min(width - 1, x + dx))) * 4
@@ -138,6 +186,7 @@ export async function enhanceImage(image, value, {signal} = {}) {
             }
             for (let c = 0; c < 3; c++) {
                 let v = data[p + c]
+                if (paperAmount) v += (clean - v) * paperAmount
                 // Ink strengthens nearby dark neutral strokes, not every dark tone.
                 if (minimum < 140 && neutral) v += (Math.min(v, minimum) - v) * options.ink / 15 * .75
                 if (options.sharpen) {
@@ -148,7 +197,7 @@ export async function enhanceImage(image, value, {signal} = {}) {
                 }
                 v = lut[Math.round(clamp(v))]
                 // Lift only light, near-neutral paper; leave coloured illustration pixels intact.
-                if (neutral && v > 160) v += (255 - v) * Math.min(1, options.whiten / 200) * (v - 160) / 95
+                if (!paper && neutral && v > 160) v += (255 - v) * Math.min(1, options.whiten / 200) * (v - 160) / 95
                 output[p + c] = v
             }
             output[p + 3] = data[p + 3]

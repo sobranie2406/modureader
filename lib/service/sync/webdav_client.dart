@@ -10,6 +10,7 @@ import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:webdav_client/webdav_client.dart';
 import 'package:xml/xml.dart';
+import 'package:anx_reader/service/sync/webdav_request_policy.dart';
 
 part 'webdav_sync_support.dart';
 
@@ -18,11 +19,15 @@ class WebdavClient extends SyncClientBase {
   late Map<String, dynamic> _config;
   bool? _atomicSupport;
   DateTime? _atomicCheckedAt;
+  late WebdavRequestPolicy requestPolicy;
+  final Future<io.Directory> Function()? policyStateDirectory;
+  DateTime? _basicAuthProbeAt;
 
   WebdavClient({
     required String url,
     required String username,
     required String password,
+    this.policyStateDirectory,
   }) {
     _config = {
       'url': url,
@@ -33,6 +38,11 @@ class WebdavClient extends SyncClientBase {
   }
 
   void _initClient() {
+    requestPolicy = WebdavRequestPolicy.forAccount(
+        _config['url'] as String, _config['username'] as String,
+        stateDirectory: policyStateDirectory);
+    final policy = requestPolicy;
+    _basicAuthProbeAt = null;
     _atomicSupport = null;
     _atomicCheckedAt = null;
     _client = newClient(
@@ -47,6 +57,87 @@ class WebdavClient extends SyncClientBase {
         'Content-Type': 'application/octet-stream'
       })
       ..setConnectTimeout(8000);
+    // The dependency manually follows 302 inside req(), even when Dio's
+    // followRedirects is false. Stop it before it can resend credentials or
+    // duplicate the endpoint prefix. Our directory reader handles safe cases.
+    final transport = _client;
+    _client.c.interceptors
+        .add(InterceptorsWrapper(onRequest: (request, handler) async {
+      try {
+        await policy.prepare();
+        final blocked = policy.rejectWhileCooling(request);
+        if (blocked != null) {
+          handler.reject(blocked);
+          return;
+        }
+        // The dependency sends OPTIONS before EVERY file GET/PUT. Once Basic
+        // authentication is established these extra probes add no guarantee:
+        // the real operation still checks permissions. Keep Digest/anonymous
+        // probes, explicit ping and all consistency/CAS checks intact.
+        if (identical(transport, _client) &&
+            request.method == 'OPTIONS' &&
+            request.extra['moduExplicitProbe'] != true &&
+            transport.auth.type == AuthType.BasicAuth &&
+            _basicAuthProbeAt != null &&
+            DateTime.now().difference(_basicAuthProbeAt!) <
+                const Duration(minutes: 5)) {
+          handler.resolve(Response(requestOptions: request, statusCode: 200));
+          return;
+        }
+        final reserved = await policy.beforeRequest(request);
+        if (reserved != null) {
+          handler.reject(reserved);
+        } else {
+          handler.next(request);
+        }
+      } catch (error) {
+        handler.reject(DioException(requestOptions: request, error: error));
+      }
+    }, onError: (error, handler) async {
+      if (identical(transport, _client) &&
+          [401, 403].contains(error.response?.statusCode)) {
+        _basicAuthProbeAt = null;
+      }
+      if (error.error is! WebdavCoolingDown) {
+        policy.observe(error.response);
+        if (isWebdavBusy(error)) {
+          try {
+            await policy.persist();
+          } catch (failure) {
+            AnxLog.warning(
+                'WebDAV cooldown persistence failed: ${failure.runtimeType}');
+          }
+        }
+      }
+      handler.next(error);
+    }, onResponse: (response, handler) async {
+      policy.observe(response);
+      final status = response.statusCode;
+      if ([429, 503].contains(status)) {
+        try {
+          await policy.persist();
+        } catch (failure) {
+          AnxLog.warning(
+              'WebDAV cooldown persistence failed: ${failure.runtimeType}');
+        }
+      }
+      if (identical(transport, _client)) {
+        if ([401, 403].contains(status)) _basicAuthProbeAt = null;
+        if (response.requestOptions.method == 'OPTIONS' &&
+            status == 200 &&
+            transport.auth.type == AuthType.BasicAuth) {
+          _basicAuthProbeAt = DateTime.now();
+        }
+      }
+      if (status != null && status >= 300 && status < 400) {
+        handler.reject(DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            type: DioExceptionType.badResponse));
+      } else {
+        handler.next(response);
+      }
+    }));
   }
 
   @override
@@ -56,6 +147,7 @@ class WebdavClient extends SyncClientBase {
     // Bound only the probe, not large book uploads on slow connections.
     final response =
         await _client.c.req(_client, 'OPTIONS', '/', optionsHandler: (options) {
+      options.extra = {'moduExplicitProbe': true};
       options.headers?['depth'] = '0';
       options.receiveTimeout = const Duration(seconds: 12);
       options.sendTimeout = const Duration(seconds: 12);
@@ -192,7 +284,10 @@ class WebdavClient extends SyncClientBase {
     // proxy changed its validator behavior. Only negative results back off.
     if (_atomicSupport == false &&
         checked != null &&
-        DateTime.now().difference(checked) < const Duration(seconds: 30)) {
+        DateTime.now().difference(checked) <
+            (requestPolicy.jianguoyun
+                ? const Duration(minutes: 30)
+                : const Duration(seconds: 30))) {
       return _atomicSupport!;
     }
     final supported = await _probeAtomicSyncWrites();
@@ -210,7 +305,9 @@ class WebdavClient extends SyncClientBase {
     // File synchronization needs decoded literal names and every page too,
     // not only the immutable record log. The upstream directory parser keeps
     // reserved characters encoded and reads only the first response page.
-    if (path == SyncPaths.books || path == SyncPaths.covers) {
+    if (path == SyncPaths.root ||
+        path == SyncPaths.books ||
+        path == SyncPaths.covers) {
       return _readCompleteSyncDirectory(path);
     }
     return (await _client.readDir(path))
@@ -226,13 +323,12 @@ class WebdavClient extends SyncClientBase {
       // database7.db/. Strict servers reject that file-as-directory request.
       // Use the same authenticated transport, but preserve the exact path and
       // request only this resource (Depth: 0).
-      final response = await _client.c.wdPropfind(
-        _client,
+      final response = await _propfindWithDirectoryRedirect(
         _safeEncodePath(path),
-        false,
-        '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/>'
-        '<d:getcontentlength/><d:getlastmodified/><d:getetag/>'
-        '</d:prop></d:propfind>',
+        directory: _isSyncDirectory(path),
+        body: '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/>'
+            '<d:getcontentlength/><d:getlastmodified/><d:getetag/>'
+            '</d:prop></d:propfind>',
       );
       receivedProperties = true;
       final document = XmlDocument.parse(response.data as String);

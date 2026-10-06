@@ -1,8 +1,8 @@
-# Modu 1.2.0 settings and features
+# Modu 1.2.1 settings and features
 
 English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
 
-For stable **1.2.0+10082**, updated 2026-10-04. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
+For stable **1.2.1+10086**, updated 2026-10-06. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
 ## Settings entry points
 
@@ -82,7 +82,7 @@ CSS changes layout; regex highlights style matching text with colors, background
 
 **Selection toolbar** lets you toggle and drag-sort built-in tools and AI commands, and edit annotation colors, names, icons and prompts. Common AI presets start disabled, including AI Knowledge and Classical Chinese translation. Manage selection templates here, separately from AI Reading Skills; both use the same reader AI dialog.
 
-Each selection command can use **selected text only** (default) or **text with context**, and can opt into online search. AI Knowledge uses the current model's knowledge first. To check further, choose **Online search** below the answer, before Regenerate and Copy. Wiktionary, Wikipedia and Baidu Baike results are summarized with sources by the same model in the same conversation. No extra search API key is required.
+Each selection command can use **text with context** (default) or **selected text only**, and can opt into online search. Explicit scope choices are preserved. AI Knowledge uses the current model's knowledge first. To check further, choose **Online search** below the answer, before Regenerate and Copy. Wiktionary, Wikipedia and Baidu Baike results are summarized with sources by the same model in the same conversation. No extra search API key is required.
 
 ## AI configuration, skills and conversations
 
@@ -127,6 +127,10 @@ Editable style templates include natural narration, gentle bedtime reading, fict
 A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
 
 ## WebDAV and the remote library
+
+Jianguoyun is recognized automatically. Repeated automatic-sync triggers coalesce, with subsequent starts at least ten minutes apart and a per-device/account rolling budget of 480 requests per half-hour. Manual sync respects the budget and server cooldown; restarting does not reset them. Other devices and apps still share the provider's limits. Other WebDAV servers keep their normal automatic-sync frequency. All providers respect HTTP 429/503 and Retry-After. Local changes are retained for later retry.
+
+For older TXT / Markdown books whose converted EPUB checksum fails, upgrade and sync the device holding the local book before downloading on another device. Keep that local copy until synchronization and download succeed.
 
 In **Settings → Sync**, enter the WebDAV parent URL, account and password, test, then enable sync. Data lives in its modu directory; do not append /modu again. Before migrating old anx / Anx directories, stop sync on every device and back up both local and server data. Do not overwrite an existing modu directory.
 
