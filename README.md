@@ -21,6 +21,16 @@
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
+## Community and feedback
+
+Join the **Modu Reader QQ group: 1009765685** (Chinese-language discussion). Search for the group number in QQ or scan the QR code below to request to join.
+
+<p align="center">
+  <img src="docs/images/community/modu-qq-group.jpg" width="280" alt="QR code for the Modu Reader QQ group, number 1009765685">
+</p>
+
+Please submit bugs and feature requests through [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose). If you cannot use GitHub, use the [feedback form](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h). Describe one issue or idea per report and include the Modu version, OS and device, reproduction steps and expected behavior. Do not share keys, passwords, private books or unredacted logs.
+
 ![Reading and chapter navigation on macOS and iOS](docs/images/showcase/cross-platform/reading-en.png)
 
 > **Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. See [Releases](https://github.com/sobranie2406/modureader/releases) for version updates and usage notes.

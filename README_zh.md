@@ -21,6 +21,16 @@
   <a href="https://github.com/sobranie2406/modureader/issues">问题反馈</a>
 </p>
 
+## 交流与反馈
+
+欢迎加入 **Modu 默读交流反馈 QQ 群：1009765685**。在 QQ 搜索群号，或扫描下方二维码申请加入。
+
+<p align="center">
+  <img src="docs/images/community/modu-qq-group.jpg" width="280" alt="Modu 默读交流反馈 QQ 群入群二维码，群号 1009765685">
+</p>
+
+问题与功能建议优先通过 [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) 提交；不方便使用 GitHub 时，可填写[在线反馈表](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)。每条反馈只描述一个问题或建议，并提供默读版本、系统与设备、复现步骤和预期结果。请勿提交密钥、密码、私人书籍或未脱敏日志。
+
 ![Mac 与 iPhone 上的阅读与章节导航](docs/images/showcase/cross-platform/reading-zh.png)
 
 > **本地阅读不需要 AI 账号。** AI、在线翻译和在线语音按需配置，费用与可用性取决于所选服务。各版本更新与使用说明见 [Releases](https://github.com/sobranie2406/modureader/releases)。
