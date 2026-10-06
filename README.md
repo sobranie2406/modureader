@@ -18,16 +18,15 @@
   <a href="#features">Features</a> ·
   <a href="docs/SETTINGS.md">Settings guide</a> ·
   <a href="docs/README.md">Documentation</a> ·
+  <a href="https://t.me/Modureader">Telegram</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
 </p>
 
 ## Community and feedback
 
-Join the **Modu Reader QQ group: 1009765685** (Chinese-language discussion). Search for the group number in QQ or scan the QR code below to request to join.
+Follow the [Modu Reader Telegram channel](https://t.me/Modureader).
 
-<p align="center">
-  <img src="docs/images/community/modu-qq-group.jpg" width="280" alt="QR code for the Modu Reader QQ group, number 1009765685">
-</p>
+Join the **Modu Reader QQ group: 1009765685** (Chinese-language discussion). Search for the group number in QQ to request to join.
 
 Please submit bugs and feature requests through [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose). If you cannot use GitHub, use the [feedback form](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h). Describe one issue or idea per report and include the Modu version, OS and device, reproduction steps and expected behavior. Do not share keys, passwords, private books or unredacted logs.
 

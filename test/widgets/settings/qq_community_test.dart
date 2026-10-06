@@ -7,7 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   for (final locale in ['zh', 'en']) {
     for (final size in [const Size(320, 640), const Size(640, 320)]) {
-      testWidgets('QQ entry, clipboard and original image: $locale $size',
+      testWidgets(
+          'QQ group number and clipboard without QR code: $locale $size',
           (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -37,17 +38,10 @@ void main() {
             .tap(find.text(locale == 'zh' ? '复制群号' : 'Copy group number'));
         await tester.pumpAndSettle();
         expect(copied, QqCommunity.groupNumber);
-        await tester.tap(find.text(locale == 'zh' ? '查看群二维码' : 'View QR code'));
-        await tester.pumpAndSettle();
-        expect(find.byType(InteractiveViewer), findsOneWidget);
-        final asset =
-            tester.widget<Image>(find.byType(Image)).image as AssetImage;
-        expect(asset.assetName, QqCommunity.imageAsset);
-        expect((await rootBundle.load(asset.assetName)).lengthInBytes,
-            greaterThan(0));
+        expect(find.byIcon(Icons.qr_code_2), findsNothing);
+        expect(find.byType(Image), findsNothing);
+        expect(find.byType(InteractiveViewer), findsNothing);
         expect(tester.takeException(), isNull);
-        await tester.tap(find.byIcon(Icons.close));
-        await tester.pumpAndSettle();
         expect(find.byType(Dialog), findsNothing);
       });
     }

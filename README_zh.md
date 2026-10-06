@@ -18,16 +18,15 @@
   <a href="#features">功能一览</a> ·
   <a href="docs/SETTINGS_zh.md">设置指南</a> ·
   <a href="docs/README.md">文档目录</a> ·
+  <a href="https://t.me/Modureader">Telegram 频道</a> ·
   <a href="https://github.com/sobranie2406/modureader/issues">问题反馈</a>
 </p>
 
 ## 交流与反馈
 
-欢迎加入 **Modu 默读交流反馈 QQ 群：1009765685**。在 QQ 搜索群号，或扫描下方二维码申请加入。
+欢迎关注 [Modu 默读 Telegram 频道](https://t.me/Modureader)。
 
-<p align="center">
-  <img src="docs/images/community/modu-qq-group.jpg" width="280" alt="Modu 默读交流反馈 QQ 群入群二维码，群号 1009765685">
-</p>
+欢迎加入 **Modu 默读交流反馈 QQ 群：1009765685**。在 QQ 搜索群号申请加入。
 
 问题与功能建议优先通过 [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) 提交；不方便使用 GitHub 时，可填写[在线反馈表](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)。每条反馈只描述一个问题或建议，并提供默读版本、系统与设备、复现步骤和预期结果。请勿提交密钥、密码、私人书籍或未脱敏日志。
 
