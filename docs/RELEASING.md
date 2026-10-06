@@ -62,8 +62,18 @@ Linux packages include the ONNX Runtime 1.22.0 shared library omitted by an olde
 2. Run Modu Packages with selected targets and the intended release tag, or push an authorized version tag. CI builds platform assets in parallel; create the source tag/release only after verification. Never retarget an existing tag to different source.
 3. Failed targets must not produce apparently successful assets. Fix and rebuild them; a release asset proves production, not full device acceptance.
 4. Retain LICENSE/NOTICE inside packages and SOURCE.txt inside desktop installations. Publish hashes and the exact tagged source. Prerelease tags create prereleases. A full stable release must verify all eight packages; scoped previews publish only the requested targets.
-5. Do not run upstream store publishing, Telegram notification or signing-service workflows.
+5. Do not run upstream store publishing or signing-service workflows. Modu uses its own Telegram release notifier described below.
 6. Mirror the identical original packages following [UPDATE_MIRROR.md](UPDATE_MIRROR.md). On Gitee, confirm deletion authority and that GitHub retains the old release, then delete only the old app release/assets before uploading the new release. Verify every hash before updating the manifest. Retain local packages for retries; do not publish an unverified manifest. Do not delete model mirrors, source, tags or branches. GitHub retains release history from 1.1.0 onward.
+
+## Telegram release announcements
+
+The dedicated ModuReader bot posts to channel `-1004343451406`. Give it only the channel permission to post messages, and store its BotFather token as the repository Actions secret `TELEGRAM_BOT_TOKEN`. Never commit the token or put it in release notes.
+
+`.github/workflows/telegram-release.yml` announces published stable and prerelease versions. It preserves the complete bilingual release body in its published order (English first, 简体中文 second), and includes the exact Release/download link. Long notes are split into numbered messages without dropping content. Drafts are rejected. The workflow has read-only repository permissions and uses only Python's standard library plus the official Telegram Bot API.
+
+`Modu Packages` calls this reusable workflow after the release job succeeds: releases created by `GITHUB_TOKEN` do not trigger another `release` workflow. Releases published manually trigger it through `release: published`. Failed builds, ordinary commits and unpublished drafts send nothing. The notification is a separate job; it cannot prevent an already published release from existing.
+
+For the initial announcement or recovery, run **Modu Telegram Release** with a published `release_tag` (or `latest` for the latest stable version). Manual runs and reruns send a new announcement, so check the channel before retrying a timeout or rerunning an already successful job. Automatic retries occur only after an explicit Telegram rate-limit rejection. Editing release notes alone does not send a second post.
 
 Current automation is .github/workflows/build.yaml, pr-check.yml and scripts/release/. Fastlane/store files are historical templates, not Modu's distribution path.
 
