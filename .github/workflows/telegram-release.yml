@@ -1,0 +1,48 @@
+name: Modu Telegram Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Published release tag to announce; latest selects the latest stable release'
+        default: latest
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+    secrets:
+      TELEGRAM_BOT_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modu-telegram-${{ github.event.release.tag_name || inputs.release_tag || 'latest' }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    if: github.repository == 'sobranie2406/modureader'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Also allows announcing releases whose old tag predates this notifier.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: scripts/release/notify_telegram.py
+          sparse-checkout-cone-mode: false
+      - name: Send published release notes and download link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: '-1004343451406'
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag || 'latest' }}
+        run: python3 scripts/release/notify_telegram.py
