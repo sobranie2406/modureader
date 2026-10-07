@@ -23,10 +23,13 @@ jobs:
     timeout-minutes: 60
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
-      PUB_CACHE: ${{ runner.temp }}/harmony-pub-cache
-      MODU_OHOS_FLUTTER: ${{ runner.temp }}/flutter-ohos
     steps:
       - uses: actions/checkout@v4
+      - name: Select ephemeral runner directories
+        shell: bash
+        run: |
+          echo "PUB_CACHE=$RUNNER_TEMP/harmony-pub-cache" >> "$GITHUB_ENV"
+          echo "MODU_OHOS_FLUTTER=$RUNNER_TEMP/flutter-ohos" >> "$GITHUB_ENV"
       - name: Prepare Harmony-only dependency overlay
         shell: bash
         run: |

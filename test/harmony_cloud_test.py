@@ -134,6 +134,7 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertIn("branches: ['codex/harmony-cloud']", workflow)
         self.assertNotIn('tags:', workflow)
         self.assertIn('contents: read', workflow)
+        self.assertNotIn('${{ runner.temp }}', workflow)
         self.assertNotIn('contents: write', workflow)
         self.assertNotIn('gh release', workflow)
         self.assertNotIn('continue-on-error', workflow)
