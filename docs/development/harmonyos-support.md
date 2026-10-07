@@ -155,6 +155,11 @@ behavior to cover Flutter OH's additional TargetPlatform enum value. Package
 archive identities, edited-file hashes, paths and versions are checked before
 patching. No native API is replaced with a no-op and no cache source is edited.
 
+The pinned Flutter OH lacks the newer onReorderItem callback used by two Modu
+settings lists. `patch_app.py` adapts those two exact sites only in the runner
+checkout, using onReorder and normalizing downward destination indices. The
+normal clients retain their existing callback API and drag behavior.
+
 The fixed Flutter OH SDK maps OHOS native-hook inputs to Linux and filters
 arbitrary environment variables. Explicit `hooks.user_defines.hf_tokenizers`
 therefore select the OHOS Rust triple, SDK, linker and pinned Rust toolchain.

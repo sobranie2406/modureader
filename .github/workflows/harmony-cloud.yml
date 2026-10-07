@@ -134,6 +134,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/harmony/patch_ui.py 2>&1 | tee build/harmony-diagnostics/ui-adapters.log
+          python3 scripts/harmony/patch_app.py 2>&1 | tee build/harmony-diagnostics/app-adapters.log
       - name: Build unsigned HAP
         if: github.event_name == 'push' || inputs.build_hap
         shell: bash
