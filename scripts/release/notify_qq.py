@@ -8,6 +8,7 @@ import urllib.parse
 import urllib.request
 
 ENDPOINT = "https://modureader-bot.2406.fun/qq/release"
+USER_AGENT = "ModuReader-GitHub-Release/1.0"
 
 
 def main():
@@ -20,7 +21,10 @@ def main():
     query = [(key, value) for key, value in query if key != "audience"]
     query.append(("audience", ENDPOINT))
     identity_url = urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
-    request = urllib.request.Request(identity_url, headers={"Authorization": "Bearer " + request_token})
+    request = urllib.request.Request(identity_url, headers={
+        "Authorization": "Bearer " + request_token,
+        "User-Agent": USER_AGENT,
+    })
     with urllib.request.urlopen(request, timeout=30) as response:
         identity = json.load(response)["value"]
     # Neither the short-lived identity nor the request credential is printed or stored.
@@ -31,6 +35,7 @@ def main():
     request = urllib.request.Request(ENDPOINT, data=body, method="POST", headers={
         "Authorization": "Bearer " + identity,
         "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
     })
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
