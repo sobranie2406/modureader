@@ -59,6 +59,7 @@ jobs:
           test "$(git -C "$MODU_OHOS_FLUTTER" rev-parse HEAD)" = 62357a93d653bf844f730bb1f4b7cc9e2139d14e
           echo "$MODU_OHOS_FLUTTER/bin" >> "$GITHUB_PATH"
           "$MODU_OHOS_FLUTTER/bin/flutter" --version
+          "$MODU_OHOS_FLUTTER/bin/flutter" precache --ohos --no-android --no-ios --no-web --no-linux --no-windows --no-macos
       - name: Resolve dependencies with Harmony Dart before native SDK setup
         shell: bash
         run: |
@@ -96,6 +97,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get 2>&1 | tee build/harmony-diagnostics/flutter-dependencies.log
+          test -f ohos/node_modules/flutter-hvigor-plugin/package.json
       - name: Prepare OHOS native-library cross compiler on runner only
         if: github.event_name == 'push' || inputs.build_hap
         shell: bash

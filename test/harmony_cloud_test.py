@@ -176,6 +176,8 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertLess(workflow.index('- name: Install verified Huawei'),
                         workflow.index('- name: Generate Flutter plugin metadata'))
         self.assertIn('export FLUTTER_ROOT="$MODU_OHOS_FLUTTER"', workflow)
+        self.assertIn('precache --ohos --no-android', workflow)
+        self.assertIn('test -f ohos/node_modules/flutter-hvigor-plugin/package.json', workflow)
 
 
 if __name__ == '__main__':

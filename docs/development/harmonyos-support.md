@@ -118,7 +118,10 @@ adapters or their unresolved federated implementations. Audit-only mode omits
 the native SDK check and does not install Huawei tools.
 
 `scripts/harmony/prepare.py` writes a dependency overlay only inside a fresh
-Actions checkout and refuses local execution. Adapter revisions are full Git
+Actions checkout and refuses local execution. It also adds the pinned WebView
+Windows implementation missing from its upstream manifest to that disposable
+root pubspec, since an override alone does not add a package to the graph.
+The canonical project pubspec is not rewritten. Adapter revisions are full Git
 commits in two JSON manifests, not moving branch names. The overlay preserves
 Modu's local icon/tokenizer packages and AI forks, replacing the entire WebView
 package family (including Windows) to avoid mixing incompatible interfaces.
@@ -129,6 +132,14 @@ Rust target setup. The first dependency solve exposed `flutter_test`'s meta
 1.17.0 pin versus hooks 2.2.0/record_use's meta >=1.19.0 requirement; the
 Harmony-only overlay now selects meta 1.19.0 (Dart >=3.5), while retaining the
 Flutter OH intl 0.20.2 pin. A completed HAP is still required for acceptance.
+
+Dependency preflight uses Dart after caching Flutter's common/OHOS engine
+artifacts (including sky_engine), with FLUTTER_ROOT explicitly selected. Native
+plugin generation uses Flutter pub only after the verified Huawei SDK is set
+up. Flutter's OHOS post-processing requires a real SDK even when solving has
+already succeeded. Both HOS_SDK_HOME and DEVECO_SDK_HOME select the SDK parent;
+OHOS_SDK_HOME selects its default/openharmony native-tool subtree. Node is
+explicitly selected from the same official bundle.
 
 The pinned WebView 6.1.5 adapter lacks two APIs used by Modu. A fail-closed,
 cloud-only patch copies three verified packages before adding native ArkWeb
