@@ -1,0 +1,43 @@
+# Modu 官方 QQ 群助手
+
+复用现有 `modureader-community-bot` Cloudflare Worker、免费 Workers AI 和 D1，保留 Telegram 服务。
+QQ 群：**1009765685**。机器人：**Modu 默读助手**，AppID **1905740672**。
+
+## 运行行为
+
+- 群里 `@助手 /ask 问题` 或直接 @ 提问，依据公开 README 和功能文档解答，支持中英文。
+- `/release` 返回最新已发布版本（含预发布版），`/stable` 返回正式版；保留发布者填写的中英文说明和 Release 链接。
+- **GitHub 发布事件主动触发版本通知，不定时检查版本。** `.github/workflows/qq-release.yml` 处理 `release.published`。自动打包流程发布后直接调用该工作流，覆盖 `GITHUB_TOKEN` 不会再次触发发布事件的情况。
+- 工作流用 GitHub 的短期 OIDC 身份调用 `POST /qq/release`。Worker 校验官方签名、接收地址、不可变仓库 ID、仓库名、工作流路径、事件和有效期。无需新增共享密钥，QQ 密钥只在 Cloudflare。
+- 通知分段保存投递状态，同一 Release ID 只通知一次；网络结果不明确时保留待核查状态，避免盲目重发。
+- 北京时间每天 **08:00、20:00** 总结之前 12 小时；仅包含启用后实际接收的文本。现有每分钟 Cron 驱动时间边界和清理，**不用于查询 GitHub 版本**。
+- 完整群消息只处理绑定群，明显密钥、联系方式和链接中的查询参数会先隐藏，文本 24 小时过期并由现有 Cron 清理。不下载图片、书籍、语音或文件。普通聊天不自动回答。
+
+## 部署与权限
+
+现有 `BOT_TOKEN`、`WEBHOOK_SECRET` 为 Telegram 加密变量，保持原值。新增 `QQ_APP_SECRET` 仅作为 Cloudflare 加密变量。配置文件中的启用开关默认关闭，真实部署启用前需获得群主授权。
+
+1. 使用群主手机 QQ 将机器人加入目标群。QQ 未认证机器人仅支持管理员使用，可加入管理员作为群主的群。
+2. 开放平台配置 `https://modureader-bot.2406.fun/qq/webhook`，订阅群 @ 消息、完整群消息、入退群、机器人加入/移除、主动发言允许/拒绝事件。
+3. 从已验证的 `GROUP_ADD_ROBOT` 回调中取得实际群 OpenID，核对来自目标群后设置 `QQ_GROUP_OPENID`。数字 QQ 群号不能替代 OpenID。
+4. 按群主授权在群内机器人设置中允许全部文字消息和主动发言，再设置 `QQ_SUMMARIES_ENABLED=true`、`QQ_RELEASE_PUSH_ENABLED=true`。
+5. 群主/管理员发送 `/push-test`，以实际无 `msg_id` 的主动发送成功为准，才启用定时与版本推送。`/summary-test` 验证当前阶段摘要；`/permissions` 只读检查官方提供的管理接口。
+6. 运行 `Modu QQ Release` 的手动工作流，选择已有发布标签和 `test_notice=true`。通知标为测试，使用独立的去重记录，不会改变正式通知状态。
+
+`GET /qq/status` 仅返回启用状态、时间及数值错误码，不暴露群 OpenID、凭据、成员或聊天文本。
+
+群管理接口的开放范围、管理员角色和主动发送权限，以 QQ 实际返回为准。某些接口仅向白名单机器人开放，代码不会因配置存在就声称功能可用。现有 Q群管家和人工入群审核可以继续使用。
+
+## 本地验证
+
+需要 Node.js 22 或更新版本；测试使用内存 SQLite 和模拟网络，不调用真实 QQ。
+
+```sh
+node --test scripts/community/qq-bot.test.mjs
+node scripts/community/build.mjs
+node --check scripts/community/dist/worker.mjs
+```
+
+`dist/worker.mjs` 是供 Cloudflare 仪表板粘贴部署的单文件。使用 Wrangler 时直接以 `wrangler.toml` 中的 `worker.mjs` 为入口；部署前保留已有绑定、变量、域名和 Cron。
+
+官方资料：[QQ 开放平台](https://bot.q.qq.com/wiki/develop/api-v2/)、[GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)、[GitHub 工作流触发规则](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)。
