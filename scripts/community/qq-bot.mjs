@@ -74,6 +74,8 @@ export function qqRedact(text) {
   return String(text || '').replace(/<@!?[^>]+>/g, '@群友')
     .replace(/\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{15,})\b/gi, '[密钥已隐藏]')
     .replace(/((?:api[_ -]?key|app[_ -]?secret|token|password|密码|密钥)\s*[:=：]\s*)[^\s,，;；]+/gi, '$1[已隐藏]')
+    .replace(/((?:QQ(?:号)?|微信(?:号)?|wechat)\s*[:=：]\s*)[^\s,，;；]+/gi, '$1[联系方式已隐藏]')
+    .replace(/((?:手机号?|电话|phone|tel)\s*[:=：]\s*)\+?\d[\d ()-]{4,}\d/gi, '$1[联系方式已隐藏]')
     .replace(/https?:\/\/[^\s]+/gi, value => {
       try { const url = new URL(value); url.username = ''; url.password = ''; url.search = ''; url.hash = ''; return url.href; }
       catch { return '[链接]'; }

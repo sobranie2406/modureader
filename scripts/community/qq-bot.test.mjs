@@ -121,10 +121,10 @@ test('full mode archives only the bound group and leaves ordinary conversation u
   await withFixture(async f => {
     await qqRoutes(await signed(event('3','无关群的内容', 'other-group')), f.env);
     assert.equal(f.DB.raw.prepare("SELECT COUNT(*) n FROM bot_state WHERE key LIKE 'qq:chat:%'").get().n, 0);
-    await qqRoutes(await signed(event('4','讨论 EPUB，联系 a@example.test，token=private-test-key')), f.env);
+    await qqRoutes(await signed(event('4','讨论 EPUB，联系 a@example.test，token=private-test-key，QQ号：123456789，微信：private_wechat，phone: +1 (555) 123-4567')), f.env);
     const row = f.DB.raw.prepare("SELECT value FROM bot_state WHERE key LIKE 'qq:chat:%'").get();
     assert.match(row.value, /讨论 EPUB/);
-    assert.doesNotMatch(row.value, /a@example.test|private-test-key/);
+    assert.doesNotMatch(row.value, /a@example.test|private-test-key|123456789|private_wechat|555/);
     assert.equal(f.sent.length, 0);
     assert.equal(f.prompts.length, 0);
   });
