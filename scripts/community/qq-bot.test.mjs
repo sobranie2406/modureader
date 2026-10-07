@@ -187,6 +187,26 @@ test('no scheduled push happens until proactive permission is actually tested', 
   });
 });
 
+test('large summaries sample both the beginning and end of the whole interval', async () => {
+  const originalNow = Date.now;
+  const at = Date.parse('2026-10-07T20:00:00+08:00');
+  Date.now = () => at;
+  try {
+    await withFixture(async f => {
+      const seconds = at/1000;
+      store(f.DB, 'qq:started', {at:seconds-86400}, seconds);
+      store(f.DB, 'qq:push-permission', {allowed:true,tested:true}, seconds);
+      for (let i=0; i<2201; i++) store(f.DB, 'qq:chat:allowed-group:'+i,
+        {ts:seconds-43000+i*10,text:i===0 ? 'Early interval topic' : i===2200 ? 'Late interval topic' : 'Reading discussion '+i}, seconds);
+      await qqSchedule({scheduledTime:at}, f.env);
+      assert.match(f.prompts[0].messages[1].content, /Early interval topic/);
+      assert.match(f.prompts[0].messages[1].content, /Late interval topic/);
+      assert.ok(f.prompts[0].messages[1].content.length < 32100);
+      assert.match(f.sent[0].content, /抽样总结/);
+    });
+  } finally {Date.now = originalNow;}
+});
+
 test('split preserves complete bilingual notes and Unicode; drafts are rejected', () => {
   const text = '中文版本说明\nEnglish release notes 📚\n'.repeat(100);
   const parts = qqSplit(text, 70);

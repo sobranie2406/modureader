@@ -331,7 +331,7 @@ async function qqArchive(env, group, message) {
   await qqPut(env, 'qq:last-chat', {at: qqNow()}, 86400*7);
 }
 async function qqSummary(env, group, window) {
-  const rows = await env.DB.prepare("SELECT value FROM bot_state WHERE key LIKE ? AND expires>? AND CAST(json_extract(value,'$.ts') AS INTEGER)>=? AND CAST(json_extract(value,'$.ts') AS INTEGER)<? ORDER BY CAST(json_extract(value,'$.ts') AS INTEGER),key LIMIT 2001")
+  const rows = await env.DB.prepare("WITH chats AS (SELECT value,ROW_NUMBER() OVER (ORDER BY CAST(json_extract(value,'$.ts') AS INTEGER),key) AS position,COUNT(*) OVER () AS total FROM bot_state WHERE key LIKE ? AND expires>? AND CAST(json_extract(value,'$.ts') AS INTEGER)>=? AND CAST(json_extract(value,'$.ts') AS INTEGER)<?) SELECT value,total FROM chats WHERE (position-1)%((total+1999)/2000)=0 ORDER BY position LIMIT 2000")
     .bind(`qq:chat:${group}:%`, qqNow(), window.start, window.end).all();
   const values = rows.results.map(r => JSON.parse(r.value));
   const init = await qqGet(env, 'qq:started');
@@ -339,7 +339,7 @@ async function qqSummary(env, group, window) {
   if (!values.length) return header + '\n\n本时段没有收到可总结的文字消息。';
   const lines = values.slice(0, 2000).map(m => `[${qqDate(m.ts).slice(-5)}] ${m.text}`);
   let transcript = lines.join('\n');
-  const limited = transcript.length > 32000 || values.length > 2000;
+  const limited = transcript.length > 32000 || rows.results[0]?.total > 2000;
   if (transcript.length > 32000) {
     // A bounded, evenly spaced sample covers the whole interval rather than only its tail.
     const step = Math.ceil(transcript.length / 30000);
