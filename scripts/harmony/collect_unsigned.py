@@ -10,7 +10,10 @@ import zipfile
 
 
 def collect(root: Path) -> list[Path]:
-    sources = sorted({p.resolve() for base in (root / 'ohos', root / 'build/app')
+    # Flutter OH copies Hvigor outputs here; prefer that final copy.
+    canonical = root / 'build/ohos/hap'
+    bases = (canonical,) if any(canonical.glob('*-unsigned.hap')) else (root / 'ohos', root / 'build/app')
+    sources = sorted({p.resolve() for base in bases
                       if base.exists() for p in base.rglob('*-unsigned.hap')})
     if not sources:
         raise ValueError('No unsigned HAP; nothing will be published.')

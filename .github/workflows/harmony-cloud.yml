@@ -108,7 +108,7 @@ jobs:
           # Host Dart code generation must finish before selecting OHOS native
           # hook parameters, otherwise its x64 host build would target arm64.
           python3 scripts/harmony/configure_native.py --root "$GITHUB_WORKSPACE"
-          flutter build hap --release --target-platform ohos-arm64 2>&1 | tee build/harmony-diagnostics/build.log
+          flutter build hap --release --no-codesign --no-pub --target-platform ohos-arm64 2>&1 | tee build/harmony-diagnostics/build.log
           python3 scripts/harmony/collect_unsigned.py
       - name: Upload unsigned package only (not a Release)
         if: success() && (github.event_name == 'push' || inputs.build_hap)

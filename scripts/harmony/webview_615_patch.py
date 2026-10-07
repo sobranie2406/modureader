@@ -101,8 +101,8 @@ def replacements():
     add(VIEW, '    this.customSettings = customSettings;',
         '    this.customSettings = customSettings;\n'
         '    this.bridgeEnabled = customSettings.javaScriptBridgeEnabled;')
-    add(VIEW, '''    this.requireController().registerJavaScriptProxy(this.javaScriptBridgeInterface, 
-    JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME, this.javaScriptBridgeInterface.getMethodList());''',
+    add(VIEW, '    this.requireController().registerJavaScriptProxy(this.javaScriptBridgeInterface, \n'
+        '    JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME, this.javaScriptBridgeInterface.getMethodList());',
         '''    if (this.isJavaScriptBridgeEnabled()) {
       this.requireController().registerJavaScriptProxy(this.javaScriptBridgeInterface,
         JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME, this.javaScriptBridgeInterface.getMethodList());

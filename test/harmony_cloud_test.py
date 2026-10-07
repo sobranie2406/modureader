@@ -85,6 +85,14 @@ class HarmonyCloudTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'No unsigned HAP'):
                 collect(Path(tmp))
 
+    def test_prefers_flutter_final_output_over_hvigor_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture(root / 'ohos/entry/build/entry-unsigned.hap')
+            final = root / 'build/ohos/hap/entry-unsigned.hap'
+            fixture(final)
+            self.assertEqual(collect(root), [final.resolve()])
+
     def test_duplicate_names_fail_without_overwriting(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -140,6 +148,7 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertNotIn('continue-on-error', workflow)
         self.assertIn('62357a93d653bf844f730bb1f4b7cc9e2139d14e', workflow)
         self.assertNotIn('secrets.HARMONY_SIGN', workflow)
+        self.assertIn('build hap --release --no-codesign --no-pub', workflow)
 
 
 if __name__ == '__main__':
