@@ -51,8 +51,8 @@ fi
 [[ -x "$ohos_sdk/toolchains/hdc" ]] || { echo 'Missing HDC.' >&2; exit 1; }
 printf '%s\n' "$node_home/bin" "${tool_bins[@]}" "$ohos_sdk/toolchains" >> "$GITHUB_PATH"
 printf 'DEVECO_NODE_HOME=%s\n' "$node_home" >> "$GITHUB_ENV"
-printf 'DEVECO_SDK_HOME=%s\nOHOS_SDK_HOME=%s\nMODU_HARMONY_SDK=%s\n' \
-  "$tool_root/sdk" "$ohos_sdk" "$ohos_sdk" >> "$GITHUB_ENV"
+printf 'DEVECO_SDK_HOME=%s\nHOS_SDK_HOME=%s\nOHOS_SDK_HOME=%s\nMODU_HARMONY_SDK=%s\n' \
+  "$tool_root/sdk" "$tool_root/sdk" "$ohos_sdk" "$ohos_sdk" >> "$GITHUB_ENV"
 if [[ -x "$tool_root/jbr/bin/java" ]]; then
   printf 'JAVA_HOME=%s\n' "$tool_root/jbr" >> "$GITHUB_ENV"
   printf '%s\n' "$tool_root/jbr/bin" >> "$GITHUB_PATH"

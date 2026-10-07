@@ -1,5 +1,6 @@
 """Cloud packaging must be separate from existing release/signing workflows."""
 import hashlib
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -37,6 +38,24 @@ class HarmonyCloudTest(unittest.TestCase):
         with patch.dict('os.environ', {'GITHUB_ACTIONS': 'false'}):
             with self.assertRaisesRegex(ValueError, 'Run only on GitHub Actions'):
                 prepare(ROOT)
+
+    def test_runner_adds_missing_federated_dependency_without_changing_original(self):
+        import yaml
+        original = (ROOT / 'pubspec.yaml').read_bytes()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'pubspec.yaml').write_bytes(original)
+            shutil.copytree(ROOT / 'scripts/harmony', root / 'scripts/harmony')
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}):
+                prepare(root)
+                with self.assertRaisesRegex(ValueError, 'existing dependency overlay'):
+                    prepare(root)
+            manifest = yaml.safe_load((root / 'pubspec.yaml').read_text())
+            self.assertIn('flutter_inappwebview_windows', manifest['dependencies'])
+            expected = yaml.safe_load(original)
+            manifest['dependencies'].pop('flutter_inappwebview_windows')
+            self.assertEqual(manifest, expected)
+        self.assertEqual((ROOT / 'pubspec.yaml').read_bytes(), original)
 
     def test_profiles_remain_unsigned(self):
         import json
@@ -135,6 +154,7 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertIn('"$tool_root/node/bin/node"', script)
         self.assertIn("printf 'DEVECO_NODE_HOME=%s", script)
         self.assertIn('"$node_home/bin"', script)
+        self.assertIn('HOS_SDK_HOME=%s', script)
 
     def test_cloud_workflow_has_no_release_or_signing_secret(self):
         workflow = (ROOT / '.github/workflows/harmony-cloud.yml').read_text()
@@ -153,6 +173,9 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertNotIn('GIT_LFS_SKIP_SMUDGE', workflow)
         self.assertLess(workflow.index('- name: Resolve dependencies'),
                         workflow.index('- name: Install verified Huawei'))
+        self.assertLess(workflow.index('- name: Install verified Huawei'),
+                        workflow.index('- name: Generate Flutter plugin metadata'))
+        self.assertIn('export FLUTTER_ROOT="$MODU_OHOS_FLUTTER"', workflow)
 
 
 if __name__ == '__main__':

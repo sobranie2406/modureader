@@ -1,6 +1,6 @@
 """Create Harmony-only overrides in a fresh runner checkout, never locally.
 
-No SDK installation here. The normal manifest and lock file remain untouched.
+No SDK installation here. Only the disposable Actions manifest is modified.
 JSON is also YAML, so pub can read the generated pubspec_overrides.yaml.
 """
 import json
@@ -37,9 +37,24 @@ def prepare(root: Path) -> None:
     if target.exists():
         raise ValueError('Refusing to replace an existing dependency overlay')
     data = overrides(root)
-    with target.open('x') as output:
-        json.dump(data, output, indent=2)
-        output.write('\n')
+    # The pinned WebView declares a Windows default implementation but forgets
+    # its dependency. An override alone cannot add it to the dependency graph.
+    # Keep this repair in the disposable checkout, not the shared pubspec.
+    manifest_path = root / 'pubspec.yaml'
+    original = manifest_path.read_bytes()
+    manifest = yaml.safe_load(original)
+    dependencies = manifest.setdefault('dependencies', {})
+    package = 'flutter_inappwebview_windows'
+    dependencies.setdefault(package, data['dependency_overrides'][package])
+    try:
+        with target.open('x') as output:
+            json.dump(data, output, indent=2)
+            output.write('\n')
+        manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False))
+    except BaseException:
+        manifest_path.write_bytes(original)
+        target.unlink(missing_ok=True)
+        raise
     print(f'Harmony-only dependency overlay: {len(data["dependency_overrides"])} packages')
 
 

@@ -59,12 +59,15 @@ jobs:
           test "$(git -C "$MODU_OHOS_FLUTTER" rev-parse HEAD)" = 62357a93d653bf844f730bb1f4b7cc9e2139d14e
           echo "$MODU_OHOS_FLUTTER/bin" >> "$GITHUB_PATH"
           "$MODU_OHOS_FLUTTER/bin/flutter" --version
-      - name: Resolve dependencies with Harmony Flutter (isolated runner)
+      - name: Resolve dependencies with Harmony Dart before native SDK setup
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/harmony-diagnostics
-          flutter pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
+          # Flutter pub also generates OHOS plugin metadata and requires a
+          # native SDK. Do only Dart dependency resolution in this preflight.
+          export FLUTTER_ROOT="$MODU_OHOS_FLUTTER"
+          "$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart" pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
       - name: Save verified open-source dependency cache before native compilation
         if: steps.source-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -87,6 +90,12 @@ jobs:
           HARMONY_TOOLS_SHA256: ${{ vars.HARMONY_LINUX_TOOLS_SHA256 }}
           HARMONY_TOOLS_LICENSE_ACCEPTED: ${{ vars.HARMONY_TOOLS_LICENSE_ACCEPTED }}
         run: bash scripts/harmony/cloud-tools.sh
+      - name: Generate Flutter plugin metadata after native SDK setup
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee build/harmony-diagnostics/flutter-dependencies.log
       - name: Prepare OHOS native-library cross compiler on runner only
         if: github.event_name == 'push' || inputs.build_hap
         shell: bash
@@ -106,6 +115,7 @@ jobs:
           if [[ "$MODU_HARMONY_BUILD_HAP" != true ]]; then args+=(--dependencies-only); fi
           dart run scripts/dev/check_harmony.dart "${args[@]}" 2>&1 | tee build/harmony-diagnostics/readiness.log
       - name: Backport WebView APIs inside the isolated OHOS adapter copies
+        if: github.event_name == 'push' || inputs.build_hap
         shell: bash
         run: |
           set -euo pipefail
