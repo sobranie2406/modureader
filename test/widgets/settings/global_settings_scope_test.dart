@@ -59,7 +59,7 @@ void main() {
   for (final entry in {
     'tts': '朗读配置',
     'ai': 'AI 供应商与对话',
-    'webdav': '同步 WebDAV',
+    'webdav': '云端同步（WebDAV / S3）',
     'remote-library-webdav': '远程书库 WebDAV',
   }.entries) {
     testWidgets(
@@ -72,7 +72,7 @@ void main() {
       expect(find.text('恢复${entry.value}？'), findsOneWidget);
       expect(find.text('恢复全局设置？'), findsNothing);
       expect(find.textContaining('未包含的设置保持不变'), findsOneWidget);
-      expect(find.textContaining('WebDAV 及自动同步需手动重新开启'),
+      expect(find.textContaining('云端同步及自动同步需手动重新开启'),
           entry.key == 'webdav' ? findsOneWidget : findsNothing);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();

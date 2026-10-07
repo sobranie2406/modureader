@@ -222,8 +222,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                       'Import scope: $scopeLabel.\n\nReplace only the ${values.length - 1} included settings (including recorded defaults); settings not included stay unchanged. Books, notes, progress, storage paths and local font/background files are unaffected.\n\n$credentialNotice\n\nRestart Modu afterwards.',
                     ) +
                     (disablesSync
-                        ? ModuStrings.text(context, '\n\nWebDAV 及自动同步需手动重新开启。',
-                            '\n\nRe-enable WebDAV and automatic sync manually.')
+                        ? ModuStrings.text(context, '\n\n云端同步及自动同步需手动重新开启。',
+                            '\n\nRe-enable cloud sync and automatic sync manually.')
                         : '')),
               ),
               actions: [
