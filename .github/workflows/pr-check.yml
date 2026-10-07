@@ -91,3 +91,19 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/modu-js-tests" jsdom@26.1.0
           MODU_JSDOM_ROOT="$RUNNER_TEMP/modu-js-tests" node --test test/reader_*.test.mjs test/vertical_*.test.mjs test/android_tts*.test.mjs test/android_reader_selection.test.mjs
+
+  qq-community:
+    name: QQ Community
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: QQ community integration regression tests
+        run: |
+          node --test scripts/community/qq-bot.test.mjs
+          node scripts/community/build.mjs
+          node --check scripts/community/dist/worker.mjs
+          python3 -m py_compile scripts/release/notify_qq.py
