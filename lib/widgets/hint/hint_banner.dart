@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -61,7 +62,7 @@ class _HintBannerState extends State<HintBanner>
     final backgroundColor = colorScheme.primary.withAlpha(30);
 
     return AnimatedSize(
-      duration: const Duration(milliseconds: 250),
+      duration: AppMotion.duration(const Duration(milliseconds: 250)),
       curve: Curves.easeInOut,
       alignment: Alignment.topCenter,
       child: _visible

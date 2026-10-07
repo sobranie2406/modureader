@@ -12,8 +12,7 @@ class SyncAssetListing {
   final _references = <String, Set<String>>{};
   final _names = <String, Set<String>>{};
 
-  static String _identity(SyncClientBase client) => jsonEncode(
-      [client.protocolName, client.config['url'], client.config['username']]);
+  static String _identity(SyncClientBase client) => jsonEncode(client.syncIdentity);
 
   void _checkEndpoint() {
     if (_identity(client) != _endpoint) {

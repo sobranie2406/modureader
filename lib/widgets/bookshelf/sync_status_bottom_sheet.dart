@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -24,6 +25,7 @@ String formatSyncTimestamp(DateTime time) =>
 Future<void> showSyncStatusBottomSheet(BuildContext context) async {
   final dbPath = await getAnxDataBasesPath();
   showModalBottomSheet(
+    sheetAnimationStyle: AppMotion.style,
     useSafeArea: true,
     context: navigatorKey.currentContext!,
     showDragHandle: true,
@@ -137,9 +139,10 @@ class SyncStatusBottomSheet extends ConsumerWidget {
         Text(syncDirection, style: theme.textTheme.titleMedium),
         Text(syncState.fileName, style: theme.textTheme.bodyMedium),
         const SizedBox(height: 10),
-        LinearProgressIndicator(
+        EinkStaticIndicator(
+            child: LinearProgressIndicator(
           value: syncState.total > 0 ? syncState.count / syncState.total : 0,
-        ),
+        )),
         const SizedBox(height: 5),
         Text(
             '${byteToHuman(syncState.count)} / ${byteToHuman(syncState.total)}'),

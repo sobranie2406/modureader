@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'package:anx_reader/service/ai/answer_presentation.dart';
 import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
@@ -412,7 +413,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(
+                  child:
+                      EinkStaticIndicator(child: CircularProgressIndicator())),
               error: (error, stack) => Center(
                 child: Text(L10n.of(context).failedToLoadHistoryTip),
               ),
@@ -815,6 +818,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final size = renderBox?.size ?? Size.zero;
 
     showMenu(
+      popUpAnimationStyle: AppMotion.style,
       context: context,
       position: RelativeRect.fromLTRB(
         offset.dx,
@@ -967,6 +971,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     final selectedId = Prefs().selectedAiService;
 
     var aiService = PopupMenuButton<String>(
+      popUpAnimationStyle: AppMotion.style,
       enabled: !_isStreaming,
       onSelected: _onProviderSelected,
       itemBuilder: (context) {
@@ -1172,8 +1177,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                                                 ConnectionState.done) {
                                               return const SizedBox.expand();
                                             }
-                                            return Skeletonizer.zone(
-                                                child: Bone.multiText());
+                                            return EinkStaticIndicator(
+                                                child: Skeletonizer.zone(
+                                                    child: Bone.multiText()));
                                           }
 
                                           final messages = snapshot.data!;
@@ -1194,8 +1200,9 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
                                             return _buildMessageList(messages);
                                           },
-                                          loading: () => Skeletonizer.zone(
-                                              child: Bone.multiText()),
+                                          loading: () => EinkStaticIndicator(
+                                              child: Skeletonizer.zone(
+                                                  child: Bone.multiText())),
                                           error: (error, stack) => Center(
                                               child: Text('error: $error')),
                                         ),
@@ -1219,7 +1226,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
 
   Widget _buildDataSharingConsent(BuildContext context) {
     final theme = Theme.of(context);
-    final maxWidth = MediaQuery.of(context).size.width * 0.9;
+    final maxWidth = MediaQuery.sizeOf(context).width * 0.9;
     final constrainedWidth = maxWidth > 500 ? 500.0 : maxWidth;
 
     return Container(
@@ -1485,7 +1492,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       {GlobalKey? replyStartKey}) {
     if (parsed.timeline.isEmpty) {
       return isStreaming
-          ? Skeletonizer.zone(child: Bone.multiText())
+          ? EinkStaticIndicator(
+              child: Skeletonizer.zone(child: Bone.multiText()))
           : const SizedBox.shrink();
     }
 
@@ -1512,7 +1520,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       }
       widgets.addAll(answerWidgets);
     } else if (widgets.isEmpty && isStreaming) {
-      widgets.add(Skeletonizer.zone(child: Bone.multiText()));
+      widgets.add(EinkStaticIndicator(
+          child: Skeletonizer.zone(child: Bone.multiText())));
     }
 
     return Column(

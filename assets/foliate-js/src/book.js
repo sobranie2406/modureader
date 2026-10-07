@@ -2,6 +2,7 @@ console.log('book.js')
 console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
+import { applyReaderMotion, reducedReaderMotionCSS } from './reader-motion.js'
 import { detectDocumentReadingMode, resolveDocumentReadingMode } from './document-reading-mode.js'
 import { FootnoteHandler } from './footnotes.js'
 import { attachFootnoteSizing, footnoteLayoutCSS, footnoteFontSize } from './footnote-size.js'
@@ -708,7 +709,8 @@ const getCSS = ({ fontSize,
   customCSSEnabled,
   useBookStyles,
   headingFontSize,
-  codeHighlightTheme
+  codeHighlightTheme,
+  eInkMode
 }) => {
 
   const { faces: fontFaces, family: fontFamily } = readerFontCSS({
@@ -921,6 +923,7 @@ const getCSS = ({ fontSize,
     }
     
     ${customCSSEnabled && customCSS ? customCSS : ''}
+    ${eInkMode === true ? reducedReaderMotionCSS : ''}
 `}
 
 const fixHeadingColor = (themeColor) => {
@@ -1057,6 +1060,7 @@ const replaceFootnote = (view, sourceFontSize) => {
   renderer.setAttribute('bottom-margin', '0px')
   const footNoteStyle = {
     fontSize: footnoteFontSize(style.fontSize),
+    eInkMode: style.eInkMode,
     fontName: style.fontName,
     fontPath: style.fontPath,
     englishFontName: style.englishFontName,
@@ -1864,6 +1868,7 @@ const callFlutter = (name, data) => {
 }
 
 const setStyle = (oldStyle) => {
+  applyReaderMotion(document, style.eInkMode === true)
   document.documentElement.style.backgroundColor = style.backgroundColor
   const turn = {
     scroll: false,
@@ -1915,6 +1920,7 @@ const setStyle = (oldStyle) => {
     : reader.view.renderer.removeAttribute('animated')
 
   const newStyle = {
+    eInkMode: style.eInkMode,
     fontSize: style.fontSize,
     fontName: style.fontName,
     fontPath: style.fontPath,

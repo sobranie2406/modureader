@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
@@ -48,6 +49,7 @@ class _TranslateSettingState extends State<TranslateSetting> {
 
   Future<void> _showServicePicker({bool fullTextOnly = false}) async {
     final selected = await showModalBottomSheet<TranslateService>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -143,6 +145,7 @@ class _TranslateSettingState extends State<TranslateSetting> {
   Future<void> _showAiModelPicker(List<AiProvider> providers) async {
     if (providers.isEmpty) return;
     final selected = await showModalBottomSheet<String>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -191,6 +194,7 @@ class _TranslateSettingState extends State<TranslateSetting> {
         .where((language) => language != LangListEnum.auto)
         .toList(growable: false);
     final selected = await showModalBottomSheet<LangListEnum>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

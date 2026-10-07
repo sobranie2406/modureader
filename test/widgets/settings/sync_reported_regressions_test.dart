@@ -107,6 +107,87 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('active WebDAV cannot be accidentally switched or reconfigured',
+      (tester) async {
+    Prefs().saveWebdavStatus(true);
+    final saved = Prefs().prefs.getString('webdavInfo');
+    await open(tester);
+    await tester.tap(find.text('Object storage'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(SimpleDialog), findsNothing);
+    await tester.ensureVisible(find.text('https://old.example.test/dav'));
+    await tester.tap(find.text('https://old.example.test/dav'),
+        warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(SimpleDialog), findsNothing);
+    expect(Prefs().prefs.getString('webdavInfo'), saved);
+    expect(Prefs().syncProtocol, isNull);
+    expect(Prefs().webdavStatus, true);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'backend tabs restore independent connection settings without enabling sync',
+      (tester) async {
+    final dav = Prefs().prefs.getString('webdavInfo');
+    Prefs().setSyncInfo(SyncProtocol.s3, {
+      'endpoint': 'https://objects.example.test',
+      'bucket': 'saved-bucket',
+      'accessKeyId': 'example-id',
+      'secretAccessKey': 'example-secret',
+    });
+    final s3 = Prefs().prefs.getString('s3Info');
+    await open(tester);
+    expect(find.text('https://old.example.test/dav'), findsOneWidget);
+    await tester.tap(find.text('Object storage'));
+    await tester.pumpAndSettle();
+    expect(Prefs().syncProtocol, 's3');
+    expect(find.text('saved-bucket'), findsOneWidget);
+    expect(find.text('https://old.example.test/dav'), findsNothing);
+    expect(Prefs().webdavStatus, false);
+    final tabs = find.byKey(const ValueKey('sync-backend-tabs'));
+    await tester.tap(find.descendant(of: tabs, matching: find.text('WebDAV')));
+    await tester.pumpAndSettle();
+    expect(Prefs().syncProtocol, 'webdav');
+    expect(find.text('https://old.example.test/dav'), findsOneWidget);
+    expect(Prefs().prefs.getString('webdavInfo'), dav);
+    expect(Prefs().prefs.getString('s3Info'), s3);
+    expect(Prefs().webdavStatus, false);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('active object storage cannot switch to WebDAV', (tester) async {
+    Prefs().syncProtocol = 's3';
+    Prefs().saveWebdavStatus(true);
+    await open(tester);
+    final tabs = find.byKey(const ValueKey('sync-backend-tabs'));
+    await tester.tap(find.descendant(of: tabs, matching: find.text('WebDAV')),
+        warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(Prefs().syncProtocol, 's3');
+    expect(Prefs().webdavStatus, true);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'WebDAV password reveal never changes saved credentials on cancel',
+      (tester) async {
+    final saved = Prefs().prefs.getString('webdavInfo');
+    await open(tester);
+    await tester.tap(find.text('https://old.example.test/dav'));
+    await tester.pumpAndSettle();
+    final password = find.byType(TextField).last;
+    expect(tester.widget<TextField>(password).obscureText, true);
+    await tester.tap(find.byTooltip('Show sensitive value'));
+    await tester.pump();
+    expect(tester.widget<TextField>(password).obscureText, false);
+    await tester.enterText(password, 'unsaved-example');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(Prefs().prefs.getString('webdavInfo'), saved);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'backup management Cancel dismisses only its dialog and keeps settings',
       (tester) async {

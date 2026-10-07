@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 
@@ -136,7 +137,8 @@ class _DocumentAnalysisPanelState extends State<DocumentAnalysisPanel> {
                 Text(ModuStrings.text(context, '类型标记保存失败，请重试。',
                     'Could not save the type correction. Please retry.')),
             ],
-            if (_busy) const LinearProgressIndicator(),
+            if (_busy)
+              const EinkStaticIndicator(child: LinearProgressIndicator()),
             if (_failed)
               Text(ModuStrings.text(context, '检测失败，请重试。原文档未改动。',
                   'Inspection failed. Retry; the source document is unchanged.')),

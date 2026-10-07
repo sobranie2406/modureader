@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
@@ -28,7 +29,7 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: AppMotion.duration(const Duration(milliseconds: 220)),
     );
     _expandAnimation = CurvedAnimation(
       parent: _animationController,
@@ -46,7 +47,9 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
   void _toggleExpanded() {
     setState(() {
       _isExpanded = !_isExpanded;
-      if (_isExpanded) {
+      if (AppMotion.disabled) {
+        _animationController.value = _isExpanded ? 1 : 0;
+      } else if (_isExpanded) {
         _animationController.forward();
       } else {
         _animationController.reverse();
@@ -58,7 +61,11 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
     if (_isExpanded) {
       setState(() {
         _isExpanded = false;
-        _animationController.reverse();
+        if (AppMotion.disabled) {
+          _animationController.value = 0;
+        } else {
+          _animationController.reverse();
+        }
       });
     }
   }
@@ -86,7 +93,7 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
 
         return AnimatedOpacity(
           opacity: ttsActive ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.duration(const Duration(milliseconds: 200)),
           child: IgnorePointer(
             ignoring: !ttsActive,
             child: PointerInterceptor(
@@ -172,7 +179,8 @@ class _TtsFabState extends State<TtsFab> with SingleTickerProviderStateMixin {
                     onPressed: _toggleExpanded,
                     elevation: 4,
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
+                      duration:
+                          AppMotion.duration(const Duration(milliseconds: 200)),
                       child: _isExpanded
                           ? const Icon(
                               Icons.close,

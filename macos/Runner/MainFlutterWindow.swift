@@ -1,10 +1,12 @@
 import Cocoa
 import CoreImage
 import FlutterMacOS
+import NaturalLanguage
 
 class MainFlutterWindow: NSWindow {
   private var configTransferChannel: FlutterMethodChannel?
   private var brightnessChannel: FlutterMethodChannel?
+  private var wordSelectionChannel: FlutterMethodChannel?
   private var brightness: WindowBrightness?
 
   override func awakeFromNib() {
@@ -18,8 +20,30 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     registerConfigTransferChannel(flutterViewController)
     registerBrightnessChannel(flutterViewController)
+    registerWordSelectionChannel(flutterViewController)
 
     super.awakeFromNib()
+  }
+
+  private func registerWordSelectionChannel(_ controller: FlutterViewController) {
+    let channel = FlutterMethodChannel(
+      name: "com.modu.reader/word_selection",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "bounds" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let args = call.arguments as? [String: Any],
+            let text = args["text"] as? String,
+            let offset = args["offset"] as? Int else {
+        result(nil)
+        return
+      }
+      result(ReflowWordSelection.bounds(text: text, offset: offset))
+    }
+    wordSelectionChannel = channel
   }
 
   private func registerBrightnessChannel(_ controller: FlutterViewController) {
@@ -136,5 +160,28 @@ class MainFlutterWindow: NSWindow {
     return detector.features(in: image)
       .compactMap { ($0 as? CIQRCodeFeature)?.messageString }
       .first
+  }
+}
+
+/// System word segmentation, including Chinese, without a downloaded dictionary.
+/// Flutter's positions are UTF-16 offsets, not Swift Character indices.
+enum ReflowWordSelection {
+  static func bounds(text: String, offset: Int) -> [Int]? {
+    let length = text.utf16.count
+    guard length > 0, length <= 65536, offset >= 0, offset <= length else { return nil }
+    let index = min(offset, length - 1)
+    // Normalize an offset inside a surrogate pair/grapheme to its start.
+    let character = (text as NSString).rangeOfComposedCharacterSequence(at: index)
+    guard let position = Range(character, in: text)?.lowerBound else { return nil }
+    let tokenizer = NLTokenizer(unit: .word)
+    tokenizer.string = text
+    let range = tokenizer.tokenRange(at: position)
+    let native = NSRange(range, in: text)
+    guard native.length > 0, native.location <= index,
+          index < NSMaxRange(native),
+          text[range].unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) else {
+      return nil
+    }
+    return [native.location, NSMaxRange(native)]
   }
 }

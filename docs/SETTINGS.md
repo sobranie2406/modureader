@@ -1,8 +1,8 @@
-# Modu 1.2.1 settings and features
+# Modu 1.2.2 settings and features
 
 English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
 
-For stable **1.2.1+10086**, updated 2026-10-06. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
+For stable **1.2.2+10087**, updated 2026-10-07. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
 ## Settings entry points
 
@@ -21,7 +21,7 @@ Open **Settings** from the home navigation. The app language can follow the syst
 | Vector Model / Embedding Models | Local or remote embeddings, automatic indexing, downloads and stopping tasks |
 | OCR model | Lightweight recognition models, download sources, selection and deletion |
 | Narrate | Engine, voice, speed and editable narration-style templates |
-| Sync | WebDAV, automatic sync, encrypted credential sync and database backup |
+| Sync | WebDAV / S3-compatible object storage, automatic sync, encrypted credential sync and database backup |
 | Global settings backup | Settings files or modu links, with optional credentials |
 | Remote library settings | Separate WebDAV browsing and book downloads |
 | Translation | Engine, target language, AI and DeepL / DeepLX |
@@ -42,6 +42,10 @@ Back up and upgrade in place; do not uninstall or clear data first. Opening an i
 ## Reading ordinary books
 
 Supported formats include EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown. TXT / Markdown are converted on import for reading. The library supports folders, tags, pinning and moving selected books into folders. Download remote books before reading offline or indexing them.
+
+Import multiple files or choose a folder and select its supported books, including subfolders. Desktop drag-and-drop accepts folders on the library or reading screen. Source files are preserved. Cover badges show the stored format and, where applicable, a scanned-book label; manual classification takes priority over automatic detection.
+
+The floating home navigation bar is translucent, with space at the end of scrollable content so the last item remains accessible. **Appearance → E-Ink** disables app transitions, animated page turning and decorative motion, uses monochrome labels, and restores normal motion when switched off.
 
 Tap the text to open the bottom panel. Drag the progress slider to preview a chapter title, or use previous chapter, previous page, next page and next chapter. **Chapter progress** means chapter number / chapter count; **progress within the chapter** means current page / pages in that chapter.
 
@@ -126,7 +130,9 @@ Editable style templates include natural narration, gentle bedtime reading, fict
 
 A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
 
-## WebDAV and the remote library
+## Cloud sync and the remote library
+
+**Upcoming build:** **Settings → Sync** provides **WebDAV / Object storage** tabs. Object storage includes presets for Alibaba OSS, Tencent COS, Amazon S3, Cloudflare R2, RainYun ROS, Qiniu Kodo, Baidu BOS and Volcengine TOS, plus custom endpoints such as MinIO. Upgrades directly retain existing WebDAV accounts, passwords and enabled state. Turn sync off and wait for transfers before explicitly changing backend. Both connection configurations are retained separately; cloud files are not migrated. Passwords and keys are hidden by default with a common Show/Hide button. See [object storage setup, permissions and limitations](OBJECT_STORAGE_SYNC.md).
 
 Jianguoyun is recognized automatically. Repeated automatic-sync triggers coalesce, with subsequent starts at least ten minutes apart and a per-device/account rolling budget of 480 requests per half-hour. Manual sync respects the budget and server cooldown; restarting does not reset them. Other devices and apps still share the provider's limits. Other WebDAV servers keep their normal automatic-sync frequency. All providers respect HTTP 429/503 and Retry-After. Local changes are retained for later retry.
 
@@ -140,7 +146,7 @@ Fonts, backgrounds, local dictionaries and vector indexes are not library-synced
 
 Timed sync during reading is off by default. It runs only during foreground reading at the chosen interval, requires WebDAV and automatic sync, and respects Wi-Fi-only settings. Locking or leaving the reader pauses it; missed intervals are not replayed and requests do not overlap.
 
-**Sync API keys** is separate and off by default. It requires an independent password of at least 12 characters; sensitive service settings use AES-256-GCM encryption. The password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
+**Sync service settings, API keys and passwords** is separate and off by default, and shared by WebDAV and object storage. It requires an independent sync encryption password of at least 12 characters, not your WebDAV password or object-storage key. Sensitive service settings use AES-256-GCM encryption; WebDAV/object-storage connection credentials are excluded. The encryption password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
 
 **Remote library settings** configures a separate browse/download connection; it does not modify that library server's files. Configuration is stored locally, and credentials follow their independent transfer switch. This is distinct from library synchronization.
 

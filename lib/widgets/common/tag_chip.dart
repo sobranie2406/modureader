@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
@@ -88,6 +89,7 @@ class TagChip extends StatelessWidget {
     final l10n = L10n.of(context);
     final controller = TextEditingController(text: initialName);
     await showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (dialogContext) {
         Color colorValue =

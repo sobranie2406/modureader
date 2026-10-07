@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,16 @@ class ReaderPopup extends StatelessWidget {
           key: const ValueKey('reader-popup-body'),
           width: double.infinity,
           height: height,
-          child: Padding(padding: const EdgeInsets.only(top: 8), child: child),
+          // This container already consumes the keyboard inset. Nested chat
+          // Scaffolds must not resize by that same inset a second time.
+          child: MediaQuery.removeViewInsets(
+            context: context,
+            removeBottom: true,
+            child: RepaintBoundary(
+              child:
+                  Padding(padding: const EdgeInsets.only(top: 8), child: child),
+            ),
+          ),
         ),
       ),
     );
@@ -32,7 +42,11 @@ class ReaderPopup extends StatelessWidget {
 Future<void> showReaderPopup(BuildContext context,
     {required WidgetBuilder builder, bool enableDrag = true}) async {
   ModalRoute<dynamic>? route;
+  // Keep the content widget stable while the bottom-sheet route responds to
+  // keyboard metrics; build it below the consumed-inset MediaQuery.
+  final content = Builder(builder: builder);
   await showModalBottomSheet<void>(
+    sheetAnimationStyle: AppMotion.style,
     context: context,
     isScrollControlled: true,
     enableDrag: enableDrag,
@@ -40,7 +54,7 @@ Future<void> showReaderPopup(BuildContext context,
     clipBehavior: Clip.hardEdge,
     builder: (context) {
       route = ModalRoute.of(context);
-      return ReaderPopup(child: builder(context));
+      return ReaderPopup(child: content);
     },
   );
   // Native reader views must not regain focus during the reverse animation.

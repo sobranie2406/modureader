@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/service/ai/ai_model_service.dart';
@@ -15,6 +16,7 @@ Future<String?> showModelPickerDialog({
   String? currentModel,
 }) {
   return showDialog<String>(
+    animationStyle: AppMotion.style,
     context: context,
     builder: (context) => _ModelPickerDialog(
       provider: provider,

@@ -1,8 +1,10 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/reading_time.dart';
 import 'package:anx_reader/enums/chart_mode.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/page/book_detail.dart';
 import 'package:anx_reader/providers/statistic_data.dart';
@@ -102,7 +104,8 @@ class _StatisticPageState extends State<StatisticPage> {
                             child: ListView(
                                 padding: EdgeInsets.only(
                                     bottom: 12 +
-                                        MediaQuery.paddingOf(context).bottom),
+                                        MediaQuery.paddingOf(context).bottom +
+                                        HomeNavigationClearance.of(context)),
                                 controller: _scrollController,
                                 children: const [
                                   StatisticsDashboard(),
@@ -281,7 +284,7 @@ class _DateBooksState extends ConsumerState<DateBooks> {
         );
       },
       loading: () => const Center(
-        child: CircularProgressIndicator(),
+        child: EinkStaticIndicator(child: CircularProgressIndicator()),
       ),
       error: (error, stack) => Center(
         child: Text('Error: $error'),
@@ -363,12 +366,13 @@ class BookStatisticItem extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: LinearProgressIndicator(
+                                child: EinkStaticIndicator(
+                                    child: LinearProgressIndicator(
                                   value: snapshot.data!.readingPercentage,
                                   backgroundColor: Colors.grey[300],
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                       Theme.of(context).colorScheme.primary),
-                                ),
+                                )),
                               ),
                               const SizedBox(width: 10),
                               Text(
@@ -382,7 +386,7 @@ class BookStatisticItem extends StatelessWidget {
             ),
           );
         } else {
-          return const CircularProgressIndicator();
+          return const EinkStaticIndicator(child: CircularProgressIndicator());
         }
       },
     );

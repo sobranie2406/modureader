@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:ui';
 
@@ -131,13 +132,14 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                               padding: const EdgeInsets.all(20),
                               width: 100,
                               height: 100,
-                              child: CircularProgressIndicator(
+                              child: EinkStaticIndicator(
+                                  child: CircularProgressIndicator(
                                 value: widget.book.readingPercentage,
                                 strokeWidth: 6,
                                 backgroundColor: Colors.grey[400],
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                     Theme.of(context).colorScheme.primary),
-                              ),
+                              )),
                             ),
                             Positioned.fill(
                               child: Center(
@@ -445,7 +447,7 @@ class _BookDetailState extends ConsumerState<BookDetail> {
             } else {
               return const Padding(
                 padding: EdgeInsets.only(left: 20, right: 20),
-                child: CircularProgressIndicator(),
+                child: EinkStaticIndicator(child: CircularProgressIndicator()),
               );
             }
           },
@@ -730,7 +732,8 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                 }),
               );
             } else {
-              return const CircularProgressIndicator();
+              return const EinkStaticIndicator(
+                  child: CircularProgressIndicator());
             }
           },
         );
@@ -793,7 +796,8 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                       : Colors.transparent,
                   title: AnimatedOpacity(
                     opacity: _isCollapsed ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
+                    duration:
+                        AppMotion.duration(const Duration(milliseconds: 300)),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(

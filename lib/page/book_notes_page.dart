@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book_note.dart';
@@ -116,6 +117,7 @@ class _BookNotesPageState extends ConsumerState<BookNotesPage> {
   Future<void> handleExportNotes(BuildContext context, Book book,
       {List<BookNote>? notes}) async {
     showModalBottomSheet(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       builder: (context) {
         bool mergeChapters = Prefs().notesExportMergeChapters;
@@ -197,7 +199,9 @@ class _BookNotesPageState extends ConsumerState<BookNotesPage> {
                   },
                   loading: () => const SizedBox(
                     height: 120,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                        child: EinkStaticIndicator(
+                            child: CircularProgressIndicator())),
                   ),
                   error: (error, stack) => Padding(
                     padding: const EdgeInsets.all(16.0),

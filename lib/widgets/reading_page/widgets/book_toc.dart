@@ -2,6 +2,7 @@ import 'package:anx_reader/models/toc_item.dart';
 import 'package:anx_reader/page/book_player/epub_player.dart';
 import 'package:anx_reader/providers/book_toc.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -85,6 +86,10 @@ class _BookTocState extends ConsumerState<BookToc> {
         }
         _pendingScrollKey = null;
         _pendingScrollAnimated = false;
+        if (AppMotion.disabled) {
+          _itemScrollController.jumpTo(index: index);
+          return;
+        }
         final duration = animated
             ? const Duration(milliseconds: 250)
             : const Duration(milliseconds: 1);
@@ -195,6 +200,11 @@ class _BookTocState extends ConsumerState<BookToc> {
         return;
       }
       _pendingScrollKey = null;
+      if (AppMotion.disabled) {
+        _pendingScrollAnimated = false;
+        _itemScrollController.jumpTo(index: index);
+        return;
+      }
       final duration = _pendingScrollAnimated
           ? const Duration(milliseconds: 250)
           : const Duration(milliseconds: 1);

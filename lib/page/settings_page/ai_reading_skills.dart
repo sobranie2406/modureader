@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_prompts.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -211,6 +212,7 @@ class _AiReadingSkillsSettingsState
             },
           ),
           PopupMenuButton<_CustomSkillAction>(
+            popUpAnimationStyle: AppMotion.style,
             tooltip: ModuStrings.text(context, '更多操作', '更多操作'),
             onSelected: (action) {
               if (action == _CustomSkillAction.edit) {
@@ -263,6 +265,7 @@ class _AiReadingSkillsSettingsState
             onChanged: (_) => notifier.toggleEnabled(skill.id),
           ),
           PopupMenuButton<_CustomSkillAction>(
+            popUpAnimationStyle: AppMotion.style,
             tooltip: ModuStrings.text(context, '更多操作', '更多操作'),
             onSelected: (action) {
               switch (action) {
@@ -313,6 +316,7 @@ class _AiReadingSkillsSettingsState
     ModalRoute<dynamic>? route;
     try {
       await showDialog<void>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (dialogContext) {
           route = ModalRoute.of(dialogContext);
@@ -551,6 +555,7 @@ class _AiReadingSkillsSettingsState
 
   Future<void> _confirmDeleteCustomSkill(UserPrompt skill) async {
     final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(ModuStrings.text(context, '删除自定义技能', '删除自定义技能')),

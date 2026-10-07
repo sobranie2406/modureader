@@ -1,8 +1,8 @@
 # Application update mirror
 
-## Current: Modu 1.2.1+10086
+## Current: Modu 1.2.2+10087
 
-This guide describes the Modu publishing repository's `v1.2.1` release procedure and client behavior. A mirror is current only after all eight installers and their checksums have been verified and its manifest updated.
+This guide describes the Modu publishing repository's `v1.2.2` release procedure and client behavior. A mirror is current only after all nine packages and their checksums have been verified and its manifest updated.
 
 A single Update Source option controls both checking and downloading. Each fresh app launch starts with GitHub preferred. A GitHub check that fails because of connection, timeout, TLS/certificate or HTTP request errors falls back to the fixed HTTPS Gitee manifest and switches the source for the whole workflow:
 
@@ -12,7 +12,7 @@ https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json
 
 Successful GitHub checks use GitHub metadata and downloads. A check resolved through Gitee uses Gitee downloads. Changing the source clears pending release/download information and requires a fresh check; downloads never silently switch sources or combine responses from two sources.
 
-### Eight-package release matrix
+### Nine-package release matrix
 
 | Platform | Architectures | Package |
 | --- | --- | --- |
@@ -21,8 +21,9 @@ Successful GitHub checks use GitHub metadata and downloads. A check resolved thr
 | macOS | ARM64, x64 | DMG |
 | Windows | ARM64, x64 | setup EXE |
 | Linux | ARM64, x64 | DEB |
+| HarmonyOS | ARM64 | Unsigned HAP; manual signing/installation, not device-validated |
 
-There are eight installers in total. Android x64 is excluded from the release matrix and update manifest.
+There are nine packages in total. Android x64 is excluded from the release matrix and update manifest. The existing update manifest still contains the eight supported installer targets; HarmonyOS HAP is distributed as a manual download with a checksum, not through an unimplemented automatic HAP installer.
 
 ### macOS browser downloads
 
@@ -34,8 +35,8 @@ If a GitHub browser download fails, select Gitee, check again and download from 
 
 The mirror repository contains explanations, update manifests and release assets, not imported application source. The existing release policy allows cleanup of old Gitee application releases within the previously agreed scope; it still requires target checks, backups and integrity verification. Any tool-enforced approval or expansion of scope is handled separately. This guide does not itself perform those actions.
 
-1. Finish the stable GitHub release with all eight installers, SHA-256 files and corresponding source.
-2. Delete the old Gitee application releases and assets before creating/uploading the new one. First confirm the eight new GitHub installers are complete, the old version remains downloadable from GitHub, and local originals for uploading are retained. Check each old release's repository, tag and assets, then confirm the release list is empty. Preserve Git tags, source, branches and the separate `modu-models` repository.
+1. Finish the stable GitHub release with all nine packages, SHA-256 files and corresponding source.
+2. Delete the old Gitee application releases and assets before creating/uploading the new one. First confirm the nine new GitHub packages are complete, the old version remains downloadable from GitHub, and local originals for uploading are retained. Check each old release's repository, tag and assets, then confirm the release list is empty. Preserve Git tags, source, branches and the separate `modu-models` repository.
 3. Upload the same-version, same-name, byte-identical installers and checksum files to Gitee. Do not replace model assets, recompress installers or reuse another version's files.
 4. Verify every public, anonymous Gitee download, redirect, byte length and SHA-256 against GitHub's asset `digest`. Mirror installer URLs follow `https://gitee.com/sobranie2406/modureader/releases/download/v<version>/<installer-name>`.
 5. Generate the manifest from the GitHub Release API JSON: `python3 scripts/release/update_manifest.py github-release.json`. The script prints JSON; it neither uploads nor modifies the repository.

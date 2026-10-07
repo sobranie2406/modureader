@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:flutter/material.dart';
@@ -86,7 +87,9 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading)
+      return const Center(
+          child: EinkStaticIndicator(child: CircularProgressIndicator()));
     return ListView(padding: const EdgeInsets.all(24), children: [
       Text(ModuStrings.text(context, '远程书库设置', 'Remote library settings'),
           style: Theme.of(context).textTheme.headlineSmall),
@@ -163,6 +166,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                 ? null
                 : () async {
                     final confirmed = await showDialog<bool>(
+                        animationStyle: AppMotion.style,
                         context: context,
                         builder: (c) => AlertDialog(
                                 title: Text(ModuStrings.text(context, '清除书库连接？',
@@ -205,7 +209,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
       if (_busy)
         const Padding(
             padding: EdgeInsets.only(top: 16),
-            child: LinearProgressIndicator()),
+            child: EinkStaticIndicator(child: LinearProgressIndicator())),
       if (_message != null)
         Padding(
             padding: const EdgeInsets.only(top: 16), child: Text(_message!)),

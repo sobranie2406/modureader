@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/constants/note_annotations.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -39,7 +40,8 @@ class BookNotesList extends ConsumerWidget {
       data: (state) => _buildContent(context, ref, state),
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+            child: EinkStaticIndicator(child: CircularProgressIndicator())),
       ),
       error: (error, stack) => Padding(
         padding: const EdgeInsets.all(16),
@@ -152,6 +154,7 @@ class BookNotesList extends ConsumerWidget {
 
   void _showFilterSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       builder: (context) {
         return Consumer(
@@ -239,7 +242,9 @@ class BookNotesList extends ConsumerWidget {
               ),
               loading: () => const SizedBox(
                 height: 160,
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(
+                    child: EinkStaticIndicator(
+                        child: CircularProgressIndicator())),
               ),
               error: (error, stack) => Padding(
                 padding: const EdgeInsets.all(16),
@@ -412,6 +417,7 @@ class BookNotesList extends ConsumerWidget {
     final contentController = TextEditingController(text: currentContent);
 
     showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) {
         return StatefulBuilder(

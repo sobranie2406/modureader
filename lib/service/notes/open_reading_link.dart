@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 
 import 'package:anx_reader/dao/book.dart';
@@ -22,6 +23,7 @@ Future<void> openReadingLink(
   Future<void> explain(String message) async {
     if (!context.mounted) return;
     await showDialog<void>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (dialogContext) => AlertDialog(
               title: Text(tr('返回原文', 'Open in Modu')),
@@ -57,6 +59,7 @@ Future<void> openReadingLink(
     Book? book = matches.first;
     if (matches.length > 1) {
       book = await showDialog<Book>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (dialogContext) => SimpleDialog(
                 title: Text(tr('选择要打开的书籍', 'Choose a book')),
@@ -74,6 +77,7 @@ Future<void> openReadingLink(
     if (!await File(book.fileFullPath).exists()) {
       if (!context.mounted) return;
       final download = await showDialog<bool>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (dialogContext) => AlertDialog(
                 title: Text(tr('书籍尚未下载', 'Book not downloaded')),

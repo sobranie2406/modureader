@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/providers/dashboard_tiles_provider.dart';
@@ -34,6 +35,7 @@ class _StatisticDashboardTitleState
     void showAddTileSheet() {
       if (availableTiles.isEmpty) return;
       showModalBottomSheet(
+        sheetAnimationStyle: AppMotion.style,
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,

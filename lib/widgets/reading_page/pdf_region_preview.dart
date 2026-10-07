@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -263,6 +264,7 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
     _timer?.cancel();
     widget.cancelRender();
     final result = await showDialog<DocumentLayoutConfig>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) => DocumentLayoutEditor(
             initial: _layout,
@@ -345,7 +347,8 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                                 icon: const Icon(Icons.chevron_right)),
                           ]),
                       ])
-                    : const CircularProgressIndicator())),
+                    : const EinkStaticIndicator(
+                        child: CircularProgressIndicator()))),
       ])));
     }
     return Dialog.fullscreen(
@@ -379,6 +382,7 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                           _generation++;
                           widget.cancelRender();
                           final result = await showDialog<DocumentEnhancement>(
+                              animationStyle: AppMotion.style,
                               context: context,
                               builder: (_) => DocumentEnhancementPanel(
                                   initial: _enhancement,
@@ -464,7 +468,8 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                 if (_busy)
                   const Align(
                       alignment: Alignment.topCenter,
-                      child: LinearProgressIndicator()),
+                      child: EinkStaticIndicator(
+                          child: LinearProgressIndicator())),
                 if (_unsupported)
                   Center(
                       child: Padding(

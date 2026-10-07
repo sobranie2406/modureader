@@ -1,10 +1,34 @@
 # Modu changelog
 
-Current stable baseline: **1.2.1+10086**. Updated 2026-10-06.
+Current stable baseline: **1.2.2+10087**. Updated 2026-10-07.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.2.2
+
+### English
+
+- Import multiple books and folders, including desktop folder drag-and-drop; preserve source files.
+- Improve OCR/reflow word expansion and selection menus; retain manual selection handles.
+- Disable visual animations in E-Ink mode; add format/scanned badges and translucent navigation with bottom clearance.
+- Add independent WebDAV and S3-compatible object-storage settings, retaining existing WebDAV configuration.
+- Fix footnotes inside highlights/underlines and make folder overflow buttons consistent with book covers.
+- Reduce Android opening/AI keyboard layout contention; actual frame-rate gains await device measurement.
+- Include an unsigned native HarmonyOS ARM64 HAP requiring local signing; not yet device-validated.
+- Add Telegram channel/discussion links and a copyable QQ group number without a QR code.
+
+### 简体中文
+
+- 支持多书籍、文件夹导入和桌面文件夹拖入，保留原始文件。
+- 改善 OCR／重排阅读的按词扩选及划词菜单，保留手动调整手柄。
+- E-Ink 模式关闭视觉动画；增加格式／扫描版标签及底部避让的半透明导航。
+- 增加独立的 WebDAV 与 S3 兼容对象存储设置，保留已有 WebDAV 配置。
+- 修复高亮、划线内脚注打不开的问题，统一文件夹与书籍更多按钮样式。
+- 减少安卓开书及 AI 键盘布局的重复负担，实际帧率提升待实机测量。
+- 提供原生鸿蒙 ARM64 未签名 HAP，需本地签名安装，尚未实机验证。
+- 增加 Telegram 频道／群组，QQ群仅显示可复制群号，不再显示二维码。
 
 ## 1.2.1
 

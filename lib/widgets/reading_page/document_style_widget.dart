@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/book_player/document_type_store.dart';
 import 'package:anx_reader/service/book_player/document_layout_store.dart';
@@ -56,6 +57,7 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
   Future<void> _openPdfPreview({bool editLayout = false}) async {
     final player = widget.player;
     await showDialog<DocumentLayoutConfig>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (_) => PdfRegionPreview(
         startWithLayoutEditor: editLayout,
@@ -77,6 +79,7 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
   Future<void> _openEpubImages({bool editLayout = false}) async {
     final player = widget.player;
     await showDialog<DocumentLayoutConfig>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) => PdfRegionPreview(
               imageEpub: true,
@@ -157,6 +160,7 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
                 final store = DocumentTextStyleStore(Prefs().prefs);
                 final book = widget.player.cssBookKey;
                 showDialog<DocumentTextStyle>(
+                    animationStyle: AppMotion.style,
                     context: context,
                     builder: (_) => DocumentTextStyleDialog(
                         initial: store.read(book),
@@ -240,6 +244,7 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
                 final store = DocumentTypeStore(Prefs().prefs);
                 final documentKey = player.cssBookKey;
                 showDialog<void>(
+                    animationStyle: AppMotion.style,
                     context: context,
                     builder: (_) => DocumentAnalysisPanel(
                         analyze: player.analyzeDocument,

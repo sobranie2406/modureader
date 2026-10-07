@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ Future<bool> confirmDeleteAiProvider(
   if (provider.isBuiltin) return false;
   final zh = Localizations.localeOf(context).languageCode == 'zh';
   return await showDialog<bool>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (context) => AlertDialog(
                 title: Text(

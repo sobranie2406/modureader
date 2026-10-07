@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-/// Uses the Android device's ICU word iterator, without network or a dictionary
-/// bundled in the app. Only needed when the chapter's WebView lacks Segmenter.
+/// Uses system word segmentation (Android ICU / macOS NaturalLanguage) without
+/// network or a bundled dictionary. Also used by the native OCR reflow surface.
 class ReaderWordSelection {
   static const _channel = MethodChannel('com.modu.reader/word_selection');
 

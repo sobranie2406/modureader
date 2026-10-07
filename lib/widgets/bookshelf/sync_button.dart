@@ -34,18 +34,16 @@ class _SyncButtonState extends ConsumerState<SyncButton>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(syncProvider.select((value) => value.isSyncing), (_, isSyncing) {
-      if (isSyncing) {
-        _syncAnimationController.repeat();
-      } else {
-        _syncAnimationController.stop();
-      }
-    });
-
     final isSyncing = ref.watch(syncProvider.select((s) => s.isSyncing));
+    final motion = !MediaQuery.disableAnimationsOf(context);
+    if (isSyncing && motion && !_syncAnimationController.isAnimating) {
+      _syncAnimationController.repeat();
+    } else if (!isSyncing || !motion) {
+      _syncAnimationController.stop();
+    }
 
     return IconButton(
-      icon: isSyncing
+      icon: isSyncing && motion
           ? RepaintBoundary(
               child: RotationTransition(
                 turns: _animation,

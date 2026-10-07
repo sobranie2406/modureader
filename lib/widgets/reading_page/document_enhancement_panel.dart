@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -192,7 +193,8 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                           if (_busy)
                             const Align(
                                 alignment: Alignment.topCenter,
-                                child: LinearProgressIndicator()),
+                                child: EinkStaticIndicator(
+                                    child: LinearProgressIndicator())),
                         ])),
                     TextButton(
                         onPressed: _saving

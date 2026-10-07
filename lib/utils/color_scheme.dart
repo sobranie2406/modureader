@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:chinese_font_library/chinese_font_library.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 
 ThemeData colorSchema(
   Prefs prefsNotifier,
@@ -77,6 +78,19 @@ ThemeData colorSchema(
 
   return themeData
       .copyWith(
+          pageTransitionsTheme: isEinkMode
+              ? PageTransitionsTheme(builders: {
+                  for (final platform in TargetPlatform.values)
+                    platform: const NoMotionPageTransitionsBuilder(),
+                })
+              : themeData.pageTransitionsTheme,
+          splashFactory:
+              isEinkMode ? NoSplash.splashFactory : themeData.splashFactory,
+          highlightColor:
+              isEinkMode ? Colors.transparent : themeData.highlightColor,
+          hoverColor: isEinkMode ? Colors.transparent : themeData.hoverColor,
+          expansionTileTheme: themeData.expansionTileTheme
+              .copyWith(expansionAnimationStyle: AppMotion.style),
           sliderTheme: const SliderThemeData(year2023: false),
           progressIndicatorTheme:
               const ProgressIndicatorThemeData(year2023: false),

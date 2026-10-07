@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 import 'dart:math';
@@ -318,6 +319,7 @@ class BookBottomSheet extends ConsumerWidget {
                 ),
               );
           return PopupMenuButton<BookAction>(
+            popUpAnimationStyle: AppMotion.style,
             key: menuKey,
             tooltip: ModuStrings.text(context, '书籍操作', 'Book actions'),
             color: Theme.of(context).colorScheme.surfaceContainer,
@@ -342,22 +344,29 @@ class BookBottomSheet extends ConsumerWidget {
                 case BookAction.scanned:
                   try {
                     final store = DocumentReadingModeStore(Prefs().prefs);
-                    final enabled = store.read(book) != DocumentReadingMode.imageEpub;
+                    final enabled =
+                        store.read(book) != DocumentReadingMode.imageEpub;
                     if (enabled) {
                       await PdfReadingStateStore(Prefs().prefs)
                           .setEnabled(customCssBookKey(book), true);
                     }
                     await store.setScanned(book, enabled);
+                    Prefs().notifyExternalChange();
                     ref.read(bookListProvider.notifier).refresh();
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ModuStrings.text(context,
-                          '阅读类型已保存，下次打开书籍时生效',
-                          'Reading type saved. Applies when you reopen the book.'))));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(ModuStrings.text(
+                              context,
+                              '阅读类型已保存，下次打开书籍时生效',
+                              'Reading type saved. Applies when you reopen the book.'))));
                     }
                   } catch (_) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ModuStrings.text(context, '阅读类型保存失败，请重试',
-                          'Could not save reading type. Please retry.'))));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(ModuStrings.text(
+                              context,
+                              '阅读类型保存失败，请重试',
+                              'Could not save reading type. Please retry.'))));
                     }
                   }
                   break;
@@ -382,10 +391,15 @@ class BookBottomSheet extends ConsumerWidget {
               entry(BookAction.details, Icons.info_outline,
                   ModuStrings.text(context, '书籍详情', 'Book details')),
               if (DocumentReadingMode.supportsImageBook(book.filePath))
-                entry(BookAction.scanned, Icons.document_scanner_outlined,
-                    DocumentReadingModeStore(Prefs().prefs).read(book) == DocumentReadingMode.imageEpub
-                        ? ModuStrings.text(context, '恢复普通书籍阅读', 'Use standard book reading')
-                        : ModuStrings.text(context, '设为扫描图片书籍', 'Set as scanned image book')),
+                entry(
+                    BookAction.scanned,
+                    Icons.document_scanner_outlined,
+                    DocumentReadingModeStore(Prefs().prefs).read(book) ==
+                            DocumentReadingMode.imageEpub
+                        ? ModuStrings.text(
+                            context, '恢复普通书籍阅读', 'Use standard book reading')
+                        : ModuStrings.text(
+                            context, '设为扫描图片书籍', 'Set as scanned image book')),
               entry(
                   BookAction.pin,
                   pinned ? Icons.push_pin : Icons.push_pin_outlined,

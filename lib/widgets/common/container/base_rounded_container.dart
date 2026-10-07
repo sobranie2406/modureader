@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 
 abstract class BaseRoundedContainer extends StatelessWidget {
   const BaseRoundedContainer({
@@ -34,7 +35,7 @@ abstract class BaseRoundedContainer extends StatelessWidget {
     final BorderRadiusGeometry borderRadius = _borderRadius;
 
     return AnimatedContainer(
-      duration: animationDuration,
+      duration: AppMotion.duration(animationDuration),
       curve: animationCurve,
       margin: margin?.add(const EdgeInsets.all(1)) ?? const EdgeInsets.all(1),
       width: width,

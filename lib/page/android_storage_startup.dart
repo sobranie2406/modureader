@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -61,7 +62,9 @@ class _AndroidStorageStartupState extends State<AndroidStorageStartup> {
                             child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    if (_running) const CircularProgressIndicator(),
+                    if (_running)
+                      const EinkStaticIndicator(
+                          child: CircularProgressIndicator()),
                     const SizedBox(height: 20),
                     Text(
                         _storageError == null

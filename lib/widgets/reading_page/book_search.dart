@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:math' as math;
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -17,6 +18,7 @@ Future<void> showBookSearchDialog(
 }) {
   final container = ProviderScope.containerOf(context);
   return showDialog<void>(
+    animationStyle: AppMotion.style,
     context: context,
     useRootNavigator: false,
     requestFocus: true,
@@ -176,8 +178,10 @@ class _BookSearchState extends ConsumerState<BookSearch> {
         ),
         const SizedBox(height: 8),
         if (state.isSearching)
-          LinearProgressIndicator(
-              value: state.progress <= 0 ? null : state.progress.clamp(0, 1)),
+          EinkStaticIndicator(
+              child: LinearProgressIndicator(
+                  value:
+                      state.progress <= 0 ? null : state.progress.clamp(0, 1))),
         Expanded(
             child: state.results.isEmpty
                 ? Center(

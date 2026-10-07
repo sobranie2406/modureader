@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -27,6 +28,8 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/utils/webdav/test_webdav.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:anx_reader/widgets/settings/webdav_switch.dart';
+import 'package:anx_reader/widgets/settings/s3_settings_dialog.dart';
+import 'package:anx_reader/widgets/settings/sync_secret_field.dart';
 import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -51,24 +54,100 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
   bool _backupBusy = false;
   @override
   Widget build(BuildContext context) {
+    final protocol = SyncClientFactory.getCurrentSyncProtocol();
+    final s3 = protocol == SyncProtocol.s3;
+    final canConfigure = !Prefs().webdavStatus;
     return settingsSections(
       sections: [
+        CustomSettingsSection(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SegmentedButton<SyncProtocol>(
+                  key: const ValueKey('sync-backend-tabs'),
+                  showSelectedIcon: false,
+                  segments: [
+                    const ButtonSegment(
+                        value: SyncProtocol.webdav, label: Text('WebDAV')),
+                    ButtonSegment(
+                        value: SyncProtocol.s3,
+                        label: Text(ModuStrings.text(
+                            context, '对象存储', 'Object storage'))),
+                  ],
+                  selected: {protocol},
+                  onSelectionChanged: canConfigure
+                      ? (selected) {
+                          if (Prefs().webdavStatus ||
+                              Sync().hasActiveTransfers) {
+                            AnxToast.show(ModuStrings.text(
+                                context,
+                                '请关闭同步并等待传输结束后再切换。',
+                                'Turn sync off and wait for transfers before switching.'));
+                            return;
+                          }
+                          if (selected.single == protocol) return;
+                          Sync().pauseAutomaticSync();
+                          SyncClientFactory.switchProtocol(selected.single);
+                          setState(() {});
+                        }
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                Text(ModuStrings.text(
+                    context,
+                    '两种服务的连接配置分别保留。升级后沿用原 WebDAV 设置；切换前请关闭同步并等待传输结束，不会自动搬运云端文件。下方同步选项为两种服务共用。',
+                    'Connection settings are kept separately. Existing WebDAV settings survive upgrades. Turn sync off and wait for transfers before switching; cloud files are not migrated. Sync options below are shared by both backends.')),
+              ],
+            ),
+          ),
+        ),
         SettingsSection(
-          title: Text(L10n.of(context).settingsSyncWebdav),
+          title: Text(ModuStrings.text(context, '云端同步', 'Cloud sync')),
           tiles: [
             webdavSwitch(context, setState, ref),
             SettingsTile.navigation(
-                title: Text(L10n.of(context).settingsSyncWebdav),
+                title: Text(s3
+                    ? ModuStrings.text(context, '对象存储（S3 兼容）',
+                        'Object storage (S3 compatible)')
+                    : L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
-                description: Text(ModuStrings.text(
-                    context,
-                    '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。',
-                    'Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day.')),
-                value: Text(Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
-                    'Not set'),
-                // enabled: Prefs().webdavStatus,
+                description: s3
+                    ? Text(ModuStrings.text(
+                        context,
+                        '同步书籍、封面、阅读记录及已启用的加密设置。使用独立不可变记录，上传后读回校验，不直接覆盖共享数据库。各设备使用相同的桶和同步前缀。',
+                        'Sync books, covers, reading records and opted-in encrypted settings through immutable records with read-back verification. All devices must use the same bucket and prefix.'))
+                    : Text(ModuStrings.text(
+                        context,
+                        '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。',
+                        'Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day.')),
+                value: Text(
+                    Prefs().getSyncInfo(protocol)[s3 ? 'bucket' : 'url'] ??
+                        ModuStrings.text(context, '未设置', 'Not configured')),
+                enabled: canConfigure,
                 onPressed: (context) async {
-                  await showWebdavDialog(context);
+                  if (Sync().hasActiveTransfers) {
+                    AnxToast.show(ModuStrings.text(context, '请等待传输结束后再修改。',
+                        'Wait for transfers to finish before changing settings.'));
+                    return;
+                  }
+                  if (s3) {
+                    final values = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        barrierDismissible: false,
+                        animationStyle: AppMotion.style,
+                        builder: (_) => S3SettingsDialog(
+                            initial: Prefs().getSyncInfo(SyncProtocol.s3)));
+                    if (values != null &&
+                        !Sync().hasActiveTransfers &&
+                        !Prefs().webdavStatus) {
+                      Prefs().setSyncInfo(SyncProtocol.s3, values);
+                      SyncClientFactory.initializeCurrentClient();
+                    }
+                  } else {
+                    await showWebdavDialog(context);
+                  }
                   if (mounted) setState(() {});
                 }),
             SettingsTile.navigation(
@@ -104,8 +183,10 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                 }),
             SettingsTile.switchTile(
                 title: Text(L10n.of(context).settingsSyncAutoSync),
-                description: isJianguoyunWebdav(
-                        Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ?? '')
+                description: !s3 &&
+                        isJianguoyunWebdav(
+                            Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
+                                '')
                     ? Text(ModuStrings.text(
                         context,
                         '已识别坚果云：自动同步至少间隔 10 分钟，期间改动合并同步。本机同账号每滚动 30 分钟最多发出 480 次请求，预算和服务器冷却在重启后保留。“立即同步”只跳过自动同步间隔，不跳过请求预算或冷却。其他设备和应用仍可能占用服务端额度。',
@@ -133,18 +214,18 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
               Text(ModuStrings.text(context, '敏感数据同步', 'Sensitive data sync')),
           tiles: [
             SettingsTile.switchTile(
-              title: Text(
-                  ModuStrings.text(context, '同步 API Key', 'Sync API keys')),
+              title: Text(ModuStrings.text(context, '同步服务配置、API Key 和密码',
+                  'Sync service settings, API keys and passwords')),
               description: Text(
                 Prefs().syncAiSettingsToWebdav
                     ? ModuStrings.text(
                         context,
-                        '已单独开启。AI、翻译、向量、在线语音及远程书库配置（含书库密码）将加密后写入 WebDAV 同步数据库。',
-                        'Enabled separately. AI, translation, vector, online speech and remote library settings (including its password) are encrypted before being written to the WebDAV database.')
+                        '已开启：AI、翻译、向量、在线语音及远程书库配置（含密钥和书库密码）加密后随当前云端服务同步。不包含 WebDAV / 对象存储的连接凭据。',
+                        'Enabled: AI, translation, vector, online speech and remote library settings (including keys and library passwords) are encrypted and synced through the selected cloud service. WebDAV / object-storage connection credentials are excluded.')
                     : ModuStrings.text(
                         context,
-                        '默认不随 WebDAV 同步。开启时需要设置独立加密密码并确认风险。',
-                        'Excluded from WebDAV sync by default. Enabling it requires a separate encryption password and risk confirmation.'),
+                        '默认关闭。开启需设置独立同步加密密码并确认风险；此密码不是 WebDAV 密码或对象存储密钥。两种同步方式共用此开关。',
+                        'Off by default. Requires a separate sync encryption password and risk confirmation, not your WebDAV password or object-storage key. This switch is shared by both backends.'),
               ),
               leading: const Icon(Icons.key_outlined),
               initialValue: Prefs().syncAiSettingsToWebdav,
@@ -204,8 +285,9 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       if (mounted) setState(() {});
     } catch (error) {
       AnxLog.severe('Failed to enable encrypted AI settings sync: $error');
-      AnxToast.show(ModuStrings.text(context, '无法启用 API Key 同步，请稍后重试',
-          'Could not enable API key sync. Please try again.'));
+      if (!mounted) return;
+      AnxToast.show(ModuStrings.text(context, '无法启用敏感服务配置同步，请稍后重试',
+          'Could not enable sensitive service-settings sync. Please try again.'));
     }
   }
 
@@ -224,11 +306,13 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
         force: true,
       );
       await Prefs().saveSyncAiSettingsEncryptionPassword(password);
-      if (mounted) setState(() {});
-      AnxToast.show(ModuStrings.text(context, '同步加密密码已更新，下次上传数据库后生效',
-          'The encryption password was updated and will take effect after the next database upload.'));
+      if (!mounted) return;
+      setState(() {});
+      AnxToast.show(ModuStrings.text(context, '同步加密密码已更新，下次成功同步后生效',
+          'The encryption password was updated and will take effect after the next successful sync.'));
     } catch (error) {
       AnxLog.severe('Failed to change AI settings sync password: $error');
+      if (!mounted) return;
       AnxToast.show(ModuStrings.text(context, '无法修改同步加密密码',
           'Could not change the sync encryption password.'));
     }
@@ -238,6 +322,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
     required bool confirmRisk,
   }) {
     return showDialog<String>(
+      animationStyle: AppMotion.style,
       context: context,
       barrierDismissible: false,
       builder: (_) => _AiSyncPasswordDialog(confirmRisk: confirmRisk),
@@ -251,7 +336,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           title: Center(child: Text(title)),
           children: const [
             Center(
-              child: CircularProgressIndicator(),
+              child: EinkStaticIndicator(child: CircularProgressIndicator()),
             ),
           ],
         ),
@@ -267,6 +352,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
     File? prefsFile;
     try {
       final password = await showDialog<String>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (_) => const _BackupPasswordDialog(exporting: true));
       if (password == null || !context.mounted) return;
@@ -303,6 +389,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           AnxLog.info('exportData: Saved to: $filePath');
           if (context.mounted) {
             await showDialog<void>(
+              animationStyle: AppMotion.style,
               context: context,
               builder: (_) => SettingsExportDialog(
                 destination: SettingsExportDestination(
@@ -363,6 +450,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
       }
       if (!mounted) return;
       final confirmed = await showDialog<bool>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (context) => AlertDialog(
                 title: Text(ModuStrings.text(
@@ -400,6 +488,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           await SmartDialog.dismiss();
           if (!mounted) return;
           final password = await showDialog<String>(
+              animationStyle: AppMotion.style,
               context: context,
               builder: (_) => const _BackupPasswordDialog(exporting: false));
           if (password == null) return;
@@ -500,12 +589,14 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
               if (widget.exporting)
                 CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(ModuStrings.text(context, '包含服务配置与 API Key（加密）',
-                        'Include service settings and API keys (encrypted)')),
+                    title: Text(ModuStrings.text(
+                        context,
+                        '包含服务配置、API Key 和密码（加密）',
+                        'Include service settings, API keys and passwords (encrypted)')),
                     subtitle: Text(ModuStrings.text(
                         context,
-                        '默认不导出 AI、翻译、语音、向量、WebDAV 和远程书库的配置与凭据。勾选后包含远程书库密码并加密设置。书籍、笔记和一般设置仍会导出。',
-                        'AI, translation, speech, vector, WebDAV and remote library settings and credentials are excluded by default. Enable this to include remote library passwords and encrypt settings. Books, notes and general settings are always exported.')),
+                        '默认不导出 AI、翻译、语音、向量、WebDAV、对象存储和远程书库的配置与凭据。勾选后包含密码、API Key 和对象存储密钥并加密设置。书籍、笔记和一般设置仍会导出。',
+                        'AI, translation, speech, vector, WebDAV, object storage and remote library settings and credentials are excluded by default. Enable this to include passwords, API keys and object-storage keys in encrypted settings. Books, notes and general settings are always exported.')),
                     value: _include,
                     onChanged: (value) =>
                         setState(() => _include = value ?? false)),
@@ -514,22 +605,15 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
                     context,
                     '设置使用 AES-256-GCM 加密；书籍、笔记和 AI 对话历史不加密。请使用独立强密码，遗失密码无法恢复密钥。密码不会写入备份。',
                     'Settings use AES-256-GCM encryption; books, notes and AI chat history are not encrypted. Use a unique strong password. Keys cannot be recovered if the password is lost. The password is not stored in the backup.')),
-                TextField(
+                SyncSecretField(
                     controller: _password,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                        labelText: ModuStrings.text(
-                            context, '备份密码', 'Backup password'),
-                        errorText: _error)),
+                    label: ModuStrings.text(context, '备份密码', 'Backup password'),
+                    errorText: _error),
                 if (widget.exporting)
-                  TextField(
+                  SyncSecretField(
                       controller: _confirm,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                          labelText: ModuStrings.text(
-                              context,
-                              '再次输入密码（至少 12 个字符）',
-                              'Repeat password (at least 12 characters)'))),
+                      label: ModuStrings.text(context, '再次输入密码（至少 12 个字符）',
+                          'Repeat password (at least 12 characters)')),
               ],
             ]))),
         actions: [
@@ -609,9 +693,9 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(_label(
-        widget.confirmRisk ? '同步 API Key 风险提示' : '修改同步加密密码',
+        widget.confirmRisk ? '同步服务配置、API Key 和密码：风险提示' : '修改同步加密密码',
         widget.confirmRisk
-            ? 'API key sync risk warning'
+            ? 'Service settings, API keys and passwords: sync risks'
             : 'Change sync encryption password',
       )),
       content: SingleChildScrollView(
@@ -623,15 +707,15 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
               Text(
                 ModuStrings.text(
                     context,
-                    '开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密，并写入 WebDAV 同步数据库。',
-                    'When enabled, AI, translation, vector and online speech settings and API keys, plus remote library settings and its password, are encrypted with AES-256-GCM and written to the WebDAV sync database.'),
+                    '开启后，AI、翻译、向量、在线语音服务的配置及 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密并随当前云端服务同步。不包含 WebDAV / 对象存储连接凭据。此开关及加密密码为两种同步方式共用。',
+                    'AI, translation, vector, online speech and remote library settings, API keys and library passwords are encrypted with AES-256-GCM and synced through the selected cloud service. WebDAV / object-storage credentials are excluded. Both backends share this switch and encryption password.'),
               ),
               const SizedBox(height: 10),
               Text(
                 ModuStrings.text(
                     context,
-                    '风险：加密不能代替可信的 WebDAV 服务。弱密码可能被猜出；任何得到数据库和正确密码的人都能读取密钥。请使用独立强密码，并妥善保管。',
-                    'Risk: encryption does not replace a trusted WebDAV service. Weak passwords may be guessed, and anyone with the database and correct password can read the keys. Use and protect a strong, unique password.'),
+                    '风险：加密不能代替可信的云端服务。弱密码可能被猜出；任何得到同步数据和正确密码的人都能读取密钥。请使用独立强密码，不要复用服务商登录密码或访问密钥，并妥善保管。',
+                    'Risk: encryption does not replace a trusted cloud service. Anyone with the synced data and correct password can read the keys. Use and protect a strong, unique password, not your provider login password or access key.'),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
               const SizedBox(height: 14),
@@ -640,26 +724,20 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
                   'After changing it, other devices must use the new password. The old password cannot decrypt newly uploaded data.')),
               const SizedBox(height: 14),
             ],
-            TextField(
+            SyncSecretField(
               controller: _passwordController,
-              obscureText: true,
               autofocus: true,
-              decoration: InputDecoration(
-                labelText: ModuStrings.text(
-                    context, '同步加密密码', 'Sync encryption password'),
-                helperText: ModuStrings.text(context, '至少 12 个字符，仅保存在本机',
-                    'At least 12 characters; stored only on this device'),
-              ),
+              label: ModuStrings.text(
+                  context, '同步加密密码', 'Sync encryption password'),
+              helperText: ModuStrings.text(context, '至少 12 个字符，仅保存在本机',
+                  'At least 12 characters; stored only on this device'),
             ),
             const SizedBox(height: 8),
-            TextField(
+            SyncSecretField(
               controller: _confirmationController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText:
-                    ModuStrings.text(context, '再次输入密码', 'Enter password again'),
-                errorText: _errorText,
-              ),
+              label:
+                  ModuStrings.text(context, '再次输入密码', 'Enter password again'),
+              errorText: _errorText,
               onSubmitted: (_) => _submit(),
             ),
           ],
@@ -765,20 +843,29 @@ Future<void> showWebdavDialog(BuildContext context) async {
   Widget buildTextField(String labelText, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        obscureText: labelText == L10n.of(context).settingsSyncWebdavPassword
-            ? true
-            : false,
-        controller: controller,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          labelText: labelText,
-        ),
-      ),
+      child: labelText == L10n.of(context).settingsSyncWebdavPassword
+          ? SyncSecretField(
+              controller: controller,
+              label: labelText,
+              helperText: ModuStrings.text(
+                  context,
+                  '坚果云请填写应用密码，不是登录密码。连接凭据仅保存在本机。',
+                  'For Jianguoyun use an app password, not your login password. Connection credentials stay on this device.'),
+            )
+          : TextField(
+              autocorrect: false,
+              enableSuggestions: false,
+              controller: controller,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: labelText,
+              ),
+            ),
     );
   }
 
   await showDialog<void>(
+    animationStyle: AppMotion.style,
     context: context,
     builder: (context) {
       return SimpleDialog(
@@ -791,9 +878,13 @@ Future<void> showWebdavDialog(BuildContext context) async {
               webdavUsernameController),
           buildTextField(L10n.of(context).settingsSyncWebdavPassword,
               webdavPasswordController),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
             children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(L10n.of(context).commonCancel),
+              ),
               TextButton.icon(
                 onPressed: () => SyncTestHelper.handleFullTestConnection(
                   context,
@@ -810,6 +901,7 @@ Future<void> showWebdavDialog(BuildContext context) async {
               TextButton(
                 onPressed: () {
                   webdavInfo['url'] = webdavUrlController.text.trim();
+                  if (Sync().hasActiveTransfers || Prefs().webdavStatus) return;
                   webdavInfo['username'] = webdavUsernameController.text;
                   webdavInfo['password'] = webdavPasswordController.text;
                   Prefs().setSyncInfo(SyncProtocol.webdav, webdavInfo);

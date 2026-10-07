@@ -52,11 +52,14 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 | Android  | arm64-v8a              | APK signed with the project's dedicated key; verify the download source before installing                                                   |
 | macOS    | x64, ARM64              | DMG; drag the app to Applications; unnotarized, not an App Store release                                                                    |
 | iOS      | ARM64 devices           | iOS 16+; IPA has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
+| HarmonyOS | ARM64 | Unsigned native HAP; requires HarmonyOS credentials/profile and manual signing before installation. Not yet device-validated; not an Android APK. |
 
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.2.1** — Improved WebDAV sync and Jianguoyun request handling, PDF/scanned-page performance and whitening, context-aware selection AI, and QQ community access.
+**Latest release: 1.2.2** — Folder and multi-book import, OCR/reflow text selection improvements, E-Ink motion controls, bookshelf format/scanned labels, a translucent floating navigation bar, and Telegram/QQ community access.
+
+Also includes S3-compatible object-storage sync alongside existing WebDAV, annotation-link fixes, Android transition/keyboard optimizations, and an unsigned HarmonyOS package. HarmonyOS installation is manual; the existing automatic update flow is not an HAP signer or installer.
 
 Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
 

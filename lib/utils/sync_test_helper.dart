@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/enums/sync_protocol.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/sync/sync_connection_tester.dart';
@@ -14,12 +15,13 @@ class SyncTestHelper {
     Function(bool success, String message)? onTestComplete,
   }) async {
     showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         content: Row(
           children: [
-            const CircularProgressIndicator(),
+            const EinkStaticIndicator(child: CircularProgressIndicator()),
             const SizedBox(width: 20),
             Text(L10n.of(context).testingConnection),
           ],
@@ -66,12 +68,13 @@ class SyncTestHelper {
     Function(bool success, String message)? onTestComplete,
   }) async {
     showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         content: Row(
           children: [
-            const CircularProgressIndicator(),
+            const EinkStaticIndicator(child: CircularProgressIndicator()),
             const SizedBox(width: 20),
             Text(L10n.of(context).testingConnection),
           ],
@@ -112,6 +115,7 @@ class SyncTestHelper {
   static void _showTestResult(BuildContext context, SyncTestResult result) {
     if (result.isSuccess) {
       showDialog(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
           title: Row(
@@ -132,6 +136,7 @@ class SyncTestHelper {
       );
     } else {
       showDialog(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
           title: Row(

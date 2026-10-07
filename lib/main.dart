@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/utils/app_version.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
@@ -54,7 +55,7 @@ bool _needsMigration = false;
 MigrationCheckResult? _migrationCheckResult;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  ModuWidgetsBinding();
   // Listen before storage prompts/migration. The inbox waits for a usable home
   // navigator, and keeps only the latest request rather than dropping cold links.
   if (!AnxPlatform.isOhos) {
@@ -90,6 +91,10 @@ Future<void> main() async {
     }
   });
   await Prefs().initPrefs();
+  AppMotion.platformDisabled = Prefs().eInkMode;
+  Prefs().addListener(() {
+    AppMotion.platformDisabled = Prefs().eInkMode;
+  });
   await AppBrightness.instance.initialize(Prefs().prefs);
   await applyBundledModelDefaults(Prefs().prefs);
   Prefs().addListener(applyVectorizationQueueSettings);
@@ -289,10 +294,22 @@ class _MyAppState extends ConsumerState<MyApp>
       ],
       child: provider.Consumer<Prefs>(
         builder: (context, prefsNotifier, child) {
+          final motion = !prefsNotifier.eInkMode;
+          SmartDialog.config.custom = SmartConfigCustom(
+              maskColor: Colors.black.withAlpha(35),
+              useAnimation: motion,
+              animationType: SmartAnimationType.centerFade_otherSlide);
+          SmartDialog.config.attach = SmartConfigAttach(useAnimation: motion);
+          SmartDialog.config.loading = SmartConfigLoading(useAnimation: motion);
+          SmartDialog.config.toast = SmartConfigToast(useAnimation: motion);
+          SmartDialog.config.notify = SmartConfigNotify(useAnimation: motion);
           return MaterialApp(
+            themeAnimationDuration: AppMotion.duration(kThemeAnimationDuration),
             debugShowCheckedModeBanner: false,
             scrollBehavior: ScrollConfiguration.of(context).copyWith(
-              physics: const BouncingScrollPhysics(),
+              physics: prefsNotifier.eInkMode
+                  ? const EinkScrollPhysics()
+                  : const BouncingScrollPhysics(),
               // dragDevices: {
               //   PointerDeviceKind.touch,
               //   PointerDeviceKind.mouse,
@@ -303,10 +320,38 @@ class _MyAppState extends ConsumerState<MyApp>
               FlutterSmartDialog.observer,
               heroineController
             ],
-            builder: (context, child) => AppBrightnessLayer(
-              controller: AppBrightness.instance,
-              child: FlutterSmartDialog.init()(context, child),
-            ),
+            builder: (context, child) => EinkMotionScope(
+                enabled: prefsNotifier.eInkMode,
+                child: AppBrightnessLayer(
+                  controller: AppBrightness.instance,
+                  child: FlutterSmartDialog.init(
+                    loadingBuilder: prefsNotifier.eInkMode
+                        ? (message) => Material(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                side: const BorderSide(color: Colors.black),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.hourglass_empty,
+                                        color: Colors.black),
+                                    if (message.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      Text(message,
+                                          style: const TextStyle(
+                                              color: Colors.black)),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            )
+                        : null,
+                  )(context, child),
+                )),
             navigatorKey: navigatorKey,
             locale: prefsNotifier.locale,
             localeListResolutionCallback: _resolveLocale,

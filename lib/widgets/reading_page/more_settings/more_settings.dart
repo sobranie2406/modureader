@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -34,6 +35,7 @@ void showMoreSettings(ReadingSettings settings) {
   );
 
   showDialog(
+    animationStyle: AppMotion.style,
     context: context,
     builder: (context) {
       return Dialog(

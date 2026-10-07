@@ -55,6 +55,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'documentDetectedTypes',
   'documentReadingModes',
   'pdfReadingStates',
   'documentTypeOverrides',
@@ -76,6 +77,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'documentDetectedTypes',
   'documentReadingModes',
   'pdfReadingStates',
   'documentTypeOverrides',
@@ -155,6 +157,8 @@ class Prefs extends ChangeNotifier {
   }
 
   late SharedPreferences prefs;
+  bool _initialized = false;
+  bool get isInitialized => _initialized;
   static final Prefs _instance = Prefs._internal();
 
   /// Notifies settings consumers after a validated external restore.
@@ -180,6 +184,7 @@ class Prefs extends ChangeNotifier {
 
   Future<void> initPrefs() async {
     prefs = await SharedPreferences.getInstance();
+    _initialized = true;
     // Remove only the retired toggle, never local indexes or remote files.
     if (prefs.containsKey('syncKnowledgeIndexes')) {
       await prefs.remove('syncKnowledgeIndexes');

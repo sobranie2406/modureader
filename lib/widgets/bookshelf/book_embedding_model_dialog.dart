@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book.dart';
@@ -8,7 +9,9 @@ import 'package:flutter/material.dart';
 
 Future<void> showBookEmbeddingModelDialog(BuildContext context, Book book) =>
     showDialog<void>(
-        context: context, builder: (_) => BookEmbeddingModelDialog(book: book));
+        animationStyle: AppMotion.style,
+        context: context,
+        builder: (_) => BookEmbeddingModelDialog(book: book));
 
 class BookEmbeddingModelDialog extends StatefulWidget {
   const BookEmbeddingModelDialog({super.key, required this.book, this.queue});

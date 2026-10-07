@@ -1,6 +1,7 @@
 import 'package:anx_reader/enums/sync_protocol.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
+import 'package:anx_reader/service/sync/s3_client.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -30,7 +31,7 @@ class SyncClientFactory {
       case SyncProtocol.ftp:
         throw UnimplementedError('FTP client not implemented yet');
       case SyncProtocol.s3:
-        throw UnimplementedError('S3 client not implemented yet');
+        return S3SyncClient(config);
       case SyncProtocol.googleDrive:
         throw UnimplementedError('Google Drive client not implemented yet');
       case SyncProtocol.oneDrive:
@@ -45,8 +46,15 @@ class SyncClientFactory {
     final protocol = getCurrentSyncProtocol();
     final config = getConfigForProtocol(protocol);
 
+    _currentClient = null;
     if (config.isNotEmpty) {
-      _currentClient = createClient(protocol, config);
+      try {
+        _currentClient = createClient(protocol, config);
+      } on FormatException {
+        // Invalid imported/older configuration must not crash application
+        // startup or silently reuse a previous account's client.
+        _currentClient = null;
+      }
     }
   }
 
@@ -94,6 +102,7 @@ class SyncClientFactory {
   static List<SyncProtocol> get availableProtocols {
     return [
       SyncProtocol.webdav,
+      SyncProtocol.s3,
       // Add other protocols as they are implemented
       // SyncProtocol.ftp,
       // SyncProtocol.s3,

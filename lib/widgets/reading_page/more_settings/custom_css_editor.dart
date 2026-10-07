@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -190,6 +191,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
 
   Future<bool> _confirm(String title, String message) async =>
       await showDialog<bool>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (context) =>
               AlertDialog(title: Text(title), content: Text(message), actions: [
@@ -228,6 +230,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         await _persistDraft();
         if (!mounted) return;
         final template = await showDialog<CustomCssProfile>(
+            animationStyle: AppMotion.style,
             context: context,
             builder: (context) => SimpleDialog(
                   title: Text(ModuStrings.text(
@@ -408,6 +411,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
             onPressed: _busy ? null : _import,
             child: Text(ModuStrings.text(context, '导入', 'Import'))),
         PopupMenuButton<bool>(
+            popUpAnimationStyle: AppMotion.style,
             enabled: !_busy,
             onSelected: _export,
             itemBuilder: (_) => [

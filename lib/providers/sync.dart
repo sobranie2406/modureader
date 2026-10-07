@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:io' as io;
 import 'package:anx_reader/service/book.dart' show getBookMetadata;
@@ -62,6 +63,7 @@ class Sync extends _$Sync {
   bool _syncRunning = false;
   final _localDownloads = LocalBookDownload();
   int _activeDownloads = 0;
+  bool get hasActiveTransfers => _syncRunning || _activeDownloads > 0;
   bool _pendingAutomatic = false;
   SyncDirection? _pendingManualDirection;
   final _autoStart = AutoSyncStartGate();
@@ -719,6 +721,7 @@ class Sync extends _$Sync {
       if (dialogContext == null || !dialogContext.mounted) return;
       // Use the same navigator route that the Cancel button dismisses.
       await showDialog<void>(
+        animationStyle: AppMotion.style,
         context: dialogContext,
         builder: (context) => AlertDialog(
           title: Text(L10n.of(context).databaseBackupManagement),

@@ -67,8 +67,8 @@ void main() {
     await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: ReadingSyncSettings())));
     expect(tester.widget<Switch>(find.byType(Switch)).onChanged, null);
-    expect(
-        find.text('Enable WebDAV and automatic sync first.'), findsOneWidget);
+    expect(find.text('Enable cloud sync and automatic sync first.'),
+        findsOneWidget);
     expect(Prefs().syncAiSettingsToWebdav, false);
   });
 }

@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/knowledge/embedding_provider.dart';
@@ -234,6 +235,7 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       return;
     }
     final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
@@ -409,7 +411,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     if (_loadingLocalModels) {
       return const Padding(
         padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+            child: EinkStaticIndicator(child: CircularProgressIndicator())),
       );
     }
     final selectedId = Prefs().vectorLocalModelId;
@@ -494,7 +497,9 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             ),
             if (progress != null) ...[
               const SizedBox(height: 12),
-              LinearProgressIndicator(value: progress == 0 ? null : progress),
+              EinkStaticIndicator(
+                  child: LinearProgressIndicator(
+                      value: progress == 0 ? null : progress)),
               const SizedBox(height: 4),
               Text(
                 progress == 0

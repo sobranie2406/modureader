@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 
 enum DismissalState { idle, dragging, animatingOut, animatingBack }
 
@@ -25,7 +26,7 @@ class PageDismissController extends ChangeNotifier {
   }) {
     _animationController = AnimationController(
       vsync: vsync,
-      duration: animationDuration,
+      duration: AppMotion.duration(animationDuration),
     );
 
     // Default animation, target offset will be updated
@@ -97,7 +98,11 @@ class PageDismissController extends ChangeNotifier {
         end: Offset.zero, // Animate back to original position
       ).animate(
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-      await _animationController.forward(from: 0.0);
+      if (AppMotion.disabled) {
+        _animationController.value = 1;
+      } else {
+        await _animationController.forward(from: 0.0);
+      }
     }
     _state = DismissalState.idle;
     _currentVerticalOffset = 0.0; // Reset drag offset after animation

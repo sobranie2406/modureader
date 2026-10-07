@@ -26,6 +26,30 @@ class DocumentTypeStore {
 
   String? read(String documentKey) => _read()[documentKey];
 
+  static const detectedKey = 'documentDetectedTypes';
+  String? readDetected(String documentKey) {
+    try {
+      final entries = jsonDecode(prefs.getString(detectedKey) ?? '{}');
+      final kind = entries is Map ? entries[documentKey] : null;
+      return kind is String && types.contains(kind) ? kind : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveDetected(String documentKey, String kind) async {
+    if (!types.contains(kind) || documentKey.isEmpty) return;
+    Map<String, dynamic> entries;
+    try {
+      entries = Map<String, dynamic>.from(
+          jsonDecode(prefs.getString(detectedKey) ?? '{}'));
+    } catch (_) {
+      entries = {};
+    }
+    entries[documentKey] = kind;
+    await prefs.setString(detectedKey, jsonEncode(entries));
+  }
+
   Future<void> save(String documentKey, String? kind) async {
     if (documentKey.isEmpty || (kind != null && !types.contains(kind))) {
       throw ArgumentError('Invalid document type correction');

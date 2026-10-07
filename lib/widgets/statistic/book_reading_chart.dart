@@ -1,5 +1,6 @@
 import 'package:anx_reader/utils/date/convert_seconds.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -39,6 +40,7 @@ class _BookReadingChartState extends State<BookReadingChart> {
             : widget.cumulativeValues.reduce((a, b) => a > b ? a : b) * 1.2);
 
     return LineChart(
+      duration: AppMotion.duration(const Duration(milliseconds: 150)),
       LineChartData(
         lineTouchData: LineTouchData(
           enabled: true,

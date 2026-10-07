@@ -18,33 +18,59 @@ abstract final class HomeNavigationMetrics {
       contentGap;
 }
 
-/// Reserve space outside every compact home page, including fixed controls and
-/// empty states, not just the last item of individual scroll views. Keep this
-/// space while the bar auto-hides so revealing it never covers content or makes
-/// the viewport jump. The containing Scaffold already handles keyboard insets.
+/// Scrollable pages paint behind the floating bar and consume the clearance at
+/// the end of their scroll content. Fixed layouts reserve it outside the page.
+/// Keep clearance while auto-hiding so revealing the bar never moves content.
 class HomeNavigationBody extends StatelessWidget {
   const HomeNavigationBody({
     super.key,
     required this.child,
     required this.hasBottomBar,
+    this.scrollBehindBar = false,
   });
 
   final Widget child;
   final bool hasBottomBar;
+  final bool scrollBehindBar;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: hasBottomBar
-            ? HomeNavigationMetrics.bottomContentInset(context)
-            : 0,
-      ),
-      child: MediaQuery.removePadding(
-        context: context,
-        removeBottom: hasBottomBar,
-        child: child,
+    final inset =
+        hasBottomBar ? HomeNavigationMetrics.bottomContentInset(context) : 0.0;
+    return HomeNavigationClearance(
+      inset: scrollBehindBar ? inset : 0,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: scrollBehindBar ? 0 : inset,
+        ),
+        child: MediaQuery.removePadding(
+          context: context,
+          removeBottom: hasBottomBar,
+          child: child,
+        ),
       ),
     );
   }
+}
+
+/// Additional trailing space for scroll views under the home navigation bar.
+/// An inherited value keeps standalone pages and modal routes unaffected.
+class HomeNavigationClearance extends InheritedWidget {
+  const HomeNavigationClearance({
+    super.key,
+    required this.inset,
+    required super.child,
+  });
+
+  final double inset;
+
+  static double of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<HomeNavigationClearance>()
+          ?.inset ??
+      0;
+
+  @override
+  bool updateShouldNotify(HomeNavigationClearance oldWidget) =>
+      inset != oldWidget.inset;
 }

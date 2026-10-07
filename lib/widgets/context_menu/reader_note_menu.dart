@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book_note.dart';
@@ -149,7 +150,7 @@ class ReaderNoteMenuState extends State<ReaderNoteMenu> {
   Widget build(BuildContext context) {
     return Expanded(
         child: AnimatedSize(
-      duration: const Duration(milliseconds: 300),
+      duration: AppMotion.duration(const Duration(milliseconds: 300)),
       curve: Curves.easeOut,
       child: ConstrainedBox(
         constraints: BoxConstraints(

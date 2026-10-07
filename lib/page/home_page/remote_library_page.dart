@@ -1,4 +1,6 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'dart:io';
 
 import 'package:anx_reader/page/settings_page/remote_library.dart';
@@ -302,14 +304,17 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                             _importing ? null : () => _download?.cancel(),
                         child: Text(ModuStrings.text(context, '取消', 'Cancel')))
                   ]),
-                  LinearProgressIndicator(
-                      value: _importing || _total <= 0
-                          ? null
-                          : (_received / _total).clamp(0, 1)),
+                  EinkStaticIndicator(
+                      child: LinearProgressIndicator(
+                          value: _importing || _total <= 0
+                              ? null
+                              : (_received / _total).clamp(0, 1))),
                 ])),
           Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator()))
                   : _error != null
                       ? Center(
                           child: Padding(
@@ -357,7 +362,11 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                               : ListView.builder(
                                   padding: EdgeInsets.only(
                                       bottom: 12 +
-                                          MediaQuery.paddingOf(context).bottom),
+                                          MediaQuery.paddingOf(context).bottom +
+                                          (_activeName == null
+                                              ? HomeNavigationClearance.of(
+                                                  context)
+                                              : 0)),
                                   itemCount: visible.length,
                                   itemBuilder: (context, index) {
                                     final entry = visible[index];
@@ -404,7 +413,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                   })),
           if (_activeName != null)
             Padding(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.fromLTRB(
+                    8, 8, 8, 8 + HomeNavigationClearance.of(context)),
                 child: Text(
                     ModuStrings.text(context, '下载期间离开此标签页会取消下载；导入开始后请等待完成。',
                         'Leaving this tab cancels a download; please wait once import starts.'),

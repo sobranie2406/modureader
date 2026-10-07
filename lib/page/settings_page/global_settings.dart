@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -44,7 +45,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
         'vector' =>
           ModuStrings.text(context, '向量模型设置', 'Vector model settings'),
         'tts' => ModuStrings.text(context, '朗读配置', 'Speech settings'),
-        'webdav' => ModuStrings.text(context, '同步 WebDAV', 'Sync WebDAV'),
+        'webdav' => ModuStrings.text(context, '云端同步（WebDAV / S3）', 'Cloud sync (WebDAV / S3)'),
         'remote-library-webdav' =>
           ModuStrings.text(context, '远程书库 WebDAV', 'Library WebDAV'),
         'translation' =>
@@ -84,6 +85,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
           final token = GlobalSettingsTransfer.link(text);
           if (!mounted) return;
           await showDialog<void>(
+              animationStyle: AppMotion.style,
               context: context,
               builder: (dialogContext) => AlertDialog(
                     title: Text(ModuStrings.format(
@@ -140,6 +142,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
     setState(() => _status = destination.status(
         zh: Localizations.localeOf(context).languageCode == 'zh'));
     await showDialog<void>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (_) => SettingsExportDialog(destination: destination),
     );
@@ -174,7 +177,9 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
   Future<void> _importLink() => _run(() async {
         if (!_canImport()) return;
         final text = await showDialog<String>(
-            context: context, builder: (_) => const _SettingsLinkDialog());
+            animationStyle: AppMotion.style,
+            context: context,
+            builder: (_) => const _SettingsLinkDialog());
         if (text == null || !mounted) return;
         await _restore(text);
       });
@@ -204,6 +209,7 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
             : ModuStrings.text(context, '本次内容不包含账号或密钥配置，本机已有账号与密钥保持不变。',
                 'This content contains no account or key configurations. Existing local accounts and keys stay unchanged.');
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (dialogContext) => AlertDialog(
               title: Text(scopes.length == 1
@@ -307,7 +313,9 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
           if (_busy)
             const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator())),
+                child: Center(
+                    child: EinkStaticIndicator(
+                        child: CircularProgressIndicator()))),
           if (_status != null)
             Padding(
                 padding: const EdgeInsets.only(top: 16),

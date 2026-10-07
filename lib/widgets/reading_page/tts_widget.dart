@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -174,6 +175,7 @@ class _TtsWidgetState extends State<TtsWidget> {
                     GestureDetector(
                       onTap: () {
                         showModalBottomSheet(
+                          sheetAnimationStyle: AppMotion.style,
                           context: context,
                           isScrollControlled: true,
                           builder: (context) {

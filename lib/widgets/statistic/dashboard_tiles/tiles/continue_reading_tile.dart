@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/last_read_book_provider.dart';
@@ -130,10 +131,11 @@ class _ContinueReadingContent extends StatelessWidget {
                 style: theme.textTheme.labelSmall,
               ),
               const SizedBox(height: 6),
-              LinearProgressIndicator(
+              EinkStaticIndicator(
+                  child: LinearProgressIndicator(
                 value: book.readingPercentage.clamp(0, 1),
                 minHeight: 6,
-              ),
+              )),
             ],
           ),
         ),

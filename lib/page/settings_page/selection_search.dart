@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/selection_search.dart';
@@ -35,7 +36,9 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
 
   Future<void> _edit([SelectionSearchEngine? engine]) async {
     final result = await showDialog<SelectionSearchEngine>(
-        context: context, builder: (_) => _EngineEditor(engine: engine));
+        animationStyle: AppMotion.style,
+        context: context,
+        builder: (_) => _EngineEditor(engine: engine));
     if (result == null || !mounted) return;
     final config = Prefs().selectionSearchSettings;
     await _save(SelectionSearchConfig(selectedId: config.selectedId, custom: [
@@ -47,6 +50,7 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
 
   Future<void> _delete(SelectionSearchEngine engine) async {
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
               title: Text(t('删除“${engine.name}”？', 'Delete “${engine.name}”?')),

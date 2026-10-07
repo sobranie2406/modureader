@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:math';
 
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -241,7 +242,7 @@ class DashboardTileShell extends ConsumerWidget {
     final notifier = ref.read(dashboardTilesProvider.notifier);
     final heroTag = 'dashboard_tile_${tileType.name}';
 
-    return Heroine(
+    return MotionHeroine(
       tag: heroTag,
       flightShuttleBuilder: const FlipShuttleBuilder(
         axis: Axis.vertical,
@@ -259,6 +260,10 @@ class DashboardTileShell extends ConsumerWidget {
           }
           Navigator.of(context).push(
             PageRouteBuilder(
+              transitionDuration:
+                  AppMotion.duration(const Duration(milliseconds: 300)),
+              reverseTransitionDuration:
+                  AppMotion.duration(const Duration(milliseconds: 300)),
               opaque: false,
               pageBuilder: (context, animation, secondaryAnimation) {
                 return AnimatedBuilder(

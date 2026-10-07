@@ -502,6 +502,11 @@ export class View extends HTMLElement {
   #createOverlayer({ doc, index }) {
     const overlayer = new Overlayer(doc)
     doc.addEventListener('click', e => {
+      // Capture runs before the link/image handlers. Let footnotes and book
+      // links receive their click even when a highlight/underline covers them.
+      // Only the marker yields: adjacent marked text keeps its annotation menu.
+      const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement
+      if (target?.closest?.('a[href]') || imageFootnoteText(target) !== null) return
       const [value, range] = overlayer.hitTest(e)
       if (value && !value.startsWith(SEARCH_PREFIX)) {
         e.preventDefault()

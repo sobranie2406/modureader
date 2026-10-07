@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_common.dart';
@@ -67,6 +68,7 @@ class _DictionarySettingsState extends State<DictionarySettings> {
     ModalRoute<dynamic>? route;
     try {
       return await showDialog<String>(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (context) {
             route = ModalRoute.of(context);
@@ -144,6 +146,7 @@ class _DictionarySettingsState extends State<DictionarySettings> {
 
   Future<void> _delete(LocalDictionary item) async {
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
                 title: Text(
@@ -187,7 +190,7 @@ class _DictionarySettingsState extends State<DictionarySettings> {
                 Text(ModuStrings.text(context, '导入字典', 'Import dictionary'))),
         if (_busy) ...[
           const SizedBox(height: 12),
-          const LinearProgressIndicator(),
+          const EinkStaticIndicator(child: LinearProgressIndicator()),
           Text(ModuStrings.format(context, '正在处理字典，已导入 {count} 条…',
               'Processing dictionary: {count} entries…',
               values: {'count': _count}))
@@ -198,7 +201,9 @@ class _DictionarySettingsState extends State<DictionarySettings> {
               child: Text(_error!,
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.error))),
-        if (_loading) const Center(child: CircularProgressIndicator()),
+        if (_loading)
+          const Center(
+              child: EinkStaticIndicator(child: CircularProgressIndicator())),
         if (!_loading && _items.isEmpty)
           Padding(
               padding: const EdgeInsets.only(top: 24),

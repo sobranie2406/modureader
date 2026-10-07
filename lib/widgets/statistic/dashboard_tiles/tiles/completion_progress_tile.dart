@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/reading_completion_provider.dart';
@@ -129,11 +130,12 @@ class _CompletionRing extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           SizedBox.expand(
-            child: CircularProgressIndicator(
+            child: EinkStaticIndicator(
+                child: CircularProgressIndicator(
               value: normalized as double,
               strokeWidth: 10,
               color: Theme.of(context).colorScheme.primary,
-            ),
+            )),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,

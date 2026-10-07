@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -79,7 +80,7 @@ class _ImageViewerState extends State<ImageViewer> {
             controller: _controller,
             backgroundDecoration: const BoxDecoration(color: Colors.black),
             loadingBuilder: (context, event) => const Center(
-              child: CircularProgressIndicator(),
+              child: EinkStaticIndicator(child: CircularProgressIndicator()),
             ),
             minScale: PhotoViewComputedScale.contained * 0.8,
             maxScale: PhotoViewComputedScale.covered * 3,

@@ -14,8 +14,7 @@ class SyncMaintenanceSchedule {
 
   Future<int?> run(
       SyncClientBase client, Future<int> Function() cleanup) async {
-    final identity = jsonEncode(
-        [client.protocolName, client.config['url'], client.config['username']]);
+    final identity = jsonEncode(client.syncIdentity);
     final digest = sha256.convert(utf8.encode(identity));
     final file = File('${directory.path}/replaced-cleanup-$digest.json');
     if (!_running.add(file.path)) return null;

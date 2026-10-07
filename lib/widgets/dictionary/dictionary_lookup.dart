@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/page/settings_page/dictionaries.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
@@ -104,7 +105,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                         onPressed: _search,
                         icon: const Icon(Icons.search),
                         tooltip: ModuStrings.text(context, '查询', 'Search'))))),
-        if (_busy) const LinearProgressIndicator(),
+        if (_busy) const EinkStaticIndicator(child: LinearProgressIndicator()),
         Expanded(
             child: ListView(padding: const EdgeInsets.all(16), children: [
           if (_error != null)

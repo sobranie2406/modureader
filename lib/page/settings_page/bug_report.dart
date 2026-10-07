@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/service/feedback/bug_report.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
@@ -213,6 +214,7 @@ class _BugReportSettingsState extends State<BugReportSettings> {
     if (!_form.currentState!.validate()) return;
     final report = _report;
     final proceed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(report.type == FeedbackType.bug
@@ -405,7 +407,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                   onChanged:
                       _busy ? null : (value) => _toggleCrashLog(value ?? false),
                 ),
-              if (_loadingCrashLog) const LinearProgressIndicator(),
+              if (_loadingCrashLog)
+                const EinkStaticIndicator(child: LinearProgressIndicator()),
               if (_includeCrashLog && _crashLog != null)
                 ExpansionTile(
                   title: Text(

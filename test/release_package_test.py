@@ -110,6 +110,22 @@ class ReleaseAssetSetTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
                 validate_release_assets(folder, 'v1.0.0')
 
+    def test_harmony_release_requires_nine_packages_and_matching_checksum(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.fixture(folder)
+            with self.assertRaisesRegex(ValueError, 'missing='):
+                validate_release_assets(folder, 'v1.0.0', include_harmony=True)
+            name = 'Modu-1.0.0-harmony-arm64.hap'
+            payload = b'synthetic HAP; actual HAP structure checked before packaging'
+            (folder / name).write_bytes(payload)
+            (folder / (name + '.sha256')).write_text(
+                f'{hashlib.sha256(payload).hexdigest()}  {name}\n')
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0', True), 9)
+            (folder / name).write_bytes(b'truncated')
+            with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
+                validate_release_assets(folder, 'v1.0.0', True)
+
     def test_android_x64_cannot_be_packaged_or_published(self):
         with self.assertRaisesRegex(ValueError, 'internal test target'):
             release_package.package('android', 'x64', '1.0.0')

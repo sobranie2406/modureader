@@ -1,6 +1,7 @@
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 import 'dart:ui';
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/service/notes/reading_link.dart';
 import 'package:anx_reader/service/notes/open_reading_link.dart';
 
@@ -272,10 +273,12 @@ class _HomePageState extends ConsumerState<HomePage> {
           return Scaffold(
             extendBody: true,
             body: BottomBar(
+              duration: AppMotion.duration(const Duration(milliseconds: 120)),
               width: 330,
               offset: HomeNavigationMetrics.barOffset,
               body: (_, controller) => HomeNavigationBody(
                 hasBottomBar: !keyboardOpen,
+                scrollBehindBar: true,
                 child: pages(currentIndex, constraints, controller),
               ),
               showIcon: !keyboardOpen,
@@ -295,17 +298,23 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(32),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                    filter: ImageFilter.blur(
+                      sigmaX: Prefs().eInkMode ? 0 : 12,
+                      sigmaY: Prefs().eInkMode ? 0 : 12,
+                    ),
                     child: Container(
                       height: HomeNavigationMetrics.barHeightFor(context),
                       decoration: BoxDecoration(
                         color: Theme.of(context)
                             .colorScheme
                             .surfaceContainer
-                            .withAlpha(123),
+                            .withAlpha(Prefs().eInkMode ? 255 : 100),
                         borderRadius: BorderRadius.circular(32),
                         border: Border.all(
-                          color: Theme.of(context).colorScheme.outline,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withAlpha(Prefs().eInkMode ? 255 : 90),
                           width: 0.5,
                         ),
                       ),

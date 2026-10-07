@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/book_sync_status.dart';
 import 'package:anx_reader/models/book.dart';
@@ -8,6 +9,7 @@ import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/bookshelf/book_type_badges.dart';
 import 'package:anx_reader/widgets/bookshelf/book_sync_status_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,6 +118,12 @@ class _BookItemState extends ConsumerState<BookItem> {
                       fit: StackFit.expand,
                       children: [
                         BookCover(book: book),
+                        Positioned(
+                          left: 8,
+                          right: 40,
+                          bottom: 8,
+                          child: BookTypeBadges(book: book),
+                        ),
                         FutureBuilder<bool>(
                           future: BookKnowledgeIndexService().hasIndex(book),
                           builder: (context, snapshot) {
@@ -170,10 +178,11 @@ class _BookItemState extends ConsumerState<BookItem> {
                                     left: 0,
                                     right: 0,
                                     bottom: 0,
-                                    child: LinearProgressIndicator(
+                                    child: EinkStaticIndicator(
+                                        child: LinearProgressIndicator(
                                       value: queueItem?.progress,
                                       minHeight: 4,
-                                    ),
+                                    )),
                                   ),
                               ],
                             );
@@ -279,7 +288,7 @@ class _KnowledgeStatusBadge extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: Prefs().eInkMode ? Colors.black : color,
         borderRadius: BorderRadius.circular(7),
       ),
       child: Padding(

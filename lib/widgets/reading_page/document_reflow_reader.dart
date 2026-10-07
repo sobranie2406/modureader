@@ -1,9 +1,11 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book_note.dart';
+import 'package:anx_reader/service/book_player/reader_word_selection.dart';
 import 'package:anx_reader/page/settings_page/ocr_model.dart';
 import 'package:anx_reader/service/ocr/document_reflow_store.dart';
 import 'package:anx_reader/service/ocr/document_text_style.dart';
@@ -11,6 +13,7 @@ import 'package:anx_reader/service/ocr/local_ocr_service.dart';
 import 'package:anx_reader/service/ocr/ocr_model_store.dart';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'document_text_style_dialog.dart';
 
 typedef ReflowSelection = Future<void> Function(DocumentReflowAnchor anchor,
@@ -87,6 +90,13 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   bool _busy = false, _needsModel = false;
   String? _error, _shownSelection;
   TextSelection _observedSelection = const TextSelection.collapsed(offset: -1);
+  Timer? _selectionTimer;
+  Timer? _mouseLongPressTimer;
+  int _selectionEpoch = 0;
+  int? _expandingEpoch;
+  bool _selectionSession = false, _expandInitialSelection = false;
+  PointerDeviceKind? _pointerKind;
+  Offset? _pointerOrigin;
   double? _progress;
   OcrCancellation? _cancel;
   List<BookNote> _notes = [];
@@ -104,6 +114,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   @override
   void dispose() {
     _generation++;
+    _selectionTimer?.cancel();
+    _mouseLongPressTimer?.cancel();
     _cancel?.cancel();
     widget.cancelRender();
     _controller.dispose();
@@ -124,7 +136,12 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final selection = _controller.selection;
     if (selection == _observedSelection) return;
     _observedSelection = selection;
+    _selectionEpoch++;
     _shownSelection = null;
+    if (_selectionSession &&
+        !(_pointerOrigin != null && _pointerKind == PointerDeviceKind.mouse)) {
+      _queueSelection();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           selection != _controller.selection ||
@@ -136,6 +153,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void clearSelection() {
+    _resetSelectionGesture();
     _editable?.hideToolbar();
     _shownSelection = null;
     _controller.selection = TextSelection.collapsed(
@@ -168,8 +186,15 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       if ((direction > 0 &&
               _scroll.offset < _scroll.position.maxScrollExtent - 1) ||
           (direction < 0 && _scroll.offset > 1)) {
-        await _scroll.animateTo(next.clamp(0, _scroll.position.maxScrollExtent),
-            duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+        final target =
+            next.clamp(0, _scroll.position.maxScrollExtent).toDouble();
+        if (AppMotion.disabled) {
+          _scroll.jumpTo(target);
+        } else {
+          await _scroll.animateTo(target,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut);
+        }
         return;
       }
     }
@@ -214,6 +239,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> _performLoad(int? target, {DocumentReflowAnchor? anchor}) async {
+    _resetSelectionGesture();
     final generation = ++_generation, cancel = OcrCancellation();
     _cancel?.cancel();
     _cancel = cancel;
@@ -373,17 +399,162 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     widget.clearMenu();
     clearSelection();
     final value = await showDialog<DocumentTextStyle>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) =>
             DocumentTextStyleDialog(initial: _style, save: widget.saveStyle));
     if (mounted && value != null) setState(() => _style = value);
   }
 
+  void _resetSelectionGesture() {
+    _selectionTimer?.cancel();
+    _mouseLongPressTimer?.cancel();
+    _selectionEpoch++;
+    _expandingEpoch = null;
+    _selectionSession = false;
+    _expandInitialSelection = false;
+    _pointerOrigin = null;
+  }
+
+  void _selectionPointerDown(PointerDownEvent event) {
+    _selectionTimer?.cancel();
+    _mouseLongPressTimer?.cancel();
+    _selectionEpoch++;
+    _selectionSession = true;
+    _expandInitialSelection = event.buttons == kPrimaryButton;
+    _pointerKind = event.kind;
+    _pointerOrigin = event.position;
+    if (event.kind == PointerDeviceKind.mouse && _expandInitialSelection) {
+      // Desktop TextField supports double-click/drag but not press-and-hold.
+      // Match the ordinary reader without competing with touch gestures.
+      _mouseLongPressTimer = Timer(kLongPressTimeout, () {
+        if (!mounted || !_expandInitialSelection || _pointerOrigin == null) {
+          return;
+        }
+        final state = _textState;
+        if (state == null) return;
+        final position =
+            state.renderEditable.getPositionForPoint(event.position);
+        final word = state.renderEditable.getWordBoundary(position);
+        if (!word.isValid || word.isCollapsed) return;
+        state.userUpdateTextEditingValue(
+            _controller.value.copyWith(
+                selection: TextSelection(
+                    baseOffset: word.start, extentOffset: word.end)),
+            SelectionChangedCause.longPress);
+        _queueSelection();
+      });
+    }
+  }
+
+  void _selectionPointerMove(PointerMoveEvent event) {
+    // A deliberate drag owns its exact range. Handle overlays live outside
+    // this Listener, so dragging a handle never arms expansion again.
+    if (_pointerOrigin != null &&
+        (event.position - _pointerOrigin!).distance >
+            (_pointerKind == PointerDeviceKind.mouse ? 2 : kTouchSlop)) {
+      _expandInitialSelection = false;
+      _mouseLongPressTimer?.cancel();
+    }
+  }
+
+  void _selectionPointerUp(PointerUpEvent event) {
+    _mouseLongPressTimer?.cancel();
+    _pointerOrigin = null;
+    _queueSelection();
+  }
+
+  void _queueSelection() {
+    _selectionTimer?.cancel();
+    _selectionTimer = Timer(const Duration(milliseconds: 80), () {
+      unawaited(_settleSelection());
+    });
+  }
+
+  Future<void> _settleSelection() async {
+    final selection = _controller.selection, page = _page;
+    final state = _textState;
+    if (!mounted ||
+        state == null ||
+        page == null ||
+        !selection.isValid ||
+        selection.isCollapsed) {
+      _expandInitialSelection = false;
+      return;
+    }
+    final epoch = _selectionEpoch, generation = _generation;
+    if (_expandingEpoch == epoch) return;
+    if (_expandInitialSelection) {
+      // Consume before awaiting: late native results must not undo a user's
+      // next gesture, a moved handle, or a restored annotation range.
+      _expandInitialSelection = false;
+      _expandingEpoch = epoch;
+      final text = _controller.text;
+      final start = selection.start == 0
+          ? 0
+          : text.lastIndexOf('\n', selection.start - 1) + 1;
+      final newline = text.indexOf('\n', selection.start);
+      final end = newline < 0 ? text.length : newline;
+      List<int>? bounds;
+      if (Prefs().longPressSelectParagraph) {
+        final paragraph = text.substring(start, end);
+        final leading = paragraph.length - paragraph.trimLeft().length;
+        bounds = [start + leading, start + paragraph.trimRight().length];
+      } else {
+        final word = await ReaderWordSelection.bounds({
+          'text': text.substring(start, end),
+          'offset': selection.start - start,
+          'locale': Localizations.localeOf(context).toLanguageTag(),
+        });
+        if (word != null) bounds = [start + word[0], start + word[1]];
+      }
+      if (_expandingEpoch == epoch) _expandingEpoch = null;
+      if (!mounted ||
+          epoch != _selectionEpoch ||
+          generation != _generation ||
+          selection != _controller.selection) return;
+      // Never shrink a native word/drag range into a smaller token.
+      if (bounds != null &&
+          bounds[0] <= selection.start &&
+          bounds[1] >= selection.end &&
+          bounds[0] < bounds[1]) {
+        final expanded = selection.baseOffset <= selection.extentOffset
+            ? TextSelection(baseOffset: bounds[0], extentOffset: bounds[1])
+            : TextSelection(baseOffset: bounds[1], extentOffset: bounds[0]);
+        state.userUpdateTextEditingValue(
+            _controller.value.copyWith(selection: expanded),
+            _pointerKind == PointerDeviceKind.mouse
+                ? SelectionChangedCause.tap
+                : SelectionChangedCause.longPress);
+        _selectionTimer?.cancel();
+      }
+    }
+    // Wait for the expanded range's layout before reading global anchors.
+    final settled = _controller.selection;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _generation ||
+          settled != _controller.selection) return;
+      _publishSelection(state);
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
   Widget _selectionMenu(BuildContext context, EditableTextState state) {
+    if (_expandingEpoch == _selectionEpoch) return const SizedBox.shrink();
+    if (_expandInitialSelection) {
+      _queueSelection();
+    } else {
+      _publishSelection(state);
+    }
+    return const SizedBox.shrink();
+  }
+
+  void _publishSelection(EditableTextState state) {
     _editable = state;
     final selection = _controller.selection, page = _page;
     if (page == null || !selection.isValid || selection.isCollapsed) {
-      return const SizedBox.shrink();
+      return;
     }
     final anchor = DocumentReflowAnchor(
         page.page, page.ocr, page.revision, selection.start, selection.end);
@@ -393,7 +564,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     if (_shownSelection != id) {
       _shownSelection = id;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted || _controller.selection != selection || _page != page) {
+        if (!mounted ||
+            _controller.selection != selection ||
+            _page != page ||
+            _shownSelection != id) {
           return;
         }
         final ids = _notes
@@ -414,7 +588,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
             contextText, Rect.fromPoints(primary, secondary).inflate(4), ids);
       });
     }
-    return const SizedBox.shrink();
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   @override
@@ -471,38 +645,46 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                     onPressed: _styleSettings,
                     icon: const Icon(Icons.settings)),
               ]),
-              if (_busy) LinearProgressIndicator(value: _progress),
+              if (_busy)
+                EinkStaticIndicator(
+                    child: LinearProgressIndicator(value: _progress)),
               Expanded(
                   child: _page == null
                       ? Center(
                           child: _busy
-                              ? const CircularProgressIndicator()
+                              ? const EinkStaticIndicator(
+                                  child: CircularProgressIndicator())
                               : Text(t('等待本页文字', 'Waiting for page text'),
                                   style: TextStyle(color: foreground)))
                       : SingleChildScrollView(
                           controller: _scroll,
                           padding: EdgeInsets.symmetric(
                               horizontal: _style.margin, vertical: 16),
-                          child: KeyedSubtree(
-                              key: _textFieldKey,
-                              child: TextField(
-                                key: const ValueKey('reflow-text'),
-                                controller: _controller,
-                                focusNode: _focus,
-                                readOnly: true,
-                                maxLines: null,
-                                showCursor: false,
-                                enableSuggestions: false,
-                                style: _style.textStyle
-                                    .copyWith(color: foreground),
-                                textAlign: _style.alignment,
-                                decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: EdgeInsets.zero),
-                                contextMenuBuilder: _selectionMenu,
-                                onTapOutside: (_) {},
-                              )))),
+                          child: Listener(
+                              onPointerDown: _selectionPointerDown,
+                              onPointerMove: _selectionPointerMove,
+                              onPointerUp: _selectionPointerUp,
+                              onPointerCancel: (_) => _resetSelectionGesture(),
+                              child: KeyedSubtree(
+                                  key: _textFieldKey,
+                                  child: TextField(
+                                    key: const ValueKey('reflow-text'),
+                                    controller: _controller,
+                                    focusNode: _focus,
+                                    readOnly: true,
+                                    maxLines: null,
+                                    showCursor: false,
+                                    enableSuggestions: false,
+                                    style: _style.textStyle
+                                        .copyWith(color: foreground),
+                                    textAlign: _style.alignment,
+                                    decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        isCollapsed: true,
+                                        contentPadding: EdgeInsets.zero),
+                                    contextMenuBuilder: _selectionMenu,
+                                    onTapOutside: (_) {},
+                                  ))))),
               if (_needsModel || _error != null)
                 Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),

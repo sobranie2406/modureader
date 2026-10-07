@@ -190,7 +190,10 @@ class BackupDirectoryTransaction {
 /// headers/endpoints, so omit the entire credential-bearing setting container.
 Map<String, dynamic> withoutBackupCredentials(Map<String, dynamic> backup) => {
       for (final entry in backup.entries)
-        if (!isCredentialPreference(entry.key)) entry.key: entry.value,
+        // A backend choice without its connection must not redirect an
+        // existing WebDAV/S3 account when importing a credential-free backup.
+        if (!isCredentialPreference(entry.key) && entry.key != 'syncProtocol')
+          entry.key: entry.value,
     };
 
 bool isCredentialPreference(String key) =>
@@ -198,6 +201,7 @@ bool isCredentialPreference(String key) =>
       'aiProviders',
       'vectorModelConfig',
       'webdavInfo',
+      's3Info',
       'ftpInfo',
       'sftpInfo',
       'remoteLibraryConnection',

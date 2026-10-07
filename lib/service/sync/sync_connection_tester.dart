@@ -3,6 +3,8 @@ import 'package:anx_reader/enums/sync_protocol.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/utils/log/common.dart';
+import 'package:anx_reader/service/sync/sync_feedback.dart';
+import 'package:flutter/widgets.dart';
 
 /// Utility class for testing sync connections
 class SyncConnectionTester {
@@ -28,7 +30,11 @@ class SyncConnectionTester {
       return SyncTestResult.success(
           L10n.of(navigatorKey.currentContext!).connectionSuccessful);
     } catch (e) {
-      final errorMessage = '${getErrorMessage(e)}\n$e';
+      final errorMessage = syncFailureMessage(e,
+          chinese: navigatorKey.currentContext == null ||
+              Localizations.localeOf(navigatorKey.currentContext!)
+                      .languageCode ==
+                  'zh');
       AnxLog.severe(
           '${protocol.displayName} connection test failed: $errorMessage');
       return SyncTestResult.failure(errorMessage);
@@ -57,7 +63,11 @@ class SyncConnectionTester {
       return SyncTestResult.success(
           L10n.of(navigatorKey.currentContext!).connectionSuccessful);
     } catch (e) {
-      final errorMessage = '${getErrorMessage(e)}\n$e';
+      final errorMessage = syncFailureMessage(e,
+          chinese: navigatorKey.currentContext == null ||
+              Localizations.localeOf(navigatorKey.currentContext!)
+                      .languageCode ==
+                  'zh');
       AnxLog.severe(
           '${protocol.displayName} full connection test failed: $errorMessage');
       return SyncTestResult.failure(errorMessage);

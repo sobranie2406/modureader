@@ -148,6 +148,9 @@ class MainActivity : AudioServiceActivity() {
         if (!flutterEngine.plugins.has(LocalOcrPlugin::class.java)) {
             flutterEngine.plugins.add(LocalOcrPlugin())
         }
+        if (!flutterEngine.plugins.has(BookFolderPlugin::class.java)) {
+            flutterEngine.plugins.add(BookFolderPlugin())
+        }
 
         val updateInstaller = AppUpdateInstaller(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,

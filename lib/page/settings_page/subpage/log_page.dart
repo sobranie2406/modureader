@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -56,6 +57,7 @@ class _LogPageState extends State<LogPage> {
 
   void showMoreAction(BuildContext context) {
     showMenu(
+      popUpAnimationStyle: AppMotion.style,
       context: context,
       position: RelativeRect.fromLTRB(
         MediaQuery.of(context).size.width,

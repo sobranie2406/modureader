@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -249,7 +250,8 @@ class _ExcerptShareBottomSheetState
                               },
                             ),
                             loading: () => const Center(
-                              child: CircularProgressIndicator(),
+                              child: EinkStaticIndicator(
+                                  child: CircularProgressIndicator()),
                             ),
                             error: (error, stack) => Center(
                               child: Text(error.toString()),
@@ -402,6 +404,7 @@ Future<void> showExcerptShareBottomSheet({
   String? chapter,
 }) async {
   await showModalBottomSheet(
+    sheetAnimationStyle: AppMotion.style,
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

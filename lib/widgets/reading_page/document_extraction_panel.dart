@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -58,6 +59,7 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
 
   Future<void> _editTextStyle() async {
     final value = await showDialog<DocumentTextStyle>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) => DocumentTextStyleDialog(
             initial: _textStyle, save: widget.saveTextStyle));
@@ -296,7 +298,8 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                     : _preview == null
                         ? Center(
                             child: _busy
-                                ? const CircularProgressIndicator()
+                                ? const EinkStaticIndicator(
+                                    child: CircularProgressIndicator())
                                 : TextButton(
                                     onPressed: () => _load(null),
                                     child: Text(t('重新加载', 'Reload'))))
@@ -317,7 +320,9 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                                               _result = null;
                                             }))));
                           })),
-            if (_busy) LinearProgressIndicator(value: _progress),
+            if (_busy)
+              EinkStaticIndicator(
+                  child: LinearProgressIndicator(value: _progress)),
             // The controls stay scrollable on phones and at large accessibility sizes.
             ConstrainedBox(
                 constraints: BoxConstraints(

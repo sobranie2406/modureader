@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/enums/translation_mode.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -28,6 +29,7 @@ class TranslationToolbarAction extends StatelessWidget {
       );
     }
     return PopupMenuButton<bool>(
+      popUpAnimationStyle: AppMotion.style,
       key: const ValueKey('reader-translation-button'),
       tooltip: tooltip,
       icon: const Badge(child: Icon(Icons.translate_outlined)),

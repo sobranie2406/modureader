@@ -18,11 +18,7 @@ class ImmutableSyncLog {
       {required Directory durableDirectory})
       : verifiedCache = Directory('${cache.path}/modu-sync-record-cache-v1'),
         pending = Directory(
-            '${durableDirectory.path}/modu-sync-pending-v1/${sha256.convert(utf8.encode(jsonEncode([
-              client.protocolName,
-              client.config['url'],
-              client.config['username']
-            ])))}');
+            '${durableDirectory.path}/modu-sync-pending-v1/${sha256.convert(utf8.encode(jsonEncode(client.syncIdentity)))}');
   final SyncClientBase client;
   final Directory staging;
   final Directory pending;

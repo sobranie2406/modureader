@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
@@ -93,6 +94,7 @@ class _TranslationMenuState extends State<TranslationMenu> {
         currentService,
     ];
     final selected = await showModalBottomSheet<TranslateService>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

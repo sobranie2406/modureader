@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/bookshelf_folder_style.dart';
 import 'package:anx_reader/models/book.dart';
@@ -80,6 +81,7 @@ class _BookFolderState extends ConsumerState<BookFolder> {
 
     void openFolder(String groupName) {
       showDialog(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => BookOpenedFolder(
           books: widget.books,
@@ -213,16 +215,12 @@ class _BookFolderState extends ConsumerState<BookFolder> {
                       folderPreview,
                       if (!widget.selectionMode)
                         Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Material(
-                            color:
-                                Theme.of(context).colorScheme.surfaceContainer,
-                            shape: const CircleBorder(),
-                            child: FolderPinMenu(
-                              groupId: widget.books.first.groupId,
-                              menuKey: _menuKey,
-                            ),
+                          right: 6,
+                          bottom: 6,
+                          child: FolderPinMenu(
+                            groupId: widget.books.first.groupId,
+                            menuKey: _menuKey,
+                            onCover: true,
                           ),
                         ),
                       if (widget.selectionMode)

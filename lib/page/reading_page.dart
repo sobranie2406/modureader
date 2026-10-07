@@ -1,5 +1,7 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
+import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
 import 'package:anx_reader/enums/translation_mode.dart';
@@ -115,7 +117,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     epubPlayerKey.currentState?.removeOverlay();
     await audioHandler.stop();
     if (!mounted) return;
-    setState(() { _reflowOcr = null; _reflowAnchor = null; });
+    setState(() {
+      _reflowOcr = null;
+      _reflowAnchor = null;
+    });
     _restoreReaderFocusAfterPanel();
   }
 
@@ -123,30 +128,50 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     final player = epubPlayerKey.currentState!;
     final styles = DocumentTextStyleStore(Prefs().prefs);
     return DocumentReflowReader(
-      key: _reflowKey, store: DocumentReflowStore(player.cssBookKey),
-      forceOcr: _reflowOcr!, anchor: _reflowAnchor,
-      initialStyle: styles.read(player.cssBookKey), saveStyle: (value) => styles.save(player.cssBookKey, value),
+      key: _reflowKey,
+      store: DocumentReflowStore(player.cssBookKey),
+      forceOcr: _reflowOcr!,
+      anchor: _reflowAnchor,
+      initialStyle: styles.read(player.cssBookKey),
+      saveStyle: (value) => styles.save(player.cssBookKey, value),
       info: player.documentReflowInfo,
       extractText: player.extractDocumentText,
-      render: (request) => player.renderPdfRegion({...request, if(player.isImageEpub) 'source':'epub'}),
-      cancelRender: () { if(player.isImageEpub) { player.cancelEpubImageRender(); } else { player.cancelPdfRegionRender(); } },
-      onClose: closeDocumentReflow, clearMenu: player.removeOverlay,
+      render: (request) => player.renderPdfRegion(
+          {...request, if (player.isImageEpub) 'source': 'epub'}),
+      cancelRender: () {
+        if (player.isImageEpub) {
+          player.cancelEpubImageRender();
+        } else {
+          player.cancelPdfRegionRender();
+        }
+      },
+      onClose: closeDocumentReflow,
+      clearMenu: player.removeOverlay,
       selectionInvalidated: player.reflowSelectionInvalidated,
       onPageChanged: player.goToDocumentPage,
       loadNotes: () => bookNoteDao.selectBookNotesByBookId(player.book.id),
-      onSelection: (anchor,text,contextText,rect,ids) async {
+      onSelection: (anchor, text, contextText, rect, ids) async {
         if (!mounted || !isReflowReading) return;
         final box = epubPlayerKey.currentContext?.findRenderObject();
         if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
         final origin = box.localToGlobal(Offset.zero);
-        await showContextMenu(context,
-            (rect.left-origin.dx)/box.size.width, (rect.top-origin.dy)/box.size.height,
-            (rect.right-origin.dx)/box.size.width, (rect.bottom-origin.dy)/box.size.height,
-            text, anchor.encode(), null, false, Axis.horizontal,
-            contextText: contextText, annotationIds: ids);
+        await showContextMenu(
+            context,
+            (rect.left - origin.dx) / box.size.width,
+            (rect.top - origin.dy) / box.size.height,
+            (rect.right - origin.dx) / box.size.width,
+            (rect.bottom - origin.dy) / box.size.height,
+            text,
+            anchor.encode(),
+            null,
+            false,
+            Axis.horizontal,
+            contextText: contextText,
+            annotationIds: ids);
       },
     );
   }
+
   static const empty = SizedBox.shrink();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late Book _book;
@@ -772,7 +797,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   void _openBookDetails() {
     Navigator.push(
         context,
-        CupertinoPageRoute(
+        MotionCupertinoPageRoute(
           builder: (_) => BookDetail(book: widget.book),
         ));
   }
@@ -805,7 +830,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   double _aiChatMaxWidth(BuildContext context) {
-    final totalWidth = MediaQuery.of(context).size.width;
+    final totalWidth = MediaQuery.sizeOf(context).width;
     final maxByPercentage = totalWidth * 0.65;
     final maxByRemaining = totalWidth - 320;
     final maxWidth = math.min(maxByPercentage, maxByRemaining);
@@ -813,7 +838,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   double _aiChatMaxHeight(BuildContext context) {
-    final totalHeight = MediaQuery.of(context).size.height;
+    final totalHeight = MediaQuery.sizeOf(context).height;
     final maxByPercentage = totalHeight * 0.60;
     final maxByRemaining = totalHeight - 320;
     final maxHeight = math.min(maxByPercentage, maxByRemaining);
@@ -958,6 +983,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
     final textStyles = DocumentTextStyleStore(Prefs().prefs);
     final text = await showDialog<String>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (_) => DocumentExtractionPanel(
         initialTextStyle: textStyles.read(bookKey),
@@ -1010,7 +1036,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
     // Determine display mode
     final displayMode = Prefs().aiChatDisplayMode;
-    final screenWidth = MediaQuery.of(navigatorKey.currentContext!).size.width;
+    final screenWidth = MediaQuery.sizeOf(navigatorKey.currentContext!).width;
 
     bool shouldShowAsPopup = false;
 
@@ -1120,7 +1146,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       onPressed: () async {
         // Determine if should show as split based on display mode
         final displayMode = Prefs().aiChatDisplayMode;
-        final screenWidth = MediaQuery.of(context).size.width;
+        final screenWidth = MediaQuery.sizeOf(context).width;
 
         bool shouldShowAsSplit = false;
         switch (displayMode) {
@@ -1220,6 +1246,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                       ),
                     if (compactToolbar)
                       PopupMenuButton<String>(
+                        popUpAnimationStyle: AppMotion.style,
                         icon: const Icon(EvaIcons.more_vertical),
                         onSelected: (action) {
                           if (action == 'copy') {
@@ -1349,7 +1376,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       ),
     );
 
-    return Scaffold(
+    final reader = Scaffold(
       resizeToAvoidBottomInset: false,
       body: Hero(
         tag: widget.heroTag ??
@@ -1357,8 +1384,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: SizedBox(
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
+            height: MediaQuery.sizeOf(context).height,
+            width: MediaQuery.sizeOf(context).width,
             child: Scaffold(
               key: _scaffoldKey,
               resizeToAvoidBottomInset: false,
@@ -1373,7 +1400,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
               drawer: PointerInterceptor(
                 child: Drawer(
                   width: math.min(
-                    MediaQuery.of(context).size.width * 0.8,
+                    MediaQuery.sizeOf(context).width * 0.8,
                     420,
                   ),
                   child: SafeArea(
@@ -1401,7 +1428,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                             if (!Prefs().showMenuOnHover) return;
                             var y = detail.position.dy;
                             if (y < 30 ||
-                                y > MediaQuery.of(context).size.height - 30) {
+                                y > MediaQuery.sizeOf(context).height - 30) {
                               showOrHideAppBarAndBottomBar(true);
                             }
                           },
@@ -1439,8 +1466,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                                   onPressed: _changingQuickMark
                                                       ? null
                                                       : _toggleQuickMark)))),
-                                if (isReflowReading && epubPlayerKey.currentState != null)
-                                  Positioned.fill(child: PointerInterceptor(child: _buildDocumentReflow())),
+                                if (isReflowReading &&
+                                    epubPlayerKey.currentState != null)
+                                  Positioned.fill(
+                                      child: PointerInterceptor(
+                                          child: _buildDocumentReflow())),
                                 if (_isResizingAiChat)
                                   SizedBox.expand(
                                     child: Container(
@@ -1552,7 +1582,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     Positioned(
                       left: 12,
                       right: 12,
-                      bottom: 24 + MediaQuery.of(context).padding.bottom,
+                      bottom: 24 + MediaQuery.viewPaddingOf(context).bottom,
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 440),
@@ -1574,5 +1604,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         ),
       ),
     );
+    return BookImportDropTarget(child: reader);
   }
 }

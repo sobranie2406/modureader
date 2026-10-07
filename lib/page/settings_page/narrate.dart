@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
@@ -129,6 +130,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
 
   Future<void> _clearSettings() async {
     final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
@@ -278,7 +280,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
 
     _highlightAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: AppMotion.duration(const Duration(milliseconds: 1500)),
     );
 
     final serviceId = Prefs().ttsService;
@@ -354,7 +356,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
       if (key?.currentContext != null) {
         Scrollable.ensureVisible(
           key!.currentContext!,
-          duration: const Duration(milliseconds: 500),
+          duration: AppMotion.duration(const Duration(milliseconds: 500)),
           curve: Curves.easeInOut,
           alignment: 0.1, // Align near top
         );
@@ -771,7 +773,10 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
           ],
         ];
       },
-      loading: () => [const Center(child: CircularProgressIndicator())],
+      loading: () => [
+        const Center(
+            child: EinkStaticIndicator(child: CircularProgressIndicator()))
+      ],
       error: (err, stack) => [Center(child: Text('Error: $err'))],
     );
   }

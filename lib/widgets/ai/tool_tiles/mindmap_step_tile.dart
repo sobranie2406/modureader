@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -128,6 +129,7 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
         Align(
           alignment: Alignment.centerRight,
           child: PopupMenuButton<MindmapExportFormat>(
+            popUpAnimationStyle: AppMotion.style,
             key: const ValueKey('mindmap-export'),
             enabled: !_exporting && _document != null,
             tooltip: ModuStrings.text(context, '导出思维导图', 'Export mind map'),
@@ -145,7 +147,8 @@ class _MindmapStepTileState extends State<MindmapStepTile> {
                   const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator(strokeWidth: 2)))
                 else
                   const Icon(Icons.file_download_outlined, size: 20),
                 const SizedBox(width: 6),
@@ -235,7 +238,6 @@ class _MindmapViewerState extends State<MindmapViewer> {
   late MindmapGraphBundle _bundle;
   Size _viewportSize = Size.zero;
   bool _fitScheduled = false;
-
 
   @override
   void initState() {

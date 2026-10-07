@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/enums/chart_mode.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/statistic_data_model.dart';
@@ -82,12 +83,13 @@ class PeriodSummaryTile extends StatisticsDashboardTileBase {
                   '${(periodSeconds / totalSeconds * 100).toStringAsFixed(1)}%',
                   style: theme.textTheme.labelMedium),
               const Spacer(),
-              LinearProgressIndicator(
+              EinkStaticIndicator(
+                  child: LinearProgressIndicator(
                 value: periodSeconds == 0
                     ? 0
                     : (periodSeconds / totalSeconds).clamp(0, 1).toDouble(),
                 minHeight: 6,
-              ),
+              )),
             ],
           );
         });

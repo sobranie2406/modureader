@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/ocr/ocr_model_store.dart';
@@ -168,6 +169,7 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
   Future<void> _delete(OcrModelSpec model) async {
     if (_busy) return;
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
               title: Text(t('删除已下载模型？', 'Delete downloaded model?')),
@@ -328,8 +330,9 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                   style: Theme.of(context).textTheme.bodySmall),
               if (downloading) ...[
                 const SizedBox(height: 12),
-                LinearProgressIndicator(
-                    value: _progress == 0 ? null : _progress),
+                EinkStaticIndicator(
+                    child: LinearProgressIndicator(
+                        value: _progress == 0 ? null : _progress)),
                 const SizedBox(height: 4),
                 Text(
                     _progress == 0

@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'package:anx_reader/l10n/modu_strings.dart';
 
@@ -111,6 +112,7 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
   if (list.isEmpty) return false;
 
   final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(list.length == 1

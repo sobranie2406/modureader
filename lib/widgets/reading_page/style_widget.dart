@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/document_reading_mode.dart';
 import 'package:anx_reader/widgets/reading_page/document_style_widget.dart';
@@ -711,6 +712,7 @@ class _ThemeChangeWidgetState extends State<ThemeChangeWidget> {
     Color pickedColor = Color(int.parse('0x$currColor'));
 
     return showDialog<String>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(

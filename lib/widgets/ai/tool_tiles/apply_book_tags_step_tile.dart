@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:convert';
 
 import 'package:anx_reader/dao/book.dart';
@@ -131,7 +132,8 @@ class _ApplyBookTagsStepTileState extends State<ApplyBookTagsStepTile> {
                   ? const SizedBox(
                       height: 16,
                       width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   : Text(_applied ? 'Applied' : 'Apply'),
             ),

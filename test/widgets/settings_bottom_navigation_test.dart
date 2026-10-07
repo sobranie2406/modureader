@@ -67,6 +67,7 @@ void main() {
                         controller = suppliedController;
                         return HomeNavigationBody(
                           hasBottomBar: true,
+                          scrollBehindBar: true,
                           child: SettingsPage(controller: suppliedController),
                         );
                       },

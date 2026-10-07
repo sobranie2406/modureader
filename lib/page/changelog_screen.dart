@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/get_current_language_code.dart';
 import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
@@ -137,7 +138,8 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
         actions: [],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: EinkStaticIndicator(child: CircularProgressIndicator()))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

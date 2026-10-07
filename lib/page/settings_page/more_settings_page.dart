@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -39,7 +40,7 @@ class MoreSettings extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          CupertinoPageRoute(
+          MotionCupertinoPageRoute(
               fullscreenDialog: false,
               builder: (context) => const SubMoreSettings()),
         );
@@ -61,8 +62,7 @@ class SubMoreSettings extends StatefulWidget {
   final bool embedded;
   final ScrollController? controller;
 
-  /// Optional extra scroll clearance for other embedding layouts. Home already
-  /// reserves navigation space outside all pages and leaves this at zero.
+  /// Trailing scroll clearance when embedded beneath floating controls.
   final double bottomContentInset;
 
   @override
@@ -201,8 +201,10 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                 "title": ModuStrings.text(context, 'OCR 模型', 'OCR model'),
                 "icon": Icons.document_scanner_outlined,
                 "sections": const OcrModelSettings(),
-                "subtitles": [ModuStrings.text(context, '文字识别、模型下载与下载源',
-                    'Text recognition, models and download sources')],
+                "subtitles": [
+                  ModuStrings.text(context, '文字识别、模型下载与下载源',
+                      'Text recognition, models and download sources')
+                ],
               },
               {
                 "title": L10n.of(context).settingsNarrate,
@@ -323,7 +325,7 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        CupertinoPageRoute(
+                        MotionCupertinoPageRoute(
                           builder: (context) => const DeveloperOptionsPage(),
                         ),
                       );

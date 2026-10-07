@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,7 +22,7 @@ class FontsSettingPage extends ConsumerWidget {
         data: (fonts) {
           if (fonts.isEmpty) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: EinkStaticIndicator(child: CircularProgressIndicator()),
             );
           }
 
@@ -41,7 +42,8 @@ class FontsSettingPage extends ConsumerWidget {
                         width: MediaQuery.of(context).size.width,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
+                          child: EinkStaticIndicator(
+                              child: CircularProgressIndicator()),
                         ),
                         errorWidget: (context, url, error) =>
                             const Icon(Icons.error),
@@ -110,7 +112,8 @@ class FontsSettingPage extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+            child: EinkStaticIndicator(child: CircularProgressIndicator())),
         error: (error, stack) => Center(
           child: Text(L10n.of(context).fontFailedToLoadFonts),
         ),
@@ -141,7 +144,9 @@ class FontsSettingPage extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(value: downloadState.progress),
+              EinkStaticIndicator(
+                  child:
+                      LinearProgressIndicator(value: downloadState.progress)),
               const SizedBox(height: 8),
               Row(
                 children: [

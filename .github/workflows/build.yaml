@@ -359,9 +359,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  harmony:
+    if: inputs.reader_diagnostic != true && (inputs.targets || 'all') == 'all'
+    uses: ./.github/workflows/harmony-cloud.yml
+    with:
+      build_hap: true
+    secrets:
+      HARMONY_LINUX_TOOLS_URL: ${{ secrets.HARMONY_LINUX_TOOLS_URL }}
+
   release:
     if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
-    needs: [quality, desktop, android, ios]
+    needs: [quality, desktop, android, ios, harmony]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -383,7 +391,7 @@ jobs:
         run: |
           expected_tag="v$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
           test "$RELEASE_TAG" = "$expected_tag"
-          python3 scripts/release/validate_assets.py dist-release "$RELEASE_TAG"
+          python3 scripts/release/validate_assets.py dist-release "$RELEASE_TAG" --include-harmony
           if [[ "$REPLACE_RELEASE" == "true" ]]; then
             test "$CREATE_RELEASE_TAG" = "true"
             [[ "$EXPECTED_TAG_COMMIT" =~ ^[0-9a-f]{40}$ ]]

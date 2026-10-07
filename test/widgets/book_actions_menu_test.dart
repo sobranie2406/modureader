@@ -248,12 +248,31 @@ void main() {
   testWidgets('folder tile long press offers pin, selection mode hides menu',
       (tester) async {
     await mount(tester, folder: true);
+    void expectTranslucentCoverMenu(IconData icon) {
+      final menu = find.byType(FolderPinMenu);
+      final decoration = tester.widget<DecoratedBox>(find.descendant(
+        of: menu,
+        matching: find.byType(DecoratedBox),
+      ));
+      expect((decoration.decoration as BoxDecoration).color,
+          Colors.black.withAlpha(150));
+      expect(tester.getSize(menu), const Size(28, 28));
+      final iconWidget = tester.widget<Icon>(find.descendant(
+        of: menu,
+        matching: find.byIcon(icon),
+      ));
+      expect(iconWidget.color, Colors.white);
+      expect(iconWidget.size, 18);
+    }
+
+    expectTranslucentCoverMenu(Icons.more_vert);
     await tester.longPress(find.byType(BookFolder));
     await tester.pumpAndSettle();
     expect(find.text('置顶'), findsOneWidget);
     await tester.tap(find.text('置顶'));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.push_pin), findsOneWidget);
+    expectTranslucentCoverMenu(Icons.push_pin);
     await tester.tap(find.byTooltip('文件夹操作'));
     await tester.pumpAndSettle();
     expect(find.text('取消置顶'), findsOneWidget);

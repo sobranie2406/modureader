@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_reasoning_effort.dart';
@@ -300,6 +301,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
 
   Future<void> _restoreDefaults(AiProvider provider) async {
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
               title: Text(
@@ -627,6 +629,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
     final keyController = TextEditingController();
 
     showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.settingsAiProviderAddKey),
@@ -752,6 +755,7 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
       final size = renderBox?.size ?? Size.zero;
 
       final selected = await showMenu<String>(
+        popUpAnimationStyle: AppMotion.style,
         context: context,
         position: RelativeRect.fromLTRB(
           offset.dx,

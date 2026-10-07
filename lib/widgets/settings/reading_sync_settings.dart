@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
@@ -25,8 +26,8 @@ class ReadingSyncSettings extends AbstractSettingsTile {
               title: Text(ModuStrings.text(
                   context, '阅读时定时同步', 'Sync periodically while reading')),
               description: Text(!enabled
-                  ? (ModuStrings.text(context, '请先启用 WebDAV 和自动同步。',
-                      'Enable WebDAV and automatic sync first.'))
+                  ? (ModuStrings.text(context, '请先启用云端同步和自动同步。',
+                      'Enable cloud sync and automatic sync first.'))
                   : (ModuStrings.text(
                       context,
                       '仅前台阅读时计时；退出书籍、切换其他页面或锁屏后暂停。使用双向合并，同步已保存的笔记、阅读进度及其他正常同步内容；不自动保存编辑草稿。',
@@ -50,6 +51,7 @@ class ReadingSyncSettings extends AbstractSettingsTile {
               enabled: enabled && prefs.readingTimedSync,
               onPressed: (_) async {
                 final selected = await showDialog<int>(
+                    animationStyle: AppMotion.style,
                     context: context,
                     builder: (dialogContext) => SimpleDialog(
                           title: Text(ModuStrings.text(

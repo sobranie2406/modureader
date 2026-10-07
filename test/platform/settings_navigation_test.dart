@@ -35,7 +35,7 @@ void main() {
     expect(source, contains('return SubMoreSettings('));
     expect(source, contains('embedded: true,'));
     expect(source, contains('controller: controller,'));
-    expect(source, contains('bottomContentInset: bottomContentInset,'));
+    expect(source, contains('HomeNavigationClearance.of(context)'));
     expect(source, isNot(contains('ChangeThemeMode')));
     expect(source, isNot(contains('webdavSwitch')));
     expect(source, isNot(contains('MoreSettings()')));

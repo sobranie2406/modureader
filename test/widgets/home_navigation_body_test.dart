@@ -16,6 +16,7 @@ Widget shell({
   double keyboard = 0,
   bool compact = true,
   bool autoHide = false,
+  bool scrollBehindBar = false,
 }) =>
     MaterialApp(
       home: MediaQuery(
@@ -36,7 +37,12 @@ Widget shell({
               showIcon: visible,
               body: (_, controller) => HomeNavigationBody(
                 hasBottomBar: visible,
-                child: SizedBox.expand(key: _viewport, child: page(controller)),
+                scrollBehindBar: scrollBehindBar,
+                child: Builder(
+                    builder: (context) => SizedBox.expand(
+                          key: _viewport,
+                          child: page(controller),
+                        )),
               ),
               child: Visibility(
                 visible: visible,
@@ -157,6 +163,70 @@ void main() {
     expect(input.text, '保留输入');
     expect(tester.takeException(), isNull);
   });
+
+  for (final bottom in [0.0, 34.0, 48.0]) {
+    for (final grid in [false, true]) {
+      testWidgets(
+          'floating content fills screen and last item clears bar: '
+          'bottom=$bottom grid=$grid', (tester) async {
+        phone(tester);
+        late ScrollController controller;
+        var taps = 0;
+        await tester.pumpWidget(shell(
+          bottom: bottom,
+          scale: 1.6,
+          autoHide: true,
+          scrollBehindBar: true,
+          page: (supplied) {
+            controller = supplied;
+            return Builder(builder: (context) {
+              final padding = EdgeInsets.only(
+                bottom: HomeNavigationClearance.of(context),
+              );
+              final children = [
+                for (var i = 0; i < 59; i++)
+                  SizedBox(height: 60, child: Text('$i')),
+                TextButton(
+                    key: _last,
+                    onPressed: () => taps++,
+                    child: const Text('最后一本书')),
+              ];
+              return grid
+                  ? GridView.count(
+                      controller: controller,
+                      padding: padding,
+                      crossAxisCount: 3,
+                      children: children)
+                  : ListView(
+                      controller: controller,
+                      padding: padding,
+                      children: children);
+            });
+          },
+        ));
+        await tester.pumpAndSettle();
+        final viewport = tester.getRect(find.byKey(_viewport));
+        expect(viewport.bottom, 740);
+        await tester.drag(
+            find.byType(grid ? GridView : ListView), const Offset(0, -300));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.byKey(_viewport)), viewport);
+        controller.jumpTo(controller.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        // Reveal the bar while staying at the end of the list.
+        controller.jumpTo(controller.offset - 1);
+        await tester.pumpAndSettle();
+        expect(
+            tester.getRect(find.byKey(_last)).bottom,
+            lessThanOrEqualTo(tester.getRect(find.byKey(_bar)).top -
+                HomeNavigationMetrics.contentGap +
+                1));
+        await tester.tap(find.byKey(_last));
+        expect(taps, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('rail layout has no bottom-bar gap and retains system safe area',
       (tester) async {

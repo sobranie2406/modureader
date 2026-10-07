@@ -56,7 +56,7 @@ userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnCo
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl
 customCSS customCssProfiles customCssDefaultIndices textAlignment bgimgFit aiPanelPosition codeHighlightTheme aiChatDisplayMode
-webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings selectionToolbar bgimg'''
+webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings selectionToolbar bgimg'''
             .split(RegExp(r'\s+')))
       key: 'string',
     'statisticsDashboardTiles': 'stringList',
@@ -203,6 +203,7 @@ webdavInfo syncProtocol remoteLibraryConnection remoteLibraryViewOptions selecti
 
   static bool disablesSync(Map<String, dynamic> values) =>
       values.containsKey('webdavInfo') ||
+      values.containsKey('s3Info') ||
       values.containsKey('syncProtocol') ||
       values.containsKey('autoSync') ||
       values.containsKey('readingTimedSync');

@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -218,6 +219,7 @@ class CssVisualControls extends StatelessWidget {
                         : <FileSystemEntity>[];
                     if (!context.mounted) return;
                     final selected = await showDialog<String>(
+                        animationStyle: AppMotion.style,
                         context: context,
                         builder: (c) => SimpleDialog(
                                 title: Text(ModuStrings.text(context, '选择已导入字体',

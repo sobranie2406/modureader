@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:collection';
 
@@ -284,6 +285,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis)),
                               PopupMenuButton<int>(
+                                popUpAnimationStyle: AppMotion.style,
                                 key: const ValueKey('search-page-zoom'),
                                 tooltip: ModuStrings.text(
                                     context, '网页缩放', 'Page zoom'),
@@ -339,7 +341,9 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                       SizedBox(
                           height: 2,
                           child: _progress < 100 && widget.pageBuilder == null
-                              ? LinearProgressIndicator(value: _progress / 100)
+                              ? EinkStaticIndicator(
+                                  child: LinearProgressIndicator(
+                                      value: _progress / 100))
                               : null),
                       Expanded(
                           child: widget.pageBuilder?.call(context, _uri) ??

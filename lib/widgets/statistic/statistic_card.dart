@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/enums/chart_mode.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/providers/statistic_data.dart';
@@ -136,7 +137,8 @@ class StatisticCard extends ConsumerWidget {
                     xLabels: data.xLabels,
                   ),
                   loading: () => const Center(
-                    child: CircularProgressIndicator(),
+                    child:
+                        EinkStaticIndicator(child: CircularProgressIndicator()),
                   ),
                   error: (error, stack) => Center(
                     child: Text('Error: $error'),
@@ -147,7 +149,7 @@ class StatisticCard extends ConsumerWidget {
           ),
         );
     return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
+      duration: AppMotion.duration(const Duration(milliseconds: 300)),
       curve: Curves.easeOutBack,
       alignment: Alignment.topCenter,
       child: FilledContainer(
@@ -164,7 +166,8 @@ class StatisticCard extends ConsumerWidget {
                   ],
                 ),
             loading: () => const Center(
-                  child: CircularProgressIndicator(),
+                  child:
+                      EinkStaticIndicator(child: CircularProgressIndicator()),
                 ),
             error: (error, stack) => throw error),
       ),

@@ -33,7 +33,7 @@ vectorModelDownloadSource vectorModelConfig''',
       '''translateService translateFrom translateTo fullTextTranslateService
 fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection webTranslationZoomPercent''',
   'webdav':
-      '''webdavInfo syncProtocol autoSync onlySyncWhenWifi syncCompletedToast
+      '''webdavInfo s3Info syncProtocol autoSync onlySyncWhenWifi syncCompletedToast
 readingTimedSync readingSyncMinutes''',
   'remote-library-webdav': 'remoteLibraryConnection remoteLibraryViewOptions',
   'notes': '''quickMarkShowMenu autoMarkSelection annotationType annotationColor

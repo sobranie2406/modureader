@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 import 'package:anx_reader/dao/database.dart';
@@ -188,7 +189,7 @@ class _AnxBackupImportPageState extends ConsumerState<AnxBackupImportPage> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(_fileName!)),
           if (_busy) ...[
-            const LinearProgressIndicator(),
+            const EinkStaticIndicator(child: LinearProgressIndicator()),
             const SizedBox(height: 8),
             Text(_status ?? ModuStrings.text(context, '正在处理…', 'Working…'))
           ],

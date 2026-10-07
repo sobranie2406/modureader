@@ -1,6 +1,8 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'dart:math';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -15,15 +17,13 @@ import 'package:anx_reader/models/tag.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/book_filters.dart';
 import 'package:anx_reader/providers/tags.dart';
-import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/page/search/search_page.dart';
-import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:anx_reader/utils/color/hash_color.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
+import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
 import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
@@ -35,13 +35,11 @@ import 'package:anx_reader/widgets/hint/hint_banner.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/tips/bookshelf_tips.dart';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reorderable_grid_view/widgets/custom_draggable.dart';
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:path/path.dart' as p;
 
 class BookshelfPage extends ConsumerStatefulWidget {
   const BookshelfPage({super.key, this.controller});
@@ -103,46 +101,6 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     super.dispose();
   }
 
-  Future<File> _copyToTempFile({
-    required String sourcePath,
-    required String fileName,
-  }) async {
-    final tempDir = await getAnxTempDir();
-    final targetPath = p.join(tempDir.path, fileName);
-    final targetFile = File(targetPath);
-    if (await targetFile.exists()) {
-      await targetFile.delete();
-    }
-    return File(sourcePath).copy(targetPath);
-  }
-
-  Future<void> _importBook() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-      allowMultiple: true,
-    );
-
-    if (result == null) {
-      return;
-    }
-
-    List<PlatformFile> files = result.files;
-    AnxLog.info('importBook files: ${files.toString()}');
-    List<File> fileList = [];
-    // FilePicker on Windows will return files with original path,
-    // but on Android it will return files with temporary path.
-    // So we need to save the files to the temp directory.
-    if (!AnxPlatform.isAndroid) {
-      fileList = await Future.wait(files.map((file) async {
-        return _copyToTempFile(sourcePath: file.path!, fileName: file.name);
-      }).toList());
-    } else {
-      fileList = files.map((file) => File(file.path!)).toList();
-    }
-
-    importBookList(fileList, context, ref);
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -177,6 +135,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
 
     Future<void> organizeSelectedBooks(bool createNew) async {
       final moved = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         barrierDismissible: false,
         builder: (_) => BookFolderDialog(
@@ -279,6 +238,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         final boxMaxWidth = max(MediaQuery.of(context).size.width * 0.8, 500.0);
 
         await showMenu<int>(
+          popUpAnimationStyle: AppMotion.style,
           color: Colors.transparent,
           shadowColor: Colors.transparent,
           context: context,
@@ -536,8 +496,13 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                           child: GridView(
                             key: _gridViewKey,
                             controller: _scrollController,
-                            padding: EdgeInsets.fromLTRB(20, 12, 20,
-                                12 + MediaQuery.paddingOf(context).bottom),
+                            padding: EdgeInsets.fromLTRB(
+                                20,
+                                12,
+                                20,
+                                12 +
+                                    MediaQuery.paddingOf(context).bottom +
+                                    HomeNavigationClearance.of(context)),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: constraints.maxWidth ~/
@@ -554,7 +519,8 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                   });
                 });
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(
+          child: EinkStaticIndicator(child: CircularProgressIndicator())),
       error: (error, stack) => Center(child: Text(error.toString())),
     );
 
@@ -613,17 +579,11 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         Expanded(
           child: DropTarget(
             onDragDone: (detail) async {
-              List<File> files = [];
-              for (var file in detail.files) {
-                files.add(await _copyToTempFile(
-                  sourcePath: file.path,
-                  fileName: file.name,
-                ));
-              }
-              importBookList(files, context, ref);
               setState(() {
                 _dragging = false;
               });
+              await pickBooksForImport(context, ref,
+                  droppedPaths: detail.files.map((file) => file.path).toList());
             },
             onDragEntered: (detail) {
               setState(() {
@@ -746,14 +706,28 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                   child: Text(ModuStrings.text(context, '选择', 'Select')),
                 ),
               const SyncButton(),
-              IconButton(
+              PopupMenuButton<bool>(
+                popUpAnimationStyle: AppMotion.style,
                 icon: const Icon(Icons.add),
-                onPressed: _importBook,
+                tooltip: ModuStrings.text(context, '导入书籍', 'Import books'),
+                onSelected: (folder) =>
+                    pickBooksForImport(context, ref, folder: folder),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                      value: false,
+                      child: Text(ModuStrings.text(
+                          context, '选择文件（可多选）', 'Select files (multiple)'))),
+                  PopupMenuItem(
+                      value: true,
+                      child: Text(
+                          ModuStrings.text(context, '导入文件夹', 'Import folder'))),
+                ],
               ),
               IconButton(
                   icon: const Icon(Icons.sort),
                   onPressed: () {
                     showMenu(
+                      popUpAnimationStyle: AppMotion.style,
                       context: context,
                       position: RelativeRect.fromLTRB(
                         MediaQuery.of(context).size.width,
@@ -913,7 +887,9 @@ class _KnowledgeQueueBanner extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 5),
-                    LinearProgressIndicator(value: current.progress),
+                    EinkStaticIndicator(
+                        child:
+                            LinearProgressIndicator(value: current.progress)),
                   ],
                 ),
               ),

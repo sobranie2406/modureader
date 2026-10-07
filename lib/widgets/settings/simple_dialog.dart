@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:anx_reader/main.dart';
 
@@ -5,6 +6,7 @@ Future<dynamic> showSimpleDialog(
     String title, Function saveToPrefs, List<Widget> children) {
   final context = navigatorKey.currentContext!;
   return showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(

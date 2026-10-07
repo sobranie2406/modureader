@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'dart:async';
 
@@ -125,7 +126,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+            child: EinkStaticIndicator(child: CircularProgressIndicator())),
         error: (error, stack) {
           return errorHandler(error);
         },
@@ -204,7 +206,9 @@ class _SearchBookResult extends ConsumerWidget {
           return BookItem(book: book);
         },
         itemCount: books.length,
-        physics: const BouncingScrollPhysics(),
+        physics: AppMotion.disabled
+            ? const EinkScrollPhysics()
+            : const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 8),
       ),
     );

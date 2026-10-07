@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -12,6 +13,7 @@ Future<Color?> showRgbColorPicker({
   Color pickedColor = initialColor;
 
   final result = await showDialog<Color>(
+    animationStyle: AppMotion.style,
     context: context,
     builder: (dialogContext) {
       return AlertDialog(

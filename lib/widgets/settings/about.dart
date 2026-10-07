@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
@@ -84,7 +85,7 @@ void _openDeveloperOptionsPage() {
   final BuildContext? navContext = navigatorKey.currentContext;
   if (navContext == null) return;
   Navigator.of(navContext).push(
-    CupertinoPageRoute(
+    MotionCupertinoPageRoute(
       fullscreenDialog: false,
       builder: (context) => const DeveloperOptionsPage(),
     ),
@@ -95,6 +96,7 @@ Future<void> openAboutDialog() async {
   final version = await getAppVersion();
 
   showDialog(
+    animationStyle: AppMotion.style,
     context: navigatorKey.currentContext!,
     builder: (BuildContext context) {
       return AlertDialog(

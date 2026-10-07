@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/chapter_split_presets.dart';
@@ -84,6 +85,7 @@ class _ChapterSplitRulesPageState extends State<ChapterSplitRulesPage> {
 
   Future<void> _onDeleteRule(ChapterSplitRule rule) async {
     final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) => AlertDialog(
         title: Text(L10n.of(context).deleteCustomRule),

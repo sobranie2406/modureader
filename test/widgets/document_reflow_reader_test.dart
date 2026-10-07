@@ -6,6 +6,9 @@ import 'package:anx_reader/service/ocr/document_text_style.dart';
 import 'package:anx_reader/service/ocr/ocr_model_store.dart';
 import 'package:anx_reader/widgets/reading_page/document_reflow_reader.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'pdf_region_preview_test.dart' as fixture;
@@ -34,11 +37,18 @@ class Model extends OcrModelStore {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MemoryStore store;
   late Model model;
   late List<BookNote> notes;
   late List<int> pages;
   late GlobalKey<DocumentReflowReaderState> key;
+  const wordChannel = MethodChannel('com.modu.reader/word_selection');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  tearDown(() {
+    messenger.setMockMethodCallHandler(wordChannel, null);
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
@@ -106,6 +116,165 @@ void main() {
       .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
       .controller!
       .text;
+
+  Offset textPoint(WidgetTester tester, int offset) {
+    final render = tester
+        .state<EditableTextState>(find.byType(EditableText))
+        .renderEditable;
+    final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
+    return render.localToGlobal(caret.center + const Offset(2, 0));
+  }
+
+  testWidgets('macOS mouse drag publishes selection without a secondary click',
+      (tester) async {
+    final selected = <String>[];
+    var wordCalls = 0;
+    messenger.setMockMethodCallHandler(wordChannel, (_) async {
+      wordCalls++;
+      return [0, 5];
+    });
+    await open(tester,
+        ocr: true,
+        recognize: () async => 'Hello reader. Another sentence.',
+        selection: (_, value, context, rect, ids) async {
+          selected.add(value);
+          expect(rect.isFinite, true);
+        });
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.down(textPoint(tester, 1));
+    await mouse.moveTo(textPoint(tester, 10));
+    await tester.pump();
+    await mouse.up();
+    await tester.pumpAndSettle();
+    final controller = tester
+        .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
+        .controller!;
+    expect(controller.selection.isCollapsed, false);
+    expect(selected.last, controller.selection.textInside(controller.text));
+    expect(wordCalls, 0); // A drag keeps its precise user-selected boundaries.
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets(
+      'Android initial OCR long press expands once and preserves handles',
+      (tester) async {
+    var wordCalls = 0;
+    final selected = <String>[];
+    messenger.setMockMethodCallHandler(wordChannel, (_) async {
+      wordCalls++;
+      return [0, 2];
+    });
+    await open(tester,
+        ocr: true,
+        recognize: () async => '中国文化源远流长。\n\n第二段。',
+        selection: (_, value, context, rect, ids) async => selected.add(value));
+    await tester.longPressAt(textPoint(tester, 0));
+    await tester.pumpAndSettle();
+    final editable = tester.state<EditableTextState>(find.byType(EditableText));
+    expect(editable.textEditingValue.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 2));
+    expect(selected.last, '中国');
+    expect(editable.selectionOverlay?.handlesAreVisible, true);
+    expect(wordCalls, 1);
+    editable.userUpdateTextEditingValue(
+        editable.textEditingValue.copyWith(
+            selection: const TextSelection(baseOffset: 1, extentOffset: 5)),
+        SelectionChangedCause.drag);
+    await tester.pumpAndSettle();
+    expect(editable.textEditingValue.selection,
+        const TextSelection(baseOffset: 1, extentOffset: 5));
+    expect(selected.last, '国文化源');
+    expect(wordCalls, 1);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets(
+      'macOS double click uses system word bounds and opens reading menu',
+      (tester) async {
+    final selected = <String>[];
+    var calls = 0;
+    messenger.setMockMethodCallHandler(wordChannel, (_) async {
+      calls++;
+      return [0, 2];
+    });
+    await open(tester,
+        ocr: true,
+        recognize: () async => '中国文化源远流长。',
+        selection: (_, value, context, rect, ids) async => selected.add(value));
+    final point = textPoint(tester, 0);
+    await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(point, kind: PointerDeviceKind.mouse);
+    await tester.pumpAndSettle();
+    expect(selected.last, '中国');
+    expect(calls, 1);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets('page change discards pending word bounds and menu',
+      (tester) async {
+    final pending = Completer<List<int>?>();
+    messenger.setMockMethodCallHandler(wordChannel, (_) => pending.future);
+    var selections = 0;
+    await open(tester,
+        extract: (_) async => '中国文化源远流长。',
+        selection: (_, value, context, rect, ids) async => selections++);
+    await tester.longPressAt(textPoint(tester, 0));
+    await tester.pump(const Duration(milliseconds: 90));
+    await key.currentState!.turnOriginalPage(1);
+    pending.complete([0, 2]);
+    await tester.pumpAndSettle();
+    final editable = tester.state<EditableTextState>(find.byType(EditableText));
+    expect(editable.textEditingValue.selection.isCollapsed, true);
+    expect(selections, 0);
+  });
+
+  testWidgets('macOS press and hold expands OCR text without a double click',
+      (tester) async {
+    final selected = <String>[];
+    messenger.setMockMethodCallHandler(wordChannel, (_) async => [0, 2]);
+    await open(tester,
+        ocr: true,
+        recognize: () async => '中国文化源远流长。',
+        selection: (_, value, context, rect, ids) async => selected.add(value));
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.down(textPoint(tester, 0));
+    await tester.pump(kLongPressTimeout);
+    await tester.pump(const Duration(milliseconds: 90));
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(selected.last, '中国');
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+
+  testWidgets(
+      'OCR uses ordinary reader paragraph preference only on initial selection',
+      (tester) async {
+    Prefs().longPressSelectParagraph = true;
+    await open(tester, extract: (_) async => '中国文化源远流长。\n\n第二段。');
+    await tester.longPressAt(textPoint(tester, 2));
+    await tester.pumpAndSettle();
+    final editable = tester.state<EditableTextState>(find.byType(EditableText));
+    expect(
+        editable.textEditingValue.selection
+            .textInside(editable.textEditingValue.text),
+        '中国文化源远流长。');
+    expect(editable.selectionOverlay?.handlesAreVisible, true);
+  });
+
+  testWidgets('late word lookup cannot overwrite a manually adjusted selection',
+      (tester) async {
+    final pending = Completer<List<int>?>();
+    messenger.setMockMethodCallHandler(wordChannel, (_) => pending.future);
+    await open(tester, extract: (_) async => '中国文化源远流长。');
+    await tester.longPressAt(textPoint(tester, 0));
+    await tester.pump(const Duration(milliseconds: 90));
+    final editable = tester.state<EditableTextState>(find.byType(EditableText));
+    editable.userUpdateTextEditingValue(
+        editable.textEditingValue.copyWith(
+            selection: const TextSelection(baseOffset: 1, extentOffset: 5)),
+        SelectionChangedCause.drag);
+    pending.complete([0, 2]);
+    await tester.pumpAndSettle();
+    expect(editable.textEditingValue.selection,
+        const TextSelection(baseOffset: 1, extentOffset: 5));
+  });
   testWidgets(
       'cropped whole-page bounds feed text and OCR and invalidate cached output',
       (tester) async {

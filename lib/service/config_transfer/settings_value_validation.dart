@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/service/sync/s3_config.dart';
 import 'package:anx_reader/service/ai/reading_skill_layout.dart';
 import 'package:anx_reader/models/ai_provider.dart';
 import 'package:anx_reader/models/chapter_split_rule.dart';
@@ -26,14 +27,19 @@ void validateSettingsValue(String key, dynamic value) {
   }
 
   const choices = {
-    'syncProtocol': ['webdav'],
+    'syncProtocol': ['webdav', 's3'],
     'pageTurnStyle': ['noAnimation', 'slide', 'scroll'],
     'pageTurnMode': ['simple', 'custom'],
     'themeMode': ['system', 'light', 'dark'],
     'vectorModelMode': ['builtin', 'remote'],
     'vectorModelDownloadSource': ['huggingFace', 'gitee'],
     'ocrModelDownloadSource': ['upstream', 'gitee'],
-    'ocrModelId': ['ppocr-v4-mobile-1', 'ppocr-v5-mobile-1', 'ppocr-v3-mobile-1', 'ppocr-v3-english-mobile-1'],
+    'ocrModelId': [
+      'ppocr-v4-mobile-1',
+      'ppocr-v5-mobile-1',
+      'ppocr-v3-mobile-1',
+      'ppocr-v3-english-mobile-1'
+    ],
   };
   if (choices.containsKey(key) && !choices[key]!.contains(value)) {
     throw const FormatException('Unknown setting choice');
@@ -145,6 +151,7 @@ void validateSettingsValue(String key, dynamic value) {
       }
     }
   }
+  if (key == 's3Info') S3Config(object());
   if (key == 'vectorModelConfig' || key.startsWith('translateServiceConfig_'))
     object();
   if (key == 'remoteLibraryViewOptions') {

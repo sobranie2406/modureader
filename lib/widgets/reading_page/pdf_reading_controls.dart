@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/pdf_reading_view.dart';
 import 'package:anx_reader/widgets/reading_page/document_enhancement_panel.dart';
@@ -111,6 +112,7 @@ class _PdfReadingControlsState extends State<PdfReadingControls> {
     Future<void> enhance() async {
       if (_busy || widget.preview == null) return;
       final result = await showDialog<DocumentEnhancement>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) => DocumentEnhancementPanel(
           bottomPanel: true,

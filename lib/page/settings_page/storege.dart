@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:math';
 
@@ -180,6 +181,7 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
       return ElevatedButton(
         onPressed: () async {
           final confirmed = await showDialog<bool>(
+              animationStyle: AppMotion.style,
               context: context,
               builder: (context) => AlertDialog(
                     title:
@@ -374,11 +376,12 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Column(
                         children: [
-                          LinearProgressIndicator(
+                          EinkStaticIndicator(
+                              child: LinearProgressIndicator(
                             value: _migrationTotal > 0
                                 ? _migrationProgress / _migrationTotal
                                 : null,
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           Text(
                             _migrationCurrentItem.isNotEmpty

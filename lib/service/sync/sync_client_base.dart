@@ -8,6 +8,11 @@ class MissingSyncValidatorException extends UnsupportedError {
 }
 
 abstract class SyncClientBase {
+  /// Non-secret destination identity for pending batches and maintenance state.
+  /// Preserve the legacy WebDAV identity; object stores also need bucket/root.
+  List<Object?> get syncIdentity =>
+      [protocolName, config['url'], config['username']];
+
   /// Verify conditional writes on an isolated disposable object, never on the
   /// user's database. Unknown backends must use immutable record transport.
   Future<bool> supportsAtomicSyncWrites() async => false;

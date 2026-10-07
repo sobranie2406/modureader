@@ -1,6 +1,9 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:anx_reader/widgets/page_router/reading_route.dart';
+import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/theme.dart';
@@ -72,6 +75,7 @@ void _checkDuplicatesAndShowDialog(
     BuildContext context,
     WidgetRef ref) async {
   showDialog(
+    animationStyle: AppMotion.style,
     context: context,
     barrierDismissible: false,
     builder: (context) => AlertDialog(
@@ -79,7 +83,7 @@ void _checkDuplicatesAndShowDialog(
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(),
+          const EinkStaticIndicator(child: CircularProgressIndicator()),
           const SizedBox(height: 16),
           Text(L10n.of(context).md5Calculating),
         ],
@@ -179,6 +183,7 @@ void _showImportDialog(
                 constraints: const BoxConstraints(),
                 onPressed: () {
                   showDialog(
+                    animationStyle: AppMotion.style,
                     context: context,
                     builder: (context) => AlertDialog(
                       title: Text(L10n.of(context).commonError),
@@ -225,6 +230,7 @@ void _showImportDialog(
   bool skipDuplicates = true;
 
   showDialog(
+      animationStyle: AppMotion.style,
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
@@ -260,7 +266,8 @@ void _showImportDialog(
                                   padding: const EdgeInsets.all(3),
                                   width: 20,
                                   height: 20,
-                                  child: const CircularProgressIndicator(),
+                                  child: const EinkStaticIndicator(
+                                      child: CircularProgressIndicator()),
                                 ))
                             : bookItem(
                                 file.path,
@@ -306,7 +313,8 @@ void _showImportDialog(
                                     padding: const EdgeInsets.all(3),
                                     width: 20,
                                     height: 20,
-                                    child: const CircularProgressIndicator(),
+                                    child: const EinkStaticIndicator(
+                                        child: CircularProgressIndicator()),
                                   ),
                                   isDuplicate: true,
                                   duplicateTitle:
@@ -502,6 +510,8 @@ Future<void> pushToReadingPage(
     navigatorKey.currentContext!,
     readingRoute<void>(
       animate: Prefs().openBookAnimation,
+      deferReaderUntilTransition: AnxPlatform.isAndroid,
+      openingPlaceholder: SizedBox.expand(child: BookCover(book: book)),
       builder: (c) => ReadingPage(
         key: readingPageKey,
         book: book,

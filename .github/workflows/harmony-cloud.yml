@@ -1,0 +1,186 @@
+name: HarmonyOS cloud (unsigned)
+
+on:
+  workflow_call:
+    inputs:
+      build_hap:
+        type: boolean
+        default: true
+    secrets:
+      HARMONY_LINUX_TOOLS_URL:
+        required: true
+  push:
+    branches: ['codex/harmony-cloud']
+  workflow_dispatch:
+    inputs:
+      build_hap:
+        description: 'Attempt unsigned HAP after readiness checks; false runs dependency audit only'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harmony-cloud-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harmony:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select ephemeral runner directories
+        shell: bash
+        run: |
+          echo "PUB_CACHE=$RUNNER_TEMP/harmony-pub-cache" >> "$GITHUB_ENV"
+          echo "MODU_OHOS_FLUTTER=$RUNNER_TEMP/flutter-ohos" >> "$GITHUB_ENV"
+          # Some upstream examples reference unavailable LFS blobs. Do not
+          # disable LFS globally: runtime/plugin files still have to download.
+          echo 'GIT_CONFIG_COUNT=1' >> "$GITHUB_ENV"
+          echo 'GIT_CONFIG_KEY_0=lfs.fetchexclude' >> "$GITHUB_ENV"
+          echo 'GIT_CONFIG_VALUE_0=**/example/**,**/examples/**' >> "$GITHUB_ENV"
+      - name: Prepare Harmony-only dependency overlay
+        shell: bash
+        run: |
+          python3 -m pip install --user PyYAML==6.0.3
+          python3 scripts/harmony/prepare.py
+      - name: Restore open-source Flutter and Pub cache (no Huawei SDK)
+        id: source-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: harmony-linux-x64-sources-v1-62357a93-${{ hashFiles('scripts/harmony/*overrides.json') }}
+          path: |
+            ${{ env.MODU_OHOS_FLUTTER }}
+            ${{ env.PUB_CACHE }}
+      - name: Install pinned, isolated Flutter OH
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d "$MODU_OHOS_FLUTTER" ]]; then
+            git clone --depth 1 --single-branch --branch '3.41.9+ohos-1.0.2' \
+              https://gitcode.com/CPF-Flutter/flutter_flutter.git "$MODU_OHOS_FLUTTER"
+          fi
+          test "$(git -C "$MODU_OHOS_FLUTTER" rev-parse HEAD)" = 62357a93d653bf844f730bb1f4b7cc9e2139d14e
+          echo "$MODU_OHOS_FLUTTER/bin" >> "$GITHUB_PATH"
+          "$MODU_OHOS_FLUTTER/bin/flutter" --version
+          "$MODU_OHOS_FLUTTER/bin/flutter" precache --ohos --no-android --no-ios --no-web --no-linux --no-windows --no-macos
+      - name: Resolve dependencies with Harmony Dart before native SDK setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/harmony-diagnostics
+          # Flutter pub also generates OHOS plugin metadata and requires a
+          # native SDK. Do only Dart dependency resolution in this preflight.
+          export FLUTTER_ROOT="$MODU_OHOS_FLUTTER"
+          "$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart" pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
+      - name: Save verified open-source dependency cache before native compilation
+        if: steps.source-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: harmony-linux-x64-sources-v1-62357a93-${{ hashFiles('scripts/harmony/*overrides.json') }}
+          path: |
+            ${{ env.MODU_OHOS_FLUTTER }}
+            ${{ env.PUB_CACHE }}
+      - name: Validate native hook protocol with fixture tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HARMONY_NATIVE_TEST_DART="$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart"
+          python3 -B -m unittest discover -s test -p harmony_native_test.py -v 2>&1 | tee build/harmony-diagnostics/native-hook-tests.log
+      - name: Set up Java for cloud build only
+        if: github.event_name == 'push' || inputs.build_hap
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install verified Huawei command-line tools on runner only
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        env:
+          HARMONY_TOOLS_URL: ${{ secrets.HARMONY_LINUX_TOOLS_URL }}
+          HARMONY_TOOLS_SHA256: ${{ vars.HARMONY_LINUX_TOOLS_SHA256 }}
+          HARMONY_TOOLS_LICENSE_ACCEPTED: ${{ vars.HARMONY_TOOLS_LICENSE_ACCEPTED }}
+        run: bash scripts/harmony/cloud-tools.sh
+      - name: Generate Flutter plugin metadata after native SDK setup
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee build/harmony-diagnostics/flutter-dependencies.log
+          test -f ohos/node_modules/flutter-hvigor-plugin/package.json
+      - name: Prepare OHOS native-library cross compiler on runner only
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --target aarch64-unknown-linux-ohos
+          echo 'RUSTUP_TOOLCHAIN=1.94.0' >> "$GITHUB_ENV"
+          chmod +x scripts/harmony/ohos-clang.sh
+          echo "MODU_OHOS_CLANG=$GITHUB_WORKSPACE/scripts/harmony/ohos-clang.sh" >> "$GITHUB_ENV"
+      - name: Audit required adapters and profiles (fail on missing support)
+        shell: bash
+        env:
+          MODU_HARMONY_BUILD_HAP: ${{ github.event_name == 'push' || inputs.build_hap }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "$MODU_HARMONY_BUILD_HAP" != true ]]; then args+=(--dependencies-only); fi
+          dart run scripts/dev/check_harmony.dart "${args[@]}" 2>&1 | tee build/harmony-diagnostics/readiness.log
+      - name: Backport WebView APIs inside the isolated OHOS adapter copies
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harmony/patch_webview.py 2>&1 | tee build/harmony-diagnostics/webview.log
+      - name: Adapt audited UI packages to the native OHOS platform
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harmony/patch_ui.py 2>&1 | tee build/harmony-diagnostics/ui-adapters.log
+          python3 scripts/harmony/patch_app.py 2>&1 | tee build/harmony-diagnostics/app-adapters.log
+      - name: Build unsigned HAP
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never consume developer signing profiles or credentials in this job.
+          if grep -Eq '"signingConfig"[[:space:]]*:' ohos/build-profile.json5; then
+            echo 'Remove signingConfig from the cloud build profile; signing is local only.' >&2
+            exit 1
+          fi
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          # Host Dart code generation must finish before selecting OHOS native
+          # hook parameters, otherwise its x64 host build would target arm64.
+          python3 scripts/harmony/configure_native.py --root "$GITHUB_WORKSPACE"
+          flutter build hap --release --no-codesign --no-pub --target-platform ohos-arm64 2>&1 | tee build/harmony-diagnostics/build.log
+          python3 scripts/harmony/collect_unsigned.py --release
+      - name: Upload verified release HAP and checksum
+        if: success() && (github.event_name == 'push' || inputs.build_hap)
+        uses: actions/upload-artifact@v4
+        with:
+          name: modu-harmony-arm64
+          path: dist-release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload unsigned package only (not a Release)
+        if: success() && (github.event_name == 'push' || inputs.build_hap)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-unsigned-${{ github.sha }}
+          path: build/harmony-unsigned/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload diagnostic logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-diagnostics-${{ github.run_id }}
+          path: build/harmony-diagnostics/*.log
+          if-no-files-found: ignore
+          retention-days: 7

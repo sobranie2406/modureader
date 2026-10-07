@@ -20,6 +20,12 @@ It is not affiliated with, endorsed by, or an official release of either upstrea
 
 Ported files retain source attribution and GPL-3.0 compatibility. Upstream updates are reviewed and merged explicitly.
 
+### Object storage synchronization references
+
+- ReadAny reference commit `40d4a8d6131394e139e073d04a72d955611ff065`: `packages/core/src/sync/s3-backend.ts`, `s3-paths.ts` and the Expo `S3Form.tsx` informed transport boundaries and connection fields. Modu implements its own Dart HTTP transport and uses its existing record merge engine rather than adopting ReadAny's cloud database format.
+- Readest reference commit `4c3ccfe85d4afd81e674b67d6a0627d83ba0744d`: `apps/readest-app/src/components/settings/integrations/S3Form.tsx` informed the settings interaction. Repository: https://github.com/readest/readest. No Readest source code is copied into this implementation.
+- Signature regression values are checked against AWS `@smithy/signature-v4` and the published S3 V2 signing example. No AWS JavaScript SDK is bundled in Modu.
+
 ## Modifications (2026)
 
 Modu branding and application identifiers; AI reading skills and per-model parameters;

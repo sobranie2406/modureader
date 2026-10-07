@@ -64,8 +64,7 @@ class ReplacedBookFiles {
   final SyncClientBase client;
   final Directory cache, durableDirectory;
 
-  String get _endpoint => jsonEncode(
-      [client.protocolName, client.config['url'], client.config['username']]);
+  String get _endpoint => jsonEncode(client.syncIdentity);
 
   Future<int> reclaim() async {
     final endpoint = _endpoint;

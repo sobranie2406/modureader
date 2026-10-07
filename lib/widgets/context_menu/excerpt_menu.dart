@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book_note.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -156,8 +157,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
           existingNote?.bookId ?? epubPlayerKey.currentState!.widget.book.id,
       content: resolvedContent,
       cfi: existingNote?.cfi ?? widget.annoCfi,
-      chapter:
-          existingNote?.chapter ?? epubPlayerKey.currentState!.selectionChapterTitle,
+      chapter: existingNote?.chapter ??
+          epubPlayerKey.currentState!.selectionChapterTitle,
       type: resolvedType,
       color: resolvedColor,
       readerNote: existingNote?.readerNote,
@@ -236,6 +237,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         return;
       }
       final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => PointerInterceptor(
             child: AlertDialog(

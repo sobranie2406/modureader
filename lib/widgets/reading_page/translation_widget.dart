@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
@@ -63,6 +64,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
 
   Future<void> _showServicePicker() async {
     final selected = await showModalBottomSheet<TranslateService>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -102,6 +104,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
         .where((language) => language != LangListEnum.auto)
         .toList(growable: false);
     final selected = await showModalBottomSheet<LangListEnum>(
+      sheetAnimationStyle: AppMotion.style,
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -315,7 +318,8 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   : const Icon(Icons.translate),
               label: Text(

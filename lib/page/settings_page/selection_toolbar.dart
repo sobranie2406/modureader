@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
@@ -84,7 +85,9 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
   Future<void> _edit(
       [SelectionToolbarItem? item, bool annotations = false]) async {
     final result = await showDialog<_ToolbarEditResult>(
-        context: context, builder: (_) => _ToolbarItemEditor(item: item));
+        animationStyle: AppMotion.style,
+        context: context,
+        builder: (_) => _ToolbarItemEditor(item: item));
     if (result == null || !mounted) return;
     final config = Prefs().selectionToolbar;
     final updated = item == null
@@ -101,6 +104,7 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
 
   Future<void> _delete(SelectionToolbarItem item) async {
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
                 title: Text(t('删除“${item.name}”？', 'Delete “${item.name}”?')),
@@ -120,6 +124,7 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
 
   Future<void> _restore() async {
     final confirmed = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (context) => AlertDialog(
                 title: Text(ModuStrings.text(
@@ -231,6 +236,7 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                                       annotations)),
                           if (item.isCustom)
                             PopupMenuButton<String>(
+                                popUpAnimationStyle: AppMotion.style,
                                 tooltip:
                                     ModuStrings.text(context, '更多', 'More'),
                                 enabled: !_busy,

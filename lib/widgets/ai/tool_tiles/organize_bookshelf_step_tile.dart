@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:convert';
 
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -182,12 +183,13 @@ class _OrganizeBookshelfStepTileState
                   ? SizedBox(
                       height: 16,
                       width: 16,
-                      child: CircularProgressIndicator(
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
                           theme.colorScheme.onPrimary,
                         ),
-                      ),
+                      )),
                     )
                   : Text(
                       _applied

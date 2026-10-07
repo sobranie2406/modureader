@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:flutter/material.dart';
 
 enum AnxButtonType { filled, outlined, text }
@@ -99,12 +100,13 @@ class AnxButton extends StatelessWidget {
       buttonContent = SizedBox(
         width: 24,
         height: 24,
-        child: CircularProgressIndicator(
+        child: EinkStaticIndicator(
+            child: CircularProgressIndicator(
           strokeWidth: 2.0,
           color: type == AnxButtonType.filled
               ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.primary,
-        ),
+        )),
       );
       // When loading, if it's an icon button or has child, we essentially want to replace content with spinner
       // leveraging the button structure.
@@ -161,12 +163,13 @@ class AnxButton extends StatelessWidget {
           ? SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(
+              child: EinkStaticIndicator(
+                  child: CircularProgressIndicator(
                 strokeWidth: 2.0,
                 color: type == AnxButtonType.filled
                     ? Theme.of(context).colorScheme.onPrimary
                     : Theme.of(context).colorScheme.primary,
-              ),
+              )),
             )
           : icon!;
 
@@ -219,11 +222,12 @@ class AnxButton extends StatelessWidget {
           child: SizedBox(
         height: 20,
         width: 20,
-        child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: type == AnxButtonType.filled
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.primary),
+        child: EinkStaticIndicator(
+            child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: type == AnxButtonType.filled
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.primary)),
       ));
     }
 

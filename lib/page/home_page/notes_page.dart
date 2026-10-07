@@ -1,4 +1,6 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/page/book_notes_page.dart';
 import 'package:anx_reader/providers/notes_page_current_book.dart';
@@ -98,7 +100,8 @@ class _NotesPageState extends ConsumerState<NotesPage> {
           ),
         );
       },
-      loading: () => const CircularProgressIndicator(),
+      loading: () =>
+          const EinkStaticIndicator(child: CircularProgressIndicator()),
       error: (error, stack) => Text('Error: $error'),
     );
   }
@@ -113,7 +116,9 @@ class _NotesPageState extends ConsumerState<NotesPage> {
             : Expanded(
                 child: ListView.builder(
                     padding: EdgeInsets.only(
-                        bottom: 12 + MediaQuery.paddingOf(context).bottom),
+                        bottom: 12 +
+                            MediaQuery.paddingOf(context).bottom +
+                            HomeNavigationClearance.of(context)),
                     controller: _scrollController,
                     itemCount: data.length,
                     itemBuilder: (context, index) {
@@ -126,7 +131,8 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                     }),
               );
       },
-      loading: () => const CircularProgressIndicator(),
+      loading: () =>
+          const EinkStaticIndicator(child: CircularProgressIndicator()),
       error: (error, stack) => Text('Error: $error'),
     );
   }
@@ -247,7 +253,8 @@ class NotesDetail extends ConsumerWidget {
                 book: current.book,
                 numberOfNotes: current.numberOfNotes);
           },
-          loading: () => const CircularProgressIndicator(),
+          loading: () =>
+              const EinkStaticIndicator(child: CircularProgressIndicator()),
           error: (error, stack) => NotesTips(),
         );
   }

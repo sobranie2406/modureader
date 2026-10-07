@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "模块描述"
+      "value": "默读阅读器"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "使用默读阅读书籍"
     },
     {
       "name": "EntryAbility_label",

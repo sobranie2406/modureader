@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
@@ -107,6 +108,7 @@ class ConfigTransferTile extends AbstractSettingsTile {
     if (!context.mounted) return;
 
     await showDialog<void>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(_text(context, '导出 $label', 'Export $label')),
@@ -220,6 +222,7 @@ class ConfigTransferTile extends AbstractSettingsTile {
 
   Future<void> _showImport(BuildContext context) async {
     final imported = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (_) => _ConfigImportDialog(
         kind: kind,
@@ -380,7 +383,8 @@ class _ConfigImportDialogState extends State<_ConfigImportDialog> {
                   icon: _readingQr
                       ? const SizedBox.square(
                           dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: EinkStaticIndicator(
+                              child: CircularProgressIndicator(strokeWidth: 2)),
                         )
                       : const Icon(Icons.image_search),
                   label: Text(

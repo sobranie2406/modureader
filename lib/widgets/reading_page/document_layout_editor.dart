@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -487,7 +488,9 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
           ])));
 
   Widget _canvas() => LayoutBuilder(builder: (context, constraints) {
-        if (_busy) return const Center(child: CircularProgressIndicator());
+        if (_busy)
+          return const Center(
+              child: EinkStaticIndicator(child: CircularProgressIndicator()));
         if (_failed || _image == null) {
           return Center(
               child: TextButton(

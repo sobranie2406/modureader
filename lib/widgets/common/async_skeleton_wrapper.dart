@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,8 +55,9 @@ class AsyncSkeletonWrapper<T> extends StatelessWidget {
     return asyncValue.when(
       data: (data) => builder(data, true),
       loading: () {
-        if (!enabled) {
-          return const Center(child: CircularProgressIndicator());
+        if (!enabled || MediaQuery.disableAnimationsOf(context)) {
+          return const Center(
+              child: EinkStaticIndicator(child: CircularProgressIndicator()));
         }
 
         // Use custom skeleton if provided
@@ -75,7 +77,8 @@ class AsyncSkeletonWrapper<T> extends StatelessWidget {
           );
         } catch (e) {
           // Fallback to circular progress if mock generation fails
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: EinkStaticIndicator(child: CircularProgressIndicator()));
         }
       },
       error: (error, stackTrace) {

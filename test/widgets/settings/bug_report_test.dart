@@ -73,6 +73,17 @@ Future<void> selectType(WidgetTester tester, FeedbackType type) async {
   final chip = find.byKey(ValueKey('feedback-type-${type.name}'));
   await tester.ensureVisible(chip);
   await tester.pumpAndSettle();
+  // NestedScrollView's outer navigation header can leave the chip below the
+  // viewport after ensureVisible. Exercise the same scroll gesture as a user,
+  // including locales whose community labels wrap onto additional lines.
+  for (var attempt = 0;
+      attempt < 8 && chip.hitTestable().evaluate().isEmpty;
+      attempt++) {
+    await tester.drag(find.byType(SingleChildScrollView).last,
+        const Offset(0, -200));
+    await tester.pumpAndSettle();
+  }
+  expect(chip.hitTestable(), findsOneWidget);
   await tester.tap(chip);
   await tester.pumpAndSettle();
 }

@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,7 @@ class PageZoomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<int>(
+        popUpAnimationStyle: AppMotion.style,
         tooltip: ModuStrings.text(context, '网页缩放', 'Page zoom'),
         initialValue: percent,
         onSelected: onChanged,

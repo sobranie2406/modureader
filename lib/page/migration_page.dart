@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/get_path/macos_migration.dart';
 import 'package:flutter/material.dart';
@@ -123,9 +124,10 @@ class _MigrationPageState extends State<MigrationPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                LinearProgressIndicator(
+                EinkStaticIndicator(
+                    child: LinearProgressIndicator(
                   value: _total > 0 ? _progress / _total : null,
-                ),
+                )),
                 const SizedBox(height: 16),
                 Text(
                   _currentItem.isNotEmpty

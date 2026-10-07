@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book.dart';
@@ -74,7 +75,7 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
               title: Text(L10n.of(context).chapterSplitting),
               onPressed: (_) {
                 Navigator.of(context).push(
-                  CupertinoPageRoute(
+                  MotionCupertinoPageRoute(
                     builder: (context) => const ChapterSplitRulesPage(),
                   ),
                 );
@@ -151,7 +152,8 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
                   children: [
                     Text(L10n.of(context).md5Calculating),
                     const SizedBox(height: 8),
-                    LinearProgressIndicator(value: _progress),
+                    EinkStaticIndicator(
+                        child: LinearProgressIndicator(value: _progress)),
                     const SizedBox(height: 4),
                     Text(
                       '${(_progress * 100).toStringAsFixed(1)}% - $_currentFile',
@@ -251,6 +253,7 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
     }
 
     final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (context) => AlertDialog(
         title: Text(L10n.of(context).md5CalculateConfirmTitle),
@@ -327,6 +330,7 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
 
       if (context.mounted) {
         showDialog(
+          animationStyle: AppMotion.style,
           context: context,
           builder: (context) => AlertDialog(
             title: Text(L10n.of(context).md5CalculationComplete),
@@ -377,6 +381,7 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
 
   Future<void> _showHttpProxyDialog(BuildContext context) async {
     await showDialog<void>(
+      animationStyle: AppMotion.style,
       context: context,
       builder: (dialogContext) {
         return _HttpProxyDialog(
@@ -581,7 +586,7 @@ Future<void> _showOnboarding(BuildContext context) async {
 void onLogPressed(BuildContext context) {
   Navigator.push(
     context,
-    CupertinoPageRoute(
+    MotionCupertinoPageRoute(
       builder: (context) => const LogPage(),
     ),
   );

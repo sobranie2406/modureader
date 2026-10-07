@@ -1,9 +1,9 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:ui';
 
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:heroine/heroine.dart';
 
 class DashboardTileDetailView extends ConsumerStatefulWidget {
   const DashboardTileDetailView({
@@ -88,7 +88,7 @@ class _DashboardTileDetailViewState
         GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: AppMotion.duration(const Duration(milliseconds: 200)),
             decoration: BoxDecoration(
               color: Colors.black.withValues(
                   alpha: 0.4 * (widget.animationValue * _blurSigma / 10.0)),
@@ -107,8 +107,9 @@ class _DashboardTileDetailViewState
 
         // Draggable card
         AnimatedPositioned(
-          duration:
-              _isDragging ? Duration.zero : const Duration(milliseconds: 300),
+          duration: _isDragging
+              ? Duration.zero
+              : AppMotion.duration(const Duration(milliseconds: 300)),
           curve: Curves.elasticOut,
           left: MediaQuery.of(context).size.width / 2 -
               widget.tile.flipSize(context).width / 2 +
@@ -120,7 +121,7 @@ class _DashboardTileDetailViewState
             onPanStart: _handleDragStart,
             onPanUpdate: _handleDragUpdate,
             onPanEnd: _handleDragEnd,
-            child: Heroine(
+            child: MotionHeroine(
               tag: widget.heroTag,
               child: widget.tile.buildFlipSide(context, ref),
             ),

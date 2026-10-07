@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
@@ -94,8 +95,9 @@ class _BookFolderDialogState extends ConsumerState<BookFolderDialog> {
                 )
               else
                 groups!.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
+                  loading: () => const Center(
+                      child: EinkStaticIndicator(
+                          child: CircularProgressIndicator())),
                   error: (_, __) => TextButton(
                       onPressed: () => ref.invalidate(groupDaoProvider),
                       child: Text(ModuStrings.text(context, '文件夹加载失败，点击重试',
@@ -125,7 +127,8 @@ class _BookFolderDialogState extends ConsumerState<BookFolderDialog> {
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
-              if (_saving) const LinearProgressIndicator(),
+              if (_saving)
+                const EinkStaticIndicator(child: LinearProgressIndicator()),
             ],
           )),
         ),

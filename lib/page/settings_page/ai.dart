@@ -87,7 +87,7 @@ class _AISettingsState extends ConsumerState<AISettings> {
           //   onPressed: (context) {
           //     Navigator.push(
           //       context,
-          //       CupertinoPageRoute(
+          //       MotionCupertinoPageRoute(
           //         builder: (context) => const AiChatPage(),
           //       ),
           //     );

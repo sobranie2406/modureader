@@ -46,9 +46,12 @@ void main(List<String> args) async {
     final arch = input.config.code.targetArchitecture;
     final crateDir = input.packageRoot.resolve('native/tokenizers_ffi/');
     final localName = _localLibraryName(os);
+    final ohos = _ohosParameters(input, os, arch);
 
     Uri? library;
-    if (os == OS.android || os == OS.iOS) {
+    if (ohos != null) {
+      library = await _ohosBuild(input, crateDir, ohos);
+    } else if (os == OS.android || os == OS.iOS) {
       library = await _mobileBuild(input, crateDir, os, arch);
     }
     var downloadFailed = false;
@@ -90,7 +93,184 @@ void main(List<String> args) async {
       crateDir.resolve('src/lib.rs'),
       crateDir.resolve('Cargo.toml'),
     ]);
+    if (ohos != null) {
+      output.dependencies.addAll([
+        crateDir.resolve('Cargo.lock'),
+        Uri.file(ohos['clang_wrapper']!),
+        Uri.file(ohos['cargo']!),
+        for (final tool in ['clang', 'llvm-ar', 'llvm-readelf'])
+          Uri.file('${ohos['sdk_root']!}/native/llvm/bin/$tool'),
+      ]);
+    }
   });
+}
+
+const _ohosKeys = {
+  'target_os',
+  'target_architecture',
+  'rust_target',
+  'sdk_root',
+  'clang_wrapper',
+  'cargo',
+  'cargo_home',
+  'rustup_home',
+  'rustup_toolchain',
+};
+
+/// Flutter OH 3.41.9 reports Linux to hooks. Only an explicit per-package
+/// user-define may select OHOS; ordinary Linux builds retain their old path.
+Map<String, String>? _ohosParameters(
+  BuildInput input,
+  OS os,
+  Architecture arch,
+) {
+  // Enumerate the protocol map only to reject unknown/misspelled keys;
+  // all parameter values are read through the public userDefines API.
+  final sources = input.json['user_defines'];
+  final source = sources is Map ? sources['workspace_pubspec'] : null;
+  final defines = source is Map ? source['defines'] : null;
+  final target = input.userDefines['target_os'];
+  if (target == null &&
+      os.name != 'ohos' &&
+      (defines == null || (defines is Map && defines.isEmpty))) {
+    return null;
+  }
+  if (target != 'ohos' ||
+      (os.name != 'linux' && os.name != 'ohos') ||
+      arch != Architecture.arm64) {
+    throw StateError('Invalid explicit OHOS target: $target / $os / $arch');
+  }
+  if (defines is! Map || defines.keys.any((key) => !_ohosKeys.contains(key))) {
+    throw StateError('Unknown OHOS user-defines');
+  }
+  final values = <String, String>{};
+  for (final key in _ohosKeys) {
+    final value = input.userDefines[key];
+    if (value is! String ||
+        value.isEmpty ||
+        value.trim() != value ||
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(value)) {
+      throw StateError('Invalid OHOS user-define: $key');
+    }
+    values[key] = value;
+  }
+  if (values['target_architecture'] != 'arm64' ||
+      values['rust_target'] != 'aarch64-unknown-linux-ohos' ||
+      !RegExp(r'^\d+\.\d+\.\d+$').hasMatch(values['rustup_toolchain']!)) {
+    throw StateError(
+      'OHOS requires arm64, the OHOS Rust target and a pinned Rust version',
+    );
+  }
+  for (final key in ['sdk_root', 'cargo_home', 'rustup_home']) {
+    final path = values[key]!;
+    if (!path.startsWith('/') || !Directory(path).existsSync()) {
+      throw StateError('Missing absolute OHOS directory: $key');
+    }
+  }
+  final sdk = values['sdk_root']!;
+  if (!Directory('$sdk/native/sysroot').existsSync()) {
+    throw StateError('Missing OHOS native sysroot');
+  }
+  for (final path in [
+    values['clang_wrapper']!,
+    values['cargo']!,
+    '$sdk/native/llvm/bin/clang',
+    '$sdk/native/llvm/bin/llvm-ar',
+    '$sdk/native/llvm/bin/llvm-readelf',
+  ]) {
+    if (!path.startsWith('/') ||
+        !File(path).existsSync() ||
+        (File(path).statSync().mode & 0x49) == 0) {
+      throw StateError('Missing executable OHOS tool: $path');
+    }
+  }
+  return values;
+}
+
+/// OHOS uses its own musl ABI; never fall back to Android/Linux host binaries.
+Future<Uri> _ohosBuild(
+  BuildInput input,
+  Uri crateDir,
+  Map<String, String> config,
+) async {
+  final sdk = config['sdk_root']!;
+  final linker = config['clang_wrapper']!;
+  final triple = config['rust_target']!;
+  final targetDir = input.outputDirectory.resolve('cargo-ohos/').toFilePath();
+  final env = _envWithCargoBin()
+    ..['OHOS_SDK_HOME'] = sdk
+    ..['MODU_OHOS_CLANG'] = linker
+    ..['CARGO_HOME'] = config['cargo_home']!
+    ..['RUSTUP_HOME'] = config['rustup_home']!
+    ..['RUSTUP_TOOLCHAIN'] = config['rustup_toolchain']!
+    ..['PATH'] = '${config['cargo_home']!}/bin:${Platform.environment['PATH'] ?? ''}'
+    ..['CARGO_TARGET_DIR'] = targetDir
+    ..['CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER'] = linker
+    ..['CC_aarch64_unknown_linux_ohos'] = linker
+    ..['AR_aarch64_unknown_linux_ohos'] = '$sdk/native/llvm/bin/llvm-ar';
+  final result = await Process.run(
+    config['cargo']!,
+    ['build', '--release', '--locked', '--target', triple],
+    workingDirectory: crateDir.toFilePath(),
+    environment: env,
+    includeParentEnvironment: false,
+  );
+  if (result.exitCode != 0) {
+    throw StateError('OHOS tokenizer build failed: ${result.stderr}');
+  }
+  final library = File('$targetDir/$triple/release/libtokenizers_ffi.so');
+  if (!await library.exists()) {
+    throw StateError('OHOS tokenizer output missing');
+  }
+  {
+    final bytes = await library
+        .openRead(0, 20)
+        .fold<List<int>>(<int>[], (result, chunk) => result..addAll(chunk));
+    // ELF64, little endian, EM_AARCH64; reject accidental runner x64 output.
+    if (bytes.length != 20 ||
+        bytes[0] != 0x7f ||
+        bytes[1] != 0x45 ||
+        bytes[2] != 0x4c ||
+        bytes[3] != 0x46 ||
+        bytes[4] != 2 ||
+        bytes[5] != 1 ||
+        bytes[16] != 3 || // ET_DYN, not an executable or relocatable object.
+        bytes[17] != 0 ||
+        bytes[18] != 0xb7 ||
+        bytes[19] != 0) {
+      throw StateError('OHOS tokenizer is not an AArch64 ELF library');
+    }
+  }
+  final readelf = '$sdk/native/llvm/bin/llvm-readelf';
+  final inspected = await Process.run(
+    readelf,
+    ['--dynamic', '--version-info', library.path],
+    environment: env,
+    includeParentEnvironment: false,
+  );
+  if (inspected.exitCode != 0) {
+    throw StateError('OHOS readelf failed: ${inspected.stderr}');
+  }
+  final report = '${inspected.stdout}\n${inspected.stderr}';
+  final needed = RegExp(r'\(NEEDED\)\s+Shared library: \[([^\]]+)\]')
+      .allMatches(report)
+      .map((match) => match.group(1)!)
+      .toList();
+  final glibc = RegExp(
+    r'GLIBC_|ld-linux|ld64\.so|'
+    r'lib(c|m|pthread|dl|rt|resolv|util|anl|nsl)\.so\.\d+|'
+    r'libstdc\+\+\.so\.6',
+  );
+  if (!report.contains('Dynamic section') ||
+      needed.isEmpty ||
+      needed.length != RegExp(r'\(NEEDED\)').allMatches(report).length ||
+      needed.any((name) => name.contains('/') || name.contains('\\')) ||
+      glibc.hasMatch(report)) {
+    throw StateError(
+      'Invalid OHOS dynamic dependencies (glibc or missing metadata): $report',
+    );
+  }
+  return library.uri;
 }
 
 String _localLibraryName(OS os) => switch (os) {

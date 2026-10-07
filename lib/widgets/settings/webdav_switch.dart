@@ -1,5 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/utils/webdav/test_webdav.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
@@ -27,6 +27,6 @@ AbstractSettingsTile webdavSwitch(
         }
       }
     },
-    title: Text(L10n.of(context).settingsSyncEnableWebdav),
+    title: Text(ModuStrings.text(context, '开启云端同步', 'Enable cloud sync')),
   );
 }

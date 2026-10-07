@@ -2,7 +2,7 @@
 
 English · [简体中文](PRIVACY_zh.md) · [Home](README.md) · [Settings guide](docs/SETTINGS.md)
 
-For **Modu 1.2.1+10086**, updated 2026-10-06. This document explains storage and network behavior. Third-party services have their own privacy policies.
+For **Modu 1.2.2+10087**, updated 2026-10-07. This document explains storage and network behavior. Third-party services have their own privacy policies.
 
 ## Local data and scanned books
 
@@ -39,6 +39,8 @@ Startup and manual checks share a source selector, initially GitHub. When GitHub
 Packages download only after your request. Except for macOS browser downloads, in-app downloads require matching size and SHA-256 checks. Android also checks package name, signature and version and requests system installation confirmation; it does not install silently. Modu cannot confirm completion or verification of a macOS browser download; compare the release checksum yourself.
 
 ## WebDAV and remote libraries
+
+The upcoming object-storage sync option is configured under **Settings → Sync**, separately from WebDAV. Selecting S3 / OSS / COS sends the same library-sync data to your chosen bucket, plus signed requests and temporary probe objects when testing. Endpoint, bucket, prefix and access credentials are stored in local preferences without additional encryption; default backups exclude the credentials. They are not included in AI-settings sync. No bucket is made public, no existing WebDAV configuration is replaced automatically, and switching does not transfer data between providers. Use private buckets, scoped keys and HTTPS. See [object storage synchronization](docs/OBJECT_STORAGE_SYNC.md).
 
 To reduce requests, the app stores request-budget timestamps, server cooldowns and maintenance schedules locally under hashed account filenames. These policy files contain no passwords, book text or full server URLs and are not library-synced. Jianguoyun request limits are per device/account; other devices and applications can still consume the same server quota.
 

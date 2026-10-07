@@ -52,10 +52,9 @@ String syncFailureMessage(Object error, {required bool chinese}) {
   }
   if (error is SyncFeedbackFailure) {
     reason = switch (error.code) {
-      SyncFailureCode.disabled =>
-        text('WebDAV 同步未开启。', 'WebDAV sync is turned off.'),
-      SyncFailureCode.notConfigured => text('尚未配置同步服务，请检查 WebDAV 设置。',
-          'No sync service configured. Check WebDAV settings.'),
+      SyncFailureCode.disabled => text('云端同步未开启。', 'Cloud sync is turned off.'),
+      SyncFailureCode.notConfigured => text('尚未配置同步服务，请检查同步设置。',
+          'No sync service configured. Check sync settings.'),
       SyncFailureCode.wifiRequired => text('已设置仅 Wi-Fi 同步，请连接 Wi-Fi 后重试。',
           'Wi-Fi-only sync is enabled. Connect to Wi-Fi and retry.'),
       SyncFailureCode.encryptionFailed => text('服务配置加密失败，请检查加密设置。',
@@ -79,8 +78,8 @@ String syncFailureMessage(Object error, {required bool chinese}) {
   } else if (error is DioException && error.response?.statusCode != null) {
     final status = error.response!.statusCode!;
     reason = switch (status) {
-      >= 300 && < 400 => text('服务器返回了无法安全跟随的重定向，请检查 WebDAV 地址及目录路径；不要删除云端数据。',
-          'The server returned a redirect that cannot be followed safely. Check the WebDAV address and directory path; do not delete remote data.'),
+      >= 300 && < 400 => text('服务器返回了无法安全跟随的重定向，请检查服务地址、区域及目录路径；不要删除云端数据。',
+          'The server returned a redirect that cannot be followed safely. Check the endpoint, region and directory path; do not delete remote data.'),
       401 || 403 => text('账号或目录访问被拒绝，请检查账号、密码和权限。',
           'Account or directory access denied. Check credentials and permissions.'),
       404 => text('远程目录或文件不存在，请检查同步路径。',
@@ -97,8 +96,8 @@ String syncFailureMessage(Object error, {required bool chinese}) {
           'The server has insufficient storage. Free remote space.'),
       >= 500 => text('服务器暂时不可用，请稍后重试。',
           'The server is temporarily unavailable. Retry later.'),
-      _ => text('服务器请求未成功，请检查 WebDAV 服务配置。',
-          'The server request failed. Check WebDAV configuration.'),
+      _ => text('服务器请求未成功，请检查同步服务配置。',
+          'The server request failed. Check sync configuration.'),
     };
     reason = '$reason (HTTP $status)';
   } else if (isTemporarySyncError(error)) {
@@ -115,7 +114,9 @@ String syncFailureMessage(Object error, {required bool chinese}) {
     } else if (message.contains('阅读位置')) {
       reason = text('阅读位置数据无效，请更新所有设备后重试。',
           'Invalid reading-position data. Update all devices and retry.');
-    } else if (message.contains('分页') || message.contains('截断')) {
+    } else if (message.contains('分页') ||
+        message.contains('截断') ||
+        message.contains('S3 listing')) {
       reason = text('服务器目录列表不完整或分页异常，已停止以避免遗漏数据。',
           'The server directory listing is incomplete or pagination is invalid. Sync stopped to avoid missing data.');
     } else if (message.contains('安全限制') || message.contains('过大')) {
@@ -129,8 +130,8 @@ String syncFailureMessage(Object error, {required bool chinese}) {
           'Sync data format or integrity validation failed. Retry later; do not delete remote data.');
     }
   } else if (error is UnsupportedError) {
-    reason = text('服务器不支持所需同步操作，请检查 WebDAV 兼容性。',
-        'The server does not support a required sync operation. Check WebDAV compatibility.');
+    reason = text('服务器不支持所需同步操作，请检查服务兼容性。',
+        'The server does not support a required sync operation. Check backend compatibility.');
   } else {
     reason = text('处理同步数据时发生错误，请重试或提交脱敏诊断日志。',
         'An error occurred while processing sync data. Retry or submit sanitized diagnostics.');

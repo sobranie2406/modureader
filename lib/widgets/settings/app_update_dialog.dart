@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:anx_reader/utils/env_var.dart';
 Future<void> showAppUpdateDialog(BuildContext context,
         {AppUpdateController? controller}) =>
     showDialog<void>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (_) => AppUpdateDialog(
             controller: controller ?? AppUpdateController.instance));
@@ -134,6 +136,7 @@ class AppUpdateDialog extends StatelessWidget {
 
   Future<void> _install(BuildContext context) async {
     final yes = await showDialog<bool>(
+        animationStyle: AppMotion.style,
         context: context,
         builder: (c) => AlertDialog(
               title: Text(ModuStrings.text(c, '确认更新', 'Confirm update')),
@@ -244,10 +247,11 @@ class AppUpdateDialog extends StatelessWidget {
                     if (c.busy)
                       Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: LinearProgressIndicator(
-                              value: phase == UpdatePhase.downloading
-                                  ? c.progress
-                                  : null)),
+                          child: EinkStaticIndicator(
+                              child: LinearProgressIndicator(
+                                  value: phase == UpdatePhase.downloading
+                                      ? c.progress
+                                      : null))),
                     if (c.error.isNotEmpty)
                       Padding(
                           padding: const EdgeInsets.only(top: 12),
