@@ -217,8 +217,10 @@ RUN_HOOK = (sys.platform == "linux" and os.environ.get("GITHUB_ACTIONS") == "tru
 @unittest.skipUnless(RUN_HOOK, "CI-only opt-in Dart hook tests; local checks never run SDKs")
 class HookExecutionTest(NativeFixture):
     def setUp(self):
-        super().setUp()
+        # NativeFixture deliberately clears the real environment. Capture the
+        # explicitly opted-in Dart executable before installing that fixture.
         self.dart = os.environ["HARMONY_NATIVE_TEST_DART"]
+        super().setUp()
         self.assertTrue(Path(self.dart).is_absolute() and Path(self.dart).is_file())
         self.defines = native_defines(self.env)
         self.log = self.base / "cargo.json"
