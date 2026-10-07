@@ -4,9 +4,29 @@ The filename is the toolchain's unsigned-output convention, not a security
 attestation. Local signing and signature verification are still mandatory.
 """
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import zipfile
+
+
+def verify_native_assets(archive):
+    names = archive.namelist()
+    library = 'libs/arm64-v8a/libtokenizers_ffi.so'
+    if library not in names:
+        raise ValueError('HAP is missing the OHOS arm64 tokenizer library.')
+    header = archive.read(library)[:20]
+    if (len(header) != 20 or header[:6] != b'\x7fELF\x02\x01'
+            or header[16:20] != b'\x03\x00\xb7\x00'):
+        raise ValueError('HAP tokenizer is not an AArch64 shared library.')
+    manifests = [name for name in names if name.endswith('/NativeAssetsManifest.json')]
+    if len(manifests) != 1:
+        raise ValueError('HAP must contain one native-assets manifest.')
+    manifest = json.loads(archive.read(manifests[0]))
+    entry = manifest.get('native-assets', {}).get('ohos_arm64', {}).get(
+        'package:hf_tokenizers/src/bindings.dart')
+    if entry != ['absolute', 'libtokenizers_ffi.so']:
+        raise ValueError('HAP native-assets manifest does not map the OHOS tokenizer.')
 
 
 def collect(root: Path) -> list[Path]:
@@ -27,6 +47,7 @@ def collect(root: Path) -> list[Path]:
                 raise ValueError('Corrupt HAP.')
             if 'module.json' not in archive.namelist():
                 raise ValueError('HAP is missing module.json.')
+            verify_native_assets(archive)
     output = root / 'build/harmony-unsigned'
     output.mkdir(parents=True, exist_ok=False)
     checksums = []

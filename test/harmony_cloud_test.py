@@ -1,5 +1,6 @@
 """Cloud packaging must be separate from existing release/signing workflows."""
 import hashlib
+import json
 import shutil
 from pathlib import Path
 import subprocess
@@ -11,7 +12,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts/harmony'))
-from collect_unsigned import collect
+from collect_unsigned import collect, verify_native_assets
 from verify_tools import verify
 from prepare import overrides, prepare
 
@@ -20,6 +21,12 @@ def fixture(path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, 'w') as archive:
         archive.writestr('module.json', '{"module":{"name":"entry"}}')
+        archive.writestr('libs/arm64-v8a/libtokenizers_ffi.so',
+                         bytes.fromhex('7f454c460201010000000000000000000300b700') + bytes(44))
+        archive.writestr('resources/rawfile/flutter_assets/NativeAssetsManifest.json',
+                         json.dumps({'native-assets': {'ohos_arm64': {
+                             'package:hf_tokenizers/src/bindings.dart':
+                                 ['absolute', 'libtokenizers_ffi.so']}}}))
 
 
 class HarmonyCloudTest(unittest.TestCase):
@@ -103,6 +110,22 @@ class HarmonyCloudTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, 'No unsigned HAP'):
                 collect(Path(tmp))
+
+    def test_wrong_native_asset_architecture_or_mapping_is_rejected(self):
+        from io import BytesIO
+        for wrong_arch, wrong_target in ((True, False), (False, True)):
+            with self.subTest(architecture=wrong_arch, target=wrong_target):
+                data = BytesIO()
+                with zipfile.ZipFile(data, 'w') as output:
+                    output.writestr('libs/arm64-v8a/libtokenizers_ffi.so',
+                                    bytes.fromhex('7f454c460201010000000000000000000300' +
+                                                  ('3e00' if wrong_arch else 'b700')) + bytes(44))
+                    output.writestr('assets/NativeAssetsManifest.json', json.dumps({
+                        'native-assets': {'linux_arm64' if wrong_target else 'ohos_arm64': {
+                            'package:hf_tokenizers/src/bindings.dart':
+                                ['absolute', 'libtokenizers_ffi.so']}}}))
+                with zipfile.ZipFile(data) as archive, self.assertRaises(ValueError):
+                    verify_native_assets(archive)
 
     def test_prefers_flutter_final_output_over_hvigor_copy(self):
         with tempfile.TemporaryDirectory() as tmp:

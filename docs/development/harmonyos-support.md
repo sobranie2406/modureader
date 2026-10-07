@@ -148,6 +148,13 @@ their bridge disabled; reader callbacks remain available. See
 `scripts/harmony/WEBVIEW_PATCH.md`. Existing platform source and PUB_CACHE are
 not patched in place.
 
+`patch_ui.py` also copies three exact pub.dev releases into an isolated UI
+adapter directory: flex_color_scheme 8.3.0, flutter_math_fork 0.7.4 and mongol
+9.3.0. Forty reviewed OHOS case labels share the existing Android/mobile
+behavior to cover Flutter OH's additional TargetPlatform enum value. Package
+archive identities, edited-file hashes, paths and versions are checked before
+patching. No native API is replaced with a no-op and no cache source is edited.
+
 The fixed Flutter OH SDK maps OHOS native-hook inputs to Linux and filters
 arbitrary environment variables. Explicit `hooks.user_defines.hf_tokenizers`
 therefore select the OHOS Rust triple, SDK, linker and pinned Rust toolchain.
@@ -206,7 +213,9 @@ After adapters and unsigned build profiles are ready, the workflow generates
 code, runs `flutter build hap --release --no-codesign --no-pub --target-platform ohos-arm64`, and
 collects only `*-unsigned.hap` plus `SHA256SUMS` as seven-day Actions artifacts.
 It does not publish a Release or upload complete build/SDK directories.
-Archive structure/CRC checks are not signature verification or device testing.
+The collector checks archive structure/CRC, the ARM64 tokenizer ELF header and
+its ohos_arm64 native-assets mapping. These checks are not signature verification
+or device testing.
 
 Local handoff: obtain the version-matched official HAP signing utility and Mac
 HDC only when a build is ready. Java is already present; verify the signing

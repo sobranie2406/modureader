@@ -77,6 +77,12 @@ jobs:
           path: |
             ${{ env.MODU_OHOS_FLUTTER }}
             ${{ env.PUB_CACHE }}
+      - name: Validate native hook protocol with fixture tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HARMONY_NATIVE_TEST_DART="$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart"
+          python3 -B -m unittest discover -s test -p harmony_native_test.py -v 2>&1 | tee build/harmony-diagnostics/native-hook-tests.log
       - name: Set up Java for cloud build only
         if: github.event_name == 'push' || inputs.build_hap
         uses: actions/setup-java@v4
@@ -122,12 +128,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/harmony/patch_webview.py 2>&1 | tee build/harmony-diagnostics/webview.log
-      - name: Validate native hook protocol with fixture tools
+      - name: Adapt audited UI packages to the native OHOS platform
+        if: github.event_name == 'push' || inputs.build_hap
         shell: bash
         run: |
           set -euo pipefail
-          export HARMONY_NATIVE_TEST_DART="$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart"
-          python3 -B -m unittest discover -s test -p harmony_native_test.py -v 2>&1 | tee build/harmony-diagnostics/native-hook-tests.log
+          python3 scripts/harmony/patch_ui.py 2>&1 | tee build/harmony-diagnostics/ui-adapters.log
       - name: Build unsigned HAP
         if: github.event_name == 'push' || inputs.build_hap
         shell: bash
