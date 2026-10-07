@@ -1,0 +1,111 @@
+name: HarmonyOS cloud (experimental, unsigned)
+
+on:
+  push:
+    branches: ['codex/harmony-cloud']
+  workflow_dispatch:
+    inputs:
+      build_hap:
+        description: 'Attempt unsigned HAP after readiness checks; false runs dependency audit only'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harmony-cloud-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harmony:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      PUB_CACHE: ${{ runner.temp }}/harmony-pub-cache
+      MODU_OHOS_FLUTTER: ${{ runner.temp }}/flutter-ohos
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Harmony-only dependency overlay
+        shell: bash
+        run: |
+          python3 -m pip install --user PyYAML==6.0.3
+          python3 scripts/harmony/prepare.py
+      - name: Install pinned, isolated Flutter OH
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --single-branch --branch '3.41.9+ohos-1.0.2' \
+            https://gitcode.com/CPF-Flutter/flutter_flutter.git "$MODU_OHOS_FLUTTER"
+          test "$(git -C "$MODU_OHOS_FLUTTER" rev-parse HEAD)" = 62357a93d653bf844f730bb1f4b7cc9e2139d14e
+          echo "$MODU_OHOS_FLUTTER/bin" >> "$GITHUB_PATH"
+          "$MODU_OHOS_FLUTTER/bin/flutter" --version
+      - name: Set up Java for cloud build only
+        if: github.event_name == 'push' || inputs.build_hap
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install verified Huawei command-line tools on runner only
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        env:
+          HARMONY_TOOLS_URL: ${{ secrets.HARMONY_LINUX_TOOLS_URL }}
+          HARMONY_TOOLS_SHA256: ${{ vars.HARMONY_LINUX_TOOLS_SHA256 }}
+          HARMONY_TOOLS_LICENSE_ACCEPTED: ${{ vars.HARMONY_TOOLS_LICENSE_ACCEPTED }}
+        run: bash scripts/harmony/cloud-tools.sh
+      - name: Prepare OHOS native-library cross compiler on runner only
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --target aarch64-unknown-linux-ohos
+          echo 'RUSTUP_TOOLCHAIN=1.94.0' >> "$GITHUB_ENV"
+          chmod +x scripts/harmony/ohos-clang.sh
+          echo "MODU_OHOS_CLANG=$GITHUB_WORKSPACE/scripts/harmony/ohos-clang.sh" >> "$GITHUB_ENV"
+      - name: Resolve dependencies with Harmony Flutter (isolated runner)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/harmony-diagnostics
+          flutter pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
+      - name: Audit required adapters and profiles (fail on missing support)
+        shell: bash
+        env:
+          MODU_HARMONY_BUILD_HAP: ${{ github.event_name == 'push' || inputs.build_hap }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "$MODU_HARMONY_BUILD_HAP" != true ]]; then args+=(--dependencies-only); fi
+          dart run scripts/dev/check_harmony.dart "${args[@]}" 2>&1 | tee build/harmony-diagnostics/readiness.log
+      - name: Build unsigned HAP
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never consume developer signing profiles or credentials in this job.
+          if grep -Eq '"signingConfig"[[:space:]]*:' ohos/build-profile.json5; then
+            echo 'Remove signingConfig from the cloud build profile; signing is local only.' >&2
+            exit 1
+          fi
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+          flutter build hap --release --target-platform ohos-arm64 2>&1 | tee build/harmony-diagnostics/build.log
+          python3 scripts/harmony/collect_unsigned.py
+      - name: Upload unsigned package only (not a Release)
+        if: success() && (github.event_name == 'push' || inputs.build_hap)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-unsigned-${{ github.sha }}
+          path: build/harmony-unsigned/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload diagnostic logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-diagnostics-${{ github.run_id }}
+          path: build/harmony-diagnostics/*.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -48,7 +48,9 @@ void main(List<String> args) async {
     final localName = _localLibraryName(os);
 
     Uri? library;
-    if (os == OS.android || os == OS.iOS) {
+    if (os.name == 'ohos') {
+      library = await _ohosBuild(input, crateDir, arch);
+    } else if (os == OS.android || os == OS.iOS) {
       library = await _mobileBuild(input, crateDir, os, arch);
     }
     var downloadFailed = false;
@@ -91,6 +93,61 @@ void main(List<String> args) async {
       crateDir.resolve('Cargo.toml'),
     ]);
   });
+}
+
+/// OHOS uses its own musl ABI; never fall back to Android/Linux host binaries.
+Future<Uri> _ohosBuild(
+  BuildInput input,
+  Uri crateDir,
+  Architecture arch,
+) async {
+  if (arch != Architecture.arm64) {
+    throw UnsupportedError('Modu HarmonyOS currently targets arm64 only');
+  }
+  final sdk = Platform.environment['OHOS_SDK_HOME'];
+  final linker = Platform.environment['MODU_OHOS_CLANG'];
+  if (sdk == null || linker == null || !File(linker).existsSync()) {
+    throw StateError(
+      'OHOS SDK/linker missing; use the isolated Harmony workflow',
+    );
+  }
+  const triple = 'aarch64-unknown-linux-ohos';
+  final targetDir = input.outputDirectory.resolve('cargo-ohos/').toFilePath();
+  final env = _envWithCargoBin()
+    ..['CARGO_TARGET_DIR'] = targetDir
+    ..['CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER'] = linker
+    ..['CC_aarch64_unknown_linux_ohos'] = linker
+    ..['AR_aarch64_unknown_linux_ohos'] = '$sdk/native/llvm/bin/llvm-ar';
+  final result = await Process.run(
+    _resolveCargo(),
+    ['build', '--release', '--locked', '--target', triple],
+    workingDirectory: crateDir.toFilePath(),
+    environment: env,
+  );
+  if (result.exitCode != 0) {
+    throw StateError('OHOS tokenizer build failed: ${result.stderr}');
+  }
+  final library = File('$targetDir/$triple/release/libtokenizers_ffi.so');
+  if (!await library.exists())
+    throw StateError('OHOS tokenizer output missing');
+  {
+    final bytes = await library
+        .openRead(0, 20)
+        .fold<List<int>>(<int>[], (result, chunk) => result..addAll(chunk));
+    // ELF64, little endian, EM_AARCH64; reject accidental runner x64 output.
+    if (bytes.length != 20 ||
+        bytes[0] != 0x7f ||
+        bytes[1] != 0x45 ||
+        bytes[2] != 0x4c ||
+        bytes[3] != 0x46 ||
+        bytes[4] != 2 ||
+        bytes[5] != 1 ||
+        bytes[18] != 0xb7 ||
+        bytes[19] != 0) {
+      throw StateError('OHOS tokenizer is not an AArch64 ELF library');
+    }
+  }
+  return library.uri;
 }
 
 String _localLibraryName(OS os) => switch (os) {

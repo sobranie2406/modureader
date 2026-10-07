@@ -1,0 +1,13 @@
+{
+  "intl": "0.20.2",
+  "web": "1.1.1",
+  "shared_preferences": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "860dc91d2263f58c26545c7c69e4d5cd765dfb4a", "path": "packages/shared_preferences/shared_preferences"}},
+  "shared_preferences_ohos": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "860dc91d2263f58c26545c7c69e4d5cd765dfb4a", "path": "packages/shared_preferences/shared_preferences_ohos"}},
+  "url_launcher": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "ae4494a78db5a9e0fe760b0eba9231605ae45716", "path": "packages/url_launcher/url_launcher"}},
+  "url_launcher_ohos": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "ae4494a78db5a9e0fe760b0eba9231605ae45716", "path": "packages/url_launcher/url_launcher_ohos"}},
+  "sqflite": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_sqflite.git", "ref": "5ef0761001378455e872e46d1c0620d39dcc1002", "path": "sqflite"}},
+  "sqflite_ohos": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_sqflite.git", "ref": "5ef0761001378455e872e46d1c0620d39dcc1002", "path": "sqflite_ohos"}},
+  "file_picker": {"git": {"url": "https://gitcode.com/CPF-Flutter/fluttertpc_file_picker.git", "ref": "86ad5c767d94e01ad174eebae09931d651e64068", "path": "."}},
+  "package_info_plus": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git", "ref": "bc4df814a726042a9dad1a267ebb1d2973544e24", "path": "packages/package_info_plus/package_info_plus"}},
+  "connectivity_plus": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git", "ref": "4ca461ac6e42c2b6e856897a8612041bef2a5a8e", "path": "packages/connectivity_plus/connectivity_plus"}}
+}

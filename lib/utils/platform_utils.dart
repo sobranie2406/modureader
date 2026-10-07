@@ -5,31 +5,22 @@ import 'package:flutter/foundation.dart';
 enum AnxPlatformEnum { android, ios, macos, windows, ohos, linux }
 
 class AnxPlatform {
-  static AnxPlatformEnum get type {
-    if (Platform.isAndroid && !kIsWeb) {
-      return AnxPlatformEnum.android;
-    }
-    if (Platform.isIOS && !kIsWeb) {
-      return AnxPlatformEnum.ios;
-    }
-    if (Platform.isMacOS && !kIsWeb) {
-      return AnxPlatformEnum.macos;
-    }
-    if (Platform.isWindows && !kIsWeb) {
-      return AnxPlatformEnum.windows;
-    }
-    if (Platform.isLinux && !kIsWeb) {
-      return AnxPlatformEnum.linux;
-    }
-    try {
-      if (Platform.operatingSystem == 'ohos') {
-        return AnxPlatformEnum.ohos;
-      }
-    } catch (_) {
-      // Platform.operatingSystem might throw if not available in some environments
-    }
-    throw UnsupportedError('Unsupported platform');
-  }
+  static AnxPlatformEnum get type => kIsWeb
+      ? throw UnsupportedError('Web is not a native platform')
+      : fromOperatingSystem(Platform.operatingSystem);
+
+  /// HarmonyOS NEXT uses the OHOS Flutter engine, not the Android runtime.
+  /// Keep this mapping testable without pretending the host is a real device.
+  static AnxPlatformEnum fromOperatingSystem(String operatingSystem) =>
+      switch (operatingSystem) {
+        'android' => AnxPlatformEnum.android,
+        'ios' => AnxPlatformEnum.ios,
+        'macos' => AnxPlatformEnum.macos,
+        'windows' => AnxPlatformEnum.windows,
+        'linux' => AnxPlatformEnum.linux,
+        'ohos' => AnxPlatformEnum.ohos,
+        _ => throw UnsupportedError('Unsupported platform: $operatingSystem'),
+      };
 
   static bool get isAndroid => type == AnxPlatformEnum.android;
   static bool get isIOS => type == AnxPlatformEnum.ios;

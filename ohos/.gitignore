@@ -19,4 +19,13 @@
 **/libs/**/libflutter.so
 **/libs/**/libvmservice_snapshot.so
 
-build-profile.json5
+# Only unsigned build profiles belong in source control. Signing material stays
+# local and is rejected by the cloud packaging job.
+
+# Local HarmonyOS outputs and signing material. Never commit signing identities.
+*.hap
+*.app
+*.p7b
+*.p12
+*.cer
+*.csr

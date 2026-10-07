@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "Modu reader"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "Read books with Modu"
     },
     {
       "name": "EntryAbility_label",
