@@ -82,6 +82,17 @@ jobs:
           args=()
           if [[ "$MODU_HARMONY_BUILD_HAP" != true ]]; then args+=(--dependencies-only); fi
           dart run scripts/dev/check_harmony.dart "${args[@]}" 2>&1 | tee build/harmony-diagnostics/readiness.log
+      - name: Backport WebView APIs inside the isolated OHOS adapter copies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harmony/patch_webview.py 2>&1 | tee build/harmony-diagnostics/webview.log
+      - name: Validate native hook protocol with fixture tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HARMONY_NATIVE_TEST_DART="$MODU_OHOS_FLUTTER/bin/cache/dart-sdk/bin/dart"
+          python3 -B -m unittest discover -s test -p harmony_native_test.py -v 2>&1 | tee build/harmony-diagnostics/native-hook-tests.log
       - name: Build unsigned HAP
         if: github.event_name == 'push' || inputs.build_hap
         shell: bash
@@ -94,6 +105,9 @@ jobs:
           fi
           flutter gen-l10n
           dart run build_runner build --delete-conflicting-outputs
+          # Host Dart code generation must finish before selecting OHOS native
+          # hook parameters, otherwise its x64 host build would target arm64.
+          python3 scripts/harmony/configure_native.py --root "$GITHUB_WORKSPACE"
           flutter build hap --release --target-platform ohos-arm64 2>&1 | tee build/harmony-diagnostics/build.log
           python3 scripts/harmony/collect_unsigned.py
       - name: Upload unsigned package only (not a Release)

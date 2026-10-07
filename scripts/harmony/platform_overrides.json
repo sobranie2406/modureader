@@ -1,5 +1,6 @@
 {
   "intl": "0.20.2",
+  "meta": "1.19.0",
   "web": "1.1.1",
   "shared_preferences": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "860dc91d2263f58c26545c7c69e4d5cd765dfb4a", "path": "packages/shared_preferences/shared_preferences"}},
   "shared_preferences_ohos": {"git": {"url": "https://gitcode.com/CPF-Flutter/flutter_packages.git", "ref": "860dc91d2263f58c26545c7c69e4d5cd765dfb4a", "path": "packages/shared_preferences/shared_preferences_ohos"}},

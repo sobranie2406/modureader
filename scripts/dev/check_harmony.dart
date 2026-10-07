@@ -9,14 +9,17 @@ String ohosPluginStatus(Map<String, dynamic>? flutter) {
   final plugin = flutter?['plugin'];
   if (plugin is! Map) return 'no-plugin-declaration';
   final platforms = plugin['platforms'];
-  if (platforms is! Map || !platforms.containsKey('ohos'))
+  if (platforms is! Map || !platforms.containsKey('ohos')) {
     return 'missing-ohos';
+  }
   final entry = platforms['ohos'];
   if (entry is! Map) return 'invalid-ohos-declaration';
   if (entry['default_package'] is String) return 'federated-ohos';
   if (entry['pluginClass'] is String ||
       entry['dartPluginClass'] is String ||
-      entry['ffiPlugin'] == true) return 'declares-ohos';
+      entry['ffiPlugin'] == true) {
+    return 'declares-ohos';
+  }
   return 'invalid-ohos-declaration';
 }
 
@@ -120,7 +123,9 @@ Future<void> main(List<String> arguments) async {
     final spec = dependencies[name];
     if (spec == null ||
         !{'declares-ohos', 'federated-ohos'}
-            .contains(ohosPluginStatus(spec.flutter))) return true;
+            .contains(ohosPluginStatus(spec.flutter))) {
+      return true;
+    }
     final implementation = (spec.flutter?['plugin'] as Map?)?['platforms']
         ?['ohos']?['default_package'];
     if (implementation is! String) return false;
@@ -152,11 +157,13 @@ Future<void> main(List<String> arguments) async {
   for (final line in sdkConstraints) {
     stdout.writeln('  $line');
   }
-  if (unresolved.isNotEmpty)
+  if (unresolved.isNotEmpty) {
     stdout.writeln('Unresolved: ${unresolved.join(', ')}');
-  if (missingRequired.isNotEmpty)
+  }
+  if (missingRequired.isNotEmpty) {
     stdout.writeln(
         'Required adapters to integrate: ${missingRequired.join(', ')}');
+  }
   stdout.writeln('\nThis audit never certifies a release. Platform channels, '
       'federated registration, native libraries, SDK/API compatibility, signing '
       'and real-device tests still require verification. No files were changed.');
