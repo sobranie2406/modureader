@@ -59,7 +59,10 @@ class NativeFixture(unittest.TestCase):
         }
 
     def apply_config(self):
-        with patch.dict(os.environ, self.env, clear=True), patch("sys.platform", "linux"):
+        # Invalid fixtures may contain NUL. Updating the real os.environ would
+        # fail part-way through patch.dict.__enter__, before it can restore the
+        # runner's environment. Replace the mapping for this read-only call.
+        with patch("configure_native.os.environ", self.env), patch("sys.platform", "linux"):
             return configure(self.root)
 
 
@@ -111,12 +114,14 @@ class ConfigureNativeTest(NativeFixture):
         self.assertEqual(real.read_text(), self.original)
 
     def test_missing_relative_and_control_character_parameters_rejected(self):
+        original_environment = dict(os.environ)
         for field in ("OHOS_SDK_HOME", "MODU_OHOS_CLANG", "CARGO"):
             for bad in ("missing", "/missing", "\n/bad", "/bad\x00", " /bad"):
                 with self.subTest(field=field, bad=bad), patch.dict(self.env, {field: bad}):
                     with self.assertRaises(ValueError):
                         self.apply_config()
         self.assertEqual(self.pubspec.read_text(), self.original)
+        self.assertEqual(dict(os.environ), original_environment)
 
     def test_required_environment_and_unpinned_rust_rejected(self):
         for field in ("OHOS_SDK_HOME", "MODU_OHOS_CLANG", "RUSTUP_TOOLCHAIN"):
@@ -217,10 +222,8 @@ RUN_HOOK = (sys.platform == "linux" and os.environ.get("GITHUB_ACTIONS") == "tru
 @unittest.skipUnless(RUN_HOOK, "CI-only opt-in Dart hook tests; local checks never run SDKs")
 class HookExecutionTest(NativeFixture):
     def setUp(self):
-        # NativeFixture deliberately clears the real environment. Capture the
-        # explicitly opted-in Dart executable before installing that fixture.
-        self.dart = os.environ["HARMONY_NATIVE_TEST_DART"]
         super().setUp()
+        self.dart = os.environ["HARMONY_NATIVE_TEST_DART"]
         self.assertTrue(Path(self.dart).is_absolute() and Path(self.dart).is_file())
         self.defines = native_defines(self.env)
         self.log = self.base / "cargo.json"
