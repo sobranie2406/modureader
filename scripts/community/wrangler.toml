@@ -1,0 +1,26 @@
+name = "modureader-community-bot"
+main = "worker.mjs"
+compatibility_date = "2025-04-01"
+account_id = "2cb062b7c9190ece9029bf7ba005ca6b"
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "modureader-community"
+database_id = "1e5436bb-59b4-4617-a576-7cbfd7461f8a"
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+GROUP_ID = "-1004201042022"
+QQ_APP_ID = "1905740672"
+# Populate QQ_GROUP_OPENID only after observing the callback from QQ group 1009765685.
+QQ_GROUP_OPENID = ""
+QQ_SUMMARIES_ENABLED = "false"
+QQ_RELEASE_PUSH_ENABLED = "false"
+
+# Existing BOT_TOKEN and WEBHOOK_SECRET, and new QQ_APP_SECRET, are encrypted secrets.
+# Never put a credential in this file or replace the existing Telegram secrets.
