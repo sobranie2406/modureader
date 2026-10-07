@@ -41,3 +41,16 @@ node --check scripts/community/dist/worker.mjs
 `dist/worker.mjs` 是供 Cloudflare 仪表板粘贴部署的单文件。使用 Wrangler 时直接以 `wrangler.toml` 中的 `worker.mjs` 为入口；部署前保留已有绑定、变量、域名和 Cron。
 
 官方资料：[QQ 开放平台](https://bot.q.qq.com/wiki/develop/api-v2/)、[GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)、[GitHub 工作流触发规则](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)。
+
+### QQ 入群答案自动审核
+
+群主将「Modu 默读助手」设为群管理员，订阅 `GROUP_JOIN_REQUEST`，并在生产环境设置
+`QQ_JOIN_APPROVAL_ENABLED=true`。保留当前「回答问题并由管理员审核」加群方式。
+收到申请后即时检查申请人填写的答案（或验证消息），匹配阅读、閱讀、读书、看书、电子书、
+默读、read/reader/reading、ModuReader、AnxReader、ebook 等表达；英文忽略大小写并兼容全角。
+只匹配答案，不匹配题目或昵称；不匹配、缺少字段、接口失败均保留人工处理，不自动拒绝或拉黑。
+只处理绑定群，按申请 ID 去重，不轮询申请列表。验证答案不交给 AI、不进入聊天摘要、不写日志；
+去重标记与无个人信息的最近一次结果保留 24 小时。`/qq/status` 可查看启用状态和最近审核结果。
+
+官方接口：[申请事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_join_request.html)、
+[审批接口](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_approval_join_request_member_openid.post.html)。

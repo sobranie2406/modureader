@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
-import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity} from './qq-bot.mjs';
+import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer} from './qq-bot.mjs';
 
 const secret = 'DG5g3B4j9X2KOErG'; // Public test vector in Tencent's official documentation.
 const encode = new TextEncoder();
@@ -307,5 +307,77 @@ test('scheduled summaries never poll GitHub for releases, even at five-minute bo
       await qqSchedule({scheduledTime:Date.parse('2026-10-07T'+time+':00+08:00')}, f.env);
     assert.equal(f.network.length, 0);
     assert.equal(f.sent.length, 0);
+  });
+});
+
+test('join answers accept reading expressions, case and full-width input', () => {
+  for (const answer of ['阅读器', '想阅读', 'READ', 'Reader', 'reading books', 'Ｒｅａｄｅｒ',
+    '我来读书', '看书软件', '電子書', '默讀', 'ModuReader', 'AnxReader', 'e-book', 'ebooks']) {
+    assert.equal(qqReadingAnswer({method:'admin_review_qa',review_qa_list:[{question:'用途？',answer}]}), true, answer);
+  }
+  for (const answer of ['', 'hello', '推广广告', 'thread', 'bread', '读卡器', null, {}]) {
+    assert.equal(qqReadingAnswer({method:'verify_message',verify_message:answer}), false);
+  }
+  assert.equal(qqReadingAnswer({method:'admin_review_qa',review_qa_list:[{question:'阅读器？',answer:'不知道'}]}), false);
+  assert.equal(qqReadingAnswer({method:'unknown',verify_message:'read'}), false);
+});
+
+function joinEvent(id, changes = {}) {
+  return {op:0,t:'GROUP_JOIN_REQUEST',id:'join-event-'+id,d:{group_openid:'allowed-group',
+    member_openid:'applicant',join_request_id:'request-'+id,
+    verify_info:{method:'admin_review_qa',review_qa_list:[{question:'本群主题？',answer:'阅读器'}]},...changes}};
+}
+
+test('signed join event approves only matching answers once and retains no answer text', async () => {
+  await withFixture(async f => {
+    f.env.QQ_JOIN_APPROVAL_ENABLED = 'true';
+    const approvals = [];
+    globalThis.fetch = async (url, options) => {
+      if (String(url).includes('/approval_join_request/')) {
+        approvals.push({url:String(url),body:JSON.parse(options.body)}); return Response.json({});
+      }
+      return f.fetch(url, options);
+    };
+    const payload = joinEvent('valid');
+    await qqRoutes(await signed(payload), f.env);
+    await qqRoutes(await signed(payload), f.env);
+    await qqRoutes(await signed({...payload,id:'redelivery-other-event'}), f.env);
+    assert.deepEqual(approvals,[{url:'https://api.bot.qq.com/v2/groups/allowed-group/approval_join_request/applicant',
+      body:{op:'approve',join_request_id:'request-valid'}}]);
+    assert.equal(f.prompts.length,0);
+    assert.equal(f.sent.length,0);
+    const rows = JSON.stringify(f.DB.raw.prepare('SELECT * FROM bot_state').all());
+    assert.doesNotMatch(rows,/阅读器|本群主题|applicant/);
+    const status = await (await qqRoutes(new Request('https://example.test/qq/status'), f.env)).json();
+    assert.equal(status.last_join_approval.outcome,'approved');
+  });
+});
+
+test('disabled, other-group, unknown, malformed and already-approved joins stay untouched', async () => {
+  await withFixture(async f => {
+    await qqRoutes(await signed(joinEvent('disabled')),f.env);
+    f.env.QQ_JOIN_APPROVAL_ENABLED = 'true';
+    for (const [id,changes] of [
+      ['other',{group_openid:'other-group'}],
+      ['unmatched',{verify_info:{method:'admin_review_qa',review_qa_list:[{question:'阅读器',answer:'广告'}]}}],
+      ['missing-answer',{verify_info:null}], ['missing-id',{join_request_id:''}],
+      ['missing-member',{member_openid:''}], ['already',{auto_approved:{strategy_id:'external'}}],
+    ]) await qqRoutes(await signed(joinEvent(id,changes)),f.env);
+    assert.equal(f.network.length,0);
+    assert.equal(f.prompts.length,0);
+    assert.equal(f.sent.length,0);
+  });
+});
+
+test('approval permission failure records only numeric status and leaves manual review available', async () => {
+  await withFixture(async f => {
+    f.env.QQ_JOIN_APPROVAL_ENABLED = 'true';
+    globalThis.fetch = async (url, options) => String(url).includes('/approval_join_request/')
+      ? Response.json({code:11703,message:'private-details'},{status:403}) : f.fetch(url,options);
+    await qqRoutes(await signed(joinEvent('permission')),f.env);
+    const status = await (await qqRoutes(new Request('https://example.test/qq/status'),f.env)).json();
+    assert.equal(status.last_join_approval.outcome,'approval_failed');
+    assert.equal(status.last_join_approval.code,11703);
+    assert.doesNotMatch(JSON.stringify(status),/private-details|applicant/);
   });
 });

@@ -380,6 +380,33 @@ async function qqPermissions(env, group) {
   await qqPut(env, 'qq:permissions', {at: qqNow(), ...result}, 86400*7);
   return result;
 }
+export function qqReadingAnswer(info) {
+  // Match only applicants' answers, never the administrator's question or nickname.
+  const answers = info?.method === 'admin_review_qa' && Array.isArray(info.review_qa_list)
+    ? info.review_qa_list.map(item => item?.answer)
+    : info?.method === 'verify_message' ? [info.verify_message] : [];
+  return answers.some(answer => typeof answer === 'string' &&
+    /阅读|閱讀|读书|讀書|看书|看書|电子书|電子書|默读|默讀|modureader|anxreader|\bread(?:er|ers|ing)?\b|\be[ -]?books?\b/i
+      .test(answer.normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '')));
+}
+async function qqApproveJoin(env, group, request) {
+  if (env.QQ_JOIN_APPROVAL_ENABLED !== 'true' || request.auto_approved) return;
+  const audit = async (outcome, code) => qqPut(env, 'qq:last-join-approval',
+    {at: qqNow(), outcome, ...(code === undefined ? {} : {code})}, 86400);
+  if (!qqReadingAnswer(request.verify_info)) return audit('manual_review');
+  if (typeof request.member_openid !== 'string' || !request.member_openid ||
+      typeof request.join_request_id !== 'string' || !request.join_request_id) return audit('missing_request_id');
+  // A request can arrive under different event IDs; never approve it twice.
+  if (!await qqClaim(env, `qq:join:${request.join_request_id}`, 86400)) return;
+  try {
+    await qqAPI(env, `/v2/groups/${encodeURIComponent(group)}/approval_join_request/${encodeURIComponent(request.member_openid)}`,
+      {op: 'approve', join_request_id: request.join_request_id});
+    await audit('approved');
+  } catch (error) {
+    // Leave failed/ambiguous requests for an administrator; never reject or blacklist.
+    await audit('approval_failed', error.code || null);
+  }
+}
 async function qqHandleEvent(env, payload) {
   const d = payload.d || {};
   const group = d.group_openid;
@@ -396,6 +423,7 @@ async function qqHandleEvent(env, payload) {
   if (payload.t === 'GROUP_MSG_RECEIVE') {
     await qqPut(env, 'qq:push-permission', {allowed: true, at: qqNow()}, 86400*365); return;
   }
+  if (payload.t === 'GROUP_JOIN_REQUEST') return qqApproveJoin(env, group, d);
   if (!['GROUP_MESSAGE_CREATE','GROUP_AT_MESSAGE_CREATE'].includes(payload.t)) return;
   if (!d.id || d.author?.bot) return;
   await qqArchive(env, group, d);
@@ -463,6 +491,8 @@ export async function qqRoutes(request, env, ctx) {
       summary_times: ['08:00 Asia/Shanghai','20:00 Asia/Shanghai'],
       releases_enabled: env.QQ_RELEASE_PUSH_ENABLED === 'true', release_trigger: 'GitHub release event',
       release_polling: false, last_release: env.DB ? await qqGet(env, 'qq:last-release') : null,
+      join_approval_enabled: env.QQ_JOIN_APPROVAL_ENABLED === 'true',
+      last_join_approval: env.DB ? await qqGet(env, 'qq:last-join-approval') : null,
       last_event: event || null, proactive: push || null, last_chat: chat || null,
       last_send: send || null, last_summary: summary || null, permissions: permissions || null});
   }
