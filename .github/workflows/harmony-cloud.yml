@@ -30,20 +30,49 @@ jobs:
         run: |
           echo "PUB_CACHE=$RUNNER_TEMP/harmony-pub-cache" >> "$GITHUB_ENV"
           echo "MODU_OHOS_FLUTTER=$RUNNER_TEMP/flutter-ohos" >> "$GITHUB_ENV"
+          # Some upstream examples reference unavailable LFS blobs. Do not
+          # disable LFS globally: runtime/plugin files still have to download.
+          echo 'GIT_CONFIG_COUNT=1' >> "$GITHUB_ENV"
+          echo 'GIT_CONFIG_KEY_0=lfs.fetchexclude' >> "$GITHUB_ENV"
+          echo 'GIT_CONFIG_VALUE_0=**/example/**,**/examples/**' >> "$GITHUB_ENV"
       - name: Prepare Harmony-only dependency overlay
         shell: bash
         run: |
           python3 -m pip install --user PyYAML==6.0.3
           python3 scripts/harmony/prepare.py
+      - name: Restore open-source Flutter and Pub cache (no Huawei SDK)
+        id: source-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: harmony-linux-x64-sources-v1-62357a93-${{ hashFiles('scripts/harmony/*overrides.json') }}
+          path: |
+            ${{ env.MODU_OHOS_FLUTTER }}
+            ${{ env.PUB_CACHE }}
       - name: Install pinned, isolated Flutter OH
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 --single-branch --branch '3.41.9+ohos-1.0.2' \
-            https://gitcode.com/CPF-Flutter/flutter_flutter.git "$MODU_OHOS_FLUTTER"
+          if [[ ! -d "$MODU_OHOS_FLUTTER" ]]; then
+            git clone --depth 1 --single-branch --branch '3.41.9+ohos-1.0.2' \
+              https://gitcode.com/CPF-Flutter/flutter_flutter.git "$MODU_OHOS_FLUTTER"
+          fi
           test "$(git -C "$MODU_OHOS_FLUTTER" rev-parse HEAD)" = 62357a93d653bf844f730bb1f4b7cc9e2139d14e
           echo "$MODU_OHOS_FLUTTER/bin" >> "$GITHUB_PATH"
           "$MODU_OHOS_FLUTTER/bin/flutter" --version
+      - name: Resolve dependencies with Harmony Flutter (isolated runner)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/harmony-diagnostics
+          flutter pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
+      - name: Save verified open-source dependency cache before native compilation
+        if: steps.source-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: harmony-linux-x64-sources-v1-62357a93-${{ hashFiles('scripts/harmony/*overrides.json') }}
+          path: |
+            ${{ env.MODU_OHOS_FLUTTER }}
+            ${{ env.PUB_CACHE }}
       - name: Set up Java for cloud build only
         if: github.event_name == 'push' || inputs.build_hap
         uses: actions/setup-java@v4
@@ -67,12 +96,6 @@ jobs:
           echo 'RUSTUP_TOOLCHAIN=1.94.0' >> "$GITHUB_ENV"
           chmod +x scripts/harmony/ohos-clang.sh
           echo "MODU_OHOS_CLANG=$GITHUB_WORKSPACE/scripts/harmony/ohos-clang.sh" >> "$GITHUB_ENV"
-      - name: Resolve dependencies with Harmony Flutter (isolated runner)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/harmony-diagnostics
-          flutter pub get 2>&1 | tee build/harmony-diagnostics/dependencies.log
       - name: Audit required adapters and profiles (fail on missing support)
         shell: bash
         env:

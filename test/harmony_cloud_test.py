@@ -149,6 +149,10 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertIn('62357a93d653bf844f730bb1f4b7cc9e2139d14e', workflow)
         self.assertNotIn('secrets.HARMONY_SIGN', workflow)
         self.assertIn('build hap --release --no-codesign --no-pub', workflow)
+        self.assertIn('GIT_CONFIG_KEY_0=lfs.fetchexclude', workflow)
+        self.assertNotIn('GIT_LFS_SKIP_SMUDGE', workflow)
+        self.assertLess(workflow.index('- name: Resolve dependencies'),
+                        workflow.index('- name: Install verified Huawei'))
 
 
 if __name__ == '__main__':
