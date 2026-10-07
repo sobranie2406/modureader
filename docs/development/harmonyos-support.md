@@ -52,8 +52,8 @@ verified, then moved to Trash on 2026-10-07 with its private package cache.
 The incomplete DevEco 6.1.1 installer was also moved to Trash; DevEco Studio
 and the HarmonyOS SDK were never installed. Existing Android/desktop tooling
 was left unchanged. No local HDC or signing identity has been provisioned.
-Unsigned root and entry `build-profile.json5` templates now target the verified
-API 24 SDK (minimum API 17). The normal desktop/Android dependency graph remains
+Unsigned build profiles now require API 26 compilation, retain the API 24
+target and minimum API 17, and use modelVersion 26.0.0. The normal desktop/Android dependency graph remains
 unchanged. The Harmony-only overlay pins upstream adapters for preferences,
 paths, database, picker, package info, connectivity, links, audio and WebView,
 including their federated implementations. A declaration is not runtime proof:
@@ -185,6 +185,22 @@ older component-specific `ohpm/bin` and `hvigor/bin` layouts;
 if a version changes it, stop and review instead of selecting arbitrary tools.
 SDK version compatibility and an actual HAP build remain to be verified.
 
+Cloud run [37572018760](https://github.com/sobranie2406/modureader/actions/runs/37572018760)
+passed Dart AOT compilation, the 19 native-hook tests, and the real OHOS ARM64
+Rust tokenizer build. ArkTS compilation then exposed an SDK mismatch: the pinned
+Flutter engine uses API 26 autofill declarations absent from the API 24 SDK.
+The engine already guards those calls on older devices; do not remove its
+autofill implementation or disable type checks. Three additional WebView
+inference errors have been repaired using explicit types and regression tests.
+These repairs still need the next native compilation run.
+
+The official download page lists Linux x64 Command Line Tools 26.0.0.851.
+The profile follows the [official API 26 compatibility table](https://developer.huawei.com/consumer/en/doc/harmonyos-releases/deveco-studio-new-features-2600).
+On this Mac the new official download was blocked by Chrome with
+`ERR_BLOCKED_BY_CLIENT`; user handoff was requested. Until its authorized URL
+and official checksum are available, no API 26 tool archive or final HAP has
+been verified. Do not reuse the API 24 archive with the new compile profile.
+
 Download recheck on 2026-10-07: the Chinese download page lists Linux x86
 6.1.1.418, but clicking it in the available browser disables the link and logs
 `Trustdomain has not been initialized, external links cannot be accessed safely`.
@@ -246,5 +262,5 @@ and [pipeline setup](https://developer.huawei.com/consumer/en/doc/harmonyos-guid
 - [Huawei development-assistant configuration](https://developer.huawei.com/consumer/cn/doc/start/hosdevassistant-config-0000002588511280)
 
 Catalog support is upstream evidence, not acceptance testing of Modu's specific
-versions. No native HarmonyOS build or real-device test was performed in this
-preparation pass.
+versions. Native compilation has been attempted in CI, but a complete HAP and
+real-device verification are still outstanding.

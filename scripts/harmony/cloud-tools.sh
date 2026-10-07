@@ -30,6 +30,7 @@ mapfile -t tool_roots < <(find "$tools_dir/extracted" -type d -path '*/sdk/defau
 }
 ohos_sdk=${tool_roots[0]}
 tool_root=${ohos_sdk%/sdk/default/openharmony}
+python3 "$(dirname "$0")/check_sdk.py" "$tool_root/sdk"
 # Current official packages expose wrappers in bin/. Older packages may expose
 # the component directories instead. Never fall through to host-installed tools.
 if [[ -x "$tool_root/bin/ohpm" && -x "$tool_root/bin/hvigorw" ]]; then

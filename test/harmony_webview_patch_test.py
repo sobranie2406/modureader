@@ -2,6 +2,7 @@
 checkout to enable the real-source integration and native control-flow tests.
 All generated files live in temporary test directories, never the application.
 """
+import difflib
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts/harmony'))
 import patch_webview as installer
-from webview_615_patch import PIN, PACKAGES, replacements, transform
+from webview_615_patch import PIN, PACKAGES, CHANNEL, replacements, transform
 
 
 def cached_dart():
@@ -171,6 +172,33 @@ class WebViewRealSourceTest(unittest.TestCase):
                                 input=json.dumps(self.patched), text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('checks passed', result.stdout)
+
+    def test_generated_channel_error_lines_have_explicit_native_types(self):
+        # Coordinates are from the COMPLETE transform of the pinned original,
+        # not from upstream or a hand-built snippet. Keep line count unchanged.
+        lines = self.patched[CHANNEL].splitlines()
+        expected = {
+            163: "const evaluationWorld: Map<string, string> | null = call.argument('contentWorld') as Map<string, string> | null;",
+            253: "const bridgeSettings: Map<string, Object> = call.argument('settings') as Map<string, Object>;",
+            254: "const bridgeEnabled: boolean | null | undefined = bridgeSettings.get('javaScriptBridgeEnabled') as boolean | null | undefined;",
+        }
+        for number, declaration in expected.items():
+            with self.subTest(generated_line=number):
+                self.assertEqual(lines[number - 1].strip(), declaration)
+
+    def test_added_native_declarations_do_not_introduce_any_or_unknown(self):
+        for name, source in self.patched.items():
+            if not name.endswith('.ets'):
+                continue
+            added = [line[1:] for line in difflib.unified_diff(
+                self.sources[name].splitlines(), source.splitlines())
+                     if line.startswith('+') and not line.startswith('+++')]
+            with self.subTest(file=name):
+                code = '\n'.join(line for line in added if not line.lstrip().startswith('//'))
+                self.assertNotRegex(code, r'\b(?:Any|any|unknown)\b')
+                for line in added:
+                    if line.lstrip().startswith(('const ', 'let ')):
+                        self.assertRegex(line, r'\b(?:const|let)\s+\w+\s*:')
 
     @unittest.skipUnless(cached_dart(), 'Set HARMONY_TEST_DART to an existing SDK binary')
     def test_dart_syntax(self):

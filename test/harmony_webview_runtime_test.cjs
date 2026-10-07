@@ -94,6 +94,8 @@ const methods = Object.fromEntries(methodNames.map(n => [n, n]));
 const channel = harness(channelSource, ['onMethodCall'], {
   WebViewChannelDelegateMethods: methods,
   ContentWorld: {fromMap: m => m == null ? null : {name: m.get('name')}},
+  InAppBrowserSession: class {},
+  InAppWebViewSettings: class { parse(value) { this.values = value; } },
   Log: {e() {}}, LOG_TAG: 'test',
 });
 async function call(name, argumentsMap = {}) {
@@ -107,9 +109,12 @@ async function call(name, argumentsMap = {}) {
 }
 (async () => {
   const document = {documentElement: {style: {}}};
+  let updates = 0;
   channel.webView = {
     isJavaScriptBridgeEnabled: () => false,
     requestFocus: () => {focuses++; return true;},
+    getInAppBrowserDelegate: () => null,
+    setSettings: () => {updates++;},
     evaluateJavascript: (source, world, callback) => {
       vm.runInNewContext(source, {document});
       callback.onReceiveValue('true');
@@ -123,11 +128,39 @@ async function call(name, argumentsMap = {}) {
   }
   assert.equal((await call('setSettings', {settings: new Map([['javaScriptBridgeEnabled', true]])})).error,
     'bridgePolicyImmutable');
+  // Type assertions must not coerce values, change null handling, or bypass the
+  // immutable policy gate. Settings contain mixed native codec value types.
+  for (const value of [undefined, null, false]) {
+    const settings = new Map([['javaScriptEnabled', true], ['minimumFontSize', 12]]);
+    if (value !== undefined) settings.set('javaScriptBridgeEnabled', value);
+    assert.equal((await call('setSettings', {settings})).value, true);
+  }
+  assert.equal(updates, 3);
+  for (const value of [true, 'false', 0]) {
+    assert.equal((await call('setSettings', {
+      settings: new Map([['javaScriptBridgeEnabled', value]]),
+    })).error, 'bridgePolicyImmutable');
+  }
+  assert.equal(updates, 3, 'rejected changes must not reach native setSettings');
+  channel.webView.isJavaScriptBridgeEnabled = () => true;
+  assert.equal((await call('setSettings', {
+    settings: new Map([['javaScriptBridgeEnabled', false]]),
+  })).error, 'bridgePolicyImmutable');
+  assert.equal((await call('setSettings', {
+    settings: new Map([['javaScriptBridgeEnabled', true]]),
+  })).value, true);
+  channel.webView.isJavaScriptBridgeEnabled = () => false;
   const response = await call('evaluateJavascript', {source: zoom, contentWorld: null});
   assert.equal(response.error, undefined);
   assert.equal(document.documentElement.style.zoom, '125%');
   assert.equal((await call('evaluateJavascript', {
+    source: zoom, contentWorld: new Map([['name', 'page']]),
+  })).error, undefined);
+  assert.equal((await call('evaluateJavascript', {
     source: zoom, contentWorld: new Map([['name', 'defaultClient']]),
+  })).error, 'javaScriptBridgeDisabled');
+  assert.equal((await call('evaluateJavascript', {
+    source: zoom, contentWorld: new Map(),
   })).error, 'javaScriptBridgeDisabled');
   console.log('Native control-flow and page zoom checks passed');
 })().catch(error => {console.error(error); process.exitCode = 1;});

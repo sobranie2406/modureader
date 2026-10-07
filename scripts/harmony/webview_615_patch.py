@@ -131,15 +131,15 @@ def replacements():
         try {
           result.success(this.webView != null ? this.webView.requestFocus() : false);
         } catch (error) {
-          const e = error as BusinessError;
+          const e: BusinessError = error as BusinessError;
           result.error('requestFocusError', e.message, null);
         }
         break;
       case WebViewChannelDelegateMethods.clearFocus:''')
     add(CHANNEL, '      case WebViewChannelDelegateMethods.setSettings:',
         '''      case WebViewChannelDelegateMethods.setSettings:
-        const bridgeSettings = call.argument('settings') as Map<string, Any>;
-        const bridgeEnabled = bridgeSettings.get('javaScriptBridgeEnabled');
+        const bridgeSettings: Map<string, Object> = call.argument('settings') as Map<string, Object>;
+        const bridgeEnabled: boolean | null | undefined = bridgeSettings.get('javaScriptBridgeEnabled') as boolean | null | undefined;
         if (this.webView != null && bridgeEnabled != null &&
             bridgeEnabled !== this.webView.isJavaScriptBridgeEnabled()) {
           result.error('bridgePolicyImmutable', 'Recreate the WebView to change javaScriptBridgeEnabled', null);
@@ -156,7 +156,7 @@ def replacements():
         }''')
     marker = '      case WebViewChannelDelegateMethods.evaluateJavascript:'
     add(CHANNEL, marker, marker + '''
-        const evaluationWorld = call.argument('contentWorld') as Map<string, Any> | null;
+        const evaluationWorld: Map<string, string> | null = call.argument('contentWorld') as Map<string, string> | null;
         if (this.webView != null && !this.webView.isJavaScriptBridgeEnabled() &&
             evaluationWorld != null && evaluationWorld.get('name') !== 'page') {
           result.error('javaScriptBridgeDisabled', 'Only page-world evaluation is available without the bridge', null);

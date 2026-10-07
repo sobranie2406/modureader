@@ -71,6 +71,8 @@ class HarmonyCloudTest(unittest.TestCase):
         for product in profile['app']['products']:
             self.assertNotIn('signingConfig', product)
             self.assertEqual(product['targetSdkVersion'], '6.1.1(24)')
+            self.assertEqual(product['compileSdkVersion'], '26.0.0')
+            self.assertEqual(product['compatibleSdkVersion'], '5.0.5(17)')
 
     def test_tools_download_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -178,6 +180,8 @@ class HarmonyCloudTest(unittest.TestCase):
         self.assertIn("printf 'DEVECO_NODE_HOME=%s", script)
         self.assertIn('"$node_home/bin"', script)
         self.assertIn('HOS_SDK_HOME=%s', script)
+        self.assertIn('/check_sdk.py" "$tool_root/sdk"', script)
+        self.assertLess(script.index('/check_sdk.py'), script.index('>> "$GITHUB_PATH"'))
 
     def test_cloud_workflow_has_no_release_or_signing_secret(self):
         workflow = (ROOT / '.github/workflows/harmony-cloud.yml').read_text()
