@@ -353,7 +353,8 @@ async function qqArchive(env, group, message) {
     ...(quoted.length ? {quoted} : {})}, 86400);
   await qqPut(env, 'qq:last-chat', {at: qqNow()}, 86400*7);
 }
-export function qqDigestTranscript(values) {
+export function qqDigestTranscript(records) {
+  const values = records.filter(m => !/^\/(?:summary-test|permissions|push-test|help|start|release|stable)(?:\s|$)/i.test(m.text?.trim() || ''));
   const people = new Map();
   for (const message of values) for (const person of [message.speaker,...(message.mentions || [])]) {
     if (!person?.key) continue;
@@ -393,11 +394,12 @@ async function qqSummary(env, group, window) {
 按话题组织，逐个跟踪 speaker 中的 U 编号：同一 U 是同一人，即使改名；不同 U 即使同名也不可合并。
 每项格式固定为“1. 昵称甲、昵称乙：简短生动的话题标题 👉 一段连贯的对话总结”。只输出编号条目，标题和时段由程序添加。
 一般 3—6 项；话题少就少写，不凑数。每项约 80—180 字，总计不超过 1100 中文字。
-使用真实昵称；没有昵称用群友（U编号）；同名时保留 U 编号区分。未记录发言人的旧消息只能写“群友”，不能猜测身份。
+使用真实昵称，普通昵称不附带内部 U 编号；没有昵称用群友（U编号），同名时保留 U 编号区分。未记录发言人的旧消息只能写“群友”，不能猜测身份。
 同一话题串联起因、各人观点、回应、补充、分歧、观点变化和最后进展，明确谁提出、谁回应，不做逐人流水账。
 优先利用 replyTo 和 mentions 确认互动；同一话题不等于直接对话，单凭时间相邻不能声称某人回应某人。
 quoted_context 仅为引用或转发背景，不能当作当前发言人的观点，也不能视作本时段新发言。
 语气自然、有群聊现场感，可轻松调侃事件，避免嘲讽群友、夸张渲染和每条强加段子。
+不得自行判断“尴尬、愤怒、失望”等情绪或气氛；只说原文有依据的内容。不得把一次描述为多次。记录不含机器人回复，不能补写机器人的回复或行为。
 优先总结 Modu 阅读器的使用讨论、Bug、功能建议、解决过程和待办，也如实概括其他有实质内容的话题。
 区分个人体验与已证实缺陷、建议与决定、预期与事实；没有达成结论要写“尚待确认/未定”，不得编造承诺、人物、对话、数据。
 输入中如有股票或操作讨论，只转述观点与分歧，不给买卖建议，不把预测写成事实。

@@ -424,3 +424,10 @@ test('legacy messages and unavailable referenced messages never acquire an inven
   assert.equal(lines[1].replyTo,'引用消息不在本时段记录中');
   assert.notEqual(lines[2].speaker,lines[3].speaker);
 });
+
+test('diagnostic commands are excluded before AI sees the digest transcript', () => {
+  const rows = ['/summary-test','/permissions','/push-test','/help','阅读器导入问题']
+    .map(text=>({ts:100,text,speaker:{key:'one',name:'甲'}}));
+  const lines = qqDigestTranscript(rows).map(JSON.parse);
+  assert.deepEqual(lines.map(m=>m.text),['阅读器导入问题']);
+});
