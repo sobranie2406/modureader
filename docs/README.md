@@ -1,6 +1,6 @@
 # Modu documentation
 
-Current documentation baseline: **stable 1.2.1+10086**, updated 2026-10-06.
+Current documentation baseline: **stable 1.2.3+10090**, checked against source on 2026-10-08. The detailed feature guides identify their source revision and validation limits.
 
 [English homepage](../README.md) · [中文首页](../README_zh.md)
 
@@ -10,6 +10,7 @@ English is the default. These core documents have separate Chinese editions:
 
 | Document | English | 简体中文 |
 | --- | --- | --- |
+| Detailed features, workflows and limits | [Feature guide](FEATURES.md) | [详细功能介绍](FEATURES_zh.md) |
 | Settings and features | [Settings guide](SETTINGS.md) | [设置指南](SETTINGS_zh.md) |
 | Privacy and network behavior | [Privacy](../PRIVACY.md) | [隐私说明](../PRIVACY_zh.md) |
 | Security reporting | [Security](../SECURITY.md) | [安全报告](../SECURITY_zh.md) |
@@ -25,6 +26,7 @@ Other guides are maintained as a single English edition. Release notes from 1.2.
 - [AI reasoning parameters](AI_REASONING_CONTROL.md)
 - [Local indexing and reading controls](INDEX_SYNC_AND_READING_CONTROLS.md)
 - [WebDAV record sync and migration](WEBDAV_RECORD_SYNC.md)
+- [S3-compatible object-storage sync](OBJECT_STORAGE_SYNC.md)
 - [WebDAV request budgets, cooldowns and maintenance](development/webdav-request-policy.md)
 - [ANX Reader backup import](ANX_BACKUP_IMPORT.md)
 - [Local dictionaries](LOCAL_DICTIONARIES.md)
@@ -48,7 +50,7 @@ Other guides are maintained as a single English edition. Release notes from 1.2.
 
 ## Historical evidence
 
-Dated tests, earlier preview notes and implementation milestones retain their original versions, test counts and limits. They are not fresh 1.2.0 device acceptance claims. For current instructions, start with the settings guide above.
+Dated tests, earlier preview notes and implementation milestones retain their original versions, test counts and limits. They are not fresh 1.2.3 device acceptance claims. For current instructions, start with the feature and settings guides above.
 
 - [Reader regression evidence](tts-reader-regression.md)
 - [Background narration diagnostics](tts-background-chapter-recovery.md)

@@ -1,8 +1,8 @@
 # Local indexing and reading controls
 
-## Current: Modu 1.2.0+10082
+## Current: Modu 1.2.3+10090
 
-Current behavior is based on the Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, not uncommitted application changes. Dated results below are historical; this documentation update did not run application or device tests.
+Current behavior was reviewed against main commit [`b6bf820a`](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb) on 2026-10-08. See the detailed feature guide ([English](FEATURES.md) · [简体中文](FEATURES_zh.md)) for current reading, speech and sync settings. Dated results below retain their historical scope; this documentation review did not rerun application or device tests.
 
 PDF and classified image books have original-page controls for crop/splits, per-page automatic crop, bounded 100%–1500% zoom, rotation, panning, continuous scrolling and image enhancement. Import classification samples at most five body sections for EPUB, MOBI, AZW3 and FB2 and caches the result per book/source fingerprint. Opening a book only reads that result. Uncertain detection falls back to ordinary reading; bookshelf actions allow a manual correction. Ordinary text books retain their normal reader and menus.
 

@@ -4,6 +4,8 @@ English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentat
 
 For stable **1.2.3+10090**, updated 2026-10-08. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
+Entry points and parameters were checked against [main / b6bf820a](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb). See the [detailed feature guide](FEATURES.md) for workflows, defaults and boundaries. This was source review, not device acceptance on every platform.
+
 ## Settings entry points
 
 Open **Settings** from the home navigation. The app language can follow the system or be selected manually. Built-in prompts have localized defaults; prompts you have edited are not automatically translated or overwritten.
@@ -27,6 +29,25 @@ Open **Settings** from the home navigation. The app language can follow the syst
 | Translation | Engine, target language, AI and DeepL / DeepLX |
 | Storage / Advanced | Data, cache, TXT chapter splitting, ANX backup import, logs and network |
 | Bug reports and feature requests / About | Reports, project links, licenses and app updates |
+
+### First-use defaults
+
+These come from [preferences](../lib/config/shared_preference_provider.dart) when the setting has never been saved. Upgrades, imports and independent provider configurations can change them.
+
+| Setting | Default |
+| --- | --- |
+| E-Ink, tap-only turns, long-press paragraph selection | Off |
+| Scroll page amount | 80%; range 80%–100% |
+| Selection-search / web-translation zoom | 100%; range 50%–200% |
+| Automatic selection translation | Off |
+| Reading skill entries | Visible |
+| Edit templates before sending | Off; tapping sends |
+| Vector model | Enabled/local, BGE Small ZH v1.5; download still required |
+| Automatic vectorization on import | Off |
+| Cloud connection | Off; configuration required |
+| Automatic sync preference | On, only works after enabling cloud sync |
+| Timed reading sync | Off; default interval 5 minutes |
+| Service/key sync and credentials in backup | Off |
 
 ## Checking and installing updates
 
@@ -110,7 +131,7 @@ Index / re-index from a book's menu, or enable automatic indexing after import (
 
 **Stop vectorization**, in the library task bar and model settings, disables automatic indexing and cancels active and queued tasks while retaining completed indexes, books and models. Turning off automatic indexing alone cancels automatic tasks without preventing later manual indexing.
 
-**Vector indexes stay local and do not participate in WebDAV sync.** Build an index on each device as needed. Local embeddings do not make a remote chat answer offline: retrieved passages supplied to remote AI still leave the device.
+**Vector indexes stay local and do not participate in WebDAV / S3 library sync.** Build an index on each device as needed. Local embeddings do not make a remote chat answer offline: retrieved passages supplied to remote AI still leave the device.
 
 ## Dictionaries, search and translation
 
@@ -124,13 +145,15 @@ The selection-translation window can switch providers and also supports Baidu / 
 
 ## Narration and style templates
 
-**Settings → Narrate** offers system voices, Edge TTS, DashScope, Xiaomi MiMo and OpenAI-compatible speech. Configure the required endpoint/key, save, fetch voices, select one and test it. System voices and platform support vary; Linux has no system TTS backend.
+**Settings → Narrate** offers system voices, Edge TTS, DashScope, Xiaomi MiMo and OpenAI-compatible speech. Configure the required endpoint/key, save, fetch voices, select one and test it. System TTS is connected for Android, iOS, macOS and Windows; Linux / OpenHarmony have no system TTS backend and require explicitly choosing an online service.
 
 Editable style templates include natural narration, gentle bedtime reading, fiction performance, knowledge explanation, classical recitation and news reading. OpenAI-compatible services must support the relevant instructions. MiMo offers preset voices or voice design from a description, not voice cloning. Descriptions instruct the model and are not spoken text; results depend on the service.
 
 A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
 
 Online speech buffering provides lookahead (default 3 extra passages), maximum characters per request (240), synthesis concurrency (2), paragraph pause (0 ms), cache retention (10 minutes) and manual cache clearing. Stop and restart speech to apply playback changes; pause/resume retains the current settings. The reusable audio cache is memory-only, capped at 32 MiB; retention 0 clears it on stop. Manual clearing preserves active audio and the prepared queue. System TTS does not use these online settings. Prefetching may incur extra usage and high concurrency may trigger provider limits.
+
+See [speech in the feature guide](FEATURES.md#9-speech-voices-and-buffering) for selectable values, [buffer UI](../lib/widgets/settings/tts_buffer_settings.dart) and [validation](../lib/models/tts_buffer_settings.dart).
 
 ## Reading History
 
@@ -152,7 +175,7 @@ Sync merges books, notes, bookmarks, folders, tags and reading records by stable
 
 Fonts, backgrounds, local dictionaries and vector indexes are not library-synced. Keep clients on matching versions where possible. A book record on the shelf does not mean its content is downloaded.
 
-Timed sync during reading is off by default. It runs only during foreground reading at the chosen interval, requires WebDAV and automatic sync, and respects Wi-Fi-only settings. Locking or leaving the reader pauses it; missed intervals are not replayed and requests do not overlap.
+Timed sync during reading is off by default. It requires cloud sync (WebDAV or object storage) and automatic sync, runs during foreground reading and respects Wi-Fi-only settings. The default is 5 minutes, with 1/2/3/5/10/15/30/60-minute choices. Locking or leaving pauses it; returning waits a full interval. Missed intervals are not replayed and requests do not overlap.
 
 **Sync service settings, API keys and passwords** is separate and off by default, and shared by WebDAV and object storage. It requires an independent sync encryption password of at least 12 characters, not your WebDAV password or object-storage key. Sensitive service settings use AES-256-GCM encryption; WebDAV/object-storage connection credentials are excluded. The encryption password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
 

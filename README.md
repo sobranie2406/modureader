@@ -91,12 +91,12 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | [Full-text translation & search](#translation) | Read inline translations, switch display modes and search selected text |
 | [Offline dictionaries](#dictionary) | Import your dictionaries and see definitions beside the selected word |
 | [Notes & highlights](#notes) | Capture passages, add comments and export notes with links back to the book |
-| [Reading statistics](#statistics) | Review reading time, trends and per-book progress |
+| [Reading history](#statistics) | Review reading time, trends, recent books and per-book progress |
 | [Vector indexing](#vector) | Build local book indexes for semantic search and retrieval-augmented answers |
-| [Sync & database backup](#data) | Sync through WebDAV and export or restore library backups |
+| [Sync & database backup](#data) | Sync through WebDAV or S3-compatible storage and export or restore library backups |
 | [Global settings backup](#backup) | Transfer preferences by file or link, with credentials controlled separately |
 
-Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). Detailed options and entry points are in the [settings guide](docs/SETTINGS.md).
+Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). See the [source-checked detailed feature guide](docs/FEATURES.md) for workflows, defaults and limits, and the [settings guide](docs/SETTINGS.md) for entry points.
 
 <a id="scanned-books"></a>
 

@@ -1,6 +1,6 @@
 # Local custom dictionaries
 
-Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
+Source-reviewed for Modu 1.2.3+10090 on 2026-10-08 ([b6bf820a](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb)). Detailed workflows and current boundaries: [English](FEATURES.md) · [简体中文](FEATURES_zh.md). See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
 ## Usage
 
