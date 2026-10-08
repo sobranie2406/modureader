@@ -1,12 +1,11 @@
 import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/reading_time.dart';
 import 'package:anx_reader/enums/chart_mode.dart';
 import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/home_navigation_metrics.dart';
 import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/page/book_detail.dart';
+import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
 import 'package:anx_reader/providers/statistic_data.dart';
 import 'package:anx_reader/utils/date/convert_seconds.dart';
 import 'package:anx_reader/utils/date/week_of_year.dart';
@@ -272,7 +271,7 @@ class _DateBooksState extends ConsumerState<DateBooks> {
                     final readingTime = bookMap.values.first;
                     return dragToDelete(
                       BookStatisticItem(
-                        bookId: book.id,
+                        book: book,
                         readingTime: readingTime,
                       ),
                       book.id,
@@ -295,9 +294,9 @@ class _DateBooksState extends ConsumerState<DateBooks> {
 
 class BookStatisticItem extends StatelessWidget {
   const BookStatisticItem(
-      {super.key, required this.bookId, required this.readingTime});
+      {super.key, required this.book, required this.readingTime});
 
-  final int bookId;
+  final Book book;
   final int readingTime;
   final TextStyle bookTitleStyle = const TextStyle(
     fontSize: 20,
@@ -317,78 +316,63 @@ class BookStatisticItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Book>(
-      future: bookDao.selectBookById(bookId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => BookDetail(book: snapshot.data!)));
-            },
-            child: FilledContainer(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Hero(
-                      tag: snapshot.data!.coverFullPath,
-                      child: BookCover(
-                        book: snapshot.data!,
-                        height: 130,
-                        width: 90,
-                        radius: 20,
-                      )),
-                  const SizedBox(width: 15),
-                  Flexible(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(snapshot.data!.title, style: bookTitleStyle),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: Text(snapshot.data!.author,
-                                    style: bookAuthorStyle),
-                              ),
-                              Text(
-                                  // getReadingTime(context),
-                                  convertSeconds(readingTime),
-                                  textAlign: TextAlign.end,
-                                  style: bookReadingTimeStyle),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: EinkStaticIndicator(
-                                    child: LinearProgressIndicator(
-                                  value: snapshot.data!.readingPercentage,
-                                  backgroundColor: Colors.grey[300],
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Theme.of(context).colorScheme.primary),
-                                )),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                  '${(snapshot.data!.readingPercentage * 100).toInt()} %'),
-                            ],
-                          ),
-                        ]),
-                  ),
-                ],
-              ),
+    return ReadingHistoryBookLink(
+      book: book,
+      child: FilledContainer(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            BookCover(
+              book: book,
+              height: 130,
+              width: 90,
+              radius: 20,
             ),
-          );
-        } else {
-          return const EinkStaticIndicator(child: CircularProgressIndicator());
-        }
-      },
+            const SizedBox(width: 15),
+            Flexible(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(book.title, style: bookTitleStyle),
+                    if (book.isDeleted)
+                      Text(L10n.of(context).bookDeleted,
+                          style: Theme.of(context).textTheme.labelSmall),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(book.author, style: bookAuthorStyle),
+                        ),
+                        Text(
+                            // getReadingTime(context),
+                            convertSeconds(readingTime),
+                            textAlign: TextAlign.end,
+                            style: bookReadingTimeStyle),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: EinkStaticIndicator(
+                              child: LinearProgressIndicator(
+                            value: book.readingPercentage.clamp(0, 1),
+                            backgroundColor: Colors.grey[300],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary),
+                          )),
+                        ),
+                        const SizedBox(width: 10),
+                        Text('${(book.readingPercentage * 100).toInt()} %'),
+                      ],
+                    ),
+                  ]),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

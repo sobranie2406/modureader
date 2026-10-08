@@ -1,6 +1,7 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/widgets/page_router/reading_route.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,10 +37,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Library'), findsOneWidget);
   });
-  test('enabled route retains platform transition', () {
+  test('enabled iOS route retains platform transition', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final route =
         readingRoute<void>(animate: true, builder: (_) => const Text('Reader'));
     expect(route, isA<CupertinoPageRoute<void>>());
     expect((route as PageRoute).transitionDuration, isNot(Duration.zero));
+  });
+  test('enabled Android route uses the stationary reader cover transition', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final route =
+        readingRoute<void>(animate: true, builder: (_) => const Text('Reader'));
+    expect(route, isA<PageRouteBuilder<void>>());
+    expect((route as PageRoute).transitionDuration,
+        const Duration(milliseconds: 720));
+    expect(route.reverseTransitionDuration, const Duration(milliseconds: 620));
   });
 }

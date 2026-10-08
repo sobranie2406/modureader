@@ -83,7 +83,10 @@ void main() {
     expect(readingSkills, contains('_customSkillTile(entry.custom!'));
     expect(readingSkills, contains('功能提示词'));
     expect(aiChat, contains('bool _showSkillPrompts = false;'));
-    expect(aiChat, contains('if (_isReaderSkills && _showSkillPrompts)'));
+    expect(
+        aiChat,
+        matches(RegExp(
+            r'if\s*\(!compact\s*&&\s*_isReaderSkills\s*&&\s*_showSkillPrompts\)')));
     expect(aiChat, contains('_buildSkillPicker(context)'));
   });
 }

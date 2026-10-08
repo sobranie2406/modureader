@@ -6,6 +6,7 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/system_voice_identity.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
+import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,8 +22,14 @@ class SystemTts extends BaseTts {
   SystemTts._internal();
 
   @visibleForTesting
-  SystemTts.forTesting({required bool supported})
-      : _supportedOverride = supported;
+  SystemTts.forTesting(
+      {required bool supported,
+      Duration startTimeout = const Duration(seconds: 60)})
+      : _supportedOverride = supported,
+        _startTimeout = startTimeout;
+
+  Duration _startTimeout = const Duration(seconds: 60);
+  VoidCallback? _cancelNativeSpeech;
 
   bool? _supportedOverride;
   bool get isSupported => _supportedOverride ?? supportsSystemTts();
@@ -112,11 +119,6 @@ class SystemTts extends BaseTts {
 
     await setAwaitOptions();
 
-    if (isAndroid) {
-      await getDefaultEngine();
-      await getDefaultVoice();
-    }
-
     // Await one utterance, then advance once. Native start/completion callbacks
     // must not enqueue or move the reader independently.
   }
@@ -130,14 +132,75 @@ class SystemTts extends BaseTts {
     }
   }
 
-  Future<void> getDefaultEngine() async {
-    var engine = await flutterTts.getDefaultEngine;
-    if (engine != null) {}
-  }
+  /// Android's plugin reports native onError separately without resolving the
+  /// pending awaitSpeakCompletion result. Race that event, not speech duration.
+  Future<dynamic> _speakNative(String text) async {
+    final signal = Completer<dynamic>();
+    final finishBuffering = beginBuffering();
+    final watch = Stopwatch()..start();
+    var live = true;
+    var started = false;
+    void cancel() {
+      if (!signal.isCompleted) signal.complete(0);
+    }
 
-  Future<void> getDefaultVoice() async {
-    var voice = await flutterTts.getDefaultVoice;
-    if (voice != null) {}
+    _cancelNativeSpeech = cancel;
+    final timer = Timer(_startTimeout, () {
+      if (live && !started && !signal.isCompleted) {
+        signal.completeError(TimeoutException('System speech did not start'));
+      }
+    });
+    final slowStart = Timer(const Duration(seconds: 5), () {
+      if (live && !started) {
+        AnxLog.warning('TTS system waiting for native audio start');
+      }
+    });
+    flutterTts.setStartHandler(() {
+      if (!live) return;
+      started = true;
+      timer.cancel();
+      slowStart.cancel();
+      finishBuffering();
+      if (watch.elapsedMilliseconds >= 5000) {
+        AnxLog.info(
+            'TTS system audio started; elapsedMs=${watch.elapsedMilliseconds}');
+      }
+    });
+    flutterTts.setErrorHandler((message) {
+      if (!live || signal.isCompleted) return;
+      // Only record the numeric native code, never plugin text/book content.
+      final code =
+          RegExp(r' - (-?\d+)$').firstMatch(message.toString())?.group(1);
+      AnxLog.warning('TTS system native error; code=${code ?? "unknown"}');
+      signal.completeError(PlatformException(code: 'system_tts_error'));
+    });
+    try {
+      return await Future.any<dynamic>([
+        Future<dynamic>.sync(() => flutterTts.speak(text)),
+        signal.future,
+      ]);
+    } catch (_) {
+      live = false;
+      // Release the plugin's retained result before allowing another utterance.
+      if (identical(_cancelNativeSpeech, cancel)) {
+        try {
+          await flutterTts.stop().timeout(const Duration(seconds: 2));
+        } catch (error) {
+          AnxLog.warning('TTS system cleanup failed: ${error.runtimeType}');
+        }
+      }
+      rethrow;
+    } finally {
+      live = false;
+      timer.cancel();
+      slowStart.cancel();
+      finishBuffering();
+      if (identical(_cancelNativeSpeech, cancel)) {
+        _cancelNativeSpeech = null;
+        flutterTts.setStartHandler(() {});
+        flutterTts.setErrorHandler((_) {});
+      }
+    }
   }
 
   /// Apply the voice by shortName
@@ -178,7 +241,8 @@ class SystemTts extends BaseTts {
     await flutterTts.setSpeechRate(rate);
     await flutterTts.setPitch(pitch);
     await _applyVoice(voiceShortName);
-    await flutterTts.speak(content);
+    await setAwaitOptions();
+    await _speakNative(content);
   }
 
   @override
@@ -212,7 +276,7 @@ class SystemTts extends BaseTts {
         await flutterTts.setPitch(pitch);
         await _applyVoice(Prefs().getTtsVoiceModel('system'));
         if (!active()) return;
-        final result = await flutterTts.speak(_currentVoiceText!);
+        final result = await _speakNative(_currentVoiceText!);
         if (!active()) return;
         if (result == 0) throw StateError('System speech failed');
         if (!continuous) return;
@@ -227,11 +291,14 @@ class SystemTts extends BaseTts {
       if (active() && continuous) updateTtsState(TtsStateEnum.stopped);
     } catch (error) {
       if (active()) {
+        AnxLog.warning('TTS system playback failed: ${error.runtimeType}');
         _pendingAdvance = null;
         _playbackError = error is PlatformException &&
                 error.code == 'windows_tts_unavailable'
             ? 'Windows 系统朗读不可用，请检查或安装系统语音包，或切换在线朗读。已保留当前位置。'
-            : '朗读失败，已保留当前位置，请重试 / Speech failed; retry from this sentence.';
+            : error is TimeoutException
+                ? '系统语音未开始播放，已保留当前位置。请检查语音引擎和网络后重试 / System speech did not start; check the engine and network, then retry.'
+                : '朗读失败，已保留当前位置，请重试 / Speech failed; retry from this sentence.';
         updateTtsState(TtsStateEnum.paused);
       }
       if (!continuous) rethrow;
@@ -242,6 +309,7 @@ class SystemTts extends BaseTts {
   Future<dynamic> stop({bool forNavigation = false}) async {
     clearBuffering();
     ++_generation;
+    _cancelNativeSpeech?.call();
     _running = null;
     _pendingAdvance = null;
     _resumeAfterAdvance = null;
@@ -255,6 +323,7 @@ class SystemTts extends BaseTts {
   Future<void> pause() async {
     _resumeAfterAdvance = _pendingAdvance;
     ++_generation;
+    _cancelNativeSpeech?.call();
     _running = null;
     updateTtsState(TtsStateEnum.paused);
     if (isSupported) await flutterTts.stop();

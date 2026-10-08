@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/models/tts_buffer_settings.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 
@@ -13,6 +14,7 @@ class TtsConfigTransfer {
         'pitch': 1.0,
         'rate': 0.6,
         'allowMixWithOtherAudio': false,
+        'buffer': const TtsBufferSettings().toMap(),
         'providers': {
           for (final id in services)
             id: {'config': <String, dynamic>{}, 'voice': ''},
@@ -26,6 +28,7 @@ class TtsConfigTransfer {
         'pitch': prefs.ttsPitch,
         'rate': prefs.ttsRate,
         'allowMixWithOtherAudio': prefs.allowMixWithOtherAudio,
+        'buffer': prefs.ttsBufferSettings.toMap(),
         'providers': {
           for (final id in services)
             id: {
@@ -88,6 +91,11 @@ class TtsConfigTransfer {
         'voice': config['voice'] ?? raw['voice']
       };
     }
+    final rawBuffer = data['buffer'];
+    if (rawBuffer != null && rawBuffer is! Map<String, dynamic>) {
+      throw const FormatException('Invalid speech buffer configuration');
+    }
+    final buffer = TtsBufferSettings.fromMap(rawBuffer ?? <String, dynamic>{});
     return {
       'version': 1,
       'service': data['service'],
@@ -95,6 +103,7 @@ class TtsConfigTransfer {
       'pitch': number('pitch', 0.5, 2),
       'rate': number('rate', 0, 4),
       'allowMixWithOtherAudio': data['allowMixWithOtherAudio'],
+      'buffer': buffer.toMap(),
       'providers': providers,
     };
   }
@@ -108,6 +117,7 @@ class TtsConfigTransfer {
       'ttsVolume': valid['volume'],
       'ttsPitch': valid['pitch'],
       'ttsRate': valid['rate'],
+      'ttsBufferSettings': jsonEncode(valid['buffer']),
       'allowMixWithOtherAudio': valid['allowMixWithOtherAudio'],
       for (final id in services)
         'onlineTtsConfig_$id': jsonEncode(valid['providers'][id]['config']),

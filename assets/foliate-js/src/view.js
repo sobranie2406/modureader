@@ -777,7 +777,7 @@ export class View extends HTMLElement {
       if (!entry?.doc) break
       entry.peek ??= new TTS(entry.doc, textWalker, null,
         range => this.getCFI(index, range),
-        { paragraphMode: this.ttsParagraphMode === true })
+        { paragraphMode: this.ttsParagraphMode === true, maxCharacters: this.ttsMaxCharacters })
       details.push(...entry.peek.collectDetails(count - details.length, { includeCurrent: true }))
     }
     return details
@@ -864,7 +864,7 @@ export class View extends HTMLElement {
         return value;
       },
       (range) => this.getCFI(index, range),
-      { paragraphMode: this.ttsParagraphMode === true },
+      { paragraphMode: this.ttsParagraphMode === true, maxCharacters: this.ttsMaxCharacters },
     );
     this.tts.sectionIndex = index;
     this.#warmTTSSections()

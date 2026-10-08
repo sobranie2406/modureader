@@ -129,6 +129,8 @@ void main() {
     final toggle =
         find.widgetWithText(SwitchListTile, 'Enable speech instructions');
     await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    expect(toggle.hitTestable(), findsOneWidget);
     await tester.tap(toggle);
     await tester.pumpAndSettle();
     final keyField = find.byWidgetPredicate(

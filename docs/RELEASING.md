@@ -1,6 +1,6 @@
 # Building, releasing and installing Modu
 
-Single-edition guide in English. Updated for stable **1.2.2+10087**, 2026-10-07.
+Single-edition guide in English. Prepared for stable **1.2.3+10090**, 2026-10-08.
 
 Modu is an independently modified derivative of Anx Reader (MIT) and ReadAny (GPL-3.0-or-later). Packages retain licenses; each release links its corresponding source, NOTICE and attribution. No separate notices ZIP is distributed.
 
@@ -56,6 +56,22 @@ Linux packages include the ONNX Runtime 1.22.0 shared library omitted by an olde
 - Update both homepages and paired user documents when functionality changes. User guide screenshots show actual layout; pair phone settings with Mac results and separate English/Chinese content.
 - docs/RELEASE_NOTES.md prepares the current release description. Published changes must also update the corresponding release, not overwrite an older release with a new version's text.
 - Starting with **1.2.0**, stable and preview notes use **English first, 简体中文 second**, in separate sections on both GitHub and Gitee. Do not reorder older versions or remove installation warnings, checksums or source links.
+- For newly written release notes and changelog entries, use one concise change per Markdown bullet in the form `- Type(scope): Description`, following the supplied ANX-style example. Use `Feat` for features, `Fix` for fixes, `Perf` for performance, `Ci` for build/release automation, `Docs` for documentation and `Chore` for maintenance. Omit `(scope)` only for genuinely project-wide changes. Use stable module names such as `reader`, `tts`, `sync`, `bookshelf`, `ai`, `appearance`, `android` and `l10n`.
+- Keep the same item order, type and scope in the English and Chinese sections. Describe actual Modu changes in the release's source range; do not copy another project's feature claims, issue numbers or credits. Add linked Issue/PR references and contributor thanks only when verified and relevant. Keep limitations and validation status accurate; installation/signing warnings, checksums and source links remain separate from the change bullets. Do not rewrite published historical releases merely to apply this style.
+
+Example of the change-list format (not a published release):
+
+```markdown
+## English
+
+- Feat(tts): Add configurable online speech lookahead, synthesis size and concurrency, paragraph pauses, cache retention and cache clearing; keep system TTS unchanged.
+- Fix(tts): Allow a fresh synthesis request after a shared cached request times out.
+
+## 简体中文
+
+- Feat(tts): 新增在线朗读缓冲量、合成字数、并发数、段落停顿、缓存保留及清理设置，系统 TTS 保持原逻辑。
+- Fix(tts): 修复共享缓存请求超时后无法重新发起语音合成的问题。
+```
 
 ## Release procedure
 

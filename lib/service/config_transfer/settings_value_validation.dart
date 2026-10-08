@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/models/tts_buffer_settings.dart';
 import 'package:anx_reader/service/sync/s3_config.dart';
 import 'package:anx_reader/service/ai/reading_skill_layout.dart';
 import 'package:anx_reader/models/ai_provider.dart';
@@ -69,6 +70,7 @@ void validateSettingsValue(String key, dynamic value) {
     throw const FormatException('Invalid proxy port');
   }
   if (key == 'readingRules') ReadingRules.fromJson(value);
+  if (key == 'ttsBufferSettings') TtsBufferSettings.fromMap(object());
   if (key == 'readingInfo') {
     final data = object();
     if (data.containsKey('header') || data.containsKey('footer')) {

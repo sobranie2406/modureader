@@ -40,6 +40,7 @@ const Set<String> _aiSettingsPreferenceKeys = {
   'ttsVolume',
   'ttsPitch',
   'ttsRate',
+  'ttsBufferSettings',
   // Legacy values remain supported so an upgraded installation does not lose
   // credentials that have not yet been migrated to the current provider UI.
   'isSystemTts',

@@ -413,7 +413,9 @@ class ReadingTimeDao extends BaseDao {
       return const [];
     }
 
-    final books = await bookDao.selectBooksByIds(ids);
+    // Deleting a book does not delete its reading history. Keep its metadata
+    // visible here; ordinary bookshelf queries still exclude deleted books.
+    final books = await bookDao.selectBooksByIds(ids, includeDeleted: true);
     final bookMap = {for (final book in books) book.id: book};
 
     final result = <Map<Book, int>>[];

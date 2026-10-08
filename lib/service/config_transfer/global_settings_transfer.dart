@@ -48,7 +48,7 @@ pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize aiPanelWidth aiPan
             .split(RegExp(r'\s+')))
       key: 'double',
     for (final key
-        in '''locale themeMode readStyle readTheme annotationType annotationColor ttsService
+        in '''locale themeMode readStyle readTheme annotationType annotationColor ttsService ttsBufferSettings
 pageTurnStyle translateService translateFrom translateTo fullTextTranslateService fullTextTranslateFrom
 fullTextTranslateTo translationAiService readingRules chapterSplitCustomRules chapterSplitSelectedRuleId
 selectedAiService vectorModelMode vectorLocalModelId vectorModelDownloadSource vectorModelConfig aiProviders ocrModelId ocrModelDownloadSource
@@ -263,6 +263,7 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
           'ttsVolume': tts['volume'],
           'ttsPitch': tts['pitch'],
           'ttsRate': tts['rate'],
+          'ttsBufferSettings': jsonEncode(tts['buffer']),
           'allowMixWithOtherAudio': tts['allowMixWithOtherAudio']
         });
         for (final id in TtsConfigTransfer.services) {

@@ -2,9 +2,10 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/last_read_book_provider.dart';
-import 'package:anx_reader/service/book.dart';
+import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
 import 'package:anx_reader/utils/date/relative_time_formatter.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
@@ -46,7 +47,7 @@ class ContinueReadingTile extends StatisticsDashboardTileBase {
         book: Book.mock(),
         lastReadDate: DateTime.now(),
       ),
-      builder: (data, _) {
+      builder: (data, ready) {
         if (data == null) {
           return _EmptyState(
             onRefresh: () => ref.read(lastReadBookProvider.notifier).refresh(),
@@ -54,27 +55,17 @@ class ContinueReadingTile extends StatisticsDashboardTileBase {
         }
         final book = data.book;
         final heroTag = 'continue_reading_${book.id}';
-        return _ContinueReadingContent(
+        return ReadingHistoryBookLink(
           book: book,
-          lastReadDate: data.lastReadDate,
-          heroTag: heroTag,
+          enabled: ready,
+          child: _ContinueReadingContent(
+            book: book,
+            lastReadDate: data.lastReadDate,
+            heroTag: heroTag,
+          ),
         );
       },
     );
-  }
-
-  @override
-  void onTap(BuildContext context, WidgetRef ref) {
-    final data = ref.read(lastReadBookProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => null,
-        );
-    final book = data?.book;
-    if (book == null) return;
-    final heroTag = 'continue_reading_${book.id}';
-    // Don't pass cfi parameter, let the book open from its saved position
-    // This allows reading progress to be saved (same behavior as bookshelf)
-    pushToReadingPage(ref, context, book, heroTag: heroTag);
   }
 }
 
@@ -100,6 +91,7 @@ class _ContinueReadingContent extends StatelessWidget {
       children: [
         Hero(
           tag: heroTag,
+          createRectTween: readerCoverRectTween,
           child: BookCover(
             book: book,
             width: 60,
@@ -125,6 +117,7 @@ class _ContinueReadingContent extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall,
               ),
+              if (book.isDeleted) Text(L10n.of(context).bookDeleted),
               const SizedBox(height: 4),
               Text(
                 subtitle,

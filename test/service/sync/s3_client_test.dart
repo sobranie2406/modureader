@@ -31,6 +31,8 @@ class S3Fixture {
   int? failure;
   int pageSize = 2;
   bool corruptDownload = false;
+  bool markerProbeReportsComplete = false;
+  bool formEncodedNames = false;
   String xml(String text) => const HtmlEscape().convert(text);
   Future<void> start() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -61,6 +63,10 @@ class S3Fixture {
           return;
         }
         final prefix = request.uri.queryParameters['prefix']!;
+        final encoded = request.uri.queryParameters['encoding-type'] == 'url';
+        String encodeName(String value) => !encoded
+            ? value
+            : formEncodedNames ? Uri.encodeQueryComponent(value) : s3Encode(value);
         final entries = <String, bool>{};
         for (final key in objects.keys.where((key) => key.startsWith(prefix))) {
           final rest = key.substring(prefix.length);
@@ -73,31 +79,40 @@ class S3Fixture {
               slash >= 0;
         }
         final keys = entries.keys.toList()..sort();
-        final start = int.parse(
-            request.uri.queryParameters['continuation-token'] ??
-                request.uri.queryParameters['marker'] ??
-                '0');
+        final continuation = request.uri.queryParameters['continuation-token'];
+        final marker = request.uri.queryParameters['marker'];
+        final start = continuation != null
+            ? int.parse(continuation.split('+')[1].split('/')[0])
+            : marker == null ? 0 : keys.indexOf(marker) + 1;
+        if (marker != null) expect(keys, contains(marker));
         final limit = int.parse(request.uri.queryParameters['max-keys']!)
             .clamp(1, pageSize);
         final page = keys.skip(start).take(limit).toList();
-        final more = start + page.length < keys.length;
+        // RainYun can report a marker-only max-keys=1 probe as complete,
+        // even when a normal directory listing contains more children.
+        final markerOnlyProbe = markerProbeReportsComplete &&
+            request.uri.queryParameters['max-keys'] == '1' &&
+            page.length == 1 &&
+            page.single == prefix;
+        final more = !markerOnlyProbe && start + page.length < keys.length;
         response.write(
             '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
-            '<Prefix>${xml(s3Encode(prefix))}</Prefix><EncodingType>url</EncodingType>'
+            '<Prefix>${xml(encodeName(prefix))}</Prefix>'
+            '${encoded ? '<EncodingType>url</EncodingType>' : ''}'
             '<IsTruncated>$more</IsTruncated>');
         for (final key in page) {
           if (entries[key]!) {
             response.write(
-                '<CommonPrefixes><Prefix>${xml(s3Encode(key))}</Prefix></CommonPrefixes>');
+                '<CommonPrefixes><Prefix>${xml(encodeName(key))}</Prefix></CommonPrefixes>');
           } else {
             response.write(
-                '<Contents><Key>${xml(s3Encode(key))}</Key><Size>${objects[key]!.length}</Size>'
+                '<Contents><Key>${xml(encodeName(key))}</Key><Size>${objects[key]!.length}</Size>'
                 '<ETag>"${md5.convert(objects[key]!)}"</ETag></Contents>');
           }
         }
         if (more)
           response.write(
-              '<NextContinuationToken>${start + page.length}</NextContinuationToken><NextMarker>${start + page.length}</NextMarker>');
+              '<NextContinuationToken>page+${start + page.length}/=</NextContinuationToken><NextMarker>${xml(encodeName(page.last))}</NextMarker>');
         response.write('</ListBucketResult>');
       } else if (request.method == 'PUT') {
         final bytes =
@@ -142,6 +157,18 @@ class S3Fixture {
 }
 
 void main() {
+  test('literal listing names are scoped to RainYun only', () {
+    for (final host in ['cn-nb1.rains3.com', '19216811.cn-nb1.rains3.com']) {
+      expect(S3Config(configuration({'endpoint': 'https://$host'}))
+          .useEncodedListingNames, false);
+    }
+    expect(S3Config(configuration({'provider': 'rainyun'}))
+        .useEncodedListingNames, false);
+    for (final host in ['s3.amazonaws.com', 'notrains3.com', 'rains3.com.example.org']) {
+      expect(S3Config(configuration({'endpoint': 'https://$host'}))
+          .useEncodedListingNames, true);
+    }
+  });
   test(
       'V4 agrees with official @smithy/signature-v4 for Unicode and query tokens',
       () {
@@ -248,6 +275,34 @@ void main() {
         expect(await client.safeReadDir('modu/empty'), isEmpty);
       }
     });
+    test('RainYun listings preserve spaces, literal plus and percent names',
+        () async {
+      server.formEncodedNames = true;
+      final names = {'a b.png', 'a+b.png', 'a%20b.png', 'a%2Bb.png', '中文 +%&.png'};
+      for (final root in ['Books/中文', 'Books/中文 folder+%']) {
+        server.objects.clear();
+        server.objects['$root/data/cover/'] = [];
+        for (final name in names) {
+          server.objects['$root/data/cover/$name'] = utf8.encode(name);
+        }
+        server.objects['$root/folder +%/child'] = [1];
+        for (final version in ['v1', 'v2']) {
+          final client = server.client({'provider': 'rainyun',
+            'remoteRoot': root, 'listVersion': version});
+          final listing = await client.readDir('modu/data/cover');
+          expect(listing.map((f) => f.name).toSet(), names);
+          expect((await client.readProps('modu/data/cover'))?.isDir, true);
+          expect((await client.readDir('modu')).map((f) => f.name),
+              contains('folder +%'));
+          for (final entry in listing) {
+            expect((await client.readProps(entry.path!))?.size, entry.size);
+            final destination = '${temp.path}/download';
+            await client.downloadFile(entry.path!, destination);
+            expect(await File(destination).readAsString(), entry.name);
+          }
+        }
+      }
+    });
     test('capability probe cleans only its own object, streamed round trip',
         () async {
       final client = server.client();
@@ -280,6 +335,45 @@ void main() {
         expect((await client.readProps('modu/data/file/'))?.isDir, true);
         expect(
             (await client.readDir('modu/data/file')).single.name, 'book.pdf');
+      }
+    });
+    test('RainYun marker-only probes still identify populated directories',
+        () async {
+      server.markerProbeReportsComplete = true;
+      server.objects['Books/中文/data/file/'] = [];
+      for (final name in ['one.pdf', 'two.epub', '中文.txt']) {
+        server.objects['Books/中文/data/file/$name'] = [1, 2, 3];
+      }
+      for (final version in ['v1', 'v2']) {
+        final client = server.client({'listVersion': version});
+        for (final path in ['modu/data/file', 'modu/data/file/']) {
+          expect((await client.readProps(path))?.isDir, true);
+          expect(await client.isExist(path), true);
+          final files = await client.readDir(path);
+          expect(files.map((f) => f.name).toSet(),
+              {'one.pdf', 'two.epub', '中文.txt'});
+          expect(files.every((f) => f.isDir == false), true);
+        }
+      }
+    });
+    test('empty marked directories exist but markers are never listed as files',
+        () async {
+      server.objects['Books/中文/'] = [];
+      server.objects['Books/中文/empty/'] = [];
+      server.objects['Books/中文/zero.txt'] = [];
+      for (final version in ['v1', 'v2']) {
+        final client = server.client({'listVersion': version});
+        for (final path in ['modu', 'modu/empty', 'modu/empty/']) {
+          expect((await client.readProps(path))?.isDir, true);
+        }
+        expect(await client.readDir('modu/empty'), isEmpty);
+        expect(await client.readProps('modu/missing'), isNull);
+        expect(await client.readProps('modu/missing/'), isNull);
+        final file = await client.readProps('modu/zero.txt');
+        expect(file?.isDir, false);
+        expect(file?.size, 0);
+        expect((await client.readDir('modu')).map((f) => f.name).toSet(),
+            {'empty', 'zero.txt'});
       }
     });
     test('errors, redirects, malformed and truncated lists fail closed',
@@ -339,6 +433,8 @@ void main() {
         }
 
         await sync(sa);
+        server.markerProbeReportsComplete = true;
+        server.objects['Books/中文/record-log-v1/'] = [];
         await sync(sb);
         await sync(sa);
         expect((await a.query('tb_notes')).map((r) => r['content']).toSet(),

@@ -11,6 +11,7 @@ import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_strea
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/continue_reading_tile.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/top_book_tile.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/total_time_tile.dart';
+import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_insight_tile.dart';
 
 /// Types of dashboard tiles that can appear in the statistics dashboard.
 enum StatisticsDashboardTileType {
@@ -27,6 +28,10 @@ enum StatisticsDashboardTileType {
   completionProgress,
   topBook,
   continueReading,
+  recentReading,
+  weeklyReview,
+  dailyReadingAverage,
+  mostAnnotatedBooks,
 }
 
 /// Default order for dashboard tiles when the user has not customized the layout.
@@ -59,4 +64,12 @@ final Map<StatisticsDashboardTileType, StatisticsDashboardTileBase>
       const CompletionProgressTile(),
   StatisticsDashboardTileType.topBook: const TopBookTile(),
   StatisticsDashboardTileType.continueReading: const ContinueReadingTile(),
+  StatisticsDashboardTileType.recentReading:
+      const ReadingInsightTile(StatisticsDashboardTileType.recentReading),
+  StatisticsDashboardTileType.weeklyReview:
+      const ReadingInsightTile(StatisticsDashboardTileType.weeklyReview),
+  StatisticsDashboardTileType.dailyReadingAverage:
+      const ReadingInsightTile(StatisticsDashboardTileType.dailyReadingAverage),
+  StatisticsDashboardTileType.mostAnnotatedBooks:
+      const ReadingInsightTile(StatisticsDashboardTileType.mostAnnotatedBooks),
 };

@@ -6,6 +6,8 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_media_state.dart';
 import 'package:anx_reader/service/tts/notification_permission.dart';
+import 'package:anx_reader/service/tts/tts_reader_wait.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:anx_reader/utils/log/common.dart';
@@ -112,8 +114,25 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     _getCurrentText = getCurrentText;
     _getNextText = getNextText;
     _getPrevText = getPrevText;
-    await tts.init(getCurrentText, getNextText, getPrevText);
+    AnxLog.info('TTS initialization; backend=${tts.runtimeType}');
+    unawaited(_logNetwork());
+    await waitForTtsReader('backend-init',
+        () => tts.init(getCurrentText, getNextText, getPrevText));
     _observePlayback();
+  }
+
+  // A connection type is diagnostic context, not proof of Internet access.
+  // Never log SSID, IP, server URLs, credentials or the book's text.
+  Future<void> _logNetwork() async {
+    try {
+      final types = await Connectivity()
+          .checkConnectivity()
+          .timeout(const Duration(seconds: 2));
+      AnxLog.info(
+          'TTS network transport: ${types.map((e) => e.name).join(",")}');
+    } catch (_) {
+      AnxLog.info('TTS network transport: unavailable');
+    }
   }
 
   Future<void> switchTtsType(String serviceId) async {
@@ -226,7 +245,8 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     // operation. Never require foreground UI or permission dialogs for it.
     if (!resuming) {
       if (reader == null) return;
-      await prepareTtsNotificationPermission();
+      await waitForTtsReader(
+          'notification-permission', prepareTtsNotificationPermission);
       if (!reader.mounted || epubPlayerKey.currentState != reader) return;
     }
     // Native pause can finish after the notification has already shown Play.
@@ -236,8 +256,12 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
       await _pendingPause;
       if (command != _transportCommand || !identical(tts, backend)) return;
       final active = focusAlreadyGained ||
-          await (_activateSessionOverride?.call() ??
-              AudioSession.instance.then((session) => session.setActive(true)));
+          await waitForTtsReader(
+              'audio-focus',
+              () =>
+                  _activateSessionOverride?.call() ??
+                  AudioSession.instance
+                      .then((session) => session.setActive(true)));
       if (!active) {
         AnxLog.warning('TTS transport play rejected: audio focus denied');
         return;

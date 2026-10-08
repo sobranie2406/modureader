@@ -1,49 +1,51 @@
-# Modu 1.2.2 · Stable
+# Modu 1.2.3 · Stable
 
 ## English
 
-**Modu 1.2.2 (build 10087)** includes the following changes since stable **1.2.1**.
+**Modu 1.2.3 (build 10090)** — changes since stable **1.2.2**.
 
-- Import multiple books at once: choose files, import a folder recursively, or select supported files within a folder. On desktop, drop files or folders onto the bookshelf or reader. Import staging preserves the original files.
-- Improve text selection in OCR and text-reflow reading: macOS shows the selection toolbar automatically and supports initial word expansion; Android also expands the initial selection. Selection handles remain available for manual adjustment, with the paragraph-selection preference supported. Ordinary text-book reading remains separate from scanned-page processing.
-- Reduce motion throughout E-Ink mode, including app navigation, pop-ups, page-turn effects and animated loading indicators. Use solid, high-contrast surfaces in place of translucent effects; turning E-Ink off restores normal presentation.
-- Add compact book-format and scanned-book badges to covers. Manual scanned-book settings take priority over automatic classification. Format badges describe the stored file, so books converted from TXT / Markdown may show EPUB.
-- Make the floating home navigation translucent, with trailing scroll clearance so the last row remains visible and accessible.
-- Add a separate object-storage sync tab with S3-compatible provider presets, including Alibaba OSS and Tencent COS. Existing WebDAV credentials and enabled state are retained; switching providers does not move cloud data. Back up before switching. Provider compatibility remains subject to the actual endpoint and bucket configuration.
-- Fix footnote links inside highlighted or underlined text being intercepted by the annotation toolbar. Make folder overflow buttons consistent with book covers.
-- Reduce Android opening-transition contention by initializing the reader after the cover transition; reduce unnecessary rebuilds when the AI keyboard changes and fix double keyboard avoidance. Actual device frame-rate improvements have not yet been measured.
-- Include a native HarmonyOS ARM64 **unsigned HAP**. It requires HarmonyOS signing credentials/profile before installation; an Android APK signature cannot be reused. This package has not yet been validated on a physical HarmonyOS device.
-- Add the Telegram channel and discussion group to About, feedback and bilingual project documentation. The QQ community shows a copyable group number instead of a QR code: **1009765685**.
+- Fix(sync): Recognize S3 directory placeholder objects as existing directories without treating them as child files, preventing false missing-directory results during synchronization.
+- Fix(sync): Request literal listing names from RainYun ROS to preserve spaces, plus signs and Unicode object keys; keep other S3 providers' URL-encoded listings and WebDAV behavior unchanged.
+- Feat(history): Rename Statistics to Reading History with a history icon; open available books by tapping their title or cover and show a clear notice for deleted books without removing reading records.
+- Feat(history): Add rearrangeable Recently read, This week, Daily reading average and Most annotated cards, with reading-date, progress, activity and annotation labels.
+- Fix(l10n): Translate the bookshelf's indexed badge according to the interface language instead of always displaying Chinese.
+- Feat(reader): Add Original / Simplified / Traditional Chinese conversion beside the Chinese font selector, using the existing reading conversion preference without rewriting book files.
+- Feat(android): Expand the shelf thumbnail and turn the cover outward around its left spine when opening a book; reverse the sequence on return. Keep the native reader outside the animated cover and initialize it immediately. E-Ink and disabled-animation settings still bypass motion.
+- Perf(android): Reduce reader platform-view and AI stream/layout contention; preserve drafts and focus, apply keyboard avoidance once, and retain manual scrolling during long responses. Device results vary; sustained smoothness is not guaranteed.
+- Fix(tts): Release stalled system-TTS waits on native errors or pre-start timeout, preserve the current sentence for retry, and keep long utterances unrestricted once speech has started.
+- Fix(tts): Report delayed or failed reader/backend/audio-focus startup without logging book text or credentials; handle narration-panel startup errors and disposed readers safely. The reported iQOO Wi-Fi-specific failure remains unconfirmed on the original device.
+- Feat(tts): Add online lookahead, synthesis-size and concurrency controls, paragraph pauses, audio-cache retention and cache clearing. Defaults are 3 extra passages, 240 characters, 2 concurrent requests, no extra pause and 10-minute retention; system TTS keeps its own engine-managed behavior.
+- Fix(tts): Bound reusable audio cache to 32 MiB, expire idle entries, clear on stop when retention is 0, and prevent late requests from undoing cache clearing. Retry timed-out shared synthesis with a fresh request.
+- Feat(settings): Include online speech buffering preferences in existing settings export/import and optional provider-settings sync; accept old exports with safe defaults.
 
-[Telegram channel](https://t.me/Modureader) · [Discussion group](https://t.me/ModuReaderDiscussion)
+**Packages:** 9 installers and 9 SHA-256 files: Android ARM64; iOS ARM64; macOS, Windows and Linux ARM64/x64; HarmonyOS ARM64. No Android x64. Mac DMGs contain only Modu.app and the Applications shortcut.
 
-Nine packages, each with SHA-256: Android ARM64; iOS ARM64; macOS, Windows and Linux ARM64/x64; HarmonyOS ARM64 (unsigned HAP, manual signing/installation). Android x64 is not distributed. Mac disk images contain only Modu.app and the Applications shortcut.
+**Installation:** Back up and upgrade in place; do not uninstall or clear the library first. Android retains the project signing key. macOS uses ad-hoc signing and is not notarized. Windows requires WebView2; Linux targets Debian 13. iOS requires your own signing for the app and Share Extension. The HarmonyOS HAP is unsigned, requires a valid HarmonyOS certificate/profile, and is not yet device-validated. Models remain on-demand downloads.
 
-Back up and upgrade in place. Android retains the project signing key. macOS uses ad-hoc signing and is not notarized; Windows requires WebView2; Linux packages target Debian 13; iOS requires your own valid signing for the app and Share Extension. Models remain on-demand downloads.
-
-[Corresponding source](https://github.com/sobranie2406/modureader/tree/v1.2.2) · [Changes since 1.2.1](https://github.com/sobranie2406/modureader/compare/v1.2.1...v1.2.2) · [Installation guide](https://github.com/sobranie2406/modureader/blob/v1.2.2/docs/RELEASING.md)
+[Source](https://github.com/sobranie2406/modureader/tree/v1.2.3) · [Changes since 1.2.2](https://github.com/sobranie2406/modureader/compare/v1.2.2...v1.2.3) · [Installation guide](https://github.com/sobranie2406/modureader/blob/v1.2.3/docs/RELEASING.md)
 
 ---
 
 ## 简体中文
 
-**Modu 1.2.2（构建 10087）**，以下为 **1.2.1 正式版以来**的变化。
+**Modu 1.2.3（构建 10090）**，以下为 **1.2.2 正式版以来**的变化。
 
-- 支持批量导入书籍：多选文件、递归导入整个文件夹，或进入文件夹后勾选适配格式。桌面端可将文件或文件夹拖到书架及阅读界面；导入过程保留原始文件。
-- 改善 OCR 与文字重排阅读中的选词：Mac 自动弹出划词工具栏并支持首次按词扩选，Android 同样支持首次扩选。保留选择手柄供手动调整，并遵循整段选择设置。普通文字书仍与扫描版处理逻辑分离。
-- E-Ink 模式关闭应用内导航、弹窗、翻页及动态加载等动画，使用清晰的实色样式；关闭 E-Ink 后恢复常规显示。
-- 封面增加紧凑的书籍格式及扫描版标签，手动设置结果优先于自动识别。格式标签显示实际存储格式，TXT、Markdown 转换后的书籍可能显示 EPUB。
-- 首页浮动导航改为半透明效果，滚动底部预留避让空间，最后一排书籍仍可完整查看及操作。
-- 同步设置增加独立的对象存储标签页，提供 S3 兼容服务预设，包括阿里云 OSS、腾讯云 COS 等。保留已有 WebDAV 凭据和开关状态；切换服务不会自动迁移云端数据，请先备份。实际兼容性仍取决于所用端点和存储桶配置。
-- 修复高亮、划线范围内的脚注链接被批注工具栏拦截；统一文件夹与书籍的更多按钮样式。
-- 安卓阅读界面在封面过渡结束后初始化，减少开书时的并发负担；减少 AI 键盘变化时不必要的重建，修复键盘重复避让。实际帧率改善幅度尚待实机测量。
-- 新增原生鸿蒙 ARM64 **未签名 HAP**，安装前需使用鸿蒙证书与 Profile 签名，不能沿用安卓 APK 签名。该包尚未完成鸿蒙实机验证。
-- 关于、问题反馈及中英文项目文档加入 Telegram 频道与讨论群；QQ 交流入口改为可复制群号 **1009765685**，不再显示二维码。
+- Fix(sync): 正确识别 S3 目录占位对象，不将其作为子文件，修复同步时将有内容的目录误判为不存在的问题。
+- Fix(sync): 雨云 ROS 改为请求原始列举名称，正确保留空格、加号及 Unicode 对象名；其他 S3 服务仍使用原 URL 编码流程，WebDAV 行为不变。
+- Feat(history): “统计”改为“阅读历史”并更换图标，点击书名或封面可打开仍在书库中的书籍；已删除书籍给出明确提示，保留阅读记录。
+- Feat(history): 增加可自由排列的“最近阅读”“本周阅读回顾”“阅读日均时长”“笔记最多的书”卡片，显示阅读日期、进度、活跃天数及笔记数量等标签。
+- Fix(l10n): 书架“已索引”标签随界面语言显示，不再在英文界面固定显示中文。
+- Feat(reader): 中文字体旁增加“原文／简体／繁体”快捷切换，沿用已有阅读转换设置，不改写书籍源文件。
+- Feat(android): 开书时由书架缩略图放大，再沿左侧书脊向外翻开，返回时反向收起；正文视图不参与封面变形并立即初始化。E-Ink 和关闭动画时仍无过渡动画。
+- Perf(android): 减少阅读视图与 AI 流式输出、布局之间的重复负担，保留输入草稿与焦点，避免键盘重复避让，长回答中保留手动滚动。不同设备效果有差异，不承诺始终无掉帧。
+- Fix(tts): 系统 TTS 原生报错或启动超时时及时结束等待，保留当前句供重试；已经开始的长段朗读不受启动超时限制。
+- Fix(tts): 增加正文获取、引擎及音频焦点启动延迟和失败诊断，不记录书籍正文或凭据；安全处理朗读面板启动失败及阅读器关闭。反馈中的 iQOO 特定 Wi-Fi 故障尚未在原设备确认根因。
+- Feat(tts): 增加在线朗读缓冲量、合成字数、并发数、段落停顿、缓存保留时间及清理功能。默认额外缓冲 3 段、单次最多 240 字、并发 2、无额外停顿、保留 10 分钟；系统 TTS 仍由设备引擎管理。
+- Fix(tts): 可复用音频缓存限制为 32 MiB，支持空闲过期、保留时间为 0 时停止清理，清理前发出的请求不会回填旧缓存；共享合成请求超时后可重新发起请求。
+- Feat(settings): 在线朗读缓冲参数纳入已有设置导入导出及可选的服务配置同步，兼容缺少新字段的旧配置。
 
-[Telegram 频道](https://t.me/Modureader) · [Telegram 讨论群](https://t.me/ModuReaderDiscussion)
+**发布包：**9 个程序包及 9 个 SHA-256 文件：Android ARM64、iOS ARM64、macOS／Windows／Linux ARM64 与 x64、HarmonyOS ARM64。不发布安卓 x64；Mac 安装盘仅展示 Modu.app 与 Applications 快捷入口。
 
-共 **9 个程序包**，各附 SHA-256：Android ARM64、iOS ARM64，macOS、Windows、Linux 的 ARM64／x64，以及鸿蒙 ARM64（未签名 HAP，需手动签名安装）；不发布安卓 x64。Mac 安装盘仅展示 Modu.app 和 Applications 快捷入口。
+**安装提醒：**先备份再覆盖升级，不要先卸载或清空书库。Android 沿用原签名；macOS 为 ad-hoc 签名且未公证；Windows 需要 WebView2，Linux 面向 Debian 13。iOS 需自行签名主应用及 Share Extension。鸿蒙 HAP 未签名，需使用有效鸿蒙证书与 Profile 签名，尚未完成鸿蒙实机验证。模型继续按需下载。
 
-请先备份，再覆盖升级，不要先卸载或清空数据。Android 沿用原签名；macOS 为 ad-hoc 签名且未公证；Windows 需要 WebView2；Linux 面向 Debian 13；iOS 需自行签名主应用及 Share Extension。模型继续按需下载。
-
-[对应源码](https://github.com/sobranie2406/modureader/tree/v1.2.2) · [1.2.1 至 1.2.2 源码差异](https://github.com/sobranie2406/modureader/compare/v1.2.1...v1.2.2) · [安装说明](https://github.com/sobranie2406/modureader/blob/v1.2.2/docs/RELEASING.md)
+[对应源码](https://github.com/sobranie2406/modureader/tree/v1.2.3) · [1.2.2 至 1.2.3 源码差异](https://github.com/sobranie2406/modureader/compare/v1.2.2...v1.2.3) · [安装说明](https://github.com/sobranie2406/modureader/blob/v1.2.3/docs/RELEASING.md)

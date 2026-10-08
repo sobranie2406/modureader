@@ -5,6 +5,7 @@ import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/service/tts/system_tts_support.dart';
 import 'package:anx_reader/service/tts/tts_service.dart' as tts_svc;
 import 'package:anx_reader/widgets/reading_page/widget_title.dart';
@@ -31,6 +32,7 @@ class _TtsWidgetState extends State<TtsWidget> {
   double rate = Prefs().ttsRate;
   double stopSeconds = 0;
   Timer? stopTimer;
+  String? _startupError;
 
   bool get _unsupportedSystem =>
       Prefs().ttsService == 'system' && !supportsSystemTts();
@@ -48,20 +50,30 @@ class _TtsWidgetState extends State<TtsWidget> {
 
   @override
   void initState() {
+    super.initState();
     if (!_unsupportedSystem &&
         TtsHandler().ttsStateNotifier.value == TtsStateEnum.stopped) {
-      TtsHandler()
-          .init(
-        widget.epubPlayerKey.currentState!.initTts,
-        widget.epubPlayerKey.currentState!.ttsNext,
-        widget.epubPlayerKey.currentState!.ttsPrev,
-      )
-          .then((value) {
-        audioHandler.play();
-      });
+      unawaited(_startReading());
     }
+  }
 
-    super.initState();
+  Future<void> _startReading() async {
+    final reader = widget.epubPlayerKey.currentState;
+    if (reader == null) return;
+    try {
+      await TtsHandler().init(reader.initTts, reader.ttsNext, reader.ttsPrev);
+      if (!mounted ||
+          !reader.mounted ||
+          widget.epubPlayerKey.currentState != reader) return;
+      await audioHandler.play();
+    } catch (error) {
+      AnxLog.warning('TTS panel startup failed: ${error.runtimeType}');
+      if (mounted)
+        setState(() => _startupError = ModuStrings.text(
+            context,
+            '朗读启动失败，请重新打开朗读面板重试。',
+            'Could not start speech. Reopen the narration panel to retry.'));
+    }
   }
 
   @override
@@ -334,6 +346,10 @@ class _TtsWidgetState extends State<TtsWidget> {
                 ReadingSettings.style,
               ),
               buttons(),
+              if (_startupError case final String error)
+                Text(error,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               if (TtsHandler().tts.playbackError case final String error)
                 Text(error,
                     style:

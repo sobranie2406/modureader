@@ -2290,13 +2290,17 @@ window.nextSection = () => reader.view.renderer.nextSection()
 window.initTts = () => reader.view.initTTS()
 
 const ttsNavigator = new TtsNavigator(() => reader.view)
-window.ttsSetParagraphMode = enabled => {
+window.ttsSetParagraphMode = (enabled, maxCharacters = 240) => {
   const paragraphMode = enabled === true
-  if ((reader.view.ttsParagraphMode === true) === paragraphMode) return
+  const limit = Number.isInteger(maxCharacters) && maxCharacters >= 100 && maxCharacters <= 2000
+    ? maxCharacters : 240
+  if ((reader.view.ttsParagraphMode === true) === paragraphMode
+    && (!paragraphMode || reader.view.ttsMaxCharacters === limit)) return
   // Switching service must not reuse a cursor with the old unit boundaries.
   ttsNavigator.stop()
   reader.view.initTTS(true)
   reader.view.ttsParagraphMode = paragraphMode
+  reader.view.ttsMaxCharacters = limit
 }
 window.ttsSetBackground = background => {
   reader.view.ttsBackground = background === true

@@ -212,7 +212,7 @@ function* getBlocks(doc, shouldSkipTextNode) {
 const speechGroupCharacters = 240
 const speechGroupSentences = 4
 
-function* splitSpeechRange(range, shouldSkipTextNode) {
+function* splitSpeechRange(range, shouldSkipTextNode, maxCharacters) {
     const doc = range.startContainer.ownerDocument
     const root = range.commonAncestorContainer
     const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
@@ -226,7 +226,7 @@ function* splitSpeechRange(range, shouldSkipTextNode) {
         spans.push({ node, start, offset: text.length, length: end - start })
         text += node.textContent.slice(start, end)
     }
-    if (text.length <= speechGroupCharacters) { yield range; return }
+    if (text.length <= maxCharacters) { yield range; return }
     const boundary = (offset, end) => {
         const span = spans.find(s => end
             ? offset > s.offset && offset <= s.offset + s.length
@@ -234,11 +234,11 @@ function* splitSpeechRange(range, shouldSkipTextNode) {
         return [span.node, span.start + offset - span.offset]
     }
     for (let start = 0; start < text.length;) {
-        let end = Math.min(start + speechGroupCharacters, text.length)
+        let end = Math.min(start + maxCharacters, text.length)
         if (end < text.length) {
             // Prefer a clause/word boundary in the latter half of a long
             // sentence; otherwise split without breaking a surrogate pair.
-            for (let i = end - 1; i >= start + speechGroupCharacters / 2; i--) {
+            for (let i = end - 1; i >= start + maxCharacters / 2; i--) {
                 if (/[，,；;：:\s]/u.test(text[i])) { end = i + 1; break }
             }
             if (/[\uDC00-\uDFFF]/.test(text[end]) && /[\uD800-\uDBFF]/.test(text[end - 1])) end--
@@ -251,17 +251,17 @@ function* splitSpeechRange(range, shouldSkipTextNode) {
     }
 }
 
-function* getSpeechGroups(doc, shouldSkipTextNode) {
+function* getSpeechGroups(doc, shouldSkipTextNode, maxCharacters) {
     let group = null
     let block = null
     let length = 0
     let count = 0
     for (const sentence of getBlocks(doc, shouldSkipTextNode)) {
-        for (const part of splitSpeechRange(sentence, shouldSkipTextNode)) {
+        for (const part of splitSpeechRange(sentence, shouldSkipTextNode, maxCharacters)) {
             const nextBlock = findBlockAncestor(part.startContainer)
             const size = getRangeText(part, shouldSkipTextNode).length
             if (group && (nextBlock !== block || count >= speechGroupSentences
-                || length + size > speechGroupCharacters)) {
+                || length + size > maxCharacters)) {
                 yield group
                 group = null
             }
@@ -385,16 +385,33 @@ export class TTS {
     #getCfi
     #textFilter
     #partial
-    constructor(doc, textWalker, highlight, getCfi, { paragraphMode = false } = {}) {
+    #paragraphEnds = new WeakSet()
+    constructor(doc, textWalker, highlight, getCfi,
+        { paragraphMode = false, maxCharacters = speechGroupCharacters } = {}) {
         this.doc = doc
         this.highlight = highlight
         this.#getCfi = getCfi
         const shouldSkipTextNode = createTextFilter(doc)
         this.#textFilter = shouldSkipTextNode
         this.paragraphMode = paragraphMode
-        const ranges = paragraphMode ? getSpeechGroups(doc, shouldSkipTextNode)
+        const limit = Number.isInteger(maxCharacters) && maxCharacters >= 100 && maxCharacters <= 2000
+            ? maxCharacters : speechGroupCharacters
+        const ranges = paragraphMode ? getSpeechGroups(doc, shouldSkipTextNode, limit)
             : getBlocks(doc, shouldSkipTextNode)
-        this.#list = new ListIterator(ranges, range => {
+        const paragraphEnds = this.#paragraphEnds
+        function* markEnds() {
+            let pending = null
+            for (const range of ranges) {
+                if (pending) {
+                    if (findBlockAncestor(pending.endContainer) !== findBlockAncestor(range.startContainer))
+                        paragraphEnds.add(pending)
+                    yield pending
+                }
+                pending = range
+            }
+            if (pending) { paragraphEnds.add(pending); yield pending }
+        }
+        this.#list = new ListIterator(paragraphMode ? markEnds() : ranges, range => {
             return [getRangeText(range, shouldSkipTextNode), range]
         })
     }
@@ -449,7 +466,8 @@ export class TTS {
         if (!cfi && this.#getCfi && range.cloneRange) {
             cfi = this.#locationOf(range)
         }
-        return { text: plainText, cfi }
+        return { text: plainText, cfi,
+            ...(this.paragraphMode ? { endsParagraph: this.#paragraphEnds.has(entry[1]) } : {}) }
     }
 
     start() {

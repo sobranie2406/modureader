@@ -2,8 +2,6 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:anx_reader/widgets/page_router/reading_route.dart';
-import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/theme.dart';
@@ -510,8 +508,6 @@ Future<void> pushToReadingPage(
     navigatorKey.currentContext!,
     readingRoute<void>(
       animate: Prefs().openBookAnimation,
-      deferReaderUntilTransition: AnxPlatform.isAndroid,
-      openingPlaceholder: SizedBox.expand(child: BookCover(book: book)),
       builder: (c) => ReadingPage(
         key: readingPageKey,
         book: book,

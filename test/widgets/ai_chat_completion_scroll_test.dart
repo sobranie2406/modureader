@@ -107,6 +107,41 @@ void main() {
       tester.widget<ListView>(find.byType(ListView)).controller!.position;
 
   for (final scope in AiChatScope.values) {
+    testWidgets('${scope.name} landscape keyboard keeps draft and send visible',
+        (tester) async {
+      final chat = await mount(tester, scope);
+      chat.emit('A complete response.', thinking: false);
+      await chat.streams.last.close();
+      await tester.pumpAndSettle();
+      final editor = find.byKey(const ValueKey('ai-message-input'));
+      await tester.enterText(editor, 'Unsent keyboard draft');
+      final fieldBefore = tester.state(editor);
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 270);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.state(editor), same(fieldBefore));
+      expect(tester.widget<TextField>(editor).controller!.text,
+          'Unsent keyboard draft');
+      expect(tester.widget<TextField>(editor).focusNode!.hasFocus, isTrue);
+      final send = find.byKey(const ValueKey('ai-send-message'));
+      expect(tester.getBottomRight(send).dy, lessThanOrEqualTo(130));
+      expect(tester.getTopLeft(editor).dy, greaterThanOrEqualTo(0));
+      expect(find.byIcon(Icons.keyboard_hide), findsOneWidget);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      tester.view.physicalSize = const Size(390, 800);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.state(editor), same(fieldBefore));
+      expect(tester.widget<TextField>(editor).controller!.text,
+          'Unsent keyboard draft');
+      expect(find.byIcon(Icons.keyboard_hide), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  for (final scope in AiChatScope.values) {
     testWidgets(
         '${scope.name} reply completion returns to the first answer paragraph',
         (tester) async {

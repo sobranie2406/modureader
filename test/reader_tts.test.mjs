@@ -446,8 +446,8 @@ test('lookahead keeps paragraph grouping, CFI ownership and consumer position ac
   const collect = () => Array.from(view.collectTTSDetails(4, {includeCurrent:true}), x => ({...x}))
   const ahead = collect()
   assert.deepEqual(ahead, [
-    {text:'当前段。', cfi:'0:当前段。'}, {text:'标题', cfi:'1:标题'},
-    {text:'第一句。第二句。', cfi:'1:第一句。第二句。'},
+    {text:'当前段。', cfi:'0:当前段。', endsParagraph:true}, {text:'标题', cfi:'1:标题', endsParagraph:true},
+    {text:'第一句。第二句。', cfi:'1:第一句。第二句。', endsParagraph:true},
   ])
   assert.deepEqual(collect(), ahead)
   assert.equal(await nav.move(1), '标题')

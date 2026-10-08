@@ -28,7 +28,7 @@ codeHighlightTheme enabledAiTools''',
 vectorModelDownloadSource vectorModelConfig''',
   'ocr': 'ocrModelId ocrModelDownloadSource',
   'tts':
-      '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio''',
+      '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio ttsBufferSettings''',
   'translation':
       '''translateService translateFrom translateTo fullTextTranslateService
 fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection webTranslationZoomPercent''',

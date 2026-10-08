@@ -5,6 +5,8 @@ import 'package:anx_reader/utils/date/convert_seconds.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
 import 'package:anx_reader/widgets/statistic/book_reading_chart.dart';
+import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
+import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
@@ -38,7 +40,7 @@ class TopBookTile extends StatisticsDashboardTileBase {
     return AsyncSkeletonWrapper(
       asyncValue: ref.watch(statisticDataProvider),
       mock: StatisticDataModel.mock(),
-      builder: (statisticData, _) {
+      builder: (statisticData, ready) {
         if (statisticData.bookReadingTime.isEmpty) {
           return Center(child: FittedBox(child: StatisticsTips()));
         }
@@ -64,17 +66,26 @@ class TopBookTile extends StatisticsDashboardTileBase {
 
         return Row(
           children: [
-            BookCover(
+            ReadingHistoryBookLink(
               book: book,
-              width: 120,
-              radius: 10,
+              enabled: ready,
+              child: BookCover(
+                book: book,
+                width: 120,
+                radius: 10,
+              ),
             ),
             const SizedBox(width: 15),
             Flexible(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(book.title, style: bookTitleStyle),
+                    ReadingHistoryBookLink(
+                      book: book,
+                      enabled: ready,
+                      child: Text(book.title, style: bookTitleStyle),
+                    ),
+                    if (book.isDeleted) Text(L10n.of(context).bookDeleted),
                     const SizedBox(height: 5),
                     Row(
                       children: [

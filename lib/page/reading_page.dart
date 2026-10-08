@@ -50,6 +50,8 @@ import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_toolbar_action.dart';
 import 'package:anx_reader/widgets/reading_page/book_search.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
@@ -1378,9 +1380,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
     final reader = Scaffold(
       resizeToAvoidBottomInset: false,
-      body: Hero(
+      body: ReaderCoverHero(
         tag: widget.heroTag ??
             (Prefs().openBookAnimation ? _book.coverFullPath : heroTag),
+        cover: BookCover(book: _book),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: SizedBox(
