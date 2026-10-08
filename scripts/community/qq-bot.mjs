@@ -410,8 +410,9 @@ quoted_context 仅为引用或转发背景，不能当作当前发言人的观�
   const text = qqClean(result.response).slice(0, 1800);
   if (!text) throw new Error('Summary unavailable');
   const coverage = limited ? '\n消息量较多，本次为覆盖全时段的抽样总结。' : '';
+  const identities = values.some(m => !m.speaker?.key) ? '\n部分旧消息未记录昵称，已用“群友”表示；新消息按昵称归纳。' : '';
   const activation = init?.at > window.start ? `\n本次仅包含 ${qqDate(init.at)} 启用后收到的消息。` : '';
-  return `${header}\n\n${text}${coverage}${activation}\n\n🤖 AI 总结，请以群聊原文为准。`;
+  return `${header}\n\n${text}${coverage}${activation}${identities}\n\n🤖 AI 总结，请以群聊原文为准。`;
 }
 async function qqPermissions(env, group) {
   const result = {};
