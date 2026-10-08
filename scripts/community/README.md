@@ -54,3 +54,15 @@ node --check scripts/community/dist/worker.mjs
 
 官方接口：[申请事件](https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/group_join_request.html)、
 [审批接口](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_approval_join_request_member_openid.post.html)。
+
+### 群聊日报（对话归纳）
+
+08:00 / 20:00 的上一阶段摘要采用「群聊日报」格式：
+`1. 昵称甲、昵称乙：话题标题 👉 起因、各人观点、相互回应、分歧和最终进展。`
+按话题组织，通常 3—6 项，少话题不凑数；语气自然轻松，不编造结论或承诺。
+
+仅从启用此版本后收到的消息记录发言人的群内昵称及按群隔离的摘要标识。
+用 QQ 稳定成员标识的摘要关联改名前后发言，给 AI 的仅为本时段 U 编号和脱敏昵称；
+同名不同 ID 不合并。记录脱敏后的 @ 对象及引用索引关系，不保存 message_scene 的 auth_token。
+引用文字单独标为背景，不当作当前发言人的观点。旧消息缺少作者时用「群友」，不猜身份。
+所有新增消息元数据随原消息保留 24 小时，不建立长期个人画像，也不读取附件。

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
-import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer} from './qq-bot.mjs';
+import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer, qqDigestTranscript} from './qq-bot.mjs';
 
 const secret = 'DG5g3B4j9X2KOErG'; // Public test vector in Tencent's official documentation.
 const encode = new TextEncoder();
@@ -380,4 +380,47 @@ test('approval permission failure records only numeric status and leaves manual 
     assert.equal(status.last_join_approval.code,11703);
     assert.doesNotMatch(JSON.stringify(status),/private-details|applicant/);
   });
+});
+
+test('conversation archive preserves speaker, mentions and reply links without raw IDs or auth tokens', async () => {
+  await withFixture(async f => {
+    const first = event('digest-1','阅读器闪退');
+    first.d.author = {member_openid:'private-openid-one',username:'小明',bot:false};
+    first.d.message_scene = {ext:['msg_idx=private-index-1','auth_token=private-auth-token']};
+    await qqRoutes(await signed(first),f.env);
+    const reply = event('digest-2','我也遇到了');
+    reply.d.author = {member_openid:'private-openid-two',username:'小明',bot:false};
+    reply.d.mentions = [first.d.author];
+    reply.d.message_scene = {ext:['msg_idx=private-index-2','ref_msg_idx=private-index-1','auth_token=never-store']};
+    reply.d.msg_elements = [{content:'token=quoted-private-key 原消息引用'}];
+    await qqRoutes(await signed(reply),f.env);
+    const renamed = event('digest-3','重启后正常');
+    renamed.d.author = {...first.d.author,username:'小明改名'};
+    await qqRoutes(await signed(renamed),f.env);
+    const records = f.DB.raw.prepare("SELECT value,expires FROM bot_state WHERE key LIKE 'qq:chat:%' ORDER BY key").all();
+    const values = records.map(r=>JSON.parse(r.value));
+    assert.equal(values[0].speaker.key,values[2].speaker.key);
+    assert.notEqual(values[0].speaker.key,values[1].speaker.key);
+    assert.equal(values[1].replyTo,values[0].messageKey);
+    assert.ok(records.every(r=>r.expires<=Math.floor(Date.now()/1000)+86400));
+    assert.doesNotMatch(JSON.stringify(values),/private-openid|private-index|private-auth|never-store|quoted-private-key/);
+    const transcript = qqDigestTranscript(values).map(JSON.parse);
+    assert.equal(transcript[0].speaker,'小明改名（U1）');
+    assert.equal(transcript[1].speaker,'小明（U2）');
+    assert.deepEqual(transcript[1].mentions,['小明改名（U1）']);
+    assert.deepEqual(transcript[1].replyTo,{message:'M1',speaker:'小明改名（U1）'});
+    assert.equal(f.prompts.length,0);
+  });
+});
+
+test('legacy messages and unavailable referenced messages never acquire an invented speaker', () => {
+  const values = [{ts:100,text:'旧消息'},
+    {ts:101,text:'跟进',speaker:{key:'one'},replyTo:'missing'},
+    {ts:102,text:'同名甲',speaker:{key:'two',name:'同名'}},
+    {ts:103,text:'同名乙',speaker:{key:'three',name:'同名'}}];
+  const lines = qqDigestTranscript(values).map(JSON.parse);
+  assert.equal(lines[0].speaker,'未记录发言人');
+  assert.equal(lines[1].speaker,'群友（U1）');
+  assert.equal(lines[1].replyTo,'引用消息不在本时段记录中');
+  assert.notEqual(lines[2].speaker,lines[3].speaker);
 });
