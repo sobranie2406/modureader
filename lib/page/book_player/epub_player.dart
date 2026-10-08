@@ -186,7 +186,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   bool _refreshRequested = false;
   bool _remotePositionPending = false;
   late final bool _animateOpening;
-  late final bool _androidOpeningCover;
   Timer? _syncRefreshRetry;
   int _syncRestoreAttempts = 0;
 
@@ -893,14 +892,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   }
 
   Future<String> initTts({String? fromCfi}) async {
+    _ttsMaxCharacters = Prefs().ttsBufferSettings.maxCharacters;
     final reflow = readingPageKey.currentState?.reflowReader;
     if (reflow != null) return reflow.speechText(fromCfi);
-    final result = await webViewController.callAsyncJavaScript(
-      functionBody: _ttsModeScript +
-          (fromCfi != null && fromCfi.isNotEmpty
-              ? 'return await window.ttsFromCfi(${jsonEncode(fromCfi)})'
-              : 'return await window.ttsHere()'),
-    );
+    final result = await waitForTtsReader(
+        'start',
+        () => webViewController.callAsyncJavaScript(
+              functionBody: _ttsModeScript +
+                  (fromCfi != null && fromCfi.isNotEmpty
+                      ? 'return await window.ttsFromCfi(${jsonEncode(fromCfi)})'
+                      : 'return await window.ttsHere()'),
+            ));
     if (result?.error != null) {
       throw StateError('TTS initialization failed: ${result!.error}');
     }
@@ -931,8 +933,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     }
   }
 
+  int _ttsMaxCharacters = 240;
   String get _ttsModeScript =>
-      'window.ttsSetParagraphMode(${getTtsService(Prefs().ttsService).isOnline});\n';
+      'window.ttsSetParagraphMode(${getTtsService(Prefs().ttsService).isOnline}, $_ttsMaxCharacters);\n';
 
   Future<String> _ttsTextCall(String function) async {
     if (readingPageKey.currentState?.isReflowReading == true) return '';
@@ -1951,10 +1954,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         // removeOverlay();
       },
     );
-    // Android already fades the cover before mounting this native view.
-    _androidOpeningCover = AnxPlatform.isAndroid &&
-        Prefs().openBookAnimation &&
-        !AppMotion.disabled;
+    // Android's route owns the cover turn. Do not place a second static cover
+    // behind it, or a slow chapter would reveal the same closed cover again.
     _animateOpening = !AnxPlatform.isAndroid &&
         Prefs().openBookAnimation &&
         !AppMotion.disabled;
@@ -2016,7 +2017,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     supportZoom: false,
     transparentBackground: true,
     isInspectable: kDebugMode,
-    useHybridComposition: true,
+    // Prefer Flutter's texture-layer composition for reader/UI overlays.
+    // initSurfaceAndroidView retains the engine's platform fallback. The build
+    // override allows device diagnostics without altering user preferences.
+    useHybridComposition: const bool.fromEnvironment(
+        'MODU_READER_HYBRID_COMPOSITION',
+        defaultValue: false),
   );
 
   bool get isDarkMode =>
@@ -2338,15 +2344,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
                         ),
                       )));
             }),
-            if (_androidOpeningCover &&
-                !_readerReady &&
-                !_readerLoadFailed &&
-                !_chapterLoadFailed)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: RepaintBoundary(child: BookCover(book: widget.book)),
-                ),
-              ),
             if (_animateOpening)
               SizedBox.expand(
                   child: IgnorePointer(

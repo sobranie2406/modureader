@@ -57,9 +57,9 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.2.2** — Folder and multi-book import, OCR/reflow text selection improvements, E-Ink motion controls, bookshelf format/scanned labels, a translucent floating navigation bar, and Telegram/QQ community access.
+**Latest release: 1.2.3** — fixes S3 directory detection and RainYun object-name compatibility; adds rearrangeable Reading History cards, quick Simplified/Traditional Chinese conversion and configurable online speech buffering/cache.
 
-Also includes S3-compatible object-storage sync alongside existing WebDAV, annotation-link fixes, Android transition/keyboard optimizations, and an unsigned HarmonyOS package. HarmonyOS installation is manual; the existing automatic update flow is not an HAP signer or installer.
+Android cover opening and AI keyboard/stream layouts have been refined. System speech errors and startup waits now recover with clearer diagnostics. HarmonyOS remains an unsigned HAP requiring local signing; see the [release notes](docs/RELEASE_NOTES.md) for limitations and installation requirements.
 
 Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
 
@@ -343,6 +343,7 @@ Follow reading time, reading days, streaks and progress through individual books
 - Review time trends and the reading heatmap.
 - Explore per-book reading records.
 - Rearrange dashboard cards and keep the metrics you care about.
+- Reading History includes Recently read, This week, Daily reading average and Most annotated cards. Tap a book title or cover to continue reading; deleted books retain their history and show a notice.
 
 ![Add a statistics card on iPhone and view reading charts on Mac](docs/images/showcase/cross-platform/statistics-en.png)
 

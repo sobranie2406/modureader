@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/database.dart';
+import 'package:anx_reader/dao/book.dart';
+import 'package:anx_reader/dao/reading_time.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/row_sync_record.dart';
@@ -45,6 +47,23 @@ void main() {
     PathProviderPlatform.instance = previousPaths;
     documentPath = previousDocumentPath;
     await root.delete(recursive: true);
+  });
+
+  test(
+      'reading history retains deleted books without restoring them to the shelf',
+      () async {
+    final db = await DBHelper().database;
+    await db.insert('tb_books', bookRow(1));
+    await readingTimeDao.insertReadingSession(
+        bookId: 1, readingTime: 120, startedAt: DateTime(2026, 10, 7));
+    await bookDao.setDeleted(1, true);
+    expect(await bookDao.selectBooksByIds([1]), isEmpty);
+    expect(await bookDao.selectNotDeleteBooks(), isEmpty);
+    final history = await readingTimeDao.selectBookReadingTimeOfAll();
+    expect(history, hasLength(1));
+    expect(history.single.keys.single.isDeleted, true);
+    expect(history.single.keys.single.title, 'Synthetic book');
+    expect(history.single.values.single, 120);
   });
 
   test('fresh install shares one complete schema across concurrent callers',

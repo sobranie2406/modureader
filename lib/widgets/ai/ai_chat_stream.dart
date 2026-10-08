@@ -1024,84 +1024,109 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         ],
       ),
     );
-    Widget inputBox = FilledContainer(
-      padding: const EdgeInsets.all(4),
-      radius: 15,
-      child: SafeArea(
-        child: Column(
-          children: [
-            const SkillTemplateDraftTile(compact: true),
-            TextField(
-              controller: inputController,
-              focusNode: _inputFocusNode,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: L10n.of(context).aiHintInputPlaceholder,
-                border: InputBorder.none,
-              ),
-              maxLines: 5,
-              minLines: 1,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendMessage(),
-            ),
-            SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    Widget inputBox({required bool compact}) => FilledContainer(
+          padding: const EdgeInsets.all(4),
+          radius: 15,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Row(
+                if (!compact) const SkillTemplateDraftTile(compact: true),
+                TextField(
+                  key: const ValueKey('ai-message-input'),
+                  controller: inputController,
+                  focusNode: _inputFocusNode,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: L10n.of(context).aiHintInputPlaceholder,
+                    border: InputBorder.none,
+                    suffixIcon: compact
+                        ? Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(
+                              tooltip: ModuStrings.text(
+                                  context, '收起键盘', 'Hide keyboard'),
+                              icon: const Icon(Icons.keyboard_hide, size: 18),
+                              onPressed: _inputFocusNode.unfocus,
+                            ),
+                            IconButton(
+                              key: const ValueKey('ai-send-message'),
+                              icon: Icon(_isStreaming ? Icons.stop : Icons.send,
+                                  size: 18),
+                              onPressed: _isStreaming
+                                  ? _cancelStreaming
+                                  : _sendMessage,
+                            ),
+                          ])
+                        : null,
+                  ),
+                  maxLines: compact ? 1 : 5,
+                  minLines: 1,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendMessage(),
+                ),
+                if (!compact) const SizedBox(height: 4),
+                if (!compact)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Flexible(child: aiService),
-                      if (currentProvider != null)
-                        IconButton(
-                          icon: const Icon(Icons.tune, size: 16),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () async {
-                            final selected = await showModelPickerDialog(
-                              context: context,
-                              provider: currentProvider,
-                              currentModel: currentProvider.model,
-                            );
-                            if (selected != null &&
-                                selected != currentProvider.model) {
-                              ref
-                                  .read(aiProvidersProvider.notifier)
-                                  .updateProvider(
-                                    currentProvider.copyWith(model: selected),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(child: aiService),
+                            if (currentProvider != null)
+                              IconButton(
+                                icon: const Icon(Icons.tune, size: 16),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () async {
+                                  final selected = await showModelPickerDialog(
+                                    context: context,
+                                    provider: currentProvider,
+                                    currentModel: currentProvider.model,
                                   );
-                            }
-                          },
+                                  if (selected != null &&
+                                      selected != currentProvider.model) {
+                                    ref
+                                        .read(aiProvidersProvider.notifier)
+                                        .updateProvider(
+                                          currentProvider.copyWith(
+                                              model: selected),
+                                        );
+                                  }
+                                },
+                              ),
+                          ],
                         ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('ai-skill-prompts-toggle'),
+                        tooltip: _showSkillPrompts
+                            ? ModuStrings.text(
+                                context, '收起技能标签', 'Hide skill shortcuts')
+                            : ModuStrings.text(
+                                context, '展开技能标签', 'Show skill shortcuts'),
+                        isSelected: _showSkillPrompts,
+                        icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                        selectedIcon: const Icon(Icons.auto_awesome, size: 18),
+                        onPressed: () {
+                          _toggleSkillPrompts();
+                        },
+                      ),
+                      IconButton(
+                        key: const ValueKey('ai-send-message'),
+                        icon: Icon(_isStreaming ? Icons.stop : Icons.send,
+                            size: 18),
+                        onPressed:
+                            _isStreaming ? _cancelStreaming : _sendMessage,
+                      ),
                     ],
                   ),
-                ),
-                IconButton(
-                  key: const ValueKey('ai-skill-prompts-toggle'),
-                  tooltip: _showSkillPrompts
-                      ? ModuStrings.text(
-                          context, '收起技能标签', 'Hide skill shortcuts')
-                      : ModuStrings.text(
-                          context, '展开技能标签', 'Show skill shortcuts'),
-                  isSelected: _showSkillPrompts,
-                  icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                  selectedIcon: const Icon(Icons.auto_awesome, size: 18),
-                  onPressed: () {
-                    _toggleSkillPrompts();
-                  },
-                ),
-                IconButton(
-                  key: const ValueKey('ai-send-message'),
-                  icon: Icon(_isStreaming ? Icons.stop : Icons.send, size: 18),
-                  onPressed: _isStreaming ? _cancelStreaming : _sendMessage,
-                ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
 
     return Scaffold(
       key: _scaffoldKey,
@@ -1144,83 +1169,96 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       body: EnvVar.isAppStore &&
               Prefs().shouldShowHint(HintKey.aiDataSharingConsent)
           ? _buildDataSharingConsent(context)
-          : Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                      builder: (context, constraints) => Column(
-                            children: [
-                              Expanded(
-                                  child: Stack(fit: StackFit.expand, children: [
-                                _messageStream != null
-                                    ? StreamBuilder<List<ChatMessage>>(
-                                        stream: _messageStream,
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasError) {
-                                            return SingleChildScrollView(
-                                              padding: const EdgeInsets.all(24),
-                                              child: Text(
-                                                  snapshot.error
-                                                      .toString()
-                                                      .replaceFirst(
-                                                          'Bad state: ', ''),
-                                                  key: const ValueKey(
-                                                      'ai-request-error'),
-                                                  style: TextStyle(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .error)),
-                                            );
-                                          }
-                                          if (!snapshot.hasData) {
-                                            if (snapshot.connectionState ==
-                                                ConnectionState.done) {
-                                              return const SizedBox.expand();
+          : LayoutBuilder(builder: (context, viewport) {
+              // Landscape keyboards and split panes can leave less room than
+              // the full composer. Keep the editor and send action reachable;
+              // the draft/skill/model controls return when the keyboard closes.
+              final compact = viewport.maxHeight < 240;
+              return Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                        builder: (context, constraints) => Column(
+                              children: [
+                                Expanded(
+                                    child:
+                                        Stack(fit: StackFit.expand, children: [
+                                  _messageStream != null
+                                      ? StreamBuilder<List<ChatMessage>>(
+                                          stream: _messageStream,
+                                          builder: (context, snapshot) {
+                                            if (snapshot.hasError) {
+                                              return SingleChildScrollView(
+                                                padding:
+                                                    const EdgeInsets.all(24),
+                                                child: Text(
+                                                    snapshot.error
+                                                        .toString()
+                                                        .replaceFirst(
+                                                            'Bad state: ', ''),
+                                                    key: const ValueKey(
+                                                        'ai-request-error'),
+                                                    style: TextStyle(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .error)),
+                                              );
                                             }
-                                            return EinkStaticIndicator(
-                                                child: Skeletonizer.zone(
-                                                    child: Bone.multiText()));
-                                          }
+                                            if (!snapshot.hasData) {
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.done) {
+                                                return const SizedBox.expand();
+                                              }
+                                              return EinkStaticIndicator(
+                                                  child: Skeletonizer.zone(
+                                                      child: Bone.multiText()));
+                                            }
 
-                                          final messages = snapshot.data!;
-                                          if (messages.isEmpty) {
-                                            return const SizedBox.expand();
-                                          }
-
-                                          return _buildMessageList(messages);
-                                        },
-                                      )
-                                    : ref
-                                        .watch(aiChatProvider(widget.scope))
-                                        .when(
-                                          data: (messages) {
+                                            final messages = snapshot.data!;
                                             if (messages.isEmpty) {
                                               return const SizedBox.expand();
                                             }
 
                                             return _buildMessageList(messages);
                                           },
-                                          loading: () => EinkStaticIndicator(
-                                              child: Skeletonizer.zone(
-                                                  child: Bone.multiText())),
-                                          error: (error, stack) => Center(
-                                              child: Text('error: $error')),
-                                        ),
-                                if (_showSkillPrompts && !_isReaderSkills)
-                                  _buildSkillPicker(context),
-                              ])),
-                              if (_isReaderSkills && _showSkillPrompts)
-                                SizedBox(
-                                  height: (constraints.maxHeight * 0.4)
-                                      .clamp(0.0, 280.0),
-                                  child: _buildSkillPicker(context),
-                                ),
-                            ],
-                          )),
-                ),
-                inputBox,
-              ],
-            ),
+                                        )
+                                      : ref
+                                          .watch(aiChatProvider(widget.scope))
+                                          .when(
+                                            data: (messages) {
+                                              if (messages.isEmpty) {
+                                                return const SizedBox.expand();
+                                              }
+
+                                              return _buildMessageList(
+                                                  messages);
+                                            },
+                                            loading: () => EinkStaticIndicator(
+                                                child: Skeletonizer.zone(
+                                                    child: Bone.multiText())),
+                                            error: (error, stack) => Center(
+                                                child: Text('error: $error')),
+                                          ),
+                                  if (!compact &&
+                                      _showSkillPrompts &&
+                                      !_isReaderSkills)
+                                    _buildSkillPicker(context),
+                                ])),
+                                if (!compact &&
+                                    _isReaderSkills &&
+                                    _showSkillPrompts)
+                                  SizedBox(
+                                    height: (constraints.maxHeight * 0.4)
+                                        .clamp(0.0, 280.0),
+                                    child: _buildSkillPicker(context),
+                                  ),
+                              ],
+                            )),
+                  ),
+                  inputBox(compact: compact),
+                ],
+              );
+            }),
     );
   }
 

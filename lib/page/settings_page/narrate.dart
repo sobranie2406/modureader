@@ -21,6 +21,7 @@ import 'package:anx_reader/widgets/settings/service_config_form.dart';
 import 'package:anx_reader/widgets/settings/mimo_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/openai_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:anx_reader/widgets/settings/tts_buffer_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -76,6 +77,8 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
         await factory.dispose();
       }
       await TtsConfigTransfer.apply(Prefs(), valid);
+      OnlineTts.clearCachedAudio();
+      OnlineTts.updateCacheRetention();
       if (mounted) {
         setState(() {
           _configDrafts.clear();
@@ -561,6 +564,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             ),
 
             _buildSettingsTransfer(),
+            TtsBufferSettingsSection(online: ttsServiceId != 'system'),
 
             // Do not preview stale credentials while service edits are pending.
             if (!unsupportedSystem && !_configDrafts.containsKey(ttsServiceId))

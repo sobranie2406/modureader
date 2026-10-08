@@ -131,6 +131,27 @@ void main() {
   });
   tearDown(() => server.close(force: true));
 
+  test('directory existence uses collection metadata, not child file size',
+      () async {
+    const directory = 'modu/data/file';
+    directories.add('/library/$directory');
+    for (final path in [directory, '$directory/']) {
+      expect((await client.readProps(path))?.isDir, true);
+      expect(await client.isExist(path), true);
+    }
+    expect(await client.readDir(directory), isEmpty);
+
+    files['/library/$directory/.keep'] = [];
+    files['/library/$directory/book.epub'] = [1, 2, 3];
+    expect((await client.readProps(directory))?.isDir, true);
+    final placeholder = await client.readProps('$directory/.keep');
+    expect(placeholder?.isDir, false);
+    expect(placeholder?.size, 0);
+    expect((await client.readDir(directory)).map((f) => f.name).toSet(),
+        {'.keep', 'book.epub'});
+    expect(await client.readProps('modu/missing'), isNull);
+  });
+
   test('removal addresses the exact book filename including URL characters',
       () async {
     const name = '中文 #100% %2F.epub';

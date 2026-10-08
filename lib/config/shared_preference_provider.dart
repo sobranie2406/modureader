@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/models/tts_buffer_settings.dart';
 import 'dart:core';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
@@ -560,6 +561,25 @@ class Prefs extends ChangeNotifier {
 
   double get ttsVolume {
     return prefs.getDouble('ttsVolume') ?? 1.0;
+  }
+
+  TtsBufferSettings get ttsBufferSettings {
+    try {
+      final raw = prefs.getString('ttsBufferSettings');
+      if (raw != null) {
+        return TtsBufferSettings.fromMap(
+            Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      }
+    } catch (_) {
+      // Old/invalid synced preferences must not prevent speech startup.
+    }
+    return const TtsBufferSettings();
+  }
+
+  set ttsBufferSettings(TtsBufferSettings settings) {
+    final valid = TtsBufferSettings.fromMap(settings.toMap());
+    prefs.setString('ttsBufferSettings', jsonEncode(valid.toMap()));
+    notifyListeners();
   }
 
   set ttsPitch(double pitch) {

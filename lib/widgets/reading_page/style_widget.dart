@@ -2,6 +2,7 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/document_reading_mode.dart';
 import 'package:anx_reader/widgets/reading_page/document_style_widget.dart';
+import 'package:anx_reader/widgets/reading_page/chinese_conversion_button.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -178,77 +179,90 @@ class StyleWidgetState extends State<StyleWidget> {
       return null;
     }
 
-    return Row(children: [
-      Expanded(
-        child: DropdownMenu<PageTurn>(
-          label: Text(L10n.of(context).readingPagePageTurningMethod),
-          initialSelection: Prefs().pageTurnStyle,
-          expandedInsets: const EdgeInsets.only(right: 5),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(50),
-            ),
-          ),
-          onSelected: (PageTurn? value) {
-            if (value != null) {
-              setState(() => Prefs().pageTurnStyle = value);
-              epubPlayerKey.currentState!.changePageTurnStyle(value);
-            }
-          },
-          dropdownMenuEntries: PageTurn.values
-              .map((e) => DropdownMenuEntry(
-                    value: e,
-                    label: e.getLabel(context),
-                  ))
-              .toList(),
+    final pageTurn = DropdownMenu<PageTurn>(
+      label: Text(L10n.of(context).readingPagePageTurningMethod),
+      initialSelection: Prefs().pageTurnStyle,
+      expandedInsets: const EdgeInsets.only(right: 5),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
         ),
       ),
-      Expanded(
-        child: DropdownMenu<FontModel>(
-          label:
-              Text(ModuStrings.text(context, '中文／正文字体', 'Chinese / body font')),
-          expandedInsets: const EdgeInsets.only(left: 5),
-          initialSelection: font,
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(50),
-            ),
-          ),
-          onSelected: (FontModel? font) async {
-            if (font == null) return;
-            if (font.name == 'newFont') {
-              // Hiding the toolbar disposes this StyleWidget. Keep the reader
-              // key, and apply even when this settings panel is no longer mounted.
-              final readerKey = widget.epubPlayerKey;
-              widget.hideAppBarAndBottomBar(false);
-              await importFont(onApplied: (imported) {
-                readerKey.currentState?.changeFont(imported);
-              });
-              if (mounted) setState(() {});
-              return;
-            } else if (font.name == 'download') {
-              widget.hideAppBarAndBottomBar(false);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const FontsSettingPage()),
-              );
-              return;
-            } else {
-              epubPlayerKey.currentState!.changeFont(font);
-              Prefs().font = font;
-            }
-          },
-          dropdownMenuEntries: fonts()
-              .map((font) => DropdownMenuEntry(
-                    value: font,
-                    label: font.label,
-                    leadingIcon: leadingIcon(font.name),
-                  ))
-              .toList(),
+      onSelected: (PageTurn? value) {
+        if (value != null) {
+          setState(() => Prefs().pageTurnStyle = value);
+          epubPlayerKey.currentState!.changePageTurnStyle(value);
+        }
+      },
+      dropdownMenuEntries: PageTurn.values
+          .map((e) => DropdownMenuEntry(
+                value: e,
+                label: e.getLabel(context),
+              ))
+          .toList(),
+    );
+    final bodyFont = DropdownMenu<FontModel>(
+      label: Text(ModuStrings.text(context, '中文／正文字体', 'Chinese / body font')),
+      expandedInsets: const EdgeInsets.only(left: 5),
+      initialSelection: font,
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
         ),
       ),
+      onSelected: (FontModel? font) async {
+        if (font == null) return;
+        if (font.name == 'newFont') {
+          // Hiding the toolbar disposes this StyleWidget. Keep the reader
+          // key, and apply even when this settings panel is no longer mounted.
+          final readerKey = widget.epubPlayerKey;
+          widget.hideAppBarAndBottomBar(false);
+          await importFont(onApplied: (imported) {
+            readerKey.currentState?.changeFont(imported);
+          });
+          if (mounted) setState(() {});
+          return;
+        } else if (font.name == 'download') {
+          widget.hideAppBarAndBottomBar(false);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const FontsSettingPage()),
+          );
+          return;
+        } else {
+          epubPlayerKey.currentState!.changeFont(font);
+          Prefs().font = font;
+        }
+      },
+      dropdownMenuEntries: fonts()
+          .map((font) => DropdownMenuEntry(
+                value: font,
+                label: font.label,
+                leadingIcon: leadingIcon(font.name),
+              ))
+          .toList(),
+    );
+    final fontAndConversion = Row(children: [
+      Expanded(child: bodyFont),
+      ChineseConversionButton(onChanged: (rules) {
+        widget.epubPlayerKey.currentState?.changeReadingRules(rules);
+      }),
     ]);
+    // Keep the font name usable on phones instead of squeezing three controls
+    // into the original two-column row.
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 600) {
+        return Column(children: [
+          pageTurn,
+          const SizedBox(height: 10),
+          fontAndConversion,
+        ]);
+      }
+      return Row(children: [
+        Expanded(child: pageTurn),
+        Expanded(flex: 2, child: fontAndConversion),
+      ]);
+    });
   }
 
   Widget englishFontSelector() {

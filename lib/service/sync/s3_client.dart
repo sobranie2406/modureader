@@ -167,13 +167,15 @@ class S3SyncClient extends SyncClientBase {
   @override
   Future<List<RemoteFile>> safeReadDir(String path) => readDir(path);
   @override
-  Future<List<RemoteFile>> readDir(String path) => _list(path);
+  Future<List<RemoteFile>> readDir(String path) async => (await _list(path)).files;
 
-  Future<List<RemoteFile>> _list(String path, {bool probe = false}) async {
+  Future<({List<RemoteFile> files, bool exists})> _list(String path,
+      {bool probe = false}) async {
     final raw = _settings.key(path);
     final prefix = raw.endsWith('/') ? raw : '$raw/';
     final seenTokens = <String>{};
     final result = <String, RemoteFile>{};
+    var hasMarker = false;
     String? token;
     for (var page = 0; page < 10000; page++) {
       final v2 = _settings.listVersion == 'v2';
@@ -181,7 +183,7 @@ class S3SyncClient extends SyncClientBase {
         if (v2) 'list-type': '2',
         'prefix': prefix,
         'delimiter': '/',
-        'encoding-type': 'url',
+        if (_settings.useEncodedListingNames) 'encoding-type': 'url',
         'max-keys': probe ? '1' : '1000',
         if (token != null) (v2 ? 'continuation-token' : 'marker'): token,
       });
@@ -207,7 +209,17 @@ class S3SyncClient extends SyncClientBase {
         final directory = item.name.local == 'CommonPrefixes';
         if (!directory && item.name.local != 'Contents') continue;
         final key = decode(value(item, directory ? 'Prefix' : 'Key'));
-        if (key == prefix) continue; // Optional directory marker.
+        if (key == prefix) {
+          // A marker proves that the directory exists; it is not a child.
+          // RainYun may return only this object for max-keys=1 with
+          // IsTruncated=false, even when the directory has real children.
+          final size = int.tryParse(value(item, 'Size') ?? '');
+          if (directory || size == null || size < 0) {
+            throw const FormatException('Invalid S3 directory marker');
+          }
+          hasMarker = true;
+          continue;
+        }
         if (!key.startsWith(prefix))
           throw const FormatException('S3 object outside requested prefix');
         var name = key.substring(prefix.length);
@@ -230,9 +242,10 @@ class S3SyncClient extends SyncClientBase {
           throw const FormatException('Repeated S3 listing entry');
         result[logical] = file;
       }
-      if ((probe && result.isNotEmpty) ||
-          value(document, 'IsTruncated') == 'false')
-        return result.values.toList();
+      final exists = hasMarker || result.isNotEmpty;
+      if ((probe && exists) || value(document, 'IsTruncated') == 'false') {
+        return (files: result.values.toList(), exists: exists);
+      }
       token = v2
           ? value(document, 'NextContinuationToken')
           : decode(value(document, 'NextMarker'));
@@ -247,8 +260,8 @@ class S3SyncClient extends SyncClientBase {
   @override
   Future<RemoteFile?> readProps(String path) async {
     if (path.endsWith('/') || path == 'modu') {
-      final files = await _list(path, probe: true);
-      return files.isEmpty
+      final listing = await _list(path, probe: true);
+      return !listing.exists
           ? null
           : RemoteFile(path: path, name: path.split('/').last, isDir: true);
     }
@@ -265,8 +278,8 @@ class S3SyncClient extends SyncClientBase {
       if (e.response?.statusCode == 404) {
         // Engines ask for logical directories without a trailing slash too.
         // HEAD only tests an exact object; an S3 prefix need not have a marker.
-        final children = await _list(path, probe: true);
-        return children.isEmpty
+        final listing = await _list(path, probe: true);
+        return !listing.exists
             ? null
             : RemoteFile(path: path, name: path.split('/').last, isDir: true);
       }

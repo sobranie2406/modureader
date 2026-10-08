@@ -1,8 +1,8 @@
-# Modu 1.2.2 settings and features
+# Modu 1.2.3 settings and features
 
 English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
 
-For stable **1.2.2+10087**, updated 2026-10-07. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
+For stable **1.2.3+10090**, updated 2026-10-08. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
 ## Settings entry points
 
@@ -130,9 +130,17 @@ Editable style templates include natural narration, gentle bedtime reading, fict
 
 A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
 
+Online speech buffering provides lookahead (default 3 extra passages), maximum characters per request (240), synthesis concurrency (2), paragraph pause (0 ms), cache retention (10 minutes) and manual cache clearing. Stop and restart speech to apply playback changes; pause/resume retains the current settings. The reusable audio cache is memory-only, capped at 32 MiB; retention 0 clears it on stop. Manual clearing preserves active audio and the prepared queue. System TTS does not use these online settings. Prefetching may incur extra usage and high concurrency may trigger provider limits.
+
+## Reading History
+
+Tap an available book's cover or title to continue reading through the existing book-opening flow. Deleted books show a notice and retain their reading records. Rearrange the Recently read, This week, Daily reading average and Most annotated cards alongside the existing charts; dates, progress, active days and note counts make the cards easier to browse. The daily average counts only days with recorded reading.
+
+The reader style panel also provides Original / Simplified / Traditional Chinese conversion beside the Chinese font selector; this changes presentation without rewriting the source book.
+
 ## Cloud sync and the remote library
 
-**Upcoming build:** **Settings → Sync** provides **WebDAV / Object storage** tabs. Object storage includes presets for Alibaba OSS, Tencent COS, Amazon S3, Cloudflare R2, RainYun ROS, Qiniu Kodo, Baidu BOS and Volcengine TOS, plus custom endpoints such as MinIO. Upgrades directly retain existing WebDAV accounts, passwords and enabled state. Turn sync off and wait for transfers before explicitly changing backend. Both connection configurations are retained separately; cloud files are not migrated. Passwords and keys are hidden by default with a common Show/Hide button. See [object storage setup, permissions and limitations](OBJECT_STORAGE_SYNC.md).
+**Settings → Sync** provides **WebDAV / Object storage** tabs. Object storage includes presets for Alibaba OSS, Tencent COS, Amazon S3, Cloudflare R2, RainYun ROS, Qiniu Kodo, Baidu BOS and Volcengine TOS, plus custom endpoints such as MinIO. Upgrades directly retain existing WebDAV accounts, passwords and enabled state. Turn sync off and wait for transfers before explicitly changing backend. Both connection configurations are retained separately; cloud files are not migrated. Passwords and keys are hidden by default with a common Show/Hide button. See [object storage setup, permissions and limitations](OBJECT_STORAGE_SYNC.md).
 
 Jianguoyun is recognized automatically. Repeated automatic-sync triggers coalesce, with subsequent starts at least ten minutes apart and a per-device/account rolling budget of 480 requests per half-hour. Manual sync respects the budget and server cooldown; restarting does not reset them. Other devices and apps still share the provider's limits. Other WebDAV servers keep their normal automatic-sync frequency. All providers respect HTTP 429/503 and Retry-After. Local changes are retained for later retry.
 

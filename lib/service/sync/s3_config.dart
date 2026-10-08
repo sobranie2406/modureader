@@ -16,6 +16,14 @@ class S3Config {
   String get addressing => text('addressing', 'path');
   String get signature => text('signature', 'v4');
   String get listVersion => text('listVersion', 'v2');
+  // RainYun uses form encoding (space -> '+') for encoding-type=url.
+  // Request literal XML names instead of guessing what a '+' represents.
+  // Match both the preset (including custom domains) and existing configs
+  // using an official endpoint without a saved provider field.
+  bool get useEncodedListingNames =>
+      text('provider') != 'rainyun' &&
+      endpoint.host != 'rains3.com' &&
+      !endpoint.host.endsWith('.rains3.com');
   bool get configured => accessKey.isNotEmpty && secretKey.isNotEmpty;
 
   void validate() {

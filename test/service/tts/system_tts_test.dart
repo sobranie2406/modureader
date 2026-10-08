@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
@@ -42,6 +44,107 @@ void main() {
     expect(calls.map((c) => c.method), contains('speak'));
     expect(calls.map((c) => c.method), isNot(contains('setVoice')));
     expect(Prefs().getTtsVoiceModel('system'), isEmpty);
+  });
+
+  test('reader initialization does not query unused native defaults', () async {
+    await tts.init(() async => '正文', () async => '', () async => '');
+    expect(
+        calls.map((call) => call.method),
+        isNot(
+            anyOf(contains('getDefaultVoice'), contains('getDefaultEngine'))));
+  });
+
+  test('native error releases a hung completion and retries the same sentence',
+      () async {
+    final hung = Completer<int>();
+    final submitted = Completer<void>();
+    var failing = true;
+    var advances = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      calls.add(call);
+      if (call.method == 'speak' && failing) {
+        submitted.complete();
+        return hung.future;
+      }
+      if (call.method == 'stop' && !hung.isCompleted) hung.complete(0);
+      return 1;
+    });
+    await tts.init(() async => '保留原句', () async {
+      advances++;
+      return '';
+    }, () async => '');
+    tts.updateTtsState(TtsStateEnum.playing);
+    final reading = tts.speak();
+    await submitted.future;
+    // The actual Android plugin sends this event but leaves speak unresolved.
+    await tts.flutterTts.platformCallHandler(const MethodCall(
+        'speak.onError', 'Error from TextToSpeech (speak) - -6'));
+    await reading.timeout(const Duration(seconds: 1));
+    expect(tts.ttsStateNotifier.value, TtsStateEnum.paused);
+    expect(tts.currentVoiceText, '保留原句');
+    expect(tts.playbackError, isNotNull);
+    expect(advances, 0);
+    expect(calls.map((call) => call.method), contains('stop'));
+    failing = false;
+    await tts.resume();
+    expect(advances, 1);
+    expect(tts.playbackError, isNull);
+    await tts.stop();
+  });
+
+  test('missing native start times out without skipping text', () async {
+    tts = SystemTts.forTesting(
+        supported: true, startTimeout: const Duration(milliseconds: 10));
+    final hung = Completer<int>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      if (call.method == 'speak') return hung.future;
+      if (call.method == 'stop' && !hung.isCompleted) hung.complete(0);
+      return 1;
+    });
+    var advances = 0;
+    await tts.init(() async => '不要跳过', () async {
+      advances++;
+      return '';
+    }, () async => '');
+    tts.updateTtsState(TtsStateEnum.playing);
+    await tts.speak().timeout(const Duration(seconds: 1));
+    expect(advances, 0);
+    expect(tts.currentVoiceText, '不要跳过');
+    expect(tts.playbackError, contains('未开始播放'));
+    expect(tts.bufferingNotifier.value, isFalse);
+    await tts.stop();
+  });
+
+  test('start deadline never interrupts an already speaking long passage',
+      () async {
+    tts = SystemTts.forTesting(
+        supported: true, startTimeout: const Duration(milliseconds: 10));
+    final completion = Completer<int>();
+    final submitted = Completer<void>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+      calls.add(call);
+      if (call.method == 'speak') {
+        submitted.complete();
+        return completion.future;
+      }
+      return 1;
+    });
+    final reading = tts.speak(content: '长段落');
+    await submitted.future;
+    await tts.flutterTts
+        .platformCallHandler(const MethodCall('speak.onStart', true));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(calls.map((call) => call.method), isNot(contains('stop')));
+    completion.complete(1);
+    await reading;
+    expect(tts.playbackError, isNull);
+    await tts.stop();
   });
 
   test('explicit saved voice is applied before speaking', () async {

@@ -2,6 +2,7 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/book_sync_status.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/service/book.dart';
@@ -9,6 +10,7 @@ import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/bookshelf/book_type_badges.dart';
 import 'package:anx_reader/widgets/bookshelf/book_sync_status_icon.dart';
 import 'package:flutter/material.dart';
@@ -102,6 +104,7 @@ class _BookItemState extends ConsumerState<BookItem> {
               Expanded(
                 child: Hero(
                   tag: book.coverFullPath,
+                  createRectTween: readerCoverRectTween,
                   child: Container(
                     decoration: BoxDecoration(
                       boxShadow: [
@@ -136,7 +139,7 @@ class _BookItemState extends ConsumerState<BookItem> {
                                   Positioned(
                                     left: 8,
                                     top: 8,
-                                    child: _KnowledgeStatusBadge(
+                                    child: KnowledgeStatusBadge(
                                       indexed: indexed,
                                       item: queueItem,
                                     ),
@@ -256,8 +259,9 @@ class _BookItemState extends ConsumerState<BookItem> {
   }
 }
 
-class _KnowledgeStatusBadge extends StatelessWidget {
-  const _KnowledgeStatusBadge({required this.indexed, required this.item});
+class KnowledgeStatusBadge extends StatelessWidget {
+  const KnowledgeStatusBadge(
+      {super.key, required this.indexed, required this.item});
 
   final bool indexed;
   final BookKnowledgeQueueItem? item;
@@ -265,22 +269,40 @@ class _KnowledgeStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = item?.status;
+    String text(String zh, String en) => ModuStrings.text(context, zh, en);
+    final indexedLabel =
+        indexed ? text('已索引', 'Indexed') : text('未索引', 'Not indexed');
     final (label, color) = switch (status) {
-      BookKnowledgeQueueStatus.queued => ('排队中', Colors.orange.shade700),
-      BookKnowledgeQueueStatus.extracting => ('读取章节', Colors.blue.shade700),
-      BookKnowledgeQueueStatus.preparing => ('整理章节', Colors.blue.shade700),
-      BookKnowledgeQueueStatus.vectorizing => (
-          '向量化 ${((item?.progress ?? 0) * 100).round()}%',
+      BookKnowledgeQueueStatus.queued => (
+          text('排队中', 'Queued'),
+          Colors.orange.shade700
+        ),
+      BookKnowledgeQueueStatus.extracting => (
+          text('读取章节', 'Reading chapters'),
           Colors.blue.shade700
         ),
-      BookKnowledgeQueueStatus.cancelling => ('正在取消', Colors.orange.shade700),
-      BookKnowledgeQueueStatus.failed => ('向量失败', Colors.red.shade700),
+      BookKnowledgeQueueStatus.preparing => (
+          text('整理章节', 'Preparing chapters'),
+          Colors.blue.shade700
+        ),
+      BookKnowledgeQueueStatus.vectorizing => (
+          '${text('向量化', 'Indexing')} ${((item?.progress ?? 0) * 100).round()}%',
+          Colors.blue.shade700
+        ),
+      BookKnowledgeQueueStatus.cancelling => (
+          text('正在取消', 'Cancelling'),
+          Colors.orange.shade700
+        ),
+      BookKnowledgeQueueStatus.failed => (
+          text('向量失败', 'Indexing failed'),
+          Colors.red.shade700
+        ),
       BookKnowledgeQueueStatus.cancelled => (
-          indexed ? '已索引' : '未索引',
+          indexedLabel,
           Colors.grey.shade700
         ),
       BookKnowledgeQueueStatus.completed || null => (
-          indexed ? '已索引' : '未索引',
+          indexedLabel,
           Colors.green.shade600
         ),
     };

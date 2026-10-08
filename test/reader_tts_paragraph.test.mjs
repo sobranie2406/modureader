@@ -21,6 +21,36 @@ function all(tts) {
     return out
 }
 
+test('configurable group sizes preserve text, Unicode and true paragraph endings', () => {
+    for (const maxCharacters of [100, 240, 600, 2000]) {
+        const text = '甲'.repeat(239) + '😀'.repeat(400) + '乙'.repeat(1700) + '。'
+        const doc = docFor(`<p>${text}</p><p>下一段。</p>`)
+        const tts = new TTS(doc, null, () => null, r => r.toString(), { paragraphMode:true, maxCharacters })
+        const details = tts.collectDetails(100, {includeCurrent:true})
+        assert.equal(details.map(d => d.text).join(''), text + '下一段。')
+        assert.ok(details.every(d => d.text.length <= maxCharacters))
+        assert.ok(details.every(d => !/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/.test(d.text)))
+        assert.equal(details.filter(d => d.endsParagraph).length, 2)
+        assert.equal(details.at(-2).endsParagraph, true)
+        assert.equal(details.at(-1).endsParagraph, true)
+        assert.ok(details.slice(0, -2).every(d => !d.endsParagraph))
+    }
+})
+
+test('system sentence mode ignores online maximum characters', () => {
+    const text = '甲'.repeat(700) + '。'
+    assert.deepEqual(all(new TTS(docFor(`<p>${text}</p>`), null, () => null, null,
+        {paragraphMode:false, maxCharacters:100})), [text])
+})
+
+test('invalid group lengths fall back to the bounded legacy default', () => {
+    for (const maxCharacters of [0, -1, 3000, NaN, '600']) {
+        const tts = new TTS(docFor(`<p>${'甲'.repeat(700)}。</p>`), null, () => null, null,
+            {paragraphMode:true, maxCharacters})
+        assert.ok(all(tts).every(text => text.length <= 240))
+    }
+})
+
 test('groups only adjacent sentences in one paragraph, never headings/list entries', () => {
     const doc = docFor('<h1>标题。</h1><p>第一句。<em>第二句！</em>“第三句？”</p><p>另一段。</p><ul><li>项目一。</li><li>项目二。</li></ul>')
     assert.deepEqual(all(speech(doc)), ['标题。', '第一句。第二句！“第三句？”', '另一段。', '项目一。', '项目二。'])

@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/widgets/page_router/reading_route.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +15,56 @@ void main() {
     await Prefs().initPrefs();
   });
 
-  testWidgets('Android transition mounts the reader only after animation ends',
+  testWidgets('Android Hero flight does not duplicate or reparent reader',
+      (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final readerKey = GlobalKey();
+    var mounts = 0;
+    await tester.pumpWidget(MaterialApp(
+      navigatorKey: navigator,
+      home: Scaffold(
+        body: SizedBox(
+            width: 100,
+            height: 150,
+            child: Hero(
+                tag: 'cover',
+                createRectTween: readerCoverRectTween,
+                child: const Text('shelf cover'))),
+      ),
+    ));
+    navigator.currentState!.push(readingRoute<void>(
+      animate: true,
+      builder: (_) => ReaderCoverHero(
+        tag: 'cover',
+        cover: const Text('flight cover'),
+        child: SizedBox.expand(
+            key: readerKey, child: _MountCounter(onMount: () => mounts++)),
+      ),
+    ));
+    await tester.pump();
+    final original = readerKey.currentContext;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('flight cover'), findsOneWidget);
+    expect(mounts, 1);
+    expect(readerKey.currentContext, same(original));
+    await tester.pump(const Duration(milliseconds: 400));
+    final turning = tester.widget<Transform>(
+        find.byKey(const ValueKey('reader-cover-spine-turn')));
+    expect(turning.transform.entry(0, 0), inExclusiveRange(0, 1));
+    expect(mounts, 1);
+    await tester.pumpAndSettle();
+    expect(find.text('flight cover'), findsNothing);
+    expect(readerKey.currentContext, same(original));
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('flight cover'), findsOneWidget);
+    expect(mounts, 1);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('opening mounts the reader before cover expansion and turn',
       (tester) async {
     final navigator = GlobalKey<NavigatorState>();
     var mounts = 0;
@@ -19,19 +72,23 @@ void main() {
         MaterialApp(navigatorKey: navigator, home: const Text('library')));
     final route = readingRoute<void>(
       animate: true,
-      deferReaderUntilTransition: true,
-      openingPlaceholder: const Text('cover'),
       builder: (_) => _MountCounter(onMount: () => mounts++),
     );
+    expect(route, isA<PageRouteBuilder<void>>());
+    expect((route as PageRoute).transitionDuration,
+        const Duration(milliseconds: 720));
     navigator.currentState!.push(route);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(mounts, 0);
-    expect(find.text('cover'), findsOneWidget);
+    expect(mounts, 1);
+    expect((route as PageRoute).animation!.status, AnimationStatus.forward);
     await tester.pumpAndSettle();
     expect(mounts, 1);
     expect(find.text('reader'), findsOneWidget);
-    expect(tester.widget<HeroMode>(find.byType(HeroMode).last).enabled, false);
+    expect(
+        find.byWidgetPredicate(
+            (widget) => widget is HeroMode && !widget.enabled),
+        findsNothing);
     // A popup and its reverse transition must not recreate the native reader.
     final context = tester.element(find.text('reader'));
     showReaderPopup(context, builder: (_) => const Text('AI'));
@@ -45,7 +102,65 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('closing during opening never creates a late reader',
+  test('cover grows completely before turning, closes before shrinking', () {
+    const shelf = Rect.fromLTWH(30, 100, 100, 150);
+    const reader = Rect.fromLTWH(0, 0, 400, 800);
+    final opening = ReaderCoverRectTween(begin: shelf, end: reader);
+    final closing = ReaderCoverRectTween(begin: reader, end: shelf);
+    expect(opening.lerp(0), shelf);
+    expect(opening.lerp(0.3)!.width, inExclusiveRange(100, 400));
+    expect(opening.lerp(0.55), reader);
+    expect(opening.lerp(0.9), reader);
+    expect(closing.lerp(0.3), reader);
+    expect(closing.lerp(1), shelf);
+    for (final t in [0.0, 0.2, 0.55, 0.8, 1.0]) {
+      expect(
+          closing.lerp(1 - t)!.left, closeTo(opening.lerp(t)!.left, 0.00001));
+    }
+  });
+
+  testWidgets('cover turns from spine and reverses without changing its child',
+      (tester) async {
+    final progress = AnimationController(vsync: tester, value: 0.3);
+    addTearDown(progress.dispose);
+    await tester.pumpWidget(Directionality(
+      textDirection: TextDirection.ltr,
+      child: ReaderCoverTurn(
+          animation: progress, child: const Text('cached cover')),
+    ));
+    Transform cover() => tester.widget<Transform>(
+        find.byKey(const ValueKey('reader-cover-spine-turn')));
+    expect(cover().transform.entry(0, 0), 1);
+    progress.value = 0.775;
+    await tester.pump();
+    expect(cover().alignment, Alignment.centerLeft);
+    // The free edge comes out of the page, not into the reader.
+    expect(cover().transform.entry(2, 0), lessThan(0));
+    expect(
+        cover().transform.entry(0, 0),
+        closeTo(math.cos(math.pi / 2 * Curves.easeInOutCubic.transform(0.5)),
+            0.001));
+    progress.value = 1;
+    await tester.pump();
+    expect(find.text('cached cover'), findsNothing);
+    progress.value = 0.55;
+    await tester.pump();
+    expect(find.text('cached cover'), findsOneWidget);
+    expect(cover().transform.entry(0, 0), 1);
+  });
+
+  testWidgets('iOS retains its existing route and Hero', (tester) async {
+    final route =
+        readingRoute<void>(animate: true, builder: (_) => const Text('reader'));
+    expect(route, isA<CupertinoPageRoute<void>>());
+    expect(readerCoverRectTween, isNull);
+    await tester.pumpWidget(const MaterialApp(
+        home: ReaderCoverHero(
+            tag: 'ios', cover: Text('cover'), child: Text('reader'))));
+    expect(tester.widget<Hero>(find.byType(Hero)).flightShuttleBuilder, isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('closing during opening does not recreate the reader',
       (tester) async {
     final navigator = GlobalKey<NavigatorState>();
     var mounts = 0;
@@ -53,14 +168,14 @@ void main() {
         MaterialApp(navigatorKey: navigator, home: const Text('library')));
     navigator.currentState!.push(readingRoute<void>(
       animate: true,
-      deferReaderUntilTransition: true,
       builder: (_) => _MountCounter(onMount: () => mounts++),
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 60));
     navigator.currentState!.pop();
     await tester.pumpAndSettle();
-    expect(mounts, 0);
+    expect(mounts, 1);
+    expect(find.text('reader'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -74,7 +189,6 @@ void main() {
           MaterialApp(navigatorKey: navigator, home: const Text('library')));
       final route = readingRoute<void>(
         animate: eink,
-        deferReaderUntilTransition: true,
         builder: (_) => _MountCounter(onMount: () => mounts++),
       );
       expect((route as PageRoute).transitionDuration, Duration.zero);

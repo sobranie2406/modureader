@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:anx_reader/models/tts_buffer_settings.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -55,11 +56,22 @@ class OnlineTts extends BaseTts {
   String? get playbackError => _playbackError;
 
   // ============ Configuration ============
-  static const int _bufferCapacity =
-      4; // Bounded paragraph groups, not sentences.
-  static const int _batchSize = 2; // Avoid competing with the current passage.
+  TtsBufferSettings _settings = const TtsBufferSettings();
+  int get _bufferCapacity => _settings.ahead + 1;
+  int get _batchSize => _settings.concurrency;
   static const int _maxRetries = 2;
   static final TtsCache _audioCache = TtsCache(maxEntries: 256);
+  static int get cachedAudioBytes => _audioCache.byteCount;
+  static int get cachedAudioEntries => _audioCache.entryCount;
+  static void clearCachedAudio() => _audioCache.clear();
+  static void updateCacheRetention() {
+    final minutes = Prefs().ttsBufferSettings.cacheMinutes;
+    _audioCache.setRetention(minutes == 0 ? null : Duration(minutes: minutes));
+  }
+
+  void _clearSessionCacheIfNeeded() {
+    if (Prefs().ttsBufferSettings.cacheMinutes == 0) clearCachedAudio();
+  }
 
   // ============ Audio Player ============
   AudioPlayer? _player;
@@ -603,6 +615,19 @@ class OnlineTts extends BaseTts {
         }
 
         _playbackCompleter = null;
+        if (!segment.isSilent && segment.sentence.endsParagraph) {
+          // Short cancellable ticks keep Stop/Next responsive even at 3s.
+          // Paused time does not consume the remaining paragraph pause.
+          var remaining = _settings.paragraphPauseMs;
+          while (remaining > 0 && !_shouldStop) {
+            final step = remaining < 30 ? remaining : 30;
+            final paused = ttsStateNotifier.value == TtsStateEnum.paused;
+            await Future<void>.delayed(Duration(milliseconds: step));
+            if (!paused && ttsStateNotifier.value != TtsStateEnum.paused) {
+              remaining -= step;
+            }
+          }
+        }
         // Advance reader position
         if (!_shouldStop) {
           while (
@@ -636,6 +661,9 @@ class OnlineTts extends BaseTts {
       }
     } finally {
       _isPlayerRunning = false;
+      if (ttsStateNotifier.value == TtsStateEnum.stopped) {
+        _clearSessionCacheIfNeeded();
+      }
       _playerCompleter?.complete();
       _playerCompleter = null;
     }
@@ -668,6 +696,10 @@ class OnlineTts extends BaseTts {
     final stopping = _stopping;
     if (stopping != null) await stopping;
     if (_isPlayerRunning || _isStarting) return;
+    // Freeze buffer boundaries for this run; changing settings while paused
+    // must not reinterpret queued CFIs or skip/repeat part of a paragraph.
+    if (content == null) _settings = Prefs().ttsBufferSettings;
+    updateCacheRetention();
     _isStarting = true;
     final generation = ++_generation;
     // A naturally ended/failed producer may still be finishing its current
@@ -683,8 +715,10 @@ class OnlineTts extends BaseTts {
     try {
       here =
           content ?? await waitForSpeechInput<dynamic>(() => getHereFunction());
-    } catch (_) {
+    } catch (error) {
       if (generation == _generation) {
+        AnxLog.warning(
+            'TTS online reader initialization failed: ${error.runtimeType}');
         _shouldStop = true;
         _playbackError = '朗读初始化失败，请重试 / Could not start reading; retry.';
         updateTtsState(TtsStateEnum.paused);
@@ -747,6 +781,7 @@ class OnlineTts extends BaseTts {
     // Cleanup
     await _disposePlayer();
     _resetBuffer();
+    _clearSessionCacheIfNeeded();
   }
 
   @override
@@ -929,7 +964,11 @@ class _ProviderAdapter implements TtsProvider {
 
   @override
   Future<TtsAudioChunk> synthesize(TtsRequest request) async {
-    final bytes = await provider.speak(request.text, voice, rate, pitch);
+    // Bound the operation inside the cache too: a timed-out shared request
+    // must be removed from its in-flight map so retry can issue a fresh one.
+    final bytes = await provider
+        .speak(request.text, voice, rate, pitch)
+        .timeout(provider.synthesisTimeout);
     return TtsAudioChunk(bytes: bytes, mimeType: ttsAudioMimeType(bytes));
   }
 }

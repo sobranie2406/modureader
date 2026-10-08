@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.modu.reader",
     "vendor": "Modu",
-    "versionCode": 10087,
-    "versionName": "1.2.2",
+    "versionCode": 10090,
+    "versionName": "1.2.3",
     "icon": "$media:app_layered_image",
     "label": "$string:app_name"
   }

@@ -155,7 +155,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       },
       if (Prefs().bottomNavigatorShowStatistics)
         {
-          'icon': Icons.show_chart,
+          'icon': Icons.history,
           'label': L10n.of(context).navBarStatistics,
           'identifier': 'statistics'
         },
