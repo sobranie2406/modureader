@@ -1,6 +1,6 @@
 # AI and book indexes
 
-Current guide for Modu 1.2.0+10082. See the [documentation index](README.md) and [settings guide](SETTINGS.md).
+Source-reviewed for Modu 1.2.3+10090 on 2026-10-08 ([b6bf820a](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb)). Detailed workflows and current boundaries: [English](FEATURES.md) · [简体中文](FEATURES_zh.md). See the [documentation index](README.md) and [settings guide](SETTINGS.md).
 
 The bookshelf book menu's **Vectorize / Re-vectorize** action is the shared manual indexing entry point. Automatic indexing uses the same background queue. The reading AI panel does not create a separate knowledge base or bypass the queue to write to the same index file concurrently. Vector model settings select the embedding model; AI settings select the language model that answers questions.
 
