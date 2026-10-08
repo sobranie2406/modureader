@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
-import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity} from './qq-bot.mjs';
+import {qqKeys, qqVerify, qqRedact, qqPlainLinks, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity} from './qq-bot.mjs';
 
 const secret = 'DG5g3B4j9X2KOErG'; // Public test vector in Tencent's official documentation.
 const encode = new TextEncoder();
@@ -141,6 +141,33 @@ test('an explicit question is answered once even when QQ redelivers it', async (
     assert.equal(f.sent[0].msg_id, '5');
     assert.equal(f.sent[0].msg_seq, 1);
     assert.match(f.sent[0].content, /README.md/);
+  });
+});
+
+test('screenshot document links have bare URLs isolated from Markdown punctuation', () => {
+  for (const path of ['README.md', 'docs/SETTINGS.md', 'docs/LOCAL_DICTIONARIES.md',
+    'docs/MARKDOWN_BOOKS.md', 'docs/AI_INDEX_USAGE.md', 'docs/INDEX_SYNC_AND_READING_CONTROLS.md']) {
+    const url = `https://github.com/sobranie2406/modureader/blob/main/${path}`;
+    assert.equal(qqPlainLinks(`- [文档](${url}).`), `- 文档：\n${url}\n.`);
+  }
+  const balanced = 'https://example.test/Function_(mathematics)';
+  assert.equal(qqPlainLinks(`[文档](${balanced})`), `文档：\n${balanced}\n`);
+  assert.equal(qqPlainLinks(balanced), balanced);
+  assert.equal(qqPlainLinks('<https://example.test/docs>。'), 'https://example.test/docs\n。');
+});
+
+test('AI Markdown links are normalized before redaction and sent as clickable QQ plain text', async () => {
+  await withFixture(async f => {
+    f.env.AI.run = async (_, input) => {
+      f.prompts.push(input);
+      return {response:'<think>internal</think>[设置指南](https://github.com/sobranie2406/modureader/blob/main/docs/SETTINGS.md?token=private-test-key#section).'};
+    };
+    await qqRoutes(await signed(event('links', '/ask 文档在哪里？')), f.env);
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].msg_type, 0);
+    assert.match(f.sent[0].content, /设置指南：\nhttps:\/\/github.com\/sobranie2406\/modureader\/blob\/main\/docs\/SETTINGS.md\n/);
+    assert.doesNotMatch(f.sent[0].content, /private-test-key|#section|internal|\]\(|SETTINGS.md\)/);
+    assert.match(f.prompts[0].messages[0].content, /Never use Markdown links/);
   });
 });
 
