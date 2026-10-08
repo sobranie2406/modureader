@@ -11,6 +11,18 @@ from patch_app import PATCHES, install, plan
 
 
 class AppCompatibilityTest(unittest.TestCase):
+    def test_hero_adapter_only_removes_unsupported_arguments_from_copy(self):
+        path = ROOT / 'lib/widgets/page_router/reader_cover_hero.dart'
+        original = path.read_text()
+        adapted = plan(ROOT)[path]
+        self.assertIn('curve: Curves.linear,', original)
+        self.assertIn('reverseCurve: Curves.linear,', original)
+        self.assertNotIn('curve: Curves.linear,', adapted)
+        self.assertNotIn('reverseCurve: Curves.linear,', adapted)
+        self.assertIn('defaultTargetPlatform != TargetPlatform.android', adapted)
+        self.assertIn('createRectTween: readerCoverRectTween', adapted)
+        self.assertEqual(path.read_text(), original)
+
     def test_real_source_has_exact_reviewed_callbacks(self):
         originals = {ROOT / name: (ROOT / name).read_bytes() for name in PATCHES}
         edits = plan(ROOT)
