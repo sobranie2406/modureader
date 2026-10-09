@@ -172,7 +172,7 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       assert.equal(f.sent.length, 0);
       await qqSchedule({scheduledTime:at}, f.env);
       await qqSchedule({scheduledTime:at}, f.env);
-      assert.equal(f.prompts.length, 1);
+      assert.equal(f.prompts.length, 2);
       assert.match(f.prompts[0].messages[1].content, /EPUB 导入/);
       assert.doesNotMatch(f.prompts[0].messages[1].content, /test-secret|Outside/);
       assert.match(f.sent[0].content, /2026-10-06 20:00 — 2026-10-07 08:00/);
@@ -234,6 +234,28 @@ test('a quiet period never republishes previous feedback or calls AI for backgro
       assert.doesNotMatch(f.sent[0].content,/闪退/);
     });
   } finally {Date.now=originalNow;}
+});
+
+test('only the source-reviewed digest is posted, never the unchecked draft', async () => {
+  await withFixture(async f => {
+    const now=Math.floor(Date.now()/1000);
+    store(f.DB,'qq:started',{at:now-86400},now);
+    store(f.DB,'qq:push-permission',{allowed:true,tested:true},now);
+    store(f.DB,'qq:chat:allowed-group:issue',{ts:now-60,text:'默读 iOS 选中文字无法批注'},now);
+    let calls=0;
+    f.env.AI.run=async (model,input)=> {
+      if (++calls===1) return {response:'1. 群友：【使用意见】无关新闻草稿'};
+      assert.match(input.messages[1].content,/无关新闻草稿/);
+      assert.match(input.messages[1].content,/默读 iOS 选中文字无法批注/);
+      return {response:'1. 群友（U1）：【Bug反馈】文字选择 👉 等待复现。'};
+    };
+    const admin=event('review-test','/summary-test 24h');
+    admin.d.author.member_role='admin';
+    await qqRoutes(await signed(admin),f.env);
+    assert.equal(calls,2);
+    assert.match(f.sent[0].content,/等待复现/);
+    assert.doesNotMatch(f.sent[0].content,/无关新闻草稿|U1/);
+  });
 });
 
 test('24-hour summary test includes retained earlier feedback and excludes expired text', async () => {
