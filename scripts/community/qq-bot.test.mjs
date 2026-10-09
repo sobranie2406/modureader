@@ -863,3 +863,24 @@ test('document retrieval finds relevant text beyond the beginning of a long sect
   assert.match(f.prompts[0].messages[0].content,/关闭中间触发格后保存/);
   assert.equal(f.searches.length,0);
 }));
+
+
+test('release lookup failure cannot claim a verified latest version or fall back to web',async()=>withFixture(async f=>{
+  globalThis.fetch=async (url,options)=>String(url).includes('api.github.com/repos/sobranie2406/modureader/releases?') ? new Response('',{status:403}) : f.fetch(url,options);
+  await qqRoutes(await signed(event('release-unavailable','/search 默读最新版本')),f.env);
+  const answer=f.sent.map(m=>m.content).join('');
+  assert.match(answer,/无法核实当前最新发布版本/);
+  assert.match(answer,/github.com\/sobranie2406\/modureader\/releases/);
+  assert.equal(f.prompts.length,0);assert.equal(f.searches.length,0);
+}));
+
+test('documentation keeps supplied download links and labels invented links instead of blanks',async()=>withFixture(async f=>{
+  const supplied='https://gitee.com/sobranie2406/modureader/releases';
+  globalThis.fetch=async (url,options)=>String(url).includes('raw.githubusercontent.com') ? new Response('[下载]('+supplied+')') : f.fetch(url,options);
+  f.env.AI.run=async()=>({response:'[下载]('+supplied+')\\n[假链接](https://invented.example/download)'});
+  await qqRoutes(await signed(event('doc-download','/ask 默读下载地址')),f.env);
+  const answer=f.sent.map(m=>m.content).join('');
+  assert.match(answer,/https:\/\/gitee.com\/sobranie2406\/modureader\/releases/);
+  assert.doesNotMatch(answer,/invented.example/);assert.match(answer,/检索资料未提供此链接/);
+  assert.equal(f.searches.length,0);
+}));
