@@ -7,6 +7,7 @@ const QQ_NAME = 'Modu 默读助手';
 const QQ_RELEASE_AUDIENCE = 'https://modureader-bot.2406.fun/qq/release';
 const QQ_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 const QQ_WORKFLOW = 'sobranie2406/modureader/.github/workflows/qq-release.yml@';
+/** @type {Array<[string, RegExp]>} */
 const QQ_DOCS = [
   ['docs/LOCAL_DICTIONARIES.md', /字典|词典|dictionary/i],
   ['docs/MARKDOWN_BOOKS.md', /markdown|\bmd\b/i],
