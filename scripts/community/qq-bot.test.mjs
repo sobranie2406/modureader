@@ -61,11 +61,15 @@ function fixture() {
       return {response: input.messages[0].content.includes('Summarize') ?
         '• 群友讨论了 EPUB 导入，相关问题尚待确认。' : 'Supported formats are documented in the README. https://github.com/sobranie2406/modureader/blob/main/README.md'};
     }}};
-  const f = {env, DB, sent, prompts, network,
+  const f = {env, DB, sent, prompts, network, searches: [], searchItems: [],
     release:{id:123,tag_name:'v1.0-beta',prerelease:true,draft:false,
       published_at:new Date().toISOString(),body:'中文：修复阅读问题。\nEnglish: Fix reader issues.'},
     async fetch(url, options = {}) {
     network.push(String(url));
+    if (String(url).startsWith('https://mwmbl.org/api/v2/search/')) {
+      f.searches.push(new URL(url).searchParams.get('q'));
+      return f.searchResponse || Response.json({results:f.searchItems});
+    }
     if (String(url).includes('/.well-known/jwks')) return Response.json({keys:[releaseJwk]});
     if (String(url).includes('getAppAccessToken')) return Response.json({access_token: 'test-access', expires_in: 3600});
     if (String(url).includes('/messages')) {sent.push(JSON.parse(options.body)); return Response.json({id:'reply-'+sent.length});}
@@ -529,4 +533,88 @@ test('diagnostic commands are excluded before AI sees the digest transcript', ()
     .map(text=>({ts:100,text,speaker:{key:'one',name:'甲'}}));
   const lines = qqDigestTranscript(rows).map(JSON.parse);
   assert.deepEqual(lines.map(m=>m.text),['阅读器导入问题']);
+});
+
+
+
+test('mentioned questions search redacted keywords once and cite only provider URLs', async () => {
+  await withFixture(async f => {
+    f.searchItems = [
+      {url:'https://developers.cloudflare.com/web-search/',title:'官方搜索文档',content:'Web search supports AI binding.'},
+      {url:'javascript:alert(1)',title:'invalid',content:'ignore'},
+      {url:'https://user:password@example.com/',title:'invalid',content:'ignore'},
+      {url:'https://developers.cloudflare.com/web-search/',title:'duplicate',content:'ignore'}];
+    f.env.AI.run = async (model, input) => {
+      f.prompts.push(input);
+      return {response: input.messages[0].content.startsWith('Extract') ? 'Cloudflare web search' :
+        '搜索支持 AI binding [1]。虚构来源 [9] https://fake.example/bogus'};
+    };
+    const payload = event('search1', '<@test-app> 搜索 Cloudflare token=private-key 联系 a@example.test', 'allowed-group', 'GROUP_AT_MESSAGE_CREATE');
+    await qqRoutes(await signed(payload), f.env);
+    await qqRoutes(await signed(payload), f.env);
+    assert.deepEqual(f.searches, ['Cloudflare web search']);
+    assert.doesNotMatch(JSON.stringify(f.prompts), /private-key|a@example.test|member-search1|test-app/);
+    assert.equal(f.prompts.length, 2);
+    assert.doesNotMatch(f.prompts[1].messages[0].content, /invalid|duplicate/);
+    const reply = f.sent.map(x => x.content).join('');
+    assert.match(reply, /联网搜索汇总（Mwmbl）/);
+    assert.match(reply, /https:\/\/developers.cloudflare.com\/web-search\//);
+    assert.doesNotMatch(reply, /fake.example|\[9\]|javascript:|password/);
+    assert.ok(f.network.every(url => !url.includes('api.cloudflare.com') && !url.includes('websearch')));
+  });
+});
+
+test('ordinary chat never searches, /search works, and /ask remains documentation only', async () => {
+  await withFixture(async f => {
+    await qqRoutes(await signed(event('plain-search','帮忙联网搜索一下')), f.env);
+    await qqRoutes(await signed(event('explicit-search','/search 最新技术新闻')), f.env);
+    assert.equal(f.searches.length, 1);
+    assert.equal(f.prompts.length, 1); // Keywords only; no fabricated summary of empty evidence.
+    assert.match(f.sent[0].content, /未找到可用来源/);
+    await qqRoutes(await signed(event('docs-search','/ask Modu 支持什么格式？')), f.env);
+    assert.equal(f.searches.length, 1);
+    assert.equal(f.prompts.length, 2);
+    assert.match(f.sent[1].content, /README.md/);
+  });
+});
+
+test('free search failure never switches to paid service or generates an unsupported answer', async () => {
+  await withFixture(async f => {
+    f.searchResponse = new Response('Rate limited', {status:429});
+    await qqRoutes(await signed(event('search-fail','/search 最新新闻')), f.env);
+    assert.equal(f.prompts.length, 1);
+    assert.equal(f.searches.length, 1);
+    assert.match(f.sent[0].content, /未能完成联网汇总/);
+    assert.equal(f.network.filter(url => url.includes('mwmbl.org')).length, 1);
+    assert.ok(f.network.every(url => !url.includes('api.cloudflare.com')));
+  });
+});
+
+test('query size is bounded and the public free search has a group-wide rate limit', async () => {
+  await withFixture(async f => {
+    await qqRoutes(await signed(event('search-long','/search '+ '文'.repeat(1025))), f.env);
+    assert.equal(f.searches.length, 0);
+    assert.equal(f.prompts.length, 0);
+    assert.match(f.sent[0].content, /1024/);
+    await qqRoutes(await signed(event('search-short1','/search EPUB 阅读器')), f.env);
+    await qqRoutes(await signed(event('search-short2','/search PDF 阅读器')), f.env);
+    assert.equal(f.searches.length, 1);
+    assert.match(f.sent[2].content, /5 秒/);
+  });
+});
+
+test('search shares the per-user cooldown and daily answer limit', async () => {
+  await withFixture(async f => {
+    const first = event('search-rate1','/search 最新技术新闻');
+    const second = event('search-rate2','/search 再搜索');
+    second.d.author = first.d.author;
+    await qqRoutes(await signed(first), f.env);
+    await qqRoutes(await signed(second), f.env);
+    assert.equal(f.searches.length, 1);
+    assert.match(f.sent[1].content, /30 秒/);
+    store(f.DB, 'qq:ai:'+new Date().toISOString().slice(0,10), 80, Math.floor(Date.now()/1000));
+    await qqRoutes(await signed(event('search-daily','/search 最新新闻')), f.env);
+    assert.equal(f.searches.length, 1);
+    assert.match(f.sent[2].content, /80 次/);
+  });
 });
