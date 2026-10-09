@@ -66,9 +66,11 @@ function fixture() {
       published_at:new Date().toISOString(),body:'中文：修复阅读问题。\nEnglish: Fix reader issues.'},
     async fetch(url, options = {}) {
     network.push(String(url));
-    if (String(url).startsWith('https://mwmbl.org/api/v2/search/')) {
-      f.searches.push(new URL(url).searchParams.get('q'));
-      return f.searchResponse || Response.json({results:f.searchItems});
+    if (String(url) === 'https://api.anysearch.com/v1/search') {
+      assert.equal(options.method, 'POST');
+      assert.equal(options.headers.authorization, undefined);
+      f.searches.push(JSON.parse(options.body).query);
+      return f.searchResponse || Response.json({code:0,data:{results:f.searchItems}});
     }
     if (String(url).includes('/.well-known/jwks')) return Response.json({keys:[releaseJwk]});
     if (String(url).includes('getAppAccessToken')) return Response.json({access_token: 'test-access', expires_in: 3600});
@@ -537,7 +539,7 @@ test('diagnostic commands are excluded before AI sees the digest transcript', ()
 
 
 
-test('mentioned questions search redacted keywords once and cite only provider URLs', async () => {
+test('mentioned questions search the redacted question once and cite only provider URLs', async () => {
   await withFixture(async f => {
     f.searchItems = [
       {url:'https://developers.cloudflare.com/web-search/',title:'官方搜索文档',content:'Web search supports AI binding.'},
@@ -546,18 +548,18 @@ test('mentioned questions search redacted keywords once and cite only provider U
       {url:'https://developers.cloudflare.com/web-search/',title:'duplicate',content:'ignore'}];
     f.env.AI.run = async (model, input) => {
       f.prompts.push(input);
-      return {response: input.messages[0].content.startsWith('Extract') ? 'Cloudflare web search' :
-        '搜索支持 AI binding [1]。虚构来源 [9] https://fake.example/bogus'};
+      return {response: '搜索支持 AI binding [1]。虚构来源 [9] https://fake.example/bogus'};
     };
     const payload = event('search1', '<@test-app> 搜索 Cloudflare token=private-key 联系 a@example.test', 'allowed-group', 'GROUP_AT_MESSAGE_CREATE');
     await qqRoutes(await signed(payload), f.env);
     await qqRoutes(await signed(payload), f.env);
-    assert.deepEqual(f.searches, ['Cloudflare web search']);
+    assert.match(f.searches[0], /搜索 Cloudflare/);
+    assert.doesNotMatch(JSON.stringify(f.searches), /private-key|a@example.test|member-search1|test-app/);
     assert.doesNotMatch(JSON.stringify(f.prompts), /private-key|a@example.test|member-search1|test-app/);
-    assert.equal(f.prompts.length, 2);
-    assert.doesNotMatch(f.prompts[1].messages[0].content, /invalid|duplicate/);
+    assert.equal(f.prompts.length, 1);
+    assert.doesNotMatch(f.prompts[0].messages[0].content, /invalid|duplicate/);
     const reply = f.sent.map(x => x.content).join('');
-    assert.match(reply, /联网搜索汇总（Mwmbl）/);
+    assert.match(reply, /联网搜索汇总（AnySearch）/);
     assert.match(reply, /https:\/\/developers.cloudflare.com\/web-search\//);
     assert.doesNotMatch(reply, /fake.example|\[9\]|javascript:|password/);
     assert.ok(f.network.every(url => !url.includes('api.cloudflare.com') && !url.includes('websearch')));
@@ -569,11 +571,11 @@ test('ordinary chat never searches, /search works, and /ask remains documentatio
     await qqRoutes(await signed(event('plain-search','帮忙联网搜索一下')), f.env);
     await qqRoutes(await signed(event('explicit-search','/search 最新技术新闻')), f.env);
     assert.equal(f.searches.length, 1);
-    assert.equal(f.prompts.length, 1); // Keywords only; no fabricated summary of empty evidence.
+    assert.equal(f.prompts.length, 0); // Empty evidence never reaches the model.
     assert.match(f.sent[0].content, /未找到可用来源/);
     await qqRoutes(await signed(event('docs-search','/ask Modu 支持什么格式？')), f.env);
     assert.equal(f.searches.length, 1);
-    assert.equal(f.prompts.length, 2);
+    assert.equal(f.prompts.length, 1);
     assert.match(f.sent[1].content, /README.md/);
   });
 });
@@ -582,14 +584,14 @@ test('free search failure never switches to paid service or generates an unsuppo
   await withFixture(async f => {
     f.searchResponse = new Response('Rate limited', {status:429});
     await qqRoutes(await signed(event('search-fail','/search 最新新闻')), f.env);
-    assert.equal(f.prompts.length, 1);
+    assert.equal(f.prompts.length, 0);
     assert.equal(f.searches.length, 1);
     assert.match(f.sent[0].content, /未能完成联网汇总/);
     const audit = JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:last-web-search'").get().value);
     assert.equal(audit.stage, 'search');
     assert.equal(audit.code, 429);
     assert.doesNotMatch(JSON.stringify(audit), /最新新闻|member-/);
-    assert.equal(f.network.filter(url => url.includes('mwmbl.org')).length, 1);
+    assert.equal(f.network.filter(url => url.includes('api.anysearch.com')).length, 1);
     assert.ok(f.network.every(url => !url.includes('api.cloudflare.com')));
   });
 });
@@ -621,4 +623,20 @@ test('search shares the per-user cooldown and daily answer limit', async () => {
     assert.equal(f.searches.length, 1);
     assert.match(f.sent[2].content, /80 次/);
   });
+});
+
+
+test('anonymous quota credentials and malformed results are never reused or exposed', async () => {
+  for (const response of [new Response('username=x password=private-password api_key=private-key', {status:402}),
+    Response.json({code:-1, message:'api_key=private-key'}), Response.json({code:0,data:{results:{}}})]) {
+    await withFixture(async f => {
+      f.searchResponse = response;
+      await qqRoutes(await signed(event('bad-search','/search EPUB')), f.env);
+      assert.equal(f.searches.length, 1);
+      assert.equal(f.prompts.length, 0);
+      assert.match(f.sent[0].content, /未能完成联网汇总/);
+      assert.doesNotMatch(JSON.stringify(f.sent)+JSON.stringify(f.DB.raw.prepare('SELECT value FROM bot_state').all()),
+        /private-key|private-password|username=x/);
+    });
+  }
 });
