@@ -951,3 +951,30 @@ test('Google requests disclose unavailable public pages; internal requests canno
     });
   }
 });
+
+
+test('Telegram chat citations link to actual retained message IDs after diagnostic filtering',async()=>withFixture(async f=>{
+  const now=Math.floor(Date.now()/1000), group='-1004201042022';
+  store(f.DB,`tg:chat:${group}:10`,{ts:now-300,text:'/summary-test 24h'},now);
+  store(f.DB,`tg:chat:${group}:11`,{ts:now-200,text:'默读导入失败',speaker:{key:'one',name:'小明'}},now);
+  store(f.DB,`tg:chat:${group}:12`,{ts:now-100,text:'重启后好了',speaker:{key:'one',name:'小明'},sourceMessageId:'999'},now);
+  store(f.DB,'tg:chat:-100999:13',{ts:now-60,text:'Other group'},now);
+  f.env.AI.run=async(model,input)=>{f.prompts.push(input);return {response:'已恢复 [M2]，最初导入失败 [M1]。伪造链接 https://t.me/c/999/999 [M999]'};};
+  const answer=await qqChatAnswer(f.env,group,'群里导入失败后来好了没','tg','20');
+  assert.match(answer,/\[M2\][^\n]*重启后好了\n查看原消息：https:\/\/t.me\/c\/4201042022\/12/);
+  assert.match(answer,/\[M1\][^\n]*默读导入失败\n查看原消息：https:\/\/t.me\/c\/4201042022\/11/);
+  assert.doesNotMatch(answer,/\/10\b|\/999\b|M999|Other group/);
+  assert.doesNotMatch(JSON.stringify(f.prompts),/sourceMessageId|t.me\/c\//);
+  assert.equal(f.network.length,0);
+}));
+test('QQ, basic Telegram groups and malformed message IDs do not get fabricated jump links',async()=>{
+  for(const [platform,group,messageId] of [['qq','allowed-group','11'],['tg','-12345','11'],['tg','-1004201042022','bad/12']]) {
+    await withFixture(async f=>{
+      const now=Math.floor(Date.now()/1000);
+      store(f.DB,`${platform}:chat:${group}:${messageId}`,{ts:now-60,text:'默读导入失败'},now);
+      f.env.AI.run=async()=>({response:'导入失败 [M1]'});
+      const answer=await qqChatAnswer(f.env,group,'群里导入失败',platform);
+      assert.match(answer,/引用群消息/);assert.doesNotMatch(answer,/查看原消息|https:\/\/t.me\/c\//);
+    });
+  }
+});
