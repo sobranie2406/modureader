@@ -82,7 +82,12 @@ test('manual Telegram digest requires administrator and excludes its own diagnos
   f.isAdmin=true;
   await f.receive(f.message(11,'默读导入失败'));
   await f.receive(f.message(12,'/summary-test@ModuReaderRelease_bot 24h'));
+  assert.equal(f.prompts.length,0);
+  await telegramSchedule({scheduledTime:at+60000},f.env);
+  await telegramSchedule({scheduledTime:at+120000},f.env);
   assert.equal(f.prompts.length,2);
+  assert.equal(f.calls.filter(c=>c.method==='sendMessage').length,1);
+  assert.equal(f.calls.find(c=>c.method==='sendMessage').body.reply_parameters.message_id,12);
   assert.doesNotMatch(f.prompts[0].messages[1].content,/summary-test/);
   assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/过去24小时反馈汇总测试/);
   assert.equal(f.raw.prepare("SELECT COUNT(*) n FROM bot_state WHERE key LIKE 'tg:summary:-%'").get().n,0);
@@ -93,4 +98,18 @@ test('diagnostic-only Telegram period does not call AI or invent feedback',async
   await telegramSchedule({scheduledTime:at},f.env);
   assert.equal(f.prompts.length,0);
   assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/没有可供汇总的聊天文字/);
+}));
+
+ test('queued Telegram AI failure produces an honest error once, without publishing empty feedback',async()=>fixture(async f=>{
+  f.isAdmin=true;
+  await f.receive(f.message(20,'默读导入失败'));
+  await f.receive(f.message(21,'/summary-test 24h'));
+  f.env.AI.run=async()=>{throw new Error('AI quota exceeded');};
+  await telegramSchedule({scheduledTime:at+60000},f.env);
+  await telegramSchedule({scheduledTime:at+120000},f.env);
+  const sent=f.calls.filter(c=>c.method==='sendMessage');
+  assert.equal(sent.length,1);
+  assert.match(sent[0].body.text,/暂时不可用/);
+  assert.doesNotMatch(sent[0].body.text,/没有收到/);
+  assert.equal(JSON.parse(f.raw.prepare("SELECT value FROM bot_state WHERE key='tg:last-summary-test'").get().value).ok,false);
 }));

@@ -63,7 +63,7 @@ QQ 和 Telegram 均在北京时间每天 **12:00** 汇总过去 **24 小时**与
 结合功能、设备、现象、代词和连续问答关联后续消息，不要求引用、@ 或每条消息都写“默读”。
 相关跟进合并在同一事项中，关联不确定标注“可能相关，待确认”；单个群友验证恢复不代表所有人已解决。
 两平台各自收集绑定群的文字，各自生成和发送反馈，不跨平台转发群聊。Telegram 机器人须为群管理员，才能接收非命令文字；启用前的消息无法补取。只保存纯文字，不收集附件说明或下载媒体。
-每天最多取 2000 条消息。跨日记录保留完整北京时间日期，先去除 QQ 表情内部标记，避免表情挤占上下文；输入仍超限时覆盖全时段抽样并提示。筛选结合 APP 功能语境及后续验证，不要求每条重复软件名称；无文字与只有测试指令的时段单独提示。AI 汇总仍需核对原文。
+每天最多取 2000 条消息。跨日记录保留完整北京时间日期，先去除 QQ 表情内部标记，避免表情挤占上下文；输入仍超限时覆盖全时段抽样并提示。筛选结合 APP 功能语境及后续验证，不要求每条重复软件名称；无文字与只有测试指令的时段单独提示。反馈汇总与复核使用同一 Cloudflare AI 绑定的 GLM-4.7-Flash，使用现有每日免费额度；不会升级套餐或启用付费后备。AI 汇总仍需核对原文。
 生成草稿后，再对照同一批原文复核相关性、最新跟进和结论；只发送复核结果，不发送未复核草稿。
 管理员可发送 `/summary-test 24h` 测试过去 24 小时仍保留的文字；`/summary-test` 测试当前阶段，不影响定时发送。
 
@@ -101,3 +101,5 @@ Tavily 需用户注册 Researcher/Free 方案并自行将密钥加入 Cloudflare
 官方接口：[AnySearch Search API](https://anysearch.com/docs/api-endpoints/v1-search)。
 
 Tavily 官方：[基础搜索](https://docs.tavily.com/documentation/api-reference/endpoint/search)、[免费额度](https://docs.tavily.com/documentation/api-credits)、[账户用量](https://docs.tavily.com/documentation/api-reference/endpoint/usage)。
+
+管理员 `/summary-test 24h` 由现有每分钟定时任务接手，通常下一分钟开始生成；两轮 AI 处理可继续运行，避免网页回调的 30 秒后台时限。每个平台 10 分钟内只接受一次测试；任务执行前领取一次性标记，发送失败不盲目重发，可查看 `qq:last-summary-test` / `tg:last-summary-test` 状态。

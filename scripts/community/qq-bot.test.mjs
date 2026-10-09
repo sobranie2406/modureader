@@ -261,16 +261,22 @@ test('only the source-reviewed digest is posted, never the unchecked draft', asy
     store(f.DB,'qq:chat:allowed-group:issue',{ts:now-60,text:'默读 iOS 选中文字无法批注'},now);
     let calls=0;
     f.env.AI.run=async (model,input)=> {
-      if (++calls===1) return {response:'1. 群友：【使用意见】无关新闻草稿'};
+      assert.equal(model,'@cf/zai-org/glm-4.7-flash');
+      assert.equal(input.chat_template_kwargs.enable_thinking,false);
+      if (++calls===1) return {choices:[{message:{content:'1. 群友：【使用意见】无关新闻草稿'}}]};
       assert.match(input.messages[1].content,/无关新闻草稿/);
       assert.match(input.messages[1].content,/默读 iOS 选中文字无法批注/);
       assert.match(input.messages[0].content,/草稿漏掉的事项必须补齐/);
-      return {response:'1. 群友（U1）：【Bug反馈】文字选择 👉 等待复现。'};
+      return {choices:[{message:{content:'1. 群友（U1）：【Bug反馈】文字选择 👉 等待复现。'}}]};
     };
     const admin=event('review-test','/summary-test 24h');
     admin.d.author.member_role='admin';
     await qqRoutes(await signed(admin),f.env);
+    assert.equal(calls,0);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:31:00+08:00')},f.env);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:32:00+08:00')},f.env);
     assert.equal(calls,2);
+    assert.equal(f.sent.length,1);
     assert.match(f.sent[0].content,/等待复现/);
     assert.doesNotMatch(f.sent[0].content,/无关新闻草稿|U1/);
   });
@@ -287,6 +293,8 @@ test('24-hour summary test includes retained earlier feedback and excludes expir
     const admin=event('admin-summary','/summary-test 24h');
     admin.d.author.member_role='admin';
     await qqRoutes(await signed(admin),f.env);
+    assert.equal(f.prompts.length,0);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:31:00+08:00')},f.env);
     const input=f.prompts[0].messages[1].content;
     assert.match(input,/无法添加批注/);
     assert.doesNotMatch(input,/Outside 24-hour/);

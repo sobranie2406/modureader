@@ -137,12 +137,10 @@ async function handle(env,update) {
     msg_elements:m.reply_to_message?.text && !m.reply_to_message.from?.is_bot ? [{content:m.reply_to_message.text}] : []
   },'tg');
   if (/^\/summary-test(?:@ModuReaderRelease_bot)?(?:\s|$)/i.test(text)) {
-    if (!isAdmin || !await claim(env,'tg:summary-test-cooldown',60)) return;
+    if (!isAdmin || !await claim(env,'tg:summary-test-cooldown',600)) return;
     const end=now(),last24h=/\s24h\s*$/i.test(text);
-    try {
-      const summary=await qqSummary(env,String(env.GROUP_ID),{start:last24h ? end-86400 : qqWindow(Date.now()).end,end},'tg');
-      await send(env,`🧪 ${last24h ? '过去24小时反馈汇总测试' : '当前阶段反馈汇总测试'}\n${summary}`,m);
-    } catch {await send(env,'反馈汇总暂时不可用，请稍后重试。',m);}
+    await put(env,`tg:summary-test-pending:${env.GROUP_ID}`,{id:m.message_id,end,
+      start:last24h ? end-86400 : qqWindow(Date.now()).end,last24h},600);
     return;
   }
   if (/^\/(help|start)(?:@ModuReaderRelease_bot)?(?:\s|$)/i.test(text)) return send(env,HELP,m);
@@ -153,6 +151,16 @@ async function handle(env,update) {
 export async function telegramSchedule(controller,env) {
   if (!env.BOT_TOKEN || !env.DB || !env.AI) return;
   env={...env,GROUP_ID:env.GROUP_ID || '-1004201042022'};
+  const pending=await get(env,`tg:summary-test-pending:${env.GROUP_ID}`);
+  if(pending && await claim(env,`tg:summary-test-job:${env.GROUP_ID}:${pending.id}`,86400)) {
+    try {
+      let text, generated=true;
+      try {text=await qqSummary(env,String(env.GROUP_ID),pending,'tg');}
+      catch {generated=false;text='反馈汇总暂时不可用，请稍后重试。';}
+      await send(env,`🧪 ${pending.last24h ? '过去24小时反馈汇总测试' : '当前阶段反馈汇总测试'}\n${text}`,{message_id:pending.id});
+      await put(env,'tg:last-summary-test',{at:now(),ok:generated},86400);
+    } catch {await put(env,'tg:last-summary-test',{at:now(),ok:false},86400);}
+  }
   const at=controller.scheduledTime || Date.now();
   if (Math.floor(at/60000)%1440!==240) return;
   const window=qqWindow(at);
