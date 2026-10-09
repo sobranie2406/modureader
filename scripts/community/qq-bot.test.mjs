@@ -161,7 +161,7 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       store(f.DB, 'qq:started', {at:seconds-86400}, seconds);
       store(f.DB, 'qq:push-permission', {allowed:true,tested:true}, seconds);
       store(f.DB, 'qq:chat:allowed-group:inside', {ts:seconds-60,text:qqRedact('EPUB 导入讨论 token=test-secret')}, seconds);
-      store(f.DB, 'qq:chat:allowed-group:before', {ts:seconds-43201,text:'Outside previous interval'}, seconds);
+      store(f.DB, 'qq:chat:allowed-group:before', {ts:seconds-86401,text:'Outside retained context'}, seconds);
       store(f.DB, 'qq:chat:allowed-group:end', {ts:seconds,text:'Outside current interval'}, seconds);
       const summarize = f.env.AI.run;
       f.env.AI.run = async (...args) => {
@@ -183,6 +183,57 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       assert.equal(JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:last-summary'").get().value).ok, true);
     });
   } finally {Date.now = originalNow;}
+});
+
+test('feedback digest keeps unmentioned follow-ups and previous context in separate chronological sections', async () => {
+  const originalNow = Date.now;
+  const at = Date.parse('2026-10-09T08:00:00+08:00');
+  Date.now = () => at;
+  try {
+    await withFixture(async f => {
+      const end = at/1000, start = end-43200;
+      store(f.DB,'qq:started',{at:end-86400},end);
+      store(f.DB,'qq:push-permission',{allowed:true,tested:true},end);
+      store(f.DB,'qq:chat:allowed-group:context',{ts:start-60,text:'默读在 WiFi 下朗读无声，Android 15。',speaker:{key:'one',name:'甲'}},end);
+      store(f.DB,'qq:chat:allowed-group:interleaved',{ts:start+60,text:'今天港股下跌',speaker:{key:'two',name:'乙'}},end);
+      store(f.DB,'qq:chat:allowed-group:followup',{ts:start+120,text:'重启后还是不行，切换流量就正常了。',speaker:{key:'one',name:'甲'}},end);
+      store(f.DB,'qq:chat:allowed-group:resolved',{ts:start+180,text:'换了家里的网络就好了，暂时怀疑单位网络。',speaker:{key:'one',name:'甲'}},end);
+      store(f.DB,'qq:chat:other-group:secret',{ts:start-30,text:'Other group private text'},end);
+      store(f.DB,'qq:chat:allowed-group:expired',{ts:start-20,text:'Expired private text'},end);
+      f.DB.raw.prepare('UPDATE bot_state SET expires=? WHERE key=?').run(end,'qq:chat:allowed-group:expired');
+      await qqSchedule({scheduledTime:at},f.env);
+      const input = f.prompts[0].messages[1].content;
+      const sections = input.split('【本时段新消息，汇总对象】\n');
+      const background = sections[0].split('\n').filter(line=>line.startsWith('{')).map(JSON.parse);
+      const current = sections[1].split('\n').filter(line=>line.startsWith('{')).map(JSON.parse);
+      assert.equal(background.length,1);
+      assert.match(background[0].text,/默读在 WiFi/);
+      assert.deepEqual(current.map(m=>m.text),['今天港股下跌','重启后还是不行，切换流量就正常了。','换了家里的网络就好了，暂时怀疑单位网络。']);
+      assert.equal(background[0].speaker,current[1].speaker);
+      assert.equal(current[1].speaker,current[2].speaker);
+      assert.ok(current.every(m=>!m.mentions && !m.replyTo));
+      assert.doesNotMatch(input,/Other group|Expired private/);
+      assert.match(f.sent[0].content,/^默读反馈汇总/);
+    });
+  } finally {Date.now=originalNow;}
+});
+
+test('a quiet period never republishes previous feedback or calls AI for background alone', async () => {
+  const originalNow=Date.now;
+  const at=Date.parse('2026-10-09T08:00:00+08:00');
+  Date.now=()=>at;
+  try {
+    await withFixture(async f=>{
+      const end=at/1000;
+      store(f.DB,'qq:started',{at:end-86400},end);
+      store(f.DB,'qq:push-permission',{allowed:true,tested:true},end);
+      store(f.DB,'qq:chat:allowed-group:old',{ts:end-43260,text:'默读闪退'},end);
+      await qqSchedule({scheduledTime:at},f.env);
+      assert.equal(f.prompts.length,0);
+      assert.match(f.sent[0].content,/本时段没有收到与默读 APP 有关的新反馈/);
+      assert.doesNotMatch(f.sent[0].content,/闪退/);
+    });
+  } finally {Date.now=originalNow;}
 });
 
 test('no scheduled push happens until proactive permission is actually tested', async () => {
