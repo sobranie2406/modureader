@@ -61,11 +61,20 @@ function fixture() {
       return {response: input.messages[0].content.includes('Summarize') ?
         '• 群友讨论了 EPUB 导入，相关问题尚待确认。' : 'Supported formats are documented in the README. https://github.com/sobranie2406/modureader/blob/main/README.md'};
     }}};
-  const f = {env, DB, sent, prompts, network, searches: [], searchItems: [],
+  const f = {env, DB, sent, prompts, network, searches: [], searchItems: [], tavilyRequests: [],
     release:{id:123,tag_name:'v1.0-beta',prerelease:true,draft:false,
       published_at:new Date().toISOString(),body:'中文：修复阅读问题。\nEnglish: Fix reader issues.'},
     async fetch(url, options = {}) {
     network.push(String(url));
+    if (String(url) === 'https://api.tavily.com/usage') {
+      assert.equal(options.headers.authorization, 'Bearer test-tavily-key');
+      return f.tavilyUsageResponse || Response.json({account:{current_plan:'Researcher',plan_limit:1000,plan_usage:0}});
+    }
+    if (String(url) === 'https://api.tavily.com/search') {
+      assert.equal(options.headers.authorization, 'Bearer test-tavily-key');
+      f.tavilyRequests.push(JSON.parse(options.body));
+      return f.tavilyResponse || Response.json({results:f.searchItems});
+    }
     if (String(url) === 'https://api.anysearch.com/v1/search') {
       assert.equal(options.method, 'POST');
       assert.equal(options.headers.authorization, undefined);
@@ -639,4 +648,77 @@ test('anonymous quota credentials and malformed results are never reused or expo
         /private-key|private-password|username=x/);
     });
   }
+});
+
+
+test('Tavily free basic search is primary, redacts the question and preserves published dates', async () => {
+  await withFixture(async f => {
+    f.env.TAVILY_API_KEY = 'test-tavily-key';
+    f.searchItems = [{title:'EPUB spec',url:'https://www.w3.org/TR/epub-33/',content:'EPUB specification',published_date:'2026-01-01'}];
+    await qqRoutes(await signed(event('tavily-primary','/search EPUB token=private-key')), f.env);
+    assert.equal(f.tavilyRequests.length, 1);
+    assert.equal(f.searches.length, 0);
+    const request = f.tavilyRequests[0];
+    assert.equal(request.search_depth, 'basic');
+    assert.equal(request.auto_parameters, false);
+    assert.equal(request.include_answer, false);
+    assert.equal(request.include_raw_content, false);
+    assert.equal(request.max_results, 5);
+    assert.doesNotMatch(JSON.stringify(request), /private-key|test-tavily-key|member-/);
+    assert.match(JSON.stringify(f.prompts), /2026-01-01/);
+    assert.match(f.sent[0].content, /联网搜索汇总（Tavily）/);
+    assert.doesNotMatch(f.sent[0].content, /test-tavily-key/);
+  });
+});
+
+test('Tavily failures, empty results and quota exhaustion use only the anonymous free fallback', async () => {
+  for (const response of [new Response('private-key', {status:401}),new Response('',{status:432}),
+    new Response('',{status:429}),Response.json({results:[]}),Response.json({results:null})]) {
+    await withFixture(async f => {
+      f.env.TAVILY_API_KEY = 'test-tavily-key'; f.tavilyResponse = response;
+      f.searchItems = [{title:'EPUB',url:'https://www.w3.org/TR/epub-33/',snippet:'EPUB'}];
+      await qqRoutes(await signed(event('tavily-fallback','/search EPUB')), f.env);
+      assert.equal(f.tavilyRequests.length, 1);
+      assert.equal(f.searches.length, 1);
+      assert.match(f.sent[0].content, /联网搜索汇总（AnySearch）/);
+      assert.doesNotMatch(JSON.stringify(f.sent)+JSON.stringify(f.DB.raw.prepare('SELECT value FROM bot_state').all()), /private-key|test-tavily-key/);
+    });
+  }
+});
+
+test('paid plans, unknown usage and exhausted free allowance never call Tavily search', async () => {
+  for (const usage of [{current_plan:'Project',plan_limit:4000,plan_usage:0},
+    {current_plan:'Researcher',plan_limit:1000,plan_usage:950},
+    {current_plan:'Researcher',plan_limit:1000,plan_usage:null},
+    {current_plan:'Researcher',plan_limit:1000,plan_usage:-1}, {}]) {
+    await withFixture(async f => {
+      f.env.TAVILY_API_KEY = 'test-tavily-key';
+      f.tavilyUsageResponse = Response.json({account:usage});
+      await qqRoutes(await signed(event('tavily-budget','/search EPUB')), f.env);
+      assert.equal(f.tavilyRequests.length, 0);
+      assert.equal(f.searches.length, 1);
+    });
+  }
+  await withFixture(async f => {
+    f.env.TAVILY_API_KEY = 'test-tavily-key';
+    store(f.DB,'qq:tavily:'+new Date().toISOString().slice(0,7),950,Math.floor(Date.now()/1000));
+    await qqRoutes(await signed(event('tavily-monthly','/search EPUB')), f.env);
+    assert.equal(f.tavilyRequests.length, 0);
+    assert.equal(f.network.filter(url => url.includes('tavily.com')).length, 0);
+    assert.equal(f.searches.length, 1);
+  });
+});
+
+test('unavailable account usage skips Tavily search; two provider failures never reach AI', async () => {
+  await withFixture(async f => {
+    f.env.TAVILY_API_KEY = 'test-tavily-key';
+    f.tavilyUsageResponse = new Response('private-key', {status:503});
+    f.searchResponse = new Response('private-key', {status:429});
+    await qqRoutes(await signed(event('both-search-fail','/search EPUB')), f.env);
+    assert.equal(f.tavilyRequests.length, 0);
+    assert.equal(f.searches.length, 1);
+    assert.equal(f.prompts.length, 0);
+    assert.match(f.sent[0].content, /未能完成联网汇总/);
+    assert.doesNotMatch(JSON.stringify(f.sent)+JSON.stringify(f.DB.raw.prepare('SELECT value FROM bot_state').all()), /private-key|test-tavily-key/);
+  });
 });

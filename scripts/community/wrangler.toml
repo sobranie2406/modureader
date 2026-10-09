@@ -23,5 +23,5 @@ QQ_SUMMARIES_ENABLED = "false"
 QQ_RELEASE_PUSH_ENABLED = "false"
 QQ_JOIN_APPROVAL_ENABLED = "false"
 
-# Existing BOT_TOKEN and WEBHOOK_SECRET, and new QQ_APP_SECRET, are encrypted secrets.
+# Existing BOT_TOKEN and WEBHOOK_SECRET, QQ_APP_SECRET and optional TAVILY_API_KEY, are encrypted secrets.
 # Never put a credential in this file or replace the existing Telegram secrets.

@@ -81,15 +81,23 @@ U 编号仅在内部关联，群内输出有昵称显示昵称，无昵称统一
 然后由当前 Qwen 模型整理要点、标注来源编号，附搜索服务实际返回的链接。
 `/ask 问题` 保留按默读公开项目文档回答。普通群聊不会触发搜索。
 
-使用 AnySearch 的公开匿名搜索 API，直接传入本次脱敏后的完整问题，
+配置加密变量 `TAVILY_API_KEY` 后优先使用 Tavily 免费基础搜索；未配置或失败时使用
+AnySearch 的公开匿名搜索 API。直接传入本次脱敏后的完整问题，
 汇总仍由现有 Workers AI 模型完成，省去关键词提炼的额外模型调用。
 每题最多取 5 个结果、1024 字，每人间隔 30 秒，全群搜索间隔 5 秒，
 与文档问答共享每天 80 次上限。不传整段群聊、昵称或成员 ID。
 搜索结果不作为指令；无来源或服务故障时明确提示，不凭模型记忆冒充联网结果。
 
-不注册搜索账号、不配置付费密钥、不调用收费搜索或自动切换付费后端。
+Tavily 需用户注册 Researcher/Free 方案并自行将密钥加入 Cloudflare 加密变量，
+保持 Pay-as-you-go 关闭。固定 `search_depth: basic`（每次 1 额度）及 `auto_parameters: false`，
+不请求服务端生成答案、全文或图片。每次先读取账户用量，只允许已识别的免费方案、
+1000 月额度且已用少于 950；机器人每月最多预留 950 次，失败预留也计数。
+额度状态未知、付费方案、余额不足或请求失败时仅回退匿名免费接口，禁止付费回退。
+不要共享此密钥给其他高流量应用；账户免费额度在每月 1 日重置。
 匿名调用按 IP 限流并受每日免费额度限制，官方未在接口文档承诺具体匿名次数；
 额度用完时停止，不使用响应中自动生成的账号、密码或密钥，也不记录错误响应正文。
 搜索结果可能遗漏或过时，模型整理需核对原文。现有模型的免费额度限制继续生效。
-来源附 AnySearch 名称与实际网页链接。
+来源显示实际使用的搜索服务与网页链接，发布时间（若有）传给汇总模型。
 官方接口：[AnySearch Search API](https://anysearch.com/docs/api-endpoints/v1-search)。
+
+Tavily 官方：[基础搜索](https://docs.tavily.com/documentation/api-reference/endpoint/search)、[免费额度](https://docs.tavily.com/documentation/api-credits)、[账户用量](https://docs.tavily.com/documentation/api-reference/endpoint/usage)。

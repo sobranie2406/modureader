@@ -174,29 +174,63 @@ async function qqWebAnswer(env, question) {
   let stage = 'search';
   try {
     if (!await qqClaim(env, 'qq:web-search-rate', 5)) return '请稍等 5 秒再联网搜索。';
-    // Anonymous free tier only; never adopt credentials returned on quota exhaustion.
-    const response = await fetch('https://api.anysearch.com/v1/search', {
-      method: 'POST', headers: {'content-type': 'application/json', accept: 'application/json'},
-      body: JSON.stringify({query, max_results: 5, language: 'zh-CN'}),
-      signal: AbortSignal.timeout(12000)});
-    if (!response.ok) throw Object.assign(new Error('Web search unavailable'), {code: response.status});
-    const data = await response.json();
-    if (data.code !== 0 || !Array.isArray(data.data?.results)) {
-      throw Object.assign(new Error('Invalid web search response'), {code: 502});
+    let provider = 'AnySearch', items;
+    if (env.TAVILY_API_KEY && await qqCount(env,
+        'qq:tavily:' + new Date().toISOString().slice(0, 7), 86400*40) <= 950) {
+      try {
+        const headers = {authorization: 'Bearer ' + env.TAVILY_API_KEY, accept: 'application/json'};
+        const usageResponse = await fetch('https://api.tavily.com/usage', {
+          headers, signal: AbortSignal.timeout(4000)});
+        if (!usageResponse.ok) throw Object.assign(new Error('Tavily usage unavailable'), {code: usageResponse.status});
+        const {account} = await usageResponse.json();
+        // Leave 50 free credits in reserve; refuse paid plans and unknown usage.
+        if (!/^(free|researcher)$/i.test(account?.current_plan || '') ||
+            account.plan_limit !== 1000 || !Number.isFinite(account.plan_usage) ||
+            account.plan_usage < 0 || account.plan_usage >= 950) {
+          throw Object.assign(new Error('Tavily free allowance unavailable'), {code: 432});
+        }
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST', headers: {...headers, 'content-type': 'application/json'},
+          body: JSON.stringify({query, search_depth: 'basic', auto_parameters: false,
+            max_results: 5, include_answer: false, include_raw_content: false,
+            include_images: false, include_published_date: true}),
+          signal: AbortSignal.timeout(8000)});
+        if (!response.ok) throw Object.assign(new Error('Tavily search unavailable'), {code: response.status});
+        const data = await response.json();
+        if (!Array.isArray(data.results)) throw Object.assign(new Error('Invalid Tavily results'), {code: 502});
+        if (data.results.length) {items = data.results; provider = 'Tavily';}
+      } catch (error) {
+        await qqPut(env, 'qq:last-tavily-fallback', {at: qqNow(),
+          code: Number.isFinite(Number(error.code)) ? Number(error.code) : null}, 86400*7);
+      }
+    }
+    if (!items) {
+      // Anonymous free tier only; never adopt credentials returned on quota exhaustion.
+      const response = await fetch('https://api.anysearch.com/v1/search', {
+        method: 'POST', headers: {'content-type': 'application/json', accept: 'application/json'},
+        body: JSON.stringify({query, max_results: 5, language: 'zh-CN'}),
+        signal: AbortSignal.timeout(8000)});
+      if (!response.ok) throw Object.assign(new Error('Web search unavailable'), {code: response.status});
+      const data = await response.json();
+      if (data.code !== 0 || !Array.isArray(data.data?.results)) {
+        throw Object.assign(new Error('Invalid web search response'), {code: 502});
+      }
+      items = data.data.results;
     }
     const seen = new Set();
-    const sources = data.data.results.flatMap(item => {
+    const sources = items.flatMap(item => {
       try {
         const url = new URL(item.url);
         if (url.protocol !== 'https:' || url.username || url.password ||
             !url.hostname.includes('.') || seen.has(url.href)) return [];
         seen.add(url.href);
         return [{url: url.href, title: qqRedact(item.title).slice(0, 160),
-          description: qqRedact(item.snippet || item.content).slice(0, 1800)}];
+          description: qqRedact(item.snippet || item.content).slice(0, 1800),
+          published_date: qqRedact(item.published_date).slice(0, 80)}];
       } catch { return []; }
     }).slice(0, 5);
     if (!sources.length) return '本次联网搜索未找到可用来源，请换一个更具体的问题。';
-    const evidence = sources.map((source, i) => ({id: i+1, title: source.title, description: source.description}));
+    const evidence = sources.map((source, i) => ({id: i+1, title: source.title, description: source.description, published_date: source.published_date}));
     const date = new Date(Date.now()+8*3600000).toISOString().slice(0, 10);
     stage = 'summary';
     const result = await env.AI.run(QQ_MODEL, {messages: [
@@ -216,8 +250,8 @@ SEARCH EVIDENCE:\n${JSON.stringify(evidence)}`},
       .replace(/\[(\d+)\]/g, (match, number) => Number(number) >= 1 && Number(number) <= sources.length ? match : '')
       .slice(0, 1800).trim();
     const links = sources.map((source, i) => `[${i+1}] ${source.title}\n${source.url}`).join('\n');
-    await qqPut(env, 'qq:last-web-search', {at: qqNow(), ok: true, sources: sources.length}, 86400*7);
-    return `🔎 联网搜索汇总（AnySearch）· ${date}\n\n${answer || '未能生成可靠汇总，请查看以下搜索来源。'}\n\n来源：\n${links}\n\n🤖 根据搜索摘要整理，请核对原文。免费服务可能限流，搜索结果也可能遗漏或过时。`;
+    await qqPut(env, 'qq:last-web-search', {at: qqNow(), ok: true, provider, sources: sources.length}, 86400*7);
+    return `🔎 联网搜索汇总（${provider}）· ${date}\n\n${answer || '未能生成可靠汇总，请查看以下搜索来源。'}\n\n来源：\n${links}\n\n🤖 根据搜索摘要整理，请核对原文。免费服务可能限流，搜索结果也可能遗漏或过时。`;
   } catch (error) {
     await qqPut(env, 'qq:last-web-search', {at: qqNow(), ok: false, stage,
       code: Number.isFinite(Number(error.code)) ? Number(error.code) : null}, 86400*7);
@@ -635,7 +669,9 @@ export async function qqRoutes(request, env, ctx) {
       group_bound: !!env.QQ_GROUP_OPENID, summaries_enabled: env.QQ_SUMMARIES_ENABLED === 'true',
       summary_times: ['08:00 Asia/Shanghai','20:00 Asia/Shanghai'],
       summary_format: 'modu-feedback-v1',
-      web_search_enabled: true, web_search_provider: 'AnySearch anonymous API', web_search_paid_fallback: false,
+      web_search_enabled: true, web_search_provider: env.TAVILY_API_KEY ? 'Tavily basic + AnySearch anonymous fallback' : 'AnySearch anonymous API',
+      tavily_configured: !!env.TAVILY_API_KEY, tavily_monthly_limit: 950, web_search_paid_fallback: false,
+      last_tavily_fallback: env.DB ? await qqGet(env, 'qq:last-tavily-fallback') : null,
       last_web_search: env.DB ? await qqGet(env, 'qq:last-web-search') : null,
       releases_enabled: env.QQ_RELEASE_PUSH_ENABLED === 'true', release_trigger: 'GitHub release event',
       release_polling: false, last_release: env.DB ? await qqGet(env, 'qq:last-release') : null,
