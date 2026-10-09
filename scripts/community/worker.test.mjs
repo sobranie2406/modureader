@@ -11,8 +11,12 @@ async function fixture(fn) {
   raw.exec('CREATE TABLE bot_state(key TEXT PRIMARY KEY,value TEXT NOT NULL,expires INTEGER NOT NULL)');
   const DB={prepare(sql) {let args=[]; return {bind(...v){args=v;return this;},async first(){return raw.prepare(sql).get(...args);},async all(){return {results:raw.prepare(sql).all(...args)};},async run(){return raw.prepare(sql).run(...args);}};}};
   const calls=[],prompts=[];
-  const f={raw,env:{DB,BOT_TOKEN:'test-token',WEBHOOK_SECRET:'test-secret',GROUP_ID:group,AI:{async run(model,input){prompts.push(input);return {response:'1. 小明（U1）：【Bug反馈】导入 👉 后续测试仍失败，待排查。'};}}},calls,prompts,isAdmin:false,failSend:false};
+  const f={raw,env:{DB,BOT_TOKEN:'test-token',WEBHOOK_SECRET:'test-secret',GROUP_ID:group,AI:{async run(model,input){prompts.push(input);return {response:'1. 小明（U1）：【Bug反馈】导入 👉 后续测试仍失败，待排查。'};}}},calls,prompts,network:[],searches:[],isAdmin:false,failSend:false};
   globalThis.fetch=async (url,options)=>{
+    f.network.push(String(url));
+    if(String(url).includes('raw.githubusercontent.com')) return new Response('Current public Modu documentation.');
+    if(String(url)==='https://api.anysearch.com/v1/search') {f.searches.push(JSON.parse(options.body));return Response.json({code:0,data:{results:[{title:'天气资料',url:'https://weather.example.test/today',snippet:'北京天气资料'}]}});}
+    if(String(url)==='https://api.tavily.com/usage') {assert.equal(options.headers.authorization,'Bearer test-tavily-key');return Response.json({account:{current_plan:'Researcher',plan_limit:1000,plan_usage:950}});}
     const method=String(url).split('/').at(-1),body=JSON.parse(options.body);calls.push({method,body});
     if(method==='getChatMember') return Response.json({ok:true,result:{status:f.isAdmin?'administrator':'member'}});
     if(method==='sendMessage') return Response.json({ok:!f.failSend,result:{message_id:20}});
@@ -112,4 +116,48 @@ test('diagnostic-only Telegram period does not call AI or invent feedback',async
   assert.match(sent[0].body.text,/暂时不可用/);
   assert.doesNotMatch(sent[0].body.text,/没有收到/);
   assert.equal(JSON.parse(f.raw.prepare("SELECT value FROM bot_state WHERE key='tg:last-summary-test'").get().value).ok,false);
+}));
+
+
+test('Telegram uses the same routing for natural questions and commands, and retains free-provider settings',async()=>{
+  for(const [question,expected,reply] of [
+    ['/search@ModuReaderRelease_bot 默读如何导入 EPUB','docs',/默读说明文档检索/],
+    ['@ModuReaderRelease_bot Modu 如何设置翻页','docs',/默读说明文档检索/],
+    ['/search@ModuReaderRelease_bot 今天北京天气','web',/联网搜索汇总/],
+    ['@ModuReaderRelease_bot 这个怎么弄','clarify',/问题不明确时不会自动联网/]
+  ]) await fixture(async f=>{
+    f.env.TAVILY_API_KEY='test-tavily-key';
+    await f.receive(f.message(30,question));
+    const answer=f.calls.find(c=>c.method==='sendMessage').body.text;
+    assert.match(answer,reply);
+    assert.equal(JSON.parse(f.raw.prepare("SELECT value FROM bot_state WHERE key='tg:last-question'").get().value).route,expected);
+    if(expected==='web') {
+      assert.ok(f.network.includes('https://api.tavily.com/usage'));
+      assert.equal(f.searches.length,1);
+    } else assert.ok(!f.network.some(url=>/api\.(?:tavily|anysearch)\.com/.test(url)));
+  });
+});
+
+test('Telegram chat retrieval excludes QQ, other groups, expired history and the asking message',async()=>fixture(async f=>{
+  f.store(`tg:chat:${group}:old`,{ts:at/1000-23*3600,text:'默读 iOS 27.2 文字选择失败',speaker:{key:'one',name:'小明'}});
+  f.store(`tg:chat:${group}:new`,{ts:at/1000-120,text:'重新测试好了',speaker:{key:'one',name:'小明'}});
+  f.store(`tg:chat:${group}:expired`,{ts:at/1000-25*3600,text:'EXPIRED PRIVATE'});
+  f.store('qq:chat:qq-group:other',{ts:at/1000-100,text:'QQ PRIVATE'});
+  f.store('tg:chat:other-group:other',{ts:at/1000-100,text:'OTHER PRIVATE'});
+  f.env.AI.run=async(model,input)=>{f.prompts.push(input);return {choices:[{message:{content:'小明重新测试好了 [M2]。'}}]};};
+  await f.receive(f.message(40,'/search@ModuReaderRelease_bot 群里 iOS 问题后来恢复了吗'));
+  assert.equal(f.prompts.length,1);
+  assert.match(f.prompts[0].messages[0].content,/iOS 27.2[\s\S]*重新测试好了/);
+  assert.doesNotMatch(f.prompts[0].messages[0].content,/QQ PRIVATE|OTHER PRIVATE|EXPIRED PRIVATE|群里 iOS 问题后来恢复了吗/);
+  assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/引用群消息/);
+  assert.ok(f.network.every(url=>url.startsWith('https://api.telegram.org/')));
+}));
+
+test('Telegram replies to a previous chat lookup inherit its source without web access',async()=>fixture(async f=>{
+  f.store(`tg:chat:${group}:source`,{ts:at/1000-120,text:'iOS 选择问题恢复了',speaker:{key:'one',name:'小明'}});
+  f.env.AI.run=async(model,input)=>{f.prompts.push(input);return {response:'小明说已经恢复 [M1]。'};};
+  await f.receive(f.message(50,'那后来好了没',{reply_to_message:{message_id:49,from:{is_bot:true,username:'ModuReaderRelease_bot'},text:'💬 群内聊天记录检索（仅本群最近24小时）\niOS选择问题'}}));
+  assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/群内聊天记录检索/);
+  assert.equal(JSON.parse(f.raw.prepare("SELECT value FROM bot_state WHERE key='tg:last-question'").get().value).route,'chat');
+  assert.ok(!f.network.some(url=>/anysearch|tavily|github/.test(url)));
 }));

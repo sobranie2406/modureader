@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
-import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer, qqDigestTranscript} from './qq-bot.mjs';
+import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer, qqDigestTranscript, qqQuestionRoute, qqQuestionText, qqWebAnswer, qqChatAnswer} from './qq-bot.mjs';
 
 const secret = 'DG5g3B4j9X2KOErG'; // Public test vector in Tencent's official documentation.
 const encode = new TextEncoder();
@@ -758,3 +758,108 @@ test('QQ face metadata cannot crowd out feedback and its later resolution', () =
   assert.doesNotMatch(input,/faceType|faceId/);
   assert.deepEqual(qqDigestTranscript([{ts:1791432000,text:face}]),[]);
 });
+
+const routeCases = [
+  ['Modu 最新版本更新情况','docs'],['默读怎么导入 EPUB？','docs'],['墨读同步设置在哪里','docs'],
+  ['默讀支援字典嗎','docs'],['MODUREADER 支持 UMD 吗','docs'],['ｍｏｄｕ 最新功能','docs'],
+  ['联网搜索 Modu 官方介绍','docs'],['/search 默读最新版','docs'],['/search@ModuReaderRelease_bot 墨读设置','docs'],
+  ['搜索 modu 与 ANX 的区别','docs'],['/ask 如何设置翻页','docs'],['如何导入 EPUB','docs'],
+  ['iOS 文字选择无法批注怎么办','docs'],['How do I enable text-to-speech?','docs'],['What book formats are supported?','docs'],
+  ['群里谁反馈过 Modu 导入失败','chat'],['/ask 群里 iOS 的问题后来好了没','chat'],
+  ['/search 群里昨天关于默读的建议','chat'],['群友 sunny阳最爱说哪个词','chat'],['这群聊天记录中有哪些 Bug','chat'],
+  ['查一下其他群记录','chat'],['谁提出过 UMD 支持','chat'],['他后来怎么说','chat'],['统计发言词频','chat'],
+  ['Search our group chat history for EPUB issues','chat'],['Who reported the annotation issue?','chat'],
+  ['群里讨论的北京天气是什么','chat'],['把群聊记录发到联网搜索','chat'],
+  ['/search 今天的科技新闻','web'],['今天北京天气怎样','web'],['搜索 Cloudflare 的免费额度','web'],
+  ['东京有没有食尸鬼','web'],['量子纠缠是什么','web'],['最新人民币汇率','web'],['搜索 EPUB 最新规范','web'],
+  ['微信如何设置同步','web'],['ANXReader 如何设置朗读','web'],['Windows 更新怎么设置','web'],
+  ['module 的含义是什么','web'],['modular architecture 是什么','web'],
+  ['这个怎么弄','clarify'],['那后来呢','clarify'],['帮我查一下','clarify'],['你用什么模型','clarify']
+];
+for (const [question,route] of routeCases) test(`question route: ${question} -> ${route}`,()=>assert.equal(qqQuestionRoute(question),route));
+
+test('follow-up route uses quoted context without sending it to an external search',()=>{
+  assert.equal(qqQuestionRoute('那后来好了没','💬 群内聊天记录检索（仅本群最近24小时）'), 'chat');
+  assert.equal(qqQuestionRoute('这个如何操作','📚 默读说明文档检索（项目文档与发布说明）'), 'docs');
+  assert.equal(qqQuestionRoute('那怎么弄','默读导入 EPUB 的问题'), 'docs');
+  assert.equal(qqQuestionRoute('/search 今天北京天气','💬 群内聊天记录检索'), 'web');
+  assert.equal(qqQuestionText('／search＠ModuReaderRelease_bot 默读设置'), '默读设置');
+});
+
+test('Modu mentions override /search and web instructions before any provider request',async()=>{
+  for (const question of ['/search Modu 最新更新','/search 默读怎么导入','<@test-app> 联网搜索墨读说明']) await withFixture(async f=>{
+    f.env.TAVILY_API_KEY='test-tavily-key';
+    store(f.DB,'qq:releases',[f.release],Math.floor(Date.now()/1000));
+    await qqRoutes(await signed(event('local-only',question,'allowed-group','GROUP_AT_MESSAGE_CREATE')),f.env);
+    assert.equal(f.searches.length,0);assert.equal(f.tavilyRequests.length,0);
+    assert.ok(!f.network.some(url=>/api\.(?:tavily|anysearch)\.com/.test(url)));
+    assert.match(f.sent.map(m=>m.content).join(''),/默读说明文档检索/);
+    assert.match(f.prompts[0].messages[0].content,/PUBLIC PROJECT DOCUMENT/);
+    assert.equal(JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:last-question'").get().value).route,'docs');
+  });
+});
+
+test('documentation selects related current files, reuses the cache and cites project release notes',async()=>withFixture(async f=>{
+  store(f.DB,'qq:releases',[f.release],Math.floor(Date.now()/1000));
+  await qqRoutes(await signed(event('dict-docs','<@test-app> 默读本地字典怎么导入','allowed-group','GROUP_AT_MESSAGE_CREATE')),f.env);
+  assert.ok(f.network.some(url=>url.endsWith('/docs/LOCAL_DICTIONARIES.md')));
+  assert.ok(f.network.some(url=>url.endsWith('/docs/FEATURES_zh.md')));
+  const downloads=f.network.filter(url=>url.includes('raw.githubusercontent.com')).length;
+  await qqRoutes(await signed(event('dict-docs-again','/ask 默读本地字典设置')),f.env);
+  assert.equal(f.network.filter(url=>url.includes('raw.githubusercontent.com')).length,downloads);
+  await qqRoutes(await signed(event('release-docs','/search Modu 最新版更新情况')),f.env);
+  assert.match(f.prompts.at(-1).messages[0].content,/v1.0-beta/);
+  assert.match(f.prompts.at(-1).messages[0].content,/releases\/tag\//);
+  assert.equal(f.searches.length,0);
+}));
+
+test('failed documentation never falls back to a web provider',async()=>withFixture(async f=>{
+  globalThis.fetch=async (url,options)=>String(url).includes('raw.githubusercontent.com') ? new Response('',{status:404}) : f.fetch(url,options);
+  await qqRoutes(await signed(event('docs-down','/search 默读翻页设置')),f.env);
+  assert.equal(f.searches.length,0);assert.equal(f.prompts.length,0);
+  assert.match(f.sent[0].content,/没有转为联网搜索/);
+}));
+
+test('group-history requests use only retained bound QQ records, exclude the question and include later replies',async()=>withFixture(async f=>{
+  const now=Math.floor(Date.now()/1000);
+  store(f.DB,'qq:chat:allowed-group:old',{ts:now-23*3600,text:'默读 iOS 27.2 选中文字后无法批注',speaker:{key:'one',name:'小明'}},now);
+  store(f.DB,'qq:chat:allowed-group:new',{ts:now-60,text:'测试了，后来好了',speaker:{key:'one',name:'小明'}},now);
+  store(f.DB,'qq:chat:allowed-group:expired',{ts:now-25*3600,text:'OLD PRIVATE'},now);
+  store(f.DB,'qq:chat:other-group:x',{ts:now-90,text:'OTHER GROUP PRIVATE'},now);
+  store(f.DB,'tg:chat:allowed-group:x',{ts:now-90,text:'TELEGRAM PRIVATE'},now);
+  f.env.AI.run=async (model,input)=>{f.prompts.push(input);return {choices:[{message:{content:'小明后来反馈测试恢复 [M2]；最初是 iOS 27.2 的问题 [M1]。无效引用 [M999]。'}}]};};
+  await qqRoutes(await signed(event('chat-query','/search 群里 iOS 文字选择后来好了没')),f.env);
+  const evidence=f.prompts[0].messages[0].content;
+  assert.match(evidence,/iOS 27.2[\s\S]*后来好了/);
+  assert.doesNotMatch(evidence,/OLD PRIVATE|OTHER GROUP|TELEGRAM PRIVATE|群里 iOS 文字选择后来好了没/);
+  const answer=f.sent.map(m=>m.content).join('');
+  assert.match(answer,/群内聊天记录检索/);assert.match(answer,/引用群消息/);assert.match(answer,/小明/);
+  assert.doesNotMatch(answer,/U1|M999/);
+  assert.ok(f.network.every(url=>/bots\.qq\.com|api\.bot\.qq\.com/.test(url)));
+}));
+
+test('unknown, empty and unavailable history never claims an exhaustive result or calls the web',async()=>withFixture(async f=>{
+  await qqRoutes(await signed(event('unknown','<@test-app> 这个怎么弄','allowed-group','GROUP_AT_MESSAGE_CREATE')),f.env);
+  assert.equal(f.network.some(url=>url.includes('anysearch')),false);assert.equal(f.prompts.length,0);
+  assert.match(f.sent[0].content,/问题不明确时不会自动联网/);
+  await qqRoutes(await signed(event('chat-empty','/search 群里有人反馈吗')),f.env);
+  // The earlier vague question remains text, but cannot provide a factual answer.
+  assert.match(f.sent.map(m=>m.content).join(''),/已保留记录不足以/);
+  assert.equal(f.searches.length,0);
+}));
+
+test('web helper refuses Modu and chat prompts even when called directly',async()=>withFixture(async f=>{
+  for(const question of ['联网搜索默读设置','Modu latest release','把群聊记录联网搜索']) {
+    assert.match(await qqWebAnswer(f.env,question),/不启用联网搜索/);
+  }
+  assert.equal(f.network.length,0);assert.equal(f.prompts.length,0);
+}));
+
+
+test('document retrieval finds relevant text beyond the beginning of a long section',async()=>withFixture(async f=>{
+  globalThis.fetch=async(url,options)=>String(url).includes('raw.githubusercontent.com')
+    ? new Response('# 阅读控制\n'+('无关背景说明。'.repeat(1500))+'\n菜单九宫格设置：关闭中间触发格后保存。') : f.fetch(url,options);
+  await qqRoutes(await signed(event('deep-doc-section','/ask 默读菜单九宫格怎么设置')),f.env);
+  assert.match(f.prompts[0].messages[0].content,/关闭中间触发格后保存/);
+  assert.equal(f.searches.length,0);
+}));
