@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 const directory = new URL('./', import.meta.url);
 const qq = (await readFile(new URL('qq-bot.mjs', directory), 'utf8')).replace(/^export /gm, '');
 const worker = (await readFile(new URL('worker.mjs', directory), 'utf8'))
-  .replace(/^import \{qqRoutes, qqSchedule\} from '\.\/qq-bot\.mjs';\s*/, '');
+  .replace(/^import \{[^}]+\} from '\.\/qq-bot\.mjs';\s*/, '');
 await mkdir(new URL('dist/', directory), {recursive: true});
 const output = new URL('dist/worker.mjs', directory);
 await writeFile(output, qq + '\n\n' + worker);

@@ -159,16 +159,17 @@ test('an explicit question is answered once even when QQ redelivers it', async (
   });
 });
 
-test('08:00 and 20:00 Beijing boundaries cover the previous twelve hours exactly', () => {
-  assert.deepEqual(qqWindow(Date.parse('2026-10-07T08:00:00+08:00')),
-    {start:Date.parse('2026-10-06T20:00:00+08:00')/1000, end:Date.parse('2026-10-07T08:00:00+08:00')/1000});
-  assert.deepEqual(qqWindow(Date.parse('2026-10-07T20:00:00+08:00')),
-    {start:Date.parse('2026-10-07T08:00:00+08:00')/1000, end:Date.parse('2026-10-07T20:00:00+08:00')/1000});
+test('Beijing noon boundaries cover the previous 24 hours exactly', () => {
+  for (const time of ['2026-10-07T12:00:00+08:00','2026-10-07T20:00:00+08:00','2026-10-08T11:59:59+08:00'])
+    assert.deepEqual(qqWindow(Date.parse(time)),
+      {start:Date.parse('2026-10-06T12:00:00+08:00')/1000, end:Date.parse('2026-10-07T12:00:00+08:00')/1000});
+  assert.deepEqual(qqWindow(Date.parse('2026-10-08T12:00:00+08:00')),
+    {start:Date.parse('2026-10-07T12:00:00+08:00')/1000, end:Date.parse('2026-10-08T12:00:00+08:00')/1000});
 });
 
 test('summary cron filters the interval, redacts text, sends proactively and deduplicates', async () => {
   const originalNow = Date.now;
-  const at = Date.parse('2026-10-07T08:00:00+08:00');
+  const at = Date.parse('2026-10-07T12:00:00+08:00');
   Date.now = () => at;
   try {
     await withFixture(async f => {
@@ -183,6 +184,7 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
         await summarize(...args);
         return {response:'1. 小明（U1）、用户 U2、群友(U3)、U4：阅读器反馈 👉 小明（U1）报告闪退，用户U2回应仍待确认。'};
       };
+      for (const hours of [-4,8,-24+8]) await qqSchedule({scheduledTime:at+hours*3600000}, f.env);
       await qqSchedule({scheduledTime:at-60000}, f.env);
       assert.equal(f.sent.length, 0);
       await qqSchedule({scheduledTime:at}, f.env);
@@ -190,7 +192,7 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       assert.equal(f.prompts.length, 2);
       assert.match(f.prompts[0].messages[1].content, /EPUB 导入/);
       assert.doesNotMatch(f.prompts[0].messages[1].content, /test-secret|Outside/);
-      assert.match(f.sent[0].content, /2026-10-06 20:00 — 2026-10-07 08:00/);
+      assert.match(f.sent[0].content, /2026-10-06 12:00 — 2026-10-07 12:00/);
       assert.equal(f.sent[0].msg_id, undefined);
       assert.match(f.sent[0].content, /1\. 小明、群友、群友、群友：阅读器反馈/);
       assert.match(f.sent[0].content, /小明报告闪退，群友回应仍待确认/);
@@ -200,16 +202,16 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
   } finally {Date.now = originalNow;}
 });
 
-test('feedback digest keeps unmentioned follow-ups and previous context in separate chronological sections', async () => {
+test('daily feedback digest keeps unmentioned follow-ups in chronological order', async () => {
   const originalNow = Date.now;
-  const at = Date.parse('2026-10-09T08:00:00+08:00');
+  const at = Date.parse('2026-10-09T12:00:00+08:00');
   Date.now = () => at;
   try {
     await withFixture(async f => {
-      const end = at/1000, start = end-43200;
+      const end = at/1000, start = end-86400;
       store(f.DB,'qq:started',{at:end-86400},end);
       store(f.DB,'qq:push-permission',{allowed:true,tested:true},end);
-      store(f.DB,'qq:chat:allowed-group:context',{ts:start-60,text:'默读在 WiFi 下朗读无声，Android 15。',speaker:{key:'one',name:'甲'}},end);
+      store(f.DB,'qq:chat:allowed-group:context',{ts:start+30,text:'默读在 WiFi 下朗读无声，Android 15。',speaker:{key:'one',name:'甲'}},end);
       store(f.DB,'qq:chat:allowed-group:interleaved',{ts:start+60,text:'今天港股下跌',speaker:{key:'two',name:'乙'}},end);
       store(f.DB,'qq:chat:allowed-group:followup',{ts:start+120,text:'重启后还是不行，切换流量就正常了。',speaker:{key:'one',name:'甲'}},end);
       store(f.DB,'qq:chat:allowed-group:resolved',{ts:start+180,text:'换了家里的网络就好了，暂时怀疑单位网络。',speaker:{key:'one',name:'甲'}},end);
@@ -221,11 +223,11 @@ test('feedback digest keeps unmentioned follow-ups and previous context in separ
       const sections = input.split('【本时段新消息，汇总对象】\n');
       const background = sections[0].split('\n').filter(line=>line.startsWith('{')).map(JSON.parse);
       const current = sections[1].split('\n').filter(line=>line.startsWith('{')).map(JSON.parse);
-      assert.equal(background.length,1);
-      assert.match(background[0].text,/默读在 WiFi/);
-      assert.deepEqual(current.map(m=>m.text),['今天港股下跌','重启后还是不行，切换流量就正常了。','换了家里的网络就好了，暂时怀疑单位网络。']);
-      assert.equal(background[0].speaker,current[1].speaker);
-      assert.equal(current[1].speaker,current[2].speaker);
+      assert.equal(background.length,0);
+      assert.match(current[0].text,/默读在 WiFi/);
+      assert.deepEqual(current.slice(1).map(m=>m.text),['今天港股下跌','重启后还是不行，切换流量就正常了。','换了家里的网络就好了，暂时怀疑单位网络。']);
+      assert.equal(current[0].speaker,current[2].speaker);
+      assert.equal(current[2].speaker,current[3].speaker);
       assert.ok(current.every(m=>!m.mentions && !m.replyTo));
       assert.doesNotMatch(input,/Other group|Expired private/);
       assert.match(f.sent[0].content,/^默读反馈汇总/);
@@ -235,14 +237,14 @@ test('feedback digest keeps unmentioned follow-ups and previous context in separ
 
 test('a quiet period never republishes previous feedback or calls AI for background alone', async () => {
   const originalNow=Date.now;
-  const at=Date.parse('2026-10-09T08:00:00+08:00');
+  const at=Date.parse('2026-10-09T12:00:00+08:00');
   Date.now=()=>at;
   try {
     await withFixture(async f=>{
       const end=at/1000;
       store(f.DB,'qq:started',{at:end-86400},end);
       store(f.DB,'qq:push-permission',{allowed:true,tested:true},end);
-      store(f.DB,'qq:chat:allowed-group:old',{ts:end-43260,text:'默读闪退'},end);
+      store(f.DB,'qq:chat:allowed-group:old',{ts:end-86460,text:'默读闪退'},end);
       await qqSchedule({scheduledTime:at},f.env);
       assert.equal(f.prompts.length,0);
       assert.match(f.sent[0].content,/本时段没有收到与默读 APP 有关的新反馈/);
@@ -296,14 +298,14 @@ test('no scheduled push happens until proactive permission is actually tested', 
     const seconds = Math.floor(Date.now()/1000);
     store(f.DB, 'qq:started', {at:seconds}, seconds);
     store(f.DB, 'qq:push-permission', {allowed:true,tested:false}, seconds);
-    await qqSchedule({scheduledTime:Date.parse('2026-10-07T08:00:00+08:00')}, f.env);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-07T12:00:00+08:00')}, f.env);
     assert.equal(f.sent.length, 0);
   });
 });
 
 test('large summaries sample both the beginning and end of the whole interval', async () => {
   const originalNow = Date.now;
-  const at = Date.parse('2026-10-07T20:00:00+08:00');
+  const at = Date.parse('2026-10-07T12:00:00+08:00');
   Date.now = () => at;
   try {
     await withFixture(async f => {
@@ -338,7 +340,7 @@ test('public status does not expose identifiers, text or credentials', async () 
     const response = await qqRoutes(new Request('https://example.test/qq/status'), f.env);
     const text = await response.text();
     assert.doesNotMatch(text, /allowed-group|DG5g3B4j9X2KOErG|test-access/);
-    assert.match(text, /08:00 Asia\/Shanghai/);
+    assert.match(text, /12:00 Asia\/Shanghai/);
     assert.match(text, /"release_polling":false/);
   });
 });

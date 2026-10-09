@@ -1,10 +1,10 @@
-import {qqRoutes, qqSchedule} from './qq-bot.mjs';
+import {qqRoutes, qqSchedule, qqArchive, qqSummary, qqWindow} from './qq-bot.mjs';
 
 const REPO = 'https://github.com/sobranie2406/modureader';
 const MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
 const BOT = 'ModuReaderRelease_bot';
 const DOCS = ['README.md','docs/SETTINGS_zh.md','docs/AI_INDEX_USAGE.md','docs/INDEX_SYNC_AND_READING_CONTROLS.md','docs/LOCAL_DICTIONARIES.md','docs/MARKDOWN_BOOKS.md'];
-const HELP = `📚 ModuReader 助手 / Helper\n/ask 问题 — 根据 GitHub 文档解答 / Ask using project docs\n/release — 最新正式版下载 / Latest stable release\n/help — 使用说明 / Help\n也可 @${BOT} 提问或回复机器人的消息。\n新成员需在 2 分钟内验证；禁止广告邀请和刷屏。\nAI 仅将提问和公开文档交给 Cloudflare；请勿提交密钥、个人信息或私密书籍。AI 可能出错，请核对引用文档。`;
+const HELP = `📚 ModuReader 助手 / Helper\n/ask 问题 — 根据 GitHub 文档解答 / Ask using project docs\n/release — 最新正式版下载 / Latest stable release\n/help — 使用说明 / Help\n也可 @${BOT} 提问或回复机器人的消息。\n新成员需在 2 分钟内验证；禁止广告邀请和刷屏。\n每天北京时间 12:00 汇总过去 24 小时的默读建议与 Bug 反馈；管理员可用 /summary-test 24h 测试。\n群文字先隐藏明显密钥和联系方式，在 Cloudflare 保存 24 小时并由 AI 汇总；不下载图片或文件。请勿提交密钥、个人信息或私密书籍。AI 可能出错，请核对引用文档。`;
 const now = () => Math.floor(Date.now()/1000);
 const json = (data,status=200) => new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8'}});
 async function telegram(env,method,data) {
@@ -130,17 +130,48 @@ async function handle(env,update) {
     if (flood>6) { await telegram(env,'deleteMessage',{chat_id:env.GROUP_ID,message_id:m.message_id}); await mute(env,m.from.id,now()+60); return; }
     if (/(?:t\.me\/\+|t\.me\/joinchat\/|telegram\.me\/joinchat\/)/i.test(text)) { await telegram(env,'deleteMessage',{chat_id:env.GROUP_ID,message_id:m.message_id}); return; }
   }
+  if (m.text) await qqArchive(env,String(env.GROUP_ID),{
+    id:String(m.message_id),timestamp:new Date(m.date*1000).toISOString(),content:m.text,
+    author:{id:String(m.from.id),username:[m.from.first_name,m.from.last_name].filter(Boolean).join(' ') || m.from.username || m.sender_chat?.title || ''},
+    message_scene:{ext:[`msg_idx=${m.message_id}`,...(m.reply_to_message ? [`ref_msg_idx=${m.reply_to_message.message_id}`] : [])]},
+    msg_elements:m.reply_to_message?.text && !m.reply_to_message.from?.is_bot ? [{content:m.reply_to_message.text}] : []
+  },'tg');
+  if (/^\/summary-test(?:@ModuReaderRelease_bot)?(?:\s|$)/i.test(text)) {
+    if (!isAdmin || !await claim(env,'tg:summary-test-cooldown',60)) return;
+    const end=now(),last24h=/\s24h\s*$/i.test(text);
+    try {
+      const summary=await qqSummary(env,String(env.GROUP_ID),{start:last24h ? end-86400 : qqWindow(Date.now()).end,end},'tg');
+      await send(env,`🧪 ${last24h ? '过去24小时反馈汇总测试' : '当前阶段反馈汇总测试'}\n${summary}`,m);
+    } catch {await send(env,'反馈汇总暂时不可用，请稍后重试。',m);}
+    return;
+  }
   if (/^\/(help|start)(?:@ModuReaderRelease_bot)?(?:\s|$)/i.test(text)) return send(env,HELP,m);
   if (/^\/release(?:@ModuReaderRelease_bot)?(?:\s|$)/i.test(text)) return send(env,`📦 最新正式版 / Latest stable release\n${REPO}/releases/latest\n测试版 / All releases: ${REPO}/releases`,m);
   const q=question(m);
   if (q!==null) await answer(env,q,m);
+}
+export async function telegramSchedule(controller,env) {
+  if (!env.BOT_TOKEN || !env.DB || !env.AI) return;
+  env={...env,GROUP_ID:env.GROUP_ID || '-1004201042022'};
+  const at=controller.scheduledTime || Date.now();
+  if (Math.floor(at/60000)%1440!==240) return;
+  const window=qqWindow(at);
+  if (!await claim(env,`tg:summary:${env.GROUP_ID}:${window.end}`,86400*7)) return;
+  try {
+    const text=await qqSummary(env,String(env.GROUP_ID),window,'tg');
+    await send(env,text);
+    await put(env,'tg:last-summary',{at:now(),...window,ok:true},86400*7);
+  } catch {
+    // Do not retry ambiguous sends or publish an invented recap.
+    await put(env,'tg:last-summary',{at:now(),...window,ok:false},86400*7);
+  }
 }
 export default {
   async fetch(request,env,ctx) {
     const qqResponse = await qqRoutes(request,env,ctx);
     if (qqResponse) return qqResponse;
     const url=new URL(request.url);
-    if (request.method==='GET' && url.pathname==='/') return json({service:'ModuReader community bot',docs:`${REPO}/tree/main/docs`,commands:['/ask','/release','/help']});
+    if (request.method==='GET' && url.pathname==='/') return json({service:'ModuReader community bot',docs:`${REPO}/tree/main/docs`,commands:['/ask','/release','/help','/summary-test'],summary_times:['12:00 Asia/Shanghai'],summary_window_hours:24,last_summary:env.DB ? await get(env,'tg:last-summary') : null,last_chat:env.DB ? await get(env,'tg:last-chat') : null});
     env={BOT_TOKEN:env.BOT_TOKEN,WEBHOOK_SECRET:env.WEBHOOK_SECRET,AI:env.AI,DB:env.DB,GROUP_ID:env.GROUP_ID || '-1004201042022'};
     if (request.method==='POST' && url.pathname==='/diagnostics') {
       if (!env.WEBHOOK_SECRET || request.headers.get('authorization')!==`Bearer ${env.WEBHOOK_SECRET}`) return json({error:'Unauthorized'},401);
@@ -181,7 +212,7 @@ export default {
     }
   },
   async scheduled(controller,env) {
-    await qqSchedule(controller,env);
+    await Promise.allSettled([qqSchedule(controller,env),telegramSchedule(controller,env)]);
     env={BOT_TOKEN:env.BOT_TOKEN,WEBHOOK_SECRET:env.WEBHOOK_SECRET,AI:env.AI,DB:env.DB,GROUP_ID:env.GROUP_ID || '-1004201042022'};
     const rows=await env.DB.prepare("SELECT key,value FROM bot_state WHERE key LIKE 'join:%'").all();
     for (const row of rows.results) {

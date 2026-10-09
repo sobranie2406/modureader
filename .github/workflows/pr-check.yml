@@ -103,7 +103,7 @@ jobs:
           node-version: '22'
       - name: QQ community integration regression tests
         run: |
-          node --test scripts/community/qq-bot.test.mjs
+          node --test scripts/community/qq-bot.test.mjs scripts/community/worker.test.mjs
           node scripts/community/build.mjs
           node --check scripts/community/dist/worker.mjs
           python3 -m py_compile scripts/release/notify_qq.py
