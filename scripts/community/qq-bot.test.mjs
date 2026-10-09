@@ -585,6 +585,10 @@ test('free search failure never switches to paid service or generates an unsuppo
     assert.equal(f.prompts.length, 1);
     assert.equal(f.searches.length, 1);
     assert.match(f.sent[0].content, /未能完成联网汇总/);
+    const audit = JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:last-web-search'").get().value);
+    assert.equal(audit.stage, 'search');
+    assert.equal(audit.code, 429);
+    assert.doesNotMatch(JSON.stringify(audit), /最新新闻|member-/);
     assert.equal(f.network.filter(url => url.includes('mwmbl.org')).length, 1);
     assert.ok(f.network.every(url => !url.includes('api.cloudflare.com')));
   });
