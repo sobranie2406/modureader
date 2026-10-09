@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><img src="https://img.shields.io/github/v/release/sobranie2406/modureader?style=flat-square&amp;color=356858" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-536878?style=flat-square" alt="GPL-3.0-or-later"></a>
-  <a href="#downloads"><img src="https://img.shields.io/badge/platforms-Android%20%C2%B7%20iOS%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6d756c?style=flat-square" alt="Android, iOS, macOS, Windows and Linux"></a>
+  <a href="#downloads"><img src="https://img.shields.io/badge/platforms-Android%20%C2%B7%20iOS%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20HarmonyOS-6d756c?style=flat-square" alt="Android, iOS, macOS, Windows, Linux and HarmonyOS"></a>
 </p>
 <p align="center">
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>Download</b></a> ·
