@@ -37,13 +37,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Library'), findsOneWidget);
   });
-  test('enabled iOS route retains platform transition', () {
+  test('enabled iOS route retains Cupertino gesture support with cover timing',
+      () {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final route =
         readingRoute<void>(animate: true, builder: (_) => const Text('Reader'));
     expect(route, isA<CupertinoPageRoute<void>>());
-    expect((route as PageRoute).transitionDuration, isNot(Duration.zero));
+    expect((route as PageRoute).transitionDuration,
+        const Duration(milliseconds: 720));
+    expect(route.reverseTransitionDuration, const Duration(milliseconds: 620));
   });
   test('enabled Android route uses the stationary reader cover transition', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

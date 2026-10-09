@@ -10,6 +10,7 @@ const moduleURL = source => `data:text/javascript;base64,${Buffer.from(source).t
 const imageSource = await sourceFor('image-footnotes.js');
 const imageURL = moduleURL(imageSource);
 const { imageFootnoteText, createImageFootnoteBook } = await import(imageURL);
+const { normalizeKF8Footnotes, restoreMOBI6Footnotes } = await import(moduleURL(await sourceFor('mobi-footnotes.js')));
 const typographyURL = moduleURL(await sourceFor('footnote-typography.js'));
 const handlerSource = (await sourceFor('footnotes.js'))
   .replace("'./image-footnotes.js'", JSON.stringify(imageURL))
@@ -134,6 +135,41 @@ test('standard noteref links still extract the referenced EPUB footnote', async 
   assert.equal(f.events[1].type, 'footnote');
   assert.equal(f.events[1].doc.body.textContent, '标准 EPUB 脚注。');
   assert.equal(f.events[1].href, '#standard-note');
+  f.close();
+});
+
+test('normalized AZW3 notes open even with heuristic detection disabled and are visible in the popup', async () => {
+  const f = handlerFixture();
+  f.doc.body.innerHTML = '<aside id="n" type="footnote">AZW3 注释</aside><p>正文<a type="noteref" href="#n">①</a></p>';
+  normalizeKF8Footnotes(f.doc);
+  f.handler.detectFootnotes = false;
+  const sourceDoc = f.doc.cloneNode(true);
+  const book = {
+    sections: [{ load: () => 'blob:azw3-note', createDocument: () => sourceDoc.cloneNode(true) }],
+    resolveHref: () => ({ index: 0, anchor: doc => doc.getElementById('n') }),
+  };
+  const event = new CustomEvent('link', { cancelable: true,
+    detail: { a: f.doc.querySelector('a'), href: '#n' } });
+  await f.handler.handle(book, event);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(f.events[1].type, 'footnote');
+  assert.equal(f.events[1].doc.body.textContent, 'AZW3 注释');
+  assert.equal(f.events[1].doc.querySelector('[style*="display"]'), null, 'hidden aside wrapper removed');
+  assert.equal(f.doc.getElementById('n').style.display, 'none', 'source note still hidden');
+  f.close();
+});
+
+test('recovered MOBI icons use the same popup without exposing the original paragraph', async () => {
+  const f = handlerFixture();
+  f.doc.body.innerHTML = '<ol width="0pt"><li value="1" height="0pt" width="0pt">MOBI 注释</li></ol>'
+    + '<p>正文<sup><small><img recindex="13" align="baseline" width="11" height="11"/></small></sup></p>';
+  restoreMOBI6Footnotes(f.doc);
+  const { event, result } = f.click(f.doc.querySelector('img'));
+  await result;
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(f.events[1].type, 'footnote');
+  assert.equal(f.events[1].doc.body.textContent, 'MOBI 注释');
+  assert.equal(f.events[1].doc.querySelector('[style*="display"]'), null);
   f.close();
 });
 

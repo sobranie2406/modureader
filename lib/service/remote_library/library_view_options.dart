@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum LibrarySortField { name, createdAt, modifiedAt, size }
 
-enum LibraryFileFilter { all, books, epub, pdf, txt, mobi, azw3, fb2, md }
+enum LibraryFileFilter { all, books, epub, pdf, txt, mobi, azw3, fb2, md, umd }
 
 class LibraryViewOptions {
   const LibraryViewOptions({

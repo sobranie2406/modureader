@@ -118,6 +118,19 @@ class ConvertedBookChecksum {
 // migration evidence, not remote authenticity proof or a checksum bypass.
 // No extraction, network or changes to the book bytes.
 Future<String?> _localConvertedHash(String path) async {
+  // UMD was introduced with correct content hashes; never migrate its checksum.
+  if (!['TXT', 'MD'].contains(await convertedBookSourceFormat(path)))
+    return null;
+  try {
+    return (await md5.bind(File(path).openRead()).first).toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Recognizes our historical converters without modifying the stored EPUB.
+/// This is display/migration evidence, never a replacement for download checks.
+Future<String?> convertedBookSourceFormat(String path) async {
   InputFileStream? input;
   Archive? archive;
   try {
@@ -182,7 +195,15 @@ Future<String?> _localConvertedHash(String path) async {
             'img { max-width:100%; height:auto; } pre { white-space:pre-wrap; overflow-wrap:anywhere; } '
                 'table { border-collapse:collapse; max-width:100%; } td,th { border:1px solid currentColor; padding:.3em; } '
                 'blockquote { margin-inline:1em; padding-inline-start:1em; border-inline-start:2px solid currentColor; }';
-    if (!txt && !markdown) return null;
+    final umd = package.getAttribute('unique-identifier') == 'book-id' &&
+        identifier.getAttribute('id') == 'book-id' &&
+        RegExp(r'^urn:umd:sha256:[0-9a-f]{64}$')
+            .hasMatch(identifier.innerText) &&
+        metadata.childElements.map((e) => e.name.qualified).join(',') ==
+            'dc:identifier,dc:title,dc:language,dc:creator,dc:source,meta' &&
+        metadata.findElements('dc:source').single.innerText ==
+            'Modu UMD import';
+    if (!txt && !markdown && !umd) return null;
     final items =
         package.findElements('manifest').single.findElements('item').toList();
     final spine =
@@ -222,7 +243,11 @@ Future<String?> _localConvertedHash(String path) async {
       }
       entry.clear();
     }
-    return (await md5.bind(file.openRead()).first).toString();
+    return txt
+        ? 'TXT'
+        : umd
+            ? 'UMD'
+            : 'MD';
   } catch (_) {
     // Advisory migration only: unknown/corrupt files remain strictly checked.
     return null;

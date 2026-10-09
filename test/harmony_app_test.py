@@ -19,7 +19,8 @@ class AppCompatibilityTest(unittest.TestCase):
         self.assertIn('reverseCurve: Curves.linear,', original)
         self.assertNotIn('curve: Curves.linear,', adapted)
         self.assertNotIn('reverseCurve: Curves.linear,', adapted)
-        self.assertIn('defaultTargetPlatform != TargetPlatform.android', adapted)
+        self.assertIn('transitionOnUserGestures: true', adapted)
+        self.assertNotIn('defaultTargetPlatform != TargetPlatform.android', adapted)
         self.assertIn('createRectTween: readerCoverRectTween', adapted)
         self.assertEqual(path.read_text(), original)
 

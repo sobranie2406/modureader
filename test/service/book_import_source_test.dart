@@ -25,6 +25,7 @@ void main() {
     final first = await book('a/Novel.EPUB', 'first');
     await book('b/Novel.EPUB', 'second');
     await book('b/notes.markdown', 'notes');
+    await book('b/novel.UMD', 'umd');
     await book('cover.jpg', 'not a book');
     await book('.hidden/book.pdf', 'hidden');
     if (!Platform.isWindows) {
@@ -32,9 +33,9 @@ void main() {
       await Link(p.join(root.path, 'alias.epub')).create(first.path);
     }
     final entries = await discoverBookImportFiles([root.path, first.path]);
-    expect(entries, hasLength(3));
+    expect(entries, hasLength(4));
     expect(entries.map((e) => e.name),
-        containsAll(['Novel.EPUB', 'notes.markdown']));
+        containsAll(['Novel.EPUB', 'notes.markdown', 'novel.UMD']));
     expect(
         entries
             .where((e) => e.name == 'Novel.EPUB')

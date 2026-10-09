@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:anx_reader/service/book_formats.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
@@ -86,12 +88,37 @@ class LibraryConnectionStore {
   }
 }
 
-bool _safeSegments(Uri uri) => uri.pathSegments.every((s) =>
-    s != '..' &&
-    s != '.' &&
-    !s.contains('/') &&
-    !s.contains('\\') &&
-    !s.contains(RegExp(r'[\x00-\x1f\x7f]')));
+bool _safeSegments(Uri uri) {
+  try {
+    return uri.pathSegments.every((s) =>
+        s != '..' &&
+        s != '.' &&
+        !s.contains('/') &&
+        !s.contains('\\') &&
+        !s.contains(RegExp(r'[\x00-\x1f\x7f]')));
+  } on FormatException {
+    return false;
+  }
+}
+
+class LibraryListingException extends FormatException {
+  const LibraryListingException(this.reason) : super(reason);
+  final String reason;
+}
+
+List<LibraryEntry> _parseLibraryBytes((Uint8List, Uri, Uri) input) {
+  final client = WebdavLibrary(LibraryConnection(
+      url: input.$2.toString(), allowHttp: input.$2.scheme == 'http'));
+  try {
+    return client.parseListing(utf8.decode(input.$1), input.$3);
+  } on LibraryListingException {
+    rethrow;
+  } on FormatException {
+    throw const LibraryListingException('invalid');
+  } finally {
+    client.close();
+  }
+}
 
 class LibraryEntry {
   const LibraryEntry(this.uri, this.name, this.isDirectory, this.size,
@@ -124,7 +151,7 @@ class WebdavLibrary {
   final Uri root;
   final Dio _dio;
   static const maxBookBytes = 512 * 1024 * 1024;
-  static const maxListingBytes = 4 * 1024 * 1024;
+  static const maxListingBytes = 32 * 1024 * 1024;
 
   bool contains(Uri uri) =>
       uri.scheme == root.scheme &&
@@ -156,20 +183,28 @@ class WebdavLibrary {
             },
             validateStatus: (code) => code == 207),
         cancelToken: cancelToken);
-    final bytes = <int>[];
+    final bytes = BytesBuilder(copy: false);
     await for (final chunk in response.data!.stream) {
       if (bytes.length + chunk.length > maxListingBytes) {
-        throw const FormatException('Directory listing too large');
+        throw const LibraryListingException('tooLarge');
       }
-      bytes.addAll(chunk);
+      bytes.add(chunk);
     }
-    return parseListing(utf8.decode(bytes), directory);
+    if (cancelToken?.isCancelled == true) throw cancelToken!.cancelError!;
+    // Decode and parse large XML listings off the UI isolate.
+    final entries =
+        await compute(_parseLibraryBytes, (bytes.takeBytes(), root, directory));
+    if (cancelToken?.isCancelled == true) throw cancelToken!.cancelError!;
+    return entries;
   }
 
   List<LibraryEntry> parseListing(String source, Uri directory) {
     _check(directory);
-    if (source.contains('<!DOCTYPE') || source.length > maxListingBytes) {
-      throw const FormatException('Unsafe XML');
+    if (source.length > maxListingBytes) {
+      throw const LibraryListingException('tooLarge');
+    }
+    if (source.contains('<!DOCTYPE')) {
+      throw const LibraryListingException('invalid');
     }
     final document = XmlDocument.parse(source);
     final top = document.rootElement;
@@ -217,6 +252,37 @@ class WebdavLibrary {
       ..sort((a, b) => a.isDirectory != b.isDirectory
           ? (a.isDirectory ? -1 : 1)
           : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  /// Sequential Depth-1 requests keep directory imports read-only and bounded.
+  Future<List<LibraryEntry>> discoverBooks(Uri directory,
+      {required CancelToken cancelToken}) async {
+    _check(directory);
+    final pending = <(Uri, int)>[(directory, 0)];
+    final visited = <Uri>{};
+    final books = <Uri, LibraryEntry>{};
+    while (pending.isNotEmpty) {
+      if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+      final (current, depth) = pending.removeLast();
+      if (!visited.add(current)) continue;
+      if (depth > 32 || visited.length > 10000) {
+        throw const LibraryListingException('scanLimit');
+      }
+      for (final entry in await list(current, cancelToken: cancelToken)) {
+        if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+        if (entry.name.startsWith('.')) continue;
+        if (entry.isDirectory) {
+          pending.add((entry.uri, depth + 1));
+        } else if (entry.isBook) {
+          books[entry.uri] = entry;
+          if (books.length > 50000) {
+            throw const LibraryListingException('scanLimit');
+          }
+        }
+      }
+    }
+    return books.values.toList()
+      ..sort((a, b) => a.uri.path.compareTo(b.uri.path));
   }
 
   Future<void> download(LibraryEntry entry, File target, CancelToken cancel,
@@ -285,7 +351,22 @@ DateTime? _propertyDate(Iterable<XmlElement> properties) {
   return null;
 }
 
-String libraryError(Object error, bool zh) {
+String libraryError(Object error, bool zh, {bool listing = false}) {
+  if (error is LibraryListingException) {
+    if (error.reason == 'tooLarge') {
+      return zh
+          ? '目录清单超过 32 MiB，请拆分文件夹后重试（不是单本书籍大小限制）。'
+          : 'Directory listing exceeds 32 MiB. Split the folder and retry; this is not a book size limit.';
+    }
+    if (error.reason == 'scanLimit') {
+      return zh
+          ? '文件夹扫描范围过大，请选择较小的子文件夹导入。'
+          : 'Folder scan limit reached. Select a smaller subfolder to import.';
+    }
+    return zh
+        ? '无法解析服务器返回的目录清单，请检查 WebDAV 服务的响应格式。'
+        : 'Cannot parse the directory listing returned by the WebDAV server.';
+  }
   if (error is DioException) {
     final status = error.response?.statusCode;
     if (status == 401 || status == 403)
@@ -301,6 +382,11 @@ String libraryError(Object error, bool zh) {
     return zh
         ? '连接失败，请检查网络、服务器地址和 HTTPS 证书。'
         : 'Connection failed. Check network, URL and HTTPS certificate.';
+  }
+  if (listing) {
+    return zh
+        ? '读取目录失败，请检查目录路径及服务器返回的清单格式。'
+        : 'Cannot read this folder. Check its path and the server listing format.';
   }
   return zh
       ? '操作失败：请检查地址、文件格式或大小（最大 512 MiB）后重试。'

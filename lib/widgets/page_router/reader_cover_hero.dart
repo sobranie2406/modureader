@@ -1,14 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// Shared by both ends of the Hero so closing first folds the cover shut,
-/// then shrinks it back to the shelf. Other platforms keep their own tween.
-CreateRectTween? get readerCoverRectTween =>
-    defaultTargetPlatform == TargetPlatform.android
-        ? (begin, end) => ReaderCoverRectTween(begin: begin, end: end)
-        : null;
+/// then shrinks it back to the shelf on every platform.
+CreateRectTween get readerCoverRectTween =>
+    (begin, end) => ReaderCoverRectTween(begin: begin, end: end);
 
 class ReaderCoverRectTween extends RectTween {
   ReaderCoverRectTween({super.begin, super.end});
@@ -26,7 +23,7 @@ class ReaderCoverRectTween extends RectTween {
   }
 }
 
-/// Never move the Android platform view into the Hero overlay. It must keep
+/// Never move the native platform view into the Hero overlay. It must keep
 /// its original constraints and parent while the cover flies between routes.
 /// The reader still mounts immediately; this does not defer book loading.
 class ReaderCoverHero extends StatelessWidget {
@@ -43,9 +40,6 @@ class ReaderCoverHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      return Hero(tag: tag, child: child);
-    }
     // A destination Hero normally removes its child during flight. Keep the
     // native reader outside it, otherwise even a cover-only shuttle disposes
     // and recreates the WebView at the end of each transition.
@@ -54,6 +48,7 @@ class ReaderCoverHero extends StatelessWidget {
       IgnorePointer(
         child: Hero(
           tag: tag,
+          transitionOnUserGestures: true,
           curve: Curves.linear,
           reverseCurve: Curves.linear,
           createRectTween: readerCoverRectTween,

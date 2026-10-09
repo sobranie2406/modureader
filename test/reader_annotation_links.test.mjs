@@ -15,6 +15,7 @@ function fixture(touch, mark) {
     <a href="#note" role="doc-noteref"><sup id="ref">③</sup></a>
     <a href="#note"><img id="icon" alt="注" /></a>
     <img id="image-note" class="qqreader-footnote" alt="图片注释" />
+    <img id="mobi-note" data-modu-mobi-footnote="MOBI 图片注释" />
     <a href="#other"><span id="internal">章节链接</span></a>
     <a href="https://example.org/"><span id="external">外部链接</span></a>
     <a id="anchor">仅书签锚点</a>
@@ -58,6 +59,7 @@ for (const touch of [false, true]) for (const mark of ['underline', 'highlight']
       for (const [id, expected, href] of [
         ['ref', 'link', '#note'], ['icon', 'link', '#note'],
         ['image-note', 'image-footnote', null], ['internal', 'link', '#other'],
+        ['mobi-note', 'image-footnote', null],
         ['external', 'external-link', 'https://example.org/'],
       ]) {
         f.actions.length = 0

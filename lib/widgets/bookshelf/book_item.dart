@@ -104,6 +104,7 @@ class _BookItemState extends ConsumerState<BookItem> {
               Expanded(
                 child: Hero(
                   tag: book.coverFullPath,
+                  transitionOnUserGestures: true,
                   createRectTween: readerCoverRectTween,
                   child: Container(
                     decoration: BoxDecoration(

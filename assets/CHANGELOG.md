@@ -1,10 +1,36 @@
 # Modu changelog
 
-Current stable baseline: **1.2.3+10090**. Updated 2026-10-08.
+Current stable baseline: **1.2.4+10093**. Updated 2026-10-09.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.2.4
+
+### English
+
+- Feat(import): Import text UMD books with chapters, metadata and supported covers, converting them to EPUB for reading and synchronization. Image/comic UMD is not supported.
+- Fix(bookshelf): Show TXT, MD and UMD source-format badges and book details after conversion; retain stored EPUB paths and content checksums used by synchronization.
+- Feat(reader): Apply the expanding, outward-opening cover transition across platforms, with the reader mounted at its final size; preserve iOS edge-swipe return and E-Ink/disabled-animation preferences.
+- Fix(ios): Refresh the selection menu after dragging native selection handles, so copying and marking use the updated range rather than the initially selected word.
+- Fix(remote-library): Read large WebDAV directory listings in a background worker, increase the listing limit to 32 MiB, skip individual malformed encoded entries and show directory-specific errors.
+- Feat(remote-library): Import the current remote folder or a folder from its menu, including subfolders; select compatible books before sequential downloads, with duplicate checks, progress and cancellation.
+- Perf(remote-library): Throttle download progress updates and reuse sorted/filtered lists during folder imports to reduce repeated UI work.
+- Fix(reader): Restore MOBI note popups only when legacy note lists and superscript icons match; recognize AZW3 note types and explicit embedded note text, hiding duplicate inline notes while retaining ambiguous content.
+- Docs(features): Update the bilingual feature and settings guides for UMD, original-format badges, remote folder imports, shared cover transitions and note compatibility.
+
+### 简体中文
+
+- Feat(import): 支持文字版 UMD 导入，保留章节、元数据和支持的封面，转换为 EPUB 后沿用阅读及同步流程；暂不支持图片／漫画 UMD。
+- Fix(bookshelf): TXT、MD、UMD 转换后仍显示原始格式标签及书籍详情，同步继续使用实际存储的 EPUB 路径和内容校验值。
+- Feat(reader): 各平台统一采用封面放大、向外翻开的开书过渡，正文在最终尺寸下初始化；保留 iOS 侧滑返回及 E-Ink／关闭动画设置。
+- Fix(ios): 拖动系统选区手柄后及时更新选词菜单，复制和标注使用调整后的范围，不再停留在首次选中的词语。
+- Fix(remote-library): 大型 WebDAV 目录在后台解析，目录响应上限提高至 32 MiB，跳过单条编码异常记录，并显示针对目录的错误信息。
+- Feat(remote-library): 支持从当前远程目录或文件夹菜单批量导入，包含子文件夹；下载前勾选兼容书籍，依次下载，提供重复检查、进度及取消操作。
+- Perf(remote-library): 限制下载进度刷新频率，复用排序和筛选结果，减少远程文件夹导入时的重复界面计算。
+- Fix(reader): 仅在旧式注释列表与上标图标匹配时恢复 MOBI 注释弹窗；补齐 AZW3 注释类型及明确内嵌注释文字的识别，隐藏重复显示的注释，保留无法可靠判定的内容。
+- Docs(features): 更新中英文功能与设置指南，补充 UMD、原格式标签、远程文件夹导入、全平台封面过渡和注释兼容说明。
 
 ## 1.2.3
 

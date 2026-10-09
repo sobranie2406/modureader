@@ -72,7 +72,6 @@ import 'package:anx_reader/models/book_note.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/webView/gererate_url.dart';
 import 'package:anx_reader/utils/webView/webview_console_message.dart';
-import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/context_menu/context_menu.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
@@ -108,8 +107,7 @@ class EpubPlayer extends ConsumerStatefulWidget {
   ConsumerState<EpubPlayer> createState() => EpubPlayerState();
 }
 
-class EpubPlayerState extends ConsumerState<EpubPlayer>
-    with TickerProviderStateMixin {
+class EpubPlayerState extends ConsumerState<EpubPlayer> {
   String get cssBookKey => customCssBookKey(widget.book);
   late InAppWebViewController webViewController;
   late ContextMenu contextMenu;
@@ -157,8 +155,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
       : null;
 
   OverlayEntry? contextMenuEntry;
-  AnimationController? _animationController;
-  Animation<double>? _animation;
   bool showHistory = false;
   bool canGoBack = false;
   bool canGoForward = false;
@@ -185,7 +181,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
   Future<void>? _syncRefresh;
   bool _refreshRequested = false;
   bool _remotePositionPending = false;
-  late final bool _animateOpening;
   Timer? _syncRefreshRetry;
   int _syncRestoreAttempts = 0;
 
@@ -1954,22 +1949,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
         // removeOverlay();
       },
     );
-    // Android's route owns the cover turn. Do not place a second static cover
-    // behind it, or a slow chapter would reveal the same closed cover again.
-    _animateOpening = !AnxPlatform.isAndroid &&
-        Prefs().openBookAnimation &&
-        !AppMotion.disabled;
-    if (_animateOpening) {
-      _animationController = AnimationController(
-        duration: const Duration(milliseconds: 600),
-        vsync: this,
-      );
-      _animation =
-          Tween<double>(begin: 1.0, end: 0.0).animate(_animationController!);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _animationController!.forward();
-      });
-    }
     super.initState();
   }
 
@@ -2007,7 +1986,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
     readingProgress.dispose();
     _syncRefreshRetry?.cancel();
     _scrollDebounceTimer?.cancel();
-    _animationController?.dispose();
     saveReadingProgress();
     removeOverlay();
     super.dispose();
@@ -2344,13 +2322,6 @@ class EpubPlayerState extends ConsumerState<EpubPlayer>
                         ),
                       )));
             }),
-            if (_animateOpening)
-              SizedBox.expand(
-                  child: IgnorePointer(
-                ignoring: true,
-                child: FadeTransition(
-                    opacity: _animation!, child: BookCover(book: widget.book)),
-              )),
             if (_readerLoadFailed || _chapterLoadFailed)
               ReaderLoadingStatus(
                 failed: _readerLoadFailed || _chapterLoadFailed,

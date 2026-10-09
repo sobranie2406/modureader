@@ -343,12 +343,17 @@ const setSelectionHandler = (view, doc, index) => {
     return false;
   };
 
-  //    doc.addEventListener('pointerdown', () => isSelecting = true);
-  // if macos or iOS
-  if (navigator.platform.includes('Mac')
-    || navigator.platform.includes('iPhone')
-    || navigator.platform.includes('iPad')
-  ) {
+  // iPadOS can report MacIntel. Native handles may change the range without
+  // delivering pointerup to the page, so publish settled selection changes.
+  const appleTouch = /iPhone|iPad|iPod/.test(navigator.platform + ' ' + navigator.userAgent)
+    || (navigator.platform.includes('Mac') && navigator.maxTouchPoints > 1);
+  if (appleTouch) {
+    settledSelectionDocuments.get(doc)?.();
+    settledSelectionDocuments.set(doc, installSettledSelection(doc, {
+      getRange: () => getSelectionRange(doc.getSelection()),
+      onSelection: () => handleSelection(view, doc, index),
+    }));
+  } else if (navigator.platform.includes('Mac')) {
     doc.addEventListener('pointerup', () => {
       if (shouldSkipPointerUp()) return;
       handleSelection(view, doc, index);

@@ -15,7 +15,132 @@ String item(String href,
 String listing(String items) =>
     '<d:multistatus xmlns:d="DAV:">$items</d:multistatus>';
 
+class _TreeLibrary extends WebdavLibrary {
+  _TreeLibrary() : super(const LibraryConnection(url: 'https://host/dav/'));
+  final tree = <String, List<LibraryEntry>>{};
+  final requested = <String>[];
+  void Function(CancelToken?)? onList;
+  @override
+  Future<List<LibraryEntry>> list(Uri directory,
+      {CancelToken? cancelToken}) async {
+    requested.add(directory.path);
+    onList?.call(cancelToken);
+    return tree[directory.path] ?? [];
+  }
+}
+
 void main() {
+  test('bad UTF-8 href does not discard otherwise valid directory entries', () {
+    final client =
+        WebdavLibrary(const LibraryConnection(url: 'https://host/dav/'));
+    addTearDown(client.close);
+    final entries = client.parseListing(
+        listing(item('/dav/bad%FF.epub') + item('/dav/good.txt')), client.root);
+    expect(entries.map((e) => e.name), ['good.txt']);
+    expect(libraryError(const FormatException(), true, listing: true),
+        isNot(contains('512')));
+    expect(libraryError(const LibraryListingException('tooLarge'), false),
+        contains('32 MiB'));
+  });
+
+  test(
+      'large listing over 4 MiB parses in background; stream limit remains bounded',
+      () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final body =
+        listing(List.generate(20000, (i) => item('/dav/book$i.epub')).join());
+    expect(utf8.encode(body).length, greaterThan(4 * 1024 * 1024));
+    server.listen((request) async {
+      request.response.statusCode = 207;
+      if (request.uri.path == '/dav/large/') {
+        request.response.write(' ' * (WebdavLibrary.maxListingBytes + 1));
+      } else {
+        request.response.write(body);
+      }
+      try {
+        await request.response.close();
+      } catch (_) {}
+    });
+    final client = WebdavLibrary(LibraryConnection(
+        url: 'http://127.0.0.1:${server.port}/dav/', allowHttp: true));
+    addTearDown(() async {
+      client.close();
+      await server.close(force: true);
+    });
+    expect((await client.list(client.root)).length, 20000);
+    await expectLater(
+        client.list(client.root.resolve('large/')),
+        throwsA(isA<LibraryListingException>()
+            .having((e) => e.reason, 'reason', 'tooLarge')));
+  });
+
+  test(
+      'folder discovery includes nested supported formats, deduplicates and ignores hidden entries',
+      () async {
+    final client = _TreeLibrary();
+    addTearDown(client.close);
+    LibraryEntry entry(String path, {bool folder = false}) => LibraryEntry(
+        client.root.resolve(path),
+        path.split('/').where((s) => s.isNotEmpty).last,
+        folder,
+        null);
+    client.tree['/dav/'] = [
+      entry('A.epub'),
+      entry('A.epub'),
+      entry('sub/', folder: true),
+      entry('.hidden/', folder: true),
+      entry('cover.jpg'),
+      entry('.book.txt')
+    ];
+    client.tree['/dav/sub/'] = [
+      for (final ext in ['txt', 'md', 'umd', 'mobi', 'azw3', 'fb2', 'pdf'])
+        entry('sub/book.$ext')
+    ];
+    final books =
+        await client.discoverBooks(client.root, cancelToken: CancelToken());
+    expect(books.length, 8);
+    expect(client.requested, ['/dav/', '/dav/sub/']);
+    expect(books.every((e) => e.isBook && !e.isDirectory), isTrue);
+  });
+
+  test(
+      'folder discovery supports cancellation and fails rather than hiding inaccessible subfolders',
+      () async {
+    final client = _TreeLibrary();
+    addTearDown(client.close);
+    client.tree['/dav/'] = [
+      LibraryEntry(client.root.resolve('sub/'), 'sub', true, null)
+    ];
+    client.onList = (token) => token!.cancel();
+    await expectLater(
+        client.discoverBooks(client.root, cancelToken: CancelToken()),
+        throwsA(isA<DioException>()));
+    expect(client.requested, ['/dav/']);
+    client.onList = (_) {
+      if (client.requested.last == '/dav/sub/')
+        throw const LibraryListingException('invalid');
+    };
+    await expectLater(
+        client.discoverBooks(client.root, cancelToken: CancelToken()),
+        throwsA(isA<LibraryListingException>()));
+  });
+
+  test('recursive discovery has a depth bound', () async {
+    final client = _TreeLibrary();
+    addTearDown(client.close);
+    for (var depth = 0; depth < 34; depth++) {
+      final parent = '/dav/${'sub/' * depth}';
+      client.tree[parent] = [
+        LibraryEntry(Uri.parse('https://host${parent}sub/'), 'sub', true, null)
+      ];
+    }
+    await expectLater(
+        client.discoverBooks(client.root, cancelToken: CancelToken()),
+        throwsA(isA<LibraryListingException>()
+            .having((e) => e.reason, 'reason', 'scanLimit')));
+    expect(client.requested.length, 33);
+  });
+
   test('HTTPS default rejects credentials in URLs, queries and insecure HTTP',
       () {
     for (final url in [

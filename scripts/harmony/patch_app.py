@@ -5,9 +5,8 @@ Modu's normal Flutter uses onReorderItem (destination after source removal).
 Do not rename blindly: downward moves need the one-slot adjustment. Remove
 this adapter after an audited Flutter OH upgrade supports onReorderItem.
 
-Flutter OH also lacks Hero.curve/reverseCurve. Those arguments belong only to
-the Android cover branch, which OHOS does not execute; omit them in this
-temporary checkout without changing canonical Android animation behavior.
+Flutter OH also lacks Hero.curve/reverseCurve. Omit those arguments in this
+temporary checkout while retaining the shared cover transition and gestures.
 """
 import os
 from pathlib import Path
@@ -23,9 +22,11 @@ PATCHES = {
         'onReorder: (a, b) => _reorder(a, b > a ? b - 1 : b, annotations),'),
     'lib/widgets/page_router/reader_cover_hero.dart': (
         '          tag: tag,\n'
+        '          transitionOnUserGestures: true,\n'
         '          curve: Curves.linear,\n'
         '          reverseCurve: Curves.linear,',
-        '          tag: tag, // OHOS SDK lacks Android-only Hero curve arguments.'),
+        '          tag: tag, // OHOS SDK lacks Hero curve arguments.\n'
+        '          transitionOnUserGestures: true,'),
 }
 
 
@@ -59,7 +60,7 @@ def install(root):
         for path, data in originals.items():
             path.write_bytes(data)
         raise
-    print('Adapted reorder callbacks and Android-only Hero arguments; canonical source unchanged.')
+    print('Adapted reorder callbacks and Hero arguments; canonical source unchanged.')
 
 
 if __name__ == '__main__':

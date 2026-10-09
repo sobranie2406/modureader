@@ -1,4 +1,4 @@
-// Android may send selectionchange without pointercancel/pointerup when the
+// Mobile WebViews may send selectionchange without pointercancel/pointerup when the
 // native long-press handles take ownership. Observe the selection itself.
 export function installSettledSelection(doc, { getRange, onSelection, beforeSelection, delay = 200 }) {
   let timer, generation = 0, disposed = false;

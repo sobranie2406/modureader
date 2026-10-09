@@ -21,7 +21,9 @@ import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/toc_search.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:anx_reader/service/convert_to_epub/umd/convert_from_umd.dart';
 import 'package:anx_reader/service/book_formats.dart';
+import 'package:anx_reader/service/book_source_format.dart';
 import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
@@ -447,10 +449,14 @@ Future<void> importBook(File file, WidgetRef ref,
 
   final extension =
       path.extension(file.path).replaceFirst('.', '').toLowerCase();
-  if (extension == 'txt' || isMarkdownExtension(extension)) {
-    final tempFile = isMarkdownExtension(extension)
-        ? await convertFromMarkdown(file)
-        : await convertFromTxt(file);
+  if (extension == 'txt' ||
+      extension == 'umd' ||
+      isMarkdownExtension(extension)) {
+    final tempFile = extension == 'umd'
+        ? await convertFromUmd(file)
+        : isMarkdownExtension(extension)
+            ? await convertFromMarkdown(file)
+            : await convertFromTxt(file);
     sourceMd5 = md5;
     md5 = await MD5Service.calculateFileMd5(tempFile.path);
     if (md5 == null) {
@@ -463,6 +469,7 @@ Future<void> importBook(File file, WidgetRef ref,
   await getBookMetadata(file,
       md5: md5,
       sourceMd5: sourceMd5,
+      sourceFormat: extension,
       inspectDocumentOnImport:
           {'epub', 'pdf', 'mobi', 'azw3', 'fb2'}.contains(extension));
   if (await file.exists()) await file.delete();
@@ -549,6 +556,7 @@ Future<void> saveBook(
   String cover, {
   Book? provideBook,
   String? sourceMd5,
+  String? sourceFormat,
   Object? documentReadingMode,
 }) async {
   // Extract original filename (without extension)
@@ -607,6 +615,13 @@ Future<void> saveBook(
   }
   // Persist only after database identity and the final local path are known.
   // A cache failure must not discard an otherwise successfully imported book.
+  if (sourceFormat != null) {
+    try {
+      await BookSourceFormat(Prefs().prefs).remember(book, sourceFormat);
+    } catch (_) {
+      AnxLog.warning('Imported source format could not be cached');
+    }
+  }
   try {
     await DocumentReadingModeStore(Prefs().prefs)
         .save(book, documentReadingMode);
@@ -630,6 +645,7 @@ Future<void> getBookMetadata(
   Book? book,
   String? md5,
   String? sourceMd5,
+  String? sourceFormat,
   WidgetRef? ref,
   bool coverOnly = false,
   bool classificationOnly = false,
@@ -729,6 +745,7 @@ Future<void> getBookMetadata(
         metadata['cover']?.toString() ?? '',
         provideBook: book,
         sourceMd5: sourceMd5,
+        sourceFormat: sourceFormat,
         documentReadingMode: metadata['documentReadingMode']);
     ref?.read(bookListProvider.notifier).refresh();
   } finally {

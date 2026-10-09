@@ -1,3 +1,5 @@
+import { normalizeKF8Footnotes, restoreMOBI6Footnotes } from './mobi-footnotes.js'
+
 const unescapeHTML = str => {
     if (!str) return ''
     const textarea = document.createElement('textarea')
@@ -832,7 +834,7 @@ class MOBI6 {
     }
     async createDocument(section) {
         const str = await this.loadText(section)
-        return this.parser.parseFromString(str, this.#type)
+        return restoreMOBI6Footnotes(this.parser.parseFromString(str, this.#type))
     }
     async loadSection(section) {
         if (this.#cache.has(section)) return this.#cache.get(section)
@@ -1151,7 +1153,7 @@ class KF8 {
     }
     async createDocument(section) {
         const str = await this.loadText(section)
-        return this.parser.parseFromString(str, this.#type)
+        return normalizeKF8Footnotes(this.parser.parseFromString(str, this.#type))
     }
     async loadSection(section) {
         if (this.#cache.has(section)) return this.#cache.get(section)
@@ -1164,6 +1166,7 @@ class KF8 {
             this.#type = MIME.HTML
             doc = this.parser.parseFromString(replaced, this.#type)
         }
+        normalizeKF8Footnotes(doc)
         for (const [url, node] of this.#inlineMap) {
             for (const el of doc.querySelectorAll(`img[src="${url}"]`))
                 el.replaceWith(node)

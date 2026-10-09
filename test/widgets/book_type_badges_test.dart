@@ -23,7 +23,8 @@ void main() {
       'txt',
       'mobi',
       'azw3',
-      'md'
+      'md',
+      'umd'
     ]) {
       expect(
           BookTypeBadges.formatFor(book(extension)), extension.toUpperCase());

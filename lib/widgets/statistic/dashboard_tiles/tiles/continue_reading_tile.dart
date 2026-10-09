@@ -91,6 +91,7 @@ class _ContinueReadingContent extends StatelessWidget {
       children: [
         Hero(
           tag: heroTag,
+          transitionOnUserGestures: true,
           createRectTween: readerCoverRectTween,
           child: BookCover(
             book: book,

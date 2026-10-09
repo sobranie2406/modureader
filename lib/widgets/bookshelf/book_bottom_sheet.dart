@@ -20,6 +20,8 @@ import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/providers/sync_status.dart';
 import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:anx_reader/service/convert_to_epub/umd/convert_from_umd.dart';
+import 'package:anx_reader/service/book_source_format.dart';
 import 'package:anx_reader/service/book_formats.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/book.dart';
@@ -223,10 +225,13 @@ class BookBottomSheet extends ConsumerWidget {
 
         // Text books use the same EPUB reader and sync pipeline.
         if (extension.toLowerCase() == '.txt' ||
+            extension.toLowerCase() == '.umd' ||
             isMarkdownExtension(extension.substring(1))) {
-          fileToProcess = isMarkdownExtension(extension.substring(1))
-              ? await convertFromMarkdown(newFileObj)
-              : await convertFromTxt(newFileObj);
+          fileToProcess = extension.toLowerCase() == '.umd'
+              ? await convertFromUmd(newFileObj)
+              : isMarkdownExtension(extension.substring(1))
+                  ? await convertFromMarkdown(newFileObj)
+                  : await convertFromTxt(newFileObj);
           extension = '.epub';
         }
 
@@ -255,6 +260,12 @@ class BookBottomSheet extends ConsumerWidget {
           updateTime: DateTime.now(),
         );
         await bookDao.updateBook(replacement);
+        try {
+          await BookSourceFormat(Prefs().prefs)
+              .remember(replacement, p.extension(newFile.name).substring(1));
+        } catch (_) {
+          // Display-cache failure must not interrupt a committed replacement.
+        }
         await BookKnowledgeIndexService().deleteIndex(book);
         enqueueImportedBookForAutomaticIndexing(
           book: replacement,

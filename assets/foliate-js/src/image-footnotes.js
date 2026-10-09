@@ -1,8 +1,9 @@
-// QQ Reader EPUBs store the annotation in an image's alt attribute rather
-// than a noteref link. Ordinary image descriptions must remain image previews.
+// Accept only explicit QQ Reader notes or markers recovered by the MOBI loader.
+// Ordinary image descriptions must remain image previews.
 export function imageFootnoteText(img) {
-    if (!img?.matches?.('img.qqreader-footnote')) return null
-    const text = img.getAttribute('alt')
+    if (!img?.matches?.('img')) return null
+    const text = img.getAttribute('data-modu-mobi-footnote')
+        ?? (img.matches('.qqreader-footnote') ? img.getAttribute('alt') : null)
     return text?.trim() ? text : null
 }
 

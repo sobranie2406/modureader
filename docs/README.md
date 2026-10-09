@@ -1,6 +1,6 @@
 # Modu documentation
 
-Current documentation baseline: **stable 1.2.3+10090**, checked against source on 2026-10-08. The detailed feature guides identify their source revision and validation limits.
+Current documentation baseline: **stable 1.2.4+10093**, updated for the changed features on 2026-10-09. The detailed feature guides identify their source revision and validation limits.
 
 [English homepage](../README.md) · [中文首页](../README_zh.md)
 

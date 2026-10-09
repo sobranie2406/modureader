@@ -1,12 +1,12 @@
 # Building, releasing and installing Modu
 
-Single-edition guide in English. Prepared for stable **1.2.3+10090**, 2026-10-08.
+Single-edition guide in English. Prepared for stable **1.2.4+10093**, 2026-10-09.
 
 Modu is an independently modified derivative of Anx Reader (MIT) and ReadAny (GPL-3.0-or-later). Packages retain licenses; each release links its corresponding source, NOTICE and attribution. No separate notices ZIP is distributed.
 
 ## Build toolchain
 
-Use the SDK pinned in [.github/flutter-version](../.github/flutter-version): Flutter 3.47.2 for 1.2.2. Run flutter pub get, flutter gen-l10n and build_runner before building. CI uses native platform runners. Windows ARM64 applies scripts/release/windows-arm64-sdk.mjs to accommodate host identification in the CI SDK, then verifies output PE architecture.
+Use the SDK pinned in [.github/flutter-version](../.github/flutter-version): Flutter 3.47.2 for 1.2.4. Run flutter pub get, flutter gen-l10n and build_runner before building. CI uses native platform runners. Windows ARM64 applies scripts/release/windows-arm64-sdk.mjs to accommodate host identification in the CI SDK, then verifies output PE architecture.
 
 The tokenizer retains its original Rust implementation in third_party/hf_tokenizers. Mobile targets cross-compile with the corresponding Rust target and Flutter NDK / Apple SDK; do not substitute a fake tokenizer.
 

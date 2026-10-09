@@ -1,10 +1,10 @@
-# Modu 1.2.3 settings and features
+# Modu 1.2.4 settings and features
 
 English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
 
-For stable **1.2.3+10090**, updated 2026-10-08. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
+For stable **1.2.4+10093**, updated 2026-10-09. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
-Entry points and parameters were checked against [main / b6bf820a](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb). See the [detailed feature guide](FEATURES.md) for workflows, defaults and boundaries. This was source review, not device acceptance on every platform.
+The 1.2.3 source review was updated for the changes in [1.2.4](https://github.com/sobranie2406/modureader/tree/v1.2.4). See the [detailed feature guide](FEATURES.md) for workflows, defaults and boundaries. Source and automated checks are distinct from device acceptance on every platform.
 
 ## Settings entry points
 
@@ -62,9 +62,11 @@ Back up and upgrade in place; do not uninstall or clear data first. Opening an i
 
 ## Reading ordinary books
 
-Supported formats include EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown. TXT / Markdown are converted on import for reading. The library supports folders, tags, pinning and moving selected books into folders. Download remote books before reading offline or indexing them.
+Supported formats include EPUB, PDF, MOBI, AZW3, FB2, TXT, Markdown and text UMD. TXT / Markdown / UMD are converted to EPUB on import for reading and synchronization. UMD retains chapters, metadata and supported covers; image/comic UMD is unsupported. The library supports folders, tags, pinning and moving selected books into folders. Download remote books before reading offline or indexing them.
 
-Import multiple files or choose a folder and select its supported books, including subfolders. Desktop drag-and-drop accepts folders on the library or reading screen. Source files are preserved. Cover badges show the stored format and, where applicable, a scanned-book label; manual classification takes priority over automatic detection.
+Import multiple files or choose a folder and select its supported books, including subfolders. Desktop drag-and-drop accepts folders on the library or reading screen. Source files are preserved. Cover badges show the original TXT / MD / UMD format when recognized, otherwise the stored format, and a scanned-book label where applicable; manual classification takes priority over automatic detection.
+
+Cover-opening and return transitions are shared across platforms and follow the disabled-motion preferences; iOS retains edge-swipe return. Dragging iOS text-selection handles updates the selection menu. MOBI note popups require a reliably matching legacy layout; AZW3 note types and explicit image-note text are recognized. Matched notes are hidden from the body and remain available in popups; ambiguous MOBI content stays visible.
 
 The floating home navigation bar is translucent, with space at the end of scrollable content so the last item remains accessible. **Appearance → E-Ink** disables app transitions, animated page turning and decorative motion, uses monochrome labels, and restores normal motion when switched off.
 
@@ -180,6 +182,8 @@ Timed sync during reading is off by default. It requires cloud sync (WebDAV or o
 **Sync service settings, API keys and passwords** is separate and off by default, and shared by WebDAV and object storage. It requires an independent sync encryption password of at least 12 characters, not your WebDAV password or object-storage key. Sensitive service settings use AES-256-GCM encryption; WebDAV/object-storage connection credentials are excluded. The encryption password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
 
 **Remote library settings** configures a separate browse/download connection; it does not modify that library server's files. Configuration is stored locally, and credentials follow their independent transfer switch. This is distinct from library synchronization.
+
+In **Remote library**, use the current-folder import button or a folder's menu to include supported books in subfolders, then select the books to download and import. Transfers run sequentially with duplicate checks, progress and cancellation; already imported books remain after cancellation. Directory listings are parsed in a background worker with a 32 MiB response limit. Book downloads retain the 512 MiB limit and their integrity checks.
 
 ## Two backups and ANX import
 

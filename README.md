@@ -57,7 +57,7 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.2.3** — fixes S3 directory detection and RainYun object-name compatibility; adds rearrangeable Reading History cards, quick Simplified/Traditional Chinese conversion and configurable online speech buffering/cache.
+**Latest release: 1.2.4** — adds text UMD and remote-folder imports, preserves original-format badges, shares cover transitions across platforms, and fixes iOS selection and MOBI/AZW3 notes.
 
 Android cover opening and AI keyboard/stream layouts have been refined. System speech errors and startup waits now recover with clearer diagnostics. HarmonyOS remains an unsigned HAP requiring local signing; see the [release notes](docs/RELEASE_NOTES.md) for limitations and installation requirements.
 
@@ -155,7 +155,7 @@ OCR runs on the device after download and needs no API key. Sending extracted te
 
 ## Your library, your way
 
-Bring EPUB, PDF, MOBI, AZW3, FB2, TXT and Markdown books into one library. Search by title, filter by reading status, group books into folders, or pin the ones you want to keep close.
+Bring EPUB, PDF, MOBI, AZW3, FB2, TXT, Markdown and text UMD books into one library. Import selected books from local or remote folders. Search by title, filter by reading status, group books into folders, or pin the ones you want to keep close.
 
 - Select multiple books to create a folder or move them into an existing one.
 - Browse a separate WebDAV library, search and sort files, then download books for offline reading.

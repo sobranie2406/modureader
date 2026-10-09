@@ -2,7 +2,7 @@
 
 English · [简体中文](FEATURES_zh.md) · [Settings](SETTINGS.md) · [Documentation](README.md)
 
-Reviewed **2026-10-08**, app **1.2.3+10090**, source baseline [main / b6bf820a](https://github.com/sobranie2406/modureader/tree/b6bf820a4a3fd5ee1f657c80c061f64349a1aedb). This guide follows visible entry points, connected services, preference defaults and validation. Source support is not certification on every device or provider. Recheck implementation when it changes rather than only changing this version label.
+Reviewed **2026-10-08**, updated for changed features **2026-10-09**, app **1.2.4+10093**, source baseline [v1.2.4](https://github.com/sobranie2406/modureader/tree/v1.2.4). This guide follows visible entry points, connected services, preference defaults and validation. Source support is not certification on every device or provider. Recheck implementation when it changes rather than only changing this version label.
 
 ## 1. Getting started
 
@@ -19,12 +19,14 @@ Ordinary book reading does not require AI, cloud sync or online speech. Download
 
 | Feature | Behavior | Boundary |
 | --- | --- | --- |
-| File import | EPUB, PDF, MOBI, AZW3, FB2, TXT, `.md` / `.markdown`; multiple selection | An accepted extension does not guarantee every damaged, encrypted or unusual book can be parsed |
+| File import | EPUB, PDF, MOBI, AZW3, FB2, TXT, `.md` / `.markdown`, text UMD; multiple selection | An accepted extension does not guarantee every damaged, encrypted or unusual book can be parsed |
 | Folder import | Includes subfolders and lets you select compatible files | Original files remain; files must be accessible |
 | TXT / Markdown | Converted to EPUB, then use normal reading, notes and sync | The source is unchanged; Markdown does not execute Mermaid, LaTeX or scripts |
 | Organization | Folders, bulk moves, tags, pins and book-menu actions | A cloud book record is separate from its downloaded body |
-| Cover badges | Actual stored format and scanned-book classification | Converted formats may differ from the original import extension |
-| Remote library | Independent WebDAV browsing and downloads | Separate from library sync; does not edit server books |
+| Cover badges | Original TXT / MD / UMD format when recognized, otherwise stored format; scanned-book classification | Display metadata does not change stored files or synchronization checksums |
+| Remote library | Independent WebDAV browsing, downloads and selectable folder imports including subfolders | Separate from library sync; does not edit server books; cancellation preserves completed imports |
+
+Text UMD imports preserve chapters, metadata and supported covers, converting to EPUB in a background worker. The file limit is 64 MiB and decoded text is limited to 32 MiB; image/comic UMD is unsupported. Remote listings are parsed in a background worker with a 32 MiB response limit, while book downloads retain the 512 MiB limit.
 
 Use UTF-8 Markdown. The first level-one heading supplies the title; headings form a table of contents. Common formatting, tables, code and static content are supported. Base64 images can be embedded; adjacent image folders are not read automatically and network images are not downloaded. Use EPUB for complete packaged resources. Markdown files are limited to 64 MiB. See [Markdown books](MARKDOWN_BOOKS.md).
 
@@ -45,7 +47,9 @@ Style controls font, size, thickness, simulated bold, line/paragraph spacing and
 | Reading brightness | Follow system; manual 20%–100% | Android window brightness; app dimming elsewhere, saved locally |
 | E-Ink mode | Off | Removes app motion and uses solid display styles |
 
-Desktop navigation keys respect reader focus, text fields and overlays. Android cover transitions are skipped when motion is disabled or E-Ink is enabled. App theme and page background are separate.
+Desktop navigation keys respect reader focus, text fields and overlays. All platforms share cover-opening and return transitions, skipped when motion is disabled or E-Ink is enabled; iOS retains edge-swipe return and refreshes selection menus after handle drags. App theme and page background are separate.
+
+MOBI note popups are recovered for matching legacy note-list/superscript-icon structures. AZW3 retains note semantics and can use explicit embedded note text where conversion links point to the wrong note. Matched inline notes are hidden in the body; ambiguous MOBI content stays visible. Original book bytes and annotation text-node positions are preserved.
 
 Source: [reading settings](../lib/page/settings_page/reading.dart), [style controls](../lib/widgets/reading_page/style_widget.dart), [defaults](../lib/config/shared_preference_provider.dart), [keyboard](../lib/service/reader_keyboard.dart), [brightness](../lib/service/app_brightness.dart).
 

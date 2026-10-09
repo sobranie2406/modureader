@@ -8,6 +8,7 @@ const allowBookExtensions = [
   'pdf',
   'md',
   'markdown',
+  'umd',
 ];
 
 bool isMarkdownExtension(String extension) =>

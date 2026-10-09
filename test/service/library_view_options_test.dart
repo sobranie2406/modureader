@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:anx_reader/service/remote_library/library_view_options.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +16,23 @@ LibraryEntry entry(String name,
         createdAt: created, modifiedAt: modified);
 
 void main() {
+  test('UMD remote books, filtering and transferred preferences are supported',
+      () {
+    final files = [
+      entry('a.UMD'),
+      entry('b.epub'),
+      entry('folder', folder: true)
+    ];
+    expect(files.first.isBook, isTrue);
+    const options = LibraryViewOptions(filter: LibraryFileFilter.umd);
+    expect(options.apply(files).map((e) => e.name), ['folder', 'a.UMD']);
+    expect(LibraryViewOptions.fromJson(options.toJson()).filter,
+        LibraryFileFilter.umd);
+    expect(
+        () => validateSettingsValue(
+            'remoteLibraryViewOptions', jsonEncode(options.toJson())),
+        returnsNormally);
+  });
   test('Markdown files are books and share one MD filter', () {
     final files = [
       entry('a.MD'),

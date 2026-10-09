@@ -15,7 +15,7 @@ void main() {
     await Prefs().initPrefs();
   });
 
-  testWidgets('Android Hero flight does not duplicate or reparent reader',
+  testWidgets('cover flight does not duplicate or reparent reader',
       (tester) async {
     final navigator = GlobalKey<NavigatorState>();
     final readerKey = GlobalKey();
@@ -62,7 +62,7 @@ void main() {
     expect(mounts, 1);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }, variant: TargetPlatformVariant.all());
 
   testWidgets('opening mounts the reader before cover expansion and turn',
       (tester) async {
@@ -74,14 +74,14 @@ void main() {
       animate: true,
       builder: (_) => _MountCounter(onMount: () => mounts++),
     );
-    expect(route, isA<PageRouteBuilder<void>>());
+    expect(route, isA<PageRoute<void>>());
     expect((route as PageRoute).transitionDuration,
         const Duration(milliseconds: 720));
     navigator.currentState!.push(route);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(mounts, 1);
-    expect((route as PageRoute).animation!.status, AnimationStatus.forward);
+    expect(route.animation!.status, AnimationStatus.forward);
     await tester.pumpAndSettle();
     expect(mounts, 1);
     expect(find.text('reader'), findsOneWidget);
@@ -100,7 +100,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('library'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
+  }, variant: TargetPlatformVariant.all());
 
   test('cover grows completely before turning, closes before shrinking', () {
     const shelf = Rect.fromLTWH(30, 100, 100, 150);
@@ -118,6 +118,46 @@ void main() {
           closing.lerp(1 - t)!.left, closeTo(opening.lerp(t)!.left, 0.00001));
     }
   });
+
+  testWidgets(
+      'window resize during flight preserves the reader and final layout',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final navigator = GlobalKey<NavigatorState>();
+    final readerKey = GlobalKey();
+    var mounts = 0;
+    await tester.pumpWidget(MaterialApp(
+        navigatorKey: navigator,
+        home: const Scaffold(
+            body: SizedBox(
+                width: 100,
+                height: 150,
+                child: Hero(tag: 'resize', child: Text('shelf'))))));
+    navigator.currentState!.push(readingRoute<void>(
+        animate: true,
+        builder: (_) => ReaderCoverHero(
+            tag: 'resize',
+            cover: const Text('cover'),
+            child: SizedBox.expand(
+                key: readerKey,
+                child: _MountCounter(onMount: () => mounts++)))));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    final original = readerKey.currentContext;
+    tester.view.physicalSize = const Size(1200, 700);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(mounts, 1);
+    expect(readerKey.currentContext, same(original));
+    expect(tester.getSize(find.byKey(readerKey)), const Size(1200, 700));
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('shelf'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.all());
 
   testWidgets('cover turns from spine and reverses without changing its child',
       (tester) async {
@@ -149,15 +189,64 @@ void main() {
     expect(cover().transform.entry(0, 0), 1);
   });
 
-  testWidgets('iOS retains its existing route and Hero', (tester) async {
-    final route =
-        readingRoute<void>(animate: true, builder: (_) => const Text('reader'));
-    expect(route, isA<CupertinoPageRoute<void>>());
-    expect(readerCoverRectTween, isNull);
-    await tester.pumpWidget(const MaterialApp(
-        home: ReaderCoverHero(
-            tag: 'ios', cover: Text('cover'), child: Text('reader'))));
-    expect(tester.widget<Hero>(find.byType(Hero)).flightShuttleBuilder, isNull);
+  testWidgets('iOS edge swipe cancels or closes the cover without remounting',
+      (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final readerKey = GlobalKey();
+    var mounts = 0;
+    await tester.pumpWidget(CupertinoApp(
+      navigatorKey: navigator,
+      home: const CupertinoPageScaffold(
+          child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                  width: 100,
+                  height: 150,
+                  child: Hero(
+                      tag: 'swipe',
+                      transitionOnUserGestures: true,
+                      child: Text('shelf'))))),
+    ));
+    final route = readingRoute<void>(
+        animate: true,
+        builder: (_) => ReaderCoverHero(
+              tag: 'swipe',
+              cover: const Text('flight cover'),
+              child: SizedBox.expand(
+                  key: readerKey,
+                  child: _MountCounter(onMount: () => mounts++)),
+            )) as PageRoute<void>;
+    navigator.currentState!.push(route);
+    await tester.pumpAndSettle();
+    final original = readerKey.currentContext;
+    expect(route.popGestureEnabled, isTrue);
+    // A short, slow swipe cancels; the reader remains mounted throughout.
+    final cancel = await tester.startGesture(const Offset(1, 300));
+    await cancel.moveBy(const Offset(180, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(route.popGestureInProgress, isTrue);
+    expect(find.text('flight cover'), findsOneWidget);
+    expect(readerKey.currentContext, same(original));
+    expect(tester.getTopLeft(find.byKey(readerKey)), Offset.zero);
+    await tester.pump(const Duration(milliseconds: 500));
+    await cancel.up();
+    await tester.pumpAndSettle();
+    expect(route.isCurrent, isTrue);
+    expect(find.text('flight cover'), findsNothing);
+    expect(mounts, 1);
+    expect(readerKey.currentContext, same(original));
+    // A long swipe completes the pop with the same cover animation.
+    final close = await tester.startGesture(const Offset(1, 300));
+    await close.moveBy(const Offset(650, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await close.up();
+    await tester.pumpAndSettle();
+    expect(find.text('reader'), findsNothing);
+    expect(find.text('shelf'), findsOneWidget);
+    expect(mounts, 1);
+    expect(tester.takeException(), isNull);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
   testWidgets('closing during opening does not recreate the reader',
@@ -177,7 +266,7 @@ void main() {
     expect(mounts, 1);
     expect(find.text('reader'), findsNothing);
     expect(tester.takeException(), isNull);
-  });
+  }, variant: TargetPlatformVariant.all());
 
   for (final eink in [false, true]) {
     testWidgets('no delay for disabled opening animation (eink=$eink)',
@@ -196,7 +285,7 @@ void main() {
       await tester.pump();
       expect(mounts, 1);
       await tester.pumpAndSettle();
-    });
+    }, variant: TargetPlatformVariant.all());
   }
 
   for (final size in [const Size(400, 900), const Size(900, 400)]) {

@@ -59,7 +59,7 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       return;
     }
     final selected = await showDialog<List<BookImportEntry>>(
-animationStyle: AppMotion.style,
+      animationStyle: AppMotion.style,
       context: context,
       builder: (_) => BookImportSelection(entries: entries!),
     );
@@ -139,8 +139,8 @@ class _BookImportSelectionState extends State<BookImportSelection> {
             child: Column(children: [
               Text(ModuStrings.text(
                   context,
-                  '支持 EPUB、MOBI、AZW3、FB2、PDF、TXT、Markdown。文件夹包含子文件夹，原文件保持不变。',
-                  'EPUB, MOBI, AZW3, FB2, PDF, TXT and Markdown. Includes subfolders; original files are kept.')),
+                  '支持 EPUB、MOBI、AZW3、FB2、PDF、TXT、Markdown、UMD。文件夹包含子文件夹，原文件保持不变。',
+                  'EPUB, MOBI, AZW3, FB2, PDF, TXT, Markdown and UMD. Includes subfolders; original files are kept.')),
               CheckboxListTile(
                 title: Text(ModuStrings.text(context, '全选', 'Select all')),
                 subtitle: Text(ModuStrings.format(

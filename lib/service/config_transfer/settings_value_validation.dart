@@ -160,8 +160,18 @@ void validateSettingsValue(String key, dynamic value) {
     final data = object();
     if (!['name', 'createdAt', 'modifiedAt', 'size'].contains(data['sort']) ||
         data['ascending'] is! bool ||
-        !['all', 'books', 'epub', 'pdf', 'txt', 'mobi', 'azw3', 'fb2', 'md']
-            .contains(data['filter'])) {
+        ![
+          'all',
+          'books',
+          'epub',
+          'pdf',
+          'txt',
+          'mobi',
+          'azw3',
+          'fb2',
+          'md',
+          'umd'
+        ].contains(data['filter'])) {
       throw const FormatException('Invalid library view');
     }
   }

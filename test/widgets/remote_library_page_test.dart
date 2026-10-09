@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:anx_reader/page/home_page/remote_library_page.dart';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
@@ -7,15 +10,55 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
+class _Paths extends PathProviderPlatform {
+  _Paths(this.path);
+  final String path;
+  @override
+  Future<String?> getTemporaryPath() async => path;
+}
 
 class _Library extends WebdavLibrary {
   _Library()
       : super(const LibraryConnection(url: 'https://example.com/books/'));
   int listings = 0;
+  bool failFolder = false;
+  Completer<List<LibraryEntry>>? scan;
+  CancelToken? scanToken;
+  Uri? scannedDirectory;
+  final downloads = <Uri>[];
+  @override
+  Future<List<LibraryEntry>> discoverBooks(Uri directory,
+      {required CancelToken cancelToken}) async {
+    scannedDirectory = directory;
+    scanToken = cancelToken;
+    if (scan != null) {
+      cancelToken.whenCancel.then((error) {
+        if (!scan!.isCompleted) scan!.completeError(error);
+      });
+      return scan!.future;
+    }
+    return [
+      LibraryEntry(directory.resolve('one.txt'), 'one.txt', false, 10),
+      LibraryEntry(directory.resolve('sub/two.umd'), 'two.umd', false, 10),
+      LibraryEntry(directory.resolve('three.pdf'), 'three.pdf', false, 10),
+    ];
+  }
+
+  @override
+  Future<void> download(LibraryEntry entry, File target, CancelToken cancel,
+      void Function(int, int) onProgress) async {
+    downloads.add(entry.uri);
+    throw const FormatException('Synthetic failed download');
+  }
+
   @override
   Future<List<LibraryEntry>> list(Uri directory,
       {CancelToken? cancelToken}) async {
     listings++;
+    if (failFolder && directory != root)
+      throw const LibraryListingException('tooLarge');
     return [
       LibraryEntry(root.resolve('folder/'), 'folder', true, null),
       LibraryEntry(root.resolve('B.pdf'), 'B.pdf', false, 10,
@@ -31,6 +74,132 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await LibraryConnectionStore.clear();
+  });
+  testWidgets(
+      'folder import uses multi-select, downloads only after confirmation, and continues after failure',
+      (tester) async {
+    final temp =
+        Directory.systemTemp.createTempSync('modu-remote-folder-test-');
+    final oldPaths = PathProviderPlatform.instance;
+    PathProviderPlatform.instance = _Paths(temp.path);
+    addTearDown(() {
+      PathProviderPlatform.instance = oldPaths;
+      temp.deleteSync(recursive: true);
+    });
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/books/'));
+    final library = _Library();
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => library))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Import folder'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(library.scannedDirectory, library.root.resolve('folder/'));
+    expect(find.text('Select books to import'), findsOneWidget);
+    expect(find.text('sub/two.umd'), findsOneWidget);
+    expect(library.downloads, isEmpty);
+    await tester.tap(find
+        .byKey(ValueKey(library.root.resolve('folder/one.txt').toString())));
+    await tester.pump();
+    expect(find.text('2 books selected'), findsOneWidget);
+    await tester.tap(find.text('Import selected'));
+    await tester.pump();
+    for (var i = 0;
+        i < 100 &&
+            find
+                .textContaining('Imported 0, skipped 0 duplicates, failed 2.')
+                .evaluate()
+                .isEmpty;
+        i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)));
+      await tester.pump();
+    }
+    expect(library.downloads.length, 2);
+    await tester.pumpAndSettle();
+    expect(library.downloads, [
+      library.root.resolve('folder/sub/two.umd'),
+      library.root.resolve('folder/three.pdf')
+    ]);
+    expect(find.textContaining('Imported 0, skipped 0 duplicates, failed 2.'),
+        findsOneWidget);
+    expect(temp.listSync(), isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('current folder selection can be cancelled without downloading',
+      (tester) async {
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/books/'));
+    final library = _Library();
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => library))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Import current folder'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(library.scannedDirectory, library.root);
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('Cancel')));
+    await tester.pumpAndSettle();
+    expect(library.downloads, isEmpty);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(
+                IconButton, Icons.drive_folder_upload_outlined))
+            .onPressed,
+        isNotNull);
+  });
+
+  testWidgets('cancelling a folder scan stops work and restores controls',
+      (tester) async {
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/books/'));
+    final library = _Library()..scan = Completer<List<LibraryEntry>>();
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => library))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Import current folder'));
+    await tester.pump();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(library.scanToken!.isCancelled, isTrue);
+    expect(library.downloads, isEmpty);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(
+                IconButton, Icons.drive_folder_upload_outlined))
+            .onPressed,
+        isNotNull);
+  });
+
+  testWidgets(
+      'failed directory keeps its own breadcrumb and a directory-specific error',
+      (tester) async {
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/books/'));
+    final library = _Library()..failFolder = true;
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => library))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('folder'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('folder/'), findsOneWidget);
+    expect(find.textContaining('32 MiB'), findsOneWidget);
+    expect(find.textContaining('512 MiB'), findsNothing);
+    expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(
+                IconButton, Icons.drive_folder_upload_outlined))
+            .onPressed,
+        isNull);
   });
   testWidgets('unconfigured remote library links to its own settings',
       (tester) async {

@@ -68,6 +68,33 @@ void main() {
     await root.delete(recursive: true);
   });
 
+  test('UMD provenance never authorizes legacy checksum repair', () async {
+    final bytes = umdTextToEpub(
+        title: 'Synthetic',
+        author: 'Author',
+        sections: [Section('Chapter', 'Example', 1)],
+        sourceDigest: 'a' * 64);
+    await addLegacy(bytes);
+    final before = await db.query('tb_books');
+    expect(await convertedBookSourceFormat(local('file/converted.epub').path),
+        'UMD');
+    expect(await repair(), 0);
+    expect(await db.query('tb_books'), before);
+    final storedHash = md5.convert(bytes).toString();
+    await LocalBookDownload().ensure(local('other/download.epub'),
+        expectedMd5: storedHash, download: (file) async {
+      await file.writeAsBytes(bytes);
+    });
+    expect(await convertedBookSourceFormat(local('other/download.epub').path),
+        'UMD');
+    await expectLater(
+        LocalBookDownload().ensure(local('other/invalid.epub'),
+            expectedMd5: sourceHash, download: (file) async {
+          await file.writeAsBytes(bytes);
+        }),
+        throwsA(isA<BookFileIntegrityException>()));
+  });
+
   for (final format in ['txt', 'markdown']) {
     test('$format legacy repair preserves book, notes, position and sync IDs',
         () async {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
+import 'package:anx_reader/service/convert_to_epub/section.dart';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -235,6 +236,40 @@ List<int> markdownToEpub(String source, {required String fallbackTitle}) {
       }
     }
   }
+  return _encodeEpub(bookTitle, chapters, resources,
+      identifier: 'urn:sha256:${sha256.convert(utf8.encode(source))}');
+}
+
+/// Reuse the EPUB packager without interpreting imported plain text as Markdown.
+List<int> umdTextToEpub({
+  required String title,
+  required String author,
+  required List<Section> sections,
+  required String sourceDigest,
+  List<int>? cover,
+  String? coverType,
+}) {
+  final chapters = sections.map((section) {
+    final chapter = _Chapter(section.title, 1);
+    chapter.nodes
+        .add(XmlElement(XmlName('h1'), [], [XmlText(_xmlText(section.title))]));
+    for (final line in section.content.split('\n')) {
+      chapter.nodes
+          .add(XmlElement(XmlName('p'), [], [XmlText(_xmlText(line))]));
+    }
+    return chapter;
+  }).toList();
+  final resources = <String, (String, List<int>)>{};
+  if (cover != null && coverType != null) {
+    resources['images/0.${coverType.split('/').last}'] = (coverType, cover);
+  }
+  return _encodeEpub(title, chapters, resources,
+      identifier: 'urn:umd:sha256:$sourceDigest', umdAuthor: author);
+}
+
+List<int> _encodeEpub(String bookTitle, List<_Chapter> chapters,
+    Map<String, (String, List<int>)> resources,
+    {required String identifier, String? umdAuthor}) {
   final archive = Archive();
   void add(String name, String content, {bool compress = true}) {
     final bytes = utf8.encode(content);
@@ -256,7 +291,6 @@ List<int> markdownToEpub(String source, {required String fallbackTitle}) {
     return builder.buildDocument().toXmlString();
   }
 
-  final identifier = 'urn:sha256:${sha256.convert(utf8.encode(source))}';
   add('OEBPS/content.opf', document((b) {
     b.element('package', attributes: {
       'xmlns': 'http://www.idpf.org/2007/opf',
@@ -270,6 +304,10 @@ List<int> markdownToEpub(String source, {required String fallbackTitle}) {
             attributes: {'id': 'book-id'}, nest: identifier);
         b.element('dc:title', nest: _xmlText(bookTitle));
         b.element('dc:language', nest: 'und');
+        if (umdAuthor != null) {
+          b.element('dc:creator', nest: _xmlText(umdAuthor));
+          b.element('dc:source', nest: 'Modu UMD import');
+        }
         b.element('meta',
             attributes: {'property': 'dcterms:modified'},
             nest: '2000-01-01T00:00:00Z');
@@ -297,7 +335,8 @@ List<int> markdownToEpub(String source, {required String fallbackTitle}) {
           b.element('item', attributes: {
             'id': 'image${resources.keys.toList().indexOf(entry.key)}',
             'href': entry.key,
-            'media-type': entry.value.$1
+            'media-type': entry.value.$1,
+            if (umdAuthor != null) 'properties': 'cover-image',
           });
         }
       });

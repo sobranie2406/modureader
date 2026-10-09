@@ -6,6 +6,9 @@ import 'dart:io';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/service/book.dart';
+import 'package:anx_reader/service/book_import_source.dart';
+import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
+import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:anx_reader/service/remote_library/library_view_options.dart';
@@ -27,6 +30,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   WebdavLibrary? _client;
   Uri? _directory;
   List<LibraryEntry> _entries = [];
+  (List<LibraryEntry>, LibraryViewOptions, String)? _visibleKey;
+  List<LibraryEntry> _visibleEntries = [];
   CancelToken? _listing, _download;
   String? _error, _activeName;
   String _filter = '';
@@ -83,7 +88,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       if (mounted)
         setState(() {
           _loading = false;
-          _error = libraryError(error, zh);
+          _error = libraryError(error, zh, listing: true);
         });
     }
   }
@@ -95,6 +100,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _directory = directory;
+      _entries = [];
     });
     try {
       final entries = await _client!.list(directory, cancelToken: token);
@@ -104,8 +111,11 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         _directory = directory;
       });
     } catch (error) {
+      AnxLog.warning('Remote library listing failed: ${error.runtimeType}'
+          '${error is LibraryListingException ? ' (${error.reason})' : ''}'
+          '${error is DioException ? ', HTTP ${error.response?.statusCode}' : ''}');
       if (mounted && !token.isCancelled)
-        setState(() => _error = libraryError(error, zh));
+        setState(() => _error = libraryError(error, zh, listing: true));
     } finally {
       if (mounted && !token.isCancelled) setState(() => _loading = false);
     }
@@ -131,7 +141,6 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
 
   Future<void> _getBook(LibraryEntry entry) async {
     if (_activeName != null) return;
-    final container = ProviderScope.containerOf(context, listen: false);
     final token = CancelToken();
     _download = token;
     setState(() {
@@ -139,6 +148,34 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       _received = 0;
       _total = -1;
     });
+    try {
+      final added = await _importEntry(entry, _client!, token);
+      if (!mounted) return;
+      _message(added
+          ? t('已下载并导入本地书架。', 'Downloaded and imported to your bookshelf.')
+          : t('书架中已存在这本书，无需重复导入。',
+              'This book is already available on your bookshelf.'));
+    } catch (error) {
+      if (!mounted) return;
+      _message(token.isCancelled
+          ? t('下载已取消。', 'Download cancelled.')
+          : _importing
+              ? t('文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。',
+                  'Download completed, but import failed. Check the format, encryption or file integrity.')
+              : libraryError(error, zh));
+    } finally {
+      if (mounted)
+        setState(() {
+          _activeName = null;
+          _importing = false;
+          _download = null;
+        });
+    }
+  }
+
+  Future<bool> _importEntry(
+      LibraryEntry entry, WebdavLibrary client, CancelToken token) async {
+    final container = ProviderScope.containerOf(context, listen: false);
     Directory? temporary;
     try {
       temporary = await (await getAnxTempDir()).createTemp('modu-webdav-');
@@ -147,44 +184,106 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       final localName =
           entry.name.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_');
       final file = File('${temporary.path}/$localName');
-      await _client!.download(entry, file, token, (received, total) {
-        if (mounted)
+      final progressClock = Stopwatch()..start();
+      await client.download(entry, file, token, (received, total) {
+        if (mounted &&
+            (progressClock.elapsedMilliseconds >= 100 || received == total)) {
+          progressClock.reset();
           setState(() {
             _received = received;
             _total = total;
           });
+        }
       });
-      if (!mounted || token.isCancelled) return;
+      if (!mounted || token.isCancelled) throw StateError('Cancelled');
       setState(() => _importing = true);
       final hash = await MD5Service.calculateFileMd5(file.path);
-      if (!mounted) return;
+      if (!mounted) throw StateError('Cancelled');
       final duplicate =
           hash == null ? null : await MD5Service.checkDuplicateByMd5(hash);
-      if (!mounted) return;
-      if (duplicate != null &&
+      if (!mounted) throw StateError('Cancelled');
+      final alreadyPresent = duplicate != null &&
           !duplicate.isDeleted &&
-          File(duplicate.fileFullPath).existsSync()) {
-        _message(ModuStrings.text(context, '书架中已存在这本书，无需重复导入。',
-            'This book is already available on your bookshelf.'));
-      } else {
+          File(duplicate.fileFullPath).existsSync();
+      if (!alreadyPresent) {
         await importBook(file, ref,
             onImported: () =>
                 container.read(bookListProvider.notifier).refresh());
-        _message(ModuStrings.text(context, '已下载并导入本地书架。',
-            'Downloaded and imported to your bookshelf.'));
       }
       if (mounted) setState(() => _imported.add(entry.uri.toString()));
-    } catch (error) {
-      if (mounted)
-        _message(token.isCancelled
-            ? ModuStrings.text(context, '下载已取消。', 'Download cancelled.')
-            : _importing
-                ? ModuStrings.text(context, '文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。',
-                    'Download completed, but import failed. Check the format, encryption or file integrity.')
-                : libraryError(error, zh));
+      return !alreadyPresent;
     } finally {
       if (temporary != null && await temporary.exists())
         await temporary.delete(recursive: true);
+    }
+  }
+
+  Future<void> _getFolder(Uri directory) async {
+    if (_activeName != null) return;
+    final client = _client!;
+    final token = CancelToken();
+    _download = token;
+    setState(() {
+      _activeName = t('扫描文件夹（含子文件夹）', 'Scanning folder (including subfolders)');
+      _received = 0;
+      _total = -1;
+    });
+    var added = 0, skipped = 0, failed = 0;
+    String? lastFailure;
+    try {
+      final entries = await client.discoverBooks(directory, cancelToken: token);
+      if (!mounted || token.isCancelled) return;
+      if (entries.isEmpty) {
+        _message(t('没有找到支持的书籍文件', 'No supported books found'));
+        return;
+      }
+      final byId = {for (final e in entries) e.uri.toString(): e};
+      final selected = await showDialog<List<BookImportEntry>>(
+          context: context,
+          animationStyle: AppMotion.style,
+          builder: (_) => BookImportSelection(
+              entries: entries
+                  .map((e) => BookImportEntry(
+                      id: e.uri.toString(),
+                      name: e.name,
+                      label: e.uri.pathSegments
+                          .skip(directory.pathSegments.length - 1)
+                          .join('/')))
+                  .toList()));
+      if (selected == null || !mounted || token.isCancelled) return;
+      for (var i = 0; i < selected.length; i++) {
+        if (!mounted || token.isCancelled) break;
+        final entry = byId[selected[i].id]!;
+        setState(() {
+          _activeName = '${i + 1}/${selected.length} · ${entry.name}';
+          _received = 0;
+          _total = -1;
+          _importing = false;
+        });
+        try {
+          if (await _importEntry(entry, client, token)) {
+            added++;
+          } else {
+            skipped++;
+          }
+        } catch (error) {
+          if (token.isCancelled || !mounted) break;
+          failed++;
+          lastFailure = _importing
+              ? t('书籍解析失败', 'Book import failed')
+              : libraryError(error, zh);
+        }
+      }
+      if (mounted)
+        _message(t(
+            '${token.isCancelled ? '已取消。' : ''}导入 $added 本，重复跳过 $skipped 本，失败 $failed 本。${lastFailure ?? ''}',
+            '${token.isCancelled ? 'Cancelled. ' : ''}Imported $added, skipped $skipped duplicates, failed $failed. ${lastFailure ?? ''}'));
+    } catch (error) {
+      if (mounted)
+        _message(token.isCancelled
+            ? t('已取消文件夹扫描。', 'Folder scan cancelled.')
+            : libraryError(error, zh, listing: true));
+    } finally {
       if (mounted)
         setState(() {
           _activeName = null;
@@ -233,11 +332,26 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   Widget build(BuildContext context) {
     final directory = _directory;
     final root = _client?.root;
-    final visible = _viewOptions.apply(_entries, query: _filter);
+    final visibleKey = (_entries, _viewOptions, _filter);
+    // Download progress must not re-sort a large directory on every repaint.
+    if (_visibleKey != visibleKey) {
+      _visibleKey = visibleKey;
+      _visibleEntries = _viewOptions.apply(_entries, query: _filter);
+    }
+    final visible = _visibleEntries;
     return Scaffold(
         appBar: AppBar(
             title: Text(ModuStrings.text(context, '远程书库', 'Remote library')),
             actions: [
+              IconButton(
+                  tooltip: t('导入当前文件夹', 'Import current folder'),
+                  onPressed: _loading ||
+                          _error != null ||
+                          directory == null ||
+                          _activeName != null
+                      ? null
+                      : () => _getFolder(directory),
+                  icon: const Icon(Icons.drive_folder_upload_outlined)),
               IconButton(
                   tooltip: ModuStrings.text(context, '刷新', 'Refresh'),
                   onPressed: _loading
@@ -325,7 +439,9 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                     Text(_error!),
                                     const SizedBox(height: 16),
                                     OutlinedButton(
-                                        onPressed: _settings,
+                                        onPressed: _activeName == null
+                                            ? _settings
+                                            : null,
                                         child: Text(ModuStrings.text(
                                             context,
                                             '检查连接设置',
@@ -387,7 +503,22 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                             ? () => _browse(entry.uri)
                                             : null,
                                         trailing: entry.isDirectory
-                                            ? const Icon(Icons.chevron_right)
+                                            ? Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                    IconButton(
+                                                        tooltip: t('导入文件夹',
+                                                            'Import folder'),
+                                                        onPressed: _activeName ==
+                                                                null
+                                                            ? () => _getFolder(
+                                                                entry.uri)
+                                                            : null,
+                                                        icon: const Icon(Icons
+                                                            .download_outlined)),
+                                                    const Icon(
+                                                        Icons.chevron_right),
+                                                  ])
                                             : !entry.isBook
                                                 ? null
                                                 : IconButton(

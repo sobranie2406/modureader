@@ -552,6 +552,83 @@ test('a late system bridge cannot open a stale toolbar after disposal or selecti
   }
 });
 
+test('Apple native handle changes refresh text, CFI and annotations without pointerup', async () => {
+  const source = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
+  const handler = source.slice(source.indexOf('const setSelectionHandler ='), source.indexOf('const isZip ='));
+  const publish = source.slice(source.indexOf('const handleSelection ='), source.indexOf('const AUTO_PAGE_DELAY_MS'));
+  for (const navigator of [
+    { platform: 'iPhone', userAgent: 'iPhone', maxTouchPoints: 5 },
+    { platform: 'iPad', userAgent: 'iPad', maxTouchPoints: 5 },
+    { platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 5 },
+    { platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 0 },
+  ]) {
+    const f = fixture('<p>我喜欢中国文化。</p><p>第二段文字。</p>'); f.control.destroy();
+    const maps = { smartSelectionDocuments: new WeakMap(), settledSelectionDocuments: new WeakMap() };
+    const emitted = [], cleared = [];
+    const view = { isFixedLayout: false, renderer: { getAttribute: () => 'scrolled' },
+      getCFI: (index, range) => `${index}:${range.startOffset}:${range.endOffset}:${range.endContainer.parentNode.tagName}`,
+      getSelectionAnnotationIds: cfi => cfi.includes(':3:4:') ? [42] : [],
+    };
+    const setup = runInNewContext(`${publish}\n${handler}\nsetSelectionHandler;`, {
+      ...maps, navigator, style: {}, installSmartSelection,
+      installSettledSelection: (doc, options) => installSettledSelection(doc, { ...options, delay: 5 }),
+      getSelectionRange: sel => sel?.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null,
+      getPosition: range => ({ left: range.startOffset, right: range.endOffset }),
+      buildRangeContextText: range => range.commonAncestorContainer.textContent,
+      onSelectionEnd: selection => emitted.push(selection),
+      stopAutoPageSession: () => {}, isInitialSmartSelection,
+      callFlutter: name => cleared.push(name),
+    });
+    const settle = () => new Promise(done => setTimeout(done, 30));
+    try {
+      setup(view, f.doc, 7);
+      if (navigator.maxTouchPoints === 0) {
+        f.select(3, 5); await settle();
+        assert.equal(emitted.length, 0, 'desktop mouse keeps pointerup timing');
+        f.send('pointerup');
+        assert.equal(emitted.at(-1).text, '中国');
+        f.select(3, 7); await settle();
+        assert.equal(emitted.length, 1);
+        f.send('pointerup');
+        assert.equal(emitted.at(-1).text, '中国文化');
+        continue;
+      }
+      f.select(3, 5); f.send('pointerup'); await settle();
+      assert.equal(emitted.at(-1).text, '中国');
+      const firstCFI = emitted.at(-1).cfi;
+      // System handle movement sends only selectionchange; intermediate
+      // ranges must not leave the toolbar with the old single-word payload.
+      f.select(3, 6); f.select(3, 7); await settle();
+      assert.equal(emitted.length, 2);
+      assert.equal(emitted.at(-1).text, '中国文化');
+      assert.notEqual(emitted.at(-1).cfi, firstCFI);
+      assert.equal(emitted.at(-1).pos.right, 7);
+      // A handle can shrink back to one character without automatic expansion.
+      f.select(3, 4); await settle();
+      assert.equal(f.text(), '中');
+      assert.equal(emitted.at(-1).text, '中');
+      assert.deepEqual(Array.from(emitted.at(-1).annotationIds), [42]);
+      const second = f.doc.querySelectorAll('p')[1].firstChild;
+      f.select(3, 4, f.doc.querySelector('p').firstChild, second); await settle();
+      assert.equal(emitted.at(-1).text, '中国文化。第二段文');
+      assert.ok(emitted.at(-1).contextText.includes('第二段文字'));
+      const count = emitted.length;
+      f.send('selectionchange', {}, f.doc); f.send('pointerup'); await settle();
+      assert.equal(emitted.length, count, 'unchanged range is not republished');
+      f.select(0, 3); f.doc.getSelection().removeAllRanges();
+      f.send('selectionchange', {}, f.doc); await settle();
+      assert.equal(emitted.length, count, 'collapse cancels pending publication');
+      assert.ok(cleared.includes('onSelectionCleared'));
+      f.doc.__moduQuickMarkEnabled = true;
+      f.select(0, 3); await settle();
+      assert.equal(emitted.length, count, 'quick mark keeps its own menu lifecycle');
+    } finally {
+      maps.settledSelectionDocuments.get(f.doc)?.();
+      maps.smartSelectionDocuments.get(f.doc)?.destroy(); f.close();
+    }
+  }
+});
+
 test('actual Android reader wiring expands a glyph selection before sending it to Flutter', async () => {
   const source = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   const handler = source.slice(source.indexOf('const setSelectionHandler ='), source.indexOf('const isZip ='));
