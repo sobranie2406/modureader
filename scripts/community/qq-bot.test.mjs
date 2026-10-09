@@ -163,6 +163,11 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       store(f.DB, 'qq:chat:allowed-group:inside', {ts:seconds-60,text:qqRedact('EPUB 导入讨论 token=test-secret')}, seconds);
       store(f.DB, 'qq:chat:allowed-group:before', {ts:seconds-43201,text:'Outside previous interval'}, seconds);
       store(f.DB, 'qq:chat:allowed-group:end', {ts:seconds,text:'Outside current interval'}, seconds);
+      const summarize = f.env.AI.run;
+      f.env.AI.run = async (...args) => {
+        await summarize(...args);
+        return {response:'1. 小明（U1）、用户 U2、群友(U3)、U4：阅读器反馈 👉 小明（U1）报告闪退，用户U2回应仍待确认。'};
+      };
       await qqSchedule({scheduledTime:at-60000}, f.env);
       assert.equal(f.sent.length, 0);
       await qqSchedule({scheduledTime:at}, f.env);
@@ -172,6 +177,9 @@ test('summary cron filters the interval, redacts text, sends proactively and ded
       assert.doesNotMatch(f.prompts[0].messages[1].content, /test-secret|Outside/);
       assert.match(f.sent[0].content, /2026-10-06 20:00 — 2026-10-07 08:00/);
       assert.equal(f.sent[0].msg_id, undefined);
+      assert.match(f.sent[0].content, /1\. 小明、群友、群友、群友：阅读器反馈/);
+      assert.match(f.sent[0].content, /小明报告闪退，群友回应仍待确认/);
+      assert.doesNotMatch(f.sent[0].content, /\bU\d+\b/);
       assert.equal(JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:last-summary'").get().value).ok, true);
     });
   } finally {Date.now = originalNow;}

@@ -373,6 +373,12 @@ export function qqDigestTranscript(records) {
     ...(m.replyTo ? {replyTo:messages.get(m.replyTo) || '引用消息不在本时段记录中'} : {}),
     ...(m.quoted?.length ? {quoted_context:m.quoted} : {})}));
 }
+export function qqDigestClean(text) {
+  return qqClean(text)
+    .replace(/(?:群友|用户|成员)\s*(?:[（(]\s*U\d+\s*[）)]|\bU\d+\b)/gi, '群友')
+    .replace(/[（(]\s*U\d+\s*[）)]/gi, '')
+    .replace(/\bU\d+\b/gi, '群友');
+}
 async function qqSummary(env, group, window) {
   const rows = await env.DB.prepare("WITH chats AS (SELECT value,ROW_NUMBER() OVER (ORDER BY CAST(json_extract(value,'$.ts') AS INTEGER),key) AS position,COUNT(*) OVER () AS total FROM bot_state WHERE key LIKE ? AND expires>? AND CAST(json_extract(value,'$.ts') AS INTEGER)>=? AND CAST(json_extract(value,'$.ts') AS INTEGER)<?) SELECT value,total FROM chats WHERE (position-1)%((total+1999)/2000)=0 ORDER BY position LIMIT 2000")
     .bind(`qq:chat:${group}:%`, qqNow(), window.start, window.end).all();
@@ -394,7 +400,7 @@ async function qqSummary(env, group, window) {
 按话题组织，逐个跟踪 speaker 中的 U 编号：同一 U 是同一人，即使改名；不同 U 即使同名也不可合并。
 每项格式固定为“1. 昵称甲、昵称乙：简短生动的话题标题 👉 一段连贯的对话总结”。只输出编号条目，标题和时段由程序添加。
 一般 3—6 项；话题少就少写，不凑数。每项约 80—180 字，总计不超过 1100 中文字。
-使用真实昵称，普通昵称不附带内部 U 编号；没有昵称用群友（U编号），同名时保留 U 编号区分。未记录发言人的旧消息只能写“群友”，不能猜测身份。
+使用真实昵称；没有昵称统一写“群友”，同名时用各自观点或上下文区分。U 编号仅用于内部跟踪，最终输出中绝不显示 U1、U2 等编号，不添加用户编号或身份代号。未记录发言人的旧消息只能写“群友”，不能猜测身份。
 同一话题串联起因、各人观点、回应、补充、分歧、观点变化和最后进展，明确谁提出、谁回应，不做逐人流水账。
 优先利用 replyTo 和 mentions 确认互动；同一话题不等于直接对话，单凭时间相邻不能声称某人回应某人。
 quoted_context 仅为引用或转发背景，不能当作当前发言人的观点，也不能视作本时段新发言。
@@ -407,7 +413,7 @@ quoted_context 仅为引用或转发背景，不能当作当前发言人的观�
 不得输出 OpenID、密钥、联系方式；不声称查看图片、附件或未提供的消息。不要模仿示例虚构任何股票话题。`},
     {role: 'user', content: transcript + '\n/no_think'}
   ], temperature: 0.3, max_tokens: 2200});
-  const text = qqClean(result.response).slice(0, 1800);
+  const text = qqDigestClean(result.response).slice(0, 1800);
   if (!text) throw new Error('Summary unavailable');
   const coverage = limited ? '\n消息量较多，本次为覆盖全时段的抽样总结。' : '';
   const identities = values.some(m => !m.speaker?.key) ? '\n部分旧消息未记录昵称，已用“群友”表示；新消息按昵称归纳。' : '';
