@@ -247,7 +247,7 @@ test('a quiet period never republishes previous feedback or calls AI for backgro
       store(f.DB,'qq:chat:allowed-group:old',{ts:end-86460,text:'默读闪退'},end);
       await qqSchedule({scheduledTime:at},f.env);
       assert.equal(f.prompts.length,0);
-      assert.match(f.sent[0].content,/本时段没有收到与默读 APP 有关的新反馈/);
+      assert.match(f.sent[0].content,/尚未记录到群文字消息/);
       assert.doesNotMatch(f.sent[0].content,/闪退/);
     });
   } finally {Date.now=originalNow;}
@@ -264,6 +264,7 @@ test('only the source-reviewed digest is posted, never the unchecked draft', asy
       if (++calls===1) return {response:'1. 群友：【使用意见】无关新闻草稿'};
       assert.match(input.messages[1].content,/无关新闻草稿/);
       assert.match(input.messages[1].content,/默读 iOS 选中文字无法批注/);
+      assert.match(input.messages[0].content,/草稿漏掉的事项必须补齐/);
       return {response:'1. 群友（U1）：【Bug反馈】文字选择 👉 等待复现。'};
     };
     const admin=event('review-test','/summary-test 24h');
@@ -723,4 +724,29 @@ test('unavailable account usage skips Tavily search; two provider failures never
     assert.match(f.sent[0].content, /未能完成联网汇总/);
     assert.doesNotMatch(JSON.stringify(f.sent)+JSON.stringify(f.DB.raw.prepare('SELECT value FROM bot_state').all()), /private-key|test-tavily-key/);
   });
+});
+
+
+test('daily transcript retains dates across midnight for contextual feedback', () => {
+  const rows=[{ts:Date.parse('2026-10-08T16:52:00+08:00')/1000,text:'iOS选中文字无法批注'},
+    {ts:Date.parse('2026-10-09T08:10:00+08:00')/1000,text:'测试后可以了'}];
+  const transcript=qqDigestTranscript(rows).map(JSON.parse);
+  assert.equal(transcript[0].time,'2026-10-08 16:52');
+  assert.equal(transcript[1].time,'2026-10-09 08:10');
+});
+
+
+test('QQ face metadata cannot crowd out feedback and its later resolution', () => {
+  const face='<faceType=1,faceId="496",ext="'+'x'.repeat(100)+'">';
+  const records=Array.from({length:190},(_,i)=>({ts:1791432000+i*60,text:'阅读讨论'+face.repeat(2)}));
+  records[40].text='iOS 27.2 拖动选区后无法复制'+face;
+  records[180].text='测试后可以了'+face;
+  records[185].quoted=['UMD支持已加入Preview版本'+face];
+  const input=qqDigestTranscript(records).join('\n');
+  assert.ok(input.length<32000);
+  assert.match(input,/iOS 27.2/);
+  assert.match(input,/测试后可以了/);
+  assert.match(input,/UMD支持已加入Preview版本/);
+  assert.doesNotMatch(input,/faceType|faceId/);
+  assert.deepEqual(qqDigestTranscript([{ts:1791432000,text:face}]),[]);
 });

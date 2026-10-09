@@ -92,5 +92,5 @@ test('diagnostic-only Telegram period does not call AI or invent feedback',async
   f.store(`tg:chat:${group}:1`,{ts:at/1000-30,text:'/help@ModuReaderRelease_bot'});
   await telegramSchedule({scheduledTime:at},f.env);
   assert.equal(f.prompts.length,0);
-  assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/本时段没有收到/);
+  assert.match(f.calls.find(c=>c.method==='sendMessage').body.text,/没有可供汇总的聊天文字/);
 }));
