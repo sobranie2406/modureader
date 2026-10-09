@@ -236,6 +236,24 @@ test('a quiet period never republishes previous feedback or calls AI for backgro
   } finally {Date.now=originalNow;}
 });
 
+test('24-hour summary test includes retained earlier feedback and excludes expired text', async () => {
+  await withFixture(async f => {
+    const now=Math.floor(Date.now()/1000);
+    store(f.DB,'qq:chat:allowed-group:earlier',{ts:now-23*3600,text:'默读选中文字后无法添加批注'},now);
+    store(f.DB,'qq:chat:allowed-group:expired',{ts:now-25*3600,text:'Outside 24-hour interval'},now);
+    const member=event('member-summary','/summary-test 24h');
+    await qqRoutes(await signed(member),f.env);
+    assert.equal(f.sent.length,0);
+    const admin=event('admin-summary','/summary-test 24h');
+    admin.d.author.member_role='admin';
+    await qqRoutes(await signed(admin),f.env);
+    const input=f.prompts[0].messages[1].content;
+    assert.match(input,/无法添加批注/);
+    assert.doesNotMatch(input,/Outside 24-hour/);
+    assert.match(f.sent[0].content,/过去24小时反馈汇总测试/);
+  });
+});
+
 test('no scheduled push happens until proactive permission is actually tested', async () => {
   await withFixture(async f => {
     const seconds = Math.floor(Date.now()/1000);

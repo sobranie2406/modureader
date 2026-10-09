@@ -388,7 +388,7 @@ async function qqSummary(env, group, window) {
   if (!values.length) return header + '\n\n本时段没有收到与默读 APP 有关的新反馈。';
   // Retained previous-period text provides context for short follow-ups, without repeating old feedback.
   const previous = await env.DB.prepare("SELECT value FROM bot_state WHERE key LIKE ? AND expires>? AND CAST(json_extract(value,'$.ts') AS INTEGER)>=? AND CAST(json_extract(value,'$.ts') AS INTEGER)<? ORDER BY CAST(json_extract(value,'$.ts') AS INTEGER) DESC,key DESC LIMIT 200")
-    .bind(`qq:chat:${group}:%`, qqNow(), window.start-43200, window.start).all();
+    .bind(`qq:chat:${group}:%`, qqNow(), Math.max(window.start-43200,qqNow()-86400), window.start).all();
   const background = previous.results.reverse().map(r => JSON.parse(r.value));
   const combined = qqDigestTranscript([...background,...values.slice(0,2000)]);
   // Diagnostic commands are filtered by qqDigestTranscript; split by their remaining record count.
@@ -520,9 +520,10 @@ async function qqHandleEvent(env, payload) {
     if (!await qqClaim(env, 'qq:summary-test-cooldown', 60)) return;
     try {
       const end = qqNow();
-      const start = qqWindow(Date.now()).end;
+      const last24h = /^\/summary-test\s+24h\s*$/i.test(command);
+      const start = last24h ? end-86400 : qqWindow(Date.now()).end;
       const text = await qqSummary(env, group, {start, end});
-      return qqSend(env, group, '🧪 当前阶段摘要测试\n' + text, d);
+      return qqSend(env, group, (last24h ? '🧪 过去24小时反馈汇总测试\n' : '🧪 当前阶段摘要测试\n') + text, d);
     } catch {
       return qqSend(env, group, '摘要暂时无法生成，请检查免费 AI 额度与消息接收设置。', d);
     }
