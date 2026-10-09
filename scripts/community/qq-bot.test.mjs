@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
-import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer, qqDigestTranscript, qqQuestionRoute, qqQuestionText, qqWebAnswer, qqChatAnswer} from './qq-bot.mjs';
+import {qqKeys, qqVerify, qqRedact, qqSplit, qqWindow, qqRoutes, qqSchedule, qqReleaseText, qqReleaseIdentity, qqReadingAnswer, qqDigestTranscript, qqQuestionRoute, qqQuestionText, qqWebAnswer, qqChatAnswer, qqBingResults} from './qq-bot.mjs';
 
 const secret = 'DG5g3B4j9X2KOErG'; // Public test vector in Tencent's official documentation.
 const encode = new TextEncoder();
@@ -81,6 +81,7 @@ function fixture() {
       f.searches.push(JSON.parse(options.body).query);
       return f.searchResponse || Response.json({code:0,data:{results:f.searchItems}});
     }
+    if (String(url).startsWith('https://www.bing.com/search?')) return f.bingResponse || new Response('<html>No static results</html>');
     if (String(url).includes('/.well-known/jwks')) return Response.json({keys:[releaseJwk]});
     if (String(url).includes('getAppAccessToken')) return Response.json({access_token: 'test-access', expires_in: 3600});
     if (String(url).includes('/messages')) {sent.push(JSON.parse(options.body)); return Response.json({id:'reply-'+sent.length});}
@@ -884,3 +885,69 @@ test('documentation keeps supplied download links and labels invented links inst
   assert.doesNotMatch(answer,/invented.example/);assert.match(answer,/检索资料未提供此链接/);
   assert.equal(f.searches.length,0);
 }));
+
+const bingCard = (url='https://www.w3.org/TR/epub-33/',title='EPUB 标准',snippet='电子书规范 &amp; 可访问性') =>
+  `<li class="b_algo"><h2><a href="${url}">${title}</a></h2><div class="b_caption"><p>${snippet}</p></div></li>`;
+test('Bing static results decode tracking URLs and text; scripts, unsafe links and shells are rejected', () => {
+  const url='https://zh.wikipedia.org/wiki/电子书';
+  const tracking='https://www.bing.com/ck/a?u=a1'+Buffer.from(url).toString('base64url');
+  const result=qqBingResults(bingCard(tracking,'<strong>电子书</strong>','&#x4e2d;&#25991;&nbsp;摘要<script>bad()</script>'));
+  assert.deepEqual(result,[{title:'电子书',url:new URL(url).href,snippet:'中文 摘要'}]);
+  for(const href of ['javascript:alert(1)','http://example.org','https://user:pass@example.org','https://www.bing.com/ck/a?u=bad'])
+    assert.deepEqual(qqBingResults(bingCard(href)),[]);
+  assert.deepEqual(qqBingResults('<html><script>results()</script></html>'),[]);
+  assert.deepEqual(qqBingResults('x'.repeat(1000001)+bingCard()),[]);
+});
+test('explicit Bing uses public HTML first and never mislabels a free API fallback', async () => {
+  await withFixture(async f=>{
+    f.env.TAVILY_API_KEY='test-tavily-key'; f.bingResponse=new Response(bingCard());
+    const answer=await qqWebAnswer(f.env,'用Bing搜索 EPUB 标准');
+    assert.match(answer,/汇总（Bing 网页）/); assert.equal(f.tavilyRequests.length,0); assert.equal(f.searches.length,0);
+    assert.equal(new URL(f.network[0]).searchParams.get('q'),'EPUB 标准');
+  });
+  await withFixture(async f=>{
+    f.env.TAVILY_API_KEY='test-tavily-key'; f.searchItems=[{title:'EPUB',url:'https://www.w3.org/TR/epub-33/',content:'标准'}];
+    const answer=await qqWebAnswer(f.env,'Bing搜索 EPUB');
+    assert.match(answer,/汇总（Tavily）/);assert.match(answer,/Bing 网页未返回可用结果/);
+  });
+});
+test('Wikipedia and Baidu Baike queries restrict both Tavily requests and all cited hosts',async()=>{
+  for(const [term,domain] of [['维基百科','wikipedia.org'],['百度百科','baike.baidu.com']]) {
+    await withFixture(async f=>{
+      f.env.TAVILY_API_KEY='test-tavily-key';
+      f.searchItems=[{title:'wrong',url:'https://example.org/',content:'wrong'},
+        {title:'spoof',url:'https://'+domain+'.evil.org/',content:'spoof'},
+        {title:'百科',url:'https://'+domain+'/item/example',content:'百科摘要'}];
+      const answer=await qqWebAnswer(f.env,term+' 电子书是什么');
+      assert.equal(f.tavilyRequests[0].query,'电子书是什么');
+      assert.deepEqual(f.tavilyRequests[0].include_domains,[domain]);assert.equal(f.tavilyRequests[0].include_domains_mode,'restrict');
+      assert.match(answer,/限定来源/);assert.ok(answer.includes('https://'+domain+'/'));
+      assert.doesNotMatch(answer,/evil.org|example.org|wrong/);
+      assert.doesNotMatch(JSON.stringify(f.prompts),/spoof|wrong/);
+    });
+  }
+});
+test('Bing is the final free fallback; encyclopedia pages from other hosts never reach AI',async()=>{
+  await withFixture(async f=>{
+    f.searchResponse=new Response('',{status:429}); f.bingResponse=new Response(bingCard());
+    assert.match(await qqWebAnswer(f.env,'EPUB 标准'),/汇总（Bing 网页）/);
+  });
+  await withFixture(async f=>{
+    f.searchItems=[{title:'wrong',url:'https://example.org/',content:'wrong'}];f.bingResponse=new Response(bingCard());
+    assert.match(await qqWebAnswer(f.env,'百度百科 电子书'),/未找到可用来源/);assert.equal(f.prompts.length,0);
+    assert.match(f.searches[0],/^site:baike.baidu.com /);
+  });
+});
+test('Google requests disclose unavailable public pages; internal requests cannot use any web provider',async()=>{
+  await withFixture(async f=>{
+    f.env.TAVILY_API_KEY='test-tavily-key';f.searchItems=[{title:'EPUB',url:'https://www.w3.org/TR/epub-33/',content:'标准'}];
+    const answer=await qqWebAnswer(f.env,'谷歌搜索 EPUB 标准');
+    assert.match(answer,/汇总（Tavily）/);assert.match(answer,/Google 公开搜索页面暂不可读取/);
+    assert.ok(!f.network.some(url=>url.includes('google.com')));
+  });
+  for(const question of ['用Bing搜索 默读怎么设置','百度百科 Modu 支持的格式','维基百科 群里昨天谁反馈Bug']) {
+    await withFixture(async f=>{
+      assert.match(await qqWebAnswer(f.env,question),/不启用联网搜索/);assert.equal(f.network.length,0);
+    });
+  }
+});

@@ -105,17 +105,17 @@ Release 缓存 4 分钟；发布说明失败时不声称已核实最新版本。
 联网答复由当前 Qwen 模型整理要点、标注来源编号，附搜索服务实际返回的链接。
 普通群聊不会触发搜索。
 配置加密变量 `TAVILY_API_KEY` 后优先使用 Tavily 免费基础搜索；未配置或失败时使用
-AnySearch 的公开匿名搜索 API。直接传入本次脱敏后的完整问题，
+AnySearch 的公开匿名搜索 API，再回退到 Bing 公开网页结果。直接传入本次脱敏后的完整问题，
 汇总仍由现有 Workers AI 模型完成，省去关键词提炼的额外模型调用。
 每题最多取 5 个结果、1024 字，每人间隔 30 秒，全群搜索间隔 5 秒，
 QQ 与文档、群记录问答共享每天 80 次上限；Telegram 保留每天 100 次问答上限。不传整段群聊、昵称或成员 ID。
 搜索结果不作为指令；无来源或服务故障时明确提示，不凭模型记忆冒充联网结果。
 
-Tavily 需用户注册 Researcher/Free 方案并自行将密钥加入 Cloudflare 加密变量，
+Tavily 需用户注册 Researcher/Free 方案，并将现有密钥保存到 Cloudflare 加密变量，
 保持 Pay-as-you-go 关闭。固定 `search_depth: basic`（每次 1 额度）及 `auto_parameters: false`，
 不请求服务端生成答案、全文或图片。每次先读取账户用量，只允许已识别的免费方案、
 1000 月额度且已用少于 950；机器人每月最多预留 950 次，失败预留也计数。
-额度状态未知、付费方案、余额不足或请求失败时仅回退匿名免费接口，禁止付费回退。
+额度状态未知、付费方案、余额不足或请求失败时仅回退匿名免费接口与公开网页，禁止付费回退。
 不要共享此密钥给其他高流量应用；账户免费额度在每月 1 日重置。
 匿名调用按 IP 限流并受每日免费额度限制，官方未在接口文档承诺具体匿名次数；
 额度用完时停止，不使用响应中自动生成的账号、密码或密钥，也不记录错误响应正文。
@@ -126,3 +126,12 @@ Tavily 需用户注册 Researcher/Free 方案并自行将密钥加入 Cloudflare
 Tavily 官方：[基础搜索](https://docs.tavily.com/documentation/api-reference/endpoint/search)、[免费额度](https://docs.tavily.com/documentation/api-credits)、[账户用量](https://docs.tavily.com/documentation/api-reference/endpoint/usage)。
 
 管理员 `/summary-test 24h` 由现有每分钟定时任务接手，通常下一分钟开始生成；两轮 AI 处理可继续运行，避免网页回调的 30 秒后台时限。每个平台 10 分钟内只接受一次测试；任务执行前领取一次性标记，发送失败不盲目重发，可查看 `qq:last-summary-test` / `tg:last-summary-test` 状态。
+
+指定“用 Bing 搜索 …”时先读取 Bing 公开搜索页面中的自然结果标题、摘要与真实链接，
+不调用收费的 Bing API。页面超时、被拦截或结构变化时说明失败并回退免费来源，
+不处理验证码，也不把脚本空壳当作搜索结果。未指定来源时始终 Tavily 优先。
+“百度百科 …”“维基百科 …”使用 Tavily 的域名限制，备用搜索添加 `site:`，
+并再次检查返回链接的域名；不混入其他站点。两种百科均汇总搜索摘要，未宣称读过全文。
+Google 公开页面目前只有 JavaScript 空壳，因此 Google 请求会明确说明尚不可读取，
+改用实际可用服务并显示其名称，不冒充 Google 结果。QQ 与 Telegram 使用相同逻辑；
+含 Modu／默读或明确群记录意图的问题仍只检索内部资料，优先级高于指定网页来源。

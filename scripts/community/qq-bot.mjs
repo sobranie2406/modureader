@@ -314,15 +314,81 @@ export async function qqChatAnswer(env, group, question, platform = 'qq', messag
     return header+'\n\n群记录检索暂时不可用；本次没有转为联网搜索。';
   }
 }
+function qqHtmlText(html) {
+  return String(html).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<[^>]*>/g, ' ').replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (match, entity) => {
+      const named = {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' '};
+      if (!entity.startsWith('#')) return named[entity.toLowerCase()] || match;
+      const code = entity[1].toLowerCase() === 'x' ? parseInt(entity.slice(2),16) : Number(entity.slice(1));
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+    }).replace(/\s+/g, ' ').trim();
+}
+export function qqBingResults(html) {
+  if (html.length > 1000000) return [];
+  // ponytail: parse only Bing's static organic result cards; changed markup fails closed.
+  return [...html.matchAll(/<li\b[^>]*class=["'][^"']*\bb_algo\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi)].flatMap(([,card]) => {
+    const heading = card.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i)?.[1];
+    const link = heading?.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+    if (!link) return [];
+    try {
+      let url = new URL(qqHtmlText(link[1]), 'https://www.bing.com');
+      if (url.hostname === 'www.bing.com' && url.pathname === '/ck/a') {
+        const encoded = url.searchParams.get('u');
+        if (!encoded?.startsWith('a1')) return [];
+        const base64 = encoded.slice(2).replace(/-/g,'+').replace(/_/g,'/');
+        url = new URL(new TextDecoder().decode(Uint8Array.from(atob(base64), c=>c.charCodeAt(0))));
+      }
+      if (url.protocol !== 'https:' || url.username || url.password || /(^|\.)bing\.com$/.test(url.hostname)) return [];
+      const title = qqHtmlText(link[2]);
+      const snippet = qqHtmlText(card.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '');
+      return title && snippet ? [{title, url:url.href, snippet}] : [];
+    } catch {return [];}
+  }).slice(0, 5);
+}
+async function qqBingSearch(query) {
+  try {
+    const response = await fetch('https://www.bing.com/search?'+new URLSearchParams({q:query,setlang:'zh-hans'}), {
+      headers:{'user-agent':'ModuReader-CommunityBot/1.0','accept-language':'zh-CN'},
+      signal:AbortSignal.timeout(6000)});
+    if (!response.ok) return [];
+    return qqBingResults(await response.text());
+  } catch {return [];}
+}
+function qqWebItems(items, domain) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : []).flatMap(item => {
+    try {
+      const url = new URL(item.url);
+      if (url.protocol !== 'https:' || url.username || url.password ||
+          !url.hostname.includes('.') || seen.has(url.href) ||
+          (domain && url.hostname !== domain && !url.hostname.endsWith('.'+domain))) return [];
+      seen.add(url.href);
+      return [{url:url.href, title:qqRedact(item.title).slice(0,160),
+        description:qqRedact(item.snippet || item.content).slice(0,1800),
+        published_date:qqRedact(item.published_date).slice(0,80)}];
+    } catch {return [];}
+  }).slice(0,5);
+}
 export async function qqWebAnswer(env, question) {
   if (qqQuestionRoute('/search '+question) !== 'web') return '此问题应查询本群记录或默读项目资料，不启用联网搜索。';
   const query = qqRedact(question).trim();
+  const domain = /百度百科/.test(query) ? 'baike.baidu.com' : /维基百科|維基百科|wikipedia/i.test(query) ? 'wikipedia.org' : '';
+  const bing = /(?:用|使用|通过)?\s*bing\s*(?:搜索|搜|查)|必应\s*(?:搜索|搜|查)/i.test(query);
+  const google = /(?:谷歌|google)\s*(?:搜索|搜|查)/i.test(query);
+  const searchQuery = query.replace(/(?:用|使用|通过)?\s*(?:bing|必应|google|谷歌)\s*(?:搜索|搜|查)(?:一下)?[：:，,\s]*/i,'')
+    .replace(/^(?:请|用|使用|从|在)?\s*(?:百度百科|维基百科|維基百科|wikipedia)(?:搜索|查询|搜|查|介绍)?[：:，,\s]+/i,'').trim() || query;
+  const pageQuery = (domain ? 'site:'+domain+' ' : '')+searchQuery;
   if (query.length > 1024) return '联网搜索的问题请控制在 1024 字以内。';
   let stage = 'search';
   try {
     if (!await qqClaim(env, 'qq:web-search-rate', 5)) return '请稍等 5 秒再联网搜索。';
-    let provider = 'AnySearch', items;
-    if (env.TAVILY_API_KEY && await qqCount(env,
+    let provider = 'AnySearch', items, searchError, notice = google ? 'Google 公开搜索页面暂不可读取，本次改用可用的免费来源。\n\n' : '';
+    if (bing) {
+      const results = qqWebItems(await qqBingSearch(pageQuery),domain);
+      if (results.length) {items=results; provider='Bing 网页';}
+      else notice='Bing 网页未返回可用结果，本次改用免费备用来源。\n\n';
+    }
+    if (!items && env.TAVILY_API_KEY && await qqCount(env,
         'qq:tavily:' + new Date().toISOString().slice(0, 7), 86400*40) <= 950) {
       try {
         const headers = {authorization: 'Bearer ' + env.TAVILY_API_KEY, accept: 'application/json'};
@@ -338,14 +404,15 @@ export async function qqWebAnswer(env, question) {
         }
         const response = await fetch('https://api.tavily.com/search', {
           method: 'POST', headers: {...headers, 'content-type': 'application/json'},
-          body: JSON.stringify({query, search_depth: 'basic', auto_parameters: false,
-            max_results: 5, include_answer: false, include_raw_content: false,
+          body: JSON.stringify({query:searchQuery, search_depth: 'basic', auto_parameters: false,
+            max_results: 5, ...(domain ? {include_domains:[domain],include_domains_mode:'restrict'} : {}), include_answer: false, include_raw_content: false,
             include_images: false, include_published_date: true}),
           signal: AbortSignal.timeout(8000)});
         if (!response.ok) throw Object.assign(new Error('Tavily search unavailable'), {code: response.status});
         const data = await response.json();
         if (!Array.isArray(data.results)) throw Object.assign(new Error('Invalid Tavily results'), {code: 502});
-        if (data.results.length) {items = data.results; provider = 'Tavily';}
+        const results = qqWebItems(data.results,domain);
+        if (results.length) {items = results; provider = 'Tavily';}
       } catch (error) {
         await qqPut(env, 'qq:last-tavily-fallback', {at: qqNow(),
           code: Number.isFinite(Number(error.code)) ? Number(error.code) : null}, 86400*7);
@@ -353,30 +420,30 @@ export async function qqWebAnswer(env, question) {
     }
     if (!items) {
       // Anonymous free tier only; never adopt credentials returned on quota exhaustion.
-      const response = await fetch('https://api.anysearch.com/v1/search', {
-        method: 'POST', headers: {'content-type': 'application/json', accept: 'application/json'},
-        body: JSON.stringify({query, max_results: 5, language: 'zh-CN'}),
-        signal: AbortSignal.timeout(8000)});
-      if (!response.ok) throw Object.assign(new Error('Web search unavailable'), {code: response.status});
-      const data = await response.json();
-      if (data.code !== 0 || !Array.isArray(data.data?.results)) {
-        throw Object.assign(new Error('Invalid web search response'), {code: 502});
-      }
-      items = data.data.results;
-    }
-    const seen = new Set();
-    const sources = items.flatMap(item => {
       try {
-        const url = new URL(item.url);
-        if (url.protocol !== 'https:' || url.username || url.password ||
-            !url.hostname.includes('.') || seen.has(url.href)) return [];
-        seen.add(url.href);
-        return [{url: url.href, title: qqRedact(item.title).slice(0, 160),
-          description: qqRedact(item.snippet || item.content).slice(0, 1800),
-          published_date: qqRedact(item.published_date).slice(0, 80)}];
-      } catch { return []; }
-    }).slice(0, 5);
-    if (!sources.length) return '本次联网搜索未找到可用来源，请换一个更具体的问题。';
+        const response = await fetch('https://api.anysearch.com/v1/search', {
+          method:'POST', headers:{'content-type':'application/json',accept:'application/json'},
+          body:JSON.stringify({query:domain ? pageQuery : searchQuery,max_results:5,language:'zh-CN'}),
+          signal:AbortSignal.timeout(8000)});
+        if (!response.ok) throw Object.assign(new Error('Anonymous search unavailable'),{code:response.status});
+        const data = await response.json();
+        if (data.code !== 0 || !Array.isArray(data.data?.results)) {
+          throw Object.assign(new Error('Invalid anonymous results'),{code:502});
+        }
+        const results = qqWebItems(data.data.results,domain);
+        if (results.length) items=results;
+      } catch (error) {searchError=error;}
+    }
+    if (!items && !bing) {
+      const results = qqWebItems(await qqBingSearch(pageQuery),domain);
+      if (results.length) {items=results; provider='Bing 网页';}
+    }
+    const sources = items || [];
+    if (!sources.length) {
+      if (searchError) throw searchError;
+      await qqPut(env,'qq:last-web-search',{at:qqNow(),ok:false,stage:'search',code:null},86400*7);
+      return '本次联网搜索未找到可用来源，未能完成联网汇总。请稍后重试或换一个更具体的问题。';
+    }
     const evidence = sources.map((source, i) => ({id: i+1, title: source.title, description: source.description, published_date: source.published_date}));
     const date = new Date(Date.now()+8*3600000).toISOString().slice(0, 10);
     stage = 'summary';
@@ -390,7 +457,7 @@ Distinguish publication date from today's search date. Never invent dates or say
 when the evidence has no date. Explain uncertainty, contradictory or insufficient evidence.
 Do not output URLs; the service appends the verified search URLs. Do not claim to perform actions.
 SEARCH EVIDENCE:\n${JSON.stringify(evidence)}`},
-      {role: 'user', content: query+'\n/no_think'}
+      {role: 'user', content: searchQuery+'\n/no_think'}
     ], temperature: 0.2, max_tokens: 1000});
     // Model-written URLs cannot become citations: append only provider-returned URLs.
     const answer = qqClean(result.response).replace(/https?:\/\/[^\s<>]+/gi, '')
@@ -398,7 +465,7 @@ SEARCH EVIDENCE:\n${JSON.stringify(evidence)}`},
       .slice(0, 1800).trim();
     const links = sources.map((source, i) => `[${i+1}] ${source.title}\n${source.url}`).join('\n');
     await qqPut(env, 'qq:last-web-search', {at: qqNow(), ok: true, provider, sources: sources.length}, 86400*7);
-    return `🔎 联网搜索汇总（${provider}）· ${date}\n\n${answer || '未能生成可靠汇总，请查看以下搜索来源。'}\n\n来源：\n${links}\n\n🤖 根据搜索摘要整理，请核对原文。免费服务可能限流，搜索结果也可能遗漏或过时。`;
+    return `🔎 联网搜索汇总（${provider}）· ${date}\n\n${notice}${domain ? '限定来源：'+domain+'\n\n' : ''}${answer || '未能生成可靠汇总，请查看以下搜索来源。'}\n\n来源：\n${links}\n\n🤖 根据搜索摘要整理，请核对原文。免费服务可能限流，搜索结果也可能遗漏或过时。`;
   } catch (error) {
     await qqPut(env, 'qq:last-web-search', {at: qqNow(), ok: false, stage,
       code: Number.isFinite(Number(error.code)) ? Number(error.code) : null}, 86400*7);
@@ -811,7 +878,7 @@ export async function qqRoutes(request, env, ctx) {
       group_bound: !!env.QQ_GROUP_OPENID, summaries_enabled: env.QQ_SUMMARIES_ENABLED === 'true',
       summary_times: ['12:00 Asia/Shanghai'], summary_window_hours: 24,
       summary_format: 'modu-feedback-v1',
-      web_search_enabled: true, web_search_provider: env.TAVILY_API_KEY ? 'Tavily basic + AnySearch anonymous fallback' : 'AnySearch anonymous API',
+      web_search_enabled: true, web_search_provider: env.TAVILY_API_KEY ? 'Tavily basic + AnySearch anonymous + Bing public-page fallback' : 'AnySearch anonymous + Bing public-page fallback',
       tavily_configured: !!env.TAVILY_API_KEY, tavily_monthly_limit: 950, web_search_paid_fallback: false,
       last_tavily_fallback: env.DB ? await qqGet(env, 'qq:last-tavily-fallback') : null,
       last_web_search: env.DB ? await qqGet(env, 'qq:last-web-search') : null,
