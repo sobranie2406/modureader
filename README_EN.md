@@ -39,8 +39,6 @@ Please submit bugs and feature requests through [GitHub Issues](https://github.c
 
 A green **Indexed** badge appears at the top left of indexed covers. Color-coded badges at the bottom left show the original file format, such as EPUB, PDF, TXT, MD or FB2; books identified or manually set as scans also show **Scanned**. TXT and Markdown imports retain their original-format labels after conversion to EPUB.
 
-<sub>Illustrative artwork based on the actual interface layout. Book titles, covers and reading progress are fictional; no personal library is shown.</sub>
-
 ![Reading and chapter navigation on macOS and iOS](docs/images/showcase/cross-platform/reading-en.png)
 
 > **Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. See [Releases](https://github.com/sobranie2406/modureader/releases) for version updates and usage notes.

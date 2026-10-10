@@ -39,8 +39,6 @@
 
 封面左上角显示绿色「已索引」状态，左下角用不同颜色标注 EPUB、PDF、TXT、MD、FB2 等原始文件格式；识别为扫描版或手动设为扫描图片书籍时，还会显示「扫描版」标签。TXT、Markdown 等转换为 EPUB 后，仍保留原始导入格式标签。
 
-<sub>基于实际界面布局制作的展示示意图；书名、封面和阅读进度均为虚构，不包含真实书库。</sub>
-
 ![Mac 与 iPhone 上的阅读与章节导航](docs/images/showcase/cross-platform/reading-zh.png)
 
 > **本地阅读不需要 AI 账号。** AI、在线翻译和在线语音按需配置，费用与可用性取决于所选服务。各版本更新与使用说明见 [Releases](https://github.com/sobranie2406/modureader/releases)。
