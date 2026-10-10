@@ -84,6 +84,7 @@ function fixture() {
     if (String(url).startsWith('https://www.bing.com/search?')) return f.bingResponse || new Response('<html>No static results</html>');
     if (String(url).includes('/.well-known/jwks')) return Response.json({keys:[releaseJwk]});
     if (String(url).includes('getAppAccessToken')) return Response.json({access_token: 'test-access', expires_in: 3600});
+    if (String(url).endsWith('/bot_state') && f.botState) return Response.json(f.botState);
     if (String(url).includes('/messages')) {sent.push(JSON.parse(options.body)); return Response.json({id:'reply-'+sent.length});}
     if (String(url).includes('raw.githubusercontent.com')) return new Response('Public Modu Reader documentation.');
     if (String(url).includes('api.github.com')) return Response.json(f.release);
@@ -274,8 +275,8 @@ test('only the source-reviewed digest is posted, never the unchecked draft', asy
     admin.d.author.member_role='admin';
     await qqRoutes(await signed(admin),f.env);
     assert.equal(calls,0);
-    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:31:00+08:00')},f.env);
-    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:32:00+08:00')},f.env);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T13:31:00+08:00')},f.env);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T13:32:00+08:00')},f.env);
     assert.equal(calls,2);
     assert.equal(f.sent.length,1);
     assert.match(f.sent[0].content,/等待复现/);
@@ -295,7 +296,7 @@ test('24-hour summary test includes retained earlier feedback and excludes expir
     admin.d.author.member_role='admin';
     await qqRoutes(await signed(admin),f.env);
     assert.equal(f.prompts.length,0);
-    await qqSchedule({scheduledTime:Date.parse('2026-10-09T12:31:00+08:00')},f.env);
+    await qqSchedule({scheduledTime:Date.parse('2026-10-09T13:31:00+08:00')},f.env);
     const input=f.prompts[0].messages[1].content;
     assert.match(input,/无法添加批注/);
     assert.doesNotMatch(input,/Outside 24-hour/);
@@ -303,7 +304,7 @@ test('24-hour summary test includes retained earlier feedback and excludes expir
   });
 });
 
-test('no scheduled push happens until proactive permission is actually tested', async () => {
+test('unavailable official permission requires a previously tested proactive permission', async () => {
   await withFixture(async f => {
     const seconds = Math.floor(Date.now()/1000);
     store(f.DB, 'qq:started', {at:seconds}, seconds);
@@ -311,6 +312,57 @@ test('no scheduled push happens until proactive permission is actually tested', 
     await qqSchedule({scheduledTime:Date.parse('2026-10-07T12:00:00+08:00')}, f.env);
     assert.equal(f.sent.length, 0);
   });
+});
+
+test('daily digest refreshes stale permission, respects current denial, and deduplicates', async () => {
+  const originalNow = Date.now;
+  const at = Date.parse('2026-10-10T12:00:00+08:00');
+  Date.now = () => at;
+  try {
+    for (const proactive of [true, false]) await withFixture(async f => {
+      store(f.DB, 'qq:started', {at:at/1000-86400}, at/1000);
+      store(f.DB, 'qq:push-permission', {allowed:!proactive,tested:!proactive}, at/1000);
+      f.botState = {member_role:'admin',recv_msg_setting:'all',allow_proactive_msg:proactive};
+      await qqSchedule({scheduledTime:at-60000}, f.env);
+      assert.equal(f.network.length, 0);
+      await qqSchedule({scheduledTime:at}, f.env);
+      await qqSchedule({scheduledTime:at}, f.env);
+      assert.equal(f.sent.length, proactive ? 1 : 0);
+      const permission = JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:permissions'").get().value);
+      assert.equal(permission.bot_state.proactive, proactive);
+      if (proactive) {
+        const push = JSON.parse(f.DB.raw.prepare("SELECT value FROM bot_state WHERE key='qq:push-permission'").get().value);
+        assert.equal(push.allowed, true);
+        assert.equal(push.tested, true);
+        assert.match(f.sent[0].content, /2026-10-09 12:00 — 2026-10-10 12:00/);
+      }
+    });
+  } finally {Date.now = originalNow;}
+});
+
+test('QQ catches up after permission recovery only before 13:00, once, with the noon window', async () => {
+  const originalNow = Date.now;
+  const noon = Date.parse('2026-10-10T12:00:00+08:00');
+  Date.now = () => noon + 20*60000;
+  try {
+    await withFixture(async f => {
+      store(f.DB, 'qq:started', {at:noon/1000-86400}, noon/1000);
+      f.botState = {allow_proactive_msg:false};
+      await qqSchedule({scheduledTime:noon}, f.env);
+      assert.equal(f.sent.length, 0);
+      f.botState.allow_proactive_msg = true;
+      await qqSchedule({scheduledTime:noon+60*60000}, f.env);
+      assert.equal(f.sent.length, 0);
+      await qqSchedule({scheduledTime:noon+20*60000}, f.env);
+      const calls = f.network.length;
+      await qqSchedule({scheduledTime:noon+21*60000}, f.env);
+      assert.equal(f.network.length, calls);
+      assert.equal(f.sent.length, 1);
+      assert.match(f.sent[0].content, /补发今日反馈汇总/);
+      assert.match(f.sent[0].content, /较早消息可能已过期/);
+      assert.match(f.sent[0].content, /2026-10-09 12:00 — 2026-10-10 12:00/);
+    });
+  } finally {Date.now = originalNow;}
 });
 
 test('large summaries sample both the beginning and end of the whole interval', async () => {

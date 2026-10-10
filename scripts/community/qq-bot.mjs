@@ -943,17 +943,24 @@ export async function qqSchedule(controller, env) {
       // Sending can fail ambiguously: record the failure without duplicating a public reply.
     }
   }
-  const push = await qqGet(env, 'qq:push-permission');
-  const init = await qqGet(env, 'qq:started');
-  if (!push?.allowed || !push?.tested || !init) return;
   const at = controller.scheduledTime || Date.now();
-  // Keep minute-level moderation cleanup, but send feedback only at Beijing noon.
-  if (env.QQ_SUMMARIES_ENABLED !== 'true' || Math.floor(at/60000) % 1440 !== 240) return;
+  // A bounded catch-up window handles a missed noon tick without sending yesterday's digest.
+  const minute = Math.floor(at/60000) % 1440;
+  if (env.QQ_SUMMARIES_ENABLED !== 'true' || minute < 240 || minute >= 300) return;
+  if (!await qqGet(env, 'qq:started')) return;
   const window = qqWindow(at);
+  if (await qqGet(env, `qq:summary:${window.end}`)) return;
+  const push = await qqGet(env, 'qq:push-permission');
+  // Event delivery can leave the cached switch stale; consult QQ before the daily send.
+  const {bot_state: state} = await qqPermissions(env, group);
+  const allowed = state.available && typeof state.proactive === 'boolean'
+    ? state.proactive : push?.allowed && push?.tested;
+  if (!allowed) return;
   if (!await qqClaim(env, `qq:summary:${window.end}`, 86400*7)) return;
   try {
     const text = await qqSummary(env, group, window);
-    await qqSend(env, group, text);
+    await qqSend(env, group, (minute > 240 ? '补发今日反馈汇总（仅使用当前仍保留的24小时内消息，较早消息可能已过期）\n' : '') + text);
+    await qqPut(env, 'qq:push-permission', {allowed:true,tested:true,at:qqNow()}, 86400*365);
     await qqPut(env, 'qq:last-summary', {at: qqNow(), start: window.start, end: window.end, ok: true}, 86400*7);
   } catch (error) {
     await qqPut(env, 'qq:last-summary', {at: qqNow(), start: window.start, end: window.end,
