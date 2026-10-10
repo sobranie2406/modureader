@@ -1,10 +1,12 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/book_list.dart';
 import 'package:anx_reader/providers/bookshelf_pins.dart';
 import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/widgets/bookshelf/book_item.dart';
+import 'package:anx_reader/widgets/bookshelf/book_selection_actions.dart';
 import 'package:anx_reader/widgets/bookshelf/folder_pin_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +28,8 @@ class BookOpenedFolder extends ConsumerStatefulWidget {
 class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
   bool isEditing = false;
   bool isEditingName = false;
+  bool selectionMode = false;
+  final selectedIds = <int>{};
   List<Book> books = [];
   late TextEditingController _nameController;
   String currentGroupName = "";
@@ -79,47 +83,51 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
       books = applyBookshelfPins([BookList().sortBooks(original)], pins).single;
     }
     return AlertDialog(
-      title: isEditingName
-          ? Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
+      title: selectionMode
+          ? Text(ModuStrings.format(
+              context, '已选 {count} 本', '{count} books selected',
+              values: {'count': selectedIds.length}))
+          : isEditingName
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                        ),
+                        autofocus: true,
+                      ),
                     ),
-                    autofocus: true,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.check),
-                  onPressed: _updateGroupName,
-                ),
-                IconButton(
-                  icon: Icon(Icons.close),
+                    IconButton(
+                      icon: Icon(Icons.check),
+                      onPressed: _updateGroupName,
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _nameController.text = currentGroupName;
+                          isEditingName = false;
+                        });
+                      },
+                    ),
+                  ],
+                )
+              : TextButton(
                   onPressed: () {
                     setState(() {
-                      _nameController.text = currentGroupName;
-                      isEditingName = false;
+                      isEditingName = true;
                     });
                   },
+                  child: Text(
+                    currentGroupName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ],
-            )
-          : TextButton(
-              onPressed: () {
-                setState(() {
-                  isEditingName = true;
-                });
-              },
-              child: Text(
-                currentGroupName,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
       content: SizedBox(
         width: MediaQuery.of(context).size.width * 0.7,
         child: GridView.builder(
@@ -133,7 +141,23 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
             itemCount: books.length,
             itemBuilder: (context, index) => Stack(
                   children: [
-                    BookItem(book: books[index]),
+                    BookItem(
+                      book: books[index],
+                      selectionMode: selectionMode,
+                      selected: selectedIds.contains(books[index].id),
+                      onSelectionChanged: (book, selected) {
+                        setState(() {
+                          selectionMode = true;
+                          isEditing = false;
+                          isEditingName = false;
+                          if (selected) {
+                            selectedIds.add(book.id);
+                          } else {
+                            selectedIds.remove(book.id);
+                          }
+                        });
+                      },
+                    ),
                     isEditing
                         ? Positioned(
                             right: 0,
@@ -161,21 +185,48 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
                 )),
       ),
       actions: [
-        if (books.isNotEmpty) FolderPinMenu(groupId: books.first.groupId),
-        TextButton(
-            onPressed: () {
-              ref.read(bookListProvider.notifier).dissolveGroup(books);
-              Navigator.pop(context);
-            },
-            child: Text(L10n.of(context).commonDissolve)),
-        TextButton(
-            onPressed: () {
-              isEditing = !isEditing;
-              setState(() {});
-            },
-            child: Text(isEditing
-                ? L10n.of(context).commonCancel
-                : L10n.of(context).commonEdit)),
+        if (selectionMode) ...[
+          BookSelectionActions(
+            books:
+                books.where((book) => selectedIds.contains(book.id)).toList(),
+            onCompleted: () => Navigator.pop(context),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              if (selectedIds.length == books.length) {
+                selectedIds.clear();
+              } else {
+                selectedIds.addAll(books.map((book) => book.id));
+              }
+            }),
+            child: Text(selectedIds.length == books.length
+                ? ModuStrings.text(context, '取消全选', 'Deselect all')
+                : ModuStrings.text(context, '全选', 'Select all')),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              selectionMode = false;
+              selectedIds.clear();
+            }),
+            child: Text(L10n.of(context).commonCancel),
+          ),
+        ] else ...[
+          if (books.isNotEmpty) FolderPinMenu(groupId: books.first.groupId),
+          TextButton(
+              onPressed: () {
+                ref.read(bookListProvider.notifier).dissolveGroup(books);
+                Navigator.pop(context);
+              },
+              child: Text(L10n.of(context).commonDissolve)),
+          TextButton(
+              onPressed: () {
+                isEditing = !isEditing;
+                setState(() {});
+              },
+              child: Text(isEditing
+                  ? L10n.of(context).commonCancel
+                  : L10n.of(context).commonEdit)),
+        ],
       ],
     );
   }

@@ -95,6 +95,20 @@ ThemeData colorSchema(
           progressIndicatorTheme:
               const ProgressIndicatorThemeData(year2023: false),
           scaffoldBackgroundColor: gropedBackgroundColor,
+          snackBarTheme: SnackBarThemeData(
+            behavior: SnackBarBehavior.floating,
+            shape: StadiumBorder(
+                side: isEinkMode
+                    ? const BorderSide(color: Colors.black)
+                    : BorderSide.none),
+            backgroundColor:
+                isEinkMode ? Colors.white : colorScheme.surfaceContainer,
+            contentTextStyle: themeData.textTheme.bodyMedium
+                ?.copyWith(color: colorScheme.onSurface),
+            actionTextColor: colorScheme.primary,
+            closeIconColor: colorScheme.onSurface,
+            insetPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          ),
           bottomSheetTheme: BottomSheetThemeData()
               .copyWith(backgroundColor: gropedBackgroundColor),
           drawerTheme: DrawerThemeData()

@@ -18,6 +18,19 @@ export function desktopPageKey(event, ctrlBrackets = false) {
   return 0;
 }
 
+export function readerShortcutAction(event, bindings) {
+  if (event.defaultPrevented || event.isComposing || interactive(event)) return null;
+  let key = event.key === ' ' ? 'space' : event.key?.toLowerCase();
+  if (key?.length === 1 && !/^[a-z0-9\[\]]$/.test(key)) {
+    if (/^(Key[A-Z]|Digit[0-9])$/.test(event.code ?? '')) key = event.code.slice(-1).toLowerCase();
+    else if (event.code === 'BracketLeft') key = '[';
+    else if (event.code === 'BracketRight') key = ']';
+  }
+  const modifiers = (event.ctrlKey ? 1 : 0) | (event.shiftKey ? 2 : 0) |
+    (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0);
+  return bindings?.[`${modifiers}:${key}`] ?? null;
+}
+
 export function desktopDragDirection(dx, dy) {
   if (![dx, dy].every(Number.isFinite)) return 0;
   const distance = Math.max(Math.abs(dx), Math.abs(dy));
@@ -27,7 +40,8 @@ export function desktopDragDirection(dx, dy) {
 
 export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   dragEnabled = enabled, nativeKeysEnabled = enabled,
-  focusOnPointerDown = () => false, ctrlBrackets = () => false }) {
+  focusOnPointerDown = () => false, ctrlBrackets = () => false,
+  shortcuts = () => null, onAction = () => {} }) {
   let pointer = null;
   let turning = false;
   let suppressClickUntil = 0;
@@ -51,6 +65,18 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   };
   on(doc, 'keydown', e => {
     if (!enabled() || selected()) return;
+    const bindings = shortcuts();
+    if (bindings != null) {
+      const action = readerShortcutAction(e, bindings);
+      if (!action) return;
+      consume(e);
+      if (action === 'previous' || action === 'next') {
+        turn(action === 'next' ? 1 : -1);
+      } else if (!e.repeat) {
+        onAction(action);
+      }
+      return;
+    }
     const direction = desktopPageKey(e, ctrlBrackets());
     if (!direction) return;
     consume(e); // Suppress native scrolling even during an in-flight page turn.
@@ -92,6 +118,11 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   on(doc, 'mouseleave', cancel);
   on(doc.defaultView, 'blur', cancel);
   return { cancel,
+    actionFromKeyboard(action) {
+      if (!nativeKeysEnabled() || selected() || interactive({ target: doc.activeElement })) return false;
+      onAction(action);
+      return true;
+    },
     // Windows texture focus can deliver the key to Flutter instead of the DOM.
     // Reuse the DOM selection/editor guards without moving native focus.
     turnFromKeyboard(direction) {

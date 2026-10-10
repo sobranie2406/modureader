@@ -45,7 +45,8 @@ class DictionaryWebSearch {
   final Duration timeout;
 
   Future<DictionarySearchResult> search(String term,
-      {Future<void>? cancelled}) async {
+      {Future<void>? cancelled,
+      Set<String> sites = const {'wiktionary', 'wikipedia', 'baidu'}}) async {
     term = term.trim();
     if (term.isEmpty || term.length > 500) {
       return const DictionarySearchResult([], hasFailures: true);
@@ -63,12 +64,14 @@ class DictionaryWebSearch {
       final language = RegExp(r'[\u3400-\u9fff]').hasMatch(term) ? 'zh' : 'en';
       final pending = Future.wait([
         for (final site in ['wiktionary', 'wikipedia'])
-          _searchSite(client, '$language.$site.org', term).timeout(timeout,
+          if (sites.contains(site))
+            _searchSite(client, '$language.$site.org', term).timeout(timeout,
+                onTimeout: () =>
+                    const DictionarySearchResult([], hasFailures: true)),
+        if (sites.contains('baidu'))
+          _searchBaiduBaike(client, term).timeout(timeout,
               onTimeout: () =>
                   const DictionarySearchResult([], hasFailures: true)),
-        _searchBaiduBaike(client, term).timeout(timeout,
-            onTimeout: () =>
-                const DictionarySearchResult([], hasFailures: true)),
       ]);
       final results = await Future.any([
         pending,

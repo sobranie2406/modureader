@@ -2,7 +2,7 @@
 
 English · [简体中文](FEATURES_zh.md) · [Settings](SETTINGS.md) · [Documentation](README.md)
 
-Reviewed **2026-10-08**, updated for changed features **2026-10-09**, app **1.2.4+10093**, source baseline [v1.2.4](https://github.com/sobranie2406/modureader/tree/v1.2.4). This guide follows visible entry points, connected services, preference defaults and validation. Source support is not certification on every device or provider. Recheck implementation when it changes rather than only changing this version label.
+Reviewed **2026-10-08**, updated for changed features **2026-10-10**, app **1.2.5+10102**, source baseline [v1.2.5](https://github.com/sobranie2406/modureader/tree/v1.2.5). This guide follows visible entry points, connected services, preference defaults and validation. Source support is not certification on every device or provider. Recheck implementation when it changes rather than only changing this version label.
 
 ## 1. Getting started
 
@@ -47,7 +47,7 @@ Style controls font, size, thickness, simulated bold, line/paragraph spacing and
 | Reading brightness | Follow system; manual 20%–100% | Android window brightness; app dimming elsewhere, saved locally |
 | E-Ink mode | Off | Removes app motion and uses solid display styles |
 
-Desktop navigation keys respect reader focus, text fields and overlays. All platforms share cover-opening and return transitions, skipped when motion is disabled or E-Ink is enabled; iOS retains edge-swipe return and refreshes selection menus after handle drags. App theme and page background are separate.
+Desktop and Android hardware keyboards have configurable paging, menu, play/pause (one key, P by default) and previous/next paragraph shortcuts, multiple bindings, conflict checks and Restore defaults. Shortcut settings are included in reading settings backup. Desktop navigation keys respect reader focus, text fields and overlays. All platforms share cover-opening and return transitions, skipped when motion is disabled or E-Ink is enabled; iOS retains edge-swipe return and refreshes selection menus after handle drags. App theme and page background are separate.
 
 MOBI note popups are recovered for matching legacy note-list/superscript-icon structures. AZW3 retains note semantics and can use explicit embedded note text where conversion links point to the wrong note. Matched inline notes are hidden in the body; ambiguous MOBI content stays visible. Original book bytes and annotation text-node positions are preserved.
 
@@ -91,9 +91,13 @@ Source: [CSS profiles](../lib/models/custom_css_profile.dart), [selection settin
 
 ## 6. Dictionaries, search and translation
 
+The default-enabled **Lookup** tool automatically combines selected dictionary, encyclopedia, translation and AI Knowledge results. Independent switches, source settings and adaptive cards control the overview. Book AI (prefilled selected text), Classical Chinese translation and Web search have separate tabs, not overview cards. AI retains edit-before-send, context scope and follow-ups; Classical Chinese translation omits reading-skill controls. Existing standalone buttons remain available, disabled by default.
+
+Dictionary sources support single/multiple local dictionaries and optional Chinese/English Wiktionary. Unmatched selected local dictionaries show an explicit no-entry result. Online entries include source/permalink and license attribution. Enabled online services receive queries or chosen context.
+
 Import, rename, enable/disable and remove dictionaries in **Custom dictionaries**. Supported inputs are MDX 1/2, StarDict companion files and a ZIP containing one dictionary. Lookup queries actual entries in enabled dictionaries and permits editing the term. Reverse lookup depends on supplied headwords; Chinese definitions are not indexed as reverse-search terms.
 
-Definitions are text only: no scripts, MDD, images or audio. MDX 3, LZO and encrypted records are unsupported; commercial variants are not universally compatible. Lookup does not silently switch to online translation. Dictionary files are excluded from sync/current backups. See [formats and limits](LOCAL_DICTIONARIES.md).
+New MDX imports retain HTML and optional MDD/local resources for inline original images, audio and script-generated entries. Originals are isolated from the app bridge and external network; audio requires user interaction. Older text-only imports need reimporting for originals; StarDict remains text-only. MDX 3, LZO and encrypted records are unsupported; commercial variants are not universally compatible. Lookup does not silently switch to online translation. Dictionary files are excluded from sync/current backups. See [formats and limits](LOCAL_DICTIONARIES.md).
 
 **Selection search** accepts preset engines or custom URLs containing `{query}`. Its browser zoom defaults to 100%, adjustable 50%–200%. Queries go to the selected website.
 

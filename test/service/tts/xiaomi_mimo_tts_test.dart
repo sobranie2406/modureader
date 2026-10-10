@@ -5,6 +5,7 @@ import 'package:anx_reader/service/tts/audio_mime_type.dart';
 import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
 import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -235,10 +236,16 @@ void main() {
   for (final status in [400, 401, 403, 404, 429, 500]) {
     test('HTTP $status gives actionable error without echoed secrets or text',
         () async {
-      response = http.Response('$fixtureKey PRIVATE_BOOK_TEXT', status);
+      response = http.Response('$fixtureKey PRIVATE_BOOK_TEXT', status,
+          headers: {'retry-after': '5'});
       await expectLater(
           provider.speak('正文', null, 1, 1),
-          throwsA(isA<StateError>()
+          throwsA(isA<TtsSynthesisError>()
+              .having((e) => e.statusCode, 'HTTP status', status)
+              .having((e) => e.retryable, 'transient only',
+                  status == 429 || status >= 500)
+              .having(
+                  (e) => e.retryAfter, 'cooldown', const Duration(seconds: 5))
               .having((e) => e.toString(), 'status', contains('$status'))
               .having(
                   (e) => e.toString(), 'no secret', isNot(contains(fixtureKey)))
@@ -260,6 +267,28 @@ void main() {
       response = r;
       await expectLater(provider.speak('正文', null, 1, 1), throwsStateError);
     }
+  });
+
+  test('truncated and blocked speech is not retried unchanged', () async {
+    for (final finish in ['length', 'content_filter']) {
+      response = audioResponse(finish: finish);
+      await expectLater(
+          provider.speak('正文', null, 1, 1),
+          throwsA(isA<TtsSynthesisError>()
+              .having((e) => e.retryable, 'retryable', false)
+              .having(
+                  (e) => e.reason,
+                  'reason',
+                  finish == 'length'
+                      ? TtsFailureReason.truncated
+                      : TtsFailureReason.blocked)));
+    }
+    response = audioResponse(data: '');
+    await expectLater(
+        provider.speak('正文', null, 1, 1),
+        throwsA(isA<TtsSynthesisError>()
+            .having((e) => e.reason, 'reason', TtsFailureReason.invalidAudio)
+            .having((e) => e.retryable, 'retryable', true)));
   });
 
   test('WAV playback uses WAV MIME and MP3 stays MPEG', () {

@@ -37,6 +37,23 @@ public final class ReaderPageKeysTest {
             equal(1, keys.handle(20, 0, 0, 8, true, false, false));
             equal(2, keys.handle(20, 0, 1, 8, true, false, false));
         }
-        System.out.println("ReaderPageKeys: direction, volume opt-in, repeat, key-up, lifecycle and reconnect tests passed");
+        keys.reset();
+        keys.configure(java.util.List.of(
+            java.util.Map.of("keyCode", 44, "modifiers", 0, "action", 4),
+            java.util.Map.of("keyCode", 22, "modifiers", 0, "action", -1),
+            java.util.Map.of("keyCode", 41, "modifiers", 1, "action", 3)));
+        equal(4, keys.handle(44, 0, 0, 7, true, false, 0));
+        equal(2, keys.handle(44, 0, 1, 7, true, false, 0));
+        equal(2, keys.handle(44, 1, 0, 7, false, false, 0));
+        equal(0, keys.handle(44, 0, 0, 7, false, false, 0));
+        equal(0, keys.handle(19, 0, 0, 7, true, false, 0));
+        equal(-1, keys.handle(22, 0, 0, 7, true, false, 0));
+        equal(0, keys.handle(41, 0, 0, 7, true, false, 0));
+        equal(3, keys.handle(41, 0, 0, 7, true, false, 1));
+        equal(2, keys.handle(41, 1, 0, 7, true, false, 0));
+        equal(-1, keys.handle(24, 0, 0, 7, true, true, 0));
+        keys.reset(); keys.configure(java.util.List.of());
+        equal(0, keys.handle(22, 0, 0, 7, true, false, 0));
+        System.out.println("ReaderPageKeys: legacy/custom mappings, modifiers, repeat, key-up, lifecycle and reconnect tests passed");
     }
 }

@@ -15,9 +15,11 @@ class TranslationMenu extends StatefulWidget {
     required this.content,
     this.contextText,
     this.resultBuilder,
+    this.embedded = false,
   });
   final String content;
   final String? contextText;
+  final bool embedded;
   final Widget Function(String content, String? contextText)? resultBuilder;
 
   @override
@@ -205,22 +207,25 @@ class _TranslationMenuState extends State<TranslationMenu> {
     return SafeArea(
       top: false,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(children: [
-              const Icon(Icons.translate_outlined),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: Text(l10n.contextMenuTranslate,
-                      style: Theme.of(context).textTheme.titleMedium)),
-              IconButton(
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop()),
-            ]),
-          ),
+          if (!widget.embedded)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: [
+                const Icon(Icons.translate_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(l10n.contextMenuTranslate,
+                        style: Theme.of(context).textTheme.titleMedium)),
+                IconButton(
+                    tooltip:
+                        MaterialLocalizations.of(context).closeButtonTooltip,
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop()),
+              ]),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Wrap(
@@ -255,13 +260,17 @@ class _TranslationMenuState extends State<TranslationMenu> {
             ),
           ),
           const Divider(height: 1),
-          Expanded(
+          Flexible(
+            fit: widget.embedded ? FlexFit.loose : FlexFit.tight,
             child: Scrollbar(
               controller: _scrollController,
-              thumbVisibility: true,
+              thumbVisibility: !widget.embedded,
               child: SingleChildScrollView(
                 key: const ValueKey('selection-translation-scroll'),
                 controller: _scrollController,
+                physics: widget.embedded
+                    ? const NeverScrollableScrollPhysics()
+                    : null,
                 padding: const EdgeInsets.all(16),
                 child: TranslationResult(
                   child: Column(

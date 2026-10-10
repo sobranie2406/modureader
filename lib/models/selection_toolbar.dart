@@ -130,14 +130,15 @@ class SelectionToolbarConfig {
       this.colors = notesColors});
 
   static const defaultItems = [
-    SelectionToolbarItem('copy', 'copy'),
-    SelectionToolbarItem('search', 'search'),
-    SelectionToolbarItem('translate', 'translate'),
-    SelectionToolbarItem('dictionary', 'dictionary'),
+    SelectionToolbarItem('query', 'query'),
     SelectionToolbarItem('narrate', 'narrate'),
     SelectionToolbarItem('note', 'note'),
-    SelectionToolbarItem('ai', 'ai'),
+    SelectionToolbarItem('copy', 'copy'),
     SelectionToolbarItem('share', 'share'),
+    SelectionToolbarItem('search', 'search', enabled: false),
+    SelectionToolbarItem('translate', 'translate', enabled: false),
+    SelectionToolbarItem('dictionary', 'dictionary', enabled: false),
+    SelectionToolbarItem('ai', 'ai', enabled: false),
   ];
   static const defaultAnnotations = [
     SelectionToolbarItem('delete', 'delete'),
@@ -187,6 +188,7 @@ class SelectionToolbarConfig {
   ];
   static const initialItems = [...defaultItems, ...templateItems];
   static const iconIds = {
+    'query',
     'copy',
     'search',
     'translate',
@@ -311,6 +313,7 @@ class SelectionToolbarConfig {
     return jsonEncode({
       'version': 1,
       'templateRevision': 1,
+      'queryRevision': 1,
       'enabled': enabled,
       'visibleCount': visibleCount,
       'items': items.map((i) => i.toJson()).toList(),
@@ -335,6 +338,24 @@ class SelectionToolbarConfig {
     }
     final items =
         (raw['items'] as List).map(SelectionToolbarItem.fromJson).toList();
+    if (raw['queryRevision'] != 1 && !items.any((i) => i.id == 'query')) {
+      // One-time migration: retain old actions and their edited prompts, but
+      // start the unified lookup as the visible entry requested for this UI.
+      for (var n = 0; n < items.length; n++) {
+        if (const {
+          'dictionary',
+          'translate',
+          'search',
+          'ai',
+          'custom-preset-dictionary',
+          'custom-preset-translate',
+          'custom-preset-classical-chinese'
+        }.contains(items[n].id)) {
+          items[n] = items[n].copyWith(enabled: false);
+        }
+      }
+      items.insert(0, defaultItems.first);
+    }
     // Add newly shipped presets to older configurations without restoring
     // deleted older presets or changing user edits/order. A saved revision
     // ensures an intentionally deleted new preset stays deleted afterward.

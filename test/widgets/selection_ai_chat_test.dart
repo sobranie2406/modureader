@@ -121,6 +121,7 @@ void main() {
   Future<void> mount(WidgetTester tester,
       {bool immediate = false,
       bool popup = false,
+      bool inlineResults = false,
       bool selection = false,
       String? sourceContext,
       bool webSearch = false,
@@ -144,6 +145,9 @@ void main() {
     Widget conversation() => AiChatStream(
         key: key,
         scope: AiChatScope.reader,
+        embedded: inlineResults,
+        inlineResults: inlineResults,
+        initialDraftOnly: inlineResults ? false : null,
         initialMessage:
             immediate ? template.promptForSelection('原文 {selection}') : '原文',
         initialSourceText: '原文 {selection}',
@@ -171,7 +175,10 @@ void main() {
                             onPressed: () => showReaderPopup(context,
                                 builder: (_) => conversation()),
                             child: const Text('打开划词结果'))))
-                : conversation())));
+                : inlineResults
+                    ? Scaffold(
+                        body: SingleChildScrollView(child: conversation()))
+                    : conversation())));
     if (immediate && !popup) {
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump();
@@ -184,6 +191,32 @@ void main() {
       await tester.pump();
     }
   }
+
+  testWidgets(
+      'inline automatic AI results grow with streamed content and accept follow-up',
+      (tester) async {
+    await mount(tester, immediate: true, inlineResults: true, selection: true);
+    expect(chat.requests, hasLength(1));
+    chat.emit('简短释义。');
+    await tester.pump();
+    final shortHeight = tester.getSize(find.byType(AiChatStream)).height;
+    chat.emit(List.filled(25, '这是需要完整展示的较长释义，不应该被固定高度截断。').join('\n\n'));
+    await tester.pump();
+    expect(tester.getSize(find.byType(AiChatStream)).height,
+        greaterThan(shortHeight + 500));
+    await chat.streams.last.close();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('ai-message-input')));
+    await tester.enterText(
+        find.byKey(const ValueKey('ai-message-input')), '请举例');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+    expect(chat.requests, hasLength(2));
+    expect(chat.requests.last.message, '请举例');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    unawaited(chat.streams.last.close());
+  });
 
   testWidgets(
       'template uses the shared reader popup and exact source on first frame',

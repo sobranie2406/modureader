@@ -21,6 +21,52 @@ function all(tts) {
     return out
 }
 
+for (const paragraphMode of [false, true]) {
+    test(`explicit paragraph arrows skip sentence/chunk splits and land at paragraph starts (grouped=${paragraphMode})`, () => {
+        const doc = docFor('<p>首段一。首段二。</p><p>中段一。中段二。中段三。中段四。中段五。中段六。</p><p>末段一。末段二。</p>')
+        const tts = new TTS(doc, null, () => null, r => r.toString(), { paragraphMode })
+        const selected = doc.createRange()
+        selected.setStart(doc.querySelectorAll('p')[1].firstChild, 4)
+        selected.collapse(true)
+        tts.from(selected, { exactStart: true })
+        const first = paragraphMode ? '首段一。首段二。' : '首段一。'
+        const middle = paragraphMode ? '中段一。中段二。中段三。中段四。' : '中段一。'
+        const last = paragraphMode ? '末段一。末段二。' : '末段一。'
+        assert.equal(tts.moveParagraph(-1), first)
+        assert.equal(tts.moveParagraph(-1), undefined)
+        assert.equal(tts.resume(), first)
+        assert.equal(tts.moveParagraph(1), middle)
+        assert.equal(tts.moveParagraph(1), last)
+        assert.equal(tts.moveParagraph(1), undefined)
+        assert.equal(tts.resume(), last)
+        assert.equal(tts.moveParagraph(-1), middle)
+        assert.equal(tts.end({ paragraph: true }), last)
+    })
+}
+
+test('paragraph arrows cross chapters at paragraph starts, skip empty chapters, and keep normal sentence navigation', async () => {
+    const docs = [docFor('<p>甲一。甲二。</p><p>乙一。乙二。</p>'), docFor('<p>……</p>'), docFor('<p>丙一。丙二。</p>')]
+    const create = doc => new TTS(doc, null, () => null, r => r.toString())
+    const view = {
+        book: { sections: docs.map(() => ({ createDocument() {} })) },
+        tts: create(docs[0]),
+        async loadTTSSection(index, isCurrent) {
+            if (!isCurrent()) return false
+            this.tts = create(docs[index]); this.tts.sectionIndex = index
+            return true
+        },
+        initTTS() {}, renderer: { pinTtsSection() {} },
+    }
+    view.tts.sectionIndex = 0
+    const nav = new TtsNavigator(() => view)
+    assert.equal(await nav.start(), '甲一。')
+    assert.equal(await nav.move(1), '甲二。')
+    assert.equal(await nav.move(1, { paragraph: true }), '乙一。')
+    assert.equal(await nav.move(1, { paragraph: true }), '丙一。')
+    assert.equal(await nav.move(-1, { paragraph: true }), '乙一。')
+    assert.equal(await nav.move(1), '乙二。')
+})
+
 test('configurable group sizes preserve text, Unicode and true paragraph endings', () => {
     for (const maxCharacters of [100, 240, 600, 2000]) {
         const text = '甲'.repeat(239) + '😀'.repeat(400) + '乙'.repeat(1700) + '。'

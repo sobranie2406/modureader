@@ -57,6 +57,7 @@ class ContinueReadingTile extends StatisticsDashboardTileBase {
         final heroTag = 'continue_reading_${book.id}';
         return ReadingHistoryBookLink(
           book: book,
+          heroTag: heroTag,
           enabled: ready,
           child: _ContinueReadingContent(
             book: book,

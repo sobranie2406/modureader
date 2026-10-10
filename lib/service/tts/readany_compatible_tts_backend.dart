@@ -7,6 +7,7 @@ import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/widgets.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:http/http.dart' as http;
@@ -126,7 +127,8 @@ abstract class ReadAnyCompatibleTtsProvider extends TtsServiceProvider {
     final config = getConfig();
     final apiKey = config['key']?.toString().trim() ?? '';
     if (apiKey.isEmpty) {
-      throw StateError('$providerName API key is missing');
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, '$providerName API key is missing');
     }
     final uri = resolveSpeechEndpoint(
       config['baseUrl']?.toString() ?? '',
@@ -155,11 +157,19 @@ abstract class ReadAnyCompatibleTtsProvider extends TtsServiceProvider {
       }),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        '$providerName request failed (${response.statusCode}): ${response.body}',
-      );
+      throw TtsSynthesisError(TtsFailureReason.http,
+          '$providerName request failed (${response.statusCode})',
+          statusCode: response.statusCode,
+          retryAfter: TtsSynthesisError.parseRetryAfter(
+              response.headers['retry-after']));
     }
-    return decodeTtsAudioResponse(response);
+    try {
+      return decodeTtsAudioResponse(response);
+    } catch (_) {
+      throw TtsSynthesisError(
+          TtsFailureReason.invalidAudio, '$providerName returned invalid audio',
+          statusCode: response.statusCode);
+    }
   }
 
   @override
@@ -336,21 +346,30 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
       String text, String? voice, double rate, double pitch) async {
     final config = getConfig();
     final key = config['key']?.toString().trim() ?? '';
-    if (key.isEmpty) throw StateError('Xiaomi MiMo：请填写 API Key。');
-    if (text.trim().isEmpty) throw StateError('Xiaomi MiMo：朗读文本为空。');
+    if (key.isEmpty) {
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'Xiaomi MiMo：请填写 API Key。');
+    }
+    if (text.trim().isEmpty) {
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'Xiaomi MiMo：朗读文本为空。');
+    }
     final model = config['model'].toString();
     final design = model == 'mimo-v2.5-tts-voicedesign';
     if (!design && model != defaultModel) {
-      throw StateError('Xiaomi MiMo：请选择内置音色或文字设计音色模型。');
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'Xiaomi MiMo：请选择内置音色或文字设计音色模型。');
     }
     final style = config['stylePrompt']?.toString().trim() ?? '';
     if (design && style.isEmpty) {
-      throw StateError('Xiaomi MiMo：文字设计音色需要填写朗读风格/音色描述。');
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'Xiaomi MiMo：文字设计音色需要填写朗读风格/音色描述。');
     }
     final selected = resolveVoice(voice).trim();
     final resolved = selected == 'default' ? defaultVoice : selected;
     if (!design && !bundledVoices.any((v) => v.shortName == resolved)) {
-      throw StateError('Xiaomi MiMo：请选择官方内置音色。');
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'Xiaomi MiMo：请选择官方内置音色。');
     }
     final directions = withStableNarration([
       if (style.isNotEmpty) style,
@@ -383,10 +402,12 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
               }))
           .timeout(synthesisTimeout);
     } on TimeoutException {
-      throw StateError('Xiaomi MiMo：语音生成超时，请重试或缩短文本。');
+      throw TtsSynthesisError(
+          TtsFailureReason.timeout, 'Xiaomi MiMo：语音生成超时，请重试或缩短文本。');
     } on Exception {
       // Do not expose a proxy URL, echoed key, or private text in app logs.
-      throw StateError('Xiaomi MiMo：网络请求失败，请检查地址和网络。');
+      throw TtsSynthesisError(
+          TtsFailureReason.network, 'Xiaomi MiMo：网络请求失败，请检查地址和网络。');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final hint = switch (response.statusCode) {
@@ -395,19 +416,37 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
         400 || 404 || 422 => '请检查接口地址、模型及音色参数',
         _ => '服务暂不可用，请稍后重试',
       };
-      throw StateError('Xiaomi MiMo（${response.statusCode}）：$hint。');
+      throw TtsSynthesisError(
+          TtsFailureReason.http, 'Xiaomi MiMo（${response.statusCode}）：$hint。',
+          statusCode: response.statusCode,
+          retryAfter: TtsSynthesisError.parseRetryAfter(
+              response.headers['retry-after']));
     }
     try {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final choice = (decoded['choices'] as List).first;
+      if (choice['finish_reason'] == 'length') {
+        throw TtsSynthesisError(
+            TtsFailureReason.truncated, 'Xiaomi MiMo：语音生成被截断，请缩短单次合成字数后重试。',
+            statusCode: response.statusCode);
+      }
+      if (choice['finish_reason'] == 'content_filter') {
+        throw TtsSynthesisError(
+            TtsFailureReason.blocked, 'Xiaomi MiMo：服务未生成这段语音，已保留当前位置。',
+            statusCode: response.statusCode);
+      }
       if (choice['finish_reason'] != 'stop') {
         throw const FormatException('Incomplete speech');
       }
       final audio = base64Decode(choice['message']['audio']['data'] as String);
       if (audio.isEmpty) throw const FormatException('Empty speech');
       return audio;
+    } on TtsSynthesisError {
+      rethrow;
     } catch (_) {
-      throw StateError('Xiaomi MiMo：没有返回完整有效的音频，已保留原文位置，请重试。');
+      throw TtsSynthesisError(
+          TtsFailureReason.invalidAudio, 'Xiaomi MiMo：没有返回完整有效的音频，已保留原文位置，请重试。',
+          statusCode: response.statusCode);
     }
   }
 

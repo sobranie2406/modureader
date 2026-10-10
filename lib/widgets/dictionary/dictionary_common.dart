@@ -13,13 +13,19 @@ LocalDictionaryStore defaultDictionaryStore() {
 String dictionaryLabel(BuildContext context, String zh, String en) =>
     ModuStrings.text(context, zh, en);
 
+// Keep every definition/example, but remove blank lines added by block tags.
+String compactDictionaryText(String text) => text
+    .replaceAll(RegExp(r'\r\n?'), '\n')
+    .replaceAll(RegExp(r'\n[ \t]*(?:\n[ \t]*)+'), '\n')
+    .trim();
+
 String dictionaryError(BuildContext context, Object error) {
   final code = error is DictionaryFailure ? error.code : '';
   final (zh, en) = switch (code) {
     'name' => ('字典名称应为 1–80 个字符。', 'Use a name of 1–80 characters.'),
     'files' || 'companions' => (
-        '每次导入一本字典：选择一个 MDX，或同时选择同名字典的 IFO、IDX（可为 IDX.GZ）、DICT（可为 DICT.DZ）及可选 SYN。也可选择包含这些文件的 ZIP。',
-        'Import one MDX, or select the matching IFO, IDX/IDX.GZ, DICT/DICT.DZ and optional SYN together. A ZIP containing one dictionary also works.'
+        '每次导入一本字典：一个 MDX 及可选同名 MDD、图片、音频、CSS、JS；或同名字典的 IFO、IDX、DICT 及可选 SYN。也可使用单本字典 ZIP 保留资源目录。',
+        'Import one MDX with optional matching MDD, images, audio, CSS and JS; or matching IFO, IDX, DICT and optional SYN. A ZIP can preserve resource directories.'
       ),
     'mdxSize' => (
         'MDX 暂支持不超过 256 MiB 的文件，请选择较小的字典。',

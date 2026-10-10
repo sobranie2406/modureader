@@ -58,8 +58,10 @@ String mdx(Directory dir,
     bool compressed = true,
     bool utf16 = false,
     String encrypted = 'No',
+    Map<String, List<int>>? resources,
     Map<String, String>? definitions}) {
-  final entries = definitions ??
+  final entries = resources?.map((key, _) => MapEntry(key, '')) ??
+      definitions ??
       {
         'apple': '<p>苹果</p><script>bad()</script><p>水果</p>',
         'apples': '@@@LINK=apple',
@@ -83,7 +85,7 @@ String mdx(Directory dir,
   final keys = BytesBuilder(), records = BytesBuilder();
   for (final e in entries.entries) {
     keys.add([...n(records.length), ...encode(e.key), ...encode('\u0000')]);
-    records.add([...encode(e.value), ...encode('\u0000')]);
+    records.add(resources?[e.key] ?? [...encode(e.value), ...encode('\u0000')]);
   }
   final keyData = keys.takeBytes(), recordData = records.takeBytes();
   final keyBlock = block(keyData), recordBlock = block(recordData);
@@ -118,7 +120,9 @@ String mdx(Directory dir,
     ...n(recordData.length),
     ...recordBlock
   ];
-  return (File(p.join(dir.path, 'demo.mdx'))..writeAsBytesSync(bytes)).path;
+  return (File(p.join(dir.path, resources == null ? 'demo.mdx' : 'demo.mdd'))
+        ..writeAsBytesSync(bytes))
+      .path;
 }
 
 void main() {
@@ -162,6 +166,23 @@ void main() {
       expect((await store.lookup('革命')).single.definition, '社会的根本变革');
     });
   }
+  test('local MDX keeps long definitions, all senses and textual examples',
+      () async {
+    final explanation = '完整释义。' * 5000;
+    await store.importFiles([
+      mdx(sources, definitions: {
+        'sample': '<p>第一义项</p><p>$explanation</p>'
+            '<div>第二义项<dl><dt>例句</dt><dd>保留的双语例句。</dd></dl></div>'
+            '<p>词条末尾</p>',
+      })
+    ], '完整性测试');
+    final result = (await store.lookup('sample')).single.definition;
+    expect(result, contains(explanation));
+    expect(result, startsWith('第一义项'));
+    expect(result, contains('第二义项'));
+    expect(result, contains('保留的双语例句。'));
+    expect(result, endsWith('词条末尾'));
+  });
   for (final version in [1, 2]) {
     for (final utf16 in [false, true]) {
       test(
@@ -307,6 +328,21 @@ void main() {
     await store.importFiles([mdx(sources)], 'MDX');
     expect((await store.lookup('apple')).map((e) => e.dictionary),
         ['MDX', 'Star']);
+    final dictionaries = await store.list();
+    final id = dictionaries.first.id;
+    final selected = await store.lookup('apple', dictionaryIds: {id});
+    expect(selected, hasLength(1));
+    expect(selected.single.dictionaryId, id);
+    expect(await store.lookup('apple', dictionaryIds: {}), isEmpty);
+    expect(await store.lookup('apple', dictionaryIds: {'missing'}), isEmpty);
+    await store.rename(dictionaries.last.id, dictionaries.first.name);
+    expect(await store.lookup('apple', dictionaryIds: {id}), hasLength(1));
+    expect(
+        await store.lookup('apple',
+            dictionaryIds: dictionaries.map((d) => d.id).toSet()),
+        hasLength(2));
+    await store.enable(id, false);
+    expect(await store.lookup('apple', dictionaryIds: {id}), isEmpty);
   });
   test('typed StarDict fields preserve phonetics, strip markup, skip binary',
       () {

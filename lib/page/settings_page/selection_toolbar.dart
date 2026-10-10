@@ -72,11 +72,19 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
         : config.copyWith(items: updated));
   }
 
-  void _reorder(int from, int to, bool annotations) {
+  void _reorder(
+      int from, int to, bool annotations, List<SelectionToolbarItem> group) {
     if (_busy) return;
     final config = Prefs().selectionToolbar;
-    final list = [...(annotations ? config.annotations : config.items)];
-    list.insert(to, list.removeAt(from));
+    final reordered = [...group];
+    reordered.insert(to, reordered.removeAt(from));
+    final ids = group.map((i) => i.id).toSet();
+    var index = 0;
+    // Reorder only this group's slots, preserving saved cross-group ordering.
+    final list = [
+      for (final item in annotations ? config.annotations : config.items)
+        ids.contains(item.id) ? reordered[index++] : item
+    ];
     _save(annotations
         ? config.copyWith(annotations: list)
         : config.copyWith(items: list));
@@ -146,15 +154,18 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
       await _save(Prefs().selectionToolbar.restoreDefaults());
   }
 
-  Widget _list(List<SelectionToolbarItem> items, bool annotations) =>
+  Widget _list(List<SelectionToolbarItem> items, bool annotations,
+          {bool optional = false}) =>
       SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverReorderableList(
               key: ValueKey(annotations
                   ? 'selection-annotation-order'
-                  : 'selection-action-order'),
+                  : optional
+                      ? 'selection-optional-order'
+                      : 'selection-action-order'),
               itemCount: items.length,
-              onReorderItem: (a, b) => _reorder(a, b, annotations),
+              onReorderItem: (a, b) => _reorder(a, b, annotations, items),
               itemBuilder: (context, index) {
                 final item = items[index];
                 final preset = SelectionToolbarConfig.templateItems
@@ -259,6 +270,10 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
       animation: Prefs(),
       builder: (context, _) {
         final config = Prefs().selectionToolbar;
+        final primaryIds = SelectionToolbarConfig.defaultItems
+            .where((item) => item.enabled)
+            .map((item) => item.id)
+            .toSet();
         return CustomScrollView(
           key: const ValueKey('selection-toolbar-scroll'),
           primary: false,
@@ -328,10 +343,11 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
               const SizedBox(height: 24),
               Text(
                   ModuStrings.text(
-                      context, '工具按钮与 AI 模板', 'Actions and AI templates'),
+                      context, '常用工具（默认开启）', 'Common tools (on by default)'),
                   style: Theme.of(context).textTheme.titleLarge),
             ])),
-            _list(config.items, false),
+            _list(config.items.where((i) => primaryIds.contains(i.id)).toList(),
+                false),
             _section(
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(ModuStrings.text(context, '批注工具', 'Annotation tools'),
@@ -340,6 +356,14 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                   'Configure the annotation row without changing existing notes.')),
             ])),
             _list(config.annotations, true),
+            _section(Text(
+                ModuStrings.text(context, '可选工具与 AI 模板（默认关闭）',
+                    'Optional tools and AI templates (off by default)'),
+                style: Theme.of(context).textTheme.titleLarge)),
+            _list(
+                config.items.where((i) => !primaryIds.contains(i.id)).toList(),
+                false,
+                optional: true),
             _section(Text(ModuStrings.value(Localizations.localeOf(context),
                 'selection_ai_help', 'AI 模板默认关闭，可分别选择内容范围和联网搜索，用户改动随全局设置备份。'))),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),

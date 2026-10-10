@@ -3,11 +3,20 @@ import 'dart:async';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/models/statistic_data_model.dart';
+import 'package:anx_reader/providers/book_daily_reading_provider.dart';
+import 'package:anx_reader/providers/last_read_book_provider.dart';
+import 'package:anx_reader/providers/reading_insights.dart';
+import 'package:anx_reader/providers/statistic_data.dart';
+import 'package:anx_reader/service/statistic/reading_insights.dart';
 import 'package:anx_reader/main.dart' show navigatorKey;
 import 'package:anx_reader/page/home_page/statistics_page.dart';
 import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
 import 'package:anx_reader/widgets/bookshelf/book_item.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
+import 'package:anx_reader/widgets/page_router/reading_route.dart';
+import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +29,8 @@ class _Access extends ReadingHistoryBookAccess {
   int calls = 0;
   Completer<void>? pending;
   bool fail = false;
+  bool showReader = false;
+  String? openedHeroTag;
 
   @override
   Future<Book?> load(int id) async {
@@ -28,11 +39,47 @@ class _Access extends ReadingHistoryBookAccess {
   }
 
   @override
-  Future<void> open(WidgetRef ref, BuildContext context, Book book) async {
+  Future<void> open(WidgetRef ref, BuildContext context, Book book,
+      {required String heroTag}) async {
     calls++;
     opened = book;
+    openedHeroTag = heroTag;
+    if (showReader) {
+      await Navigator.of(context).push(readingRoute<void>(
+        animate: Prefs().openBookAnimation,
+        builder: (_) => ReaderCoverHero(
+          tag: heroTag,
+          cover: const Text('flying history cover'),
+          child: const Scaffold(body: Text('reader body')),
+        ),
+      ));
+    }
     await pending?.future;
   }
+}
+
+class _LastRead extends LastReadBook {
+  _LastRead(this.book);
+  final Book book;
+  @override
+  Future<LastReadBookData?> build() async => LastReadBookData(book: book);
+}
+
+class _Statistics extends StatisticData {
+  _Statistics(this.book);
+  final Book book;
+  @override
+  Future<StatisticDataModel> build() async =>
+      StatisticDataModel.mock().copyWith(bookReadingTime: [
+        {book: 120}
+      ]);
+}
+
+class _DailyReading extends BookDailyReading {
+  @override
+  Future<BookDailyReadingData> build(
+          {required int bookId, int days = 30}) async =>
+      BookDailyReadingData.mock();
 }
 
 void main() {
@@ -44,11 +91,29 @@ void main() {
   });
 
   Widget app(Widget child,
-          {Locale locale = const Locale('en'), _Access? access}) =>
+          {Locale locale = const Locale('en'),
+          _Access? access,
+          Book? dashboardBook}) =>
       ProviderScope(
         overrides: [
           if (access != null)
             readingHistoryBookAccessProvider.overrideWithValue(access),
+          if (dashboardBook != null) ...[
+            lastReadBookProvider.overrideWith(() => _LastRead(dashboardBook)),
+            statisticDataProvider
+                .overrideWith(() => _Statistics(dashboardBook)),
+            bookDailyReadingProvider(bookId: dashboardBook.id)
+                .overrideWith(_DailyReading.new),
+            readingInsightsProvider.overrideWith((ref) async => ReadingInsights(
+                  recent: [
+                    ReadingInsightBook(dashboardBook,
+                        lastDay: DateTime(2026, 10, 9))
+                  ],
+                  mostAnnotated: [
+                    ReadingInsightBook(dashboardBook, noteCount: 2)
+                  ],
+                )),
+          ],
         ],
         child: MaterialApp(
           navigatorKey: navigatorKey,
@@ -62,6 +127,54 @@ void main() {
   Book fixture() => Book.mock()
     ..coverPath = 'missing-history-cover.png'
     ..filePath = 'file/history.epub';
+
+  for (final type in [
+    null,
+    StatisticsDashboardTileType.continueReading,
+    StatisticsDashboardTileType.topBook,
+    StatisticsDashboardTileType.recentReading,
+    StatisticsDashboardTileType.mostAnnotatedBooks,
+  ]) {
+    testWidgets('title and cover fly to/from the reader: $type',
+        (tester) async {
+      final book = fixture();
+      final access = _Access()
+        ..current = book
+        ..showReader = true;
+      await tester.pumpWidget(app(
+        SizedBox(
+            height: 300,
+            child: type == null
+                ? BookStatisticItem(book: book, readingTime: 120)
+                : Consumer(
+                    builder: (context, ref, _) => dashboardTileRegistry[type]!
+                        .buildContent(context, ref))),
+        access: access,
+        dashboardBook: book,
+      ));
+      await tester.pumpAndSettle();
+      final tag = tester.widget<Hero>(find.byType(Hero)).tag;
+      for (final tapTitle in [true, false]) {
+        await tester.tap(
+            tapTitle ? find.text(book.title).last : find.byType(BookCover));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(access.openedHeroTag, tag);
+        expect(find.text('flying history cover'), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(find.text('reader body'), findsOneWidget);
+        navigatorKey.currentState!.pop();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text('flying history cover'), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(find.byType(BookCover), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    },
+        variant: TargetPlatformVariant(
+            {TargetPlatform.android, TargetPlatform.iOS}));
+  }
 
   testWidgets('title and cover open the current book, preserving its position',
       (tester) async {

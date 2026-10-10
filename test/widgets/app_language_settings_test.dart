@@ -184,6 +184,8 @@ void main() {
                 matching: find.byType(Scrollable))
             .first,
         maxScrolls: 50);
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
     await tester.tap(target);
     await tester.pumpAndSettle();
     expect(

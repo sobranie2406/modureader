@@ -171,7 +171,8 @@ class SystemTts extends BaseTts {
       // Only record the numeric native code, never plugin text/book content.
       final code =
           RegExp(r' - (-?\d+)$').firstMatch(message.toString())?.group(1);
-      AnxLog.warning('TTS system native error; code=${code ?? "unknown"}');
+      AnxLog.warning(
+          'TTS system native error; provider=system reason=native code=${code ?? "unknown"}');
       signal.completeError(PlatformException(code: 'system_tts_error'));
     });
     try {
@@ -291,7 +292,8 @@ class SystemTts extends BaseTts {
       if (active() && continuous) updateTtsState(TtsStateEnum.stopped);
     } catch (error) {
       if (active()) {
-        AnxLog.warning('TTS system playback failed: ${error.runtimeType}');
+        AnxLog.warning(
+            'TTS system playback failed: provider=system reason=${error is TimeoutException ? "timeout" : "native"} type=${error.runtimeType} retained=true');
         _pendingAdvance = null;
         _playbackError = error is PlatformException &&
                 error.code == 'windows_tts_unavailable'
@@ -388,10 +390,12 @@ class SystemTts extends BaseTts {
   }
 
   @override
-  Future<void> prev() => _navigate(getPrevTextFunction);
+  Future<void> prev({FutureOr<dynamic> Function()? locate}) =>
+      _navigate(locate ?? getPrevTextFunction);
 
   @override
-  Future<void> next() => _navigate(getNextTextFunction, forward: true);
+  Future<void> next({FutureOr<dynamic> Function()? locate}) =>
+      _navigate(locate ?? getNextTextFunction, forward: locate == null);
 
   @override
   Future<void> restart() async {

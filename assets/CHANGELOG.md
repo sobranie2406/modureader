@@ -1,10 +1,46 @@
 # Modu changelog
 
-Current stable baseline: **1.2.4+10093**. Updated 2026-10-09.
+Current stable baseline: **1.2.5+10102**. Updated 2026-10-10.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.2.5
+
+### English
+
+- Feat(lookup): Add the default-enabled Lookup selection tool. Its overview queries dictionaries, encyclopedia, translation and AI Knowledge automatically, with independent source switches, adaptive cards and settings links. Book AI, Classical Chinese translation and Web search remain separate tabs; existing standalone tools remain available, disabled by default.
+- Feat(dictionary): Query one or several local dictionaries, show sources and explicit no-entry results, and offer optional Chinese/English Wiktionary with attribution. Remove Free Dictionary API.
+- Feat(dictionary): Display original MDX HTML, images, audio and script-generated entries inline using imported MDD/local resources. Originals run in an isolated local view without an app bridge or external network access; audio requires user interaction. Older text-only imports need reimporting for original resources. MDX 3 remains unsupported.
+- Perf(lookup): Tighten dictionary typography and spacing, size cards to their contents and avoid duplicating original and plain-text results. Very long originals scroll within a capped view.
+- Feat(ai): Prefill Book AI with selected text, retain context choices, edit-before-send and follow-up questions, and hide reading-skill controls in Classical Chinese translation.
+- Feat(keyboard): Add customizable reader shortcuts for desktop and Android hardware keyboards, with multiple bindings, conflict checks, settings backup and restore defaults. Play/pause uses one key, P by default; previous/next paragraph controls are also supported.
+- Fix(bookshelf): Long-press enters multi-selection instead of a sticky action menu. Keep three-dot menus and add shared batch create-folder, move and delete actions in the shelf and opened folders.
+- Fix(reader): Use the shared cover-opening transition when opening books from folders or Reading History, respecting disabled-animation and E-Ink preferences; improve long chapter-title layout.
+- Feat(notifications): Use temporary rounded pill notifications for downloads and other status messages across platforms.
+- Fix(tts): Add previous/next paragraph arrows and preserve playing or paused state during navigation. Shorten the Chinese labels for return-to-narration and start-from-page controls.
+- Fix(tts): Recognize additional publisher footnote markers so their numbers are not narrated, without stripping ordinary numeric links.
+- Fix(tts): Classify synthesis failures across online engines, validate MiMo audio responses, retry transient failures with bounded backoff and server cooldown handling, and improve privacy-safe diagnostics. Stop or configuration changes cancel pending retries; configuration and permanent HTTP failures are not repeatedly retried.
+- Ci(harmony): Update the isolated HarmonyOS reorder-callback adapter for the revised selection-tool settings.
+- Docs(features): Refresh the bilingual settings, feature and privacy guides, Chinese-default homepage and fictional bookshelf badge showcase.
+
+### 简体中文
+
+- Feat(lookup): 新增默认开启的划词「综合」入口，汇总页自动查询字典、百科、翻译和 AI 知识，支持独立来源开关、内容自适应卡片及设置入口。本书 AI、文言文翻译、联网搜索使用独立标签；原有单独工具保留，默认关闭。
+- Feat(dictionary): 本地词典可单选或多选查询，显示来源及明确的「词典名 · 无条目」结果；可选用带来源标注的中英文维基词典，移除 Free Dictionary API。
+- Feat(dictionary): 导入 MDX 及配套 MDD／本地资源后，直接内嵌显示原版 HTML、图片、音频与脚本生成词条。原版视图与应用桥接和外部网络隔离，音频需主动操作；旧的纯文字导入需重新导入才能补齐原版资源，暂不支持 MDX 3。
+- Perf(lookup): 缩小字典字号与留白，结果卡片随内容适配，避免原版与纯文字重复展示；过长原版内容在限高视图内滚动。
+- Feat(ai): 本书 AI 自动填入选中文字，保留上下文选择、先编辑再发送和继续提问；文言文翻译隐藏阅读技能控件。
+- Feat(keyboard): 桌面与安卓实体键盘新增自定义阅读按键，支持多个绑定、冲突检查、设置备份及恢复默认。播放／暂停使用同一个按键，默认 P；支持上一段／下一段。
+- Fix(bookshelf): 长按封面改为多选，不再打开难以关闭的操作菜单。保留三个点菜单，书架与文件夹内统一支持批量建立文件夹、移入和删除。
+- Fix(reader): 从书架文件夹和阅读历史开书时沿用统一封面过渡，遵循关闭动画与 E-Ink 设置；改善长章节标题的排版。
+- Feat(notifications): 下载完成等状态提示统一使用短暂显示、自动消失的圆角椭圆提示框，适用于各平台。
+- Fix(tts): 朗读浮动栏增加上一段／下一段箭头，跳转时保留播放或暂停状态；定位按钮文案改为「回朗读页」「此页开始」。
+- Fix(tts): 补齐出版物注释标记识别，避免朗读注释序号，同时保留普通数字链接的正文。
+- Fix(tts): 在线语音引擎统一分类合成失败，校验 MiMo 音频响应，对临时错误进行有限退避重试并遵循服务端冷却；增强不包含正文和密钥的诊断日志。停止朗读或修改配置会取消重试，不反复重试配置及永久 HTTP 错误。
+- Ci(harmony): 更新独立鸿蒙构建中的排序回调适配，兼容新版划词工具设置。
+- Docs(features): 更新中英设置、功能与隐私说明，首页默认中文，并使用虚构书库展示索引及格式标签。
 
 ## 1.2.4
 

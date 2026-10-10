@@ -29,6 +29,7 @@ void main() {
   Future<void> mount(WidgetTester tester,
       {Locale locale = const Locale('zh'),
       double scale = 1,
+      Future<void> Function()? previous,
       Future<void> Function()? readHere}) async {
     await tester.pumpWidget(MaterialApp(
       locale: locale,
@@ -60,6 +61,8 @@ void main() {
                   stateListenable: state,
                   onReturnToPosition: () async => actions.add('return'),
                   onReadHere: readHere ?? () async => actions.add('here'),
+                  onPrevious: previous ?? () async => actions.add('previous'),
+                  onNext: () async => actions.add('next'),
                   onPlay: () async {
                     actions.add('play');
                     state.value = TtsStateEnum.playing;
@@ -84,15 +87,23 @@ void main() {
         (tester) async {
       state.value = playing ? TtsStateEnum.playing : TtsStateEnum.paused;
       await mount(tester);
-      expect(find.text('回到朗读位置'), findsOneWidget);
-      expect(find.text('从此处朗读'), findsOneWidget);
+      expect(find.text('回朗读页'), findsOneWidget);
+      expect(find.text('此页开始'), findsOneWidget);
       await tester.tap(key('return'));
       await tester.pumpAndSettle();
       await tester.tap(key('read-here'));
       await tester.pumpAndSettle();
       await tester.tap(key('settings'));
       await tester.pumpAndSettle();
-      expect(actions, ['return', 'here', 'settings']);
+      await tester.tap(key('previous'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('next'));
+      await tester.pumpAndSettle();
+      expect(actions, ['return', 'here', 'settings', 'previous', 'next']);
+      expect(find.byIcon(Icons.chevron_left_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+      expect(find.text('上一段'), findsNothing);
+      expect(find.text('下一段'), findsNothing);
       expect(state.value, playing ? TtsStateEnum.playing : TtsStateEnum.paused);
     });
   }
@@ -154,7 +165,14 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await mount(tester, locale: locale, scale: 2);
-      for (final name in ['return', 'read-here', 'play-pause', 'settings']) {
+      for (final name in [
+        'return',
+        'read-here',
+        'previous',
+        'next',
+        'play-pause',
+        'settings'
+      ]) {
         expect(key(name).hitTestable(), findsOneWidget,
             reason:
                 '$name: ${tester.getRect(key(name))}, bar: ${tester.getRect(key('toolbar'))}');
@@ -162,10 +180,65 @@ void main() {
         expect(rect.left, greaterThanOrEqualTo(12));
         expect(rect.right, lessThanOrEqualTo(268));
       }
-      expect(tester.getSize(key('toolbar')).height, 44);
+      expect(tester.getSize(key('toolbar')).height, 88);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+      'wide capsule orders arrows around playback; resizing stacks two rows',
+      (tester) async {
+    await mount(tester);
+    final names = [
+      'settings',
+      'return',
+      'previous',
+      'play-pause',
+      'next',
+      'read-here'
+    ];
+    for (var i = 1; i < names.length; i++) {
+      expect(tester.getRect(key(names[i])).left,
+          greaterThanOrEqualTo(tester.getRect(key(names[i - 1])).right));
+    }
+    final viewport =
+        tester.getRect(find.byKey(const ValueKey('reader-viewport')));
+    tester.view.physicalSize = const Size(280, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(key('toolbar')).height, 88);
+    expect(tester.getRect(key('return')).bottom,
+        lessThanOrEqualTo(tester.getRect(key('previous')).top));
+    for (final name in names) {
+      expect(key(name).hitTestable(), findsOneWidget);
+    }
+    state.value = TtsStateEnum.stopped;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byKey(const ValueKey('reader-viewport'))).size,
+        const Size(280, 600));
+    expect(viewport.size, const Size(800, 600));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('pending paragraph navigation cannot overlap another seek',
+      (tester) async {
+    final pending = Completer<void>();
+    await mount(tester, previous: () {
+      actions.add('previous');
+      return pending.future;
+    });
+    await tester.tap(key('previous'));
+    await tester.pump();
+    await tester.tap(key('next'));
+    expect(actions, ['previous']);
+    for (final name in ['previous', 'next', 'play-pause', 'settings']) {
+      expect(tester.widget<IconButton>(key(name)).onPressed, isNull);
+    }
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(key('next')).onPressed, isNotNull);
+  });
 
   testWidgets('pending restart cannot be submitted twice', (tester) async {
     final pending = Completer<void>();

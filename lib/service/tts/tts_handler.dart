@@ -426,6 +426,28 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     await tts.next();
   }
 
+  Future<void> navigateParagraph(FutureOr<dynamic> Function() locate,
+      {required bool forward}) async {
+    final backend = tts;
+    final wasPlaying = backend.isPlaying;
+    final command = _transportCommand + 1;
+    // Seek while paused so the command does not await the entire playback loop.
+    await pause();
+    bool current() =>
+        command == _transportCommand &&
+        identical(tts, backend) &&
+        backend.ttsStateNotifier.value == TtsStateEnum.paused;
+    if (!current()) return;
+    await (forward
+        ? backend.next(locate: locate)
+        : backend.prev(locate: locate));
+    if (!current()) return;
+    if (backend.playbackError != null) {
+      throw StateError('TTS paragraph navigation failed');
+    }
+    if (wasPlaying) await play();
+  }
+
   ValueNotifier<TtsStateEnum> get ttsStateNotifier => tts.ttsStateNotifier;
 
   bool get isPlaying => tts.isPlaying;

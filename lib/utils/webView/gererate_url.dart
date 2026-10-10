@@ -74,6 +74,9 @@ String generateUrl(
     // In particular, native WebView focus bypasses Flutter's page shortcuts.
     'desktopPageInput': AnxPlatform.isDesktop,
     'keyboardShortcutTurnPage': Prefs().keyboardShortcutTurnPage,
+    'readerShortcuts': Prefs()
+        .readerShortcuts
+        .actions(ctrlBrackets: Prefs().keyboardShortcutTurnPage),
     'mobileTouchPaging': AnxPlatform.isMobile,
     'mobileImageFit': AnxPlatform.isMobile,
     'tapOnlyPageTurn': Prefs().tapOnlyPageTurn,

@@ -18,14 +18,17 @@ void main() {
   const own = SelectionToolbarItem('custom-own', 'aiCommand',
       name: '改写', icon: 'note', prompt: '请改写 {selection}');
 
-  test('all seven templates start disabled; native actions remain enabled', () {
+  test('unified query starts enabled; standalone lookup actions stay optional',
+      () {
     const config = SelectionToolbarConfig();
     config.validate();
     expect(config.items.where((i) => i.isCustom), hasLength(7));
     expect(
         config.items.where((i) => i.isCustom).every((i) => !i.enabled), true);
     expect(config.availableItems().map((i) => i.id),
-        SelectionToolbarConfig.defaultItems.map((i) => i.id));
+        ['query', 'narrate', 'note', 'copy', 'share']);
+    expect(config.items.takeWhile((i) => i.enabled), hasLength(5));
+    expect(config.items.skip(5).every((i) => !i.enabled), true);
     expect(config.availableItems(footnote: true).any((i) => i.action == 'note'),
         false);
     expect(config.availableItems(aiEnabled: false).any((i) => i.isAi), false);
@@ -188,7 +191,42 @@ void main() {
             name: '命令$i', prompt: '解释'),
     ]);
     config.restoreDefaults().validate();
-    expect(config.restoreDefaults().items, hasLength(39));
+    expect(config.restoreDefaults().items,
+        hasLength(SelectionToolbarConfig.initialItems.length + 24));
+  });
+
+  test('old toolbar migrates once and retains edited prompts and later choices',
+      () {
+    final raw = jsonDecode(const SelectionToolbarConfig().encode()) as Map;
+    raw.remove('queryRevision');
+    (raw['items'] as List).removeWhere((i) => i['id'] == 'query');
+    final legacy = (raw['items'] as List)
+        .firstWhere((i) => i['id'] == 'custom-preset-dictionary');
+    legacy['enabled'] = true;
+    legacy['prompt'] = '我的解释 {selection}';
+    final migrated = SelectionToolbarConfig.decode(jsonEncode(raw));
+    expect(migrated.items.first.id, 'query');
+    expect(migrated.items.first.enabled, true);
+    expect(
+        migrated.items
+            .firstWhere((i) => i.id == 'custom-preset-dictionary')
+            .prompt,
+        '我的解释 {selection}');
+    expect(
+        migrated.items
+            .firstWhere((i) => i.id == 'custom-preset-dictionary')
+            .enabled,
+        false);
+    final edited = migrated.copyWith(
+        items: migrated.items
+            .map((i) => i.id == 'dictionary'
+                ? i.copyWith(enabled: true)
+                : i.id == 'query'
+                    ? i.copyWith(enabled: false)
+                    : i)
+            .toList());
+    expect(SelectionToolbarConfig.decode(edited.encode()).encode(),
+        edited.encode());
   });
 
   test('classical translation preset quotes selection and omits bundled text',

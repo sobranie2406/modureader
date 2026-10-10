@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:anx_reader/utils/toast/common.dart';
 
 import 'package:anx_reader/page/home_page/remote_library_page.dart';
 import 'package:anx_reader/page/settings_page/remote_library.dart';
@@ -71,6 +72,7 @@ class _Library extends WebdavLibrary {
 }
 
 void main() {
+  tearDown(() => AnxToast.fToast.removeQueuedCustomToasts());
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await LibraryConnectionStore.clear();
@@ -126,6 +128,11 @@ void main() {
     expect(find.textContaining('Imported 0, skipped 0 duplicates, failed 2.'),
         findsOneWidget);
     expect(temp.listSync(), isEmpty);
+    expect(find.byType(SnackBar), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Imported 0, skipped 0 duplicates, failed 2.'),
+        findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -169,6 +176,8 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(library.scanToken!.isCancelled, isTrue);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
     expect(library.downloads, isEmpty);
     expect(find.byType(AlertDialog), findsNothing);
     expect(

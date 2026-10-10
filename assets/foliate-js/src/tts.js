@@ -21,12 +21,12 @@ const typesOf = el => (el.getAttributeNS?.('http://www.idpf.org/2007/ops', 'type
 const explicitNote = el => typesOf(el).some(type => noteTypes.has(type))
     || (el.getAttribute('role') ?? '').split(/\s+/)
         .some(role => noteTypes.has(role.replace(/^doc-/, '')))
-    || [...el.classList].some(name => /^(?:footnotes?|endnotes?|rearnotes?|noteref|footnote-ref|footnote-backref)(?:[-_]\d+)?$/i.test(name))
+    || [...el.classList].some(name => /^(?:footnotes?|fnotes?|endnotes?|rearnotes?|noteref|footnote-ref|footnote-backref)(?:[-_]\d+)?$/i.test(name))
 
 const isNoteReference = el => typesOf(el).includes('noteref')
     || (el.getAttribute('role') ?? '').split(/\s+/).includes('doc-noteref')
     || [...el.classList].some(name => /^(?:noteref|footnote-ref)(?:[-_]\d+)?$/i.test(name))
-const isNoteMarker = el => /^(?:\[?\d+\]?|[①-⑳*†‡]+|注\d*)$/.test(el.textContent.trim())
+const isNoteMarker = el => /^(?:\d+|\[\d+\]|\(\d+\)|（\d+）|[①-⑳*†‡]+|注\d*)$/.test(el.textContent.trim())
 const localLinkTarget = (doc, link) => {
     const href = link.getAttribute('href') ?? ''
     if (!href.startsWith('#')) return null
@@ -64,7 +64,13 @@ const createTextFilter = doc => {
         const noteTarget = /(?:^|[/#])(?:footnotes?|endnotes?|rearnotes?|notes?|fn)[-_.\d]/i.test(href)
         const knownTarget = target && explicitNote(target)
             && !isNoteReference(target)
-        if (!explicitNote(link) && !knownTarget && !(marker && noteTarget)) continue
+        // Publisher notes use ch5-back -> other.xhtml#ch5 without EPUB roles.
+        // Require the paired ID and superscript, not just a numeric link.
+        const pairedReference = /\d-back$/.test(link.id)
+            && /^[^:#?]*#[^#]+$/.test(href) && !href.startsWith('//')
+            && href.endsWith(`#${link.id.slice(0, -5)}`)
+            && (link.closest('sup') || link.querySelector('sup'))
+        if (!explicitNote(link) && !knownTarget && !(marker && (noteTarget || pairedReference))) continue
         excluded.add(link)
         if (target) {
             // A backlink anchor at the start of a note usually owns no text;
@@ -478,11 +484,12 @@ export class TTS {
         return this.#resultFrom(entry, { highlight: true })?.text
     }
 
-    end() {
+    end({ paragraph = false } = {}) {
         this.#partial = null
         this.#lastMark = null
-        const entry = this.#list.last()
+        let entry = this.#list.last()
         if (!entry) return this.next()
+        if (paragraph) entry = this.#paragraphStart(entry)
         return this.#resultFrom(entry, { highlight: true })?.text
     }
 
@@ -504,6 +511,37 @@ export class TTS {
         this.#lastMark = null
         const entry = this.#list.next()
         return this.#resultFrom(entry, { highlight: paused })?.text
+    }
+
+    #paragraphStart(entry) {
+        const block = findBlockAncestor(entry[1].startContainer)
+        let before
+        while ((before = this.#list.prev())) {
+            if (findBlockAncestor(before[1].startContainer) !== block) {
+                this.#list.next()
+                break
+            }
+            entry = before
+        }
+        return entry
+    }
+
+    moveParagraph(direction) {
+        const original = this.#ensureCurrentEntry()
+        if (!original) return
+        const block = findBlockAncestor(original[1].startContainer)
+        let entry
+        do {
+            entry = direction > 0 ? this.#list.next() : this.#list.prev()
+        } while (entry && findBlockAncestor(entry[1].startContainer) === block)
+        if (!entry) {
+            this.#list.find(range => range === original[1])
+            return
+        }
+        if (direction < 0) entry = this.#paragraphStart(entry)
+        this.#partial = null
+        this.#lastMark = null
+        return this.#resultFrom(entry, { highlight: true })?.text
     }
 
     // get next text without moving the iterator

@@ -8,6 +8,7 @@ import 'package:anx_reader/service/tts/openai_voice_presets.dart';
 import 'package:anx_reader/service/tts/stable_narration.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
@@ -123,7 +124,8 @@ class OpenAiTtsProvider extends TtsServiceProvider {
     final String resolvedVoice = resolveVoice(voice);
 
     if (key == null || key.isEmpty) {
-      throw Exception('OpenAI TTS config missing (key)');
+      throw TtsSynthesisError(
+          TtsFailureReason.configuration, 'OpenAI TTS config missing (key)');
     }
 
     final instructions = OpenAiVoicePresets.sendsInstructions(config)
@@ -152,8 +154,11 @@ class OpenAiTtsProvider extends TtsServiceProvider {
       return response.bodyBytes;
     }
 
-    throw Exception(
-        'OpenAI TTS failed: ${response.statusCode} ${response.body}');
+    throw TtsSynthesisError(
+        TtsFailureReason.http, 'OpenAI TTS failed: ${response.statusCode}',
+        statusCode: response.statusCode,
+        retryAfter:
+            TtsSynthesisError.parseRetryAfter(response.headers['retry-after']));
   }
 
   String _buildInstructions(String? base, double pitch) {

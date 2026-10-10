@@ -7,7 +7,6 @@ import 'dart:math';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/enums/hint_key.dart';
 import 'package:anx_reader/enums/sort_field.dart';
 import 'package:anx_reader/enums/sort_order.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -22,22 +21,17 @@ import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:anx_reader/page/search/search_page.dart';
 import 'package:anx_reader/utils/color/hash_color.dart';
 import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
-import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
-import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
+import 'package:anx_reader/widgets/bookshelf/book_selection_actions.dart';
 import 'package:anx_reader/widgets/bookshelf/stop_vectorization_button.dart';
 import 'package:anx_reader/widgets/bookshelf/sync_button.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/common/tag_chip.dart';
-import 'package:anx_reader/widgets/hint/hint_banner.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:anx_reader/widgets/tips/bookshelf_tips.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_reorderable_grid_view/widgets/custom_draggable.dart';
-import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icons_plus/icons_plus.dart';
 
@@ -118,6 +112,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
 
     void setBookSelected(Book book, bool selected) {
       setState(() {
+        _selectionMode = true;
         if (selected) {
           _selectedBookIds.add(book.id);
         } else {
@@ -131,19 +126,6 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         _selectionMode = false;
         _selectedBookIds.clear();
       });
-    }
-
-    Future<void> organizeSelectedBooks(bool createNew) async {
-      final moved = await showDialog<bool>(
-        animationStyle: AppMotion.style,
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => BookFolderDialog(
-          bookIds: selectedBooks.map((book) => book.id).toList(),
-          createNew: createNew,
-        ),
-      );
-      if (moved == true && mounted) exitSelectionMode();
     }
 
     Widget buildFilterBar() {
@@ -406,118 +388,42 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
       );
     }
 
-    void handleBottomSheet(BuildContext context, Book book) {
-      showBottomSheet(
-        context: context,
-        builder: (context) => BookBottomSheet(book: book),
-      );
-    }
-
-    List<int> lockedIndices = [];
-
     Widget buildBookshelfBody = booksAsync.when(
       data: (books) {
-        for (int i = 0; i < books.length; i++) {
-          // folder can't be dragged
-          if (books[i].first.groupId != 0) {
-            lockedIndices.add(i);
-          }
-        }
         return books.isEmpty
             ? const Center(child: BookshelfTips())
-            : ReorderableBuilder(
-                // lock all index of books
-                lockedIndices: lockedIndices,
-                enableDraggable: !_selectionMode,
-                longPressDelay: const Duration(milliseconds: 300),
-                onReorder: (ReorderedListFunction reorderedListFunction) {},
-                scrollController: _scrollController,
-                onDragStarted: (index) {
-                  if (books[index].first.groupId == 0) {
-                    handleBottomSheet(context, books[index].first);
-                    // add other books to lockedIndices
-                    for (int i = 0; i < books.length; i++) {
-                      if (i != index) {
-                        lockedIndices.add(i);
-                      }
-                    }
-                  }
-                },
-                onDragEnd: (index) {
-                  // remove all books from lockedIndices
-                  lockedIndices = [];
-                  for (int i = 0; i < books.length; i++) {
-                    if (books[i].first.groupId != 0) {
-                      lockedIndices.add(i);
-                    }
-                  }
-                  setState(() {});
-                },
-                children: [
-                  ...books.map(
-                    (book) {
-                      final topLevelKey = ValueKey<String>(
-                        book.first.groupId == 0
-                            ? 'book:${book.first.id}'
-                            : 'folder:${book.first.groupId}',
-                      );
-                      return book.first.groupId == 0
-                          ? CustomDraggable(
-                              key: topLevelKey,
-                              data: book.first,
-                              child: BookFolder(
-                                books: book,
-                                selectionMode: _selectionMode,
-                                selectedBookIds: _selectedBookIds,
-                                onSelectionChanged: setBookSelected,
-                              ),
-                            )
-                          : BookFolder(
-                              key: topLevelKey,
-                              books: book,
-                              selectionMode: _selectionMode,
-                              selectedBookIds: _selectedBookIds,
-                              onSelectionChanged: setBookSelected,
-                            );
-                    },
+            : LayoutBuilder(builder: (context, constraints) {
+                return GridView(
+                  key: _gridViewKey,
+                  controller: _scrollController,
+                  padding: EdgeInsets.fromLTRB(
+                      20,
+                      12,
+                      20,
+                      12 +
+                          MediaQuery.paddingOf(context).bottom +
+                          HomeNavigationClearance.of(context)),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                        max(1, constraints.maxWidth ~/ Prefs().bookCoverWidth),
+                    childAspectRatio: 1 / 2.1,
+                    mainAxisSpacing: 30,
+                    crossAxisSpacing: 20,
                   ),
-                ],
-                builder: (children) {
-                  return LayoutBuilder(builder: (context, constraints) {
-                    return Column(
-                      children: [
-                        HintBanner(
-                            icon: const Icon(Icons.copy),
-                            hintKey: HintKey.dragAndDropToCreateFolder,
-                            margin: EdgeInsets.fromLTRB(20, 0, 20, 5),
-                            child: Text(L10n.of(context)
-                                .dragAndDropToCreateFolderHint)),
-                        Expanded(
-                          child: GridView(
-                            key: _gridViewKey,
-                            controller: _scrollController,
-                            padding: EdgeInsets.fromLTRB(
-                                20,
-                                12,
-                                20,
-                                12 +
-                                    MediaQuery.paddingOf(context).bottom +
-                                    HomeNavigationClearance.of(context)),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: constraints.maxWidth ~/
-                                  Prefs().bookCoverWidth,
-                              childAspectRatio: 1 / 2.1,
-                              mainAxisSpacing: 30,
-                              crossAxisSpacing: 20,
-                            ),
-                            children: children,
-                          ),
-                        ),
-                      ],
-                    );
-                  });
-                });
+                  children: [
+                    for (final book in books)
+                      BookFolder(
+                        key: ValueKey<String>(book.first.groupId == 0
+                            ? 'book:${book.first.id}'
+                            : 'folder:${book.first.groupId}'),
+                        books: book,
+                        selectionMode: _selectionMode,
+                        selectedBookIds: _selectedBookIds,
+                        onSelectionChanged: setBookSelected,
+                      ),
+                  ],
+                );
+              });
       },
       loading: () => const Center(
           child: EinkStaticIndicator(child: CircularProgressIndicator())),
@@ -530,49 +436,9 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
         if (_selectionMode)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                TextButton.icon(
-                  onPressed: selectedBooks.isEmpty
-                      ? null
-                      : () => organizeSelectedBooks(true),
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                  label: Text(ModuStrings.text(context, '新建文件夹', 'New folder')),
-                ),
-                TextButton.icon(
-                  onPressed: selectedBooks.isEmpty
-                      ? null
-                      : () => organizeSelectedBooks(false),
-                  icon: const Icon(Icons.drive_file_move_outline),
-                  label: Text(
-                      ModuStrings.text(context, '移入文件夹', 'Move to folder')),
-                ),
-                TextButton.icon(
-                  onPressed: selectedBooks.isEmpty
-                      ? null
-                      : () {
-                          queueBooksForVectorization(selectedBooks);
-                          exitSelectionMode();
-                        },
-                  icon: const Icon(Icons.hub_outlined),
-                  label: Text(ModuStrings.text(context, '向量化', 'Vectorize')),
-                ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  onPressed: selectedBooks.isEmpty
-                      ? null
-                      : () async {
-                          final deleted =
-                              await confirmAndDeleteBooksFromBookshelf(
-                                  context, ref, selectedBooks);
-                          if (deleted && mounted) exitSelectionMode();
-                        },
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text(ModuStrings.text(context, '删除', 'Delete')),
-                ),
-              ],
+            child: BookSelectionActions(
+              books: selectedBooks,
+              onCompleted: exitSelectionMode,
             ),
           ),
         const _KnowledgeQueueBanner(),
@@ -786,25 +652,30 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
             ],
     );
 
-    return Container(
-        decoration: Prefs().eInkMode
-            ? null
-            : BoxDecoration(
-                gradient: RadialGradient(
-                  tileMode: TileMode.clamp,
-                  center: Alignment.topRight,
-                  radius: 1,
-                  colors: [
-                    Theme.of(context).colorScheme.primary.withAlpha(5),
-                    Theme.of(context).scaffoldBackgroundColor,
-                  ],
-                ),
-              ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: appBar,
-          body: body,
-        ));
+    return PopScope(
+        canPop: !_selectionMode,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && _selectionMode) exitSelectionMode();
+        },
+        child: Container(
+            decoration: Prefs().eInkMode
+                ? null
+                : BoxDecoration(
+                    gradient: RadialGradient(
+                      tileMode: TileMode.clamp,
+                      center: Alignment.topRight,
+                      radius: 1,
+                      colors: [
+                        Theme.of(context).colorScheme.primary.withAlpha(5),
+                        Theme.of(context).scaffoldBackgroundColor,
+                      ],
+                    ),
+                  ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: appBar,
+              body: body,
+            )));
   }
 }
 

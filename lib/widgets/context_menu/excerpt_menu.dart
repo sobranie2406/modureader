@@ -17,6 +17,7 @@ import 'package:anx_reader/widgets/context_menu/annotation_color_palette.dart';
 import 'package:anx_reader/widgets/context_menu/selection_action_toolbar.dart';
 import 'package:anx_reader/widgets/context_menu/selection_toolbar_labels.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
+import 'package:anx_reader/widgets/dictionary/unified_query.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -373,6 +374,16 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     final reader = readingPageKey.currentState;
     final text = widget.annoContent;
     switch (item.action) {
+      case 'query':
+        final sourceContext = widget.contextText;
+        widget.onClose();
+        if (reader != null) {
+          await reader.showUnifiedQuery(text, contextText: sourceContext);
+        } else if (popupContext.mounted) {
+          await showReaderPopup(popupContext, enableDrag: false,
+              builder: (_) => UnifiedQuery(text: text, contextText: sourceContext));
+        }
+        break;
       case 'copy':
         final message = L10n.of(context).notesPageCopied;
         await Clipboard.setData(ClipboardData(text: text));

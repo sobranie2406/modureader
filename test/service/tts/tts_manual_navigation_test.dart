@@ -5,6 +5,9 @@ import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
 import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/system_tts.dart';
+import 'package:anx_reader/service/tts/tts_factory.dart';
+import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +20,125 @@ void main() {
   });
 
   for (final system in [false, true]) {
+    for (final stopped in [false, true]) {
+      test(
+          '${system ? "system" : "online"}: failed or cancelled paragraph seek never resumes; stopped=$stopped',
+          () async {
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        var spoken = 0;
+        messenger.setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+          if (call.method == 'speak') spoken++;
+          return 1;
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(
+            const MethodChannel('flutter_tts'), null));
+        final BaseTts tts = system
+            ? SystemTts.forTesting(supported: true)
+            : OnlineTts.forTesting(
+                collect: (_) async => [const TtsSentence(text: '下一段')],
+                synthesize: (_) async => Uint8List.fromList([1]),
+                play: (_) async => spoken++);
+        final handler = TtsHandler.forTesting(
+            factory: TtsFactory.forTesting(() => tts),
+            activateSession: () async => true,
+            deactivateSession: () async {},
+            stopReader: () async {});
+        addTearDown(handler.stop);
+        await handler.init(() async => '当前段', () async => '', () async => '');
+        handler.mediaItem.add(const MediaItem(id: 'test-book', title: 'Test'));
+        tts.updateTtsState(TtsStateEnum.playing);
+        final reached = Completer<void>();
+        final located = Completer<String>();
+        final navigation = handler.navigateParagraph(() {
+          reached.complete();
+          return located.future;
+        }, forward: true);
+        await reached.future.timeout(const Duration(seconds: 2));
+        if (stopped) {
+          await handler.stop();
+          located.complete('下一段');
+          await navigation;
+        } else {
+          final failure = expectLater(navigation, throwsStateError);
+          located.completeError(StateError('reader failed'));
+          await failure;
+          expect(tts.playbackError, isNotNull);
+        }
+        expect(tts.ttsStateNotifier.value,
+            stopped ? TtsStateEnum.stopped : TtsStateEnum.paused);
+        expect(spoken, 0);
+      });
+    }
+    for (final playing in [false, true]) {
+      test(
+          '${system ? "system" : "online"}: paragraph seek completes before audio and preserves playing=$playing',
+          () async {
+        final finish = Completer<void>();
+        final began = Completer<void>();
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(const MethodChannel('flutter_tts'),
+            (call) async {
+          if (call.method == 'speak') {
+            if (!began.isCompleted) began.complete();
+            await finish.future;
+          }
+          return 1;
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(
+            const MethodChannel('flutter_tts'), null));
+        final BaseTts tts = system
+            ? SystemTts.forTesting(supported: true)
+            : OnlineTts.forTesting(
+                collect: (_) async => [const TtsSentence(text: '相邻段的开头')],
+                synthesize: (_) async => Uint8List.fromList([1]),
+                play: (_) async {
+                  if (!began.isCompleted) began.complete();
+                  await finish.future;
+                });
+        final handler = TtsHandler.forTesting(
+            factory: TtsFactory.forTesting(() => tts),
+            activateSession: () async => true,
+            deactivateSession: () async {},
+            stopReader: () async {});
+        addTearDown(() async {
+          if (!finish.isCompleted) finish.complete();
+          await handler.stop();
+        });
+        var seeks = 0, sequentialCalls = 0;
+        await handler.init(() async => '当前段', () async {
+          sequentialCalls++;
+          return '';
+        }, () async {
+          sequentialCalls++;
+          return '';
+        });
+        handler.mediaItem.add(const MediaItem(id: 'test-book', title: 'Test'));
+        tts.updateTtsState(
+            playing ? TtsStateEnum.playing : TtsStateEnum.paused);
+        for (final forward in [true, false]) {
+          await handler.navigateParagraph(() async {
+            seeks++;
+            return '相邻段的开头';
+          }, forward: forward).timeout(const Duration(seconds: 2));
+          expect(tts.currentVoiceText, '相邻段的开头');
+          expect(tts.ttsStateNotifier.value,
+              playing ? TtsStateEnum.playing : TtsStateEnum.paused);
+          // The running mock audio deliberately stays unfinished; one seek is enough.
+          if (playing) break;
+        }
+        expect(seeks, playing ? 1 : 2);
+        expect(sequentialCalls, 0);
+        if (playing) {
+          await began.future.timeout(const Duration(seconds: 2));
+          expect(finish.isCompleted, isFalse);
+        } else {
+          expect(began.isCompleted, isFalse);
+        }
+      });
+    }
     test(
         '${system ? "system" : "online"}: playing navigation never publishes a stopped state',
         () async {

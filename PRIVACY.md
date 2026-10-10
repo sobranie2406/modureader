@@ -2,7 +2,7 @@
 
 English · [简体中文](PRIVACY_zh.md) · [Home](README_EN.md) · [Settings guide](docs/SETTINGS.md)
 
-For **Modu 1.2.2+10087**, updated 2026-10-07. This document explains storage and network behavior. Third-party services have their own privacy policies.
+For **Modu 1.2.5+10102**, updated 2026-10-10. This document explains storage and network behavior. Third-party services have their own privacy policies.
 
 ## Local data and scanned books
 
@@ -10,11 +10,15 @@ Books, progress, notes, bookmarks, reading time and AI history are stored locall
 
 Import-time scanned-book detection, PDF/image-book cropping, panels, image enhancement, scanned watermark fading, text extraction and OCR run locally. These actions do not automatically upload or rewrite source books. Reflow appears in the reader; **Extract** fills an editable AI draft. Sending that draft then uses your selected AI service.
 
-Custom dictionaries are imported, parsed and queried locally. Definitions are text-only: scripts, external CSS, images, audio and remote dictionary resources are not loaded. Dictionaries are excluded from library sync and current settings/database backups.
+Custom dictionaries are imported, parsed and queried locally. Text results remain available. In 1.2.5, newly imported MDX entries display imported HTML, CSS, JavaScript, images and audio (including matching MDD resources) directly in the result card, in an isolated sandboxed WebView served only on loopback while the view is open. Local scripts run when the original content is displayed, without an app bridge, file access or external network resources; audio requires a user gesture. Older text-only imports require reimporting the MDX and companion resources. StarDict remains text-only. Dictionaries are excluded from library sync and current settings/database backups.
+
+In 1.2.5, optional online dictionary lookup is off by default. Enabling Chinese/English Wiktionary sends the query (which may be selected book text), IP address and normal request metadata to the selected service, not surrounding passages or the book file. Responses are rendered as text with source and license links; no remote scripts, images or audio are loaded. Results are cached only in memory for the lookup window. Local dictionary selections and online opt-in stay on this device and are excluded from settings transfer. Service availability and privacy policies are controlled by their providers.
 
 Custom CSS can contain remote resource URLs and make network requests when enabled. Use book JavaScript, external links and webpage content only from trusted sources.
 
 ## AI, translation, search and narration
+
+In unified lookup, opening Overview automatically queries its enabled dictionary, encyclopedia, translation and AI knowledge sections. Dictionary network sources remain individually opt-in. Wikipedia receives only the query; translation and AI receive selected text and, when enabled, its context using your configured services. AI auto-send is enabled by default and can incur provider charges; enable **Edit AI questions before sending** for manual sending or disable individual Overview sources. Existing explicit manual-send choices are retained. Book AI and web search are not automatically requested by Overview.
 
 Remote AI receives the actual prompt, conversation history and selected text, chapters or retrieved passages needed for the task. Selection templates default to text with context; you may choose selected text only. Explicit scope choices are preserved. Reading skills and app tools supply different source scopes for their tasks. Editing a prompt does not automatically send the whole book.
 
@@ -40,7 +44,7 @@ Packages download only after your request. Except for macOS browser downloads, i
 
 ## WebDAV and remote libraries
 
-The upcoming object-storage sync option is configured under **Settings → Sync**, separately from WebDAV. Selecting S3 / OSS / COS sends the same library-sync data to your chosen bucket, plus signed requests and temporary probe objects when testing. Endpoint, bucket, prefix and access credentials are stored in local preferences without additional encryption; default backups exclude the credentials. They are not included in AI-settings sync. No bucket is made public, no existing WebDAV configuration is replaced automatically, and switching does not transfer data between providers. Use private buckets, scoped keys and HTTPS. See [object storage synchronization](docs/OBJECT_STORAGE_SYNC.md).
+Object-storage sync is configured under **Settings → Sync**, separately from WebDAV. Selecting S3 / OSS / COS sends the same library-sync data to your chosen bucket, plus signed requests and temporary probe objects when testing. Endpoint, bucket, prefix and access credentials are stored in local preferences without additional encryption; default backups exclude the credentials. They are not included in AI-settings sync. No bucket is made public, no existing WebDAV configuration is replaced automatically, and switching does not transfer data between providers. Use private buckets, scoped keys and HTTPS. See [object storage synchronization](docs/OBJECT_STORAGE_SYNC.md).
 
 To reduce requests, the app stores request-budget timestamps, server cooldowns and maintenance schedules locally under hashed account filenames. These policy files contain no passwords, book text or full server URLs and are not library-synced. Jianguoyun request limits are per device/account; other devices and applications can still consume the same server quota.
 

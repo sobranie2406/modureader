@@ -89,7 +89,7 @@ export class TtsNavigator {
         }
         return false
     }
-    move(direction, { section = false, last = direction < 0, start = false, range, cfi } = {}) {
+    move(direction, { section = false, paragraph = false, last = direction < 0, start = false, range, cfi } = {}) {
         const generation = this.#generation
         const operation = async () => {
             if (generation !== this.#generation) return ''
@@ -113,7 +113,8 @@ export class TtsNavigator {
                 const text = range ? view.tts.from(range, { exactStart: !!cfi }) : view.tts.start()
                 if (text?.trim()) return text
             } else if (!section) {
-                const text = direction > 0 ? view.tts.next(true) : view.tts.prev(true)
+                const text = paragraph ? view.tts.moveParagraph(direction)
+                    : direction > 0 ? view.tts.next(true) : view.tts.prev(true)
                 if (text?.trim()) return text
             }
             const sections = view.book.sections
@@ -130,7 +131,7 @@ export class TtsNavigator {
                 }
                 if (!await this.#loadSection(view, index, before, generation)) return ''
                 if (view.tts?.sectionIndex !== index) view.initTTS(false, { force: true })
-                const text = last ? view.tts.end() : view.tts.start()
+                const text = last ? view.tts.end({ paragraph }) : view.tts.start()
                 if (text?.trim()) return text
             }
             return ''

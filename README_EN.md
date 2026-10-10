@@ -61,7 +61,7 @@ Modu has no in-app unlock purchases or subscriptions. Fees charged by online ser
 <details>
 <summary>Installation, updates and release notes</summary>
 
-**Latest release: 1.2.4** — adds text UMD and remote-folder imports, preserves original-format badges, shares cover transitions across platforms, and fixes iOS selection and MOBI/AZW3 notes.
+**Latest release: 1.2.5** — adds unified lookup, online Wiktionary, original local dictionary media and reader shortcuts; improves multi-selection, cover transitions and narration retries.
 
 Android cover opening and AI keyboard/stream layouts have been refined. System speech errors and startup waits now recover with clearer diagnostics. HarmonyOS remains an unsigned HAP requiring local signing; see the [release notes](docs/RELEASE_NOTES.md) for limitations and installation requirements.
 
@@ -94,6 +94,7 @@ A library for your books, a workspace for your thoughts, and tools you can make 
 | [Selection tools](#selection) | Toggle and reorder actions; create your own AI commands |
 | [Full-text translation & search](#translation) | Read inline translations, switch display modes and search selected text |
 | [Offline dictionaries](#dictionary) | Import your dictionaries and see definitions beside the selected word |
+| [Unified lookup](#unified-query) | Dictionaries, encyclopedia, translation and AI Knowledge in one window |
 | [Notes & highlights](#notes) | Capture passages, add comments and export notes with links back to the book |
 | [Reading history](#statistics) | Review reading time, trends, recent books and per-book progress |
 | [Vector indexing](#vector) | Build local book indexes for semantic search and retrieval-augmented answers |
@@ -314,7 +315,17 @@ Select a word and read its definition right beside the book. Imported MDX and St
 
 ![An enabled local dictionary on iPhone and its word definition in the Mac reader](docs/images/showcase/cross-platform/dictionary-en.png)
 
-Name, enable, disable or remove dictionaries in Settings → Custom dictionaries. Results come from your imported dictionary's entries; dictionary files are not bundled. The picture uses an original demonstration entry.
+Name, enable, disable or remove dictionaries in Settings → Custom dictionaries. Query one or several dictionaries, with sources and explicit no-entry results, or opt into Chinese/English Wiktionary. Newly imported MDX dictionaries can use MDD/local resources to display original images, audio and script-generated content inline. Older text-only imports need reimporting to add these resources. Dictionary files are not bundled; the picture uses an original demonstration entry.
+
+<a id="unified-query"></a>
+
+## One window, a clearer meaning
+
+The default-enabled **Lookup** selection tool combines dictionaries, encyclopedia, translation and AI Knowledge results. Book AI, Classical Chinese translation and Web search have separate tabs. Choose sources independently; AI supports editing before sending and follow-up questions. Existing standalone tools remain available, disabled by default. Online queries require the relevant service configuration and send the term or selected context.
+
+![Unified lookup on phone and Mac, showing dictionary, encyclopedia, translation and AI Knowledge results](docs/images/showcase/cross-platform/unified-query-en.png)
+
+Desktop and Android hardware keyboards support customizable paging, menu, play/pause and previous/next paragraph keys under **Reading → Reader shortcuts**, with multiple bindings and restore defaults. Playback and pause share one key, P by default.
 
 <a id="notes"></a>
 

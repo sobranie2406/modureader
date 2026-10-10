@@ -49,8 +49,8 @@
   "selection_ai_web_search": {"zh":"联网搜索","en":"Search online"},
   "selection_ai_web_search_help": {"zh":"勾选后检索公开词典／百科并交给当前模型整理，附来源；无需额外 API Key。","en":"Search public dictionaries/encyclopedias and let the current model summarize with sources. No extra API key needed."},
   "selection_ai_help": {"zh":"AI 模板在此独立管理，默认关闭。范围默认仅选中文字，可选择附近上下文；联网搜索可单独开启。使用当前 AI 服务，每次新建对话并在回答结束后返回第一段。用户改动随全局设置备份。","en":"AI templates are managed separately and disabled by default. Use selected text only, or include nearby context; online search is optional. Each task uses the current provider in a new chat and returns to the answer start. User changes are included in global backups."},
-  "ui_tts_quick_return": {"zh":"回到朗读位置","en":"Return to narration"},
-  "ui_tts_quick_here": {"zh":"从此处朗读","en":"Read from here"},
+  "ui_tts_quick_return": {"zh":"回朗读页","en":"Return to narration"},
+  "ui_tts_quick_here": {"zh":"此页开始","en":"Read from here"},
   "ui_tts_quick_error": {"zh":"朗读操作失败，请重试","en":"Narration action failed. Please retry."},
   "ui_dictionary_web_follow_up": {
     "zh": "如需联网补查，请点击下方的联网搜索按钮。",

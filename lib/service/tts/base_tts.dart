@@ -65,9 +65,9 @@ abstract class BaseTts {
 
   Future<void> resume();
 
-  Future<void> prev();
+  Future<void> prev({FutureOr<dynamic> Function()? locate});
 
-  Future<void> next();
+  Future<void> next({FutureOr<dynamic> Function()? locate});
 
   Future<void> restart();
 

@@ -16,6 +16,7 @@ void main() {
     'trueDarkMode': true,
     'pageTurnStyle': 'scroll',
     'scrollPagePercent': 93,
+    'readerShortcuts': '{"next":[{"key":"n","modifiers":1}]}',
     'eInkRefreshPages': 10,
     'longPressSelectParagraph': true,
     'readStyle':

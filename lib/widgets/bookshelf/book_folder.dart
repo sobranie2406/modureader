@@ -80,14 +80,33 @@ class _BookFolderState extends ConsumerState<BookFolder> {
     }
 
     void openFolder(String groupName) {
-      showDialog(
-        animationStyle: AppMotion.style,
-        context: context,
-        builder: (context) => BookOpenedFolder(
-          books: widget.books,
-          groupName: groupName,
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final themes =
+          InheritedTheme.capture(from: context, to: navigator.context);
+      // Hero flights require a PageRoute at both ends, including this dialog.
+      navigator.push(PageRouteBuilder<void>(
+        opaque: false,
+        barrierDismissible: true,
+        barrierLabel:
+            MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        barrierColor: DialogTheme.of(context).barrierColor ?? Colors.black54,
+        transitionDuration:
+            AppMotion.duration(const Duration(milliseconds: 150)),
+        reverseTransitionDuration:
+            AppMotion.duration(const Duration(milliseconds: 150)),
+        pageBuilder: (context, animation, secondaryAnimation) => themes.wrap(
+          FocusScope(
+            child: SafeArea(
+              child: BookOpenedFolder(
+                books: widget.books,
+                groupName: groupName,
+              ),
+            ),
+          ),
         ),
-      );
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ));
     }
 
     String groupName = ref.watch(groupDaoProvider).whenOrNull(
@@ -194,9 +213,13 @@ class _BookFolderState extends ConsumerState<BookFolder> {
             children: [
               Expanded(
                 child: InkWell(
-                  onLongPress: widget.selectionMode
-                      ? null
-                      : () => _menuKey.currentState?.showButtonMenu(),
+                  onLongPress: widget.onSelectionChanged == null
+                      ? () => _menuKey.currentState?.showButtonMenu()
+                      : () {
+                          for (final book in widget.books) {
+                            widget.onSelectionChanged!(book, !allSelected);
+                          }
+                        },
                   onSecondaryTap: widget.selectionMode
                       ? null
                       : () => _menuKey.currentState?.showButtonMenu(),

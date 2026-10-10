@@ -3,6 +3,7 @@ import 'package:anx_reader/providers/book_daily_reading_provider.dart';
 import 'package:anx_reader/providers/statistic_data.dart';
 import 'package:anx_reader/utils/date/convert_seconds.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
 import 'package:anx_reader/widgets/statistic/book_reading_chart.dart';
 import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
@@ -47,6 +48,7 @@ class TopBookTile extends StatisticsDashboardTileBase {
         final entry = statisticData.bookReadingTime.first;
         final book = entry.keys.first;
         final seconds = entry.values.first;
+        final heroTag = 'history_top_book_${book.id}';
 
         final TextStyle bookTitleStyle = const TextStyle(
           fontSize: 20,
@@ -68,11 +70,17 @@ class TopBookTile extends StatisticsDashboardTileBase {
           children: [
             ReadingHistoryBookLink(
               book: book,
+              heroTag: heroTag,
               enabled: ready,
-              child: BookCover(
-                book: book,
-                width: 120,
-                radius: 10,
+              child: Hero(
+                tag: heroTag,
+                transitionOnUserGestures: true,
+                createRectTween: readerCoverRectTween,
+                child: BookCover(
+                  book: book,
+                  width: 120,
+                  radius: 10,
+                ),
               ),
             ),
             const SizedBox(width: 15),
@@ -82,6 +90,7 @@ class TopBookTile extends StatisticsDashboardTileBase {
                   children: [
                     ReadingHistoryBookLink(
                       book: book,
+                      heroTag: heroTag,
                       enabled: ready,
                       child: Text(book.title, style: bookTitleStyle),
                     ),

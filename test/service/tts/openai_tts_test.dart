@@ -4,6 +4,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/tts/openai_tts_backend.dart';
 import 'package:anx_reader/service/tts/openai_voice_presets.dart';
 import 'package:anx_reader/service/tts/stable_narration.dart';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -25,6 +26,29 @@ void main() {
   Future<void> config(Map<String, dynamic> values) =>
       Prefs().saveOnlineTtsConfig(
           'openai', {'key': 'fixture-key', 'voice': 'nova', ...values});
+
+  test('HTTP errors preserve retry policy but never echo response bodies',
+      () async {
+    await config({});
+    for (final status in [401, 429, 503]) {
+      final client = MockClient((_) async => http.Response(
+          'PRIVATE_BOOK fixture-key', status,
+          headers: {'retry-after': '3'}));
+      addTearDown(client.close);
+      final failing = OpenAiTtsProvider.forTesting(client: client);
+      await expectLater(
+          failing.speak('正文', null, 1, 1),
+          throwsA(isA<TtsSynthesisError>()
+              .having((e) => e.statusCode, 'status', status)
+              .having((e) => e.retryable, 'retryable', status != 401)
+              .having(
+                  (e) => e.retryAfter, 'cooldown', const Duration(seconds: 3))
+              .having((e) => e.toString(), 'no content',
+                  isNot(contains('PRIVATE_BOOK')))
+              .having((e) => e.toString(), 'no key',
+                  isNot(contains('fixture-key')))));
+    }
+  });
 
   test('every template is instructions, never input or a voice ID', () async {
     for (final prompt in OpenAiVoicePresets.templates.values) {

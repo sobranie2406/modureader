@@ -2,6 +2,7 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_common.dart';
+import 'package:anx_reader/widgets/dictionary/dictionary_sources.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,23 @@ FileType dictionaryPickerType(TargetPlatform platform) =>
 
 const dictionaryExtensions = [
   'mdx',
+  'mdd',
+  'css',
+  'js',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'svg',
+  'mp3',
+  'wav',
+  'ogg',
+  'm4a',
+  'aac',
+  'woff',
+  'woff2',
+  'ttf',
   'zip',
   'ifo',
   'idx',
@@ -175,13 +193,20 @@ class _DictionarySettingsState extends State<DictionarySettings> {
         const SizedBox(height: 12),
         Text(ModuStrings.text(
             context,
-            '应用不内嵌字典。请导入有权使用的本地字典；选中文字后点“字典”即可离线查询所有已启用的字典。字典仅保存在本机，不参加 WebDAV 同步或设置备份。',
-            'No dictionaries are bundled. Import dictionaries you are licensed to use, then select text and tap Dictionary to search enabled dictionaries offline. Dictionaries stay on this device and are excluded from WebDAV sync and settings backups.')),
+            '不预装本地词典数据。请导入有权使用的字典；可选择一本或多本进行离线查询，也可按需启用免费在线词典。本地字典及查询来源选择不参加 WebDAV 同步或设置备份。',
+            'No local dictionary data is bundled. Import dictionaries you are licensed to use; select one or more for offline lookup, or opt into free online dictionaries. Local dictionaries and source selections are excluded from WebDAV sync and settings backups.')),
+        TextButton.icon(
+            onPressed: _busy || _loading
+                ? null
+                : () => showDictionarySources(context, _items),
+            icon: const Icon(Icons.checklist),
+            label: Text(ModuStrings.text(context, '查询来源 / 在线字典',
+                'Query sources / online dictionaries'))),
         const SizedBox(height: 12),
         Text(ModuStrings.text(
             context,
-            '支持：MDX 1/2（非 LZO、非加密正文，≤256 MiB）；StarDict 2.4.2/3.0.0（IFO + IDX/IDX.GZ + DICT/DICT.DZ，可选 SYN），也支持单本字典 ZIP。仅显示文字释义；不执行脚本、不加载外部资源，暂不支持 MDD 图片/音频和 DSL。',
-            'Supported: MDX 1/2 (no LZO or encrypted records, ≤256 MiB); StarDict 2.4.2/3.0.0 (IFO + IDX/IDX.GZ + DICT/DICT.DZ, optional SYN), or a ZIP with one dictionary. Text definitions only: no scripts or external resources. MDD images/audio and DSL are not supported yet.')),
+            '支持 MDX 1/2（非 LZO、非加密正文，≤256 MiB），可同时选择同名 MDD、图片、音频、CSS、JS；有子目录时请使用 ZIP 保留目录结构。原版内容在隔离窗口显示，只加载已导入资源，音频需点击播放；旧词典需重新导入。StarDict 2.4.2/3.0.0 仍显示文字释义；暂不支持 DSL。',
+            'Supports MDX 1/2 (no LZO or encrypted records, ≤256 MiB), with matching MDD, images, audio, CSS and JS. Use ZIP to preserve subdirectories. Original content opens in isolation using imported resources only; tap to play audio. Reimport old dictionaries. StarDict 2.4.2/3.0.0 remains text-only; DSL is unsupported.')),
         const SizedBox(height: 16),
         FilledButton.icon(
             onPressed: _busy || _loading ? null : _import,

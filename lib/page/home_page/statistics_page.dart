@@ -10,6 +10,7 @@ import 'package:anx_reader/providers/statistic_data.dart';
 import 'package:anx_reader/utils/date/convert_seconds.dart';
 import 'package:anx_reader/utils/date/week_of_year.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/common/container/filled_container.dart';
 import 'package:anx_reader/widgets/common/container/outlined_container.dart';
 import 'package:anx_reader/widgets/hint/hint_banner.dart';
@@ -316,18 +317,25 @@ class BookStatisticItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heroTag = 'history_list_${book.id}';
     return ReadingHistoryBookLink(
       book: book,
+      heroTag: heroTag,
       child: FilledContainer(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(8.0),
         child: Row(
           children: [
-            BookCover(
-              book: book,
-              height: 130,
-              width: 90,
-              radius: 20,
+            Hero(
+              tag: heroTag,
+              transitionOnUserGestures: true,
+              createRectTween: readerCoverRectTween,
+              child: BookCover(
+                book: book,
+                height: 130,
+                width: 90,
+                radius: 20,
+              ),
             ),
             const SizedBox(width: 15),
             Flexible(

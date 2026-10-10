@@ -15,6 +15,38 @@ import 'package:uuid/uuid.dart';
 const _entryLimit = 2 * 1024 * 1024;
 const _indexLimit = 64 * 1024 * 1024;
 const _dataLimit = 2 * 1024 * 1024 * 1024;
+const dictionaryResourceLimit = 32 * 1024 * 1024;
+
+String dictionaryResourcePath(String path) {
+  final normalized =
+      path.replaceAll('\\', '/').replaceFirst(RegExp(r'^/+'), '');
+  if (normalized.isEmpty ||
+      normalized.contains(':') ||
+      normalized.contains('\u0000') ||
+      normalized.split('/').contains('..')) {
+    throw const DictionaryFailure('resource');
+  }
+  return p.posix.normalize(normalized);
+}
+
+const dictionaryResourceTypes = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.css': 'text/css',
+  '.js': 'text/javascript',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+};
 
 class DictionaryFailure implements Exception {
   const DictionaryFailure(this.code);
@@ -32,8 +64,17 @@ class LocalDictionary {
 }
 
 class DictionaryEntry {
-  const DictionaryEntry(this.dictionary, this.word, this.definition);
+  const DictionaryEntry(this.dictionary, this.word, this.definition,
+      {this.dictionaryId,
+      this.sourceUri,
+      this.license,
+      this.licenseUri,
+      this.html,
+      this.attribution});
   final String dictionary, word, definition;
+  final String? dictionaryId, license, attribution;
+  final Uri? sourceUri, licenseUri;
+  final String? html;
 }
 
 /// Independent local storage: deliberately outside book DB, prefs and WebDAV
@@ -87,17 +128,40 @@ class LocalDictionaryStore {
         if (await file.exists()) await file.delete();
       });
 
-  Future<List<DictionaryEntry>> lookup(String word) => _serial(() {
+  Future<List<DictionaryEntry>> lookup(String word,
+          {Set<String>? dictionaryIds}) =>
+      _serial(() {
         final query = word.trim();
         if (query.isEmpty || query.length > 256) {
           return Future.value(<DictionaryEntry>[]);
         }
-        return _lookupAsync(root, query);
+        return _lookupAsync(root, query, dictionaryIds?.toSet());
+      });
+
+  Future<Uint8List?> resource(String id, String name) => _serial(() {
+        final file = _dictionaryPath(root, id);
+        final key = dictionaryResourcePath(name);
+        return _resourceAsync(file, key);
       });
 }
 
 // Separate top-level scopes prevent Isolate.run from capturing a store's
 // pending Future, Flutter widgets or the progress callback along with its data.
+Future<Uint8List?> _resourceAsync(String file, String key) => Isolate.run(() {
+      final db = sqlite3.open(file, mode: OpenMode.readOnly);
+      try {
+        if (db
+            .select("SELECT name FROM sqlite_master WHERE name='resources'")
+            .isEmpty) {
+          return null;
+        }
+        final rows =
+            db.select('SELECT data FROM resources WHERE path=?', [key]);
+        return rows.isEmpty ? null : rows.single['data'] as Uint8List;
+      } finally {
+        db.dispose();
+      }
+    });
 Future<List<LocalDictionary>> _listAsync(String directory) =>
     Isolate.run(() => _list(directory));
 Future<void> _importAsync(
@@ -115,15 +179,18 @@ Future<void> _updateAsync(String path, String? name, bool? enabled) =>
         db.dispose();
       }
     });
-Future<List<DictionaryEntry>> _lookupAsync(String directory, String query) =>
+Future<List<DictionaryEntry>> _lookupAsync(
+        String directory, String query, Set<String>? ids) =>
     Isolate.run(() {
       final result = <DictionaryEntry>[];
-      for (final dictionary in _list(directory).where((d) => d.enabled)) {
+      for (final dictionary in _list(directory)
+          .where((d) => d.enabled && (ids == null || ids.contains(d.id)))) {
         final db = sqlite3.open(_dictionaryPath(directory, dictionary.id),
             mode: OpenMode.readOnly);
         try {
-          result.addAll(_lookup(db, query, <String>{})
-              .map((row) => DictionaryEntry(dictionary.name, row.$1, row.$2)));
+          result.addAll(_lookup(db, query, <String>{}).map((row) =>
+              DictionaryEntry(dictionary.name, row.$1, row.$2,
+                  html: row.$3, dictionaryId: dictionary.id)));
         } finally {
           db.dispose();
         }
@@ -165,12 +232,17 @@ List<LocalDictionary> _list(String root) {
   return result;
 }
 
-List<(String, String)> _lookup(Database db, String word, Set<String> visited) {
+List<(String, String, String?)> _lookup(
+    Database db, String word, Set<String> visited) {
   final key = word.trim().toLowerCase();
   if (visited.length >= 8 || !visited.add(key)) return [];
-  final rows =
-      db.select('SELECT word,body FROM entries WHERE lookup=? LIMIT 20', [key]);
-  final result = <(String, String)>[];
+  final hasHtml = db
+      .select('PRAGMA table_info(entries)')
+      .any((row) => row['name'] == 'html');
+  final rows = db.select(
+      'SELECT word,body,${hasHtml ? 'html' : 'NULL AS html'} FROM entries WHERE lookup=? LIMIT 20',
+      [key]);
+  final result = <(String, String, String?)>[];
   for (final row in rows) {
     if (result.length >= 20) break;
     final body = row['body'] as String;
@@ -178,7 +250,7 @@ List<(String, String)> _lookup(Database db, String word, Set<String> visited) {
       result.addAll(_lookup(db, body.substring(8).trim(), visited)
           .take(20 - result.length));
     } else {
-      result.add((row['word'] as String, body));
+      result.add((row['word'] as String, body, row['html'] as String?));
     }
   }
   return result;
@@ -216,7 +288,7 @@ Future<void> _import(
   final stage = Directory(root).createTempSync('.import-');
   Database? db;
   try {
-    if (paths.isEmpty || paths.length > 16) {
+    if (paths.isEmpty || paths.length > 1000) {
       throw const DictionaryFailure('files');
     }
     if (paths.length == 1 && paths.single.toLowerCase().endsWith('.zip')) {
@@ -229,7 +301,9 @@ Future<void> _import(
     db = sqlite3.open(output);
     db.execute('PRAGMA cache_size=-4096');
     db.execute(
-        'CREATE TABLE entries(id INTEGER PRIMARY KEY, word TEXT NOT NULL, lookup TEXT NOT NULL, body TEXT NOT NULL)');
+        'CREATE TABLE entries(id INTEGER PRIMARY KEY, word TEXT NOT NULL, lookup TEXT NOT NULL, body TEXT NOT NULL, html TEXT)');
+    db.execute(
+        'CREATE TABLE resources(path TEXT PRIMARY KEY, data BLOB NOT NULL)');
     db.execute(
         'CREATE TABLE info(name TEXT, format TEXT, count INTEGER, enabled INTEGER)');
     var count = 0;
@@ -288,6 +362,10 @@ Future<void> _import(
               throw const DictionaryFailure('entry');
             }
             add(entry.keyText, dictionaryPlainText(entry.data));
+            totalBytes += utf8.encode(entry.data).length;
+            if (totalBytes > _dataLimit) throw const DictionaryFailure('size');
+            db.execute('UPDATE entries SET html=? WHERE id=?',
+                [entry.data, db.lastInsertRowId]);
           }
           if (count != reader.numEntries) {
             throw const DictionaryFailure('count');
@@ -295,6 +373,7 @@ Future<void> _import(
         } finally {
           await reader.close();
         }
+        await _importResources(db, paths, mdx.single, _dataLimit - totalBytes);
       } else {
         await _readStarDict(ifo.single, paths, stage.path, db, add);
       }
@@ -320,6 +399,79 @@ Future<void> _import(
   } finally {
     db?.dispose();
     if (stage.existsSync()) stage.deleteSync(recursive: true);
+  }
+}
+
+Future<void> _importResources(
+    Database db, List<String> paths, String mdx, int budget) async {
+  final statement = db.prepare('INSERT INTO resources(path,data) VALUES(?,?)');
+  var total = 0, count = 0;
+  void add(String name, List<int> bytes) {
+    final key = dictionaryResourcePath(name);
+    if (!dictionaryResourceTypes
+        .containsKey(p.posix.extension(key).toLowerCase())) {
+      return;
+    }
+    total += bytes.length;
+    if (bytes.length > dictionaryResourceLimit ||
+        total > budget ||
+        ++count > 100000) {
+      throw const DictionaryFailure('size');
+    }
+    statement.execute([key, Uint8List.fromList(bytes)]);
+  }
+
+  try {
+    for (final path in paths) {
+      final ext = p.extension(path).toLowerCase();
+      if (ext == '.mdd') {
+        final stem = p.basenameWithoutExtension(mdx).toLowerCase();
+        if (!RegExp('^${RegExp.escape(stem)}(?:\\.\\d+)?\\.mdd\$',
+                caseSensitive: false)
+            .hasMatch(p.basename(path))) {
+          throw const DictionaryFailure('companions');
+        }
+        if (File(path).lengthSync() > 256 * 1024 * 1024) {
+          throw const DictionaryFailure('size');
+        }
+        final reader = DictReader(path);
+        try {
+          await reader.initDict(readKeys: false, readRecordBlockInfo: false);
+          final version = double.tryParse(
+                  reader.header['GeneratedByEngineVersion'] ?? '') ??
+              0;
+          final encrypted = reader.header['Encrypted'] ?? 'No';
+          if (version < 1 ||
+              version >= 3 ||
+              encrypted == 'Yes' ||
+              ((int.tryParse(encrypted) ?? 0) & 1) != 0) {
+            throw const DictionaryFailure('format');
+          }
+          await reader.initDict();
+          var records = 0;
+          await for (final resource in reader.readWithMddData()) {
+            if (resource.data.length > dictionaryResourceLimit) {
+              throw const DictionaryFailure('size');
+            }
+            add(resource.keyText, resource.data);
+            records++;
+          }
+          if (records != reader.numEntries) {
+            throw const DictionaryFailure('count');
+          }
+        } finally {
+          await reader.close();
+        }
+      } else if (dictionaryResourceTypes.containsKey(ext)) {
+        if (File(path).lengthSync() > dictionaryResourceLimit) {
+          throw const DictionaryFailure('size');
+        }
+        add(p.relative(path, from: p.dirname(mdx)),
+            await File(path).readAsBytes());
+      }
+    }
+  } finally {
+    statement.dispose();
   }
 }
 
@@ -350,9 +502,13 @@ Future<List<String>> _unzip(String path, String target) async {
       }
       if (name.endsWith('/')) continue;
       final base = p.posix.basename(name);
-      if (!RegExp(r'\.(mdx|ifo|idx|idx\.gz|dict|dict\.dz|syn)$',
+      final dictionaryFile = RegExp(
+              r'\.(mdx|mdd|ifo|idx|idx\.gz|dict|dict\.dz|syn)$',
               caseSensitive: false)
-          .hasMatch(base)) {
+          .hasMatch(base);
+      if (!dictionaryFile &&
+          !dictionaryResourceTypes
+              .containsKey(p.posix.extension(base).toLowerCase())) {
         continue;
       }
       final size = header.uncompressedSize ?? -1;
@@ -360,7 +516,7 @@ Future<List<String>> _unzip(String path, String target) async {
       if (size < 0 || size > _dataLimit || total > _dataLimit) {
         throw const DictionaryFailure('size');
       }
-      if (!names.add(base.toLowerCase())) {
+      if (!names.add((dictionaryFile ? base : name).toLowerCase())) {
         throw const DictionaryFailure('files');
       }
       if (entry.flags & 1 != 0 || !{0, 8}.contains(entry.compressionMethod)) {
@@ -377,7 +533,8 @@ Future<List<String>> _unzip(String path, String target) async {
           ? compressed().transform(ZLibDecoder(raw: true))
           : compressed();
       var written = 0, crc = 0;
-      final file = File(p.join(target, base));
+      final file = File(p.join(target, name));
+      file.parent.createSync(recursive: true);
       final sink = file.openWrite();
       try {
         await sink.addStream(stream.map((bytes) {

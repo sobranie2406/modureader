@@ -587,6 +587,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         mobileTouchPaging: ${AnxPlatform.isMobile},
         desktopPageInput: ${AnxPlatform.isDesktop},
         keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
+        readerShortcuts: ${jsonEncode(Prefs().readerShortcuts.actions(ctrlBrackets: Prefs().keyboardShortcutTurnPage))},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
         longPressSelectParagraph: ${Prefs().longPressSelectParagraph},
         selectionLocale: ${jsonEncode(Prefs().effectiveLocale.toLanguageTag())},
@@ -696,6 +697,15 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     }
     webViewController.evaluateJavascript(
         source: 'window.turnPageFromKeyboard($direction)');
+  }
+
+  void readerActionFromKeyboard(String action) {
+    if (readingPageKey.currentState?.isReflowReading == true) {
+      readingPageKey.currentState?.handleReaderShortcut(action);
+      return;
+    }
+    webViewController.evaluateJavascript(
+        source: 'window.readerActionFromKeyboard?.(${jsonEncode(action)})');
   }
 
   String? _pendingLinkedCfi;
@@ -946,6 +956,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
 
   Future<String> ttsNext() => _ttsTextCall('ttsNext');
   Future<String> ttsPrev() => _ttsTextCall('ttsPrev');
+  Future<String> ttsPrevParagraph() => _ttsTextCall('ttsPrevParagraph');
+  Future<String> ttsNextParagraph() => _ttsTextCall('ttsNextParagraph');
   Future<String> ttsPrevSection() => _ttsTextCall('ttsPrevSection');
   Future<String> ttsNextSection() => _ttsTextCall('ttsNextSection');
 
@@ -1361,6 +1373,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }
 
   Future<void> setHandler(InAppWebViewController controller) async {
+    controller.addJavaScriptHandler(
+        handlerName: 'onReaderShortcut',
+        callback: (args) {
+          if (mounted && args.isNotEmpty && args.first is String) {
+            readingPageKey.currentState?.handleReaderShortcut(args.first);
+          }
+        });
     controller.addJavaScriptHandler(
         handlerName: 'onPdfReadingSettings',
         callback: (_) {
@@ -2204,6 +2223,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           ),
           child: ReadingInfoLine(
             style: headerTextStyle,
+            titleSlots: {
+              for (final (index, field) in [
+                readingInfo.header.left,
+                readingInfo.header.center,
+                readingInfo.header.right,
+              ].indexed)
+                if (field == ReadingInfoEnum.chapterTitle) index,
+            },
             children: headerWidgets,
           ),
         ),
@@ -2216,6 +2243,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           ),
           child: ReadingInfoLine(
             style: footerTextStyle,
+            titleSlots: {
+              for (final (index, field) in [
+                readingInfo.footer.left,
+                readingInfo.footer.center,
+                readingInfo.footer.right,
+              ].indexed)
+                if (field == ReadingInfoEnum.chapterTitle) index,
+            },
             children: footerWidgets,
           ),
         ),

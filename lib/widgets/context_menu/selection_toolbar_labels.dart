@@ -4,6 +4,7 @@ import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:flutter/material.dart';
 
 const selectionToolbarIcons = <String, IconData>{
+  'query': Icons.manage_search,
   'copy': Icons.content_copy,
   'search': Icons.travel_explore,
   'translate': Icons.translate,
@@ -29,9 +30,11 @@ IconData selectionToolbarIcon(SelectionToolbarItem item) =>
     Icons.auto_awesome;
 
 String selectionToolbarLabel(BuildContext context, SelectionToolbarItem item) {
-  if (item.name.trim().isNotEmpty) return item.localizedName(Localizations.localeOf(context)).trim();
+  if (item.name.trim().isNotEmpty)
+    return item.localizedName(Localizations.localeOf(context)).trim();
   final l10n = L10n.of(context);
   return switch (item.action) {
+    'query' => ModuStrings.text(context, '综合', 'Look up'),
     'copy' => l10n.contextMenuCopy,
     'search' => l10n.contextMenuSearch,
     'translate' => l10n.contextMenuTranslate,

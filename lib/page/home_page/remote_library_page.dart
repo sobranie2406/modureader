@@ -9,6 +9,7 @@ import 'package:anx_reader/service/book.dart';
 import 'package:anx_reader/service/book_import_source.dart';
 import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/utils/log/common.dart';
+import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/service/md5_service.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:anx_reader/service/remote_library/library_view_options.dart';
@@ -134,9 +135,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   }
 
   void _message(String value) {
-    if (mounted)
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(value)));
+    if (mounted) AnxToast.show(value, context: context);
   }
 
   Future<void> _getBook(LibraryEntry entry) async {

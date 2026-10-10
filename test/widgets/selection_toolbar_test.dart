@@ -65,7 +65,13 @@ void main() {
     await reveal(tester, key('toolbar-toggle-copy'));
     await tester.tap(key('toolbar-toggle-copy'));
     await tester.pumpAndSettle();
-    expect(Prefs().selectionToolbar.items.first.enabled, false);
+    expect(
+        Prefs()
+            .selectionToolbar
+            .items
+            .firstWhere((i) => i.id == 'copy')
+            .enabled,
+        false);
     await reveal(tester, key('selection-toolbar-enabled'));
     await tester.tap(key('selection-toolbar-enabled'));
     await tester.pumpAndSettle();
@@ -73,17 +79,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+      'default-on tools precede annotations and optional tools without rewriting saved order',
+      (tester) async {
+    const defaults = SelectionToolbarConfig();
+    final front = ['search', 'query', 'translate', 'narrate'];
+    final config = defaults.copyWith(items: [
+      for (final id in front) defaults.items.singleWhere((i) => i.id == id),
+      ...defaults.items.where((i) => !front.contains(i.id)),
+    ]);
+    await Prefs().saveSelectionToolbar(config);
+    await tester.pumpWidget(app(const SelectionToolbarSettings()));
+    await tester.pumpAndSettle();
+    expect(Prefs().selectionToolbar.encode(), config.encode());
+    final scroll =
+        tester.widget<CustomScrollView>(key('selection-toolbar-scroll'));
+    expect(scroll.slivers.whereType<SliverPadding>().map((s) => s.child?.key), [
+      const ValueKey('selection-action-order'),
+      const ValueKey('selection-annotation-order'),
+      const ValueKey('selection-optional-order'),
+    ]);
+    await reveal(tester, key('toolbar-item-search'));
+    final optional =
+        tester.widget<SliverReorderableList>(key('selection-optional-order'));
+    optional.onReorderItem!(0, 1);
+    await tester.pumpAndSettle();
+    expect(Prefs().selectionToolbar.items.take(4).map((i) => i.id),
+        ['translate', 'query', 'search', 'narrate']);
+    expect(Prefs().selectionToolbar.annotations.map((i) => i.id),
+        defaults.annotations.map((i) => i.id));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('drag order persists and annotation order is independent',
       (tester) async {
     await tester.pumpWidget(app(const SelectionToolbarSettings()));
     await tester.pumpAndSettle();
-    await reveal(tester, key('toolbar-item-copy'));
+    await reveal(tester, key('toolbar-item-narrate'));
     await tester.pumpAndSettle();
     final handle = find.descendant(
-        of: key('toolbar-item-copy'),
+        of: key('toolbar-item-narrate'),
         matching: find.byType(ReorderableDragStartListener));
     final first = tester.getCenter(handle);
-    final third = tester.getCenter(key('toolbar-item-translate'));
+    final third = tester.getCenter(key('toolbar-item-copy'));
     expect(handle.hitTestable(), findsOneWidget);
     final gesture = await tester.startGesture(first);
     await tester.pump(const Duration(milliseconds: 100));
@@ -95,8 +133,8 @@ void main() {
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(Prefs().selectionToolbar.items.take(3).map((i) => i.id),
-        ['search', 'copy', 'translate']);
+    expect(Prefs().selectionToolbar.items.take(4).map((i) => i.id),
+        ['query', 'note', 'narrate', 'copy']);
     expect(Prefs().selectionToolbar.annotations.first.id, 'delete');
     await reveal(tester, key('toolbar-item-delete'));
     final annotations =
@@ -111,20 +149,20 @@ void main() {
       (tester) async {
     await tester.pumpWidget(app(const SelectionToolbarSettings()));
     await tester.pumpAndSettle();
-    await reveal(tester, key('toolbar-item-copy'));
+    await reveal(tester, key('toolbar-item-narrate'));
     final label = find.descendant(
-        of: key('toolbar-item-copy'),
+        of: key('toolbar-item-narrate'),
         matching: find.byType(ReorderableDelayedDragStartListener));
     final first = tester.getCenter(label);
-    final third = tester.getCenter(key('toolbar-item-translate'));
+    final third = tester.getCenter(key('toolbar-item-copy'));
     final gesture = await tester.startGesture(first);
     await tester.pump(const Duration(milliseconds: 600));
     await gesture.moveTo(Offset(first.dx, third.dy));
     await tester.pump(const Duration(milliseconds: 400));
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(Prefs().selectionToolbar.items.take(3).map((i) => i.id),
-        ['search', 'copy', 'translate']);
+    expect(Prefs().selectionToolbar.items.take(4).map((i) => i.id),
+        ['query', 'note', 'narrate', 'copy']);
     expect(Prefs().selectionToolbar.items.first.enabled, true);
     expect(tester.takeException(), isNull);
   });
@@ -335,7 +373,8 @@ void main() {
         (tester) async {
       final chosen = <String>[];
       final items = [
-        SelectionToolbarConfig.defaultItems.last
+        SelectionToolbarConfig.defaultItems
+            .singleWhere((i) => i.id == 'share')
             .copyWith(name: '海报', icon: 'star'),
         ...SelectionToolbarConfig.defaultItems.take(7)
       ];

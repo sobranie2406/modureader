@@ -25,6 +25,8 @@ import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/widgets/bookshelf/book_bottom_sheet.dart';
 import 'package:anx_reader/widgets/bookshelf/book_item.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
+import 'package:anx_reader/widgets/page_router/reading_route.dart';
 import 'package:anx_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -167,7 +169,9 @@ void main() {
                                             book.copyWith(groupId: 42),
                                             if (!singleInFolder)
                                               book.copyWith(
-                                                  id: 790, groupId: 42)
+                                                  id: 790,
+                                                  groupId: 42,
+                                                  coverPath: 'cover/second.png')
                                           ],
                                           selectionMode: selection,
                                           onSelectionChanged: select,
@@ -232,6 +236,65 @@ void main() {
     });
   }
 
+  testWidgets(
+      'cover long press enters batch selection without a persistent sheet',
+      (tester) async {
+    await mount(tester, shelf: true);
+    await tester.longPress(find.byType(BookItem).first);
+    await tester.pumpAndSettle();
+    expect(find.text('已选 1 本'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(PopupMenuItem<BookAction>), findsNothing);
+    await tester.tap(find.byType(BookItem).last);
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 本'), findsOneWidget);
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 本'), findsOneWidget);
+    expect(File(book.fileFullPath).existsSync(), isTrue);
+    final context = tester.element(find.byType(BookshelfPage));
+    await Navigator.of(context).maybePop();
+    await tester.pumpAndSettle();
+    expect(find.text('选择'), findsOneWidget);
+    await tester.tap(find.byTooltip('书籍操作').first);
+    await tester.pumpAndSettle();
+    expect(actions(tester), BookAction.values);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(PopupMenuItem<BookAction>), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.all());
+
+  testWidgets('folder books long press supports batch selection and cancel',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await mount(tester, folder: true);
+    await tester.tap(find.byType(BookFolder));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byType(BookItem).first);
+    await tester.pumpAndSettle();
+    expect(find.text('已选 1 本'), findsOneWidget);
+    await tester.tap(find.text('全选'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 本'), findsOneWidget);
+    expect(find.text('新建文件夹'), findsOneWidget);
+    expect(find.text('移入文件夹'), findsOneWidget);
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 本'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('书籍操作'), findsNWidgets(2));
+    expect(File(book.fileFullPath).existsSync(), isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('one-book folder still opens as folder and exposes folder menu',
       (tester) async {
     await mount(tester, folder: true, singleInFolder: true);
@@ -244,6 +307,50 @@ void main() {
     expect(find.byType(BookItem), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final eink in [false, true]) {
+    testWidgets(
+        'folder cover flies to reader and returns to folder; eink=$eink',
+        (tester) async {
+      Prefs().eInkMode = eink;
+      await mount(tester, folder: true);
+      await tester.tap(find.byType(BookFolder));
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(BookItem).first);
+      final folderRoute = ModalRoute.of(context)!;
+      expect(folderRoute, isA<PageRoute<void>>());
+      expect(folderRoute.barrierDismissible, true);
+      if (eink) expect(folderRoute.transitionDuration, Duration.zero);
+      final navigator = Navigator.of(context);
+      navigator.push(readingRoute<void>(
+        animate: Prefs().openBookAnimation,
+        builder: (_) => ReaderCoverHero(
+          tag: book.coverFullPath,
+          cover: const Text('flying folder cover'),
+          child: const Scaffold(body: Text('reader body')),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('flying folder cover'),
+          eink ? findsNothing : findsOneWidget);
+      await tester.pumpAndSettle();
+      navigator.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('flying folder cover'),
+          eink ? findsNothing : findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byType(BookOpenedFolder), findsOneWidget);
+      // Modal dismissal still works after returning from the reader.
+      await tester.tapAt(const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(find.byType(BookOpenedFolder), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+        variant: TargetPlatformVariant(
+            {TargetPlatform.android, TargetPlatform.iOS}));
+  }
 
   testWidgets('folder tile long press offers pin, selection mode hides menu',
       (tester) async {
@@ -380,7 +487,9 @@ void main() {
         isNot(contains(bookPinKey(book))));
     expect(tester.takeException(), isNull);
   });
-  testWidgets('book menu can set scanned mode and restore standard without changing progress', (tester) async {
+  testWidgets(
+      'book menu can set scanned mode and restore standard without changing progress',
+      (tester) async {
     await mount(tester);
     final position = book.lastReadPosition;
     final store = DocumentReadingModeStore(Prefs().prefs);

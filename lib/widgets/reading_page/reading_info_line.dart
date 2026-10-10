@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 /// icons cannot paint into the text below/above the reader chrome.
 class ReadingInfoLine extends StatelessWidget {
   const ReadingInfoLine(
-      {super.key, required this.style, required this.children});
+      {super.key,
+      required this.style,
+      required this.children,
+      this.titleSlots = const {}});
 
   final TextStyle style;
   final List<Widget> children;
+  final Set<int> titleSlots;
 
   @override
   Widget build(BuildContext context) {
@@ -22,13 +26,40 @@ class ReadingInfoLine extends StatelessWidget {
           style: lineStyle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              for (final child in children) Flexible(child: child),
-            ],
-          ),
+          child: LayoutBuilder(
+              builder: (context, constraints) => Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      for (var i = 0; i < children.length; i++)
+                        if (titleSlots.isEmpty)
+                          Flexible(child: children[i])
+                        else if (titleSlots.contains(i))
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.only(
+                                  start: i == 0 ? 0 : 4,
+                                  end: i == children.length - 1 ? 0 : 4),
+                              child: Align(
+                                alignment: [
+                                  AlignmentDirectional.centerStart,
+                                  Alignment.center,
+                                  AlignmentDirectional.centerEnd,
+                                ][i],
+                                child: children[i],
+                              ),
+                            ),
+                          )
+                        else
+                          // Short metadata keeps its natural width; titles use the rest.
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                                maxWidth:
+                                    constraints.maxWidth / children.length),
+                            child: children[i],
+                          ),
+                    ],
+                  )),
         ),
       ),
     );

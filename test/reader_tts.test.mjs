@@ -148,6 +148,32 @@ test('legacy numbered note links and their target paragraphs are skipped, ordina
     <p><a id="note_1"></a>老式章末注释。</p><p>后续正文。</p>`)
   assert.deepEqual(all(speech(doc)), ['正文继续，2026年与x2。', '后续正文。'])
 })
+for (const paragraphMode of [false, true]) {
+  test(`publisher cross-chapter parenthesized notes after quotes are silent (${paragraphMode})`, () => {
+    // Same markup as the supplied EPUB; synthetic text keeps the fixture small.
+    const doc = documentFor(`<p>他说：“正文。”<a id="ch5-back" href="part002.html#ch5"><sup class="calibre6">(5)</sup></a>继续正文。</p>
+      <p>“另一句”<a id="ch6-back" href="part002.html#ch6"><sup>(6)</sup></a>，保留2026年与x<sup>2</sup>。</p>
+      <p class="fnote"><a id="ch5" href="part001.html#ch5-back">(5)</a>注释内容。</p>
+      <p>后续正文。</p>`)
+    const before = doc.body.innerHTML
+    const tts = new TTS(doc, null, () => null, r => r.toString(), {paragraphMode})
+    const expected = paragraphMode
+      ? ['他说：“正文。”继续正文。', '“另一句”，保留2026年与x2。', '后续正文。']
+      : ['他说：“正文。”', '继续正文。', '“另一句”，保留2026年与x2。', '后续正文。']
+    assert.deepEqual(all(tts), expected)
+    tts.start()
+    assert.deepEqual(tts.collectDetails(10, {includeCurrent:true}).map(x => x.text), expected)
+    assert.equal(doc.body.innerHTML, before)
+  })
+}
+
+test('parenthesized ordinary links and superscript numbers remain speech', () => {
+  const doc = documentFor(`<p>项目(5)，<a href="part002.html#ch5">(5)</a>，
+    <a id="ch6-back" href="part002.html#ch6">(6)</a>，
+    <a id="ch7-back" href="part002.html#other"><sup>(7)</sup></a>，
+    <a id="ch8-back" href="https://example.com/#ch8"><sup>(8)</sup></a>，x<sup>2</sup>。</p>`)
+  assert.equal(all(speech(doc)).join('').replace(/\s+/g, ''), '项目(5)，(5)，(6)，(7)，(8)，x2。')
+})
 test('CSS-hidden spans inside a sentence are filtered using original ancestors', () => {
   const doc = documentFor(`<style>.popup { display:none }</style>
     <p>开始<span class="popup">隐藏注释。</span>结束。</p>

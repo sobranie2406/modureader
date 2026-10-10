@@ -1,10 +1,10 @@
-# Modu 1.2.4 settings and features
+# Modu 1.2.5 settings and features
 
 English · [简体中文](SETTINGS_zh.md) · [Home](../README_EN.md) · [Documentation](README.md)
 
-For stable **1.2.4+10093**, updated 2026-10-09. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
+For stable **1.2.5+10102**, updated 2026-10-10. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 
-The 1.2.3 source review was updated for the changes in [1.2.4](https://github.com/sobranie2406/modureader/tree/v1.2.4). See the [detailed feature guide](FEATURES.md) for workflows, defaults and boundaries. Source and automated checks are distinct from device acceptance on every platform.
+The source review includes the changes in [1.2.5](https://github.com/sobranie2406/modureader/tree/v1.2.5). See the [detailed feature guide](FEATURES.md) for workflows, defaults and boundaries. Source and automated checks are distinct from device acceptance on every platform.
 
 ## Settings entry points
 
@@ -101,6 +101,8 @@ Open **Settings → OCR model**. **PP-OCRv4 Chinese / English** is recommended; 
 
 Cards support download-and-use, selection, verification, cancellation and deletion. Files must pass size and SHA-256 checks before use. Deleting a downloaded model does not delete books. Recognition runs locally and needs no OCR API key. Model choice and source settings can be backed up; model files are not transferred in global settings backups. Review small text, complex columns and poor-quality scans manually.
 
+Desktop and Android hardware keyboards can configure paging, menu, play/pause and previous/next paragraph under **Reading → Reader shortcuts**, below page-turn mode and above scrolling. Each action supports multiple bindings; conflicts are rejected and Restore defaults asks for confirmation. Play/pause shares P by default. Input fields, selection and dialogs are guarded; OS-reserved keys may not reach the app. Playback controls operate an active narration session.
+
 ## CSS and selection tools
 
 **Settings → CSS settings** provides 32 named slots and 13 editable presets. Enable the master switch and desired profiles; multiple profiles can apply together. Each book can follow the default combination or select its own. Profile contents are shared globally, so editing one can affect other books using it.
@@ -137,7 +139,11 @@ Index / re-index from a book's menu, or enable automatic indexing after import (
 
 ## Dictionaries, search and translation
 
-Import MDX 1/2 or StarDict companion files / ZIP that you are entitled to use. Lookup is offline and uses actual headwords; edit the query when necessary. Two-way lookup depends on the dictionary containing entries in both languages. There is no reverse search through Chinese definitions. Only text is displayed; dictionary scripts and media are not loaded. Dictionaries are not included in library sync or current backups.
+**Lookup** is enabled by default in the selection toolbar. Choose dictionaries, encyclopedia, translation and AI Knowledge independently for automatic overview queries. Book AI, Classical Chinese translation and Web search use separate tabs; Book AI prefills selected text without automatically sending. AI permits context selection, editing before sending and follow-ups. Classical Chinese translation hides reading-skill controls. Standalone dictionary/translation/AI tools remain available, disabled by default. Online providers receive the query or chosen context and may charge for requests.
+
+Choose one or several local dictionaries and optional Chinese/English Wiktionary in dictionary sources. Results identify their source, license/link for online entries, and unmatched selected dictionaries.
+
+Import MDX 1/2 or StarDict companion files / ZIP that you are entitled to use. Lookup is offline and uses actual headwords; edit the query when necessary. Two-way lookup depends on the dictionary containing entries in both languages. There is no reverse search through Chinese definitions. New MDX imports can retain original HTML with MDD/local images, audio, CSS and scripts displayed inline in an isolated view without app-bridge or external network access. Audio requires user interaction. Reimport old text-only dictionaries with resources to enable originals; StarDict remains text-only. Dictionaries are not included in library sync or current backups.
 
 Selection search opens results in the in-app browser. Choose a built-in engine or a custom URL containing {query}; results support zoom. The search site receives the query text.
 
@@ -151,7 +157,7 @@ The selection-translation window can switch providers and also supports Baidu / 
 
 Editable style templates include natural narration, gentle bedtime reading, fiction performance, knowledge explanation, classical recitation and news reading. OpenAI-compatible services must support the relevant instructions. MiMo offers preset voices or voice design from a description, not voice cloning. Descriptions instruct the model and are not spoken text; results depend on the service.
 
-A compact reader bar provides play/pause, return to the narration position and read from here. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
+A compact reader bar provides play/pause, previous/next paragraph arrows, return to the narration page and start from this page. Paragraph navigation preserves playing or paused state. Online playback supports up to 4× with separate 3× and 4× steps after 2×. System/instruction-based speed does not guarantee an exact multiplier. Clearing speech settings requires confirmation and does not clear the library. Transfer speech configuration through **Global settings backup**, not a separate QR entry.
 
 Online speech buffering provides lookahead (default 3 extra passages), maximum characters per request (240), synthesis concurrency (2), paragraph pause (0 ms), cache retention (10 minutes) and manual cache clearing. Stop and restart speech to apply playback changes; pause/resume retains the current settings. The reusable audio cache is memory-only, capped at 32 MiB; retention 0 clears it on stop. Manual clearing preserves active audio and the prepared queue. System TTS does not use these online settings. Prefetching may incur extra usage and high concurrency may trigger provider limits.
 
@@ -193,7 +199,7 @@ In **Remote library**, use the current-folder import button or a folder's menu t
 | Back up the local library | Settings → Sync → Database backup | ZIP with local books, covers, fonts, backgrounds, AI history, general settings and database records |
 | Migrate from ANX | Settings → Advanced → Import ANX Reader backup | Validate an ANX ZIP and merge supported books/records |
 
-Global settings backup includes appearance, reading layout, CSS, selection tools, prompts, speech, translation and model choices. It excludes font/background/dictionary/model files, books, notes, chats and reading progress. **Accounts, passwords and API keys are excluded by default; including them produces recoverable plaintext JSON / links, not encrypted backups.** Review the import scope first. With the credentials switch off, existing local credentials are preserved. There is no QR transfer; use a file for a complete backup.
+Global settings backup includes appearance, reading layout, keyboard shortcuts, CSS, selection tools, prompts, speech, translation and model choices. It excludes font/background/dictionary/model files, books, notes, chats and reading progress. **Accounts, passwords and API keys are excluded by default; including them produces recoverable plaintext JSON / links, not encrypted backups.** Review the import scope first. With the credentials switch off, existing local credentials are preserved. There is no QR transfer; use a file for a complete backup.
 
 Download the books you want to keep before exporting Modu-Backup-*.zip. Service credentials are excluded by default; optional encryption protects the settings section, not all books, notes or chats. Import the ZIP without unpacking it. Restore replaces the current library and backed-up settings rather than merging them. Back up current data first, wait for sync/indexing to finish, then close and reopen after restore.
 

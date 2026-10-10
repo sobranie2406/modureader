@@ -15,8 +15,9 @@ class ReadingHistoryBookAccess {
         whereArgs: [id],
       );
 
-  Future<void> open(WidgetRef ref, BuildContext context, Book book) =>
-      pushToReadingPage(ref, context, book);
+  Future<void> open(WidgetRef ref, BuildContext context, Book book,
+          {required String heroTag}) =>
+      pushToReadingPage(ref, context, book, heroTag: heroTag);
 }
 
 final readingHistoryBookAccessProvider =
@@ -26,11 +27,13 @@ class ReadingHistoryBookLink extends ConsumerStatefulWidget {
   const ReadingHistoryBookLink({
     super.key,
     required this.book,
+    required this.heroTag,
     required this.child,
     this.enabled = true,
   });
 
   final Book book;
+  final String heroTag;
   final Widget child;
   final bool enabled;
 
@@ -56,7 +59,7 @@ class _ReadingHistoryBookLinkState
             SnackBar(content: Text(L10n.of(context).bookDeleted)));
         return;
       }
-      await access.open(ref, context, book);
+      await access.open(ref, context, book, heroTag: widget.heroTag);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

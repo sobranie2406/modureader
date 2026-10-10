@@ -208,6 +208,21 @@ void main() {
       });
 
   for (final term in ['行藏', 'serendipity']) {
+    test(
+        'encyclopedia-only requests never contact dictionary or Baidu for $term',
+        () async {
+      final hosts = <String>[];
+      final result = await DictionaryWebSearch(
+          clientFactory: () => MockClient((request) async {
+                hosts.add(request.url.host);
+                return http.Response(payload(snippet: 'excerpt'), 200,
+                    headers: {
+                      'content-type': 'application/json; charset=utf-8'
+                    });
+              })).search(term, sites: const {'wikipedia'});
+      expect(hosts, [term == '行藏' ? 'zh.wikipedia.org' : 'en.wikipedia.org']);
+      expect(result.hits, hasLength(1));
+    });
     test('keyless search uses bounded literal query on fixed $term hosts',
         () async {
       final requests = <http.Request>[];

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/models/reader_shortcuts.dart';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
 import 'dart:core';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
@@ -56,6 +57,8 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'unifiedQueryPreferences',
+  'dictionaryLookupSources',
   'documentDetectedTypes',
   'documentReadingModes',
   'pdfReadingStates',
@@ -78,6 +81,8 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'unifiedQueryPreferences',
+  'dictionaryLookupSources',
   'documentDetectedTypes',
   'documentReadingModes',
   'pdfReadingStates',
@@ -1485,6 +1490,13 @@ class Prefs extends ChangeNotifier {
 
   bool get keyboardShortcutTurnPage {
     return prefs.getBool('keyboardShortcutTurnPage') ?? false;
+  }
+
+  ReaderShortcuts get readerShortcuts =>
+      ReaderShortcuts.decode(prefs.getString('readerShortcuts'));
+  set readerShortcuts(ReaderShortcuts value) {
+    prefs.setString('readerShortcuts', value.encode());
+    notifyListeners();
   }
 
   set swapPageTurnArea(bool status) {

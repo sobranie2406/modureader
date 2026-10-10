@@ -9,6 +9,7 @@ import 'package:anx_reader/service/tts/edge_tts_backend.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:anx_reader/service/tts/tts_provider.dart';
 import 'package:anx_reader/service/tts/tts_text_filter.dart';
 import 'package:anx_reader/service/tts/audio_mime_type.dart';
@@ -60,6 +61,7 @@ class OnlineTts extends BaseTts {
   int get _bufferCapacity => _settings.ahead + 1;
   int get _batchSize => _settings.concurrency;
   static const int _maxRetries = 2;
+  int _nextFetchId = 0;
   static final TtsCache _audioCache = TtsCache(maxEntries: 256);
   static int get cachedAudioBytes => _audioCache.byteCount;
   static int get cachedAudioEntries => _audioCache.entryCount;
@@ -316,7 +318,7 @@ class OnlineTts extends BaseTts {
       segment.fetchVersion = _audioFetchVersion; // Mark with current version
     }
     AnxLog.info(
-        'Cleared pending audio buffer - will re-fetch with new settings (version: $_audioFetchVersion)');
+        'Cleared pending audio buffer for retry/settings update (version: $_audioFetchVersion)');
   }
 
   // ============ Producer: Prefetcher Loop ============
@@ -438,19 +440,28 @@ class OnlineTts extends BaseTts {
 
     // Capture the version at the start of fetching
     final targetVersion = segment.fetchVersion;
+    final fetchId = ++_nextFetchId;
+    final providerId = _synthesizeOverride == null ? backend.serviceId : 'test';
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       if (_shouldStop || segment.fetchVersion != targetVersion) return;
       if (segment.isReady) return;
-
+      final watch = Stopwatch()..start();
       try {
         if (_synthesizeOverride != null) {
           final bytes =
               await _untilStopped(_synthesizeOverride!(segment.sentence.text));
           if (bytes == null) return;
           if (_shouldStop || segment.fetchVersion != targetVersion) return;
-          if (bytes.isEmpty) throw StateError('Empty speech audio');
+          if (bytes.isEmpty) {
+            throw TtsSynthesisError(
+                TtsFailureReason.invalidAudio, 'Empty speech audio');
+          }
           segment.audio = bytes;
+          if (attempt > 0) {
+            AnxLog.info(
+                'TTS fetch recovered: provider=$providerId fetch=$fetchId attempt=${attempt + 1}');
+          }
           return;
         }
         final currentBackend = backend;
@@ -482,35 +493,51 @@ class OnlineTts extends BaseTts {
         // Check if version is still valid (settings haven't changed during fetch)
         if (_shouldStop || segment.fetchVersion != targetVersion) {
           AnxLog.info(
-              'Audio fetch completed but version changed - discarding (segment version: ${segment.fetchVersion}, target: $targetVersion)');
+              'Audio fetch discarded: stopped=$_shouldStop, segmentVersion=${segment.fetchVersion}, targetVersion=$targetVersion');
           return;
         }
 
         if (bytes.isEmpty) {
-          throw StateError('Empty speech audio');
+          throw TtsSynthesisError(
+              TtsFailureReason.invalidAudio, 'Empty speech audio');
         } else {
           segment.audio = Uint8List.fromList(bytes);
         }
-        return; // Success, exit retry loop
-      } on TimeoutException {
-        if (_shouldStop || segment.fetchVersion != targetVersion) return;
-        AnxLog.severe(
-            'TTS fetch timeout (attempt ${attempt + 1}/${_maxRetries + 1})');
-        if (attempt == _maxRetries) {
-          // Check version before marking as silent
-          if (segment.fetchVersion == targetVersion) {
-            segment.error = TimeoutException('Speech synthesis timed out');
-          }
+        if (attempt > 0) {
+          AnxLog.info(
+              'TTS fetch recovered: provider=$providerId fetch=$fetchId attempt=${attempt + 1}');
         }
+        return; // Success, exit retry loop
       } catch (e) {
         if (_shouldStop || segment.fetchVersion != targetVersion) return;
-        AnxLog.severe(
-            'TTS fetch failed (attempt ${attempt + 1}): ${e.runtimeType}');
-        if (attempt == _maxRetries) {
-          // Check version before marking as silent
-          if (segment.fetchVersion == targetVersion) {
-            segment.error = e;
-          }
+        final failure = TtsSynthesisError.classify(e);
+        var delay = Duration(seconds: 1 << attempt);
+        if (failure.retryAfter != null && failure.retryAfter! > delay) {
+          delay = failure.retryAfter!;
+        }
+        // Never retry earlier than the server permits. Long cooldowns require
+        // an explicit retry instead of keeping the reader waiting indefinitely.
+        final retry = failure.retryable &&
+            attempt < _maxRetries &&
+            delay <= const Duration(seconds: 60);
+        AnxLog.warning(
+            'TTS fetch failed: provider=$providerId fetch=$fetchId attempt=${attempt + 1}/${_maxRetries + 1} '
+            'reason=${failure.reason.name} http=${failure.statusCode ?? "none"} type=${e.runtimeType} '
+            'elapsedMs=${watch.elapsedMilliseconds} retry=$retry waitMs=${retry ? delay.inMilliseconds : 0} '
+            'retryAfterMs=${failure.retryAfter?.inMilliseconds ?? 0}');
+        if (!retry) {
+          segment.error = failure;
+          return;
+        }
+        // Short ticks also notice settings changes, not just an explicit Stop.
+        var remaining = delay;
+        while (remaining > Duration.zero) {
+          if (_shouldStop || segment.fetchVersion != targetVersion) return;
+          final tick = remaining < const Duration(milliseconds: 50)
+              ? remaining
+              : const Duration(milliseconds: 50);
+          await Future<void>.delayed(tick);
+          remaining -= tick;
         }
       }
     }
@@ -882,13 +909,13 @@ class OnlineTts extends BaseTts {
   }
 
   @override
-  Future<void> prev() async {
-    await _navigate(() => getPrevTextFunction());
+  Future<void> prev({FutureOr<dynamic> Function()? locate}) async {
+    await _navigate(locate ?? () => getPrevTextFunction());
   }
 
   @override
-  Future<void> next() async {
-    await _navigate(() => getNextTextFunction());
+  Future<void> next({FutureOr<dynamic> Function()? locate}) async {
+    await _navigate(locate ?? () => getNextTextFunction());
   }
 
   @override

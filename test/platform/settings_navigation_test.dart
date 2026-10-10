@@ -86,7 +86,7 @@ void main() {
     expect(
         aiChat,
         matches(RegExp(
-            r'if\s*\(!compact\s*&&\s*_isReaderSkills\s*&&\s*_showSkillPrompts\)')));
+            r'if\s*\(!compact\s*&&\s*widget\.showSkillControls\s*&&\s*_isReaderSkills\s*&&\s*_showSkillPrompts\)')));
     expect(aiChat, contains('_buildSkillPicker(context)'));
   });
 }

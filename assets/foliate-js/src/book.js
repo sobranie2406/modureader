@@ -1413,13 +1413,15 @@ class Reader {
 
   installDesktopInput(doc) {
     desktopInputDocuments.get(doc)?.destroy();
-    const enabled = () => style.desktopPageInput === true && !window.isFootNoteOpen();
+    const enabled = () => style.desktopPageInput === true && this.keyboardActive !== false && !window.isFootNoteOpen();
     desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
       enabled,
       ctrlBrackets: () => style.keyboardShortcutTurnPage === true,
+      shortcuts: () => style.readerShortcuts,
+      onAction: action => callFlutter('onReaderShortcut', action),
       // Android receives remote keys through the scoped Activity bridge. Do not
       // also activate DOM keys behind a Flutter dialog or reader settings panel.
-      nativeKeysEnabled: () => !window.isFootNoteOpen(),
+      nativeKeysEnabled: () => this.keyboardActive !== false && !window.isFootNoteOpen(),
       focusOnPointerDown: enabled,
       hasSelection: () => this.view.renderer.getContents().some(
         ({ doc: content }) => !!content.getSelection()?.toString()),
@@ -1430,6 +1432,11 @@ class Reader {
   turnFromKeyboard(direction) {
     const doc = this.view.renderer.getContents().find(({ doc }) => doc.hasFocus())?.doc ?? document;
     return desktopInputDocuments.get(doc)?.turnFromKeyboard(direction) ?? false;
+  }
+
+  actionFromKeyboard(action) {
+    const doc = this.view.renderer.getContents().find(({ doc }) => doc.hasFocus())?.doc ?? document;
+    return desktopInputDocuments.get(doc)?.actionFromKeyboard(action) ?? false;
   }
 
   #onLoad({ detail: { doc, index } }) {
@@ -2048,7 +2055,10 @@ const getMetadata = async (book, inspectDocument = false) => {
 }
 
 window.refreshToc = () => onSetToc()
-window.setDocumentReaderActive = active => { if (reader?.view?.renderer) reader.view.renderer.readerActive = active === true }
+window.setDocumentReaderActive = active => {
+  if (reader) reader.keyboardActive = active === true;
+  if (reader?.view?.renderer) reader.view.renderer.readerActive = active === true;
+}
 window.setPdfReadingView = value => reader?.view?.renderer?.setPdfView?.(value) ?? false
 window.panPdfReadingView = (dx, dy) => reader?.view?.renderer?.panPdfView?.(dx, dy) ?? false
 window.setPdfReadingLayout = async (config, enabled, view) => {
@@ -2217,6 +2227,7 @@ window.goToPercent = percent => reader.view.goToFraction(percent)
 window.nextPage = () => reader.view.next()
 
 window.turnPageFromKeyboard = direction => reader.turnFromKeyboard(direction)
+window.readerActionFromKeyboard = action => reader.actionFromKeyboard(action)
 
 window.prevPage = () => reader.view.prev()
 
@@ -2351,6 +2362,10 @@ window.ttsPrevSection = (last = false) => ttsNavigator.move(-1, { section: true,
 window.ttsNext = () => ttsNavigator.move(1)
 
 window.ttsPrev = () => ttsNavigator.move(-1)
+
+window.ttsNextParagraph = () => ttsNavigator.move(1, { paragraph: true })
+
+window.ttsPrevParagraph = () => ttsNavigator.move(-1, { paragraph: true })
 
 window.ttsPrepare = () => reader.view.tts.prepare()
 

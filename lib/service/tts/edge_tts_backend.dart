@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'dart:typed_data';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -276,6 +277,7 @@ class EdgeTtsClient {
         throw _EdgeWebSocketUpgradeException(
           statusCode: response.statusCode,
           dateHeader: response.headers.value(HttpHeaders.dateHeader),
+          retryAfter: response.headers.value(HttpHeaders.retryAfterHeader),
           body: body,
         );
       }
@@ -417,11 +419,13 @@ class _EdgeWebSocketUpgradeException implements Exception {
   const _EdgeWebSocketUpgradeException({
     required this.statusCode,
     this.dateHeader,
+    this.retryAfter,
     this.body,
   });
 
   final int statusCode;
   final String? dateHeader;
+  final String? retryAfter;
   final String? body;
 
   @override
@@ -473,13 +477,20 @@ class EdgeTtsProvider extends TtsServiceProvider {
     String? voice,
     double rate,
     double pitch,
-  ) {
-    return _client.synthesize(
-      text,
-      voice: resolveVoice(voice),
-      rate: rate,
-      pitch: pitch,
-    );
+  ) async {
+    try {
+      return await _client.synthesize(
+        text,
+        voice: resolveVoice(voice),
+        rate: rate,
+        pitch: pitch,
+      );
+    } on _EdgeWebSocketUpgradeException catch (error) {
+      throw TtsSynthesisError(
+          TtsFailureReason.http, 'Edge TTS connection rejected',
+          statusCode: error.statusCode,
+          retryAfter: TtsSynthesisError.parseRetryAfter(error.retryAfter));
+    }
   }
 
   @override

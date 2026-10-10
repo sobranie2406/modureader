@@ -62,7 +62,7 @@ class _BookItemState extends ConsumerState<BookItem> {
     }
 
     Future<void> handleLongPress(BuildContext context) async {
-      if (selectionMode) {
+      if (onSelectionChanged != null) {
         toggleSelection();
         return;
       }
@@ -97,7 +97,9 @@ class _BookItemState extends ConsumerState<BookItem> {
               ? toggleSelection
               : () => pushToReadingPage(ref, context, book),
           onLongPress: () => handleLongPress(context),
-          onSecondaryTap: () => handleLongPress(context),
+          onSecondaryTap: selectionMode
+              ? toggleSelection
+              : () => menuKey.currentState?.showButtonMenu(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

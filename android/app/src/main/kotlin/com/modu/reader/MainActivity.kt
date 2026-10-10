@@ -25,9 +25,11 @@ class MainActivity : AudioServiceActivity() {
             event.keyCode, event.action, event.repeatCount, event.deviceId,
             readerKeysActive && hasWindowFocus() && !imeVisible,
             readerVolumeKeys,
-            event.isCtrlPressed || event.isAltPressed || event.isShiftPressed || event.isMetaPressed,
+            (if (event.isCtrlPressed) 1 else 0) or (if (event.isShiftPressed) 2 else 0) or
+                (if (event.isAltPressed) 4 else 0) or (if (event.isMetaPressed) 8 else 0),
         )
         if (result == -1 || result == 1) pageKeyChannel?.invokeMethod("turnPage", result)
+        if (result in 3..7) pageKeyChannel?.invokeMethod("shortcut", result)
         // Do not also deliver handled keys to Flutter/WebView (double paging).
         return if (result != ReaderPageKeys.PASS) true else super.dispatchKeyEvent(event)
     }
@@ -113,6 +115,7 @@ class MainActivity : AudioServiceActivity() {
                 if (call.method == "configure") {
                     readerKeysActive = call.argument<Boolean>("active") == true
                     readerVolumeKeys = call.argument<Boolean>("volume") == true
+                    readerKeys.configure(call.argument<List<Map<String, Number>>>("shortcuts"))
                     result.success(null)
                 } else result.notImplemented()
             }

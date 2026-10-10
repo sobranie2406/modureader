@@ -1,6 +1,7 @@
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
+import 'package:anx_reader/models/reader_shortcuts.dart';
 import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
@@ -40,11 +41,13 @@ import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:anx_reader/widgets/ai/ai_stream.dart';
 import 'package:anx_reader/widgets/reading_page/notes_widget.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_lookup.dart';
+import 'package:anx_reader/widgets/dictionary/unified_query.dart';
 import 'package:anx_reader/widgets/reading_page/quick_mark_toggle.dart';
 import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
 import 'package:anx_reader/widgets/reading_page/tts_quick_toolbar.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:anx_reader/service/tts/base_tts.dart';
 import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_widget.dart';
 import 'package:anx_reader/widgets/reading_page/translation_toolbar_action.dart';
@@ -345,6 +348,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _pageKeys.update(
         active: _canUsePageKeys,
         volume: Prefs().volumeKeyTurnPage,
+        shortcuts: Prefs()
+            .readerShortcuts
+            .nativeBindings(ctrlBrackets: Prefs().keyboardShortcutTurnPage),
         force: force);
   }
 
@@ -378,6 +384,12 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   void initState() {
     _readerFocusNode = FocusNode(debugLabel: 'reading_page_focus');
     _pageKeys = ReaderPageKeys(
+        onShortcut: (code) {
+          if (!_canUsePageKeys) return;
+          for (final action in ReaderAction.values) {
+            if (action.nativeCode == code) _sendReaderShortcut(action.name);
+          }
+        },
         onHostStateChanged: _refreshReaderHostState,
         onDirection: (direction) {
           if (_canUsePageKeys) {
@@ -543,7 +555,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   // }
 
   KeyEventResult _handleReaderKeyEvent(FocusNode node, KeyEvent event) {
-    if (_searchDialogOpen || ModalRoute.of(context)?.isCurrent != true) {
+    if (!_canUsePageKeys ||
+        _searchDialogOpen ||
+        ModalRoute.of(context)?.isCurrent != true) {
       return KeyEventResult.ignored;
     }
     if (!readerOwnsPageKeys(_readerFocusNode, _readerWebViewFocusScope,
@@ -555,35 +569,21 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       return KeyEventResult.ignored;
     }
 
-    final logicalKey = event.logicalKey;
-
-    final keyboard = HardwareKeyboard.instance;
-    final direction = readerPageKeyDirection(event,
-        control: keyboard.isControlPressed,
-        shift: keyboard.isShiftPressed,
-        alt: keyboard.isAltPressed,
-        meta: keyboard.isMetaPressed,
-        ctrlBrackets: Prefs().keyboardShortcutTurnPage);
-    if (direction != 0) {
-      if (AnxPlatform.isDesktop) {
-        // A bubbled Windows key must use the same DOM editor/selection guards
-        // as a key received directly by the native WebView.
-        epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
-      } else if (direction > 0) {
-        epubPlayerKey.currentState?.nextPage();
-      } else {
-        epubPlayerKey.currentState?.prevPage();
+    final key = ReaderKey.fromEvent(event);
+    final action = Prefs()
+        .readerShortcuts
+        .actions(ctrlBrackets: Prefs().keyboardShortcutTurnPage)[key?.id];
+    if (action != null) {
+      if (event is! KeyRepeatEvent ||
+          action == 'previous' ||
+          action == 'next') {
+        _sendReaderShortcut(action);
       }
       return KeyEventResult.handled;
     }
 
     // Other shortcuts belong to the child WebView/control, not its ancestor.
     if (!_readerFocusNode.hasPrimaryFocus) return KeyEventResult.ignored;
-
-    if (logicalKey == LogicalKeyboardKey.enter) {
-      showOrHideAppBarAndBottomBar(true);
-      return KeyEventResult.handled;
-    }
 
     if (Prefs().volumeKeyTurnPage) {
       if (event.physicalKey == PhysicalKeyboardKey.audioVolumeUp) {
@@ -597,6 +597,52 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
 
     return KeyEventResult.ignored;
+  }
+
+  void _sendReaderShortcut(String action) {
+    final direction = action == 'next'
+        ? 1
+        : action == 'previous'
+            ? -1
+            : 0;
+    if (direction != 0) {
+      epubPlayerKey.currentState?.turnPageFromKeyboard(direction);
+    } else {
+      epubPlayerKey.currentState?.readerActionFromKeyboard(action);
+    }
+  }
+
+  bool _shortcutBusy = false;
+  Future<void> handleReaderShortcut(String action) async {
+    if (!_canUsePageKeys || _shortcutBusy) return;
+    if (action == 'menu') {
+      showOrHideAppBarAndBottomBar(true);
+      return;
+    }
+    final state = TtsHandler().ttsStateNotifier.value;
+    if (state != TtsStateEnum.playing && state != TtsStateEnum.paused) return;
+    _shortcutBusy = true;
+    try {
+      switch (action) {
+        case 'playPause':
+          if (state == TtsStateEnum.playing) {
+            await audioHandler.pause();
+          } else {
+            await audioHandler.play();
+          }
+        case 'previousPassage':
+          await _moveNarration(forward: false);
+        case 'nextPassage':
+          await _moveNarration(forward: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        AnxToast.show(ModuStrings.text(
+            context, '朗读操作失败，请重试。', 'Narration action failed. Please retry.'));
+      }
+    } finally {
+      _shortcutBusy = false;
+    }
   }
 
   @override
@@ -748,6 +794,17 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     await epubPlayerKey.currentState?.returnToTtsPosition();
   }
 
+  Future<void> _moveNarration({required bool forward}) async {
+    final player = epubPlayerKey.currentState;
+    if (player == null || !player.mounted) return;
+    await TtsHandler().navigateParagraph(
+        forward ? player.ttsNextParagraph : player.ttsPrevParagraph,
+        forward: forward);
+    if (mounted && player.mounted && epubPlayerKey.currentState == player) {
+      await player.returnToTtsPosition();
+    }
+  }
+
   Future<void> _readAloudFromHere() async {
     final player = epubPlayerKey.currentState;
     if (player == null || !player.mounted || player.cfi.isEmpty) return;
@@ -820,6 +877,18 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     await showReaderPopup(context,
         builder: (_) => DictionaryLookup(word: content));
     _restoreReaderFocusAfterPanel();
+  }
+
+  Future<void> showUnifiedQuery(String content, {String? contextText}) async {
+    showOrHideAppBarAndBottomBar(false);
+    try {
+      await showReaderPopup(context,
+          enableDrag: false,
+          builder: (_) =>
+              UnifiedQuery(text: content, contextText: contextText));
+    } finally {
+      _restoreReaderFocusAfterPanel();
+    }
   }
 
   Future<void> showSelectionSearch(String content) async {
@@ -1593,6 +1662,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                             stateListenable: TtsHandler().ttsStateNotifier,
                             onReturnToPosition: _returnToNarration,
                             onReadHere: _readAloudFromHere,
+                            onPrevious: () => _moveNarration(forward: false),
+                            onNext: () => _moveNarration(forward: true),
                             onPlay: audioHandler.play,
                             onPause: audioHandler.pause,
                             onOpenSettings: _openNarrationSettings,

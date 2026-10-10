@@ -5,6 +5,7 @@ import 'package:anx_reader/main.dart' show navigatorKey;
 import 'package:anx_reader/providers/reading_insights.dart';
 import 'package:anx_reader/service/statistic/reading_insights.dart';
 import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
+import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
 import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
@@ -157,11 +158,18 @@ class ReadingInsightTile extends StatisticsDashboardTileBase {
       for (final entry in entries)
         ReadingHistoryBookLink(
             book: entry.book,
+            heroTag: 'history_${type.name}_${entry.book.id}',
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child:
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                BookCover(book: entry.book, width: 40, height: 56, radius: 5),
+                Hero(
+                  tag: 'history_${type.name}_${entry.book.id}',
+                  transitionOnUserGestures: true,
+                  createRectTween: readerCoverRectTween,
+                  child: BookCover(
+                      book: entry.book, width: 40, height: 56, radius: 5),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                     child: Column(

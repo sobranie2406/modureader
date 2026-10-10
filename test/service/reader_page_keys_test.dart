@@ -67,6 +67,33 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test('custom actions respect active state and binding changes resend policy',
+      () async {
+    final actions = <int>[];
+    final bridge = ReaderPageKeys(
+        android: true, onDirection: (_) {}, onShortcut: actions.add);
+    const bindings = [
+      {'keyCode': 66, 'modifiers': 0, 'action': 3}
+    ];
+    bridge.update(active: true, volume: false, shortcuts: bindings);
+    bridge.update(active: true, volume: false, shortcuts: bindings);
+    expect(calls, hasLength(1));
+    expect(calls.single.arguments['shortcuts'], bindings);
+    await send(3, 'shortcut');
+    await send(7, 'shortcut');
+    await send(8, 'shortcut');
+    await send('3', 'shortcut');
+    expect(actions, [3, 7]);
+    bridge.update(active: true, volume: false, shortcuts: []);
+    expect(calls, hasLength(2));
+    bridge.update(active: false, volume: false, shortcuts: []);
+    await send(4, 'shortcut');
+    expect(actions, [3, 7]);
+    bridge.dispose();
+    await send(5, 'shortcut');
+    expect(actions, [3, 7]);
+  });
+
   test(
       'native host refresh resends unchanged policy, including blocked readers',
       () async {

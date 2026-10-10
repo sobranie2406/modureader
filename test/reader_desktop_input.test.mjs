@@ -2,9 +2,45 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../assets/foliate-js/src/desktop-page-input.js', import.meta.url), 'utf8');
-const { desktopPageKey, desktopDragDirection, installDesktopPageInput } = await import(
+const { desktopPageKey, desktopDragDirection, installDesktopPageInput, readerShortcutAction } = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const settle = () => new Promise(resolve => setImmediate(resolve));
+test('shifted symbols use the same binding as native key capture', () => {
+  assert.equal(readerShortcutAction({key:'!',code:'Digit1',shiftKey:true}, {'2:1':'menu'}),'menu');
+  assert.equal(readerShortcutAction({key:'{',code:'BracketLeft',shiftKey:true}, {'2:[':'previous'}),'previous');
+});
+test('custom bindings replace defaults and match modifiers without stealing editors', async () => {
+  const bindings = {'0:n':'next', '1:m':'menu', '0:p':'playPause', '0:[':'previousPassage'};
+  assert.equal(readerShortcutAction({key:'m',ctrlKey:true},bindings),'menu');
+  assert.equal(readerShortcutAction({key:'m'},bindings),null);
+  assert.equal(readerShortcutAction({key:'m',ctrlKey:true,shiftKey:true},bindings),null);
+  assert.equal(readerShortcutAction({key:'p',isComposing:true},bindings),null);
+  assert.equal(readerShortcutAction({key:'p',target:{isContentEditable:true}},bindings),null);
+  const doc = new EventTarget(); doc.getSelection = () => '';
+  const actions = [], turns = [];
+  const controller = installDesktopPageInput(doc, {enabled:()=>true,
+    shortcuts:()=>bindings, onAction:a=>actions.push(a), turnPage:d=>turns.push(d)});
+  const send = (key, repeat=false) => {const e = new Event('keydown',{cancelable:true});
+    Object.assign(e,{key,repeat}); doc.dispatchEvent(e); return e.defaultPrevented;};
+  assert.equal(send('ArrowRight'),false);
+  assert.equal(send('n'),true); await settle(); assert.deepEqual(turns,[1]);
+  assert.equal(send('p'),true); assert.equal(send('p',true),true);
+  assert.deepEqual(actions,['playPause']);
+  doc.getSelection = () => 'selected'; assert.equal(send('p'),false);
+  assert.equal(controller.actionFromKeyboard('playPause'),false);
+  doc.getSelection = () => ''; assert.equal(controller.actionFromKeyboard('playPause'),true);
+  assert.deepEqual(actions,['playPause','playPause']);
+  controller.destroy(); assert.equal(send('p'),false);
+});
+test('reader toggle pauses playing audio and resumes paused audio behind active-state guards', async () => {
+  const source = await readFile(new URL('../lib/page/reading_page.dart', import.meta.url), 'utf8');
+  const start = source.indexOf('Future<void> handleReaderShortcut(');
+  const method = source.slice(start, source.indexOf('\n  @override', start));
+  assert.match(method, /if \(!_canUsePageKeys \|\| _shortcutBusy\) return/);
+  assert.match(method, /state != TtsStateEnum.playing && state != TtsStateEnum.paused/);
+  assert.match(method, /case 'playPause':\s*if \(state == TtsStateEnum.playing\) \{\s*await audioHandler.pause\(\);\s*\} else \{\s*await audioHandler.play\(\);/);
+  assert.doesNotMatch(method, /case '(play|pause)':/);
+});
 function fixture() {
   const doc = new EventTarget();
   doc.defaultView = new EventTarget();
@@ -110,8 +146,8 @@ test('runtime wires mobile keyboard and desktop-only mouse input for every chapt
   const dart=await readFile(new URL('../lib/page/book_player/epub_player.dart',import.meta.url),'utf8');
   assert.match(book,/this\.installDesktopInput\(document\)/);
   assert.match(book,/this\.installDesktopInput\(doc\)/);
-  assert.match(book,/style\.desktopPageInput === true && !window\.isFootNoteOpen\(\)/);
-  assert.match(book,/nativeKeysEnabled: \(\) => !window\.isFootNoteOpen\(\)/);
+  assert.match(book,/style\.desktopPageInput === true && this\.keyboardActive !== false && !window\.isFootNoteOpen\(\)/);
+  assert.match(book,/nativeKeysEnabled: \(\) => this\.keyboardActive !== false && !window\.isFootNoteOpen\(\)/);
   assert.match(book,/focusOnPointerDown: enabled/);
   assert.match(dart,/desktopPageInput: \$\{AnxPlatform\.isDesktop\}/);
   const initial=await readFile(new URL('../lib/utils/webView/gererate_url.dart',import.meta.url),'utf8');

@@ -18,8 +18,8 @@ PATCHES = {
         'onReorder: (oldIndex, newIndex) {\n'
         '        if (newIndex > oldIndex) newIndex -= 1;'),
     'lib/page/settings_page/selection_toolbar.dart': (
-        'onReorderItem: (a, b) => _reorder(a, b, annotations),',
-        'onReorder: (a, b) => _reorder(a, b > a ? b - 1 : b, annotations),'),
+        'onReorderItem: (a, b) => _reorder(a, b, annotations, items),',
+        'onReorder: (a, b) => _reorder(a, b > a ? b - 1 : b, annotations, items),'),
     'lib/widgets/page_router/reader_cover_hero.dart': (
         '          tag: tag,\n'
         '          transitionOnUserGestures: true,\n'
