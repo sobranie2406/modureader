@@ -1,6 +1,6 @@
 # Privacy and network behavior
 
-English · [简体中文](PRIVACY_zh.md) · [Home](README.md) · [Settings guide](docs/SETTINGS.md)
+English · [简体中文](PRIVACY_zh.md) · [Home](README_EN.md) · [Settings guide](docs/SETTINGS.md)
 
 For **Modu 1.2.2+10087**, updated 2026-10-07. This document explains storage and network behavior. Third-party services have their own privacy policies.
 

@@ -8,5 +8,5 @@ The unused upstream screenshot links were removed from the tracked tree on 2026-
 
 This directory retains only Chinese and English text drafts; their presence does not establish a store listing. The original removed assets remain recoverable through Git history.
 
-Current documentation: [Chinese](../../README_zh.md) · [English](../../README.md)
+Current documentation: [Chinese](../../README.md) · [English](../../README_EN.md)
 Downloads: https://github.com/sobranie2406/modureader/releases

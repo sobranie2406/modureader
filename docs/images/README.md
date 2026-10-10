@@ -2,16 +2,17 @@
 
 ## Current: Modu 1.2.0+10082
 
-Feature claims follow the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, not uncommitted application changes. The English homepage is [README.md](../../README.md); the Chinese homepage is [README_zh.md](../../README_zh.md). `README_EN.md` keeps the previous English URL working.
+Feature claims follow the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`, not uncommitted application changes. The default Chinese homepage is [README.md](../../README.md); the English homepage is [README_EN.md](../../README_EN.md). `README_zh.md` keeps the previous Chinese URL working.
 
-The 33 images in `showcase/cross-platform/` are the current homepage set, including later documentation artwork for the stable features. A macOS window sits behind an overlapping foreground iPhone, with a clear headline, light backdrop and soft shadows. Each major feature has its own image beside its description; Chinese artwork also includes framed vertical reading.
+The 35 images in `showcase/cross-platform/` are the current homepage set, including later documentation artwork for the stable features. A macOS window sits behind an overlapping foreground iPhone, with a clear headline, light backdrop and soft shadows. Each major feature has its own image beside its description; Chinese artwork also includes framed vertical reading.
 
 Artwork uses actual interfaces and code-supported behavior as its basis, with composition/redrawing by the built-in image-generation tool. It is composed showcase imagery rather than an untouched device capture. Preserve the actual Mac interface structure and control relationships; replace private content only inside that layout. The iPhone retains its Dynamic Island, status bar, bottom home indicator and iOS-style typography. Desktop recording markers and mouse cursors are removed.
 
-Every feature pair uses phone configuration → Mac result. The phone stays in the foreground and shows controls or editing; the larger Mac window shows the resulting behavior. Keep EN and ZH as separate localized assets (`*-en` and `*-zh`), matching labels, prose and language-specific examples. Do not mix the two languages into a single showcase panel.
+Feature configuration/result pairs use phone configuration → Mac result. The phone stays in the foreground and shows controls or editing; the larger Mac window shows the resulting behavior. Bookshelf-home overviews instead show the library on both devices. Keep EN and ZH as separate localized assets (`*-en` and `*-zh`), matching labels, prose and language-specific examples. Do not mix the two languages into a single showcase panel.
 
 | Assets | Phone configuration | Mac result |
 | --- | --- | --- |
+| `bookshelf-home-*` | Bookshelf home with fictional books and index/format labels | Bookshelf home with Indexed, original-format and Scanned badges |
 | `library-*` | Create a folder for selected books | Books organized into a folder |
 | `styles-*` | Font, thickness and spacing | Comfortable book typography |
 | `scanned-pdf-*` | Original-page crop preview, per-page automatic crop and safety margin | The same page enlarged after cropping its outer margins |
@@ -32,7 +33,7 @@ The opening `reading-*` banners and `vertical-zh` show reading layouts directly.
 
 OCR artwork shows Text Reflow/OCR Reflow directly in the reader for the current original page or its whole saved crop. It must not depict a region-selection popup as the reflow reader: only Extract opens that editor and can fill an editable AI input without automatically sending. Model downloads are optional; V4 is recommended, V5 upstream is ModelScope, and V3/V4 upstream is Hugging Face, with Gitee alternatives. Artwork is not an OCR accuracy measurement. Ordinary text books retain their normal controls; E-Ink refresh claims apply only to supported devices.
 
-Only selected final assets are tracked; prompt drafts and discarded variants remain outside the published source tree. This update edits documentation only: it does not create or alter screenshots, rerun Mac layout checks or claim new application/device tests.
+Only selected final assets are tracked; prompt drafts and discarded variants remain outside the published source tree. The 2026-10-10 update adds `bookshelf-home-zh.png` and `bookshelf-home-en.png` using the built-in image-generation tool, matching the existing Mac-window/iPhone composition. Unlike configuration/result pairs, both screens show the bookshelf home. Badge positions, labels and colors were checked against `book_item.dart` and `book_type_badges.dart`: green indexed status at the top left, colored original-format labels at the bottom left, plus an orange scanned label where applicable. All books, covers and progress values are fictional. These are labeled illustrative images, not untouched device screenshots; no new application/device testing is claimed.
 
 Reading examples use the original [Chinese demonstration book](../examples/modu-reading-demo.epub) and [The Quiet Reader](../examples/modu-reading-demo-en.epub), plus original sample passages and dictionary definitions written for artwork. Source/redistribution terms are in [example books](../examples/README.md). Statistics, notes, retrieval excerpts and AI answers are illustrative data, not private accounts or performance benchmarks. No private bookshelf, notes, AI conversation or credentials are included. Settings illustrate features and are not necessarily factory defaults.
 

@@ -1,6 +1,6 @@
 # Modu 1.2.4 settings and features
 
-English · [简体中文](SETTINGS_zh.md) · [Home](../README.md) · [Documentation](README.md)
+English · [简体中文](SETTINGS_zh.md) · [Home](../README_EN.md) · [Documentation](README.md)
 
 For stable **1.2.4+10093**, updated 2026-10-09. Phones usually open settings one page at a time; wide desktop windows use a two-column layout. Some capabilities depend on the operating system, reader engine and selected service.
 

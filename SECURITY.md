@@ -1,6 +1,6 @@
 # Security reporting
 
-English · [简体中文](SECURITY_zh.md) · [Home](README.md)
+English · [简体中文](SECURITY_zh.md) · [Home](README_EN.md)
 
 Reviewed for Modu 1.2.0 on 2026-10-04.
 

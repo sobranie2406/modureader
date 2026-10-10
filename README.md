@@ -1,11 +1,11 @@
 <p align="center">
   <img src="assets/icon/modu-app-icon.png" width="96" alt="Modu app icon">
 </p>
-<h1 align="center">Modu Reader</h1>
+<h1 align="center">默读 · Modu Reader</h1>
 <p align="center">
-  <a href="README_zh.md">简体中文</a> · <a href="README.md">English</a>
+  <a href="README.md">简体中文</a> · <a href="README_EN.md">English</a>
 </p>
-<p align="center">An open-source, cross-platform reader for ebooks, PDFs and scanned books. Crop and enhance original pages, recognize text with on-device OCR, read with full-text translation, listen aloud and explore your books with AI. Keep notes and reading progress together with WebDAV sync.</p>
+<p align="center">默读是基于 Flutter 的开源跨平台阅读器，支持电子书、PDF 与扫描图片书籍。裁边增强、设备端 OCR、全文翻译、听书与 AI 阅读，让不同格式的书籍更易阅读；笔记、阅读进度与 WebDAV 同步相连，也可按需建立本地或远程向量索引。</p>
 
 <p align="center">
   <a href="https://github.com/sobranie2406/modureader/releases/latest"><img src="https://img.shields.io/github/v/release/sobranie2406/modureader?style=flat-square&amp;color=356858" alt="Latest release"></a>
@@ -13,474 +13,486 @@
   <a href="#downloads"><img src="https://img.shields.io/badge/platforms-Android%20%C2%B7%20iOS%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20HarmonyOS-6d756c?style=flat-square" alt="Android, iOS, macOS, Windows, Linux and HarmonyOS"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>Download</b></a> ·
-  <a href="https://gitee.com/sobranie2406/modureader/releases">Gitee mirror</a> ·
-  <a href="#features">Features</a> ·
-  <a href="docs/SETTINGS.md">Settings guide</a> ·
-  <a href="docs/README.md">Documentation</a> ·
-  <a href="https://t.me/Modureader">Telegram channel</a> ·
-  <a href="https://t.me/ModuReaderDiscussion">Telegram group</a> ·
-  <a href="https://github.com/sobranie2406/modureader/issues">Feedback</a>
+  <a href="https://github.com/sobranie2406/modureader/releases/latest"><b>下载最新版</b></a> ·
+  <a href="https://gitee.com/sobranie2406/modureader/releases">Gitee 镜像</a> ·
+  <a href="#features">功能一览</a> ·
+  <a href="docs/SETTINGS_zh.md">设置指南</a> ·
+  <a href="docs/README.md">文档目录</a> ·
+  <a href="https://t.me/Modureader">Telegram 频道</a> ·
+  <a href="https://t.me/ModuReaderDiscussion">Telegram 讨论群</a> ·
+  <a href="https://github.com/sobranie2406/modureader/issues">问题反馈</a>
 </p>
 
-## Community and feedback
+## 交流与反馈
 
-Connect with the Modu Reader community on Telegram or QQ:
+欢迎关注 Modu 默读频道，并加入 Telegram 讨论群或 QQ 交流群：
 
-| Community | What you will find | Address / group number |
+| 交流入口 | 内容与用途 | 地址／群号 |
 | --- | --- | --- |
-| **Modu Reader · Telegram channel** | New releases, changelogs and project updates | [https://t.me/Modureader](https://t.me/Modureader) |
-| **Modu Reader · Telegram discussion group** | Reading discussions, help using the app, bug reports and feature suggestions | [https://t.me/ModuReaderDiscussion](https://t.me/ModuReaderDiscussion) |
-| **Modu Reader · QQ group** | Chinese-language discussion, help using the app and feedback | **1009765685** — search for the group number in QQ to request to join |
+| **Modu 默读 · Telegram 频道** | 新版本发布、更新说明与项目动态 | [https://t.me/Modureader](https://t.me/Modureader) |
+| **Modu 默读 · Telegram 讨论群** | 阅读交流、使用答疑、问题反馈与功能建议 | [https://t.me/ModuReaderDiscussion](https://t.me/ModuReaderDiscussion) |
+| **Modu 默读 · QQ 交流群** | 中文阅读交流、使用答疑与问题反馈 | **1009765685** — 在 QQ 搜索群号申请加入 |
 
-Please submit bugs and feature requests through [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose). If you cannot use GitHub, use the [feedback form](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h). Describe one issue or idea per report and include the Modu version, OS and device, reproduction steps and expected behavior. Do not share keys, passwords, private books or unredacted logs.
+问题与功能建议优先通过 [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) 提交；不方便使用 GitHub 时，可填写[在线反馈表](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)。每条反馈只描述一个问题或建议，并提供默读版本、系统与设备、复现步骤和预期结果。请勿提交密钥、密码、私人书籍或未脱敏日志。
 
-![Reading and chapter navigation on macOS and iOS](docs/images/showcase/cross-platform/reading-en.png)
+![书架首页：虚构书籍展示已索引、文件格式及扫描版标签](docs/images/showcase/cross-platform/bookshelf-home-zh.png)
 
-> **Local reading does not require an AI account.** AI, online translation and online speech are optional; availability and costs depend on your chosen providers. See [Releases](https://github.com/sobranie2406/modureader/releases) for version updates and usage notes.
+封面左上角显示绿色「已索引」状态，左下角用不同颜色标注 EPUB、PDF、TXT、MD、FB2 等原始文件格式；识别为扫描版或手动设为扫描图片书籍时，还会显示「扫描版」标签。TXT、Markdown 等转换为 EPUB 后，仍保留原始导入格式标签。
 
-Modu has no in-app unlock purchases or subscriptions. Fees charged by online service providers are separate from Modu.
+<sub>基于实际界面布局制作的展示示意图；书名、封面和阅读进度均为虚构，不包含真实书库。</sub>
+
+![Mac 与 iPhone 上的阅读与章节导航](docs/images/showcase/cross-platform/reading-zh.png)
+
+> **本地阅读不需要 AI 账号。** AI、在线翻译和在线语音按需配置，费用与可用性取决于所选服务。各版本更新与使用说明见 [Releases](https://github.com/sobranie2406/modureader/releases)。
+
+默读不提供内购解锁或订阅；在线服务商自行收取的费用不属于默读内购。
 
 <a id="downloads"></a>
 
-## Downloads
+## 下载
 
-| Platform | Published architectures | Installation                                                                                                                                |
-| -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows  | x64, ARM64              | EXE installer with shortcuts and an uninstaller; no commercial code signature; requires WebView2 Runtime                                    |
-| Linux    | x64, ARM64              | DEB for Debian 13 (trixie); install with APT to resolve system dependencies                                                                 |
-| Android  | arm64-v8a              | APK signed with the project's dedicated key; verify the download source before installing                                                   |
-| macOS    | x64, ARM64              | DMG; drag the app to Applications; unnotarized, not an App Store release                                                                    |
-| iOS      | ARM64 devices           | iOS 16+; IPA has no Apple distribution signature and cannot be installed directly; you must sign it yourself using a valid signing identity |
-| HarmonyOS | ARM64 | Unsigned native HAP; requires HarmonyOS credentials/profile and manual signing before installation. Not yet device-validated; not an Android APK. |
+| 平台      | 已发布架构             | 安装方式                                           |
+| ------- | ----------------- | ---------------------------------------------- |
+| Windows | x64、ARM64         | EXE 安装器；支持快捷方式和卸载，未做商业代码签名，需要 WebView2 Runtime |
+| Linux   | x64、ARM64         | DEB；面向 Debian 13 (trixie)，使用 APT 安装并解析系统依赖     |
+| Android | arm64-v8a         | 项目专用密钥签名的 APK；首次安装请核验下载来源                      |
+| macOS   | x64、ARM64         | DMG；打开后拖入 Applications，未公证，非 App Store 版本      |
+| iOS     | ARM64 真机          | iOS 16+，IPA；无 Apple 分发签名，不能直接安装，需要自行合法签名       |
+| 原生鸿蒙 | ARM64 | 未签名 HAP，安装前需使用鸿蒙证书及 Profile 手动签名；尚未完成实机验证，不是安卓 APK。 |
 
 <details>
-<summary>Installation, updates and release notes</summary>
+<summary>安装、更新与版本说明</summary>
 
-**Latest release: 1.2.4** — adds text UMD and remote-folder imports, preserves original-format badges, shares cover transitions across platforms, and fixes iOS selection and MOBI/AZW3 notes.
+**最新版本：1.2.4** — 增加文字 UMD 和远程文件夹导入，保留原始格式标签，统一全平台封面过渡，并修复 iOS 选区及 MOBI／AZW3 注释。
 
-Android cover opening and AI keyboard/stream layouts have been refined. System speech errors and startup waits now recover with clearer diagnostics. HarmonyOS remains an unsigned HAP requiring local signing; see the [release notes](docs/RELEASE_NOTES.md) for limitations and installation requirements.
+改善安卓翻书动画和 AI 键盘／流式布局，完善系统朗读错误恢复与启动诊断。鸿蒙仍提供需本地签名的 HAP；限制及安装要求见[更新说明](docs/RELEASE_NOTES.md)。
 
-Modu checks for updates at launch. Settings → About Modu → App updates uses one GitHub/Gitee source selector for both checking and downloading, defaulting to GitHub. After switching sources, check again before downloading. Failed GitHub requests fall back to Gitee while size and SHA-256 verification remain mandatory. macOS downloads open in your browser. Gitee hosts packages, documentation and update metadata; old releases are replaced by the newest release, with links to the corresponding GitHub source.
+应用每次启动检查更新，也可在「设置 → 关于默读 → 版本检查与更新」选择 GitHub 或 Gitee，检查、下载、取消并打开安装器。默认优先 GitHub，连接失败时自动尝试 Gitee；手动选择 Gitee 则直接使用镜像。两站提供相同安装包及 SHA-256，应用内下载安装前再次校验。macOS 使用浏览器下载 DMG。Gitee 保留最新版，GitHub 提供历史版本及完整源码。
 
-Settings → Appearance lets you choose an app language or follow the system. Bundled AI prompts follow that language; your edited prompts retain their original text.
+检查与下载共用一个来源选择，切换来源后重新检查即可。语言可在「设置 → 外观」手动选择或跟随系统，内置 AI 提示词随应用语言切换；用户自行编辑的提示词保持原文。
 
-Here, x64 means x86-64; ARM64 is also 64-bit. There is no x64 iPhone/iPad device package.
-Download the installer and its SHA-256 file from [Releases](https://github.com/sobranie2406/modureader/releases), choosing your system and architecture.
+这里的 x64 指 x86-64，ARM64 也是 64 位。iPhone/iPad 没有 x64 真机包。
+安装包及 SHA-256 校验文件见 [Releases](https://github.com/sobranie2406/modureader/releases)，请按系统与架构选择。
 
-Desktop apps use native installers. Download the installer for your platform, not GitHub's automatically generated source archive. Licenses are included in each package. See [Release and installation instructions](docs/RELEASING.md).
+桌面端提供原生安装包，GitHub 的 `Source code (zip)` 用于获取源码。签名、依赖和安装步骤见 [安装指南](docs/RELEASING.md)。
 
 </details>
 
 <a id="features"></a>
 
-## Features
+## 功能一览
 
-A library for your books, a workspace for your thoughts, and tools you can make your own.
+从整理书库，到沉浸阅读、随手记录，再到用 AI 深入理解——把常用工具放在阅读身边。
 
-| Module | What you can do |
+| 功能模块 | 可以做什么 |
 | --- | --- |
-| [Library](#library) | Import seven ebook formats, organize folders, pin books and browse a remote library |
-| [Reading & styles](#reading) | Tune typography, switch layouts and apply visual CSS presets |
-| [PDF & scanned books](#scanned-books) | Crop margins, set panel order and enhance original pages |
-| [On-device OCR](#ocr) | Download lightweight models, reflow recognized text and extract passages for AI |
-| [Custom CSS](#css) | Visual rules, custom code, multiple profiles and visible effects on the page |
-| [Listening](#listening) | Choose a voice, edit narration prompts and listen at up to 4× speed |
-| [AI reading](#ai) | Ask about chapters, customize skills and continue conversations |
-| [Selection tools](#selection) | Toggle and reorder actions; create your own AI commands |
-| [Full-text translation & search](#translation) | Read inline translations, switch display modes and search selected text |
-| [Offline dictionaries](#dictionary) | Import your dictionaries and see definitions beside the selected word |
-| [Notes & highlights](#notes) | Capture passages, add comments and export notes with links back to the book |
-| [Reading history](#statistics) | Review reading time, trends, recent books and per-book progress |
-| [Vector indexing](#vector) | Build local book indexes for semantic search and retrieval-augmented answers |
-| [Sync & database backup](#data) | Sync through WebDAV or S3-compatible storage and export or restore library backups |
-| [Global settings backup](#backup) | Transfer preferences by file or link, with credentials controlled separately |
+| [书库管理](#library) | 多格式导入、文件夹整理、批量移动、置顶与远程书库 |
+| [阅读与排版](#reading) | 字体、粗细、间距、页边距、横排与竖排 |
+| [PDF 与扫描书](#scanned-books) | 原页裁边、分格顺序、窗口适配与图像增强 |
+| [本地 OCR 识别](#ocr) | 按需下载轻量模型，识别重排、划词与提取到 AI |
+| [CSS 自定义](#css) | 图形调节、正则高亮、自定义代码、多套方案与导入导出 |
+| [听书与声音](#listening) | 多引擎朗读、音色与风格提示词、最高 4 倍速 |
+| [AI 阅读](#ai) | 章节问答、阅读技能、自定义提示词、多轮追问 |
+| [划词工具栏](#selection) | 按钮开关、拖动排序、选文范围与自定义 AI 命令 |
+| [全文翻译与搜索](#translation) | 正文双语对照、仅译文模式、划词翻译与网页搜索 |
+| [离线词典](#dictionary) | 导入本地词典，在书页旁查看选中词语的释义 |
+| [笔记与高亮](#notes) | 标注原文、记录想法、导出笔记、链接返回书中位置 |
+| [阅读历史](#statistics) | 阅读时长、趋势、热力图、最近阅读与单本书记录 |
+| [向量化与知识检索](#vector) | 本地模型、远程嵌入接口、后台索引与语义检索 |
+| [同步与数据库备份](#data) | WebDAV / S3 兼容对象存储同步、书库 ZIP 备份与恢复 |
+| [全局设置备份与导出](#backup) | 文件与链接迁移设置，账号密钥独立控制 |
 
-Screens use original demo content rather than a personal library. Try [The Quiet Reader](docs/examples/modu-reading-demo-en.epub). See the [source-checked detailed feature guide](docs/FEATURES.md) for workflows, defaults and limits, and the [settings guide](docs/SETTINGS.md) for entry points.
+展示使用原创示例内容，不包含个人书库。可下载 [《阅读，让思考慢下来》](docs/examples/modu-reading-demo.epub) 体验。操作流程、默认值和功能边界见[按代码核对的详细功能介绍](docs/FEATURES_zh.md)，设置入口见[设置指南](docs/SETTINGS_zh.md)。
 
 <a id="scanned-books"></a>
 
-## Original pages, easier to read
+## 保留原版，也让扫描书更好读
 
-Keep the original layout of a PDF or scanned image book while making the page fit your screen. Dedicated reading controls replace text-book typography settings only for PDFs and books classified as scans.
+保留原书的图文版式，同时让书页适应眼前的屏幕。PDF 与已识别为扫描版的图片书使用专用阅读菜单，不再套用普通文字书的字体、行距控件。
 
-- **Crop the margins:** automatic cropping detects content bounds on each page; adjust the safety margin or drag a crop rectangle manually.
-- **Read in the right order:** split a page into panels, set their order, rotate the page and choose single-page or continuous-scroll reading.
-- **See the details:** fit the page to the screen or its width, zoom in, and enhance stroke strength, contrast, darkening, paper whitening or sharpness.
-- **Compare with the original:** preview changes and optionally fade scanned watermarks. Crop and enhancement settings do not rewrite the source book.
+- **去掉多余留白：**自动裁边逐页识别内容边界，可调保护留白，也可手动拖动裁边框。
+- **按合适顺序阅读：**分格并设置阅读顺序，旋转页面，选择单页或连续卷轴。
+- **把细节看清楚：**适应屏幕、适应屏宽、缩放，配合文字加黑、对比度、加黑、漂白和锐化。
+- **随时对照原图：**预览图像增强效果，可选扫描水印减淡；裁边和增强不改写原书文件。
 
-![PDF crop settings on iPhone and an enlarged, cropped original page in the Mac reader](docs/images/showcase/cross-platform/scanned-pdf-en.png)
+![手机设置 PDF 裁边，Mac 展示裁去留白并放大适屏的原版书页](docs/images/showcase/cross-platform/scanned-pdf-zh.png)
 
-EPUB, MOBI, AZW3 and FB2 image books are identified during import, not every time you open them. You can also change the classification in the bookshelf menu. Ordinary text books retain their familiar controls.
+EPUB、MOBI、AZW3、FB2 在导入时识别图片书，打开时不重复检测，也可通过书架菜单手动切换。普通文字书继续使用原有阅读菜单与样式。
 
 <details>
-<summary>Image processing and e-ink controls</summary>
+<summary>图像处理与墨水屏说明</summary>
 
-Automatic crop settings can apply throughout the book, with bounds detected separately for each page. Keep a little margin to protect footnotes and page numbers. Scanned watermark fading is image processing, not guaranteed reconstruction of text hidden beneath a watermark; always compare the result with the original.
+自动裁边可应用于全书，每一页分别识别边界。建议保留少量留白，保护页码、脚注和文字边缘。扫描水印减淡属于图像处理，不能保证还原被水印遮挡的文字，请对照原图确认。
 
-The menu follows the app theme. E-ink-only refresh controls appear when E-INK mode is enabled; hardware refresh support depends on the device. Ordinary text ebooks retain their normal reading menus and styles.
+菜单颜色跟随软件主题；只有开启 E-INK 模式才显示专用刷新控件，硬件刷新效果取决于设备支持。普通文字书保持原有阅读菜单与样式，不受扫描版设置影响。
 
 </details>
 
 <a id="ocr"></a>
 
-## Turn scans into readable text
+## 让扫描书，也能划词阅读
 
-Go beyond an image of the page. Recognize text locally, then read the result **inside the reader**, with adjustable typography, selection tools, highlights, notes and AI actions.
+不止于放大一张图片。识别出的文字**直接进入阅读界面**，可以调节排版、划词、标注、记笔记，也可以继续使用 AI 阅读工具。
 
-![Lightweight OCR model settings on iPhone and selectable reflowed text in the Mac reader](docs/images/showcase/cross-platform/ocr-en.png)
+![手机选择轻量 OCR 模型，Mac 展示识别重排后可划词的正文](docs/images/showcase/cross-platform/ocr-zh.png)
 
-1. In **Settings → OCR models**, choose a model and download source. **PP-OCRv4 Chinese / English** is the recommended starting point.
-2. Open the PDF/scanned-book menu. **Text reflow** uses an available text layer; **OCR reflow** recognizes the current page image. Reflow uses the current page or its cropped area, without an extra region-selection step.
-3. Select words in the reflowed text to copy, translate, annotate or ask AI. The style gear adjusts the recognized text, not the original scan or other books.
-4. For a specific passage, choose **Extract**, select a region and send its text to an **editable AI draft**. Review it before sending.
+1. 在**「设置 → OCR 模型」**选择模型和下载源，推荐先使用 **PP-OCRv4 中英文版**。
+2. 打开 PDF／扫描书菜单：**文字重排**利用已有文字层，**OCR 重排**识别页面图片。按当前整页或裁边后的区域重排，无需再次选择范围。
+3. 在重排正文中选词，进行复制、翻译、标注或 AI 提问；齿轮入口调节识别文字的样式，不改变原图和其他书籍。
+4. 只需要某段内容时，使用**「提取」**选择区域，将文字送入 **AI 输入框草稿**，检查、编辑后再发送。
 
 <details>
-<summary>Lightweight models, offline use and limitations</summary>
+<summary>轻量模型、离线使用与识别限制</summary>
 
-| Model | Download size | Use |
+| 模型 | 下载体积 | 适用方向 |
 | --- | --- | --- |
-| PP-OCRv4 Chinese / English | About 14.9 MiB | Recommended general choice |
-| PP-OCRv5 Chinese / English | About 20.5 MiB | Newer mobile model |
-| PP-OCRv3 Chinese / English | About 12.5 MiB | Smaller alternative |
-| PP-OCRv3 English | About 10.9 MiB | Lightweight English recognition |
+| PP-OCRv4 中英文 | 约 14.9 MiB | 推荐的通用选择 |
+| PP-OCRv5 中英文 | 约 20.5 MiB | 轻量新版 |
+| PP-OCRv3 中英文 | 约 12.5 MiB | 更小的备选模型 |
+| PP-OCRv3 英文 | 约 10.9 MiB | 英文轻量识别 |
 
-Models are downloaded on demand, not bundled in the installer. Choose the upstream host or Gitee mirror; downloads are checked by size and SHA-256. Delete a downloaded model from its card to reclaim space without deleting books or recognized text.
+模型按需下载，不内置在安装包中。可选上游或 Gitee 镜像，下载后检查大小与 SHA-256；模型卡片提供删除选项，释放空间时不删除书籍或已识别文字。
 
-OCR runs on the device after download and needs no API key. Sending extracted text to an online AI provider is a separate action. Recognition quality depends on scan clarity, language and layout; check names, numbers and complex columns against the original. OCR does not automatically index the entire book or rewrite the source PDF.
+下载后在本机离线识别，无需 API Key；将提取文字发送给在线 AI 是另一个独立操作。识别效果受清晰度、语言和版式影响，姓名、数字和复杂分栏应对照原图核验。OCR 不会自动向量化整本书，也不会改写原始 PDF。
 
 </details>
 
 <a id="library"></a>
 
-## Your library, your way
+## 让每本书，都有位置
 
-Bring EPUB, PDF, MOBI, AZW3, FB2, TXT, Markdown and text UMD books into one library. Import selected books from local or remote folders. Search by title, filter by reading status, group books into folders, or pin the ones you want to keep close.
+支持 EPUB、PDF、MOBI、AZW3、FB2、TXT、Markdown 和文字 UMD，可从本地或远程文件夹勾选导入。按阅读状态筛选，用文件夹整理书籍，把常读的书或文件夹置顶。
 
-- Select multiple books to create a folder or move them into an existing one.
-- Browse a separate WebDAV library, search and sort files, then download books for offline reading.
-- Import an ANX Reader ZIP backup through the migration entry in Advanced settings.
+- 批量选择书籍，新建文件夹，或移入已有文件夹。
+- 搜索、排序 WebDAV 远程书库，按需下载后离线阅读。
+- 在高级设置中导入 ANX Reader 的 ZIP 备份，迁移已有书库。
 
-![Create a folder on iPhone and see the organized book library on Mac](docs/images/showcase/cross-platform/library-en.png)
+![手机建立文件夹，Mac 展示整理后的书库](docs/images/showcase/cross-platform/library-zh.png)
 
 <details>
-<summary>Remote library and migration details</summary>
+<summary>远程书库与迁移说明</summary>
 
-The remote-library connection is separate from synchronization: it reads and downloads files without uploading or deleting server content. Configure it in Settings → Remote library settings. Anonymous and username/password access are supported; prefer HTTPS and a read-only account. Downloads are one at a time, with a 512 MiB per-file limit and duplicate checks.
+远程书库与同步分别配置，只读取和下载，不上传或删除服务器文件。入口为「设置 → 远程书库设置」，支持匿名访问和用户名/密码认证，推荐 HTTPS 与只读账号。单文件上限 512 MiB，一次下载一本，并进行重复检查。
 
-ANX backup import validates and merges supported records while retaining existing Modu data and creating a pre-import database snapshot. Read the import screen's compatibility notes before proceeding.
+ANX 备份导入会校验并合并支持的数据，保留已有默读记录，并在导入前创建数据库快照。导入前请阅读页面上的兼容范围和操作说明。
 
 </details>
 
 <a id="reading"></a>
 
-## Make every page your own
+## 把阅读，调成喜欢的样子
 
-Adjust fonts, font thickness, line spacing, paragraph spacing and margins. Use separate body and Latin fonts, choose paginated or scrolling reading, and make the page comfortable for your screen.
+调整字体、字体粗细、行距、段距和页边距，中英文可以使用不同字体。翻页或滚动、浅色或深色，都由自己的阅读习惯决定。
 
-- Tap the page for chapter/page navigation; drag the progress slider to preview chapter titles.
-- Choose themes and backgrounds, or use dark, OLED and e-ink modes.
-- Manage named CSS profiles with editable presets, visual controls, regex highlights and optional custom code. Enable several profiles together or import/export them.
+- 点击正文即可调出章节与翻页控制，拖动进度条时预览章节标题。
+- 支持背景、主题、OLED 与墨水屏模式，应用语言可手动选择或跟随系统。
+- 长按自动选词或整段，随后用手柄自由调整范围。
+- 样式中的图形调节与 CSS 方案搭配使用，阅读界面直接应用。
 
-![Font and spacing controls on iPhone, with the resulting book layout on Mac](docs/images/showcase/cross-platform/styles-en.png)
+![手机调节字体与间距，Mac 展示应用后的阅读排版](docs/images/showcase/cross-platform/styles-zh.png)
+
+### 竖排，也有书页的秩序
+
+适合的书籍可以切换竖排，搭配边框与栏线，保留传统书页的阅读节奏。
+
+![带边框的竖排阅读效果](docs/images/showcase/cross-platform/vertical-zh.png)
 
 <details>
-<summary>Typography, navigation and CSS details</summary>
+<summary>字体与阅读细节</summary>
 
-Settings → CSS settings provides 32 named profiles and 13 editable presets. Detailed editing stays in Settings; the reader applies your profiles. See [CSS presets](docs/CSS_PRESETS.md).
+字体粗细为 0.5–2.0，步进 0.1；固定字重字体可开启「模拟加粗」，在大于 1.0 时增加笔画厚度，但不能把固定粗体变细。PDF 等固定版式不会重新排版。
 
-Font thickness ranges from 0.5 to 2.0 in 0.1 steps. The optional Simulated bold control can add weight to fixed-weight fonts above 1.0; it cannot make a fixed bold face thinner. PDF and other fixed-layout pages are not re-typeset.
-
-Scrolling page steps can be set from 80% to 100%. Long-press selection can expand to a word or paragraph, then be adjusted with the selection handles. Footnotes open within the reader. Vertical typesetting supports optional frames and column rules for suitable books.
-
-Choose an app language or follow the system in Settings → Appearance. Bundled AI prompts follow that language; your edited prompts keep their original text.
+滚动翻页步幅支持 80%–100%。正文注释在阅读器中弹出；页眉页脚可分别显示章节序号与本章当前页/总页数。内置 AI 提示词跟随应用语言，自行编辑的提示词保持原文。
 
 </details>
 
 <a id="css"></a>
 
-## Your CSS rules, visible on the page
+## CSS 自定义，让效果出现在书页上
 
-Start with visual presets for colors, spacing and underlines, then add custom CSS when you want finer control. The example below shows **colored dialogue with wavy underlines, highlighted keywords and generous paragraph spacing**.
+不用先写代码，也能从预设开始调整颜色、字体、间距和下划线；需要更细的控制时，再填写自定义 CSS。下面的效果展示了**对白变色与波浪线、关键词高亮，以及宽松段落排版**。
 
-![CSS rule controls on iPhone and their reading effects on Mac](docs/images/showcase/cross-platform/css-en.png)
+![手机调整 CSS 规则，Mac 展示正文配色、波浪线和关键词高亮](docs/images/showcase/cross-platform/css-zh.png)
 
-- 32 named slots and 13 editable presets, with independent switches and combined activation.
-- Visual controls for page typography and layout; regex rules for dialogue and keywords.
-- Edit centrally in Settings and apply from the reader, with per-book activation choices.
-- Import a plain CSS file or a Modu JSON profile; export the current or all nonempty profiles.
+- 32 个命名位置、13 个可编辑预设，多套方案独立开关，也可同时启用。
+- 图形调节文字、背景、段落与下划线；按正则匹配对白、关键词等文字。
+- 设置中统一编辑，阅读界面选择应用；书籍可使用自己的启用组合。
+- 导入普通 CSS 或默读 JSON 方案，导出当前或全部非空方案。
 
 <details>
-<summary>Presets, scope and file exchange</summary>
+<summary>预设、作用范围与文件交换</summary>
 
-Presets cover novels, vertical spacing, images, centered headings, long-form text, English paragraphs, poetry, tables, dialogue colors/wavy lines, keyword/date highlights and heading underlines. Choose all text, headings or body scope; set your own keyword in the rule.
+预设覆盖横排小说、竖排间距、图片适配、标题居中、长文间距、英文段落、诗词、表格，以及对白变色、对白波浪线、关键词/日期高亮、标题下划线。支持全部、标题或正文作用范围；示例中的关键词需要在规则里设置。
 
-Page CSS controls layout. Regex highlights style matching text with colors, backgrounds and underlines without changing the book text or annotation positions. JSON preserves visual parameters, expressions and scope. Import only trusted CSS: remote resource URLs may make network requests. See [CSS profiles](docs/CSS_PRESETS.md).
+普通 CSS 调整页面排版；正则高亮用于匹配文字的颜色、背景与下划线，并不改变原文内容或笔记定位。JSON 可以保留图形参数、正则表达式和作用范围；只导入可信方案，远程资源地址可能触发网络请求。详见 [CSS 方案说明](docs/CSS_PRESETS.md)。
 
 </details>
 
 <a id="listening"></a>
 
-## A voice for every story
+## 为每个故事，选择合适的声音
 
-Listen with system speech, Edge TTS, Xiaomi MiMo, OpenAI-compatible services or DashScope. Start from the current position or selected text, and keep listening across chapters.
+支持系统朗读、Edge TTS、小米 MiMo、OpenAI 兼容服务和 DashScope。从当前位置或选中文字开始听，章末接续下一章。
 
-**Start with a template, then make the voice your own.** Choose natural narration, bedtime reading, fiction performance, knowledge explanation, classical recitation or news reading. Edit the description and append suggestions for articulation, pauses, tone and pace.
+**先选模板，再微调声音。** 自然旁白、睡前轻读、小说演绎、知识讲解、古文诵读和新闻播报，都可以作为起点；继续编辑提示词，加入咬字、停顿、语气和节奏要求。
 
-![Voice prompt settings on iPhone, with passage highlighting and playback on Mac](docs/images/showcase/cross-platform/listening-en.png)
+![手机编辑语音提示词，Mac 展示朗读高亮和播放工具栏](docs/images/showcase/cross-platform/listening-zh.png)
 
-- MiMo offers preset voices and voice design through descriptions of timbre, tone and delivery.
-- OpenAI-compatible speech settings offer an instructions switch, templates and an editable prompt.
-- A compact reader toolbar provides play/pause, return to the narration position and read from here.
-- Online narration supports up to 4× playback, with separate 3× and 4× slider steps after 2×.
+- MiMo 支持预设音色，也可以用文字描述音色与表达风格。
+- OpenAI 兼容语音提供提示词开关、预设模板和编辑框。
+- 轻量朗读工具栏提供播放/暂停、回到朗读位置和从此处朗读。
+- 在线语音最高支持 4 倍速，2 倍之后使用 3 倍、4 倍独立档位。
 
 <details>
-<summary>Voice prompts and playback details</summary>
+<summary>提示词与播放说明</summary>
 
-Find these controls in Settings → Narrate. Selecting a description template fills the editor; suggestions append text for further editing. For example:
+入口为「设置 → 朗读」。选择描述模板会填入编辑框，点击常用描述词可以追加并继续修改。例如自然旁白可要求：
 
-> Read in a natural storytelling style with clear articulation, moderate pauses between sentences, and steady emotion, suitable for long listening sessions.
+> 以自然讲故事的方式朗读，吐字清晰，句间停顿适中，情绪平稳，适合长时间连续听书。
 
-Descriptions guide delivery; they are not spoken book text or additional official voice IDs. MiMo's rate slider adjusts local playback speed from 0.5–4.0× without regenerating audio. Prompt support depends on the service; instructions are not sent to tts-1 / tts-1-hd and can be disabled for incompatible endpoints.
+描述用于指导声音，不会作为书籍正文读出，也不是新增的官方音色 ID。MiMo 语速滑块调节本地播放速度 0.5–4.0 倍，无需重新生成音频；提示词能力取决于所选服务。tts-1 / tts-1-hd 不发送语音描述，不支持该参数的兼容接口可关闭提示词。
 
-Edge, MiMo, OpenAI-compatible and DashScope synthesis groups neighboring sentences within natural paragraphs, splitting long paragraphs. Highlighting and previous/next controls follow each passage; system speech retains sentence navigation. Upcoming passages are prefetched during playback.
+Edge、MiMo、OpenAI 兼容与 DashScope 按自然段合并相邻句子，长段拆分；高亮与前后跳转按段落片段定位，系统朗读保留逐句定位。播放期间预加载后续片段。
 
 </details>
 
 <a id="ai"></a>
 
-## Turn reading into a conversation
+## 把阅读，变成一场对话
 
-Ask about a passage, summarize a chapter, examine an argument or organize ideas into a mind map. Configure your own AI provider and choose which reading tools it may use.
+解释一段文字、总结一个章节、拆解一条论证，或生成思维导图。选择自己的 AI 服务，也选择它可以调用的阅读工具。
 
-- Built-in and custom reading skills can be enabled, disabled, edited and reordered together.
-- Turn on “fill the input first” to add a chapter range or extra instructions before sending.
-- Continue with follow-up questions in the current conversation or a restored historical conversation.
-- View mind maps full screen, zoom and pan, collapse branches, and export them.
+- 内置与自定义技能均可开关、编辑、混合排序。
+- 开启「先填入输入框」，在模板基础上补充章节范围，再手动发送。
+- 当前对话与历史对话均可继续追问，沿用已有上下文。
+- 思维导图支持全屏、缩放、移动、节点展开/收回和多格式导出。
 
-![A chapter-summary prompt on iPhone and its reader AI conversation on Mac](docs/images/showcase/cross-platform/skills-en.png)
+![手机编辑章节总结提示词，Mac 展示阅读中的 AI 回答](docs/images/showcase/cross-platform/skills-zh.png)
 
 <details>
-<summary>Models, skills and conversation context</summary>
+<summary>模型、技能与对话上下文</summary>
 
-Supported protocols include OpenAI-compatible, Claude and Gemini. Configure endpoints, keys and model parameters in Settings → AI settings. Service capabilities and charges depend on the provider.
+支持 OpenAI 兼容、Claude、Gemini 等协议，在「设置 → AI 设置」配置接口、密钥与模型参数。具体能力与费用由所选服务商决定。
 
-Home AI works with library, notes and reading records. Reader AI works with the current book, chapter or selection. Enabled tools can retrieve chapters, search text and inspect notes; answers depend on the material actually retrieved.
+首页 AI 面向书架、笔记和阅读记录；阅读页 AI 面向当前书籍、章节和选文。按需启用读取章节、检索正文、查找笔记等工具，回答依据实际获取的内容。
 
-Common skills include chapter/book summaries, concept explanations, argument analysis, character tracking, quote collection, reading guides and mind maps. Mind maps export as PNG, SVG, Markdown, FreeMind (.mm) or JSON. Completed reader answers return to their first paragraph.
+常用技能包括本章/全书总结、概念解析、论证分析、人物追踪、金句摘录、阅读指南和思维导图。导图可导出 PNG、SVG、Markdown、FreeMind（.mm）及 JSON。阅读 AI 输出结束后回到本次回答的第一段。
 
 </details>
 
 <a id="selection"></a>
 
-## Put your favorite tools at your fingertips
+## 划词之后，常用工具就在手边
 
-Choose what appears when you select text. Keep useful actions close and hide the ones you do not need.
+把常用按钮留在前面，不需要的就隐藏。划词工具栏既能处理复制、标注、翻译和搜索，也能运行自己的 AI 命令。
 
-- Toggle and drag-sort built-in tools, annotation controls and custom AI commands.
-- Edit command names, icons and prompts; common AI templates start disabled.
-- Choose selected text only or selected text with context, and opt into online search per command.
-- Selection templates are managed separately from reading skills but use the same reader AI dialog.
+- 内置按钮、标注工具、自定义 AI 命令都可开关和拖动排序。
+- 编辑名称、图标、提示词；常用 AI 预设默认不启用。
+- 选择「仅选中文字」或「结合上下文」，每个命令可独立选择是否联网。
+- 划词模板单独管理，与 AI 阅读技能共用同一个阅读对话弹窗。
 
-![Toolbar configuration on iPhone and adjustable text selection on Mac](docs/images/showcase/cross-platform/selection-en.png)
+![手机配置划词工具栏，Mac 展示选词手柄与划词工具栏](docs/images/showcase/cross-platform/selection-zh.png)
 
-AI Knowledge uses your current model's knowledge first. If further checking is needed, use **Online search** beneath the answer, before Regenerate and Copy, to retrieve Wiktionary, Wikipedia and Baidu Baike material in the same conversation. The same model summarizes the results with sources. No separate search API key is needed.
+「AI 知识」优先使用当前模型已有知识；需要补查时，点击回答下方、重新生成和复制之前的 **联网搜索** 按钮，即可在同一对话中检索维基词典、维基百科及百度百科，再交给同一模型整理并附来源，无需额外搜索 API Key。
 
 <a id="translation"></a>
 
-## Read beyond one language
+## 跨过语言，不离开书页
 
-Read translated paragraphs **directly on the book page**, rather than in a separate selection popup. Choose **Original + translation** for inline bilingual reading, or **Translation only** for a continuous translated view.
+让译文**直接出现在书页正文中**，而不是只在划词弹窗里查看一句话。选择**「原文 + 译文」**逐段对照阅读，也可切换**「仅译文」**连续阅读。
 
-![Full-text translation controls on iPhone and English–Spanish inline bilingual reading on Mac](docs/images/showcase/cross-platform/translation-en.png)
+![手机配置全文翻译，Mac 展示英文原文与中文译文逐段对照的阅读效果](docs/images/showcase/cross-platform/translation-zh.png)
 
-Open the reader's translation controls, choose an engine and target language, then translate the current reading content. Translation follows the reading position; this is not a one-click export of a translated copy of the entire book. The stop action stays in the toolbar rather than covering the text.
+在阅读翻译面板选择引擎、目标语言和显示方式，翻译当前阅读内容。译文随阅读位置加载，并非一次性导出整本书的译本；停止翻译的操作留在工具栏中，不遮挡正文。
 
-- Google translation, AI translation and DeepL/DeepLX.
-- Selection translation also offers embedded webpages, including Baidu and Youdao; these are separate from inline full-text translation.
-- Selection search with Baidu, Bing, Google, Baidu Baike, Wikipedia or a custom engine in the built-in browser.
+- Google 翻译、AI 翻译、DeepL/DeepLX。
+- 划词翻译另可在应用内打开百度、有道等网页服务，与正文全文翻译独立。
+- 在内置浏览器使用百度、Bing、Google、百度百科、维基百科或自定义搜索引擎。
 
-The English showcase uses English–Spanish paragraphs; the [Chinese showcase](README_zh.md#translation) uses English–Chinese paragraphs and a Chinese interface. Online translation sends the requested text to the selected provider.
+中文配图使用中文界面和英汉对照；[英文配图](README_EN.md#translation)使用英文界面与英西对照，分别展示。在线翻译会将待译文字发送给所选服务提供方。
 
 <a id="dictionary"></a>
 
-## Understand a word without losing your place
+## 看懂一个词，不打断阅读
 
-Select a word and read its definition right beside the book. Imported MDX and StarDict dictionaries work offline, with no AI account required.
+选中词语，就在书页旁查看释义。导入 MDX 或 StarDict 字典后可离线查询，无需 AI 账号。
 
-![An enabled local dictionary on iPhone and its word definition in the Mac reader](docs/images/showcase/cross-platform/dictionary-en.png)
+![手机启用本地词典，Mac 在阅读界面显示选中词语的释义](docs/images/showcase/cross-platform/dictionary-zh.png)
 
-Name, enable, disable or remove dictionaries in Settings → Custom dictionaries. Results come from your imported dictionary's entries; dictionary files are not bundled. The picture uses an original demonstration entry.
+在「设置 → 自定义字典」中命名、启停或删除词典。查询结果取决于所导入词典的词目，软件不内置词典文件；图中使用原创示例词条。
 
 <a id="notes"></a>
 
-## Keep what stays with you
+## 把读过的，留在心里
 
-Highlight a passage, underline an idea and add your own thoughts. Review notes by book and chapter, then return to the original passage when you need its context.
+高亮一句话，为一个观点画线，再写下自己的想法。按书籍与章节重看笔记，需要语境时返回原文。
 
-- Choose highlight colors and annotation styles.
-- On mobile, use Quick mark to swipe over text and save a highlight.
-- Export Markdown, TXT or CSV with original passages and creation or last-edit times.
-- Reading-position links in exports reopen the corresponding book location in Modu when that book is available.
+- 多种高亮颜色与标注样式。
+- 手机开启快速标注后，划过文字即可保存高亮。
+- 导出 Markdown、TXT、CSV，保留原文及创建或最后修改时间。
+- 导出内容中的阅读位置链接，可打开默读里已有书籍的对应位置。
 
-![Edit a highlight and comment on iPhone, then review saved notes on Mac](docs/images/showcase/cross-platform/notes-en.png)
+![手机编辑高亮与备注，Mac 展示保存后的书籍笔记](docs/images/showcase/cross-platform/notes-zh.png)
 
 <details>
-<summary>Deleting annotations and exporting notes</summary>
+<summary>标注删除与笔记导出</summary>
 
-Select part or all of an existing highlight or underline, choose the trash action and confirm to delete the complete overlapping annotation and its comment. The confirmation appears above the toolbar and color palette.
+选中已有高亮或下划线的局部或全部，点击垃圾桶并确认，可删除相交的完整标注及备注；确认框位于工具栏和颜色栏上方。
 
-Exports distinguish the original passage from your comments; Markdown also highlights the note content. Quick mark works with reflowable text, not scanned PDF images, and has an explicit Exit control to restore normal gestures.
+导出原文统一使用「原文：【…】」，Markdown 额外高亮笔记内容。快速标注适用于可重排文本，不适用于扫描 PDF，并提供退出按钮恢复正常翻页手势。
 
 </details>
 
 <a id="statistics"></a>
 
-## See your reading take shape
+## 看见阅读，日积月累
 
-Follow reading time, reading days, streaks and progress through individual books. Switch between periods to see how your habits change.
+阅读时长、阅读天数、连续阅读和书籍进度，让每一次翻开书页都有迹可循。
 
-- Review time trends and the reading heatmap.
-- Explore per-book reading records.
-- Rearrange dashboard cards and keep the metrics you care about.
-- Reading History includes Recently read, This week, Daily reading average and Most annotated cards. Tap a book title or cover to continue reading; deleted books retain their history and show a notice.
+- 按时间范围查看趋势与阅读热力图。
+- 查看每本书的阅读时长和记录。
+- 拖动调整统计卡片，把关心的数据留在前面。
+- “阅读历史”增加最近阅读、本周回顾、阅读日均时长和笔记最多的书等卡片；点击书名或封面继续阅读，已删除书籍保留记录并给出提示。
 
-![Add a statistics card on iPhone and view reading charts on Mac](docs/images/showcase/cross-platform/statistics-en.png)
+![手机添加统计卡片，Mac 展示阅读统计图表](docs/images/showcase/cross-platform/statistics-zh.png)
 
 <a id="vector"></a>
 
-## Find ideas, not just words
+## 向量化，找到意思相近的那一段
 
-Vector indexing turns book passages into searchable representations of their meaning. Combine keyword and semantic search to find relevant text, then let AI use retrieved passages as context for its answer.
+为书籍建立向量索引，不只查相同的字词，也能查语义相关的内容。将关键词检索与语义检索结合，为 AI 回答提供相关原文。
 
-1. Choose a local ONNX model or a remote embedding API in Settings → Embedding Models.
-2. Download a local model when needed, then index a book from its menu.
-3. Follow the background indexing task; use the resulting index for retrieval.
+1. 在「设置 → 向量模型」选择本地 ONNX 模型或远程嵌入 API。
+2. 按需下载本地模型，在书籍菜单中建立索引。
+3. 后台队列继续处理，可查看任务进度，完成后用于语义检索。
 
-![Local embedding settings on iPhone and an AI answer grounded in retrieved passages on Mac](docs/images/showcase/cross-platform/vector-en.png)
+![手机配置本地向量模型，Mac 展示基于检索章节片段的回答](docs/images/showcase/cross-platform/vector-zh.png)
 
 <details>
-<summary>Local models, downloads and privacy</summary>
+<summary>本地模型、下载与隐私</summary>
 
-| Local model | Languages | Dimensions |
+| 本地模型 | 语言 | 向量维度 |
 | --- | --- | --- |
-| all-MiniLM-L6-v2 | English | 384 |
-| BGE Small EN v1.5 | English | 384 |
-| BGE Small ZH v1.5 | Chinese | 512 |
-| Multilingual E5 Small | Multilingual | 384 |
+| all-MiniLM-L6-v2 | 英文 | 384 |
+| BGE Small EN v1.5 | 英文 | 384 |
+| BGE Small ZH v1.5 | 中文 | 512 |
+| Multilingual E5 Small | 多语言 | 384 |
 
-Models and tokenizers are downloaded on demand, not bundled in installers. Choose Hugging Face or the [Gitee model mirror](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1); downloads are checked by size and SHA-256. Verified local models can run offline without an API key.
+模型与分词器按需下载，不塞进安装包。可选择 Hugging Face 或 [Gitee 模型镜像](https://gitee.com/sobranie2406/modu-models/releases/tag/models-v1)，下载校验大小与 SHA-256；完整本地模型可离线使用，无需 API Key。
 
-Automatic indexing after import is off by default. Indexes stay local and are not included in WebDAV library sync. Reindex when changing the embedding model. **The chat model and embedding model are separate settings:** one generates answers; the other helps retrieve relevant passages.
+导入后自动向量化默认关闭。索引保存在本机，不随 WebDAV 书库同步；更换向量模型后需重新建立索引。**聊天模型和向量模型是两套配置**：前者生成回答，后者帮助找到相关原文。
 
-Local embedding computation stays on the device. Remote embedding services receive the text to be indexed; online AI services receive the context used for their answers.
+本地向量计算在设备上完成。使用远程嵌入服务时，会发送需要索引的文本；使用在线 AI 时，会发送回答所需的上下文。
 
 </details>
 
 <a id="data"></a>
 
-## Continue on another device
+## 换一台设备，接着读
 
-Use your own WebDAV server to sync books, notes, bookmarks and reading progress. Keep a database backup before changing devices or restoring a library.
+通过自己的 WebDAV 服务同步书籍、笔记、书签和阅读进度；换机或恢复前，先保留一份数据库备份。
 
-- Automatic sync, Wi-Fi-only controls and optional timed sync during foreground reading.
-- ZIP database backup export/import with a visible save location.
-- Backup includes local books, covers, notes, reading records, AI chat history and general settings.
-- Sensitive service settings are excluded by default; backup export can optionally include them with encryption.
+- 自动同步、仅 Wi-Fi、前台阅读定时同步。
+- 导出或导入 ZIP 数据库备份，完成后显示保存位置。
+- 备份包含本机书籍、封面、笔记、阅读记录、AI 对话历史和一般设置。
+- 服务配置与凭据默认排除，可在备份导出时选择加密包含。
 
-![Sync and backup controls on iPhone, with restored reading progress and annotation on Mac](docs/images/showcase/cross-platform/sync-en.png)
+![手机同步与备份设置，Mac 展示同步后的阅读位置和高亮](docs/images/showcase/cross-platform/sync-zh.png)
 
 <details>
-<summary>Restore behavior and sync security</summary>
+<summary>恢复方式与同步安全</summary>
 
-Settings → Sync → Database backup exports Modu-Backup-*.zip. Select the ZIP directly when restoring; do not extract it. Import validates then **replaces existing data rather than merging**, so back up the current library first and restart after restoring.
+入口为「设置 → 同步 → 数据库备份」，导出 Modu-Backup-*.zip。恢复时直接选择 ZIP，无需解压；校验后**替换现有数据，不是合并**，请先备份当前书库，恢复后重启软件。
 
-Windows saves to the user's Downloads folder; other platforms use the system save destination. Successful export shows the path or filename. Download any books you want included before backing up.
+Windows 默认保存到当前用户的 Downloads（下载）文件夹；其他平台使用系统保存窗口选择的位置，成功后显示路径或文件名。希望迁移的书籍需先下载到本机。
 
-WebDAV sync merges records by stable identity and uses the latest reading action, not the furthest progress. Fonts, background images, local dictionaries and vector indexes are not part of library sync. Server compatibility is described in the [sync guide](docs/WEBDAV_RECORD_SYNC.md).
+WebDAV 按稳定标识合并记录，阅读位置采用最近一次操作，不是最远进度。字体、背景、本地字典和向量索引不随书库同步；服务器兼容与迁移方式见[同步说明](docs/WEBDAV_RECORD_SYNC.md)。
 
-Sync API keys is a separate opt-in switch. Sensitive configurations are encrypted with AES-256-GCM and require the same encryption password on every device. This does not encrypt the entire library or replace a trusted server.
+「同步 API Key」为独立开关，默认关闭；开启后使用 AES-256-GCM 加密敏感配置，其他设备需要同一加密密码。这并不等于整个书库都已加密。
 
 </details>
 
 <a id="backup"></a>
 
-## Take your preferences with you
+## 全局设置备份与导出，把习惯一起带走
 
-Global settings backup transfers the way you use Modu: appearance, reader layout, CSS profiles, AI skills, selection tools, speech, translation and general preferences.
+一次迁移外观、阅读排版、CSS 方案、AI 技能、划词工具、朗读、翻译和其他通用设置，不必换机后逐项重配。
 
-- Export a settings file or modu link; restore from a file or pasted link.
-- Review the contents before importing.
-- Keep accounts, passwords and API configurations behind an independent switch, **off by default**.
-- Only changes to built-in prompt templates are backed up, alongside your custom templates.
+- 导出设置文件或 modu 链接，从文件或粘贴链接恢复。
+- 导入前校验并展示实际包含的设置。
+- 账号、密码与 API 接口配置使用独立开关，**默认关闭**。
+- 内置提示词只保存用户改动，自定义模板一并保留。
 
-![Global settings backup on iPhone and a completed export with its save location on Mac](docs/images/showcase/cross-platform/backup-en.png)
+![手机全局设置备份，Mac 展示导出成功和文件保存位置](docs/images/showcase/cross-platform/backup-zh.png)
 
-| Need | Use |
+| 想做什么 | 使用哪个功能 |
 | --- | --- |
-| Move preferences and custom prompts | Global settings backup |
-| Back up books, notes and reading records | Database backup |
-| Keep reading data aligned across devices | WebDAV sync |
+| 迁移偏好设置、自定义提示词 | 全局设置备份 |
+| 备份书籍、笔记与阅读记录 | 数据库备份 |
+| 多设备持续同步阅读数据 | WebDAV 同步 |
 
-Settings files do **not** contain books, notes, chat history, font/background files, dictionaries or downloaded vector models. If you include credentials, the settings file or link contains recoverable plaintext credentials: **keep it private**. QR export is not offered; use a file for a complete settings backup.
+设置文件**不包含**书籍、笔记、聊天记录、字体/背景文件、字典或已下载的向量模型。若开启包含凭据，文件和链接会含可还原的明文账号密钥，**请勿公开分享**。不提供二维码导出，全量设置推荐用文件备份。
 
-Windows settings exports default to Downloads; other platforms use the selected save destination. The success message shows the saved location and lets you copy it.
+Windows 设置文件默认保存至 Downloads（下载）文件夹，其他平台以选择的位置为准；成功提示可查看并复制保存位置。
 
-## Getting started
+## 开始使用
 
-1. Download the package for your system and architecture from [Releases](https://github.com/sobranie2406/modureader/releases). Follow the installation instructions.
-2. Add an ebook to the library and open it. No API key is required if you do not use AI.
-3. To use AI, configure a model in Settings → AI Settings and test the connection.
-4. For semantic search, download a local model in Settings → Embedding Models (Chinese BGE is the default), then index a downloaded book from its menu. You can also configure a remote embedding endpoint.
-5. Choose translation, read-aloud and sync services as needed. See the [Settings guide](docs/SETTINGS.md) for instructions, parameter explanations and security considerations.
+1. 从 [Releases](https://github.com/sobranie2406/modureader/releases) 下载对应系统和架构的包，按安装指南完成安装。
+2. 在书架添加电子书，打开后即可阅读；不使用 AI 时无需填写任何 API Key。
+3. 需要 AI 时，在「设置 → AI 设置」配置模型，并先做连接测试。
+4. 需要语义检索时，在「设置 → 向量模型」按需下载本地模型（默认中文 BGE），再从已下载书籍的菜单建立索引；也可配置远程向量接口。
+5. 按需选择翻译、朗读与同步服务。详细操作、参数含义和安全注意事项见[设置指南](docs/SETTINGS_zh.md)。
 
-## Feedback
+## 问题反馈
 
-See [Releases](https://github.com/sobranie2406/modureader/releases) for version changes and downloads.
+各版本的更新记录见 [Release 说明](https://github.com/sobranie2406/modureader/releases)。
 
-When reporting an issue in [this repository](https://github.com/sobranie2406/modureader/issues), include your version, system, architecture, reproduction steps and a sample without private information. Never submit API keys, WebDAV passwords or settings files and links containing credentials.
+发现问题时，请在本仓库 [Issues](https://github.com/sobranie2406/modureader/issues) 提供版本、系统与架构、复现步骤和不含私人资料的示例。请勿提交 API Key、WebDAV 密码或含凭据的设置文件及链接。
 
-If Modu helps you enjoy reading, please give the repository a **Star ⭐** in the top-right corner. It helps more readers discover the project and encourages continued development. Thank you!
+如果默读对你有帮助，欢迎点击仓库右上角的 **Star ⭐**，让更多人发现它，也为持续改进添一份支持。谢谢！
 
-## Build from source
+## 从源码构建
 
 <details>
-<summary>Expand build instructions</summary>
+<summary>展开构建步骤</summary>
 
-The pinned Flutter version is recorded in [.github/flutter-version](.github/flutter-version); dependencies are locked in pubspec.lock. You need Flutter's native toolchain for your platform. Building the tokenizer from source also requires Rust, including the appropriate mobile targets.
+固定 Flutter 版本记录在 [.github/flutter-version](.github/flutter-version)，依赖锁定在 pubspec.lock。
+需要对应平台的 Flutter 原生工具链；本地 tokenizer 的源码编译还需要 Rust（移动端需相应 Rust target）。
 
 ```sh
 flutter pub get
 flutter gen-l10n
 dart run build_runner build --delete-conflicting-outputs
 flutter test --concurrency 1
-# Run on the appropriate host platform:
+# 在对应宿主平台运行：
 flutter build macos --release --build-name "$(python3 scripts/release/verify_mobile.py --apple-build-name)"
-# Configure Android release signing as described in docs/RELEASING.md first.
+# Android 的 release 签名先按 docs/RELEASING.md 配置
 flutter build apk --release --target-platform android-arm64 --split-per-abi
 ```
 
-See [.github/workflows/build.yaml](.github/workflows/build.yaml) and scripts/release for the complete build and packaging procedure. The Dart package name remains `anx_reader` for compatibility with existing imports. The user-facing brand and application ID are Modu / `com.modu.reader`.
+完整可复现的构建/打包步骤以 [.github/workflows/build.yaml](.github/workflows/build.yaml) 和 scripts/release 为准。
+Dart 包名暂时保留 anx\_reader，以兼容现有 import；用户可见品牌及应用 ID 为 Modu / com.modu.reader。
 
 </details>
 
-## Star history
+## Star 趋势
 
-Thank you to everyone supporting Modu. Click the chart to explore its growth on [Star History](https://www.star-history.com/?repos=sobranie2406%2Fmodureader\&type=date\&legend=top-left).
+感谢每一位支持默读的读者。点击图表可在 [Star History](https://www.star-history.com/?repos=sobranie2406%2Fmodureader\&type=date\&legend=top-left) 查看详细趋势。
 
 <a href="https://www.star-history.com/?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;theme=dark&amp;legend=top-left" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left" />
-    <img alt="Modu GitHub stars over time" src="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left" width="800" />
+    <img alt="默读 GitHub Star 数量随时间变化的趋势图" src="https://api.star-history.com/chart?repos=sobranie2406%2Fmodureader&amp;type=date&amp;legend=top-left" width="800" />
   </picture>
 </a>
 
-## License and origins
+## 开源许可与来源
 
-The project is distributed under **GPL-3.0-or-later**; see [LICENSE](LICENSE).
-Anx Reader's MIT copyright and license are preserved in [LICENSES/Anx-Reader-MIT.txt](LICENSES/Anx-Reader-MIT.txt).
-ReadAny's copyright and license are preserved in [LICENSES/ReadAny-GPL-3.0-or-later.txt](LICENSES/ReadAny-GPL-3.0-or-later.txt).
-See [UPSTREAM.md](UPSTREAM.md) and [NOTICE](NOTICE) for pinned upstream revisions, modification scope and third-party attribution. When distributing binaries, retain the licenses, identify your modifications and provide the complete corresponding source and build scripts for that version.
+整体按 **GPL-3.0-or-later** 发布，见 [LICENSE](LICENSE)。
+Anx Reader 的 MIT 版权与许可保留在 [LICENSES/Anx-Reader-MIT.txt](LICENSES/Anx-Reader-MIT.txt)；
+ReadAny 的版权与许可保留在 [LICENSES/ReadAny-GPL-3.0-or-later.txt](LICENSES/ReadAny-GPL-3.0-or-later.txt)。
+固定上游提交、修改范围和第三方归属见 [UPSTREAM.md](UPSTREAM.md)、[NOTICE](NOTICE)。
+分发二进制时请保留许可、注明修改，并提供对应版本的完整源码与构建脚本。
 
-[Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[隐私说明](PRIVACY_zh.md) · [安全报告](SECURITY_zh.md) · [参与贡献](CONTRIBUTING_zh.md)

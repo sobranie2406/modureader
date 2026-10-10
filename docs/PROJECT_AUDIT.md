@@ -2,13 +2,13 @@
 
 ## Current: Modu 1.2.0+10082
 
-The current product baseline is the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Current guides must describe that release rather than uncommitted application changes. The homepage is English `README.md` with a separate Chinese `README_zh.md`; `README_EN.md` redirects the old English address. Single-version guides use English, while dated historical records retain their evidence and version boundaries.
+The current product baseline is the stable Modu publishing repository's `v1.2.0` commit `77dc238fb2ae2ce02455bd80c500ee9fd140f219`. Current guides must describe that release rather than uncommitted application changes. As of 2026-10-10, the default homepage is Chinese `README.md`, the complete English edition is `README_EN.md`, and `README_zh.md` links to the default homepage. Single-version guides use English, while dated historical records retain their evidence and version boundaries.
 
 Current document reading includes PDF and classified image books, optional local OCR, current-page/cropped-whole-page reader reflow and Extract's region editor/editable AI input. The earlier OCR cancellation was superseded by later implementation. Ordinary text books retain their normal reader. Vector indexes stay local; Stop Vectorization remains available. Release guidance uses eight installers, excluding Android x64, GitHub-first checking and the same resolved download source, with browser DMG downloads on macOS rather than an in-app file-hash claim. See the [scanned-document status](SCANNED_DOCUMENT_DEVELOPMENT.md), [indexing guide](INDEX_SYNC_AND_READING_CONTROLS.md) and [update mirror](UPDATE_MIRROR.md).
 
-The current homepage set contains 33 images, following later documented expansion of the nine-image set retained on 2026-10-03. Current imagery preserves actual Mac layout, places phone configuration in the foreground and Mac results behind it, uses white PDF pages, and separates EN/ZH artwork. These are display/provenance requirements, not new app or device verification. See [display assets](images/README.md).
+The current homepage set contains 35 images (including two fictional bookshelf-home illustrations added on 2026-10-10), following later documented expansion of the nine-image set retained on 2026-10-03. Current imagery preserves actual Mac layout, places phone configuration in the foreground and Mac results behind it, uses white PDF pages, and separates EN/ZH artwork. These are display/provenance requirements, not new app or device verification. See [display assets](images/README.md).
 
-No new tests, builds, device checks or full security audit were performed for this documentation update. The records below describe earlier work and do not move tags or alter published assets.
+The 2026-10-10 homepage update passed eight documentation identity/link checks; it did not run new application builds, device checks or a full security audit. The records below describe earlier work and do not move tags or alter published installers.
 
 ## Historical identity cleanup
 

@@ -1,6 +1,6 @@
 # 参与贡献
 
-[English](CONTRIBUTING.md) · 简体中文 · [中文首页](README_zh.md)
+[English](CONTRIBUTING.md) · 简体中文 · [中文首页](README.md)
 
 核对版本：Modu 1.2.0，日期：2026-10-04。项目来源于 Anx Reader 和 ReadAny，请保留原作者归属。
 

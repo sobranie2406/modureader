@@ -1,6 +1,6 @@
 # 安全报告
 
-[English](SECURITY.md) · 简体中文 · [中文首页](README_zh.md)
+[English](SECURITY.md) · 简体中文 · [中文首页](README.md)
 
 核对版本：Modu 1.2.0，日期：2026-10-04。
 

@@ -1,6 +1,6 @@
 # 隐私与网络行为
 
-[English](PRIVACY.md) · 简体中文 · [中文首页](README_zh.md) · [设置指南](docs/SETTINGS_zh.md)
+[English](PRIVACY.md) · 简体中文 · [中文首页](README.md) · [设置指南](docs/SETTINGS_zh.md)
 
 适用于 **Modu 1.2.2+10087**，更新日期：2026-10-07。本文说明软件的数据存放和网络行为；第三方服务另适用其各自隐私政策。
 

@@ -50,7 +50,7 @@ Linux packages include the ONNX Runtime 1.22.0 shared library omitted by an olde
 
 ## Documentation conventions
 
-- README.md is the English homepage; README_zh.md is the Chinese homepage. README_EN.md redirects the legacy English entry. Describe current features, entry points, screenshots and installation without accumulating per-preview change sections.
+- README.md is the default Chinese homepage; README_EN.md is the complete English homepage. README_zh.md retains a compatibility link to the Chinese homepage. Describe current features, entry points, screenshots and installation without accumulating per-preview change sections.
 - SETTINGS, PRIVACY, CONTRIBUTING and SECURITY have English defaults and separate _zh editions, with reciprocal language links. Other current guides use English when maintained as a single edition.
 - [Documentation index](README.md) distinguishes current guides from historical releases/test evidence. Historical versions, test counts and limits remain historical; third-party originals and licenses are preserved.
 - Update both homepages and paired user documents when functionality changes. User guide screenshots show actual layout; pair phone settings with Mac results and separate English/Chinese content.
