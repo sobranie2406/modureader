@@ -174,8 +174,17 @@ void main() {
       await tester.runAsync(() async {
         release.complete();
         await lock;
-        await Future<void>.delayed(const Duration(milliseconds: 150));
       });
+      // SQLite completes on the real event loop, while the route callback and
+      // saving spinner also need widget pumps. Wait for completion, not a fixed
+      // delay that can expire before the queued write finishes on a busy CI host.
+      final saveWait = Stopwatch()..start();
+      while (returned == null && saveWait.elapsed < const Duration(seconds: 10)) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(returned, 'before save', reason: 'The pending save must complete');
       await tester.pumpAndSettle();
       final stored = await tester.runAsync(() => bookDao.selectReview(1));
       expect(find.byType(BookReviewEditorPage), findsNothing);
