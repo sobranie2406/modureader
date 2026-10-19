@@ -50,6 +50,44 @@ void main() {
     });
   }
 
+  test('daily check-in goal round trips with reading and global settings',
+      () async {
+    for (final scope in ['all', 'reading']) {
+      for (final goal in [0, 10, 120]) {
+        Prefs().dailyCheckInMinutes = goal;
+        final data = await GlobalSettingsTransfer.decode(
+            await GlobalSettingsTransfer.export(Prefs(), scope: scope));
+        expect(data['dailyCheckInMinutes'], {'type': 'int', 'value': goal});
+        Prefs().dailyCheckInMinutes = 30;
+        await GlobalSettingsTransfer.apply(Prefs(), data);
+        expect(Prefs().dailyCheckInMinutes, goal);
+      }
+    }
+  });
+
+  test('daily check-in defaults and stored values stay within bounds', () async {
+    expect(Prefs().dailyCheckInMinutes, 10);
+    Prefs().dailyCheckInMinutes = -5;
+    expect(Prefs().dailyCheckInMinutes, 0);
+    Prefs().dailyCheckInMinutes = 200;
+    expect(Prefs().dailyCheckInMinutes, 120);
+    await Prefs().prefs.setInt('dailyCheckInMinutes', -20);
+    expect(Prefs().dailyCheckInMinutes, 0);
+    await Prefs().prefs.setInt('dailyCheckInMinutes', 300);
+    expect(Prefs().dailyCheckInMinutes, 120);
+  });
+
+  test('daily check-in import rejects values outside its supported range', () {
+    for (final goal in [-1, 121]) {
+      expect(
+          () => GlobalSettingsTransfer.validate({
+                '__prefsBackupVersion': 1,
+                'dailyCheckInMinutes': {'type': 'int', 'value': goal},
+              }),
+          throwsFormatException);
+    }
+  });
+
   for (final version in [1, 2]) {
     for (final asLink in [false, true]) {
       test('imports legacy auto theme v$version, link=$asLink', () async {

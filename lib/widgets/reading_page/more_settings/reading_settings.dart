@@ -565,6 +565,59 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
       );
     }
 
+    /// 每日打卡：当天（跨书累计）阅读满 N 分钟才算完成打卡。
+    /// 0 分钟即旧行为「打开书籍即打卡」。
+    Widget dailyCheckIn() {
+      return ListenableBuilder(
+        listenable: Prefs(),
+        builder: (context, _) {
+          final minutes = Prefs().dailyCheckInMinutes;
+          final valueLabel = minutes == 0
+              ? L10n.of(context).settingsDailyCheckInOff
+              : L10n.of(context).settingsDailyCheckInMinutes('$minutes');
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    L10n.of(context).settingsDailyCheckInSection,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      valueLabel,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                L10n.of(context).settingsDailyCheckInTip,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey),
+              ),
+              Slider(
+                allowedInteraction: SliderInteraction.slideThumb,
+                value: minutes.toDouble(),
+                min: 0,
+                max: 120,
+                divisions: 24,
+                label: valueLabel,
+                onChanged: (value) {
+                  Prefs().dailyCheckInMinutes = value.round();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     Widget codeHighlightTheme() {
       return StatefulBuilder(
         builder: (context, setState) {
@@ -706,6 +759,8 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
       child: Column(
         children: [
           downloadFonts(),
+          const Divider(height: 20),
+          dailyCheckIn(),
           const Divider(height: 20),
           ReaderSettingAvailability(
               enabled: !widget.documentMode,

@@ -962,5 +962,32 @@
   "bookReviewSaveFailed": "Failed to save review",
   "bookReviewUnsavedTitle": "Unsaved changes",
   "bookReviewUnsavedContent": "Leaving will discard unsaved changes. Leave anyway?",
-  "bookReviewDiscard": "Discard"
+  "bookReviewDiscard": "Discard",
+  "tileReadingStreakQualifiedDaysLabel": "Days checked in",
+  "tileReadingStreakTodayProgress": "Today {read} / {goal} min",
+  "@tileReadingStreakTodayProgress": {
+    "placeholders": {
+      "read": {"type": "String"},
+      "goal": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayRemaining": "{minutes} min to go for today's check-in",
+  "@tileReadingStreakTodayRemaining": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayDone": "Checked in today",
+  "tileReadingStreakEncouragementGoalPending": "A few more minutes will complete today's goal.",
+  "settingsDailyCheckInSection": "Daily check-in",
+  "settingsDailyCheckInGoal": "Reading time needed to check in",
+  "settingsDailyCheckInOff": "0 min (opening a book counts)",
+  "settingsDailyCheckInMinutes": "{minutes} min",
+  "@settingsDailyCheckInMinutes": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "settingsDailyCheckInTip": "A day counts once the total reading time across all books reaches this goal. Past streaks are recalculated with the current setting."
+
 }

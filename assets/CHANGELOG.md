@@ -10,9 +10,13 @@ Older sections retain their original version scope; they are not current accepta
 
 ### English
 
+- Feat(statistics): Add a daily check-in goal, defaulting to 10 minutes across all books; 0 minutes keeps the previous recorded-reading rule. Show today's progress and total qualified days, and recalculate history without changing reading records. Include the goal in settings backups, refresh after sync/settings changes, and handle small screens and calendar-day boundaries. [#49](https://github.com/sobranie2406/modureader/pull/49), thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh) for the feature contribution.
+
 - Feat(review): Sync book reviews independently of reading progress and book metadata, including edits and clearing. Refresh open review cards after sync. This extends the unreleased v9 sync protocol; all syncing devices need a compatible client.
 
 ### 中文
+
+- Feat(statistics): 新增每日打卡目标，默认跨书累计阅读 10 分钟，设为 0 分钟可沿用有阅读记录即打卡的规则；显示今日进度和累计达标天数，按当前目标重算历史但不修改原始记录。目标纳入设置备份，同步及设置变化后刷新统计，并适配小屏和日历日期边界。[#49](https://github.com/sobranie2406/modureader/pull/49)，感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh) 贡献此功能。
 
 - Feat(review): 书评独立于阅读进度和书籍信息跨设备同步，支持修改、清空，同步后刷新已打开的书评卡片。此功能属于尚未发布的 v9 同步协议，参与同步的设备均需更新兼容客户端。
 

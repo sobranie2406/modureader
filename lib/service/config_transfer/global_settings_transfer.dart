@@ -37,7 +37,7 @@ httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn continu
             .split(RegExp(r'\s+')))
       key: 'bool',
     for (final key
-        in '''themeColor awakeTime pageTurningType aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
+        in '''themeColor awakeTime dailyCheckInMinutes pageTurningType aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
 readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex scrollPagePercent selectionSearchZoomPercent webTranslationZoomPercent eInkRefreshPages ocrPrecachePages'''
             .split(RegExp(r'\s+')))
       key: 'int',

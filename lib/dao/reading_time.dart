@@ -5,6 +5,7 @@ import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/reading_time.dart';
+import 'package:anx_reader/providers/reading_data_revision.dart';
 import 'package:anx_reader/providers/sync.dart';
 
 class ReadingTimeDao extends BaseDao {
@@ -55,6 +56,9 @@ class ReadingTimeDao extends BaseDao {
       roundNumber: readingTime.round,
       seconds: readingTime.readingTime,
     );
+
+    // 通知统计（打卡/热力图）重算
+    bumpReadingDataRevision();
   }
 
   Future<void> insertReadingSession({
@@ -416,6 +420,9 @@ class ReadingTimeDao extends BaseDao {
       where: 'book_id IN ($placeholders)',
       whereArgs: bookIds,
     );
+
+    // 删除记录同样影响打卡/热力图统计
+    bumpReadingDataRevision();
 
     Sync().syncData(SyncDirection.both, null, trigger: SyncTrigger.auto);
   }

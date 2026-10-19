@@ -54,6 +54,10 @@ void validateSettingsValue(String key, dynamic value) {
   if (key == 'ocrPrecachePages' && (value is! int || value < 1 || value > 5)) {
     throw const FormatException('Invalid OCR prefetch window');
   }
+  if (key == 'dailyCheckInMinutes' &&
+      (value is! int || value < 0 || value > 120)) {
+    throw const FormatException('Invalid daily check-in goal');
+  }
   if (key == 'scrollPagePercent' && (value < 80 || value > 100)) {
     throw const FormatException('Invalid scroll page percentage');
   }

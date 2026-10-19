@@ -961,5 +961,32 @@
   "bookReviewSaveFailed": "备注保存失败",
   "bookReviewUnsavedTitle": "有未保存的修改",
   "bookReviewUnsavedContent": "离开将丢失未保存的修改，确定离开吗？",
-  "bookReviewDiscard": "放弃修改"
+  "bookReviewDiscard": "放弃修改",
+  "tileReadingStreakQualifiedDaysLabel": "累计打卡",
+  "tileReadingStreakTodayProgress": "今日 {read} / {goal} 分钟",
+  "@tileReadingStreakTodayProgress": {
+    "placeholders": {
+      "read": {"type": "String"},
+      "goal": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayRemaining": "还差 {minutes} 分钟即可打卡",
+  "@tileReadingStreakTodayRemaining": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayDone": "今日已打卡",
+  "tileReadingStreakEncouragementGoalPending": "再读一会儿就能完成今天的打卡。",
+  "settingsDailyCheckInSection": "每日打卡",
+  "settingsDailyCheckInGoal": "打卡所需阅读时长",
+  "settingsDailyCheckInOff": "0 分钟（打开书籍即打卡）",
+  "settingsDailyCheckInMinutes": "{minutes} 分钟",
+  "@settingsDailyCheckInMinutes": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "settingsDailyCheckInTip": "当天跨书累计阅读达到该时长才算完成打卡；历史连击会按当前设置重新计算。"
+
 }
