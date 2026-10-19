@@ -4,6 +4,9 @@ import 'package:anx_reader/utils/reading_progress.dart';
 
 part 'book_sync_identity.dart';
 
+// An intentional new-round reset is an operation, not an unread legacy row.
+const syncPositionResetPrefix = 'modu-position-reset-v1:';
+
 /// Portable identity and operation clock; never a device-local integer row ID.
 class RowSyncRecord {
   const RowSyncRecord(
@@ -30,7 +33,7 @@ class RowSyncRecord {
       };
 
   factory RowSyncRecord.fromMap(Map<String, Object?> row) {
-    return normalizeSyncReadingPosition(RowSyncRecord(
+    return normalizeRoundFields(normalizeSyncReadingPosition(RowSyncRecord(
       row['kind'] as String,
       row['sync_id'] as String,
       row['clock'] as int,
@@ -38,8 +41,39 @@ class RowSyncRecord {
       row['deleted'] == 1,
       Map<String, Object?>.from(jsonDecode(row['payload'] as String) as Map),
       narration: NarrationPosition.decode(row['narration']),
-    ));
+    )));
   }
+}
+
+/// Defaults added by sync schema v9, without changing local `modu_sync_records`
+/// rows owned by older clients.
+///
+/// - `time.round` defaults to 1: every session written before reading rounds
+///   existed belongs to the first round.
+/// - `round` records always carry the full field set so strict validation and
+///   older payloads cannot drop nullable fields.
+RowSyncRecord normalizeRoundFields(RowSyncRecord record) {
+  if (record.deleted) return record;
+  if (record.kind == 'time') {
+    if (record.data.containsKey('round')) return record;
+    return RowSyncRecord(record.kind, record.id, record.clock, record.revision,
+        false, {...record.data, 'round': 1},
+        narration: record.narration);
+  }
+  if (record.kind == 'round') {
+    final data = {...record.data};
+    data['round_number'] ??= 1;
+    data['status'] ??= 'reading';
+    data['start_percentage'] ??= 0;
+    data['end_percentage'] ??= 0;
+    if (!data.containsKey('start_time')) data['start_time'] = null;
+    if (!data.containsKey('end_time')) data['end_time'] = null;
+    if (!data.containsKey('end_position')) data['end_position'] = null;
+    return RowSyncRecord(record.kind, record.id, record.clock, record.revision,
+        record.deleted, data,
+        narration: record.narration);
+  }
+  return record;
 }
 
 /// Canonicalize only the two legacy nullable position fields. Keep identities,
@@ -64,6 +98,7 @@ RowSyncRecord normalizeSyncReadingPosition(RowSyncRecord record) {
 }
 
 bool _hasReadingPosition(RowSyncRecord record) =>
+    record.revision.startsWith(syncPositionResetPrefix) ||
     (record.data['last_read_position'] is String &&
         (record.data['last_read_position'] as String).isNotEmpty) ||
     (record.data['reading_percentage'] is num &&
@@ -79,7 +114,7 @@ List<RowSyncRecord> mergeSyncRecords(
   final input = [...local, ...remote];
   for (final raw
       in reconcileBookIdentities ? _normalizeBookIdentities(input) : input) {
-    final record = normalizeSyncReadingPosition(raw);
+    final record = normalizeRoundFields(normalizeSyncReadingPosition(raw));
     final previous = result[record.key];
     result[record.key] = previous == null ? record : _winner(previous, record);
   }

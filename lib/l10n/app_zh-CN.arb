@@ -917,5 +917,76 @@
   "aiChatFontSize": "字体大小",
   "aiModelSwitchTitle": "切换模型",
   "aiModelEnterManually": "输入模型名称",
-  "aiModelOrSelectBelow": "或从列表中选择："
+  "aiModelOrSelectBelow": "或从列表中选择：",
+  "readingRoundsSectionTitle": "阅读轮次",
+  "readingRoundsCurrentRound": "当前轮次",
+  "readingRoundsInProgress": "进行中",
+  "readingRoundsFinished": "已完成",
+  "readingRoundsNth": "第 {n} 刷",
+  "@readingRoundsNth": {
+    "placeholders": {
+      "n": {"type": "String"}
+    }
+  },
+  "readingRoundsDuration": "累计时长",
+  "readingRoundsProgress": "阅读进度",
+  "readingRoundsFinishAndStartNext": "完成本轮，开始下一刷",
+  "readingRoundsUndo": "撤销",
+  "readingRoundsConfirmTitle": "完成本轮？",
+  "readingRoundsConfirmContent": "完成本轮后：记录本轮阅读数据，阅读进度与位置将重置，从开头开始下一轮。",
+  "readingRoundsConfirmOk": "确认完成",
+  "readingRoundsFinishedToast": "第 {n} 刷已完成，第 {m} 刷开始",
+  "@readingRoundsFinishedToast": {
+    "placeholders": {
+      "n": {"type": "String"},
+      "m": {"type": "String"}
+    }
+  },
+  "readingRoundsUndoToast": "已撤销，回到第 {n} 刷",
+  "@readingRoundsUndoToast": {
+    "placeholders": {
+      "n": {"type": "String"}
+    }
+  },
+  "readingRoundsEmpty": "还没有已完成的轮次，读完首刷后即可开启二刷",
+  "bookReviewSectionTitle": "备注 · 书评",
+  "bookReviewEmptyHint": "点击写下这本书的书评或备注（支持 Markdown 语法）",
+  "bookReviewEditorTitle": "编辑备注",
+  "bookReviewEditorHint": "写下你对这本书的想法……\n支持 Markdown：**加粗**、*斜体*、# 标题、- 列表、> 引用",
+  "bookReviewMarkdownHint": "支持 Markdown 语法；留空即删除备注",
+  "bookReviewPreviewMode": "预览",
+  "bookReviewEditMode": "编辑",
+  "bookReviewPreviewEmpty": "暂无可预览内容",
+  "bookReviewSaved": "备注已保存",
+  "bookReviewSaveFailed": "备注保存失败",
+  "bookReviewUnsavedTitle": "有未保存的修改",
+  "bookReviewUnsavedContent": "离开将丢失未保存的修改，确定离开吗？",
+  "bookReviewDiscard": "放弃修改",
+  "tileReadingStreakQualifiedDaysLabel": "累计打卡",
+  "tileReadingStreakTodayProgress": "今日 {read} / {goal} 分钟",
+  "@tileReadingStreakTodayProgress": {
+    "placeholders": {
+      "read": {"type": "String"},
+      "goal": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayRemaining": "还差 {minutes} 分钟即可打卡",
+  "@tileReadingStreakTodayRemaining": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayDone": "今日已打卡",
+  "tileReadingStreakEncouragementGoalPending": "再读一会儿就能完成今天的打卡。",
+  "settingsDailyCheckInSection": "每日打卡",
+  "settingsDailyCheckInGoal": "打卡所需阅读时长",
+  "settingsDailyCheckInOff": "0 分钟（打开书籍即打卡）",
+  "settingsDailyCheckInMinutes": "{minutes} 分钟",
+  "@settingsDailyCheckInMinutes": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "settingsDailyCheckInTip": "当天跨书累计阅读达到该时长才算完成打卡；历史连击会按当前设置重新计算。"
+
 }

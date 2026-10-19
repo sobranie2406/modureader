@@ -8,7 +8,7 @@ showAuthorOnDefaultCover openBookAnimation bottomNavigatorShowNote
 bottomNavigatorShowStatistics bottomNavigatorShowAI sortField sortOrder''',
   'reading':
       '''readStyle readTheme hideStatusBar readerFullscreen autoHideBottomBar
-awakeTime pageTurningType pageTurnStyle readingRules chapterSplitCustomRules
+awakeTime dailyCheckInMinutes pageTurningType pageTurnStyle readingRules chapterSplitCustomRules
 chapterSplitSelectedRuleId autoAdjustReadingTheme readingNightMode volumeKeyTurnPage
 keyboardShortcutTurnPage readerShortcuts swapPageTurnArea tapOnlyPageTurn continuousScroll longPressSelectParagraph scrollPagePercent showMenuOnHover showActionLabels eInkRefreshPages
 useBookStyles pageTurnMode customPageTurnConfig readingInfo showTextUnderIconButton
@@ -27,7 +27,8 @@ codeHighlightTheme enabledAiTools''',
   'vector':
       '''vectorModelEnabled autoVectorizeOnImport vectorModelMode vectorLocalModelId
 vectorModelDownloadSource vectorModelConfig''',
-  'ocr': 'ocrModelId ocrModelDownloadSource ocrPrecacheEnabled ocrPrecachePages',
+  'ocr':
+      'ocrModelId ocrModelDownloadSource ocrPrecacheEnabled ocrPrecachePages',
   'tts':
       '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio ttsBufferSettings''',
   'translation':

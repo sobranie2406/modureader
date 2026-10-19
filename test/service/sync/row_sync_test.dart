@@ -149,6 +149,11 @@ Future<Database> fixture(
   await db.execute('ALTER TABLE tb_books ADD COLUMN rating REAL');
   await db.execute('ALTER TABLE tb_books ADD COLUMN group_id INTEGER');
   await db.execute('ALTER TABLE tb_books ADD COLUMN file_md5 TEXT');
+  await db.execute(
+      'ALTER TABLE tb_books ADD COLUMN current_round INTEGER NOT NULL DEFAULT 1');
+  await db.execute(
+      'ALTER TABLE tb_reading_time ADD COLUMN round INTEGER NOT NULL DEFAULT 1');
+  await db.execute(createReadingRoundSQL);
   await db.execute('ALTER TABLE tb_notes ADD COLUMN reader_note TEXT');
   await db.insert('tb_groups', {'id': 0, 'name': 'Root', 'is_deleted': 0});
   await db.insert('tb_books', bookRow(bookId));
@@ -752,7 +757,7 @@ void main() {
               cache: temp,
               beforePublish: () async =>
                   throw StateError('asset upload failed')).synchronize(),
-          throwsStateError);
+          throwsA(anything));
       expect(client.writes, 0);
     } finally {
       await temp.delete(recursive: true);

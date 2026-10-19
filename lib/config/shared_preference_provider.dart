@@ -536,6 +536,21 @@ class Prefs extends ChangeNotifier {
     return prefs.getInt('awakeTime') ?? 5;
   }
 
+  /// 每日打卡所需阅读时长（分钟）。
+  ///
+  /// - `0`：沿用旧口径，当天只要产生过阅读记录即算打卡
+  /// - `>0`：当天（跨书累计）阅读时长达到该值才计入连续阅读
+  ///
+  /// 该值只影响「打卡/连击」的判定，不会修改任何原始阅读时长数据。
+  set dailyCheckInMinutes(int minutes) {
+    prefs.setInt('dailyCheckInMinutes', minutes.clamp(0, 120));
+    notifyListeners();
+  }
+
+  int get dailyCheckInMinutes {
+    return (prefs.getInt('dailyCheckInMinutes') ?? 10).clamp(0, 120);
+  }
+
   set lastShowUpdate(DateTime time) {
     prefs.setString('lastShowUpdate', time.toIso8601String());
     notifyListeners();

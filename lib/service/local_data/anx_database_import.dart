@@ -407,7 +407,10 @@ class AnxDatabaseImport {
       times[key] = {
         'book_id': book,
         'date': date.substring(0, 10),
-        'reading_time': duration + (previous?['reading_time'] as int? ?? 0)
+        'reading_time': duration + (previous?['reading_time'] as int? ?? 0),
+        // The sync protocol v9 requires a round on every time record.
+        // Imported AnxReader history predates rounds, so it is round 1.
+        'round': 1,
       };
     }
     for (final entry in times.entries) {

@@ -16,7 +16,14 @@ import 'package:anx_reader/utils/log/common.dart';
 /// settings. Never ships local paths, fonts, indexes, or the entire app DB.
 class RowSyncArchive {
   static const format = 1;
-  static const databaseVersion = 8;
+
+  /// Transport schema version. v9 adds `time.round`, `round` and `review` kinds.
+  ///
+  /// The remote file name intentionally stays `database8.db`: old clients must
+  /// READ the new archive and stop with "不支持的同步数据库版本" instead of
+  /// silently creating a second, diverging archive under a new name.
+  static const databaseVersion = 9;
+  static const legacyVersion = 8;
 
   static Future<void> write(String path, List<RowSyncRecord> records,
           {Directory? databaseDirectory}) =>
@@ -74,8 +81,7 @@ class RowSyncArchive {
   }
 
   static Future<List<RowSyncRecord>> read(String path,
-      {bool legacy = false, Directory? databaseDirectory}) async {
-    // A bounded metadata-only database; an oversized/corrupt download cannot
+      {bool legacy = false, Directory? databaseDirectory}) async {    // A bounded metadata-only database; an oversized/corrupt download cannot
     // be mistaken for an empty cloud library.
     if (await File(path).length() > 64 * 1024 * 1024) {
       throw const FormatException('同步数据库超过 64 MiB 安全限制');
@@ -84,6 +90,29 @@ class RowSyncArchive {
         writing: false,
         databaseDirectory: databaseDirectory,
         action: (local) => _read(local, legacy: legacy));
+  }
+
+  static Future<int?> versionOf(String path) async {
+    int? version;
+    try {
+      // OHOS resolves database paths relative to its own root; reuse the same
+      // copy-to-temp path as read() instead of opening the staging file directly.
+      await _withDatabasePath(path, writing: false, action: (local) async {
+        final db = await openDatabase(local, readOnly: true,
+            singleInstance: false);
+        try {
+          version = await db.getVersion();
+        } finally {
+          await db.close();
+        }
+      });
+    } catch (_) {
+      // Corrupt/truncated cloud files are handled by read() (integrity check),
+      // which produces the user-facing "同步数据库校验失败" path. The probe must
+      // never turn them into an untyped database exception.
+      return null;
+    }
+    return version;
   }
 
   static Future<List<RowSyncRecord>> _read(String path,
@@ -109,7 +138,12 @@ class RowSyncArchive {
         return await RowSyncStore(db).snapshot();
       }
       if (version != databaseVersion) {
-        throw const FormatException('不支持的同步数据库版本');
+        if (version != legacyVersion) {
+          throw const FormatException('不支持的同步数据库版本');
+        }
+        // v8 has no round records and its time payloads have no `round`.
+        // RowSyncRecord.fromMap() defaults time.round to 1, so the read is a
+        // pure in-memory upgrade; the caller decides when to publish v9.
       }
       final manifest = await db.query('modu_sync_manifest');
       if (manifest.length != 1 || manifest.single['format'] != format) {
@@ -152,10 +186,42 @@ class RowSyncEngine {
   final Duration validatorRetryDelay;
   static final remotePath = SyncPaths.database('database8.db');
 
+  /// Read-only version gate executed before assets/logs are touched.
+  ///
+  /// Corrupt files return `null` and are handled by the integrity check in
+  /// [RowSyncArchive.read]. Only a *newer* transport version aborts here.
+  Future<void> _preflightRemoteVersion(Directory staging) async {
+    final metadata = await client.readProps(remotePath);
+    if (metadata == null) return;
+    if ((metadata.size ?? 0) > 64 * 1024 * 1024) {
+      throw const FormatException('同步数据库过大，已停止下载');
+    }
+    final download = '${staging.path}/preflight-archive.db';
+    await client.downloadFile(remotePath, download);
+    final version = await RowSyncArchive.versionOf(download);
+    if (version != null && version > RowSyncArchive.databaseVersion) {
+      throw FormatException(
+          '云端同步数据版本过新（v$version），本机未做任何写入；请升级本机客户端');
+    }
+  }
+
+  /// Keep the pre-v9 bytes before the first v9 publish. The name is stable
+  /// (`database8.db`) so old clients fail closed instead of forking the cloud.
+  Future<void> _keepLegacyArchiveBackup(String source, int attempt) async {
+    final directory = durableDirectory ?? cache;
+    await directory.create(recursive: true);
+    final stamp = DateTime.now()
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+    final target =
+        p.join(directory.path, 'sync-v8-backup-$stamp-$attempt.db');
+    await File(source).copy(target);
+    AnxLog.info('Sync: pre-v9 remote archive backup kept at $target');
+  }
+
   Future<RowSyncOutcome> synchronize() async {
-    // Complete asset uploads first. Retrying after an interrupted transfer
-    // must not advertise unavailable new books as successfully synchronized.
-    await beforePublish?.call();
     final staging = await cache.createTemp('modu-row-sync-');
     var backedUp = false;
     var published = false;
@@ -195,6 +261,15 @@ class RowSyncEngine {
         return outcome;
       }
 
+      // Read-only version gate BEFORE any asset/log write. A v9+ client must
+      // never touch a cloud archive written by a future/uncoordinated format.
+      await _preflightRemoteVersion(staging);
+      // Assets first: retrying after an interrupted transfer must not advertise
+      // unavailable books as synchronized. Still after the version gate.
+      await beforePublish?.call();
+      // Repair/replay pending log batches before listing the journal: a partial
+      // upload from a previous run is reinstated here (and never before the
+      // version gate above).
       published = await log.resumePending();
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         // Both transports always consume the immutable log, including after
@@ -208,6 +283,7 @@ class RowSyncEngine {
           metadata = await client.readProps(path);
         }
         List<RowSyncRecord> remoteRecords = [];
+        var legacyArchive = false;
         if (metadata != null) {
           if ((metadata.size ?? 0) > 64 * 1024 * 1024) {
             throw const FormatException('同步数据库过大，已停止下载');
@@ -220,6 +296,21 @@ class RowSyncEngine {
               metadata.size != after.size ||
               metadata.mTime != after.mTime) {
             continue;
+          }
+          // Strict fail-closed gate: inspect the archive version BEFORE any
+          // asset upload, pending-log upload or local merge. A future/unknown
+          // format is never overwritten.
+          final remoteVersion = await RowSyncArchive.versionOf(download);
+          if (remoteVersion != null &&
+              remoteVersion > RowSyncArchive.databaseVersion) {
+            throw FormatException(
+                '云端同步数据版本过新（v$remoteVersion），本机未做任何写入；请升级本机客户端');
+          }
+          if (remoteVersion == RowSyncArchive.legacyVersion) {
+            legacyArchive = true;
+            // Keep the exact v8 bytes we are about to migrate. Recovery never
+            // depends on the network, and old clients can still be restored.
+            await _keepLegacyArchiveBackup(download, attempt);
           }
           remoteRecords =
               await RowSyncArchive.read(download, legacy: remote == null);
@@ -256,6 +347,7 @@ class RowSyncEngine {
             'mergedBooks=${bookRecords(merged)}, checkpoint=${metadata != null}, '
             'journalRecords=${journal.length}');
         if ((remote != null || journal.isNotEmpty) &&
+            !legacyArchive &&
             !repairsRemoteIdentity &&
             sameSyncRecords(merged, remoteRecords)) {
           if (log.hasReadBatches) {

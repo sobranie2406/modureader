@@ -33,6 +33,7 @@ import 'package:anx_reader/service/sync/local_book_download.dart';
 import 'package:anx_reader/service/sync/converted_book_checksum.dart';
 import 'package:anx_reader/service/sync/book_file_sync.dart';
 import 'package:anx_reader/service/sync/document_reflow_sync.dart';
+import 'package:anx_reader/service/sync/reading_round_sync.dart';
 import 'package:anx_reader/service/sync/sync_asset_listing.dart';
 import 'package:anx_reader/service/sync/sync_maintenance_schedule.dart';
 import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
@@ -516,6 +517,9 @@ class Sync extends _$Sync {
         beforePublish: () => syncFiles(assetListing: assetListing),
         beforeMerge: _createMergeBackup,
         afterMerge: () async {
+          // Round records arrive before/with the time rows; reconcile derived
+          // caches (current_round, cancelled-round time) before publishing.
+          await ReadingRoundSync.reconcile(await DBHelper().database);
           await ConvertedBookChecksum(await DBHelper().database)
               .repairLocalBooks(
                   localFile: (path) => io.File(getBasePath(path)));

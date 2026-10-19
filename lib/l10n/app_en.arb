@@ -918,5 +918,76 @@
   "aiChatFontSize": "Font Size",
   "aiModelSwitchTitle": "Switch Model",
   "aiModelEnterManually": "Enter model name",
-  "aiModelOrSelectBelow": "Or select from list:"
+  "aiModelOrSelectBelow": "Or select from list:",
+  "readingRoundsSectionTitle": "Reading Rounds",
+  "readingRoundsCurrentRound": "Current Round",
+  "readingRoundsInProgress": "In progress",
+  "readingRoundsFinished": "Finished",
+  "readingRoundsNth": "Round {n}",
+  "@readingRoundsNth": {
+    "placeholders": {
+      "n": {"type": "String"}
+    }
+  },
+  "readingRoundsDuration": "Duration",
+  "readingRoundsProgress": "Progress",
+  "readingRoundsFinishAndStartNext": "Finish this round & start the next",
+  "readingRoundsUndo": "Undo",
+  "readingRoundsConfirmTitle": "Finish this round?",
+  "readingRoundsConfirmContent": "This records the current round's stats, then resets the reading progress to start the next round.",
+  "readingRoundsConfirmOk": "Finish Round",
+  "readingRoundsFinishedToast": "Round {n} finished. Now starting round {m}.",
+  "@readingRoundsFinishedToast": {
+    "placeholders": {
+      "n": {"type": "String"},
+      "m": {"type": "String"}
+    }
+  },
+  "readingRoundsUndoToast": "Undone. Back to round {n}.",
+  "@readingRoundsUndoToast": {
+    "placeholders": {
+      "n": {"type": "String"}
+    }
+  },
+  "readingRoundsEmpty": "No finished rounds yet. Finish your first read to start round 2.",
+  "bookReviewSectionTitle": "Review & Notes",
+  "bookReviewEmptyHint": "Tap to write a review or note for this book (Markdown supported)",
+  "bookReviewEditorTitle": "Edit Review",
+  "bookReviewEditorHint": "Write your thoughts about this book...\nMarkdown supported: **bold**, *italic*, # heading, - list, > quote",
+  "bookReviewMarkdownHint": "Markdown supported; clear the text to delete the review",
+  "bookReviewPreviewMode": "Preview",
+  "bookReviewEditMode": "Edit",
+  "bookReviewPreviewEmpty": "Nothing to preview yet",
+  "bookReviewSaved": "Review saved",
+  "bookReviewSaveFailed": "Failed to save review",
+  "bookReviewUnsavedTitle": "Unsaved changes",
+  "bookReviewUnsavedContent": "Leaving will discard unsaved changes. Leave anyway?",
+  "bookReviewDiscard": "Discard",
+  "tileReadingStreakQualifiedDaysLabel": "Days checked in",
+  "tileReadingStreakTodayProgress": "Today {read} / {goal} min",
+  "@tileReadingStreakTodayProgress": {
+    "placeholders": {
+      "read": {"type": "String"},
+      "goal": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayRemaining": "{minutes} min to go for today's check-in",
+  "@tileReadingStreakTodayRemaining": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "tileReadingStreakTodayDone": "Checked in today",
+  "tileReadingStreakEncouragementGoalPending": "A few more minutes will complete today's goal.",
+  "settingsDailyCheckInSection": "Daily check-in",
+  "settingsDailyCheckInGoal": "Reading time needed to check in",
+  "settingsDailyCheckInOff": "0 min (opening a book counts)",
+  "settingsDailyCheckInMinutes": "{minutes} min",
+  "@settingsDailyCheckInMinutes": {
+    "placeholders": {
+      "minutes": {"type": "String"}
+    }
+  },
+  "settingsDailyCheckInTip": "A day counts once the total reading time across all books reaches this goal. Past streaks are recalculated with the current setting."
+
 }

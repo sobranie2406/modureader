@@ -1,10 +1,12 @@
 import 'package:anx_reader/dao/base_dao.dart';
 import 'package:anx_reader/dao/book.dart';
+import 'package:anx_reader/dao/reading_round.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
 import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/reading_time.dart';
 import 'package:anx_reader/models/reading_time_deletion.dart';
+import 'package:anx_reader/providers/reading_data_revision.dart';
 import 'package:anx_reader/providers/sync.dart';
 
 class ReadingTimeDao extends BaseDao {
@@ -28,24 +30,49 @@ class ReadingTimeDao extends BaseDao {
     readingTime.date ??= resolvedDay;
 
     if (readingTime.readingTime <= 0) return;
+
+    // 轮次以数据库为准：同步可能刚把 current_round 推进到下一轮，
+    // 阅读页里的 Book 实例仍是旧的；若沿用旧值，就会把新时长记到上一轮。
+    final currentRound = await rawQuerySingle<int>(
+      'SELECT current_round FROM tb_books WHERE id = ?',
+      arguments: [readingTime.bookId],
+      mapper: (row) => (row['current_round'] as int?) ?? 1,
+    );
+    if (currentRound != null && currentRound > 0) {
+      readingTime.round = currentRound;
+    }
+
     // Each completed reading interval is an independent sync event. Daily
     // statistics already use SUM/GROUP BY; never modify a shared daily total.
     await db.insert(table, {
       'book_id': readingTime.bookId,
       'date': resolvedDay,
       'reading_time': readingTime.readingTime,
+      'round': readingTime.round,
     });
+
+    // 同步把本次时长累加到该书进行中的轮次（多刷统计）
+    await readingRoundDao.accumulateReadingTime(
+      bookId: readingTime.bookId,
+      roundNumber: readingTime.round,
+      seconds: readingTime.readingTime,
+    );
+
+    // 通知统计（打卡/热力图）重算
+    bumpReadingDataRevision();
   }
 
   Future<void> insertReadingSession({
     required int bookId,
     required int readingTime,
     DateTime? startedAt,
+    int round = 1,
   }) async {
     final session = ReadingTime(
       bookId: bookId,
       readingTime: readingTime,
       date: startedAt?.toIso8601String(),
+      round: round,
     );
 
     await insertReadingTime(session, startedAt: startedAt);
@@ -287,6 +314,18 @@ class ReadingTimeDao extends BaseDao {
     return total ?? 0;
   }
 
+  /// 某本书某一轮次的累计阅读时长（秒）
+  Future<int> selectTotalReadingTimeByBookAndRound(
+      int bookId, int round) async {
+    final total = await rawQuerySingle(
+      'SELECT SUM(reading_time) AS total_sum FROM $table '
+      'WHERE book_id = ? AND round = ?',
+      arguments: [bookId, round],
+      mapper: (row) => row['total_sum'] as int? ?? 0,
+    );
+    return total ?? 0;
+  }
+
   Future<List<Map<Book, int>>> selectBookReadingTimeOfDay(DateTime date) async {
     final rows = await _aggregateByBook(
       where: 'DATE(date) = DATE(?)',
@@ -383,6 +422,9 @@ class ReadingTimeDao extends BaseDao {
         await txn.delete(table, where: scope.where, whereArgs: scope.whereArgs);
       }
     });
+
+    // 删除记录同样影响打卡/热力图统计
+    bumpReadingDataRevision();
 
     Sync().syncData(SyncDirection.both, null, trigger: SyncTrigger.auto);
   }

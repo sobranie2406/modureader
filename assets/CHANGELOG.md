@@ -1,14 +1,20 @@
 # Modu changelog
 
-Latest stable: **1.2.11+10149**. Updated 2026-10-18.
+Latest stable: **1.2.12+10150**. Updated 2026-10-19.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
-## Unreleased
+## 1.2.12
 
 ### English
+
+- Feat(reading): Add multiple reading rounds with per-round statistics, atomic round changes and undo; synchronize rounds and their reading time across devices with sync protocol v9. Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh) for [#46](https://github.com/sobranie2406/modureader/pull/46) and [#47](https://github.com/sobranie2406/modureader/pull/47).
+
+- Feat(review): Add Markdown book reviews and independent cross-device synchronization, including edits and clearing. Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh) for [#48](https://github.com/sobranie2406/modureader/pull/48). All syncing devices must upgrade to 1.2.12 for protocol v9 compatibility.
+
+- Feat(statistics): Add a daily check-in goal, defaulting to 10 minutes across all books; 0 minutes keeps the previous recorded-reading rule. Show today's progress and total qualified days, and recalculate history without changing reading records. Include the goal in settings backups and refresh after sync/settings changes. Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh) for [#49](https://github.com/sobranie2406/modureader/pull/49).
 
 - Feat(tts): Highlight the current spoken sentence in text/OCR reflow using the ebook speech colour. Keep the highlight while paused and clear it on stop, page end or page change without changing selection, saved notes or page boundaries.
 
@@ -31,6 +37,12 @@ Older sections retain their original version scope; they are not current accepta
 - Fix(statistics): Limit reading-history deletion and undo to the selected book and day/week/month/year, preserving records outside that interval when leaving statistics.
 
 ### 简体中文
+
+- Feat(reading): 新增多轮阅读及分轮统计，支持原子切换轮次和撤销；通过 v9 同步协议跨设备同步轮次与阅读时长。感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh) 贡献 [#46](https://github.com/sobranie2406/modureader/pull/46)、[#47](https://github.com/sobranie2406/modureader/pull/47)。
+
+- Feat(review): 新增 Markdown 书评及独立跨设备同步，支持修改与清空。感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh) 贡献 [#48](https://github.com/sobranie2406/modureader/pull/48)。参与同步的设备均需升级至 1.2.12，以兼容 v9 协议。
+
+- Feat(statistics): 新增每日打卡目标，默认跨书累计阅读 10 分钟，设为 0 分钟可沿用有记录即打卡的规则；显示今日进度和累计达标天数，按当前目标重算历史但不修改原始记录。目标纳入设置备份，同步及设置变化后刷新统计。感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh) 贡献 [#49](https://github.com/sobranie2406/modureader/pull/49)。
 
 - Feat(tts): 文字／OCR 重排朗读增加当前句高亮，沿用普通电子书朗读颜色；暂停保留，停止、读完或换页时清除，不改变文字选区、已有笔记及本页朗读边界。
 

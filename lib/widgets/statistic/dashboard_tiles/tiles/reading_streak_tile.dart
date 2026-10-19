@@ -31,7 +31,10 @@ class ReadingStreakTile extends StatisticsDashboardTileBase {
       mock: const ReadingStreakData(
         currentStreak: 4,
         longestStreak: 12,
-        lastReadingDay: null,
+        lastQualifiedDay: null,
+        qualifiedDays: 12,
+        todaySeconds: 0,
+        goalSeconds: 600,
       ),
       builder: (data, _) => _ReadingStreakContent(data: data),
     );
@@ -46,69 +49,147 @@ class _ReadingStreakContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasReadToday = _isSameDay(data.lastReadingDay, DateTime.now());
-    final fireColor =
-        hasReadToday ? theme.colorScheme.primary : theme.colorScheme.outline;
     final l10n = L10n.of(context);
-    final encouragement = hasReadToday
+    final hasQualifiedToday = data.hasQualifiedToday;
+    final fireColor = hasQualifiedToday
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outline;
+
+    final encouragement = hasQualifiedToday
         ? l10n.tileReadingStreakEncouragementActive
-        : l10n.tileReadingStreakEncouragementInactive;
-    final subtitle = hasReadToday
-        ? l10n.tileReadingStreakSubtitleActive
-        : l10n.tileReadingStreakSubtitleInactive;
+        : data.hasGoal
+            ? l10n.tileReadingStreakEncouragementGoalPending
+            : l10n.tileReadingStreakEncouragementInactive;
+
+    return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                    child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.local_fire_department, color: fireColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.tileReadingStreakCurrent(
+                                    data.currentStreak),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: fireColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                _goalSubtitle(l10n, hasQualifiedToday),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                    if (data.hasGoal) ...[
+                      const SizedBox(height: 10),
+                      _GoalProgress(data: data),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: _StatPill(
+                              label: l10n.tileReadingStreakBestLabel,
+                              value: l10n
+                                  .tileReadingStreakCurrent(data.longestStreak),
+                            ),
+                          ),
+                        ),
+                        if (data.hasGoal && data.qualifiedDays > 0) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: _StatPill(
+                                label: l10n.tileReadingStreakQualifiedDaysLabel,
+                                value:
+                                    '${data.qualifiedDays} ${l10n.tileReadingDaysUnit}',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      encouragement,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                )))));
+  }
+
+  /// 连击数字下方的一行状态说明
+  String _goalSubtitle(L10n l10n, bool hasQualifiedToday) {
+    if (!data.hasGoal) {
+      return hasQualifiedToday
+          ? l10n.tileReadingStreakSubtitleActive
+          : l10n.tileReadingStreakSubtitleInactive;
+    }
+    if (hasQualifiedToday) {
+      return l10n.tileReadingStreakTodayDone;
+    }
+    final remainingMinutes = (data.remainingSeconds / 60).ceil();
+    return l10n.tileReadingStreakTodayRemaining('$remainingMinutes');
+  }
+}
+
+/// 今日打卡进度：进度条 + 「今日已读 / 目标」文字
+class _GoalProgress extends StatelessWidget {
+  const _GoalProgress({required this.data});
+
+  final ReadingStreakData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = L10n.of(context);
+    final goalMinutes = (data.goalSeconds / 60).round();
+    final readMinutes = data.todaySeconds ~/ 60;
+    final progress = data.goalSeconds <= 0
+        ? 0.0
+        : (data.todaySeconds / data.goalSeconds).clamp(0.0, 1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            Icon(Icons.local_fire_department, color: fireColor),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.tileReadingStreakCurrent(data.currentStreak),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: fireColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            )
-          ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _StatPill(
-              label: l10n.tileReadingStreakBestLabel,
-              value: l10n.tileReadingStreakCurrent(data.longestStreak),
-            ),
-          ],
-        ),
-        const Spacer(),
+        const SizedBox(height: 4),
         Text(
-          encouragement,
-          style: theme.textTheme.bodyMedium,
+          l10n.tileReadingStreakTodayProgress('$readMinutes', '$goalMinutes'),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
         ),
       ],
     );
-  }
-
-  bool _isSameDay(DateTime? date1, DateTime? date2) {
-    if (date1 == null || date2 == null) return false;
-    return date1.year == date2.year &&
-        date1.month == date2.month &&
-        date1.day == date2.day;
   }
 }
 

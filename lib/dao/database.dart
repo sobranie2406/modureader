@@ -15,7 +15,9 @@ import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Current app database version
-const int currentDbVersion = 9;
+// v10: 多刷阅读统计（tb_reading_rounds + tb_books.current_round + tb_reading_time.round）
+// v11: 书籍备注/书评（tb_books.review）
+const int currentDbVersion = 11;
 
 const createBookSQL = '''
 CREATE TABLE tb_books (
@@ -87,6 +89,24 @@ CREATE TABLE tb_reading_time (
 )
 ''';
 
+// 多刷阅读统计：每本书的每一轮阅读记录（v10 新增）
+const createReadingRoundSQL = '''
+CREATE TABLE tb_reading_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id INTEGER,
+  round_number INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'reading',
+  start_time TEXT,
+  end_time TEXT,
+  start_percentage REAL NOT NULL DEFAULT 0,
+  end_percentage REAL NOT NULL DEFAULT 0,
+  end_position TEXT,
+  total_reading_time INTEGER NOT NULL DEFAULT 0,
+  create_time TEXT,
+  update_time TEXT
+)
+''';
+
 const createGroupSQL = '''
 CREATE TABLE tb_groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,6 +169,10 @@ class DBHelper {
             await onUpgradeDatabase(db, 0, version);
           },
           onUpgrade: onUpgradeDatabase,
+          onOpen: (db) async {
+            await RowSyncStore.ensureRounds(db);
+            await db.transaction(RowSyncStore.ensureReviews);
+          },
         );
       case AnxPlatformEnum.ios:
       case AnxPlatformEnum.linux:
@@ -168,6 +192,10 @@ class DBHelper {
               await onUpgradeDatabase(db, 0, version);
             },
             onUpgrade: onUpgradeDatabase,
+            onOpen: (db) async {
+              await RowSyncStore.ensureRounds(db);
+              await db.transaction(RowSyncStore.ensureReviews);
+            },
           ),
         );
     }
@@ -483,6 +511,20 @@ class DBHelper {
 
     if (oldVersion < 8) await RowSyncStore.install(db);
     if (oldVersion < 9) await RowSyncStore.installNarration(db);
+
+    // v10：多刷阅读统计（全新库与升级库都走这里，故不放进 switch）
+    if (oldVersion < 10) {
+      await db.execute(createReadingRoundSQL);
+      await db.execute(
+          "ALTER TABLE tb_books ADD COLUMN current_round INTEGER NOT NULL DEFAULT 1");
+      await db.execute(
+          "ALTER TABLE tb_reading_time ADD COLUMN round INTEGER NOT NULL DEFAULT 1");
+    }
+
+    // v11：书籍备注/书评（tb_books.review，可空）
+    if (oldVersion < 11) {
+      await db.execute("ALTER TABLE tb_books ADD COLUMN review TEXT");
+    }
 
     if (oldVersion != 0 && Prefs().webdavStatus) {
       updatedDB = true;

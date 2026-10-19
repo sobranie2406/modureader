@@ -26,6 +26,8 @@ import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
 import 'package:anx_reader/widgets/common/tag_chip.dart';
 import 'package:anx_reader/widgets/highlight_digit.dart';
 import 'package:anx_reader/widgets/hint/hint_banner.dart';
+import 'package:anx_reader/widgets/book_review/book_review_card.dart';
+import 'package:anx_reader/widgets/reading_round/reading_rounds_card.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
@@ -59,6 +61,15 @@ class _BookDetailState extends ConsumerState<BookDetail> {
   void dispose() {
     _newTagController.dispose();
     super.dispose();
+  }
+
+  /// 轮次完成/撤销后：更新书籍本地状态并刷新书架
+  void _handleRoundFinished(Book updated) {
+    _book.currentRound = updated.currentRound;
+    _book.readingPercentage = updated.readingPercentage;
+    _book.lastReadPosition = updated.lastReadPosition;
+    setState(() {});
+    ref.read(bookListProvider.notifier).refresh();
   }
 
   @override
@@ -828,6 +839,14 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                                     buildEditButton(),
                                     const SizedBox(height: 5),
                                     buildBookStatistics(),
+                                    ReadingRoundsCard(
+                                      book: _book,
+                                      onRoundFinished: _handleRoundFinished,
+                                    ),
+                                    BookReviewCard(
+                                      bookId: _book.id,
+                                      bookTitle: _book.title,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -850,6 +869,14 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                               buildEditButton(),
                               const SizedBox(height: 5),
                               buildBookStatistics(),
+                              ReadingRoundsCard(
+                                book: _book,
+                                onRoundFinished: _handleRoundFinished,
+                              ),
+                              BookReviewCard(
+                                bookId: _book.id,
+                                bookTitle: _book.title,
+                              ),
                               const SizedBox(height: 15),
                               buildMoreDetail(),
                             ],
