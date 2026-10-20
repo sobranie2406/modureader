@@ -219,6 +219,13 @@ function qqBase64URL(value) {
   return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')
     .padEnd(Math.ceil(value.length / 4) * 4, '=')), c => c.charCodeAt(0));
 }
+function qqReleaseBranch(claims) {
+  const branch = /^refs\/heads\/release\/(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/.exec(claims.ref || '');
+  return branch && claims.event_name === 'workflow_dispatch' &&
+    claims.workflow_ref === 'sobranie2406/modureader/.github/workflows/build.yaml@' + claims.ref &&
+    claims.job_workflow_ref === QQ_WORKFLOW + claims.ref && /^[0-9a-f]{40}$/.test(claims.sha || '')
+    ? 'v' + branch[1].replace(/^v/, '') : null;
+}
 export async function qqReleaseIdentity(token) {
   try {
     if (typeof token !== 'string' || token.length > 16000) return null;
@@ -228,15 +235,16 @@ export async function qqReleaseIdentity(token) {
     const claims = JSON.parse(new TextDecoder().decode(qqBase64URL(pieces[1])));
     const now = qqNow();
     const workflow = claims.job_workflow_ref || claims.workflow_ref;
+    const releaseBranch = qqReleaseBranch(claims);
     if (header.alg !== 'RS256' || typeof header.kid !== 'string' || header.kid.length > 200 ||
         claims.iss !== QQ_OIDC_ISSUER || claims.aud !== QQ_RELEASE_AUDIENCE ||
         claims.repository !== 'sobranie2406/modureader' || String(claims.repository_id) !== '1357833506' ||
         claims.repository_owner !== 'sobranie2406' || typeof workflow !== 'string' ||
         !workflow.startsWith(QQ_WORKFLOW) ||
-        !(workflow === QQ_WORKFLOW + 'refs/heads/main' ||
+        !(releaseBranch || workflow === QQ_WORKFLOW + 'refs/heads/main' ||
           (typeof claims.ref === 'string' && claims.ref.startsWith('refs/tags/') && workflow === QQ_WORKFLOW + claims.ref)) ||
         !['release','workflow_dispatch','push'].includes(claims.event_name) ||
-        (claims.event_name === 'workflow_dispatch' && claims.ref !== 'refs/heads/main') ||
+        (claims.event_name === 'workflow_dispatch' && claims.ref !== 'refs/heads/main' && !releaseBranch) ||
         (claims.event_name !== 'workflow_dispatch' && !String(claims.ref).startsWith('refs/tags/')) ||
         !Number.isInteger(claims.exp) || claims.exp <= now || claims.exp > now + 600 ||
         !Number.isInteger(claims.iat) || claims.iat > now + 30 || claims.iat < now - 600 ||
@@ -270,8 +278,10 @@ async function qqReleaseTrigger(request, env) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return qqJSON({error:'Invalid JSON'}, 400);
   const tag = input.release_tag;
   const test = input.test_notice === true;
+  const releaseBranch = qqReleaseBranch(claims);
   if (typeof tag !== 'string' || !tag || tag.length > 200 || /[\x00-\x20\x7f]/.test(tag) ||
       (claims.event_name !== 'workflow_dispatch' && claims.ref !== 'refs/tags/' + tag) ||
+      (releaseBranch && (tag !== releaseBranch || test)) ||
       (test && claims.event_name !== 'workflow_dispatch')) return qqJSON({error:'Invalid release request'}, 400);
   if (env.QQ_RELEASE_PUSH_ENABLED !== 'true' || !env.QQ_GROUP_OPENID || !env.QQ_APP_SECRET)
     return qqJSON({error:'QQ release notices not configured'}, 503);
@@ -286,6 +296,13 @@ async function qqReleaseTrigger(request, env) {
     const release = await response.json();
     if (release.draft || !release.published_at || !Number.isInteger(release.id) ||
         (tag !== 'latest' && release.tag_name !== tag)) return qqJSON({error:'Release is not published'}, 400);
+    if (releaseBranch) {
+      // A release branch may announce only its published tag pointing at the signed build commit.
+      const commit = await fetch('https://api.github.com/repos/sobranie2406/modureader/commits/' + encodeURIComponent(tag),
+        {headers:{accept:'application/vnd.github+json', 'user-agent':'ModuReader-QQ-helper'}});
+      if (!commit.ok) return qqJSON({error:'Published release unavailable'}, 502);
+      if ((await commit.json()).sha !== claims.sha) return qqJSON({error:'Unauthorized'}, 401);
+    }
     const key = `qq:${test ? 'release-test' : 'release'}:${release.id}`;
     const parts = qqSplit((test ? '🧪 发布通知测试 / Release notification test\n' : '') + qqReleaseText(release));
     if (await qqGet(env, key)) return qqJSON({ok:true, duplicate:true, parts:parts.length});

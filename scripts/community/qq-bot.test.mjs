@@ -70,6 +70,7 @@ function fixture() {
     if (String(url).includes('getAppAccessToken')) return Response.json({access_token: 'test-access', expires_in: 3600});
     if (String(url).includes('/messages')) {sent.push(JSON.parse(options.body)); return Response.json({id:'reply-'+sent.length});}
     if (String(url).includes('raw.githubusercontent.com')) return new Response('Public Modu Reader documentation.');
+    if (String(url).includes('/commits/')) return f.commitResponse || Response.json({sha:'a'.repeat(40)});
     if (String(url).includes('api.github.com')) return Response.json(f.release);
     throw new Error('Unexpected test network request');
   }};
@@ -307,5 +308,66 @@ test('scheduled summaries never poll GitHub for releases, even at five-minute bo
       await qqSchedule({scheduledTime:Date.parse('2026-10-07T'+time+':00+08:00')}, f.env);
     assert.equal(f.network.length, 0);
     assert.equal(f.sent.length, 0);
+  });
+});
+
+function releaseBuildClaims(version = '1.3.0') {
+  const ref = 'refs/heads/release/' + version;
+  return {event_name:'workflow_dispatch', ref, sha:'a'.repeat(40),
+    workflow_ref:'sobranie2406/modureader/.github/workflows/build.yaml@'+ref,
+    job_workflow_ref:'sobranie2406/modureader/.github/workflows/qq-release.yml@'+ref};
+}
+
+test('release-branch build can announce its matching published commit once, including beta', async () => {
+  for (const version of ['1.3.0','1.3.1-beta.1','v1.3.2']) await withFixture(async f => {
+    f.env.QQ_RELEASE_PUSH_ENABLED = 'true';
+    store(f.DB,'qq:push-permission',{allowed:true,tested:true},Math.floor(Date.now()/1000));
+    const tag = 'v' + version.replace(/^v/,'');
+    f.release.tag_name = tag;
+    const token = await identity(releaseBuildClaims(version));
+    assert.equal((await qqRoutes(releaseRequest(token, tag),f.env)).status,200);
+    assert.equal((await (await qqRoutes(releaseRequest(token, tag),f.env)).json()).duplicate,true);
+    assert.equal(f.sent.length,1);
+  });
+});
+
+test('release branches reject wrong caller, workflow, SHA, event, tag and test notices', async () => {
+  await withFixture(async f => {
+    f.env.QQ_RELEASE_PUSH_ENABLED = 'true';
+    store(f.DB,'qq:push-permission',{allowed:true,tested:true},Math.floor(Date.now()/1000));
+    const claims = releaseBuildClaims();
+    for (const change of [
+      {ref:'refs/heads/feature/1.3.0'}, {event_name:'push'}, {event_name:'pull_request'},
+      {sha:''}, {sha:'not-a-commit'}, {repository_id:'123'},
+      {workflow_ref:claims.workflow_ref.replace('build.yaml','other.yml')},
+      {job_workflow_ref:claims.job_workflow_ref.replace('release/1.3.0','main')},
+      {job_workflow_ref:undefined},
+    ]) assert.equal((await qqRoutes(releaseRequest(await identity({...claims,...change}),'v1.3.0'),f.env)).status,401);
+    const token = await identity(claims);
+    for (const tag of ['latest','v1.3.1','v1.2.12'])
+      assert.equal((await qqRoutes(releaseRequest(token,tag),f.env)).status,400);
+    assert.equal((await qqRoutes(releaseRequest(token,'v1.3.0',true),f.env)).status,400);
+    assert.equal(f.sent.length,0);
+  });
+});
+
+test('release branch requires a published release and a resolvable matching tag commit before claiming delivery', async () => {
+  await withFixture(async f => {
+    f.env.QQ_RELEASE_PUSH_ENABLED = 'true';
+    store(f.DB,'qq:push-permission',{allowed:true,tested:true},Math.floor(Date.now()/1000));
+    f.release.tag_name = 'v1.3.0';
+    const token = await identity(releaseBuildClaims());
+    f.release.draft = true;
+    assert.equal((await qqRoutes(releaseRequest(token,'v1.3.0'),f.env)).status,400);
+    f.release.draft = false;
+    f.commitResponse = Response.json({sha:'b'.repeat(40)});
+    assert.equal((await qqRoutes(releaseRequest(token,'v1.3.0'),f.env)).status,401);
+    f.commitResponse = new Response('Unavailable',{status:503});
+    assert.equal((await qqRoutes(releaseRequest(token,'v1.3.0'),f.env)).status,502);
+    assert.equal(f.sent.length,0);
+    assert.equal(f.DB.raw.prepare("SELECT count(*) AS n FROM bot_state WHERE key LIKE 'qq:release:%'").get().n,0);
+    f.commitResponse = undefined;
+    assert.equal((await qqRoutes(releaseRequest(token,'v1.3.0'),f.env)).status,200);
+    assert.equal(f.sent.length,1);
   });
 });
