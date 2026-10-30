@@ -57,6 +57,13 @@ class _StatisticPageState extends State<StatisticPage> {
                         .appLayoutMode
                         .usesWideLayout(constraints.maxWidth)) {
                       return Row(
+                        key: const ValueKey('history-wide-layout'),
+                        // The right-hand date group is shorter than the
+                        // dashboard. A Row centers its children vertically by
+                        // default, which made the whole date panel float in
+                        // the middle instead of starting at the top like the
+                        // AnxReader layout.
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: SingleChildScrollView(
