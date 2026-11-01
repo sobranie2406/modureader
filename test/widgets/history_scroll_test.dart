@@ -103,4 +103,30 @@ void main() {
       });
     }
   }
+
+  testWidgets('wide history date panel starts at the top', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        statisticDataProvider.overrideWith(() => _Statistics(1)),
+        totalReadingTimeProvider.overrideWith(_Total.new),
+      ],
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        locale: const Locale('en'),
+        supportedLocales: L10n.supportedLocales,
+        localizationsDelegates: L10n.localizationsDelegates,
+        home: const Scaffold(body: StatisticPage()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final row =
+        tester.widget<Row>(find.byKey(const ValueKey('history-wide-layout')));
+    expect(row.crossAxisAlignment, CrossAxisAlignment.start);
+    expect(find.byType(DateBooks), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
