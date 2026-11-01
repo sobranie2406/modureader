@@ -41,7 +41,7 @@ def deb_version(version, build_number=None):
 
 
 def verify_payload(bundle, platform, arch, installed=False):
-    if arch not in ('x64', 'arm64'):
+    if arch not in ('x64', 'arm64') and not (platform == 'macos' and arch == 'universal'):
         raise ValueError(arch)
     notice_root = bundle
     if platform == 'macos' and not (bundle / 'SOURCE.txt').is_file():
@@ -53,8 +53,8 @@ def verify_payload(bundle, platform, arch, installed=False):
         app = bundle / 'Modu.app'
         with (app / 'Contents/Info.plist').open('rb') as f:
             executable = plistlib.load(f)['CFBundleExecutable']
-        expected = 'x86_64' if arch == 'x64' else 'arm64'
-        if expected not in command('lipo', '-archs', app / 'Contents/MacOS' / executable).split():
+        expected = {'x86_64', 'arm64'} if arch == 'universal' else {'x86_64' if arch == 'x64' else 'arm64'}
+        if not expected.issubset(command('lipo', '-archs', app / 'Contents/MacOS' / executable).split()):
             raise ValueError('Mislabeled macOS architecture')
         command('codesign', '--verify', '--deep', '--strict', app)
         return
@@ -204,6 +204,9 @@ def build_windows(bundle, arch, version, output, work):
     verify_payload(prepared, 'windows', arch)
     verify_crt(prepared, arch)
     bundle = prepared
+    if os.environ.get('MODU_EXPORT_DESKTOP_PAYLOAD') == '1':
+        from universal_desktop import export_payload
+        export_payload(bundle, 'windows', arch)
     compiler = shutil.which('iscc')
     if not compiler:
         compiler = str(Path(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'))
@@ -332,6 +335,9 @@ def build(bundle, platform, arch, version, output, build_number=None):
     verify_payload(bundle, platform, arch)
     if platform == 'macos':
         verify_apple_bundle(bundle / 'Modu.app', version)
+        if os.environ.get('MODU_EXPORT_DESKTOP_PAYLOAD') == '1':
+            from universal_desktop import export_payload
+            export_payload(bundle, platform, arch)
     output.mkdir(parents=True, exist_ok=True)
     names = {'macos': f'Modu-{version}-macos-{arch}.dmg',
              'windows': f'Modu-{version}-windows-{arch}-setup.exe',

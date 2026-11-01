@@ -431,8 +431,10 @@ Future<void> _importResources(
             .hasMatch(p.basename(path))) {
           throw const DictionaryFailure('companions');
         }
-        if (File(path).lengthSync() > 256 * 1024 * 1024) {
-          throw const DictionaryFailure('size');
+        // MDD records are streamed block by block; keep the decoded resource
+        // budget and per-resource limit instead of the smaller MDX file cap.
+        if (File(path).lengthSync() > _dataLimit) {
+          throw const DictionaryFailure('mddSize');
         }
         final reader = DictReader(path);
         try {

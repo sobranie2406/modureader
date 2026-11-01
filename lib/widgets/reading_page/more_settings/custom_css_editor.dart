@@ -34,6 +34,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
   final _patternController = TextEditingController();
   Set<int> _active = {};
   bool _highlight = false;
+  String _filterMode = '';
   String _scope = 'all';
   late int _index;
   late bool _enabled;
@@ -87,6 +88,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
     _nameController.text = _displayName;
     _patternController.text = profile.pattern;
     _highlight = profile.isHighlight;
+    _filterMode = profile.filterMode;
     _scope = profile.scope;
     _visual = profile.visual ?? const CssVisualStyle();
     _error = null;
@@ -101,11 +103,15 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
   }
 
   bool _validate() {
-    if (_highlight &&
+    if ((_highlight || _filterMode.isNotEmpty) &&
         (_patternController.text.trim().isEmpty ||
             _patternController.text.length > 512)) {
       setState(() => _error = ModuStrings.text(
-          context, '请输入 1–512 个字符的正则表达式', 'Enter a regex of 1–512 characters'));
+          context,
+          _filterMode.isEmpty ? '请输入 1–512 个字符的正则表达式' : '请输入 1–512 个字符的匹配文字',
+          _filterMode.isEmpty
+              ? 'Enter a regex of 1–512 characters'
+              : 'Enter literal phrases of 1–512 characters'));
       return false;
     }
     final css = _cssController.text;
@@ -121,7 +127,9 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           ? _storedName
           : _nameController.text.trim(),
       css: _cssController.text,
-      pattern: _highlight ? _patternController.text : '',
+      pattern:
+          _highlight || _filterMode.isNotEmpty ? _patternController.text : '',
+      filterMode: _filterMode,
       scope: _scope,
       visual: _visual);
 
@@ -299,6 +307,7 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
                   '${p.localizedName(Localizations.localeOf(context))} ${ModuStrings.text(context, '副本', 'copy')}',
               css: p.css,
               pattern: p.pattern,
+              filterMode: p.filterMode,
               scope: p.scope,
               visual: p.visual)
         ]);
@@ -495,11 +504,14 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       Wrap(spacing: 8, runSpacing: 8, children: [
         ChoiceChip(
             label: Text(ModuStrings.text(context, '排版 CSS', 'Layout CSS')),
-            selected: !_highlight,
+            selected: !_highlight && _filterMode.isEmpty,
             onSelected: _busy
                 ? null
                 : (_) {
-                    setState(() => _highlight = false);
+                    setState(() {
+                      _highlight = false;
+                      _filterMode = '';
+                    });
                     _autoSave();
                   }),
         ChoiceChip(
@@ -508,10 +520,54 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
             onSelected: _busy
                 ? null
                 : (_) {
-                    setState(() => _highlight = true);
+                    setState(() {
+                      _highlight = true;
+                      _filterMode = '';
+                    });
+                    _autoSave();
+                  }),
+        ChoiceChip(
+            label: Text(_text('文字过滤', 'Text filter')),
+            selected: _filterMode.isNotEmpty,
+            onSelected: _busy
+                ? null
+                : (_) {
+                    setState(() {
+                      _highlight = false;
+                      _filterMode = 'text';
+                    });
                     _autoSave();
                   }),
       ]),
+      if (_filterMode.isNotEmpty) ...[
+        Wrap(spacing: 8, children: [
+          for (final mode in ['text', 'paragraph'])
+            ChoiceChip(
+                label: Text(mode == 'text'
+                    ? _text('过滤匹配文字', 'Hide matched text')
+                    : _text('过滤所在段落', 'Hide containing paragraph')),
+                selected: _filterMode == mode,
+                onSelected: _busy
+                    ? null
+                    : (_) {
+                        setState(() => _filterMode = mode);
+                        _autoSave();
+                      }),
+        ]),
+        TextField(
+            key: const ValueKey('custom-filter-words'),
+            controller: _patternController,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 512,
+            enabled: !_busy,
+            onChanged: (_) => _autoSave(),
+            decoration: InputDecoration(
+                labelText:
+                    _text('每行一条匹配文字（非正则）', 'One literal phrase per line'))),
+        Text(_text('仅改变显示，朗读跳过过滤内容；关闭后恢复原文。',
+            'Hide content and skip it in narration. Disable to restore the original.')),
+      ],
       TextField(
           key: const ValueKey('custom-css-name'),
           controller: _nameController,
@@ -557,16 +613,17 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
           ),
       ]),
       const SizedBox(height: 12),
-      IgnorePointer(
-          ignoring: _busy,
-          child: CssVisualControls(
-            style: _visual,
-            highlight: _highlight,
-            onChanged: (style) {
-              setState(() => _visual = style);
-              _autoSave();
-            },
-          )),
+      if (_filterMode.isEmpty)
+        IgnorePointer(
+            ignoring: _busy,
+            child: CssVisualControls(
+              style: _visual,
+              highlight: _highlight,
+              onChanged: (style) {
+                setState(() => _visual = style);
+                _autoSave();
+              },
+            )),
       if (_error != null)
         Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -578,38 +635,39 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               TextButton(
                   onPressed: _autoSave, child: Text(_text('重试', 'Retry'))),
             ])),
-      ExpansionTile(
-        key: ValueKey('css-code-editor-$_index'),
-        title: Text(ModuStrings.text(
-            context, '自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
-        initiallyExpanded: _cssController.text.isNotEmpty,
-        children: [
-          Text(_highlight
-              ? ModuStrings.text(context, '局部高亮填写 CSS 声明，不加选择器和花括号。',
-                  'For highlights, enter declarations without selectors or braces.')
-              : ModuStrings.text(context, '保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
-                  'Original code is preserved and follows visual settings. Code selectors determine its scope.')),
-          SizedBox(
-              height: 200,
-              child: TextField(
-                key: const ValueKey('custom-css-code'),
-                controller: _cssController,
-                enabled: !_busy,
-                maxLines: null,
-                expands: true,
-                onChanged: (_) {
-                  _autoSave();
-                },
-                style: const TextStyle(
-                    fontFamily: 'Courier New', fontSize: 14, height: 1.4),
-                decoration: InputDecoration(
-                    hintText: L10n.of(context).cssEditorHint,
-                    border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.all(12)),
-                textAlignVertical: TextAlignVertical.top,
-              )),
-        ],
-      ),
+      if (_filterMode.isEmpty)
+        ExpansionTile(
+          key: ValueKey('css-code-editor-$_index'),
+          title: Text(ModuStrings.text(
+              context, '自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
+          initiallyExpanded: _cssController.text.isNotEmpty,
+          children: [
+            Text(_highlight
+                ? ModuStrings.text(context, '局部高亮填写 CSS 声明，不加选择器和花括号。',
+                    'For highlights, enter declarations without selectors or braces.')
+                : ModuStrings.text(context, '保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
+                    'Original code is preserved and follows visual settings. Code selectors determine its scope.')),
+            SizedBox(
+                height: 200,
+                child: TextField(
+                  key: const ValueKey('custom-css-code'),
+                  controller: _cssController,
+                  enabled: !_busy,
+                  maxLines: null,
+                  expands: true,
+                  onChanged: (_) {
+                    _autoSave();
+                  },
+                  style: const TextStyle(
+                      fontFamily: 'Courier New', fontSize: 14, height: 1.4),
+                  decoration: InputDecoration(
+                      hintText: L10n.of(context).cssEditorHint,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.all(12)),
+                  textAlignVertical: TextAlignVertical.top,
+                )),
+          ],
+        ),
       const SizedBox(height: 12),
       Wrap(spacing: 12, runSpacing: 8, children: [
         TextButton.icon(

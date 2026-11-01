@@ -1,4 +1,5 @@
 import 'package:anx_reader/utils/app_motion.dart';
+import 'package:anx_reader/utils/changelog.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/utils/get_current_language_code.dart';
 import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
@@ -42,12 +43,15 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
       // Load changelog from assets
       final String fullChangelog =
           await rootBundle.loadString('assets/CHANGELOG.md');
-      _changelogContent = _extractVersionChangelog(fullChangelog);
+      _changelogContent = changelogSince(fullChangelog,
+          previous: widget.lastVersion,
+          current: widget.currentVersion,
+          chinese: getCurrentLanguageCode().startsWith('zh'));
+      if (_changelogContent.isEmpty) _changelogContent = _getDefaultChangelog();
     } catch (e) {
       AnxLog.warning('Failed to load changelog from assets: $e');
       _changelogContent = _getDefaultChangelog();
     } finally {
-      _changelogContent = processChangelogContent(_changelogContent);
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -56,78 +60,9 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
     }
   }
 
-  String processChangelogContent(String content) {
-    bool isChinese() => getCurrentLanguageCode().startsWith('zh');
-
-    final lines = content.split('\n');
-    var processedLines = <String>[];
-
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) {
-        continue;
-      }
-
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        processedLines.add(line);
-        continue;
-      }
-    }
-    if (isChinese()) {
-      processedLines = processedLines.sublist(processedLines.length ~/ 2);
-    } else {
-      processedLines = processedLines.sublist(0, processedLines.length ~/ 2);
-    }
-
-    return processedLines.join('\n');
-  }
-
-  String _extractVersionChangelog(String fullChangelog) {
-    // Extract version number from currentVersion (e.g., "1.2.3+1234" -> "1.2.3")
-    final versionMatch = RegExp(r'^(\d+\.\d+\.\d+)').firstMatch(currentVersion);
-    if (versionMatch == null) {
-      return _getDefaultChangelog();
-    }
-
-    final version = versionMatch.group(1)!;
-    final versionHeader = '## $version';
-
-    // Find the version section in the changelog
-    final lines = fullChangelog.split('\n');
-    final startIndex = lines.indexWhere((line) => line.trim() == versionHeader);
-
-    if (startIndex == -1) {
-      AnxLog.warning('Version $version not found in changelog');
-      return _getDefaultChangelog();
-    }
-
-    // Find the end of this version section (next version header or end of file)
-    int endIndex = lines.length;
-    for (int i = startIndex + 1; i < lines.length; i++) {
-      if (lines[i].trim().startsWith('## ') &&
-          lines[i].trim() != versionHeader) {
-        endIndex = i;
-        break;
-      }
-    }
-
-    // Extract the content for this version (skip the header line)
-    final versionContent =
-        lines.sublist(startIndex + 1, endIndex).join('\n').trim();
-
-    if (versionContent.isEmpty) {
-      return _getDefaultChangelog();
-    }
-
-    return versionContent;
-  }
-
-  String _getDefaultChangelog() {
-    return '''
-- Fixed some bugs
-- 修复已知问题
-''';
-  }
+  String _getDefaultChangelog() => getCurrentLanguageCode().startsWith('zh')
+      ? '暂无此版本的更新说明。'
+      : 'Release notes are unavailable for this version.';
 
   @override
   Widget build(BuildContext context) {

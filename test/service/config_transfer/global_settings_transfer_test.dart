@@ -191,7 +191,9 @@ void main() {
 
   test('CSS multi-selection and highlight rules travel through global export',
       () async {
-    await Prefs().saveCustomCssProfile(1, customCssTemplates.last);
+    final titleHighlight = customCssTemplates
+        .lastWhere((p) => p.scope == 'title' && p.pattern.isNotEmpty);
+    await Prefs().saveCustomCssProfile(1, titleHighlight);
     await Prefs().saveCustomCssSelection(
         const CustomCssSelection(index: 1, enabled: true, indices: [0, 1]));
     final data = await GlobalSettingsTransfer.decode(
@@ -200,7 +202,7 @@ void main() {
         jsonDecode(data['customCssDefaultIndices']['value'] as String), [0, 1]);
     final profiles =
         jsonDecode(data['customCssProfiles']['value'] as String) as List;
-    expect(profiles[1]['pattern'], customCssTemplates.last.pattern);
+    expect(profiles[1]['pattern'], titleHighlight.pattern);
     expect(profiles[1]['scope'], 'title');
   });
 

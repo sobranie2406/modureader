@@ -43,6 +43,8 @@ jobs:
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
       has_desktop: ${{ steps.matrix.outputs.has_desktop }}
+      macos_universal: ${{ steps.matrix.outputs.macos_universal }}
+      windows_universal: ${{ steps.matrix.outputs.windows_universal }}
       android: ${{ steps.matrix.outputs.android }}
       ios: ${{ steps.matrix.outputs.ios }}
       harmony: ${{ steps.matrix.outputs.harmony }}
@@ -226,6 +228,8 @@ jobs:
           curl --retry 10 --retry-connrefused --retry-delay 1 --fail --silent http://127.0.0.1:8765/ > /dev/null
           flutter test integration_test/bundled_embedding_test.dart -d windows --dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/ --reporter expanded
       - name: Verify architecture and package
+        env:
+          MODU_EXPORT_DESKTOP_PAYLOAD: '1'
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify Windows installation and uninstallation
         if: matrix.platform == 'windows'
@@ -238,6 +242,14 @@ jobs:
           sudo apt-get remove -y modureader
           test ! -e /opt/modureader/modu
       - uses: actions/upload-artifact@v4
+        if: matrix.platform != 'linux'
+        with:
+          name: desktop-payload-${{ matrix.platform }}-${{ matrix.arch }}
+          path: build/desktop-payload/*.tar
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'linux' || (matrix.platform == 'macos' && needs.targets.outputs.macos_universal != 'true') || (matrix.platform == 'windows' && needs.targets.outputs.windows_universal != 'true')
         with:
           name: modu-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -247,6 +259,85 @@ jobs:
             dist-release/*.sha256
           if-no-files-found: error
           retention-days: 14
+
+  universal:
+    needs: [targets, desktop]
+    if: needs.targets.outputs.macos_universal == 'true' || needs.targets.outputs.windows_universal == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: macos, os: macos-15}
+          - {platform: windows, os: windows-2025}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        if: needs.targets.outputs[format('{0}_universal', matrix.platform)] == 'true'
+        with:
+          pattern: desktop-payload-${{ matrix.platform }}-*
+          path: native-inputs
+          merge-multiple: true
+      - name: Install pinned Inno Setup compiler
+        if: matrix.platform == 'windows' && needs.targets.outputs.windows_universal == 'true'
+        shell: pwsh
+        run: ./scripts/release/setup-inno.ps1
+      - name: Combine native architectures and create legacy updater copies
+        if: needs.targets.outputs[format('{0}_universal', matrix.platform)] == 'true'
+        run: |
+          python scripts/release/universal_desktop.py ${{ matrix.platform }} --inputs native-inputs --output dist-release --version "$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+      - uses: actions/upload-artifact@v4
+        if: needs.targets.outputs[format('{0}_universal', matrix.platform)] == 'true'
+        with:
+          name: modu-${{ matrix.platform }}-universal
+          path: dist-release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  universal-installation:
+    needs: [targets, universal]
+    if: needs.targets.outputs.macos_universal == 'true' || needs.targets.outputs.windows_universal == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: macos, arch: arm64, os: macos-15}
+          - {platform: macos, arch: x64, os: macos-15-intel}
+          - {platform: windows, arch: arm64, os: windows-11-arm}
+          - {platform: windows, arch: x64, os: windows-2025}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        if: needs.targets.outputs[format('{0}_universal', matrix.platform)] == 'true'
+        with:
+          name: modu-${{ matrix.platform }}-universal
+          path: dist-release
+      - name: Verify unified Windows installer on native architecture
+        if: matrix.platform == 'windows' && needs.targets.outputs.windows_universal == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          old="Modu-1.3.5-windows-${{ matrix.arch }}-setup.exe"
+          gh release download v1.3.5 --repo sobranie2406/modureader --pattern "$old" --pattern "$old.sha256" --dir old-release
+          (cd old-release && sha256sum -c "$old.sha256")
+          python scripts/release/verify_windows_install.py dist-release/*-windows-universal-setup.exe ${{ matrix.arch }} --native-launch
+          python scripts/release/verify_windows_install.py dist-release/*-windows-universal-setup.exe ${{ matrix.arch }} --native-launch --previous-installer "old-release/$old"
+      - name: Verify universal Mac installation on native architecture
+        if: matrix.platform == 'macos' && needs.targets.outputs.macos_universal == 'true'
+        run: python scripts/release/verify_macos_universal.py dist-release/*-macos-universal.dmg ${{ matrix.arch }}
 
   android:
     needs: [targets, models]
@@ -396,10 +487,11 @@ jobs:
       (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') &&
       needs.quality.result == 'success' && needs.models.result == 'success' && needs.targets.result == 'success' &&
       (needs.targets.outputs.has_desktop != 'true' || needs.desktop.result == 'success') &&
+      ((needs.targets.outputs.macos_universal != 'true' && needs.targets.outputs.windows_universal != 'true') || (needs.universal.result == 'success' && needs.universal-installation.result == 'success')) &&
       (needs.targets.outputs.android != 'true' || needs.android.result == 'success') &&
       (needs.targets.outputs.ios != 'true' || needs.ios.result == 'success') &&
       (needs.targets.outputs.harmony != 'true' || needs.harmony.result == 'success')
-    needs: [quality, models, targets, desktop, android, ios, harmony]
+    needs: [quality, models, targets, desktop, universal, universal-installation, android, ios, harmony]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

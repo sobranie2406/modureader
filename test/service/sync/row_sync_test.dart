@@ -705,8 +705,10 @@ void main() {
     final source = File('lib/providers/sync.dart').readAsStringSync();
     expect(source,
         contains('if (hasPendingChanges) await _pendingSync.request();'));
-    expect(source,
-        contains('if (!hasPendingChanges && Prefs().syncCompletedToast)'));
+    expect(
+        source,
+        contains(
+            'if (!hasPendingChanges &&\n          _readingFeedback.success('));
     expect(source, contains('return !hasPendingChanges;'));
     expect(
         source,

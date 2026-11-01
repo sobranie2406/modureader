@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:anx_reader/service/reading/text_filter.dart';
 import 'dart:ui' show TextRange;
 
 import 'models/tts_sentence.dart';
@@ -9,13 +10,17 @@ class TtsPageSource {
   TtsPageSource(String text,
       {required this.chapter,
       this.onPosition,
+      this.excludedRanges,
       this.onHighlight,
       this.onNextPage,
       this.onCancelAdvance}) {
     _setText(text);
   }
 
+  final List<TextRange> Function(String)? excludedRanges;
+
   void _setText(String text) {
+    text = maskFilteredText(text, excludedRanges?.call(text) ?? const []);
     _sentences.clear();
     _offsets.clear();
     _index = 0;
@@ -49,7 +54,7 @@ class TtsPageSource {
   final _offsets = <int>[];
   int _index = 0;
   bool _valid = true;
-  bool get valid => _valid && _sentences.isNotEmpty;
+  bool get valid => _valid && (_sentences.isNotEmpty || onNextPage != null);
   bool get atEnd => _index >= _sentences.length;
 
   void invalidate() {
@@ -75,6 +80,13 @@ class TtsPageSource {
     if (!valid) return '';
     if (_index >= _sentences.length) rewind();
     return _current();
+  }
+
+  Future<String> currentTextContinuous() async {
+    final text = currentText();
+    return text.isEmpty && valid && onNextPage != null
+        ? await nextTextContinuous()
+        : text;
   }
 
   String nextText() {
@@ -103,6 +115,9 @@ class TtsPageSource {
         onNextPage!(this, current),
         cancelled.future,
       ]);
+      if (current() && loaded && _sentences.isEmpty) {
+        return await _nextContinuous();
+      }
       return current() && loaded ? _current() : '';
     } catch (_) {
       // Retry the last sentence, not the entire page, after OCR/load failure.

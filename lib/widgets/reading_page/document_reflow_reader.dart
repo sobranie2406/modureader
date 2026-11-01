@@ -1,3 +1,9 @@
+import 'package:anx_reader/service/reading/reflow_css.dart';
+import 'package:anx_reader/service/reading/text_filter.dart';
+import 'package:anx_reader/page/reading_page.dart' show epubPlayerKey;
+import 'package:anx_reader/utils/coordinates_to_part.dart';
+import 'more_settings/page_turning/types_and_icons.dart';
+import 'more_settings/page_turning/diagram.dart';
 import 'reader_menu_appearance.dart';
 import 'package:anx_reader/service/translate/official_api.dart';
 import 'ocr_precache_settings.dart';
@@ -14,6 +20,7 @@ import 'package:anx_reader/service/translate/microsoft_free.dart';
 import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:anx_reader/service/tts/tts_page_source.dart';
 import 'package:anx_reader/service/ocr/document_reflow_loader.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -367,17 +374,21 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final controller = _readingController;
     return _narrationSource ??= TtsPageSource(controller.text,
         chapter: chapter,
+        excludedRanges: (text) => filteredTextRanges(text,
+            Prefs().textFiltersForBook(epubPlayerKey.currentState?.cssBookKey)),
         onNextPage: _showTranslation ? null : _continueNarration,
-        onCancelAdvance: cancelLoading, onHighlight: (range) {
-      if (mounted) controller.setNarrationRange(range);
-    }, onPosition: (offset) {
-      if (!mounted ||
-          _readingController.selection.isValid &&
-              !_readingController.selection.isCollapsed) {
-        return;
-      }
-      _textState?.bringIntoView(TextPosition(offset: offset));
-    });
+        onCancelAdvance: cancelLoading,
+        onHighlight: (range) {
+          if (mounted) controller.setNarrationRange(range);
+        },
+        onPosition: (offset) {
+          if (!mounted ||
+              _readingController.selection.isValid &&
+                  !_readingController.selection.isCollapsed) {
+            return;
+          }
+          _textState?.bringIntoView(TextPosition(offset: offset));
+        });
   }
 
   Future<bool> _continueNarration(
@@ -1092,15 +1103,42 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         (event.position - _pointerOrigin!).distance < kTouchSlop &&
         _pointerDownTime != null &&
         event.timeStamp - _pointerDownTime! < kLongPressTimeout;
-    if (shortTap && widget.onOpenReaderMenu != null) {
+    if (shortTap) {
       _menuTapTimer = Timer(kDoubleTapTimeout, () {
         if (mounted && _readingController.selection.isCollapsed) {
-          widget.onOpenReaderMenu!();
+          _tapPage(event.position);
         }
       });
     }
     _pointerOrigin = null;
     _queueSelection();
+  }
+
+  void _tapPage(Offset global) {
+    if (_busy || !_readingController.selection.isCollapsed) return;
+    final box = _translationViewportKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final point = box.globalToLocal(global);
+    final part = coordinatesToPart(
+        point.dx / box.size.width, point.dy / box.size.height);
+    final prefs = Prefs();
+    var action = prefs.pageTurnMode == 'custom'
+        ? PageTurningType.values[prefs.customPageTurnConfig[part]]
+        : pageTurningTypes[
+            prefs.pageTurningType.clamp(0, pageTurningTypes.length - 1)][part];
+    if (prefs.pageTurnMode != 'custom' && prefs.swapPageTurnArea) {
+      if (action == PageTurningType.prev) {
+        action = PageTurningType.next;
+      } else if (action == PageTurningType.next) {
+        action = PageTurningType.prev;
+      }
+    }
+    if (action == PageTurningType.menu) {
+      widget.onOpenReaderMenu?.call();
+    } else if (!prefs.keyboardShortcutTurnPage) {
+      if (action == PageTurningType.next) unawaited(turn(1));
+      if (action == PageTurningType.prev) unawaited(turn(-1));
+    }
   }
 
   void _queueSelection() {
@@ -1256,7 +1294,28 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         listenable: Prefs(), builder: (context, _) => _buildReader(context));
   }
 
+  String? _filterSignature;
+  String? _filteredOriginal, _filteredTranslation;
   Widget _buildReader(BuildContext context) {
+    final rules =
+        Prefs().textFiltersForBook(epubPlayerKey.currentState?.cssBookKey);
+    final signature = jsonEncode(rules.map((p) => p.toJson()).toList());
+    if (_filterSignature != signature) {
+      _filteredOriginal = _filteredTranslation = null;
+      _filterSignature = signature;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _invalidateNarration();
+      });
+    }
+    if (_filteredOriginal != _controller.text) {
+      _filteredOriginal = _controller.text;
+      _controller.filteredRanges = filteredTextRanges(_controller.text, rules);
+    }
+    if (_filteredTranslation != _translatedController.text) {
+      _filteredTranslation = _translatedController.text;
+      _translatedController.filteredRanges =
+          filteredTextRanges(_translatedController.text, rules);
+    }
     Color parse(String value, Color fallback) =>
         Color(int.tryParse(value.replaceFirst('#', ''), radix: 16) ??
             fallback.toARGB32());
@@ -1264,6 +1323,17 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         isDarkMode: Theme.of(context).brightness == Brightness.dark);
     final foreground =
         parse(theme.textColor, Theme.of(context).colorScheme.onSurface);
+    final prefs = Prefs();
+    final selection =
+        prefs.customCssSelection(epubPlayerKey.currentState?.cssBookKey);
+    final css = ReflowCss(
+        selection.enabled
+            ? selection.activeIndices
+                .map((i) => prefs.customCssProfiles[i])
+                .toList()
+            : [],
+        _style.textStyle.copyWith(color: foreground));
+    _controller.paragraphSpacing = css.paragraphGap ?? _style.paragraphSpacing;
     return DocumentReaderSurface(
       readerContentOnly: widget.onOpenReaderMenu != null,
       hideHeader: widget.readerMenuVisible,
@@ -1325,7 +1395,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       ]),
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onOpenReaderMenu,
+        onTapUp: (details) => _tapPage(details.globalPosition),
         child: Column(children: [
           if (_busy || _translation.busy)
             EinkStaticIndicator(
@@ -1367,9 +1437,9 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                                         maxLines: null,
                                         showCursor: false,
                                         enableSuggestions: false,
-                                        style: _style.textStyle
-                                            .copyWith(color: foreground),
-                                        textAlign: _style.alignment,
+                                        style: css.textStyle,
+                                        textAlign:
+                                            css.alignment ?? _style.alignment,
                                         decoration: const InputDecoration(
                                             border: InputBorder.none,
                                             isCollapsed: true,
@@ -1450,6 +1520,7 @@ class _ReflowTextController extends TextEditingController {
     notifyListeners();
   }
 
+  List<TextRange> filteredRanges = const [];
   double paragraphSpacing = 1;
   DocumentReflowPage? page;
   List<BookNote> notes = [];
@@ -1478,6 +1549,7 @@ class _ReflowTextController extends TextEditingController {
     final edges = {
       0,
       text.length,
+      for (final range in filteredRanges) ...[range.start, range.end],
       for (final range in translatedRanges) ...[range.start, range.end],
       if (_narrationRange case final range?
           when range.isValid && range.end <= text.length) ...[
@@ -1495,7 +1567,13 @@ class _ReflowTextController extends TextEditingController {
       for (var i = 0; i < edges.length - 1; i++)
         TextSpan(
             text: text.substring(edges[i], edges[i + 1]),
-            style: _styleAt(edges[i], marks)
+            style: (filteredRanges.any((range) => edges[i] >= range.start && edges[i] < range.end)
+                    ? const TextStyle(
+                        fontSize: 0,
+                        height: 0.01,
+                        letterSpacing: 0,
+                        color: Colors.transparent)
+                    : _styleAt(edges[i], marks))
                 .merge(translatedRanges
                         .any((r) => edges[i] >= r.start && edges[i] < r.end)
                     ? translationStyle
@@ -1505,6 +1583,14 @@ class _ReflowTextController extends TextEditingController {
                         text[edges[i]] == '\n'
                     ? TextStyle(
                         height: paragraphSpacing == 0 ? .01 : paragraphSpacing)
+                    : null)
+                .merge(filteredRanges.any((range) =>
+                        edges[i] >= range.start && edges[i] < range.end)
+                    ? const TextStyle(
+                        fontSize: 0,
+                        height: 0.01,
+                        letterSpacing: 0,
+                        color: Colors.transparent)
                     : null))
     ]);
   }

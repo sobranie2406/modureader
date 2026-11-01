@@ -208,8 +208,8 @@ class _DictionarySettingsState extends State<DictionarySettings> {
             const SizedBox(height: 12),
             Text(ModuStrings.text(
                 context,
-                '支持 MDX 1/2（非 LZO、非加密正文，≤256 MiB），可同时选择同名 MDD、图片、音频、CSS、JS；有子目录时请使用 ZIP 保留目录结构。原版内容在隔离窗口显示，只加载已导入资源，音频需点击播放；旧词典需重新导入。StarDict 2.4.2/3.0.0 仍显示文字释义；暂不支持 DSL。',
-                'Supports MDX 1/2 (no LZO or encrypted records, ≤256 MiB), with matching MDD, images, audio, CSS and JS. Use ZIP to preserve subdirectories. Original content opens in isolation using imported resources only; tap to play audio. Reimport old dictionaries. StarDict 2.4.2/3.0.0 remains text-only; DSL is unsupported.')),
+                '支持 MDX 1/2（非 LZO、非加密正文，≤256 MiB），可同时选择同名 MDD（单个≤2 GiB）、图片、音频、CSS、JS；有子目录时请使用 ZIP 保留目录结构。原版内容在隔离窗口显示，只加载已导入资源，音频需点击播放；旧词典需重新导入。StarDict 2.4.2/3.0.0 仍显示文字释义；暂不支持 DSL。',
+                'Supports MDX 1/2 (no LZO or encrypted records, ≤256 MiB), with matching MDD (up to 2 GiB each), images, audio, CSS and JS. Use ZIP to preserve subdirectories. Original content opens in isolation using imported resources only; tap to play audio. Reimport old dictionaries. StarDict 2.4.2/3.0.0 remains text-only; DSL is unsupported.')),
             const SizedBox(height: 16),
             FilledButton.icon(
                 onPressed: _busy || _loading ? null : _import,

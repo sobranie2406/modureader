@@ -167,6 +167,8 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
     final contentWidth = math.min(availableWidth,
         math.max(240.0, columns * coverWidth + (columns - 1) * 10));
     final dialog = AlertDialog(
+      // OHOS defaults to an outer scroll view; the grid needs bounded height.
+      scrollable: false,
       insetPadding: const EdgeInsets.all(24),
       contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),

@@ -45,7 +45,7 @@ Open **Settings** from the home navigation. The app language can follow the syst
 | Remote library settings | Separate WebDAV browsing and book downloads |
 | Translation | Engine, target language, AI and DeepL / DeepLX |
 | Experimental features | Plugins are off by default; warning and confirmation required; only project-reviewed packages accepted |
-| Advanced | Storage, cache, TXT chapter splitting, ANX backup import, logs and network |
+| Advanced | Storage, cache, TXT chapter splitting, logs and network |
 | About Modu | Bug reports and feature requests, project links, community, licenses and app updates |
 
 WeRead: enable the connection under Appearance and enter your own official API Key. In book details, search and confirm the edition before linking. Its metadata/ratings/reviews stay separate from personal data; public cached data syncs with downloaded books, while keys require explicit sensitive-settings opt-in. See [WeRead](WEREAD.md).
@@ -152,17 +152,21 @@ Cards support download-and-use, selection, verification, cancellation and deleti
 
 Desktop and Android hardware keyboards can configure paging, menu, play/pause and previous/next paragraph under **Reading → Reader shortcuts**, below page-turn mode and above scrolling. Each action supports multiple bindings; conflicts are rejected and Restore defaults asks for confirmation. Play/pause shares P by default. Input fields, selection and dialogs are guarded; OS-reserved keys may not reach the app. Playback controls operate an active narration session.
 
+Unzoomed single-page PDFs support single-finger swipe paging; enlarged pages use drag-to-pan. Pinch zoom and text selection do not turn pages. Reflow supports the configured tap-to-turn regions.
+
 ## CSS and selection tools
 
 In-reader settings use Reading / Style / CSS / Other tabs, with CSS templates in their own tab. Style, detailed settings and PDF reading settings follow the Lookup popup sizing rules and scroll within the panel. Selection-toolbar and keyboard-shortcut configuration remain available from Settings.
 
-**Settings → Reading → CSS settings** provides 32 named slots and 13 editable presets. Enable the master switch and desired profiles; multiple profiles can apply together. Each book can follow the default combination or select its own. Profile contents are shared globally, so editing one can affect other books using it.
+**Settings → Reading → CSS settings** provides 32 named slots and 14 editable presets. Enable the master switch and desired profiles; multiple profiles can apply together. Each book can follow the default combination or select its own. Profile contents are shared globally, so editing one can affect other books using it.
 
 CSS changes layout; regex highlights style matching text with colors, backgrounds and underlines without rewriting text or annotation positions. Import trusted CSS / JSON only: remote resource URLs can make network requests. New, copied and imported profiles start disabled; imports fill empty slots without silently overwriting profiles.
 
 **Selection toolbar** lets you toggle and drag-sort built-in tools and AI commands, and edit annotation colors, names, icons and prompts. Common AI presets start disabled, including AI Knowledge and Classical Chinese translation. Manage selection templates here, separately from AI Reading Skills; both use the same reader AI dialog.
 
 Each selection command can use **text with context** (default) or **selected text only**, and can opt into online search. Explicit scope choices are preserved. AI Knowledge uses the current model's knowledge first. To check further, choose **Online search** below the answer, before Regenerate and Copy. Wiktionary, Wikipedia and Baidu Baike results are summarized with sources by the same model in the same conversation. No extra search API key is required.
+
+Text-filter profiles live alongside CSS profiles and can hide matching text or its entire paragraph; narration skips filtered content. Native PDF/OCR reflow supports applicable font size, weight, line/letter spacing, colors and alignment, not arbitrary HTML selectors or web layouts.
 
 ## Plugins
 
@@ -256,6 +260,8 @@ Sync merges books, notes, bookmarks, folders, tags and reading records by stable
 
 Fonts, backgrounds, local dictionaries and vector indexes are not library-synced. Keep clients on matching versions where possible. A book record on the shelf does not mean its content is downloaded.
 
+Ordinary and PDF readers do not show sync-success messages. After a failed reader sync, Modu retries the complete reconciliation up to three times, respecting service cooldowns; if all attempts fail, it shows one notice with the failure reason. Repeated failures remain quiet until a successful sync resets the notice. Reader attempts check connectivity: no connection, or no Wi-Fi with Wi-Fi-only enabled, silently defers synchronization and preserves pending progress. Sync notices outside the reader remain unchanged.
+
 Timed sync during reading is off by default. It requires cloud sync (WebDAV or object storage) and automatic sync, runs during foreground reading and respects Wi-Fi-only settings. The default is 5 minutes, with 1/2/3/5/10/15/30/60-minute choices. Locking or leaving pauses it; returning waits a full interval. Missed intervals are not replayed and requests do not overlap.
 
 **Sync service settings, API keys and passwords** is separate and off by default, and shared by WebDAV and object storage. It requires an independent sync encryption password of at least 12 characters, not your WebDAV password or object-storage key. Sensitive service settings use AES-256-GCM encryption; WebDAV/object-storage connection credentials are excluded. The encryption password is not included in sync data. Books, notes and the whole database do not become encrypted, and lost passwords cannot recover the keys.
@@ -264,21 +270,18 @@ Timed sync during reading is off by default. It requires cloud sync (WebDAV or o
 
 In **Remote library**, use the current-folder import button or a folder's menu to include supported books in subfolders, then select the books to download and import. Transfers run sequentially with duplicate checks, progress and cancellation; already imported books remain after cancellation. Directory listings are parsed in a background worker with a 32 MiB response limit. Book downloads retain the 512 MiB limit and their integrity checks.
 
-## Two backups and ANX import
+## Two backup types
 
 | Need | Entry | Contents |
 | --- | --- | --- |
 | Transfer preferences/prompts | Settings → Global settings backup | JSON / modu link, without books or chats |
 | Back up the local library | Settings → Sync → Database backup | ZIP with local books, covers, fonts, backgrounds, AI history, general settings and database records |
-| Migrate from ANX | Settings → Advanced → Import ANX Reader backup | Validate an ANX ZIP and merge supported books/records |
 
 Global settings backup includes appearance, reading layout, keyboard shortcuts, CSS, selection tools, prompts, plugins, speech, translation and model choices. It excludes font/background/dictionary/model files, books, notes, chats and reading progress. **Accounts, passwords and API keys are excluded by default; including them produces recoverable plaintext JSON / links, not encrypted backups.** Review the import scope first. With the credentials switch off, existing local credentials are preserved. There is no QR transfer; use a file for a complete backup.
 
 Download the books you want to keep before exporting Modu-Backup-*.zip. Service credentials are excluded by default; optional encryption protects the settings section, not all books, notes or chats. Import the ZIP without unpacking it. Restore replaces the current library and backed-up settings rather than merging them. Back up current data first, wait for sync/indexing to finish, then close and reopen after restore.
 
 Windows exports default to the user's Downloads directory, usually `C:\Users\<username>\Downloads`. Other platforms use the system save destination. Successful export shows the actual location and lets you copy it. If Android returns only a document identifier, find the filename in the selected folder.
-
-ANX import accepts original schema-7 backup ZIPs. It imports downloaded books, covers, notes, progress, time, folders and tags, but not accounts, app settings, AI chats or books with missing content. Files determine identity; repeated import does not duplicate matching records. A local database snapshot is created first. Standalone DB files, encrypted ZIPs and unknown schema versions are unsupported. This is migration, not ongoing cross-app sync.
 
 ## Data, security and feedback
 

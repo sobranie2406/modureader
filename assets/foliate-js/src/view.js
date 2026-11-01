@@ -748,6 +748,7 @@ export class View extends HTMLElement {
     entry.promise = Promise.resolve().then(() => this.book.sections[index].createDocument())
       .then(doc => {
         if (!doc?.body) throw new Error('Speech chapter has no text document')
+        this.prepareTtsDocument?.(doc)
         entry.doc = doc
         return doc
       }).catch(error => {

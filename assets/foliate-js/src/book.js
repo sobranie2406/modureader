@@ -2,6 +2,8 @@ console.log('book.js')
 console.log('AnxUA', navigator.userAgent)
 
 import './view.js'
+import { applyTextFilters } from './text-filter.js'
+import { BookImageGallery, imageDataUrl } from './image-gallery.js'
 import { applyReaderMotion, reducedReaderMotionCSS } from './reader-motion.js'
 import { detectDocumentReadingMode, resolveDocumentReadingMode } from './document-reading-mode.js'
 import { FootnoteHandler } from './footnotes.js'
@@ -39,6 +41,7 @@ const settledSelectionDocuments = new WeakMap();
 const highlightWarnings = new Set();
 const highlightSignatures = new WeakMap();
 const updateCustomHighlights = (doc, force = false) => {
+  applyTextFilters(doc, style.customTextFilters ?? []);
   const rules = style.customCSSEnabled ? style.customHighlightRules : [];
   const signature = JSON.stringify(rules ?? []);
   if (!force && highlightSignatures.get(doc) === signature) return;
@@ -987,6 +990,7 @@ class Reader {
   }
 
   setView(view) {
+    view.prepareTtsDocument = doc => applyTextFilters(doc, style.customTextFilters ?? [])
     // Footnote selections belong to another document and must not target the
     // main book's annotations, even when their local CFI paths look alike.
     view.getSelectionAnnotationIds = cfi => view === this.view
@@ -1047,16 +1051,17 @@ class Reader {
     })
     view.addEventListener('click-image', async e => {
       if (view.scannedImageDocument) return
-      // console.log('click-image', e.detail.img.src)
-      const blobUrl = e.detail.img.src
-      const blob = await fetch(blobUrl).then(r => r.blob())
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve(reader.result)
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      })
-      callFlutter('onImageClick', base64)
+      try {
+        const img = e.detail.img
+        const image = await imageDataUrl(await fetch(img.src).then(r => r.blob()))
+        const section = view.renderer?.getContents()?.find(item => item.doc === img.ownerDocument)?.index
+        const ordinal = [...img.ownerDocument.querySelectorAll('img')].indexOf(img)
+        this.imageGallery?.close()
+        const token = this.imageGalleryToken = (this.imageGalleryToken ?? 0) + 1
+        this.imageGallery = Number.isInteger(section) && ordinal >= 0
+          ? new BookImageGallery(view.book, section, ordinal) : null
+        callFlutter('onImageClick', { image, token })
+      } catch (error) { console.warn('Image preview failed', error) }
     })
   }
 
@@ -1293,6 +1298,7 @@ class Reader {
     this.#saveOriginalContent()
 
     this.readingFeatures(readingRules)
+    applyTextFilters(doc, style.customTextFilters ?? [])
     
     // Apply code highlighting to newly loaded content
     if (style && style.codeHighlightTheme && style.codeHighlightTheme !== 'off') {
@@ -1393,8 +1399,10 @@ class Reader {
   }
 
   readingFeatures = () => {
+    applyTextFilters(this.#doc, [])
     this.#restoreOriginalContent()
     readingFeaturesDocHandler(this.#doc)
+    applyTextFilters(this.#doc, style.customTextFilters ?? [])
   }
 
   getChapterContent = () => {
@@ -1679,6 +1687,11 @@ const callFlutter = (name, data) => {
 }
 
 const setStyle = (oldStyle) => {
+  if (!oldStyle || JSON.stringify(style.customTextFilters ?? []) !== JSON.stringify(oldStyle.customTextFilters ?? [])) {
+    for (const {doc} of reader.view.renderer?.getContents?.() ?? []) {
+      applyTextFilters(doc, style.customTextFilters ?? []);
+    }
+  }
   const paintKeys = ['backgroundColor', 'fontColor', 'readingNightMode',
     'backgroundImage', 'bgimgBlur', 'bgimgOpacity', 'bgimgFit', 'verticalPageChrome']
   const paintOnly = !!oldStyle && Object.keys(style).every(key =>
@@ -2093,6 +2106,17 @@ window.onNativeReaderLongPress = () => {
   if (!reader.view?.renderer || reader.view.isFixedLayout || isPdf || window.isFootNoteOpen()) return;
   for (const { doc } of reader.view.renderer.getContents())
     smartSelectionDocuments.get(doc)?.nativeLongPress?.();
+}
+
+window.bookImageGalleryIndex = token => token === reader.imageGalleryToken
+  ? reader.imageGallery?.index() : null
+window.bookImageGalleryImage = (token, index) => token === reader.imageGalleryToken
+  ? reader.imageGallery?.image(index) : null
+window.closeBookImageGallery = token => {
+  if (token === reader.imageGalleryToken) {
+    reader.imageGallery?.close()
+    reader.imageGallery = null
+  }
 }
 
 window.getSelection = () => reader.getSelection()

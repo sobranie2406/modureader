@@ -59,6 +59,31 @@ void main() {
   });
 
   test(
+      'large streamed MDD accepts files above 256 MiB and retains the 2 GiB cap',
+      () async {
+    final main = mdx(temp, definitions: {'sample': '<img src="pic.png">'});
+    final media = mdx(temp, utf16: true, resources: {
+      r'\pic.png': [137, 80, 78, 71]
+    });
+    // Sparse padding exercises file-size boundaries without allocating a huge fixture.
+    final handle = File(media).openSync(mode: FileMode.append);
+    handle.truncateSync(256 * 1024 * 1024 + 1);
+    handle.closeSync();
+    await store.importFiles([main, media], 'Large media');
+    final id = (await store.list()).single.id;
+    expect(await store.resource(id, 'pic.png'), [137, 80, 78, 71]);
+    final oversized = File(media).openSync(mode: FileMode.append);
+    oversized.truncateSync(2 * 1024 * 1024 * 1024 + 1);
+    oversized.closeSync();
+    await expectLater(
+        store.importFiles([main, media], 'Too large'),
+        throwsA(
+            isA<DictionaryFailure>().having((e) => e.code, 'code', 'mddSize')));
+    expect(await store.list(), hasLength(1));
+    expect(await store.resource(id, 'pic.png'), [137, 80, 78, 71]);
+  });
+
+  test(
       'ZIP preserves nested loose CSS/images; failed resource import is atomic',
       () async {
     final file = mdx(temp, definitions: {'sample': '<img src="img/pic.png">'});

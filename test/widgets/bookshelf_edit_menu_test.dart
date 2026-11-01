@@ -9,6 +9,7 @@ import 'package:anx_reader/providers/tb_groups.dart';
 import 'package:anx_reader/widgets/bookshelf/book_folder.dart';
 import 'package:anx_reader/widgets/bookshelf/book_opened_folder.dart';
 import 'package:flutter/material.dart';
+import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +41,8 @@ Widget app(Widget child, {BookList? books}) => ProviderScope(
       child: provider.ChangeNotifierProvider.value(
         value: Prefs(),
         child: MaterialApp(
+          scrollBehavior: const AppScrollBehavior().copyWith(
+              physics: const BouncingScrollPhysics()),
           locale: const Locale('en'),
           supportedLocales: L10n.supportedLocales,
           localizationsDelegates: const [

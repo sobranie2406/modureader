@@ -24,6 +24,14 @@ def validate(directory, tag, include_harmony=False, targets='all'):
     if not selected or any(t not in packages for t in selected) or len(set(selected)) != len(selected):
         raise ValueError('Invalid release targets')
     expected = {packages[t] for t in selected}
+    universal = tuple(map(int, version.split('-', 1)[0].split('.'))) >= (1, 3, 6)
+    pairs = []
+    if universal:
+        for platform, suffix in [('macos', '.dmg'), ('windows', '-setup.exe')]:
+            if all(f'{platform}-{arch}' in selected for arch in ('arm64', 'x64')):
+                name = f'Modu-{version}-{platform}-universal{suffix}'
+                expected.add(name)
+                pairs += [(name, packages[f'{platform}-{arch}']) for arch in ('arm64', 'x64')]
     files = {p.name for p in Path(directory).iterdir() if p.is_file()}
     complete = expected | {name + '.sha256' for name in expected}
     if files != complete:
@@ -37,6 +45,11 @@ def validate(directory, tag, include_harmony=False, targets='all'):
             actual = hashlib.file_digest(source, 'sha256').hexdigest()
         if checksum != [actual, name]:
             raise ValueError(f'Checksum mismatch: {name}')
+    for universal_name, legacy_name in pairs:
+        a = (Path(directory) / (universal_name + '.sha256')).read_text().split()[0]
+        b = (Path(directory) / (legacy_name + '.sha256')).read_text().split()[0]
+        if a != b:
+            raise ValueError('Legacy updater copy differs from universal package')
     return len(expected)
 
 

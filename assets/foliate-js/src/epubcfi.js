@@ -194,7 +194,7 @@ const getChildNodes = (node, filter) => {
         .filter(node => isTextNode(node) || isElementNode(node))
     return nodes.map(node => {
         // Reader-owned inline layout runs are not part of the publication CFI.
-        if (node.__moduPageRun === true) return getChildNodes(node, filter)
+        if ((node.__moduPageRun === true || node.__moduTextFilter === true)) return getChildNodes(node, filter)
         if (!filter) return node
         const accept = filter(node)
         if (accept === NodeFilter.FILTER_REJECT) return null
@@ -261,13 +261,13 @@ const partsToNode = (node, parts, filter) => {
 }
 
 const nodeToParts = (node, offset, filter) => {
-    if (node.__moduPageRun === true) {
+    if ((node.__moduPageRun === true || node.__moduTextFilter === true)) {
         offset = offset ? node.textContent.length : 0
         node = node.firstChild
     }
     const { id } = node
     let { parentNode } = node
-    while (parentNode.__moduPageRun === true) parentNode = parentNode.parentNode
+    while ((parentNode.__moduPageRun === true || parentNode.__moduTextFilter === true)) parentNode = parentNode.parentNode
     const indexed = indexChildNodes(parentNode, filter)
     const index = indexed.findIndex(x =>
         Array.isArray(x) ? x.some(x => x === node) : x === node)

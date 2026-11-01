@@ -276,10 +276,11 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('flutter_tts'),
         (call) async {
-      if (call.method == 'speak')
+      if (call.method == 'speak') {
         spoken.add(call.arguments is String
             ? call.arguments as String
             : call.arguments['text'] as String);
+      }
       return 1;
     });
     addTearDown(() => messenger.setMockMethodCallHandler(

@@ -111,9 +111,14 @@ void main() {
   });
 
   test('all named presets compile and round-trip without code loss', () {
-    expect(customCssTemplates, hasLength(13));
+    expect(customCssTemplates, hasLength(14));
     for (final profile in customCssTemplates) {
-      expect(profile.compiledCss, isNotEmpty, reason: profile.name);
+      if (profile.isFilter) {
+        expect(profile.pattern, isNotEmpty);
+        expect(profile.filterMode, 'text');
+      } else {
+        expect(profile.compiledCss, isNotEmpty, reason: profile.name);
+      }
       final restored = CustomCssProfile.fromJson(profile.toJson());
       expect(restored.compiledCss, profile.compiledCss);
     }

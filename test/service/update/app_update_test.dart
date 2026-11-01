@@ -81,6 +81,62 @@ class ControlledTransport extends UpdateTransport {
 }
 
 void main() {
+  for (final platform in ['macos', 'windows']) {
+    for (final arch in ['arm64', 'x64']) {
+      test('$platform $arch prefers universal and still reads old releases',
+          () {
+        final suffix = platform == 'macos' ? '.dmg' : '-setup.exe';
+        final legacy = 'Modu-1.3.6-$platform-$arch$suffix';
+        final universal = 'Modu-1.3.6-$platform-universal$suffix';
+        Map<String, Object> entry(String name) => {
+              'name': name,
+              'state': 'uploaded',
+              'size': 1024,
+              'digest': 'sha256:${'a' * 64}',
+              'browser_download_url': '$moduReleasePage/download/v1.3.6/$name',
+            };
+        final release = <String, dynamic>{
+          'tag_name': 'v1.3.6',
+          'draft': false,
+          'prerelease': false,
+          'assets': [entry(legacy), entry(universal)],
+        };
+        for (final mirror in [true, false]) {
+          expect(
+              UpdateRelease.parse(release,
+                      platform: platform,
+                      abi: '${platform}_$arch',
+                      fromMirror: mirror)
+                  .asset
+                  ?.name,
+              universal);
+        }
+        release['assets'] = [entry(legacy)];
+        expect(
+            UpdateRelease.parse(release,
+                    platform: platform, abi: '${platform}_$arch')
+                .asset
+                ?.name,
+            legacy);
+        release['assets'] = [
+          entry(legacy),
+          {...entry(universal), 'digest': 'invalid'}
+        ];
+        expect(
+            UpdateRelease.parse(release,
+                    platform: platform, abi: '${platform}_$arch')
+                .asset,
+            isNull);
+        release['assets'] = [entry(universal), entry(universal)];
+        expect(
+            UpdateRelease.parse(release,
+                    platform: platform, abi: '${platform}_$arch')
+                .asset,
+            isNull);
+      });
+    }
+  }
+
   test('semantic version ordering, prerelease upgrade, no build-only downgrade',
       () {
     expect(isNewerRelease('1.0.10', '1.0.9+10026'), isTrue);

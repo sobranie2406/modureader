@@ -3,7 +3,7 @@
 const documents = new WeakMap()
 const scrollLines = new WeakMap()
 const spacingStyles = new WeakMap()
-const excluded = 'script, style, template, table, pre, ruby, math, svg, figure'
+const excluded = 'script, style, template, table, pre, ruby, math, svg, figure, [data-modu-text-filter]'
 const noteSelector = 'sup, sub, [role="doc-noteref"], [epub\\:type~="noteref"], img[zy-footnote], img.epub-footnote, img.epub-footnote1'
 const isNote = el => el.closest(noteSelector)
 const runStyle = 'display:inline!important;position:relative!important;top:0px!important;padding:0!important;margin:0!important;border:0!important;font:inherit!important;'

@@ -1,3 +1,4 @@
+import 'package:anx_reader/models/custom_css_profile.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:anx_reader/service/installed_fonts.dart';
@@ -1038,6 +1039,8 @@ void main() {
   testWidgets(
       'embedded reflow delegates menus to ebook host without duplicate chrome',
       (tester) async {
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig = List.filled(9, 3);
     var opened = 0, closed = 0;
     final panels = <Widget>[];
     await open(tester,
@@ -1423,7 +1426,51 @@ void main() {
     return render.localToGlobal(caret.center + const Offset(2, 0));
   }
 
-  testWidgets('single text tap opens the shared menu once', (tester) async {
+  testWidgets(
+      'reflow templates apply CSS and skip filtered speech without changing stored text',
+      (tester) async {
+    await Prefs().saveCustomCssProfile(
+        0, const CustomCssProfile(pattern: '正文', filterMode: 'text'));
+    await Prefs().saveCustomCssProfile(1,
+        const CustomCssProfile(css: 'p { font-size: 28px; color: #123456; }'));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 0, enabled: true, indices: [0, 1]));
+    await open(tester);
+    final field =
+        tester.widget<TextField>(find.byKey(const ValueKey('reflow-text')));
+    expect(field.style!.fontSize, 28);
+    expect(field.style!.color, const Color(0xff123456));
+    expect(field.controller!.text, contains('正文'));
+    expect(key.currentState!.narrationSource!.currentText(),
+        isNot(contains('正文')));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 0, enabled: false, indices: [0, 1]));
+    await tester.pumpAndSettle();
+    expect(key.currentState!.narrationSource!.currentText(), contains('正文'));
+  });
+
+  testWidgets('reflow taps turn pages using configured previous and next zones',
+      (tester) async {
+    await open(tester);
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig = List.filled(9, 1);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(store.latest.containsKey('1'), true);
+    Prefs().customPageTurnConfig = List.filled(9, 2);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    final field =
+        tester.widget<TextField>(find.byKey(const ValueKey('reflow-text')));
+    expect(field.controller!.text, contains('第0页'));
+  });
+
+  testWidgets('single text tap respects a custom menu zone once',
+      (tester) async {
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig = List.filled(9, 3);
     var opened = 0;
     await open(tester, openReaderMenu: () => opened++);
     await tester.tapAt(textPoint(tester, 1));

@@ -31,6 +31,10 @@ String dictionaryError(BuildContext context, Object error) {
         'MDX 暂支持不超过 256 MiB 的文件，请选择较小的字典。',
         'MDX files are currently limited to 256 MiB. Please choose a smaller dictionary.'
       ),
+    'mddSize' => (
+        '单个 MDD 资源文件不能超过 2 GiB。已有字典未改变。',
+        'Each MDD resource file is limited to 2 GiB. Existing dictionaries are unchanged.'
+      ),
     'size' || 'zipSize' => (
         '字典超过导入大小限制，请选择较小的字典。',
         'Dictionary exceeds the import size limit. Please choose a smaller dictionary.'

@@ -64,6 +64,10 @@ class CustomCssTransfer {
               !const ['all', 'title', 'body'].contains(entry['scope']))) {
         throw const FormatException('Invalid highlight rule');
       }
+      if (entry.containsKey('filterMode') &&
+          !const ['text', 'paragraph'].contains(entry['filterMode'])) {
+        throw const FormatException('Invalid text filter');
+      }
       if (entry.containsKey('visual') && entry['visual'] is! String) {
         throw const FormatException('Invalid visual CSS');
       }

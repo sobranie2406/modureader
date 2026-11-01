@@ -385,10 +385,12 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     RuntimeDiagnostics.record(RuntimeEvent.ttsPlay);
     // A media command must finish promptly, not hold its response open until
     // an entire book has finished. Later pause/stop remains authoritative.
-    unawaited(Future<void>.sync(() => resume
-            ? backend.resume()
-            : backend.speak(content: backend.pageSource?.currentText()))
-        .catchError((Object error) {
+    unawaited(Future<void>.sync(() async {
+      if (resume) return backend.resume();
+      final content = await backend.pageSource?.currentTextContinuous();
+      if (command != _transportCommand || !identical(tts, backend)) return;
+      await backend.speak(content: content);
+    }).catchError((Object error) {
       AnxLog.warning('TTS playback command failed: ${error.runtimeType}');
       RuntimeDiagnostics.record(RuntimeEvent.ttsFailed);
       if (command == _transportCommand && identical(tts, backend)) {

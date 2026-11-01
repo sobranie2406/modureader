@@ -4,6 +4,10 @@ import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/sync_direction.dart';
+import 'package:anx_reader/enums/sync_trigger.dart';
+import 'package:anx_reader/providers/current_reading.dart';
+import 'package:anx_reader/models/current_reading_state.dart';
+import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/providers/sync.dart';
 import 'package:anx_reader/service/sync/pending_auto_sync.dart';
 import 'package:anx_reader/service/sync/sync_client_factory.dart';
@@ -30,6 +34,8 @@ void main() {
   HttpOverrides? oldHttp;
   late Sync sync;
   var requests = 0;
+  var responseStatus = 503;
+  var disconnectOnRequest = false;
   var network = ['wifi'];
   const connectivity = MethodChannel('dev.fluttercommunity.plus/connectivity');
 
@@ -39,6 +45,9 @@ void main() {
     oldHttp = HttpOverrides.current;
     HttpOverrides.global = null;
     requests = 0;
+    responseStatus = 503;
+    disconnectOnRequest = false;
+    container.read(currentReadingProvider.notifier).finish();
     network = ['wifi'];
     directory = await Directory.systemTemp.createTemp('modu-auto-sync-');
     oldPaths = PathProviderPlatform.instance;
@@ -47,7 +56,8 @@ void main() {
     server.listen((request) async {
       requests++;
       // Exercise the real provider and transport without creating a cloud library.
-      request.response.statusCode = 503;
+      request.response.statusCode = responseStatus;
+      if (disconnectOnRequest) network = ['none'];
       await request.response.close();
     });
     SharedPreferences.setMockInitialValues({
@@ -73,6 +83,38 @@ void main() {
     PathProviderPlatform.instance = oldPaths;
     await server.close(force: true);
     await directory.delete(recursive: true);
+  });
+
+  test('PDF reader retries a real server failure exactly three times',
+      () async {
+    responseStatus = 405;
+    container.read(currentReadingProvider.notifier).start(CurrentReadingState(
+        book: Book.mock().copyWith(filePath: 'file/test.pdf')));
+    await sync.syncData(SyncDirection.both, null, immediate: true);
+    expect(requests, 4);
+    expect(container.read(syncProvider).isSyncing, false);
+    expect(PendingAutoSync(() => Prefs().prefs).pending, true);
+  });
+
+  test('reader losing its network after the first failure stops silently',
+      () async {
+    responseStatus = 405;
+    disconnectOnRequest = true;
+    container.read(currentReadingProvider.notifier).start(CurrentReadingState(
+        book: Book.mock().copyWith(filePath: 'file/test.epub')));
+    await sync.syncData(SyncDirection.both, null, immediate: true);
+    expect(requests, 1);
+    expect(PendingAutoSync(() => Prefs().prefs).pending, true);
+  });
+
+  test('manual reader synchronization without a connection makes no requests',
+      () async {
+    network = ['none'];
+    container.read(currentReadingProvider.notifier).start(CurrentReadingState(
+        book: Book.mock().copyWith(filePath: 'file/test.epub')));
+    await sync.syncData(SyncDirection.both, null, trigger: SyncTrigger.manual);
+    expect(requests, 0);
+    expect(container.read(syncProvider).isSyncing, false);
   });
 
   test('exit waits for saved progress, then probes without two-second debounce',

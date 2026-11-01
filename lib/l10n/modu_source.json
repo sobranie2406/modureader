@@ -1,4 +1,5 @@
 {
+  "ui_e7f97418": {"zh": "文字过滤", "en": "Text filter"},
   "ui_8b9f86e6": {"zh": "点击编辑可选择书籍打开方式、添加卡片；编辑时长按拖动卡片排序。", "en": "Tap Edit to choose how books open or add cards. While editing, hold and drag cards to reorder them."},
   "ui_1e3a3236": {"zh": "点击书籍时", "en": "When tapping a book"},
   "ui_ec75866a": {"zh": "直接阅读", "en": "Read directly"},

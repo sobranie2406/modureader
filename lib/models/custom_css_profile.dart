@@ -11,9 +11,13 @@ class CustomCssProfile {
       this.css = '',
       this.pattern = '',
       this.scope = 'all',
+      this.filterMode = '',
       this.visual});
   final String name;
   String localizedName(Locale locale) {
+    if (ModuStrings.isBundledText('文字过滤', name)) {
+      return ModuStrings.label(locale, '文字过滤', 'Text filter');
+    }
     for (final template in _legacyCssTemplates) {
       if (ModuStrings.isBundledText(template.name, name)) {
         return ModuStrings.label(locale, template.name, template.name);
@@ -25,6 +29,8 @@ class CustomCssProfile {
   final String css;
   final String pattern;
   final String scope;
+  final String filterMode;
+  bool get isFilter => filterMode.isNotEmpty;
   final CssVisualStyle? visual;
   String get compiledCss => compileCss();
   String compileCss({String fontOrigin = ''}) => [
@@ -33,7 +39,7 @@ class CustomCssProfile {
             '',
         css
       ].where((s) => s.trim().isNotEmpty).join('\n\n');
-  bool get isHighlight => pattern.isNotEmpty;
+  bool get isHighlight => pattern.isNotEmpty && !isFilter;
   bool get isEmpty =>
       name.isEmpty &&
       css.isEmpty &&
@@ -45,6 +51,7 @@ class CustomCssProfile {
         'css': css,
         'pattern': pattern,
         'scope': scope,
+        if (isFilter) 'filterMode': filterMode,
         if (visual != null) 'visual': visual!.encode()
       };
 
@@ -57,6 +64,9 @@ class CustomCssProfile {
           ? CssVisualStyle.decode(value['visual'] as String)
           : null,
       pattern: value['pattern'] is String ? value['pattern'] as String : '',
+      filterMode: const ['text', 'paragraph'].contains(value['filterMode'])
+          ? value['filterMode'] as String
+          : '',
       scope: const ['all', 'title', 'body'].contains(value['scope'])
           ? value['scope'] as String
           : 'all',
@@ -147,6 +157,7 @@ final customCssTemplates = [
         _ => const <String, Object>{},
       }),
     ),
+  const CustomCssProfile(name: '文字过滤', pattern: '要过滤的文字', filterMode: 'text'),
 ];
 
 class CustomCssSelection {

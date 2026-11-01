@@ -182,6 +182,6 @@ Modu is released under **GPL-3.0-or-later**, based on Anx Reader and incorporati
 
 [Project license](LICENSE) · [Anx Reader license](LICENSES/Anx-Reader-MIT.txt) · [ReadAny license](LICENSES/ReadAny-GPL-3.0-or-later.txt) · [Upstream and modifications](UPSTREAM.md) · [Third-party notices](NOTICE)
 
-## 1.3.5 updates
+## 1.3.6 updates
 
-Device-local reading popup height and opacity controls, improved resume synchronization and reading anchors, continuous PDF reflow narration, and removal of the unnecessary Windows startup location subscription.
+Universal Mac and Windows installers preserve older updater compatibility. Browse images across the book, filter matching text or paragraphs, apply supported reflow CSS and tap paging, and swipe through PDF pages again. Improved reader sync notices, dictionary resource imports and HarmonyOS bookshelf compatibility.

@@ -268,18 +268,48 @@ test('source-page arrows move only inside the enlarged crop and never change pag
     } finally {h.close()}
 });
 
-test('old swipe settings never turn original/scanned pages; short taps remain available', async () => {
+for (const [swipe, dx, dy, expected] of [
+    ['horizontal', -150, 0, 2], ['horizontal', 150, 0, 0],
+    ['reverse', -150, 0, 0], ['vertical', 0, -150, 2], ['tap', -150, 0, 1],
+]) test(`PDF single-page ${swipe} gesture (${dx},${dy}) reaches page ${expected}`, async () => {
     const h=harness();
     try {
-        await h.renderer.setPdfLayout({version:1,pages:{}},true);await h.renderer.goTo({index:0});
-        for(const swipe of ['horizontal','reverse','vertical']) {
-            h.renderer.setPdfView({zoom:1,display:{swipe}});
-            const doc=h.renderer.getContents()[0].doc;
-            const send=(type,points)=>{const e=new doc.defaultView.Event(type,{bubbles:true,cancelable:true});
-                Object.defineProperty(e,'touches',{value:points.map(([screenX,screenY])=>({screenX,screenY}))});doc.dispatchEvent(e);return e;};
-            send('touchstart',[[200,200]]);send('touchmove',[[50,50]]);send('touchend',[]);
-            await new Promise(resolve=>setImmediate(resolve));assert.equal(h.renderer.index,0);
+        await h.renderer.setPdfLayout({version:1,pages:{}},true);
+        await h.renderer.goTo({index:1});
+        await h.renderer.setPdfView({zoom:1,display:{swipe}});
+        const doc=h.renderer.getContents()[0].doc;
+        const send=(type,points)=>{const e=new doc.defaultView.Event(type,{bubbles:true,cancelable:true});
+            Object.defineProperty(e,'touches',{value:points.map(([screenX,screenY])=>({screenX,screenY}))});doc.dispatchEvent(e);return e;};
+        // A tap remains available to the normal click/page-region handler.
+        send('touchstart',[[200,200]]);
+        assert.equal(send('touchend',[]).defaultPrevented,false);
+        assert.equal(h.renderer.index,1);
+        send('touchstart',[[200,200]]);
+        send('touchmove',[[200+dx,200+dy]]);send('touchend',[]);
+        assert.equal(doc.dispatchEvent(new doc.defaultView.MouseEvent('click',
+            {bubbles:true,cancelable:true})),false,'swipe must not also trigger click paging');
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(h.renderer.index,expected);
+    } finally {h.close()}
+});
+
+test('PDF text selection keeps swipe gestures from turning a page', async () => {
+    const h=harness();
+    try {
+        await h.renderer.setPdfLayout({version:1,pages:{}},true);
+        await h.renderer.goTo({index:1});
+        const doc=h.renderer.getContents()[0].doc;
+        const range=doc.createRange();range.selectNodeContents(doc.querySelector('.textLayer span'));
+        doc.getSelection().addRange(range);
+        for(const [type,points] of [['touchstart',[[200,200]]],['touchmove',[[50,200]]],['touchend',[]]]) {
+            const e=new doc.defaultView.Event(type,{bubbles:true,cancelable:true});
+            Object.defineProperty(e,'touches',{value:points.map(([screenX,screenY])=>({screenX,screenY}))});
+            doc.dispatchEvent(e);
+            assert.equal(e.defaultPrevented,false);
         }
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(h.renderer.index,1);
+        assert.equal(doc.getSelection().toString(),'Original text');
     } finally {h.close()}
 });
 

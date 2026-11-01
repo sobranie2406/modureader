@@ -799,10 +799,23 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       ''');
   }
 
+  String? _appliedFilterSignature;
+
   void changeStyle(BookStyle? bookStyle) {
     if (mounted) setState(() {});
     styleTimer?.cancel();
-    styleTimer = Timer(const Duration(milliseconds: 300), () {
+    styleTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (!mounted) return;
+      final signature = jsonEncode(Prefs()
+          .textFiltersForBook(cssBookKey)
+          .map((p) => p.toJson())
+          .toList());
+      if (_appliedFilterSignature != null &&
+          _appliedFilterSignature != signature &&
+          _hasNarrationSession) {
+        await TtsHandler().stop();
+      }
+      _appliedFilterSignature = signature;
       if (!mounted) return;
       final bgimgUrl =
           readingBackgroundForDisplay(Prefs(), isDarkMode: isDarkMode);
@@ -845,6 +858,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         bgimgBlur: ${Prefs().bgimg.blur},
         bgimgOpacity: ${Prefs().bgimg.opacity},
         bgimgFit: '${Prefs().bgimgFit.code}',
+        customTextFilters: ${jsonEncode(Prefs().textFiltersForBook(cssBookKey).map((p) => p.toJson()).toList())},
         customCSS: ${jsonEncode(Prefs().customCssForBook(cssBookKey))},
         customHighlightRules: ${jsonEncode(Prefs().customHighlightRulesForBook(cssBookKey))},
         customCSSEnabled: ${Prefs().customCssSelection(cssBookKey).enabled},
@@ -2324,16 +2338,55 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     );
     controller.addJavaScriptHandler(
       handlerName: 'onImageClick',
-      callback: (args) {
+      callback: (args) async {
         if (!mounted || supportsDocumentImages) return;
-        String image = args[0];
-        Navigator.push(
+        final payload = args[0];
+        final image = payload is String ? payload : payload['image'] as String;
+        final token = payload is Map ? payload['token'] : null;
+        try {
+          await Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => ImageViewer(
-                      image: image,
-                      bookName: widget.book.title,
-                    )));
+              builder: (context) => ImageViewer(
+                image: image,
+                bookName: widget.book.title,
+                loadIndex: token == null
+                    ? null
+                    : () async {
+                        final result = await controller.callAsyncJavaScript(
+                          functionBody:
+                              'return await window.bookImageGalleryIndex(token);',
+                          arguments: {'token': token},
+                        );
+                        final value = result?.value;
+                        if (result?.error != null || value is! Map) {
+                          throw StateError('Image index unavailable');
+                        }
+                        return ImageGalleryIndex(value['count'] as int,
+                            value['initialIndex'] as int);
+                      },
+                loadImage: (index) async {
+                  final result = await controller.callAsyncJavaScript(
+                    functionBody:
+                        'return await window.bookImageGalleryImage(token, index);',
+                    arguments: {'token': token, 'index': index},
+                  );
+                  if (result?.error != null || result?.value is! String) {
+                    throw StateError('Book image unavailable');
+                  }
+                  return result!.value as String;
+                },
+              ),
+            ),
+          );
+        } finally {
+          if (mounted && token != null) {
+            await controller.callAsyncJavaScript(
+              functionBody: 'window.closeBookImageGallery(token);',
+              arguments: {'token': token},
+            );
+          }
+        }
       },
     );
     controller.addJavaScriptHandler(

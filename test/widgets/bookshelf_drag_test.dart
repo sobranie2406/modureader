@@ -193,6 +193,45 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('folder with many books can scroll to its last book',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await Prefs().prefs.setString('sortField', 'title');
+    await Prefs().prefs.setString('sortOrder', 'ascending');
+    final books = List.generate(6, (index) => book(index + 1, group: 2));
+    store.entries = [books];
+    await tester.pumpWidget(app(
+        Center(
+          child: SizedBox(
+            width: 160,
+            height: 320,
+            child: BookFolder(books: books),
+          ),
+        ),
+        books: store));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(BookFolder));
+    await tester.pumpAndSettle();
+    // Flutter OH otherwise wraps this already-scrollable grid in another view.
+    expect(tester.widget<AlertDialog>(find.byType(AlertDialog)).scrollable, false);
+    final scrollable = find.descendant(
+            of: find.byType(BookOpenedFolder),
+            matching: find.byType(Scrollable))
+        .first;
+    await tester.drag(scrollable, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    final position = tester.state<ScrollableState>(scrollable).position;
+    expect(position.pixels, greaterThan(0));
+    expect(item(6).hitTestable(), findsOneWidget);
+    expect(tester.getBottomLeft(item(6)).dy,
+        lessThanOrEqualTo(tester.getBottomLeft(scrollable).dy + 1));
+    expect(tester.takeException(), isNull);
+    expect(store.moves, isEmpty);
+  });
+
   testWidgets(
       'drop outside moves out, final drop on shelf target closes folder',
       (tester) async {

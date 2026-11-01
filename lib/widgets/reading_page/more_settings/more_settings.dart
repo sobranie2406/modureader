@@ -9,7 +9,7 @@ import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/more_settings/custom_css_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:anx_reader/service/ocr/document_text_style.dart';
-import 'reader_setting_availability.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import '../reader_settings_scroll_view.dart';
 import '../reader_menu_group.dart';
 
@@ -54,7 +54,7 @@ class _ReaderMoreSettingsState extends State<ReaderMoreSettings> {
 
   @override
   Widget build(BuildContext context) {
-    final bookKey = _document ? null : epubPlayerKey.currentState?.cssBookKey;
+    final bookKey = epubPlayerKey.currentState?.cssBookKey;
     return DefaultTabController(
       length: 4,
       initialIndex: widget.settings == ReadingSettings.theme ? 0 : 1,
@@ -86,10 +86,14 @@ class _ReaderMoreSettingsState extends State<ReaderMoreSettings> {
                   ReaderSettingsScrollView(
                       child: ReaderMenuGroup(
                     padding: const EdgeInsets.all(8),
-                    child: ReaderSettingAvailability(
-                        enabled: !_document,
-                        child: CustomCSSEditor(
-                            key: ValueKey(bookKey), bookKey: bookKey)),
+                    child: Column(children: [
+                      if (_document)
+                        Text(ModuStrings.text(
+                            context,
+                            '重排支持文字过滤和字体、字号、颜色、行距、字距、对齐等文字样式。代码仅适配 html、body、p、*；复杂选择器、图片布局和正则高亮暂不适用。',
+                            'Reflow supports text filters and basic text styles. CSS supports html, body, p and *. Complex selectors, image layout and regex highlights are not supported.')),
+                      CustomCSSEditor(key: ValueKey(bookKey), bookKey: bookKey),
+                    ]),
                   )),
                   ReaderSettingsScrollView(
                       child: OtherSettings(

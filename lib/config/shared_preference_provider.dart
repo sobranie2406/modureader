@@ -1863,7 +1863,10 @@ class Prefs extends ChangeNotifier {
   }
 
   double get bookCoverWidth {
-    return prefs.getDouble('bookCoverWidth') ?? 120;
+    // Harmony may reload integral doubles as ints after a process restart.
+    final value = prefs.get('bookCoverWidth');
+    if (value is! num || !value.isFinite) return 120;
+    return value.toDouble().clamp(80.0, 260.0);
   }
 
   bool get bookshelfListMode => prefs.getBool('bookshelfListMode') ?? false;
@@ -2514,13 +2517,23 @@ class Prefs extends ChangeNotifier {
     return customCssSelection(bookKey)
         .activeIndices
         .map((index) => profiles[index])
-        .where((p) => !p.isHighlight)
+        .where((p) => !p.isHighlight && !p.isFilter)
         // EPUB chapters have blob URLs; root-relative fonts cannot resolve
         // there. Resolve against this device's active local reader server.
         .map(
             (p) => p.compileCss(fontOrigin: 'http://127.0.0.1:$lastServerPort'))
         .where((css) => css.trim().isNotEmpty)
         .join('\n\n');
+  }
+
+  List<CustomCssProfile> textFiltersForBook([String? bookKey]) {
+    final selection = customCssSelection(bookKey);
+    if (!selection.enabled) return [];
+    final profiles = customCssProfiles;
+    return selection.activeIndices
+        .map((i) => profiles[i])
+        .where((p) => p.isFilter)
+        .toList();
   }
 
   List<Map<String, String>> customHighlightRulesForBook([String? bookKey]) {

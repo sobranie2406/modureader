@@ -25,6 +25,7 @@ import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/reading_sync_retry.dart';
 import 'package:anx_reader/service/sync/pending_auto_sync.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
@@ -53,6 +54,7 @@ import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/book.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -75,6 +77,8 @@ class Sync extends _$Sync {
   bool _pendingAutomatic = false;
   SyncDirection? _pendingManualDirection;
   final _autoStart = AutoSyncStartGate();
+  final _readingRetry = ReadingSyncRetry();
+  final _readingFeedback = ReadingSyncFeedback();
   final _pendingSync = PendingAutoSync(() => Prefs().prefs);
   Timer? _retryAutomatic;
   SyncClientBase? _automaticClient;
@@ -97,6 +101,7 @@ class Sync extends _$Sync {
 
   void pauseAutomaticSync() {
     _autoStart.invalidate();
+    _readingRetry.cancel();
     _pendingAutomatic = false;
     _retryAutomatic?.cancel();
     _retryAutomatic = null;
@@ -179,14 +184,27 @@ class Sync extends _$Sync {
       return false;
     }
 
+    if (_isReading) return _networkReady();
     if (!automatic &&
         Prefs().onlySyncWhenWifi &&
         !(await Connectivity().checkConnectivity())
             .contains(ConnectivityResult.wifi)) {
       throw const SyncFeedbackFailure(SyncFailureCode.wifiRequired);
     }
-
     return true;
+  }
+
+  bool get _isReading => ref.read(currentReadingProvider).isReading;
+
+  Future<bool> _networkReady() async {
+    try {
+      return syncNetworkAllowed(await Connectivity().checkConnectivity(),
+          onlyWifi: Prefs().onlySyncWhenWifi);
+    } catch (error) {
+      if (!_isReading) rethrow;
+      AnxLog.warning('Sync network check unavailable: ${error.runtimeType}');
+      return false;
+    }
   }
 
   Future<void> syncData(
@@ -212,12 +230,21 @@ class Sync extends _$Sync {
     final policy =
         scheduledClient is WebdavClient ? scheduledClient.requestPolicy : null;
     if (automatic && !_autoSyncAllowed) return;
-    try {
-      await policy?.prepare();
-    } catch (error) {
-      AnxToast.show(syncFailureMessage(error, chinese: _chineseFeedback));
+    if (_isReading && !await _networkReady()) {
       _retryPendingSyncLater();
       return;
+    }
+    (Object, StackTrace)? preparationFailure;
+    try {
+      await policy?.prepare();
+    } catch (error, stack) {
+      if (!_isReading) {
+        AnxToast.show(syncFailureMessage(error, chinese: _chineseFeedback));
+        _retryPendingSyncLater();
+        return;
+      }
+      // Report preparation failures through the same bounded reader retry cycle.
+      preparationFailure = (error, stack);
     }
     if (!identical(_automaticClient, scheduledClient) ||
         !identical(_automaticPolicy, policy)) {
@@ -226,6 +253,7 @@ class Sync extends _$Sync {
       _autoStart.invalidate();
       _automaticClient = scheduledClient;
       _automaticPolicy = policy;
+      _readingFeedback.reset();
     }
     if (automatic) {
       if (!_autoSyncAllowed) return;
@@ -267,8 +295,33 @@ class Sync extends _$Sync {
       if (!(shouldStart?.call() ?? true)) return;
       await _pendingSync.ready;
       final pendingRevision = _pendingSync.revision;
-      final completed = await _syncData(direction, ref,
-          trigger: trigger, shouldStart: shouldStart);
+      final generation = _autoStart.generation;
+      final identity = List<Object?>.of(scheduledClient?.syncIdentity ?? []);
+      bool stillAllowed() =>
+          (shouldStart?.call() ?? true) &&
+          identical(scheduledClient, _syncClient) &&
+          listEquals(identity, scheduledClient?.syncIdentity ?? []) &&
+          (!automatic ||
+              (_autoSyncAllowed && generation == _autoStart.generation));
+      final completed = await _readingRetry.run(
+        enabled: stillAllowed,
+        reading: () => _isReading,
+        networkReady: _networkReady,
+        policyDelay: () =>
+            policy?.automaticStartDelay(immediate: true) ?? Duration.zero,
+        synchronize: () async {
+          final failedPreparation = preparationFailure;
+          preparationFailure = null;
+          if (failedPreparation != null) {
+            Error.throwWithStackTrace(
+                failedPreparation.$1, failedPreparation.$2);
+          }
+          await policy?.prepare();
+          if (!stillAllowed()) return false;
+          return _syncData(direction, ref,
+              trigger: trigger, shouldStart: stillAllowed);
+        },
+      );
       if (completed) await _pendingSync.acknowledge(pendingRevision);
       RuntimeDiagnostics.record(
           completed ? RuntimeEvent.syncComplete : RuntimeEvent.syncPending,
@@ -281,12 +334,15 @@ class Sync extends _$Sync {
           'Sync incomplete: ${syncFailureDiagnostic(e)}, automatic=$automatic',
           null,
           stack);
-      // Intentional pause/cancellation is not a failed synchronization. Final
-      // automatic network failures are reported only after preflight retries.
+      // Intentional pause/cancellation is not a failed synchronization.
+      // Reader failures reach here only after the bounded reconciliation retries.
       if (automatic && (!_autoSyncAllowed || !(shouldStart?.call() ?? true))) {
         return;
       }
-      AnxToast.show(syncFailureMessage(e, chinese: _chineseFeedback));
+      if ((!_isReading || await _networkReady()) &&
+          _readingFeedback.failure(reading: _isReading)) {
+        AnxToast.show(syncFailureMessage(e, chinese: _chineseFeedback));
+      }
     } finally {
       _syncRunning = false;
       changeState(state.copyWith(isSyncing: false));
@@ -333,18 +389,13 @@ class Sync extends _$Sync {
     // Fail visibly without treating authentication/network errors as absence.
     final generation = _autoStart.generation;
     if (!await SyncPreflight().run(
-      automatic: trigger == SyncTrigger.auto,
+      automatic: trigger == SyncTrigger.auto && !_isReading,
       enabled: () =>
           (shouldStart?.call() ?? true) &&
           Prefs().webdavStatus &&
           (trigger != SyncTrigger.auto ||
               (_autoSyncAllowed && generation == _autoStart.generation)),
-      networkReady: () async {
-        final connections = await Connectivity().checkConnectivity();
-        return connections.any((value) => value != ConnectivityResult.none) &&
-            (!Prefs().onlySyncWhenWifi ||
-                connections.contains(ConnectivityResult.wifi));
-      },
+      networkReady: _networkReady,
       probe: client.ping,
     )) {
       return false;
@@ -450,7 +501,9 @@ class Sync extends _$Sync {
 
       // Backup cleanup is now handled by DatabaseSyncManager
 
-      if (!hasPendingChanges && Prefs().syncCompletedToast) {
+      if (!hasPendingChanges &&
+          _readingFeedback.success(
+              reading: _isReading, enabled: Prefs().syncCompletedToast)) {
         AnxToast.show(syncSuccessMessage(chinese: _chineseFeedback));
       }
       return !hasPendingChanges;

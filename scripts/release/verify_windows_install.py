@@ -102,22 +102,30 @@ def verify_unsupported_switch(installer, root):
     print('Windows installer rejects /S and /s without opening the wizard')
 
 
-def smoke(installer, arch):
+def smoke(installer, arch, previous_installer=None, native_launch=False):
     if os.environ.get('GITHUB_ACTIONS') != 'true' or os.name != 'nt':
         raise RuntimeError('This installation smoke test requires a disposable Windows CI runner')
     with tempfile.TemporaryDirectory(prefix='modu-install-check-') as tmp:
         root = Path(tmp)
         verify_unsupported_switch(installer, root)
         install = root / 'Modu'
+        if previous_installer is not None:
+            subprocess.run([str(previous_installer.resolve()), '/VERYSILENT', '/SUPPRESSMSGBOXES',
+                            '/NORESTART', '/SP-', f'/DIR={install}'], check=True, timeout=180)
+            verify_payload(install, 'windows', arch, installed=True)
+            # A marker in the existing installation must survive an in-place update.
+            (install / 'upgrade-preservation.txt').write_text('preserve-existing-installation')
         subprocess.run([str(installer.resolve()), '/VERYSILENT', '/SUPPRESSMSGBOXES',
                         '/NORESTART', '/SP-', f'/DIR={install}', f'/LOG={root / "install.log"}'],
                        check=True, timeout=180)
         verify_payload(install, 'windows', arch, installed=True)
         verify_crt(install, arch)
         verify_installed_version(install)
+        if previous_installer is not None and (install / 'upgrade-preservation.txt').read_text() != 'preserve-existing-installation':
+            raise RuntimeError('Upgrade removed existing installation data')
         if not (install / 'WINDOWS-RUNTIME.txt').is_file():
             raise RuntimeError('Missing VC++ redistributable provenance')
-        if arch == 'x64':
+        if arch == 'x64' or native_launch:
             verify_window_close(install / 'modu.exe')
         sentinel = root / 'user-library-must-survive.txt'
         sentinel.write_text('Synthetic user data outside program files')
@@ -142,5 +150,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('installer', type=Path)
     parser.add_argument('arch', choices=['x64', 'arm64'])
+    parser.add_argument('--previous-installer', type=Path)
+    parser.add_argument('--native-launch', action='store_true')
     args = parser.parse_args()
-    smoke(args.installer, args.arch)
+    smoke(args.installer, args.arch, args.previous_installer, args.native_launch)

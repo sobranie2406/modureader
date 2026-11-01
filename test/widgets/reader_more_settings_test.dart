@@ -83,7 +83,8 @@ void main() {
   });
 
   for (final size in [const Size(390, 844), const Size(1440, 900)]) {
-    testWidgets('OCR gear disables unsupported controls at $size',
+    testWidgets(
+        'OCR gear enables CSS while retaining unsupported-control guards at $size',
         (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
@@ -122,18 +123,13 @@ void main() {
       expect(saved.last.margin, size.width * .2);
       await tester.tap(find.text('CSS'));
       await tester.pumpAndSettle();
-      final disabled = tester.widget<ReaderSettingAvailability>(find
-          .ancestor(
+      expect(find.byType(CustomCSSEditor), findsOneWidget);
+      expect(
+          find.ancestor(
               of: find.byType(CustomCSSEditor),
-              matching: find.byType(ReaderSettingAvailability))
-          .first);
-      expect(disabled.enabled, false);
-      final focus = tester.widget<ExcludeFocus>(find
-          .ancestor(
-              of: find.byType(CustomCSSEditor),
-              matching: find.byType(ExcludeFocus))
-          .first);
-      expect(focus.excluding, true);
+              matching: find.byType(ReaderSettingAvailability)),
+          findsNothing);
+      expect(find.byKey(const ValueKey('apply-css-13')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

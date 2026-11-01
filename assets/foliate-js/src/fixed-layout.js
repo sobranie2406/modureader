@@ -455,7 +455,7 @@ export class FixedLayout extends HTMLElement {
             this.#render()
             this.#attachPdfPan(frame.iframe.contentDocument)
             attachDocumentGestures(frame.iframe.contentDocument,
-                () => ({...this.#pdfView, display: {...this.#pdfView.display, swipe: 'tap', swipeMenu: false}}),
+                () => ({...this.#pdfView, display: {...this.#pdfView.display, swipeMenu: false}}),
                 direction => direction > 0 ? this.next() : this.prev(),
                 () => this.dispatchEvent(new CustomEvent('document-menu')))
             this.dispatchEvent(new CustomEvent('load', { detail: { doc: frame.iframe.contentDocument, index: page } }))

@@ -126,6 +126,8 @@ String generateUrl(
     // DOM events. EPUB sanitization/CSP remains controlled solely by allowScript.
     'readerScriptEvents':
         AnxPlatform.isMacOS || AnxPlatform.isIOS || AnxPlatform.isLinux,
+    'customTextFilters':
+        Prefs().textFiltersForBook(cssBookKey).map((p) => p.toJson()).toList(),
     'customCSS': Prefs().customCssForBook(cssBookKey),
     'customHighlightRules': Prefs().customHighlightRulesForBook(cssBookKey),
     'customCSSEnabled': Prefs().customCssSelection(cssBookKey).enabled,

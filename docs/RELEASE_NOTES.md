@@ -1,51 +1,65 @@
-# Modu 1.3.5
+# Modu 1.3.6
 
-Build / 构建：**10167** · Stable / 正式版
+Build / 构建：**10168** · Stable / 正式版
 
 ### English
 
-- Feat(reader): Add device-local popup height limits (40–80%, default 80%) and reading popup opacity (20–100%, default 100%); E-Ink mode keeps popups opaque.
+- Feat(desktop): Provide a universal macOS DMG and a Windows installer that selects the native x64/ARM64 payload; keep separate Linux packages and compatible filenames for older updaters.
 
-- Fix(reader): Prevent clipping in narration controls and nested reading menus; keep narration and zoom floating bars at their original opacity.
+- Feat(reader): Swipe through other images in the book from the enlarged image viewer, retaining zoom and sharing.
 
-- Fix(sync): Refresh retained readers after unlocking and apply newer synchronized page and paused narration positions.
+- Feat(reader): Add text-filter profiles alongside CSS presets: hide matching text or its whole paragraph and skip filtered content during narration.
 
-- Fix(sync): Save the visible page anchor when leaving ordinary reading; preserve resumable narration anchors and highlights without starting playback or initializing an unconfigured engine.
+- Feat(reader): Apply supported font, spacing, color and alignment CSS settings to PDF/OCR reflow, and turn reflow pages using the configured tap regions.
 
-- Feat(tts): Continue PDF reflow narration onto the next original page, preferring cached and corrected text and waiting for extraction or OCR when needed; PDF narration remains session-only.
+- Fix(pdf): Restore single-finger swipe paging in unzoomed single-page reading while preserving enlarged-page panning, pinch zoom and text selection.
 
-- Fix(tts): Restore playback from paused vivo/iQOO media notifications.
+- Fix(sync): Keep success notices silent in every reader; retry failed sync three times before one notice with the reason, and silently defer offline or Wi-Fi-restricted attempts. Other screens retain their notices.
 
-- Fix(windows): Remove the permission plugin’s unnecessary startup location subscription.
+- Fix(dictionary): Allow MDD resource packages up to 2 GiB while retaining the 256 MiB MDX text limit and import validation.
 
-- Chore(android): Remove the obsolete all-files access request and block its inclusion by transitive dependencies; retain system document-picker exports.
+- Fix(bookshelf): Restore scrolling to the last row of HarmonyOS book folders ([#65](https://github.com/sobranie2406/modureader/issues/65)). Thanks [@zggnice](https://github.com/zggnice) for the report.
 
-- Fix(appearance): Use fixed 50% opacity for transient messages, independently of reading popup settings.
+- Fix(appearance): Accept integer-valued cover widths after restart and recover invalid values, preventing blank bookshelf and appearance pages ([#67](https://github.com/sobranie2406/modureader/issues/67)). Thanks [@zggnice](https://github.com/zggnice).
+
+- Fix(history): Keep wide-screen reading-history content aligned to the top.
+
+- Feat(update): Show all intervening stable-version changes when upgrading across multiple versions.
+
+- Chore(settings): Remove the ANX-backup import entry from Advanced settings.
 
 ### 简体中文
 
-- Feat(reader): 新增本机阅读弹窗高度上限（40～80%，默认 80%）和阅读弹出界面不透明度（20～100%，默认 100%）；电子墨水模式保持完全不透明。
+- Feat(desktop): macOS 改为 Intel／Apple Silicon 通用 DMG，Windows 改为自动选择 x64／ARM64 的统一安装包；Linux 保持分架构，保留旧版自动更新兼容文件名。
 
-- Fix(reader): 修复朗读调节控件与下级阅读菜单遮挡、裁切，朗读浮动条和缩放浮动条保留原有不透明度。
+- Feat(reader): 放大书中图片后可左右滑动浏览其他图片，保留缩放与分享。
 
-- Fix(sync): 锁屏恢复到未退出的阅读界面后触发同步，跳转到较新的页面及暂停朗读位置。
+- Feat(reader): CSS 方案中新增文字过滤模板，可隐藏匹配文字或所在整段，朗读同步跳过过滤内容。
 
-- Fix(sync): 普通阅读退出时保存当前页位置，有朗读记录时保留朗读起点与高亮；恢复同步状态不自动播放，也不初始化未配置的朗读引擎。
+- Feat(reader): PDF／OCR 重排支持适用的字号、间距、配色与对齐 CSS 设置，并可按已配置的点击区域翻页。
 
-- Feat(tts): PDF 重排朗读到页末自动翻到下一原始页继续，优先使用缓存及校对文字，缺失时等待提取或 OCR；PDF 不保存跨会话朗读断点。
+- Fix(pdf): 恢复 PDF 单页未放大时的单指滑动翻页，保留放大平移、双指缩放及划词选择。
 
-- Fix(tts): 修复 vivo／iQOO 通知栏暂停后点击三角播放按钮无法继续的问题。
+- Fix(sync): 所有阅读界面隐藏同步成功提示；失败后再重试 3 次，仍失败仅提醒一次并附原因；断网或不满足仅 Wi-Fi 条件时静默跳过，其他界面提示照旧。
 
-- Fix(windows): 移除 Windows 权限插件在启动时自动订阅位置变化的多余行为。
+- Fix(dictionary): MDD 资源包导入上限提高至 2 GiB，保留 MDX 正文 256 MiB 上限及导入校验。
 
-- Chore(android): 删除遗留的所有文件访问权限申请并阻止依赖引入该权限，保留系统文件选择器导出。
+- Fix(bookshelf): 修复鸿蒙书架分组无法滚动到末行（[#65](https://github.com/sobranie2406/modureader/issues/65)）。感谢 [@zggnice](https://github.com/zggnice) 反馈。
 
-- Fix(appearance): 短时提示统一使用固定 50% 不透明度，不随阅读弹窗设置变化。
+- Fix(appearance): 兼容重启后以整数读取的封面宽度，并为异常值提供兜底，避免书架和外观页面空白（[#67](https://github.com/sobranie2406/modureader/issues/67)）。感谢 [@zggnice](https://github.com/zggnice)。
+
+- Fix(history): 阅读历史在宽屏下保持顶部对齐。
+
+- Feat(update): 跨版本升级后汇总展示原版本至当前版本之间的正式版更新说明。
+
+- Chore(settings): 移除高级设置中的 ANX 备份导入入口。
 
 ### Downloads / 下载
 
-Android ARM64 · iOS ARM64 · macOS / Windows / Linux ARM64 & x64 · HarmonyOS ARM64. Every package includes a SHA-256 sidecar. / 每个安装包均提供 SHA-256 校验文件。
+Android ARM64 · iOS ARM64 · macOS Universal (Intel + Apple Silicon) · Windows Universal (x64 + ARM64) · Linux x64 / ARM64 · HarmonyOS ARM64.
 
-iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing without notarization; Windows has no commercial Authenticode signature. / iOS IPA 与鸿蒙 HAP 需自行签名；macOS 为临时签名、未公证，Windows 无商业 Authenticode 签名。
+Use the `macos-universal.dmg` and `windows-universal-setup.exe` downloads. The four architecture-named Mac/Windows files are byte-identical compatibility copies for older updaters. Seven primary packages plus four compatibility copies; every file has a SHA-256 sidecar. / Mac 与 Windows 请选择名称含 `universal` 的安装包。另保留四个按架构命名的兼容文件供旧版自动更新，内容与对应统一包完全相同。共七个主要安装包及四个兼容副本，均提供 SHA-256 校验文件。
 
-[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.5) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.5/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.5/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.5/NOTICE)
+iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing without notarization; Windows has no commercial Authenticode signature and requires WebView2. Linux DEB targets Debian 13. / iOS IPA 与鸿蒙 HAP 需自行签名；macOS 为临时签名、未公证；Windows 无商业 Authenticode 签名，需 WebView2；Linux DEB 面向 Debian 13。
+
+[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.6) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.6/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.6/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.6/NOTICE)

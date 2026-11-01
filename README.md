@@ -204,6 +204,6 @@
 
 [项目许可](LICENSE) · [Anx Reader 许可](LICENSES/Anx-Reader-MIT.txt) · [ReadAny 许可](LICENSES/ReadAny-GPL-3.0-or-later.txt) · [上游与修改说明](UPSTREAM.md) · [第三方声明](NOTICE)
 
-## 1.3.5 更新
+## 1.3.6 更新
 
-阅读弹窗支持本机高度与不透明度设置；改进锁屏恢复同步和阅读位置记忆，PDF 重排支持跨页连续朗读，并移除 Windows 启动时多余的定位监听。
+Mac 通用版与 Windows 统一安装包兼容旧版自动更新；支持书中图片连续浏览、文字／整段过滤、重排 CSS 和点击翻页，恢复 PDF 滑动翻页，并改进阅读同步提示、字典资源导入及鸿蒙书架兼容。

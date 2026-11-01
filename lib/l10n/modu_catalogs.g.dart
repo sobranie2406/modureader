@@ -2,6 +2,7 @@
 
 const moduCatalogs = <String, Map<String, String>>{
   "ar": {
+    "ui_e7f97418": "تصفية النص",
     "ui_8b9f86e6":
         "انقر على تحرير لاختيار طريقة فتح الكتب أو إضافة بطاقات. أثناء التحرير، اضغط مطولًا واسحب البطاقات لإعادة ترتيبها.",
     "ui_1e3a3236": "عند النقر على كتاب",
@@ -1125,6 +1126,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "في وضع الصفحات، عطّل التنقل بالسحب وإيماءات السحب العمودي. أوقف هذا الخيار للسماح بالسحب. لا يتغير تحديد النص أو التظليل السريع أو وضع التمرير.",
   },
   "de": {
+    "ui_e7f97418": "Textfilter",
     "ui_8b9f86e6":
         "Tippe auf Bearbeiten, um die Buchaktion auszuwählen oder Karten hinzuzufügen. Halte und ziehe Karten im Bearbeitungsmodus zum Umsortieren.",
     "ui_1e3a3236": "Beim Antippen eines Buches",
@@ -2321,6 +2323,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "Im Seitenmodus werden Wisch-, Zieh- und Auf-/Abziehgesten zum Navigieren deaktiviert. Ausschalten, um durch Wischen umzublättern. Textauswahl, Schnellmarkierung und Scroll-Lesemodus bleiben unverändert.",
   },
   "en": {
+    "ui_e7f97418": "Text filter",
     "ui_8b9f86e6":
         "Tap Edit to choose how books open or add cards. While editing, hold and drag cards to reorder them.",
     "ui_1e3a3236": "When tapping a book",
@@ -3464,6 +3467,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "In page mode, disable swipe navigation and pull gestures. Turn off to allow swipes. Text selection, quick mark and scrolling mode are unchanged.",
   },
   "es": {
+    "ui_e7f97418": "Filtro de texto",
     "ui_8b9f86e6":
         "Toca Editar para elegir cómo abrir los libros o añadir tarjetas. Al editar, mantén pulsadas y arrastra las tarjetas para reordenarlas.",
     "ui_1e3a3236": "Al tocar un libro",
@@ -4656,6 +4660,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "En modo paginado, desactiva la navegación al deslizar, arrastrar y tirar hacia arriba o abajo. Desactiva la opción para permitir pasar páginas deslizando. La selección de texto, el marcado rápido y el modo de lectura por desplazamiento no cambian.",
   },
   "fr": {
+    "ui_e7f97418": "Filtre de texte",
     "ui_8b9f86e6":
         "Touchez Modifier pour choisir comment ouvrir les livres ou ajouter des cartes. En mode édition, maintenez et faites glisser les cartes pour les réorganiser.",
     "ui_1e3a3236": "Au toucher d’un livre",
@@ -5855,6 +5860,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "En mode paginé, désactive la navigation par balayage, glissement et gestes de traction vers le haut ou le bas. Désactivez l’option pour autoriser le balayage. La sélection de texte, le marquage rapide et la lecture par défilement restent inchangés.",
   },
   "it": {
+    "ui_e7f97418": "Filtro del testo",
     "ui_8b9f86e6":
         "Tocca Modifica per scegliere come aprire i libri o aggiungere schede. Durante la modifica, tieni premute e trascina le schede per riordinarle.",
     "ui_1e3a3236": "Al tocco di un libro",
@@ -7043,6 +7049,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "In modalità pagina, disattiva la navigazione a scorrimento e i gesti di trascinamento verticale. Disattiva l'opzione per consentire lo scorrimento. Selezione del testo, evidenziazione rapida e modalità di lettura a scorrimento restano invariate.",
   },
   "ja": {
+    "ui_e7f97418": "文字フィルター",
     "ui_8b9f86e6":
         "編集をタップすると、本の開き方の選択やカードの追加ができます。編集中にカードを長押ししてドラッグすると並べ替えられます。",
     "ui_1e3a3236": "本をタップしたとき",
@@ -8064,6 +8071,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "有効にするとページモードでスワイプやドラッグによるページ移動、上下のプル操作を無効にします。オフでスワイプ移動を許可します。文字選択、クイックマーク、スクロール読書モードには影響しません。",
   },
   "ko": {
+    "ui_e7f97418": "텍스트 필터",
     "ui_8b9f86e6":
         "편집을 탭하여 책을 여는 방법을 선택하거나 카드를 추가하세요. 편집 중 카드를 길게 눌러 끌면 순서를 바꿀 수 있습니다.",
     "ui_1e3a3236": "책을 탭할 때",
@@ -9100,6 +9108,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "켜면 페이지 모드에서 밀기나 드래그로 페이지를 넘기거나 위아래 당기기 동작을 할 수 없습니다. 끄면 밀어서 넘길 수 있습니다. 글 선택, 빠른 표시, 스크롤 읽기 모드에는 영향을 주지 않습니다.",
   },
   "pt": {
+    "ui_e7f97418": "Filtro de texto",
     "ui_8b9f86e6":
         "Toque em Editar para escolher como abrir os livros ou adicionar cartões. Durante a edição, mantenha os cartões premidos e arraste-os para reordenar.",
     "ui_1e3a3236": "Ao tocar num livro",
@@ -10283,6 +10292,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "No modo de páginas, desativa a navegação por deslizamento e os gestos de puxar. Desative a opção para permitir deslizamentos. A seleção de texto, a marcação rápida e o modo de rolagem permanecem inalterados.",
   },
   "ro": {
+    "ui_e7f97418": "Filtru de text",
     "ui_8b9f86e6":
         "Atinge Editează pentru a alege cum se deschid cărțile sau pentru a adăuga carduri. În timpul editării, ține apăsat și trage cardurile pentru a le reordona.",
     "ui_1e3a3236": "La atingerea unei cărți",
@@ -11456,6 +11466,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "În modul paginat, dezactivează navigarea prin glisare și gesturile de tragere verticală. Dezactivează opțiunea pentru a permite glisarea. Selecția textului, marcarea rapidă și modul de derulare rămân neschimbate.",
   },
   "ru": {
+    "ui_e7f97418": "Фильтр текста",
     "ui_8b9f86e6":
         "Нажмите «Изменить», чтобы выбрать способ открытия книг или добавить карточки. В режиме редактирования удерживайте и перетаскивайте карточки для изменения порядка.",
     "ui_1e3a3236": "При нажатии на книгу",
@@ -12629,6 +12640,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "При включении в страничном режиме отключаются перелистывание свайпом, перетаскиванием и жесты вытягивания вверх/вниз. Выключите для свайпов. Выделение текста, быстрые отметки и режим прокрутки не меняются.",
   },
   "tr": {
+    "ui_e7f97418": "Metin filtresi",
     "ui_8b9f86e6":
         "Kitapların nasıl açılacağını seçmek veya kart eklemek için Düzenle’ye dokunun. Düzenleme sırasında kartları basılı tutup sürükleyerek sıralayın.",
     "ui_1e3a3236": "Bir kitaba dokununca",
@@ -13795,6 +13807,7 @@ const moduCatalogs = <String, Map<String, String>>{
         "Sayfa modunda kaydırarak gezinmeyi ve çekme hareketlerini devre dışı bırakır. Kaydırmaya izin vermek için kapatın. Metin seçimi, hızlı işaretleme ve kaydırma modu değişmez.",
   },
   "zh-CN": {
+    "ui_e7f97418": "文字过滤",
     "ui_8b9f86e6": "点击编辑可选择书籍打开方式、添加卡片；编辑时长按拖动卡片排序。",
     "ui_1e3a3236": "点击书籍时",
     "ui_ec75866a": "直接阅读",
@@ -14767,6 +14780,7 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "开启后，分页模式下滑动、拖动不翻页，也不触发上下拉手势；关闭后可滑动翻页。不影响选词、快速标记和滚动阅读模式。",
   },
   "zh-LZH": {
+    "ui_e7f97418": "文字過濾",
     "ui_8b9f86e6": "點編輯可擇開書之法、增卡；編輯時長按拖曳以易其序。",
     "ui_1e3a3236": "點書時",
     "ui_ec75866a": "徑讀",
@@ -15731,6 +15745,7 @@ const moduCatalogs = <String, Map<String, String>>{
     "ui_fff6666": "啟用後，分頁模式之滑動、拖動不翻頁，亦不觸上下拉手勢；閉之可滑動翻頁。不涉選詞、快速標記及滾動閱讀模式。",
   },
   "zh-TW": {
+    "ui_e7f97418": "文字過濾",
     "ui_8b9f86e6": "點擊編輯可選擇書籍開啟方式、加入卡片；編輯時長按拖曳卡片排序。",
     "ui_1e3a3236": "點擊書籍時",
     "ui_ec75866a": "直接閱讀",
@@ -16704,6 +16719,7 @@ const moduCatalogs = <String, Map<String, String>>{
 };
 
 const moduSourceKeys = <String, String>{
+  "文字过滤": "ui_e7f97418",
   "点击编辑可选择书籍打开方式、添加卡片；编辑时长按拖动卡片排序。": "ui_8b9f86e6",
   "点击书籍时": "ui_1e3a3236",
   "直接阅读": "ui_ec75866a",
