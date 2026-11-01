@@ -23,9 +23,6 @@ def create_manifest(release):
         for arch in ("arm64", "x64")
         if platform != "android" or arch == "arm64"
     } | {f"Modu-{version}-ios-arm64.ipa"}
-    universal = tuple(map(int, version.split('.'))) >= (1, 3, 6)
-    if universal:
-        names |= {f'Modu-{version}-macos-universal.dmg', f'Modu-{version}-windows-universal-setup.exe'}
     assets = []
     seen = set()
     for asset in release.get("assets", []):
@@ -45,15 +42,7 @@ def create_manifest(release):
         assets.append(dict(name=name, state="uploaded", size=size,
                            digest=digest.lower(), browser_download_url=url))
     if seen != names:
-        raise ValueError("All verified platform installers and compatibility copies are required")
-    if universal:
-        by_name = {a['name']: a for a in assets}
-        for platform, suffix in [('macos', '.dmg'), ('windows', '-setup.exe')]:
-            canonical = by_name[f'Modu-{version}-{platform}-universal{suffix}']
-            for arch in ('arm64', 'x64'):
-                old = by_name[f'Modu-{version}-{platform}-{arch}{suffix}']
-                if (old['size'], old['digest']) != (canonical['size'], canonical['digest']):
-                    raise ValueError('Compatibility installer differs from universal installer')
+        raise ValueError("All eight verified platform installers are required")
     return dict(modu_update_schema=1, tag_name=tag, draft=False,
                 prerelease=False,
                 body=release.get("body") if isinstance(release.get("body"), str) else "",

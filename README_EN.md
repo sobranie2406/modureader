@@ -184,4 +184,4 @@ Modu is released under **GPL-3.0-or-later**, based on Anx Reader and incorporati
 
 ## 1.3.6 updates
 
-Universal Mac and Windows installers preserve older updater compatibility. Browse images across the book, filter matching text or paragraphs, apply supported reflow CSS and tap paging, and swipe through PDF pages again. Improved reader sync notices, dictionary resource imports and HarmonyOS bookshelf compatibility.
+Mac, Windows and Linux retain architecture-specific installers and existing update compatibility. Recover broken EPUB note links. Browse images across the book, filter matching text or paragraphs, apply supported reflow CSS and tap paging, and swipe through PDF pages again. Improved reader sync notices, dictionary resource imports and HarmonyOS bookshelf compatibility.

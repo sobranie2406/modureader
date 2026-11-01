@@ -4,7 +4,7 @@ Build / 构建：**10168** · Stable / 正式版
 
 ### English
 
-- Feat(desktop): Provide a universal macOS DMG and a Windows installer that selects the native x64/ARM64 payload; keep separate Linux packages and compatible filenames for older updaters.
+- Fix(reader): Recover verified self-referencing EPUB note links so popups show the actual annotation instead of the source paragraph, preserving text layout and reading positions.
 
 - Feat(reader): Swipe through other images in the book from the enlarged image viewer, retaining zoom and sharing.
 
@@ -30,7 +30,7 @@ Build / 构建：**10168** · Stable / 正式版
 
 ### 简体中文
 
-- Feat(desktop): macOS 改为 Intel／Apple Silicon 通用 DMG，Windows 改为自动选择 x64／ARM64 的统一安装包；Linux 保持分架构，保留旧版自动更新兼容文件名。
+- Fix(reader): 兼容部分 EPUB 注释链接错误指向自身的情况，核实配对后显示真正的注释，保留正文排版与阅读定位。
 
 - Feat(reader): 放大书中图片后可左右滑动浏览其他图片，保留缩放与分享。
 
@@ -56,9 +56,9 @@ Build / 构建：**10168** · Stable / 正式版
 
 ### Downloads / 下载
 
-Android ARM64 · iOS ARM64 · macOS Universal (Intel + Apple Silicon) · Windows Universal (x64 + ARM64) · Linux x64 / ARM64 · HarmonyOS ARM64.
+Android ARM64 · iOS ARM64 · macOS ARM64 / x64 · Windows ARM64 / x64 · Linux x64 / ARM64 · HarmonyOS ARM64.
 
-Use the `macos-universal.dmg` and `windows-universal-setup.exe` downloads. The four architecture-named Mac/Windows files are byte-identical compatibility copies for older updaters. Seven primary packages plus four compatibility copies; every file has a SHA-256 sidecar. / Mac 与 Windows 请选择名称含 `universal` 的安装包。另保留四个按架构命名的兼容文件供旧版自动更新，内容与对应统一包完全相同。共七个主要安装包及四个兼容副本，均提供 SHA-256 校验文件。
+Nine architecture-specific packages, each with a SHA-256 sidecar. Existing automatic-update filenames are preserved. / 共九个分架构安装包，均提供 SHA-256 校验文件，沿用原有自动更新文件名。
 
 iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing without notarization; Windows has no commercial Authenticode signature and requires WebView2. Linux DEB targets Debian 13. / iOS IPA 与鸿蒙 HAP 需自行签名；macOS 为临时签名、未公证；Windows 无商业 Authenticode 签名，需 WebView2；Linux DEB 面向 Debian 13。
 

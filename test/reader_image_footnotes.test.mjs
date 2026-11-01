@@ -9,6 +9,7 @@ const sourceFor = name => readFile(new URL(`../assets/foliate-js/src/${name}`, i
 const moduleURL = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 const imageSource = await sourceFor('image-footnotes.js');
 const imageURL = moduleURL(imageSource);
+const { repairSelfReferentialNotes } = await import(moduleURL(await sourceFor('footnote-links.js')));
 const { imageFootnoteText, createImageFootnoteBook } = await import(imageURL);
 const { normalizeKF8Footnotes, restoreMOBI6Footnotes } = await import(moduleURL(await sourceFor('mobi-footnotes.js')));
 const typographyURL = moduleURL(await sourceFor('footnote-typography.js'));
@@ -309,3 +310,51 @@ test('real View.close is safe before the asynchronous renderer import completes'
   }; View`);
   assert.doesNotThrow(() => new View().close());
 });
+
+
+test('self-pointing converted EPUB note pairs open the note and restore return links without moving text', async () => {
+  const f = handlerFixture();
+  f.doc.body.innerHTML = '<p>正文<sup style="vertical-align:super"><a id="Chapter7.xhtml_note_1" href="#Chapter7.xhtml_note_1">[</a><a href="#Chapter7.xhtml_note_1">†</a><a href="#Chapter7.xhtml_note_1">]</a></sup>继续正文</p>'
+    + '<p><span id="Chapter7.xhtml_noteBack_1"><a href="#Chapter7.xhtml_noteBack_1">[*]</a>真正的<b>注释</b>。</span></p>';
+  const text = f.doc.body.textContent, nodes = [...f.doc.querySelectorAll('*')];
+  repairSelfReferentialNotes(f.doc);
+  assert.equal(f.doc.body.textContent, text);
+  assert.deepEqual([...f.doc.querySelectorAll('*')], nodes);
+  assert.equal(f.doc.querySelector('span a').getAttribute('href'), '#Chapter7.xhtml_note_1');
+  const repaired = f.doc.body.innerHTML;
+  repairSelfReferentialNotes(f.doc);
+  assert.equal(f.doc.body.innerHTML, repaired, 'idempotent on reused chapter documents');
+  const sourceDoc = f.doc.cloneNode(true);
+  const book = {
+    sections: [{load: () => 'blob:converted-note', createDocument: () => sourceDoc.cloneNode(true)}],
+    resolveHref: href => ({index: 0, anchor: doc => doc.getElementById(href.split('#')[1])}),
+  };
+  for (const a of f.doc.querySelectorAll('sup a')) {
+    const event = new CustomEvent('link', {cancelable: true, detail: {a, href: a.getAttribute('href')}});
+    await f.handler.handle(book, event);
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(f.events.at(-1).doc.body.textContent, '[*]真正的注释。');
+    assert.ok(f.events.at(-1).doc.querySelector('b'), 'preserve note markup');
+    f.handler.close();
+  }
+  assert.equal(f.doc.body.innerHTML, repaired);
+  f.close();
+});
+
+for (const variant of ['missing pair', 'duplicate ID', 'normal note', 'ordinary link', 'unrelated return', 'nested target']) {
+  test(`self-pointing note repair leaves ${variant} unchanged`, () => {
+    const dom = fixture(), doc = dom.window.document;
+    let html = '<p><sup><a id="c_note_1" href="#c_note_1">*</a></sup></p><p><span id="c_noteBack_1"><a href="#c_noteBack_1">*</a>解释</span></p>';
+    if (variant === 'missing pair') html = html.split('</p>')[0] + '</p>';
+    if (variant === 'duplicate ID') html += '<span id="c_noteBack_1">其他内容</span>';
+    if (variant === 'normal note') html = html.replace('href="#c_note_1"', 'href="#c_noteBack_1"').replace('id="c_noteBack_1"><a href="#c_noteBack_1"', 'id="c_noteBack_1"><a href="#c_note_1"');
+    if (variant === 'ordinary link') html = html.replace('>*</a></sup>', '>跳到章节</a></sup>');
+    if (variant === 'unrelated return') html += '<a href="#c_noteBack_1">跳到章节</a>';
+    if (variant === 'nested target') html = '<span id="c_noteBack_1"><a id="c_note_1" href="#c_note_1">*</a><a href="#c_noteBack_1">*</a>解释</span>';
+    doc.body.innerHTML = html;
+    const before = doc.body.innerHTML;
+    repairSelfReferentialNotes(doc);
+    assert.equal(doc.body.innerHTML, before);
+    dom.window.close();
+  });
+}

@@ -100,18 +100,9 @@ class UpdateRelease {
       throw const FormatException('Not a stable Modu release');
     }
     final version = tag.substring(1);
-    var expected = updateAssetName(version, platform, abi);
+    final expected = updateAssetName(version, platform, abi);
     if (json['assets'] is! List) {
       throw const FormatException('Invalid release assets');
-    }
-    if (expected != null && (platform == 'macos' || platform == 'windows')) {
-      final suffix = platform == 'macos' ? '.dmg' : '-setup.exe';
-      final universal = 'Modu-$version-$platform-universal$suffix';
-      if ((json['assets'] as List)
-          .whereType<Map>()
-          .any((a) => a['name'] == universal)) {
-        expected = universal;
-      }
     }
     final matches = (json['assets'] as List)
         .whereType<Map>()

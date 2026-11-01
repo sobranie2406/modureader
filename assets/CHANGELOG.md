@@ -10,7 +10,7 @@ Older sections retain their original version scope; they are not current accepta
 
 ### English
 
-- Feat(desktop): Provide a universal macOS DMG and a Windows installer that selects the native x64/ARM64 payload; keep separate Linux packages and compatible filenames for older updaters.
+- Fix(reader): Recover verified self-referencing EPUB note links so popups show the actual annotation instead of the source paragraph, preserving text layout and reading positions.
 
 - Feat(reader): Swipe through other images in the book from the enlarged image viewer, retaining zoom and sharing.
 
@@ -36,7 +36,7 @@ Older sections retain their original version scope; they are not current accepta
 
 ### 简体中文
 
-- Feat(desktop): macOS 改为 Intel／Apple Silicon 通用 DMG，Windows 改为自动选择 x64／ARM64 的统一安装包；Linux 保持分架构，保留旧版自动更新兼容文件名。
+- Fix(reader): 兼容部分 EPUB 注释链接错误指向自身的情况，核实配对后显示真正的注释，保留正文排版与阅读定位。
 
 - Feat(reader): 放大书中图片后可左右滑动浏览其他图片，保留缩放与分享。
 

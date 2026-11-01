@@ -4,6 +4,7 @@ import { Overlayer } from './overlayer.js'
 import { textWalker } from './text-walker.js'
 import { Translator, TranslationMode } from './translator.js'
 import { imageFootnoteText } from './image-footnotes.js'
+import { repairSelfReferentialNotes } from './footnote-links.js'
 const { TTS } = await import('./tts.js')
 
 const SEARCH_PREFIX = 'foliate-search:'
@@ -303,6 +304,7 @@ export class View extends HTMLElement {
     if (!this.language.isCJK)
       doc.documentElement.dir ||= this.language.direction ?? ''
 
+    repairSelfReferentialNotes(doc)
     this.#handleLinks(doc, index)
     this.#handleClick(doc)
     this.#handleImage(doc)
