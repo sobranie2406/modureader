@@ -65,10 +65,18 @@ void main() {
       throwsA(isA<PluginInstallError>().having(
           (error) => error.code, 'code', PluginErrorCode.unknownCapability)),
     );
+    // net:http became supported in P3a, so the "known but unavailable" example
+    // is now script:run. Declaring net:http alone is still rejected, because a
+    // network capability without a network block cannot be honoured.
+    expect(
+      () => parse(manifestJson(capabilities: ['script:run'])),
+      throwsA(isA<PluginInstallError>().having((error) => error.code, 'code',
+          PluginErrorCode.capabilityUnavailable)),
+    );
     expect(
       () => parse(manifestJson(capabilities: ['net:http'])),
       throwsA(isA<PluginInstallError>().having((error) => error.code, 'code',
-          PluginErrorCode.capabilityUnavailable)),
+          PluginErrorCode.invalidManifest)),
     );
     final toolbar = parse(manifestJson(
       capabilities: ['ai:prompt-pack', 'ui:selection-action'],

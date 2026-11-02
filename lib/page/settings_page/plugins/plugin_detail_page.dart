@@ -380,6 +380,22 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
               ? resolvedLabel
               : description,
         );
+      case PluginSettingType.secret:
+        // Secrets are never edited through the ordinary config form: that map
+        // is exported and backed up. Until P3c adds the device-only entry field,
+        // the row states what is required instead of pretending to store it.
+        return ConfigItem(
+          key: spec.key,
+          label: resolvedLabel,
+          type: ConfigItemType.tip,
+          defaultValue: ModuStrings.text(
+            context,
+            '此插件需要填写密钥。密钥仅保存在本机，不会随设置或备份导出；填写功能将在网络插件正式启用时提供。',
+            'This plugin needs a key. Keys stay on this device and are never '
+                'exported with settings or backups; entry becomes available when '
+                'network plugins are enabled.',
+          ),
+        );
     }
   }
 

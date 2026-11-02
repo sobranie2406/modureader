@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:anx_reader/models/plugin_network.dart';
+
 import 'package:pub_semver/pub_semver.dart';
 
 /// Structural limits for a v1 plugin package. The package reader enforces the
@@ -20,18 +22,22 @@ class PluginLimits {
   static const int maxDisplayNameLength = 40;
   static const int maxSelectionActionNameLength = 30;
   static const int maxSelectionActionsPerPlugin = 24;
+  static const int maxDictionarySourcesPerPlugin = 8;
   static const int maxDescriptionLength = 2000;
   static const int maxSettingLabelLength = 80;
   static const int maxIdLength = 64;
 }
 
-/// Capability tokens that P1 understands and accepts at install time.
+/// Capability tokens this build understands and accepts at install time.
 ///
+/// `net:http` is accepted from P3a onward, but a package that declares it gains
+/// no network code path until the transport lands: P3a validates and rejects.
 /// `storage:plugin` is implicit (plugins always own their private directory)
 /// but declared packages are accepted for forward compatibility.
 const Set<String> kP1SupportedCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
+  'net:http',
   'storage:plugin',
 };
 
@@ -51,6 +57,7 @@ const String kAiPromptPackCapability = 'ai:prompt-pack';
 const String kSelectionActionCapability = 'ui:selection-action';
 const String kAiSkillContributionKind = 'aiSkill';
 const String kSelectionActionContributionKind = 'selectionAction';
+const String kDictionarySourceContributionKind = 'dictionarySource';
 
 enum PluginErrorCode {
   untrustedPackage,
@@ -313,6 +320,7 @@ sealed class PluginContribution {
     Map<String, dynamic> json, {
     required int index,
     required List<String> warnings,
+    PluginNetwork? network,
   }) {
     final kind = json['kind'];
     if (kind is! String || kind.trim().isEmpty) {
@@ -341,6 +349,19 @@ sealed class PluginContribution {
       }
       return SelectionActionContribution.parse(
           kind: kind, schema: schema, id: id, index: index, raw: json);
+    }
+    if (kind == kDictionarySourceContributionKind) {
+      if (!_skillIdPattern.hasMatch(id)) {
+        throw PluginInstallError(PluginErrorCode.invalidContribution,
+            'contributes[$index].id is invalid.');
+      }
+      return DictionarySourceContribution.parse(
+          kind: kind,
+          schema: schema,
+          id: id,
+          index: index,
+          raw: json,
+          network: network);
     }
     // Forward compatibility: an unknown kind is skipped even if new fields or
     // a missing id would fail the known-kind schema (decision D1).
@@ -502,7 +523,12 @@ class SelectionActionContribution extends PluginContribution {
   }
 }
 
-enum PluginSettingType { text, number, toggle, select, tip }
+/// Setting kinds.
+///
+/// `secret` is a P3 addition: the value never enters `pluginConfig_`, is stored
+/// under `pluginSecret_<pluginId>`, and is never exported or logged. It is only
+/// accepted in packages that declare `net:http`.
+enum PluginSettingType { text, number, toggle, select, tip, secret }
 
 class PluginSettingSpec {
   const PluginSettingSpec({
@@ -512,6 +538,7 @@ class PluginSettingSpec {
     this.description,
     this.defaultValue,
     this.options = const [],
+    this.required = false,
   });
 
   final String key;
@@ -520,6 +547,12 @@ class PluginSettingSpec {
   final PluginText? description;
   final Object? defaultValue;
   final List<String> options;
+
+  /// Secrets only: when true a lookup fails instead of silently omitting the
+  /// header, so a misconfigured source reports a configuration error.
+  final bool required;
+
+  bool get isSecret => type == PluginSettingType.secret;
 
   static PluginSettingSpec parse(Object? raw, int index) {
     if (raw is! Map) {
@@ -587,6 +620,24 @@ class PluginSettingSpec {
         break;
       case PluginSettingType.tip:
         break;
+      case PluginSettingType.secret:
+        // A secret has no default: shipping one would put a credential in the
+        // package, and every user would share it.
+        if (defaultValue != null) {
+          throw PluginInstallError(PluginErrorCode.invalidSetting,
+              'settings[$index].defaultValue is not allowed for a secret.');
+        }
+        break;
+    }
+    final requiredRaw = raw['required'];
+    if (type == PluginSettingType.secret) {
+      if (requiredRaw != null && requiredRaw is! bool) {
+        throw PluginInstallError(PluginErrorCode.invalidSetting,
+            'settings[$index].required must be a boolean.');
+      }
+    } else if (requiredRaw != null) {
+      throw PluginInstallError(PluginErrorCode.invalidSetting,
+          'settings[$index].required is only valid for a secret.');
     }
     return PluginSettingSpec(
       key: key,
@@ -595,6 +646,7 @@ class PluginSettingSpec {
       description: description,
       defaultValue: defaultValue,
       options: options,
+      required: requiredRaw is bool ? requiredRaw : false,
     );
   }
 }
@@ -614,6 +666,7 @@ class PluginManifest {
     required this.settings,
     required this.hostApi,
     required this.warnings,
+    this.network,
   });
 
   final int schemaVersion;
@@ -628,6 +681,9 @@ class PluginManifest {
   final List<PluginContribution> contributions;
   final List<PluginSettingSpec> settings;
   final int hostApi;
+
+  /// Declarative network block; null unless the package declares `net:http`.
+  final PluginNetwork? network;
 
   /// Non-fatal issues, e.g. unsupported contribution kinds that were skipped.
   final List<String> warnings;
@@ -748,6 +804,21 @@ class PluginManifest {
       capabilities.add(capability);
     }
 
+    // P3: a network block is mandatory for net:http and forbidden without it.
+    // Failing closed here means a package cannot declare a transport it did not
+    // ask permission for, nor get permission it never uses.
+    final rawNetwork = json['network'];
+    final declaresNet = capabilities.contains('net:http');
+    if (declaresNet && rawNetwork == null) {
+      throw PluginInstallError(PluginErrorCode.invalidManifest,
+          "A package declaring 'net:http' must provide a 'network' block.");
+    }
+    if (!declaresNet && rawNetwork != null) {
+      throw PluginInstallError(PluginErrorCode.invalidManifest,
+          "A 'network' block requires the 'net:http' capability.");
+    }
+    final network = rawNetwork == null ? null : PluginNetwork.parse(rawNetwork);
+
     final rawContributions = json['contributes'] ?? const <dynamic>[];
     if (rawContributions is! List) {
       throw PluginInstallError(
@@ -765,8 +836,8 @@ class PluginManifest {
         throw PluginInstallError(PluginErrorCode.invalidContribution,
             'contributes[$index] must be an object.');
       }
-      final contribution =
-          PluginContribution.parse(raw, index: index, warnings: warnings);
+      final contribution = PluginContribution.parse(raw,
+          index: index, warnings: warnings, network: network);
       if (!ids.add('${contribution.kind}:${contribution.id}')) {
         throw PluginInstallError(PluginErrorCode.duplicateContribution,
             "Duplicate contribution '${contribution.kind}:${contribution.id}'.",
@@ -793,7 +864,30 @@ class PluginManifest {
         throw PluginInstallError(PluginErrorCode.duplicateSetting,
             "Duplicate setting key '${setting.key}'.");
       }
+      // A secret is only meaningful when the package can transmit it, and a
+      // package without net:http must not accumulate credentials at all.
+      if (setting.isSecret && !declaresNet) {
+        throw PluginInstallError(PluginErrorCode.invalidSetting,
+            "settings[$index] is a secret, which requires the 'net:http' capability.");
+      }
       settings.add(setting);
+    }
+
+    // Every {setting.<key>} and {secret.<key>} a source references must exist,
+    // so a typo is an install error rather than a silently empty request.
+    final settingByKey = {for (final setting in settings) setting.key: setting};
+    for (final source
+        in contributions.whereType<DictionarySourceContribution>()) {
+      _validateTemplateReferences(source, settingByKey);
+    }
+
+    final dictionarySources = contributions
+        .whereType<DictionarySourceContribution>()
+        .length;
+    if (dictionarySources > PluginLimits.maxDictionarySourcesPerPlugin) {
+      throw PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package may declare at most '
+          '${PluginLimits.maxDictionarySourcesPerPlugin} dictionary sources.');
     }
 
     return PluginManifest(
@@ -811,7 +905,57 @@ class PluginManifest {
       settings: settings,
       hostApi: hostApi,
       warnings: List.unmodifiable(warnings),
+      network: network,
     );
+  }
+
+  /// Every placeholder in a source's templates must resolve.
+  ///
+  /// Checked at install time rather than request time: a package that asks for
+  /// `{setting.missing}` would otherwise send a literal placeholder to the
+  /// upstream API, which is a silent data bug the user cannot diagnose.
+  static void _validateTemplateReferences(
+    DictionarySourceContribution source,
+    Map<String, PluginSettingSpec> settings,
+  ) {
+    void check(String value, String field, {required bool secretAllowed}) {
+      for (final match
+          in PluginRequestTemplate.settingPlaceholder.allMatches(value)) {
+        final key = match.group(1)!;
+        final setting = settings[key];
+        if (setting == null) {
+          throw PluginInstallError(PluginErrorCode.invalidContribution,
+              "$field references an undeclared setting '$key'.");
+        }
+        if (setting.isSecret) {
+          throw PluginInstallError(
+              PluginErrorCode.invalidContribution,
+              "$field references '$key', which is a secret; secrets may only be used in the Authorization header.");
+        }
+      }
+      for (final match
+          in PluginRequestTemplate.secretPlaceholder.allMatches(value)) {
+        final key = match.group(1)!;
+        if (!secretAllowed) {
+          throw PluginInstallError(PluginErrorCode.invalidContribution,
+              "$field must not reference the secret '$key'.");
+        }
+        final setting = settings[key];
+        if (setting == null || !setting.isSecret) {
+          throw PluginInstallError(PluginErrorCode.invalidContribution,
+              "$field references an undeclared secret '$key'.");
+        }
+      }
+    }
+
+    check(source.request.url, 'request.url', secretAllowed: false);
+    for (final entry in source.request.query.entries) {
+      check(entry.value, 'request.query.${entry.key}', secretAllowed: false);
+    }
+    for (final entry in source.request.headers.entries) {
+      check(entry.value, 'request.headers.${entry.key}',
+          secretAllowed: entry.key == 'Authorization');
+    }
   }
 
   static void _validateContributionCounts(
@@ -861,3 +1005,109 @@ final RegExp _licensePattern = RegExp(r'^[A-Za-z0-9.+\-(): ]+$');
 final RegExp _capabilityPattern = RegExp(r'^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$');
 
 int _runes(String value) => value.runes.length;
+
+/// A declarative dictionary source backed by a host-proxied HTTPS GET.
+///
+/// The package supplies a request template, a response mapping and the licence
+/// it operates under; the host owns the transport, the allowlist, the quotas and
+/// the rendering. Nothing here executes code.
+class DictionarySourceContribution extends PluginContribution {
+  const DictionarySourceContribution({
+    required super.kind,
+    required super.schema,
+    required super.id,
+    required super.index,
+    required super.raw,
+    required this.name,
+    required this.request,
+    required this.response,
+    required this.license,
+    required this.attribution,
+    required this.licenseUri,
+    required this.sourceUrl,
+  });
+
+  final PluginText name;
+  final PluginRequestTemplate request;
+  final PluginResponseMapping response;
+
+  /// Required: the lookup UI shows these next to results.
+  final String license;
+  final String attribution;
+  final String? licenseUri;
+  final String? sourceUrl;
+
+  factory DictionarySourceContribution.parse({
+    required String kind,
+    required int schema,
+    required String id,
+    required int index,
+    required Map<String, dynamic> raw,
+    required PluginNetwork? network,
+  }) {
+    if (network == null) {
+      throw PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          "contributes[$index] uses 'dictionarySource' but the package declares no 'network' block.");
+    }
+    final name = PluginText.parse(raw['name'],
+        field: 'contributes[$index].name',
+        maxLength: PluginLimits.maxDisplayNameLength);
+
+    final license = raw['license'];
+    if (license is! String || license.trim().isEmpty) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].license is required: a dictionary source must state '
+          'the terms of the content it serves.');
+    }
+    final attribution = raw['attribution'];
+    if (attribution is! String || attribution.trim().isEmpty) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].attribution is required: results must name their source.');
+    }
+    if (_runes(attribution.trim()) > 200) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].attribution is too long.');
+    }
+    final licenseUri =
+        _httpsUrl(raw['licenseUri'], 'contributes[$index].licenseUri');
+    final sourceUrl =
+        _httpsUrl(raw['sourceUrl'], 'contributes[$index].sourceUrl');
+
+    final request = PluginRequestTemplate.parse(raw['request'], network);
+    final response = PluginResponseMapping.parse(raw['response']);
+
+    return DictionarySourceContribution(
+      kind: kind,
+      schema: schema,
+      id: id,
+      index: index,
+      raw: raw,
+      name: name,
+      request: request,
+      response: response,
+      license: license.trim(),
+      attribution: attribution.trim(),
+      licenseUri: licenseUri,
+      sourceUrl: sourceUrl,
+    );
+  }
+
+  /// Optional metadata URLs must be https; a bad one is an error rather than a
+  /// silently dropped field, because it is shown to the user as provenance.
+  static String? _httpsUrl(Object? raw, String field) {
+    if (raw == null) return null;
+    if (raw is! String || raw.trim().isEmpty) {
+      throw PluginInstallError(
+          PluginErrorCode.invalidContribution, '$field must be a string.');
+    }
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          '$field must be an https URL without credentials.');
+    }
+    return raw.trim();
+  }
+}
