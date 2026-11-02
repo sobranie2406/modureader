@@ -41,9 +41,9 @@ Neither adjustment changes the conclusions "target form C, script host in P4, We
 - Plugin host: `lib/service/plugins/plugin_host.dart`, with install/enable/disable/uninstall/upgrade, `PluginStatus`, startup reconciliation and the `AppliedContribution` hash guard.
 - Contribution registry: `lib/service/plugins/plugin_contribution_handler.dart` + `plugin_contributions.dart`, resolving handlers by `kind`; P1 registers `aiSkill` and `selectionAction`.
 - Plugin state: the single `pluginState` key plus `pluginConfig_<id>`; P1 already wires both into settings export and strict validation.
-- Built-in dispatch state (**P2a landed: AI tools and reading skills now go through registries**):
-  - Translation: the `switch` in `TranslateService.provider` (`lib/service/translate/index.dart:29-50`). — still static, P2b.
-  - TTS: the `switch` in `TtsService.provider` (`lib/service/tts/tts_service.dart:19-32`). — still static, P2b.
+- Built-in dispatch state (**P2a and P2b landed: AI tools, reading skills, translation and TTS go through registries**):
+  - Translation: **registry-based** since P2b — `TranslateRegistry.current` wraps `HostRegistry<TranslateProviderEntry>`; the enum stays only because its `name` is the persisted token. `microsoft` is an alias of `microsoftApi`; picker orders are explicit lists so they do not follow registration order (`lib/service/translate/translate_registry.dart`).
+  - TTS: **registry-based** since P2b — `TtsRegistry.current` wraps `HostRegistry<TtsProviderEntry>`; `aliyun`/`azure` are aliases of `system`, and the transfer snapshot keeps the historical five-provider order while preserving unknown providers on import (`lib/service/tts/tts_service.dart`, `lib/service/config_transfer/tts_config_transfer.dart`).
   - Dictionary: `enum OnlineDictionary` and host construction by enum inside `OnlineDictionaryService.lookup` (`lib/service/dictionary/online_dictionary.dart:8-40`). — still static, P2c.
   - AI tools: **registry-based** since P2a — `AiToolRegistry.current` wraps `HostRegistry<AiToolEntry>`; ids unchanged and persisted on purpose (`lib/service/ai/tools/ai_tool_registry.dart`).
   - Reading skills: **registry-based** since P2a — `ReadingSkillRegistry.current` wraps `HostRegistry<ReadingSkillEntry>` and keeps retired prompts visible to recognition only (`lib/service/ai/reading_skill_registry.dart`).

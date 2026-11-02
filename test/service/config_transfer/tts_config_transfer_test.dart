@@ -86,6 +86,29 @@ void main() {
     expect(Prefs().prefs.getString('sync-sentinel'), 'do-not-touch');
   });
 
+  test('a provider this build does not know is preserved, not dropped', () async {
+    // A newer build (or a plugin) may have written a provider we cannot run.
+    // Importing must keep its configuration so the setting survives a
+    // downgrade / reinstall instead of being silently deleted.
+    final data = example();
+    data['providers']['elevenlabs'] = {
+      'config': <String, dynamic>{'voice': 'rachel', 'model': 'v2'},
+      'voice': 'rachel',
+    };
+    await TtsConfigTransfer.apply(Prefs(), data);
+    expect(Prefs().prefs.getString('onlineTtsConfig_elevenlabs'), isNotNull);
+    expect(Prefs().prefs.getString('ttsVoiceModel_elevenlabs'), 'rachel');
+    // It does not become the selected service and is not validated as built-in.
+    expect(Prefs().ttsService, 'openai');
+  });
+
+  test('a retired provider id is normalised when the snapshot is applied', () async {
+    final data = example();
+    data['service'] = 'aliyun';
+    await TtsConfigTransfer.apply(Prefs(), data);
+    expect(Prefs().ttsService, 'system');
+  });
+
   test('config voice is authoritative over an outdated separate selection', () {
     final data = example();
     data['providers']['openai']['voice'] = 'old-voice';

@@ -4,14 +4,8 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/lang_list.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/config/config_item.dart';
-import 'package:anx_reader/service/translate/ai.dart';
-import 'package:anx_reader/service/translate/deepl.dart';
-import 'package:anx_reader/service/translate/google_api.dart';
-import 'package:anx_reader/service/translate/microsoft_free.dart';
-import 'package:anx_reader/service/translate/microsoft_api.dart';
-import 'official_api.dart';
+import 'package:anx_reader/service/translate/translate_registry.dart';
 import 'package:anx_reader/service/translate/web_view.dart';
-import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,30 +22,15 @@ enum TranslateService {
   baiduWeb,
   youdaoWeb;
 
-  TranslateServiceProvider get provider {
-    switch (this) {
-      case TranslateService.microsoftFree:
-        return MicrosoftFreeTranslateProvider();
-      case TranslateService.bingWeb:
-        return BingWebTranslateProvider();
-      case TranslateService.googleWeb:
-        return GoogleWebTranslateProvider();
-      case TranslateService.microsoftApi:
-        return MicrosoftApiTranslateProvider();
-      case TranslateService.googleApi:
-        return GoogleApiTranslateProvider();
-      case TranslateService.deepl:
-        return DeepLTranslateProvider();
-      case TranslateService.ai:
-        return AiTranslateProvider();
-      case TranslateService.baiduApi:
-        return OfficialApiTranslateProvider(TranslateService.baiduApi);
-      case TranslateService.baiduWeb:
-        return BaiduWebTranslateProvider();
-      case TranslateService.youdaoWeb:
-        return YoudaoWebTranslateProvider();
-    }
-  }
+  /// Built-in providers, resolved through [TranslateRegistry].
+  ///
+  /// The enum stays because its `name` is the persisted token in
+  /// 'translateService' and 'fullTextTranslateService', and the suffix of
+  /// 'translateServiceConfig_...'. P2 moved the table to a registry without
+  /// renaming a single id.
+  TranslateServiceProvider get provider =>
+      TranslateRegistry.current.providerFor(name);
+
 
   /// Get the display label from the provider.
   String getLabel(BuildContext context) => provider.getLabel(context);
@@ -63,41 +42,23 @@ enum TranslateService {
   bool get usesPageLanguagePicker =>
       this == TranslateService.baiduWeb || this == TranslateService.youdaoWeb;
 
-  static List<TranslateService> get activeValues => values
-      .where((e) => e != TranslateService.ai || EnvVar.enableAIFeature)
-      .toList();
+  static List<TranslateService> get activeValues =>
+      TranslateRegistry.current.activeValues;
 
   /// Providers displayed by ReadAny's translation settings.
-  static List<TranslateService> get readAnyValues => [
-        TranslateService.microsoftFree,
-        TranslateService.baiduApi,
-        TranslateService.microsoftApi,
-        if (EnvVar.enableAIFeature) TranslateService.ai,
-        TranslateService.deepl,
-      ];
+  static List<TranslateService> get readAnyValues =>
+      TranslateRegistry.current.readAnyValues;
 
-  static const webValues = [
-    TranslateService.googleWeb,
-    TranslateService.bingWeb,
-    TranslateService.baiduWeb,
-    TranslateService.youdaoWeb,
-  ];
+  static List<TranslateService> get webValues =>
+      TranslateRegistry.current.webValues;
 
   static List<TranslateService> get selectionValues =>
-      [...readAnyValues, ...webValues];
+      TranslateRegistry.current.selectionValues;
 }
 
-TranslateService getTranslateService(String name) {
-  if (name == 'microsoft') {
-    return TranslateService.microsoftApi;
-  }
-
-  try {
-    return TranslateService.values.firstWhere((e) => e.name == name);
-  } catch (e) {
-    return TranslateService.microsoftFree;
-  }
-}
+TranslateService getTranslateService(String name) =>
+    TranslateRegistry.current.resolveService(name) ??
+    TranslateService.microsoftFree;
 
 /// Base class for all translation service providers.
 /// Subclasses must implement [service], [label], [translate], and [translateStream].
