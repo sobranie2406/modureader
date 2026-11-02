@@ -16,22 +16,37 @@ void main() {
     expect(p.online, isEmpty);
   });
   test(
-      'removed online source is ignored without changing local or wiki choices',
+      'an unrecognised source is hidden from the UI but kept in storage',
       () async {
+    // A source can be missing because a plugin is uninstalled, not because the
+    // user removed it. Dropping the token would silently lose the selection and
+    // reinstalling would not restore it (P2 §4.4.6).
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(dictionaryPreferencesKey,
         ['local:one', 'online:freeEnglish', 'online:wiktionaryZh']);
     final loaded = await DictionaryPreferences.load();
     expect(loaded.localIds, {'one'});
     expect(loaded.online, {OnlineDictionary.wiktionaryZh});
+    expect(loaded.unknownTokens, {'online:freeEnglish'});
     await loaded.save();
     expect(prefs.getStringList(dictionaryPreferencesKey),
-        ['local:one', 'online:wiktionaryZh']);
+        ['local:one', 'online:wiktionaryZh', 'online:freeEnglish']);
+
     await prefs.setStringList(
         dictionaryPreferencesKey, ['local:*', 'online:freeEnglish']);
     final removedOnly = await DictionaryPreferences.load();
     expect(removedOnly.localIds, isNull);
     expect(removedOnly.online, isEmpty);
+    expect(removedOnly.unknownTokens, {'online:freeEnglish'});
+  });
+
+  test('a plugin-style source token is preserved without resolving', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(dictionaryPreferencesKey,
+        ['online:plugin:com.example.pack:en', 'online:wiktionaryEn']);
+    final loaded = await DictionaryPreferences.load();
+    expect(loaded.online, {OnlineDictionary.wiktionaryEn});
+    expect(loaded.unknownTokens, {'online:plugin:com.example.pack:en'});
   });
   test('empty, single and multiple local selections survive reload', () async {
     for (final ids in [

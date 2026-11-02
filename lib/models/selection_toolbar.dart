@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:anx_reader/l10n/modu_strings.dart';
 
 import 'package:anx_reader/constants/note_annotations.dart';
+import 'package:anx_reader/models/toolbar_action_definition.dart';
 
 /// Stable action IDs, rather than translated labels or platform icon codes.
 enum SelectionAiScope { selection, context }
@@ -271,6 +272,10 @@ class SelectionToolbarConfig {
       throw const FormatException('Invalid toolbar configuration');
     }
     final ids = <String>{};
+    // Built-in identity comes from the catalog rather than from comparing list
+    // instances, so reorganising the const tables cannot change what "built-in"
+    // means. See lib/models/toolbar_action_definition.dart.
+    final catalog = ToolbarCatalog.standard;
     void validateItem(
         SelectionToolbarItem item, List<SelectionToolbarItem> defaults) {
       if (!ids.add(item.id) ||
@@ -284,15 +289,15 @@ class SelectionToolbarConfig {
         throw const FormatException('Invalid toolbar item');
       }
       if (item.isCustom) {
-        if (!identical(defaults, defaultItems) ||
-            !item.id.startsWith('custom-') ||
+        // A custom command is any `custom-` id that is not a shipped action:
+        // user commands and plugin actions share the same rules.
+        if (!item.id.startsWith('custom-') ||
             item.id.length <= 7 ||
             item.name.trim().isEmpty ||
             item.prompt.trim().isEmpty) {
           throw const FormatException('Invalid custom AI command');
         }
-      } else if (!defaults
-              .any((d) => d.id == item.id && d.action == item.action) ||
+      } else if (!catalog.matches(item.id, item.action) ||
           (!item.isAi && item.prompt.isNotEmpty)) {
         throw const FormatException('Invalid built-in toolbar action');
       }
