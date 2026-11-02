@@ -40,6 +40,18 @@ void main() {
     );
   });
 
+  test('a stored list of only unknown ids stays empty rather than reverting', () {
+    // "the user enabled nothing this build knows" must not silently become
+    // "enable every default tool": the saved list is the user's intent.
+    expect(AiToolRegistry.current.sanitizeIds(['future_tool']), ['future_tool']);
+    expect(
+      AiToolRegistry.current
+          .definitions
+          .where((definition) => ['future_tool'].contains(definition.id)),
+      isEmpty,
+    );
+  });
+
   test('unknown ids resolve to null and keep their raw display name', () {
     expect(AiToolRegistry.current.byId('removed_tool'), isNull);
     expect(AiToolRegistry.current.displayNameForId('removed_tool'),

@@ -94,6 +94,13 @@ class HostRegistry<T extends RegistryEntry> {
     if (_byId.containsKey(entry.id)) {
       throw StateError("Duplicate ${domain.name} id: ${entry.id}");
     }
+    // A new id must not shadow an existing alias: otherwise resolve() would
+    // silently start returning the new entry for a token that still means the
+    // old one, and the alias would never match again.
+    if (_aliases.containsKey(entry.id)) {
+      throw StateError(
+          "${domain.name} id '${entry.id}' is already an alias for '${_aliases[entry.id]}'");
+    }
     final seen = <String>{};
     for (final alias in entry.aliases) {
       if (alias == entry.id || !seen.add(alias)) {

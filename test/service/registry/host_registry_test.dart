@@ -77,6 +77,19 @@ void main() {
     );
   });
 
+  test('a new id may not shadow an existing alias', () {
+    // Otherwise the alias would silently start resolving to the new entry and
+    // the token's old meaning would be lost without any error.
+    registry.register(const _Entry(
+        id: 'microsoftApi', domain: RegistryDomain.aiTool, aliases: ['microsoft']));
+    expect(
+      () => registry.register(
+          const _Entry(id: 'microsoft', domain: RegistryDomain.aiTool)),
+      throwsA(isA<StateError>()),
+    );
+    expect(registry.resolve('microsoft')?.id, 'microsoftApi');
+  });
+
   test('rejects entries from another domain', () {
     expect(
       () => registry.register(

@@ -1467,19 +1467,20 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tool ids the user enabled.
+  ///
+  /// Unknown ids are **kept** (P2): a tool this build does not ship may belong
+  /// to a newer version, and dropping it here would lose the selection. Tools
+  /// are filtered when they are built, not when they are read. An empty stored
+  /// list therefore means "the user enabled nothing", which is distinct from a
+  /// missing key ("never configured" → defaults).
   List<String> get enabledAiToolIds {
     final stored = prefs.getStringList(_enabledAiToolsKey);
     if (stored == null) {
       return AiToolRegistry.current.defaultEnabledToolIds();
     }
-    if (stored.isEmpty) {
-      return const [];
-    }
-    final sanitized = AiToolRegistry.current.sanitizeIds(stored);
-    if (sanitized.isEmpty && stored.isNotEmpty) {
-      return AiToolRegistry.current.defaultEnabledToolIds();
-    }
-    return sanitized;
+    if (stored.isEmpty) return const [];
+    return AiToolRegistry.current.sanitizeIds(stored);
   }
 
   set enabledAiToolIds(List<String> ids) {
