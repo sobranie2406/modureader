@@ -1,5 +1,6 @@
 import 'package:anx_reader/models/user_prompt.dart';
 import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/reading_skill_registry.dart';
 
 /// Stable, namespaced IDs allow custom and built-in skills to share one order.
 class ReadingSkillEntry {
@@ -24,7 +25,8 @@ List<ReadingSkillEntry> orderedReadingSkills(
     List<UserPrompt> customSkills, List<String> order) {
   final custom = [...customSkills]..sort((a, b) => a.order.compareTo(b.order));
   final entries = <ReadingSkillEntry>[
-    for (final skill in readAnySkills) ReadingSkillEntry.builtIn(skill),
+    for (final skill in ReadingSkillRegistry.current.visibleSkills)
+      ReadingSkillEntry.builtIn(skill),
     for (final skill in custom) ReadingSkillEntry.custom(skill),
   ];
   final remaining = {for (final entry in entries) entry.id: entry};

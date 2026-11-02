@@ -1465,14 +1465,14 @@ class Prefs extends ChangeNotifier {
   List<String> get enabledAiToolIds {
     final stored = prefs.getStringList(_enabledAiToolsKey);
     if (stored == null) {
-      return AiToolRegistry.defaultEnabledToolIds();
+      return AiToolRegistry.current.defaultEnabledToolIds();
     }
     if (stored.isEmpty) {
       return const [];
     }
-    final sanitized = AiToolRegistry.sanitizeIds(stored);
+    final sanitized = AiToolRegistry.current.sanitizeIds(stored);
     if (sanitized.isEmpty && stored.isNotEmpty) {
-      return AiToolRegistry.defaultEnabledToolIds();
+      return AiToolRegistry.current.defaultEnabledToolIds();
     }
     return sanitized;
   }
@@ -1480,7 +1480,7 @@ class Prefs extends ChangeNotifier {
   set enabledAiToolIds(List<String> ids) {
     prefs.setStringList(
       _enabledAiToolsKey,
-      AiToolRegistry.sanitizeIds(ids),
+      AiToolRegistry.current.sanitizeIds(ids),
     );
     notifyListeners();
   }

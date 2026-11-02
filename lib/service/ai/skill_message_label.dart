@@ -1,5 +1,5 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/reading_skill_registry.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
 import 'dart:ui';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -13,7 +13,7 @@ String? skillMessageLabel(String content, {String? skillId, Locale? locale}) {
   if (skillId == 'selection_toolbar') {
     return ModuStrings.label(language, '划词 AI', 'Selection AI');
   }
-  for (final skill in readingSkillPromptDefinitions) {
+  for (final skill in ReadingSkillRegistry.current.promptDefinitions) {
     if (skill.id == skillId ||
         skill.isDefaultPrompt(prompt) ||
         prompt == ReadingSkillPromptStore.promptFor(skill).trim()) {

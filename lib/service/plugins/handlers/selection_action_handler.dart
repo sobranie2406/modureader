@@ -162,6 +162,17 @@ class SelectionActionContributionHandler implements PluginContributionHandler {
     return applied;
   }
 
+  /// Actions are stored in preferences, not an in-memory registry.
+  @override
+  bool get runtimeOnly => false;
+
+  /// Actions persist in selectionToolbar, so a missing id means the
+  /// contribution was removed and has to be re-materialised.
+  @override
+  bool isApplied(AppliedContribution applied) =>
+      applied.kind == kind &&
+      Prefs().selectionToolbar.items.any((item) => item.id == applied.id);
+
   @override
   Future<void> remove(List<AppliedContribution> applied) async {
     final entries = applied.where((entry) => entry.kind == kind).toList();

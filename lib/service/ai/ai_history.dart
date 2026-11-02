@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/reading_skill_registry.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
 import 'package:anx_reader/service/ai/reading_skill_execution.dart';
@@ -71,7 +71,7 @@ class AiChatHistoryEntry {
       final label = skillLabels[0];
       final first =
           messages.whereType<HumanChatMessage>().firstOrNull?.contentAsString;
-      for (final skill in readingSkillPromptDefinitions) {
+      for (final skill in ReadingSkillRegistry.current.promptDefinitions) {
         if ((label != null &&
                 ModuStrings.isDefault(
                     'skill_${skill.id}_name', label, skill.name)) ||
@@ -201,7 +201,7 @@ String _inferLegacyScope(List<ChatMessage> messages) {
   }
   if (firstHumanPrompt.isEmpty) return 'library';
 
-  final matchesCurrentSkill = readingSkillPromptDefinitions.any(
+  final matchesCurrentSkill = ReadingSkillRegistry.current.promptDefinitions.any(
     (skill) => skill.isDefaultPrompt(firstHumanPrompt),
   );
   if (matchesCurrentSkill) return 'reader';

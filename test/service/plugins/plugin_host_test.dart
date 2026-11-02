@@ -4,6 +4,10 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/models/user_prompt.dart';
+import 'package:anx_reader/service/plugins/handlers/ai_prompt_handler.dart';
+import 'package:anx_reader/service/plugins/handlers/selection_action_handler.dart';
+import 'package:anx_reader/service/plugins/plugin_contribution_handler.dart';
+import 'package:anx_reader/service/plugins/plugin_contributions.dart';
 import 'package:anx_reader/service/plugins/plugin_host.dart';
 import 'package:anx_reader/service/plugins/plugin_paths.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -272,6 +276,58 @@ void main() {
     expect(Prefs().userPrompts, hasLength(1));
   });
 
+  test('a runtime-only kind is rebuilt on every start', () async {
+    // P3 dictionary sources live only in an in-memory registry, so a restart
+    // must re-materialise them even though nothing in prefs looks missing.
+    final runtimeContributions = PluginContributions(PluginContributionRegistry([
+      AiPromptContributionHandler(),
+      SelectionActionContributionHandler(),
+      const _RuntimeOnlyHandler(),
+    ]));
+    final runtimeHost = PluginHost(
+      trust: const FixturePluginTrust(),
+      paths: paths,
+      contributions: runtimeContributions,
+      appVersionResolver: () async => '1.3.1+10152',
+    );
+    addTearDown(runtimeHost.dispose);
+    await runtimeHost.initialize();
+
+    // A contribution of that kind has to exist in the manifest, otherwise the
+    // coordinator never calls the handler.
+    final runtimePackage = await writePluginZip(
+      temp,
+      samplePackageFiles(
+        manifest: manifestJson(contributes: [
+          aiSkill(id: 'deep-summary'),
+          {'kind': 'runtimeOnlyKind', 'schema': 1, 'id': 'source'},
+        ]),
+      ),
+      name: 'runtime-only.moduplugin',
+    );
+    await runtimeHost.install(runtimePackage);
+
+    final restarted = PluginHost(
+      trust: const FixturePluginTrust(),
+      paths: paths,
+      contributions: PluginContributions(PluginContributionRegistry([
+        AiPromptContributionHandler(),
+        SelectionActionContributionHandler(),
+        const _RuntimeOnlyHandler(),
+      ])),
+      appVersionResolver: () async => '1.3.1+10152',
+    );
+    addTearDown(restarted.dispose);
+    await restarted.initialize();
+
+    // The manifest carries one prompt; the runtime-only kind was re-applied
+    // during reconciliation even though nothing in prefs looked missing.
+    expect(Prefs().userPrompts, hasLength(1));
+    expect(restarted.byId('com.example.prompt-pack')!.status,
+        PluginStatus.enabled);
+    expect(_RuntimeOnlyHandler.applied, isTrue);
+  });
+
   test('rejects minAppVersion above the running app', () async {
     final file = await writePluginZip(temp,
         samplePackageFiles(manifest: manifestJson(minAppVersion: '9.0.0')));
@@ -319,4 +375,41 @@ void main() {
     expect(Prefs().userPrompts.single.content, '用户内容');
     expect(host.plugins, isEmpty);
   });
+}
+
+/// A kind that only lives in memory, like P3 dictionary sources.
+class _RuntimeOnlyHandler implements PluginContributionHandler {
+  const _RuntimeOnlyHandler();
+
+  static bool applied = false;
+
+  @override
+  String get kind => 'runtimeOnlyKind';
+
+  @override
+  Set<String> get requiredCapabilities => const {};
+
+  @override
+  bool get runtimeOnly => true;
+
+  @override
+  bool isApplied(AppliedContribution applied) => false;
+
+  @override
+  void validate(
+      PluginManifest manifest, List<PluginContribution> contributions) {}
+
+  @override
+  Future<List<AppliedContribution>> apply(
+      PluginManifest manifest, List<PluginContribution> contributions) async {
+    applied = true;
+    return [
+      for (final contribution in contributions)
+        AppliedContribution(
+            kind: kind, id: contribution.id, contentSha256: 'hash'),
+    ];
+  }
+
+  @override
+  Future<void> remove(List<AppliedContribution> applied) async {}
 }

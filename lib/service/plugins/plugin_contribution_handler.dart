@@ -1,7 +1,7 @@
 import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 
-/// One contribution type. The host never switches on `kind`; it looks the
+/// One contribution type. The host never switches on kind; it looks the
 /// handler up in [PluginContributionRegistry] (decision D9), so new types are
 /// added by writing a handler and registering it.
 abstract class PluginContributionHandler {
@@ -23,6 +23,19 @@ abstract class PluginContributionHandler {
   /// Removes previously materialised contributions. Implementations keep
   /// user-edited values (renaming them instead of deleting).
   Future<void> remove(List<AppliedContribution> applied);
+
+  /// Whether [applied] still exists at runtime.
+  ///
+  /// Startup reconciliation uses this to decide whether contributions must be
+  /// re-materialised, for example after a settings import removed them. Kinds
+  /// without a cheap check, and kinds unknown to this build, stay conservative
+  /// and report true so an older client never deletes what a newer one wrote.
+  bool isApplied(AppliedContribution applied) => true;
+
+  /// True when the contribution lives only in an in-memory registry and is
+  /// therefore rebuilt on every start. Declarative kinds (prompts, toolbar
+  /// actions) persist in preferences and are false.
+  bool get runtimeOnly => false;
 }
 
 class PluginContributionRegistry {
@@ -36,7 +49,7 @@ class PluginContributionRegistry {
         .toSet();
     if (duplicates.isNotEmpty) {
       throw ArgumentError(
-          'Duplicate plugin contribution handlers: ${duplicates.join(', ')}');
+          "Duplicate plugin contribution handlers: ${duplicates.join(', ')}");
     }
   }
 

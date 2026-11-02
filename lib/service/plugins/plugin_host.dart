@@ -239,12 +239,19 @@ class PluginHost extends ChangeNotifier {
     }
 
     if (record.status == PluginStatus.enabled) {
-      final promptIds = Prefs().userPrompts.map((prompt) => prompt.id).toSet();
-      final toolbarIds =
-          Prefs().selectionToolbar.items.map((item) => item.id).toSet();
-      final lost = record.applied.isEmpty ||
-          record.applied
-              .every((entry) => !_isMaterialised(entry, promptIds, toolbarIds));
+      // Each handler answers for its own kind (P2). runtimeOnly kinds live in
+      // an in-memory registry, so they are rebuilt on every start rather than
+      // probed. Declarative kinds keep P1's "rebuild only when every entry is
+      // gone" rule, so one prompt the user deleted is not resurrected.
+      final hasRuntimeOnly = record.applied.any((entry) =>
+          _contributions.registry.forKind(entry.kind)?.runtimeOnly ?? false);
+      final lost = hasRuntimeOnly ||
+          record.applied.isEmpty ||
+          record.applied.every((entry) {
+            final handler = _contributions.registry.forKind(entry.kind);
+            // A kind this build does not know cannot be judged; leave it alone.
+            return handler != null && !handler.isApplied(entry);
+          });
       if (lost) {
         try {
           final applied = await _contributions.apply(manifest);
@@ -609,20 +616,6 @@ class PluginHost extends ChangeNotifier {
     }
     if (!replaced) next.add(record);
     _plugins = next;
-  }
-
-  static bool _isMaterialised(AppliedContribution entry, Set<String> promptIds,
-      Set<String> toolbarIds) {
-    switch (entry.kind) {
-      case kAiSkillContributionKind:
-        return promptIds.contains(entry.id);
-      case kSelectionActionContributionKind:
-        return toolbarIds.contains(entry.id);
-      default:
-        // A kind without a handler in this build cannot be checked; leave it
-        // alone rather than recreating or deleting unrelated values.
-        return true;
-    }
   }
 
   Future<void> _removeContributions(PluginRecord record) async {

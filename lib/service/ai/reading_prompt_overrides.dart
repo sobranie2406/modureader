@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:anx_reader/enums/ai_prompts.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:anx_reader/service/ai/reading_skill_registry.dart';
 
 /// Strip bundled prompt text from a portable snapshot, not from live settings.
 /// Null means use the receiving application's built-in default. Unknown IDs
@@ -18,7 +18,7 @@ Object? readingPromptOverride(String key, Object? value) {
     final raw = jsonDecode(value);
     if (raw is! Map || raw.values.any((v) => v is! String)) return value;
     final overrides = Map<String, dynamic>.from(raw);
-    for (final skill in readingSkillPromptDefinitions) {
+    for (final skill in ReadingSkillRegistry.current.promptDefinitions) {
       final saved = overrides[skill.id] as String?;
       if (saved != null && skill.isDefaultPrompt(saved)) {
         overrides.remove(skill.id);

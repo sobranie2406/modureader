@@ -284,7 +284,7 @@ String reasoningContentToPlainText(String content) {
       case ParsedReasoningEntryType.tool:
         final step = entry.toolStep;
         if (step != null) {
-          final toolName = AiToolRegistry.displayNameForId(step.name);
+          final toolName = AiToolRegistry.current.displayNameForId(step.name);
           final lines = <String>['[Tool $toolName ${step.status}]'];
           final output = step.output?.trim();
           if (output != null && output.isNotEmpty) {
