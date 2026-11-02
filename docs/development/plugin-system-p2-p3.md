@@ -1085,6 +1085,10 @@ Overall rollback principle: P2 reverts code only; P3 first removes the capabilit
 
 ### 10.4 Open questions
 
+The P3 items below (JSON vs HTML, secret export, backup domains, restart-persistent
+quotas, dedicated HTTP client) are analysed in [the P3 security review](plugin-p3-security-review.md) §9,
+which is the gate for P3a.
+
 1. Should P3's `dictionarySource` support JSON only, or also a minimal HTML text extraction in v1? This document defaults to JSON-only.
 2. Should plugin secrets be exported when `includeSecrets=true`? This document defaults to **never export**; if maintainers want exportable secrets, that needs a separate security review and a second UI confirmation.
 3. May a plugin declare multiple domains for one API (primary/backup)? This document allows 1–8 but permits exactly one host per request and no runtime switching.
