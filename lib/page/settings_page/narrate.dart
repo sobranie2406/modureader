@@ -22,6 +22,7 @@ import 'package:anx_reader/widgets/settings/mimo_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/openai_voice_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/tts_buffer_settings.dart';
+import 'package:anx_reader/widgets/settings/tts_role_settings.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -226,15 +227,19 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
     try {
       final tts = TtsFactory().current;
       await tts.stop();
+      // Previews always use the original speed: the reader's playback rate is a
+      // listening preference, not part of the voice being tested.
+      final voice = voiceShortName ??
+          tts_svc.getTtsService(Prefs().ttsService).provider.getSelectedVoice();
       if (tts is OnlineTts) {
-        if (voiceShortName != null) {
-          await tts.speakWithVoice(text, voiceShortName);
+        if (voice.isNotEmpty) {
+          await tts.speakWithVoice(text, voice, rate: 1.0);
         } else {
           await tts.speak(content: text);
         }
       } else if (tts is SystemTts) {
-        if (voiceShortName != null) {
-          await tts.speakWithVoice(text, voiceShortName);
+        if (voice.isNotEmpty) {
+          await tts.speakWithVoice(text, voice, rate: 1.0);
         } else {
           await tts.speak(content: text);
         }
@@ -565,6 +570,10 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               ],
             ),
 
+            // Placed right below the service choice so it is visible without
+            // scrolling past the long provider configuration form.
+            TtsRoleSettingsSection(),
+
             _buildSettingsTransfer(),
             TtsBufferSettingsSection(online: ttsServiceId != 'system'),
 
@@ -634,7 +643,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
                     ),
                   )
                 ],
-              )
+              ),
           ],
         ));
   }

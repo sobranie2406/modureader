@@ -3,6 +3,7 @@ import 'package:anx_reader/service/translate/classical_translation.dart';
 import 'package:anx_reader/enums/app_layout_mode.dart';
 import 'package:anx_reader/models/reader_shortcuts.dart';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
+import 'package:anx_reader/models/tts_role_config.dart';
 import 'dart:core';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
 import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
@@ -714,6 +715,60 @@ class Prefs extends ChangeNotifier {
   String getTtsVoiceModel(String serviceId) {
     return prefs.getString('ttsVoiceModel_$serviceId') ?? '';
   }
+
+  // ============ Multi-speaker narration ============
+
+  static const _ttsRoleConfigKey = 'ttsRoleConfig';
+  static String _ttsRoleBookKey(int bookId) => 'ttsRoleBook_$bookId';
+
+  /// Global narration/dialogue voices. Book-level overrides resolve on top.
+  TtsRoleConfig get ttsRoleConfig {
+    final raw = prefs.getString(_ttsRoleConfigKey);
+    if (raw == null || raw.isEmpty) return TtsRoleConfig.disabled;
+    try {
+      return TtsRoleConfig.fromMap(jsonDecode(raw));
+    } catch (_) {
+      // A corrupt entry must not break narration; fall back to one voice.
+      return TtsRoleConfig.disabled;
+    }
+  }
+
+  Future<void> saveTtsRoleConfig(TtsRoleConfig config) async {
+    if (config == TtsRoleConfig.disabled) {
+      await prefs.remove(_ttsRoleConfigKey);
+    } else {
+      await prefs.setString(_ttsRoleConfigKey, jsonEncode(config.toMap()));
+    }
+    notifyListeners();
+  }
+
+  /// Per-book delta; an empty override removes the entry.
+  TtsRoleBookOverride ttsRoleBookOverride(int? bookId) {
+    if (bookId == null) return const TtsRoleBookOverride();
+    final raw = prefs.getString(_ttsRoleBookKey(bookId));
+    if (raw == null || raw.isEmpty) return const TtsRoleBookOverride();
+    try {
+      return TtsRoleBookOverride.fromMap(jsonDecode(raw));
+    } catch (_) {
+      return const TtsRoleBookOverride();
+    }
+  }
+
+  Future<void> saveTtsRoleBookOverride(
+      int? bookId, TtsRoleBookOverride override) async {
+    if (bookId == null) return;
+    if (override.isEmpty) {
+      await prefs.remove(_ttsRoleBookKey(bookId));
+    } else {
+      await prefs.setString(
+          _ttsRoleBookKey(bookId), jsonEncode(override.toMap()));
+    }
+    notifyListeners();
+  }
+
+  /// Effective configuration for [bookId]; also what narration consumes.
+  TtsRoleConfig ttsRoleConfigForBook(int? bookId) =>
+      ttsRoleBookOverride(bookId).resolve(ttsRoleConfig);
 
   set ttsService(String serviceId) {
     prefs.setString('ttsService', serviceId);

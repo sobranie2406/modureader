@@ -211,8 +211,8 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
             'Adjacent sentences in one paragraph are synthesized together. Highlighting and navigation follow each passage; long paragraphs are split. Steady narration instructions are added without changing your saved description. Voice and timing still depend on the model.')),
         Text(ModuStrings.text(
             context,
-            '描述不会作为正文朗读。语速滑块在本地调节播放速度（0.5–2.0 倍），松手后生效，无需重新生成语音。1 倍是接口返回音频的原始速度；描述中的快慢节奏仍可能影响原始音频。音高仍由提示词控制。修改描述后点击“保存设置”生效。',
-            'Descriptions are instructions, not spoken text. The rate slider controls local playback (0.5–2.0×) on release without regenerating speech. 1× is the original generated speed; timing instructions can still affect that audio. Pitch remains prompt-controlled. Save settings to apply description changes.')),
+            '描述不会作为正文朗读。语速在本地按 0.1 档调节播放倍速（0.1–4.0 倍，也可直接输入），立即生效，无需重新生成语音。1 倍是接口返回音频的原始速度；描述中的快慢节奏仍可能影响原始音频。音高仍由提示词控制，本地音调范围 0.5–2.0 倍。修改描述后点击“保存设置”生效。',
+            'Descriptions are instructions, not spoken text. Playback rate is adjusted locally in 0.1 steps (0.1–4.0×, or typed directly) and applies immediately without regenerating speech. 1× is the original generated speed; timing instructions can still affect that audio. Pitch remains prompt-controlled; the local pitch range is 0.5–2.0×. Save settings to apply description changes.')),
       ],
     );
   }

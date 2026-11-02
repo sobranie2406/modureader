@@ -253,12 +253,15 @@ class SystemTts extends BaseTts {
     }
   }
 
-  /// For testing a specific voice in settings (matching OnlineTts API)
-  Future<void> speakWithVoice(String content, String voiceShortName) async {
+  /// For testing a specific voice in settings (matching OnlineTts API).
+  /// A preview always speaks at the original 1.0x speed so the sample reflects
+  /// the voice rather than the reader's playback preference.
+  Future<void> speakWithVoice(String content, String voiceShortName,
+      {double? rate}) async {
     _requireSupport();
     await stop();
     await flutterTts.setVolume(volume);
-    await flutterTts.setSpeechRate(rate);
+    await flutterTts.setSpeechRate(rate ?? this.rate);
     await flutterTts.setPitch(pitch);
     await _applyVoice(voiceShortName);
     await setAwaitOptions();

@@ -31,7 +31,7 @@ vectorModelDownloadSource vectorModelConfig''',
   'ocr':
       'ocrModelId ocrModelDownloadSource ocrPrecacheEnabled ocrPrecachePages',
   'tts':
-      '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio ttsBufferSettings''',
+      '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio ttsBufferSettings ttsRoleConfig''',
   'translation':
       '''translateService translateFrom translateTo fullTextTranslateService
 fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection webTranslationZoomPercent
