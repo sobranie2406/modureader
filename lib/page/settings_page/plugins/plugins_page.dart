@@ -4,6 +4,7 @@ import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/page/settings_page/plugins/plugin_detail_page.dart';
+import 'package:anx_reader/page/settings_page/plugins/plugin_install_preview.dart';
 import 'package:anx_reader/service/plugins/plugin_host.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
@@ -140,6 +141,13 @@ class _PluginSettingsState extends State<PluginSettings> {
     try {
       final file = await (widget.pickPackage?.call() ?? _pickPackage());
       if (file == null) return;
+      // Inspect first: trust, compatibility and version conflicts surface here,
+      // and the user sees permissions/README before anything is written.
+      final preview =
+          await _host.preview(file, allowSameVersion: replaceId != null);
+      if (!mounted) return;
+      final confirmed = await PluginInstallPreviewPage.show(context, preview);
+      if (!confirmed || !mounted) return;
       final result =
           await _host.install(file, allowSameVersion: replaceId != null);
       if (!mounted) return;

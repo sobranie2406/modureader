@@ -22,6 +22,41 @@ class PluginInstallResult {
   final List<String> warnings;
 }
 
+/// Read-only inspection of a package before anything is written.
+///
+/// The preview runs the same package, trust and compatibility checks as
+/// [PluginHost.install], so a confirmed preview cannot fail for a reason the
+/// user could have seen first. Nothing here mutates preferences or the files.
+class PluginPreview {
+  const PluginPreview({
+    required this.manifest,
+    required this.manifestText,
+    required this.sha256,
+    required this.compressedBytes,
+    required this.readme,
+    required this.warnings,
+    required this.installedVersion,
+  });
+
+  final PluginManifest manifest;
+  final String manifestText;
+  final String sha256;
+  final int compressedBytes;
+
+  /// First [maxReadmeChars] of the package README, or null when it has none.
+  final String? readme;
+
+  /// Non-fatal parsing notices, for example skipped contribution kinds.
+  final List<String> warnings;
+
+  /// Version already installed for this id, if any.
+  final String? installedVersion;
+
+  static const int maxReadmeChars = 8 * 1024;
+
+  bool get willReplace => installedVersion != null;
+}
+
 /// Single source of truth for installed plugins.
 ///
 /// P1a only materialises declarative contributions; no package code runs.
@@ -94,6 +129,10 @@ class PluginHost extends ChangeNotifier {
   PluginManifest? manifestFor(String id) => _manifests[id];
 
   String? manifestTextFor(String id) => _manifestTexts[id];
+
+  /// First 8 KB of the installed package README, resolved lazily so startup
+  /// does not read files it may never show.
+  Future<String?> readmeFor(String id) => _readReadme(_paths.pluginDir(id));
 
   /// Loads the registry and reconciles it with the package directory.
   ///
@@ -237,6 +276,82 @@ class PluginHost extends ChangeNotifier {
     return _LoadedManifest(PluginManifest.parse(text), text);
   }
 
+  /// Inspects [package] without installing it.
+  ///
+  /// Runs the same package, trust and compatibility checks as [install] so the
+  /// confirmation page can show what would happen; the staging directory is
+  /// always removed and no preference is written.
+  Future<PluginPreview> preview(File package,
+          {bool allowSameVersion = false}) =>
+      _exclusive(() => _preview(package, allowSameVersion: allowSameVersion));
+
+  Future<PluginPreview> _preview(File package,
+      {required bool allowSameVersion}) async {
+    _ensureUsable();
+    if (!_initialized) await _initialize();
+    final pkg = await _reader.read(package);
+    try {
+      final manifest = pkg.manifest;
+      await trust.verify(pkg.staging, manifest.id, manifest.version);
+      if (_appVersion.isNotEmpty) manifest.ensureCompatibleWith(_appVersion);
+      final existing = byId(manifest.id);
+      _checkVersionConflict(existing, manifest,
+          allowSameVersion: allowSameVersion);
+      return PluginPreview(
+        manifest: manifest,
+        manifestText: pkg.manifestText,
+        sha256: pkg.sha256,
+        compressedBytes: pkg.compressedBytes,
+        readme: await _readReadme(pkg.staging),
+        warnings: List.unmodifiable(pkg.warnings),
+        installedVersion: existing?.version,
+      );
+    } finally {
+      await pkg.dispose();
+    }
+  }
+
+  /// Shared by install and preview so both reject the same version states.
+  void _checkVersionConflict(
+    PluginRecord? existing,
+    PluginManifest manifest, {
+    required bool allowSameVersion,
+  }) {
+    if (existing == null) return;
+    final comparison = Version.parse(manifest.version)
+        .compareTo(Version.parse(existing.version));
+    final repairable = existing.status == PluginStatus.broken ||
+        existing.status == PluginStatus.missing;
+    if (comparison < 0) {
+      throw PluginInstallError(PluginErrorCode.downgradeNotAllowed,
+          'A newer version (${existing.version}) is already installed. Uninstall it first.');
+    }
+    if (comparison == 0 && !repairable && !allowSameVersion) {
+      throw PluginInstallError(PluginErrorCode.alreadyInstalled,
+          'Version ${manifest.version} is already installed.');
+    }
+  }
+
+  /// The details page shows the first 8 KB of the README as plain text.
+  Future<String?> _readReadme(Directory directory) async {
+    final file = File(p.join(directory.path, 'README.md'));
+    try {
+      if (!await file.exists()) return null;
+      // Four bytes per character covers every UTF-8 scalar value; a sequence
+      // cut at the limit is decoded with replacement instead of throwing.
+      final bytes = await file.readAsBytes();
+      final text = const Utf8Decoder(allowMalformed: true)
+          .convert(bytes.take(PluginPreview.maxReadmeChars * 4).toList());
+      final runes = text.runes.toList();
+      if (runes.length <= PluginPreview.maxReadmeChars) return text;
+      return '${String.fromCharCodes(
+              runes.take(PluginPreview.maxReadmeChars))}…';
+    } catch (error) {
+      AnxLog.warning('Could not read plugin README: $error');
+      return null;
+    }
+  }
+
   Future<PluginInstallResult> install(File package,
           {bool allowSameVersion = false}) =>
       _exclusive(() => _install(package, allowSameVersion: allowSameVersion));
@@ -252,20 +367,8 @@ class PluginHost extends ChangeNotifier {
       if (_appVersion.isNotEmpty) manifest.ensureCompatibleWith(_appVersion);
 
       final existing = byId(manifest.id);
-      if (existing != null) {
-        final comparison = Version.parse(manifest.version)
-            .compareTo(Version.parse(existing.version));
-        final repairable = existing.status == PluginStatus.broken ||
-            existing.status == PluginStatus.missing;
-        if (comparison < 0) {
-          throw PluginInstallError(PluginErrorCode.downgradeNotAllowed,
-              'A newer version (${existing.version}) is already installed. Uninstall it first.');
-        }
-        if (comparison == 0 && !repairable && !allowSameVersion) {
-          throw PluginInstallError(PluginErrorCode.alreadyInstalled,
-              'Version ${manifest.version} is already installed.');
-        }
-      }
+      _checkVersionConflict(existing, manifest,
+          allowSameVersion: allowSameVersion);
 
       final promptsSnapshot = Prefs().userPrompts;
       final toolbarSnapshot = Prefs().selectionToolbar;

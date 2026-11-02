@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/page/settings_page/plugins/plugins_page.dart';
 import 'package:anx_reader/page/settings_page/experimental.dart';
@@ -65,7 +66,9 @@ void main() {
   });
 
   Future<void> pumpSettings(WidgetTester tester,
-      {VoidCallback? onPick, bool pickNothing = false}) async {
+      {VoidCallback? onPick,
+      bool pickNothing = false,
+      PluginHost? hostOverride}) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -74,7 +77,7 @@ void main() {
       locale: const Locale('en'),
       home: Scaffold(
         body: PluginSettings(
-          host: host,
+          host: hostOverride ?? host,
           pickPackage: () async {
             onPick?.call();
             return pickNothing ? null : nextPackage;
@@ -248,8 +251,7 @@ void main() {
 
     expect(find.text('Add selection toolbar actions'), findsOneWidget);
     expect(find.text('Explain'), findsWidgets);
-    expect(find.text('Reserved settings (stored only; do not affect prompts)'),
-        findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Enable magic'), findsOneWidget);
     expect(find.text('Tone'), findsOneWidget);
 
@@ -259,4 +261,86 @@ void main() {
 
     expect(Prefs().pluginConfig('com.example.prompt-pack')['enabled'], isFalse);
   });
+
+  testWidgets('installing shows the confirmation page and cancel writes nothing',
+      (tester) async {
+    final fake = _PreviewHost(packageFile: nextPackage!, previewResult: previewFor());
+    await pumpSettings(tester, hostOverride: fake);
+    await tester.tap(find.byKey(const ValueKey('plugin-install')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Install plugin'), findsOneWidget);
+    expect(find.text('Add AI prompt templates'), findsOneWidget);
+    expect(find.text('AI prompts'), findsOneWidget);
+    expect(find.text('# Example prompt pack'), findsOneWidget,
+        reason: 'README preview is shown before installing');
+
+    await tester.tap(find.byKey(const ValueKey('plugin-install-cancel')));
+    await tester.pumpAndSettle();
+    expect(fake.installs, 0);
+    expect(host.plugins, isEmpty);
+  });
+
+  testWidgets('confirming the preview installs the package', (tester) async {
+    final fake = _PreviewHost(packageFile: nextPackage!, previewResult: previewFor());
+    await pumpSettings(tester, hostOverride: fake);
+    await tester.tap(find.byKey(const ValueKey('plugin-install')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('plugin-install-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(fake.installs, 1);
+  });
+
+  testWidgets('the details page shows the package README', (tester) async {
+    await installSample(tester);
+    await pumpSettings(tester);
+    await tester.tap(find.text('Example prompt pack'));
+    await settleAsync(tester);
+
+    expect(find.text('Package README'), findsOneWidget);
+    expect(find.textContaining('Example prompt pack'), findsWidgets);
+  });
 }
+
+/// A preview/install host that never touches the file system, so widget tests
+/// can assert navigation without waiting on real zip unpacking.
+class _PreviewHost extends PluginHost {
+  _PreviewHost({required this.packageFile, required this.previewResult})
+      : super(trust: const FixturePluginTrust());
+
+  final File packageFile;
+  final PluginPreview previewResult;
+  int installs = 0;
+
+  @override
+  Future<PluginPreview> preview(File file,
+          {bool allowSameVersion = false}) async =>
+      previewResult;
+
+  @override
+  Future<PluginInstallResult> install(File file,
+      {bool allowSameVersion = false}) async {
+    installs++;
+    return PluginInstallResult(
+        record: PluginRecord(
+      id: previewResult.manifest.id,
+      version: previewResult.manifest.version,
+      name: previewResult.manifest.name,
+      license: previewResult.manifest.license,
+      installedAt: DateTime(2026),
+      sha256: previewResult.sha256,
+      status: PluginStatus.enabled,
+    ));
+  }
+}
+
+PluginPreview previewFor() => PluginPreview(
+      manifest: PluginManifest.parse(manifestJson()),
+      manifestText: manifestJson(),
+      sha256: 'a' * 64,
+      compressedBytes: 4096,
+      readme: '# Example prompt pack',
+      warnings: const [],
+      installedVersion: null,
+    );
