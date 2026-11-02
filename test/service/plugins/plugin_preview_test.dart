@@ -5,7 +5,6 @@ import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/service/plugins/plugin_host.dart';
 import 'package:anx_reader/service/plugins/plugin_paths.dart';
-import 'package:anx_reader/service/plugins/plugin_trust.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
