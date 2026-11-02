@@ -167,6 +167,9 @@ class PluginRecord {
   }
 }
 
+/// Backups may not turn the displayed package digest into arbitrary text.
+final RegExp _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
+
 class PluginState {
   const PluginState({this.schemaVersion = 1, this.plugins = const []});
 
@@ -254,6 +257,7 @@ class PluginState {
     for (final item in rawPlugins) {
       final record = PluginRecord.fromJson(item);
       if (!pluginIdPattern.hasMatch(record.id) ||
+          !_sha256Pattern.hasMatch(record.sha256) ||
           record.name.isEmpty ||
           !seen.add(record.id)) {
         throw const FormatException('Invalid plugin record');

@@ -152,8 +152,13 @@ class SelectionActionContributionHandler implements PluginContributionHandler {
       ));
     }
 
-    await Prefs()
-        .saveSelectionToolbar(config.copyWith(items: List.unmodifiable(next)));
+    // Skip a write when the toolbar already matches, so re-enabling a plugin
+    // whose actions are unchanged does not churn preferences and notify every
+    // listener for nothing.
+    if (!_sameItems(config.items, next)) {
+      await Prefs().saveSelectionToolbar(
+          config.copyWith(items: List.unmodifiable(next)));
+    }
     return applied;
   }
 
@@ -206,6 +211,27 @@ class SelectionActionContributionHandler implements PluginContributionHandler {
 
   static String toolbarIdFor(String pluginId, String actionId) =>
       PluginPromptTemplate.actionId(pluginId, actionId);
+
+  static bool _sameItems(
+      List<SelectionToolbarItem> a, List<SelectionToolbarItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final left = a[i];
+      final right = b[i];
+      if (left.id != right.id ||
+          left.action != right.action ||
+          left.name != right.name ||
+          left.icon != right.icon ||
+          left.prompt != right.prompt ||
+          left.scope != right.scope ||
+          left.enabled != right.enabled ||
+          left.webSearch != right.webSearch ||
+          left.skillId != right.skillId) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   static String _hash(String canonical) =>
       sha256.convert(utf8.encode(canonical)).toString();
