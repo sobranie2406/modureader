@@ -2,6 +2,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/ai_quick_prompt_chip.dart';
 import 'package:anx_reader/service/ai/reading_skill_layout.dart';
 import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:flutter/material.dart';
 
 IconData readingSkillIcon(String id) => switch (id) {
@@ -38,7 +39,9 @@ List<AiQuickPromptChip> configuredReadingSkillChips(Locale locale) {
         chips.add(AiQuickPromptChip(
             icon: Icons.person_outline,
             label: skill.name,
-            prompt: skill.content,
+            // Plugin prompts may carry {setting.<key>}; resolve at use time so
+            // a settings change takes effect without rewriting user content.
+            prompt: PluginPromptTemplate.resolveUserPrompt(skill),
             skillId: 'custom.${skill.id}'));
       }
     }
