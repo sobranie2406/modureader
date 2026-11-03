@@ -6,15 +6,12 @@ import 'package:anx_reader/l10n/app_language.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
-import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
-import 'package:anx_reader/widgets/settings/theme_mode.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:provider/provider.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:anx_reader/enums/bookshelf_folder_style.dart';
+import 'package:anx_reader/page/settings_page/theme_colors.dart';
 import 'package:anx_reader/page/settings_page/weread_settings.dart';
 
 const List<Map<String, String>> languageOptions = [
@@ -44,6 +41,19 @@ class AppearanceSetting extends StatefulWidget {
 }
 
 class _AppearanceSettingState extends State<AppearanceSetting> {
+  /// Preset name, or the raw hex for a colour chosen outside the palette.
+  String _activeThemeColorLabel(BuildContext context) {
+    final preset = Prefs().activeThemePreset;
+    if (preset != null) return preset.label(Localizations.localeOf(context));
+    final hex = Prefs()
+        .themeColor
+        .toARGB32()
+        .toRadixString(16)
+        .substring(2)
+        .toUpperCase();
+    return '#$hex';
+  }
+
   @override
   Widget build(BuildContext context) {
     final localeKey = appLocaleKey(Localizations.localeOf(context));
@@ -62,16 +72,18 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
         SettingsSection(
           title: Text(L10n.of(context).settingsAppearanceTheme),
           tiles: [
-            const CustomSettingsTile(
-                child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: ChangeThemeMode(),
-            )),
             SettingsTile.navigation(
                 title: Text(L10n.of(context).settingsAppearanceThemeColor),
                 leading: const Icon(Icons.color_lens),
+                value: Text(_activeThemeColorLabel(context)),
+                description: Text(ModuStrings.text(
+                    context,
+                    '明暗模式、预设与自定义配色',
+                    'Light/dark mode, presets and custom palettes')),
                 onPressed: (context) async {
-                  await showColorPickerDialog(context);
+                  await Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ThemeColorsPage()));
+                  if (context.mounted) setState(() {});
                 }),
             SettingsTile.switchTile(
               title: Text('OLED · ${L10n.of(context).settingsDarkMode}'),
@@ -413,63 +425,4 @@ void showLanguagePickerDialog(BuildContext context) {
               );
             }).toList(),
           ));
-}
-
-Future<void> showColorPickerDialog(BuildContext context) async {
-  final prefsProvider = Provider.of<Prefs>(context, listen: false);
-  final currentColor = prefsProvider.themeColor;
-
-  Color pickedColor = currentColor;
-
-  await showDialog<void>(
-    animationStyle: AppMotion.style,
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(L10n.of(context).settingsAppearanceThemeColor),
-        content: SingleChildScrollView(
-          child: ColorPicker(
-            pickerColor: pickedColor,
-            onColorChanged: (color) {
-              pickedColor = color;
-            },
-            enableAlpha: false,
-            displayThumbColor: true,
-            pickerAreaHeightPercent: 0.8,
-          ),
-        ),
-        actions: <Widget>[
-          TextButton.icon(
-            key: const ValueKey('reset-theme-color'),
-            icon: const Icon(Icons.restore),
-            label: Text(L10n.of(context).cssRestoreDefault),
-            onPressed: () async {
-              if (!await confirmColorReset(
-                  context,
-                  ModuStrings.text(context, '恢复默认主题颜色？其他外观设置不会改变。',
-                      'Restore the default theme colour? Other appearance settings will not change.'))) {
-                return;
-              }
-              if (!context.mounted) return;
-              await prefsProvider.resetThemeColor();
-              if (context.mounted) Navigator.of(context).pop();
-            },
-          ),
-          TextButton(
-            child: Text(L10n.of(context).commonCancel),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-          TextButton(
-            child: Text(L10n.of(context).commonOk),
-            onPressed: () {
-              prefsProvider.saveThemeToPrefs(pickedColor.toARGB32());
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
-      );
-    },
-  );
 }

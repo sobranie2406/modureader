@@ -92,7 +92,10 @@ void main() {
               expect(redAt(rect.left + 1, rect.top + 1), lessThan(220),
                   reason: 'The outer corner must expose the backdrop, not a '
                       'square child background.');
-              expect(redAt(rect.center.dx, rect.top + 30), 252);
+              // The panel paints the theme surface; its exact colour now comes
+              // from the active preset canvas.
+              expect(redAt(rect.center.dx, rect.top + 30),
+                  (theme.colorScheme.surface.r * 255).round());
               const preview = String.fromEnvironment('POPUP_PREVIEW');
               if (preview.isNotEmpty) {
                 final png =

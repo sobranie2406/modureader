@@ -81,11 +81,17 @@ void main() {
   test('moved settings remain in their single canonical sections', () {
     final appearance =
         File('lib/page/settings_page/appearance.dart').readAsStringSync();
+    final themeColors =
+        File('lib/page/settings_page/theme_colors.dart').readAsStringSync();
     final sync = File('lib/page/settings_page/sync.dart').readAsStringSync();
     final settings = File('lib/page/settings_page/more_settings_page.dart')
         .readAsStringSync();
 
-    expect(appearance, contains('ChangeThemeMode'));
+    // Theme mode moved into the theme colour page; the appearance page only
+    // links to it, so exactly one page owns the selector.
+    expect(appearance, contains('ThemeColorsPage'));
+    expect(appearance, isNot(contains('ChangeThemeMode')));
+    expect(themeColors, contains('ChangeThemeMode'));
     expect(sync, contains('webdavSwitch(context, setState, ref)'));
     expect(settings, isNot(contains('IAPPage')));
 

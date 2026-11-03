@@ -1,3 +1,4 @@
+import 'package:anx_reader/models/theme_preset.dart';
 import 'dart:convert';
 import 'package:anx_reader/enums/app_layout_mode.dart';
 import 'dart:math';
@@ -159,6 +160,19 @@ void main() {
     }
     expect(text, isNot(contains('device-font')));
     expect(text, isNot(contains('/device/bg.png')));
+  });
+
+  test('default appearance backup clears an old preset and reader-link switch',
+      () async {
+    final prefs = Prefs();
+    final data = await GlobalSettingsTransfer.decode(
+        await GlobalSettingsTransfer.export(prefs, scope: 'appearance'));
+    await prefs.selectThemePreset(builtInThemePresetById('pink')!);
+    await prefs.setThemeAppliesToReader(true);
+    await GlobalSettingsTransfer.apply(prefs, data);
+    expect(prefs.themePresetId, isEmpty);
+    expect(prefs.activeThemePreset?.id, 'modu');
+    expect(prefs.themeAppliesToReader, isFalse);
   });
 
   test('E-Ink animation preference roundtrips in appearance settings',
