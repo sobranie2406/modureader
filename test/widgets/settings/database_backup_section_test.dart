@@ -41,7 +41,10 @@ void main() {
       localizationsDelegates: L10n.localizationsDelegates,
       home: Scaffold(
         body: MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+          // Keep a real size: help popovers clamp their width to the window.
+          data: const MediaQueryData(
+              size: Size(390, 844),
+              textScaler: TextScaler.linear(1.5)),
           child: SingleChildScrollView(
             child: DatabaseBackupSection(
               platform: platform,
@@ -66,11 +69,26 @@ void main() {
         'ui_database_backup_export',
         'ui_database_backup_import',
         'ui_database_backup_contents',
-        'ui_database_backup_export_step',
-        'ui_database_backup_import_step',
         'ui_database_backup_save_windows',
       ]) {
         expect(find.text(catalog[key]!), findsOneWidget, reason: key);
+      }
+      // Instructions are anchored help popovers: they are opened on demand so
+      // the list stays compact at 1.5x text scale.
+      final helps = find.byIcon(Icons.help_outline);
+      expect(helps, findsNWidgets(2));
+      for (final key in [
+        'ui_database_backup_export_step',
+        'ui_database_backup_import_step',
+      ]) {
+        final index = key.contains('export') ? 0 : 1;
+        await tester.ensureVisible(helps.at(index));
+        await tester.pumpAndSettle();
+        await tester.tap(helps.at(index));
+        await tester.pumpAndSettle();
+        expect(find.text(catalog[key]!), findsOneWidget, reason: key);
+        await tester.tapAt(const Offset(4, 4));
+        await tester.pumpAndSettle();
       }
       expect(find.text('Export/Import'), findsNothing);
       expect(tester.takeException(), isNull);
