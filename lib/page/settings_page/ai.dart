@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_chat_display_mode.dart';
 import 'package:anx_reader/enums/ai_panel_position.dart';
@@ -71,6 +72,7 @@ class _AISettingsState extends ConsumerState<AISettings> {
         tiles: [
           SettingsTile.navigation(
             title: Text(l10n.settingsAiProviders),
+            descriptionAsHelp: false,
             description: _buildProviderDescription(),
             onPressed: (context) {
               Navigator.push(
@@ -154,12 +156,13 @@ class _AISettingsState extends ConsumerState<AISettings> {
         tiles: [
           CustomSettingsTile(
             child: ListTile(
-              title: Text(
-                  ModuStrings.text(context, '保留对话历史', 'Keep chat history')),
-              subtitle: Text(ModuStrings.text(
-                  context,
-                  '对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。',
-                  'Chats are stored locally and are not removed when clearing the cache or changing its size limit. Manage them separately in AI chat history.')),
+              title: SettingHelp(
+                  title: Text(
+                      ModuStrings.text(context, '保留对话历史', 'Keep chat history')),
+                  description: Text(ModuStrings.text(
+                      context,
+                      '对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。',
+                      'Chats are stored locally and are not removed when clearing the cache or changing its size limit. Manage them separately in AI chat history.'))),
             ),
           ),
         ],
@@ -306,11 +309,12 @@ class _AiRpmTileState extends State<_AiRpmTile> {
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
     return ListTile(
-      title: Text(l10n.settingsAiRpm),
-      subtitle: Text(
-        l10n.settingsAiRpmTip,
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-      ),
+      title: SettingHelp(
+          title: Text(l10n.settingsAiRpm),
+          description: Text(
+            l10n.settingsAiRpmTip,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          )),
       trailing: SizedBox(
         width: 80,
         child: TextField(

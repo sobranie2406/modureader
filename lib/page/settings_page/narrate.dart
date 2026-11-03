@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -529,10 +530,13 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             if (AnxPlatform.isAndroid)
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
-                title: Text(
-                    ModuStrings.text(context, '朗读通知', 'Reading notifications')),
-                subtitle: Text(ModuStrings.text(context, '在系统设置中管理通知栏与锁屏播放控制',
-                    'Manage notification and lock-screen controls in system settings')),
+                title: SettingHelp(
+                    title: Text(ModuStrings.text(
+                        context, '朗读通知', 'Reading notifications')),
+                    description: Text(ModuStrings.text(
+                        context,
+                        '在系统设置中管理通知栏与锁屏播放控制',
+                        'Manage notification and lock-screen controls in system settings'))),
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () async {
                   await openAppSettings();
@@ -976,14 +980,16 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                     ),
-                    title: Text(
-                      displayName,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    subtitle: Text(subtitle),
+                    title: SettingHelp(
+                        title: Text(
+                          displayName,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        description: Text(subtitle)),
                     trailing: isSelected
                         ? Icon(Icons.check,
                             color: Theme.of(context).primaryColor)

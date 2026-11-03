@@ -10,8 +10,7 @@ import 'package:anx_reader/enums/code_highlight_theme.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/reading_info.dart';
 import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/page/settings_page/subpage/fonts.dart';
-import 'package:anx_reader/page/settings_page/subpage/installed_fonts.dart';
+import 'package:anx_reader/page/settings_page/subpage/font_management.dart';
 import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
@@ -556,32 +555,14 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
       );
     }
 
-    Widget downloadFonts() {
-      return ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(L10n.of(context).downloadFonts),
-        leading: const Icon(Icons.font_download_outlined),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const FontsSettingPage(),
-            ),
-          );
-        },
-      );
-    }
-
     Widget manageFonts() => ListTile(
-          key: const ValueKey('manage-installed-fonts'),
+          key: const ValueKey('font-management'),
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.font_download_outlined),
-          title: Text(
-              ModuStrings.text(context, '管理已安装字体', 'Manage installed fonts')),
+          title: Text(ModuStrings.text(context, '字体管理', 'Font management')),
           trailing: const Icon(Icons.arrow_forward_ios),
           onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const InstalledFontsPage())),
+              MaterialPageRoute(builder: (_) => const FontManagementPage())),
         );
 
     /// 每日打卡：当天（跨书累计）阅读满 N 分钟才算完成打卡。
@@ -777,7 +758,6 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
       return Container(
         padding: const EdgeInsets.all(18),
         child: Column(children: [
-          downloadFonts(),
           manageFonts(),
           const Divider(height: 20),
           dailyCheckIn(),
@@ -804,8 +784,6 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ReaderMenuGroup(
-              padding: const EdgeInsets.all(12), child: downloadFonts()),
           ReaderMenuGroup(
               padding: const EdgeInsets.all(12), child: manageFonts()),
           ReaderMenuGroup(

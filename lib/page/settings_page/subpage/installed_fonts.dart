@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -49,6 +50,7 @@ class _InstalledFontsPageState extends ConsumerState<InstalledFontsPage> {
       final changed =
           await removeInstalledFont(filename, directory: getFontDir());
       ref.invalidate(fontListProvider);
+      ref.invalidate(fontPreviewProvider);
       final reader = epubPlayerKey.currentState;
       if (reader != null && reader.mounted) {
         if (changed.contains('font')) reader.changeFont(Prefs().font);
@@ -114,7 +116,8 @@ class _InstalledFontsPageState extends ConsumerState<InstalledFontsPage> {
                       padding: EdgeInsets.zero,
                       child: ListTile(
                         leading: const Icon(Icons.font_download_outlined),
-                        title: Text(file.uri.pathSegments.last),
+                        title: FontNamePreview(file.uri.pathSegments.last,
+                            filename: file.uri.pathSegments.last),
                         subtitle:
                             file.uri.pathSegments.last == bundledFontFilename
                                 ? Text(t('应用内置', 'Bundled with the app'))

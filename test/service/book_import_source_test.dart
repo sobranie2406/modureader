@@ -5,6 +5,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  test('PDF imports keep filenames instead of unreliable embedded titles', () {
+    for (final title in ['P3', '天', 'æµ‹è¯•', '正常的内部标题', 'Unknown', '']) {
+      expect(importedBookTitle('/cache/倪海厦人纪系列之针灸.PDF', title),
+          '倪海厦人纪系列之针灸');
+    }
+    expect(importedBookTitle('/cache/书名.修订版.pdf', 'P3'), '书名.修订版');
+  });
+
+  test('other book formats retain metadata titles and filename fallbacks', () {
+    for (final extension in ['epub', 'mobi', 'azw3', 'fb2']) {
+      final file = '/cache/文件名.$extension';
+      expect(importedBookTitle(file, '书内标题'), '书内标题');
+      for (final missing in ['Unknown', '', '  ']) {
+        expect(importedBookTitle(file, missing), '文件名');
+      }
+    }
+  });
+
   late Directory root;
   setUp(() async {
     root = await Directory.systemTemp.createTemp('modu-import-test-');

@@ -22,7 +22,7 @@ Widget settingsTitle({
         title: Text(title),
         trailing: const Icon(Icons.chevron_right),
         selected: !isMobile && selectedIndex == id,
-        subtitle: Text(subtitle.join(' • ')),
+        subtitle: Text(subtitle.join(' • ').replaceAll(' · ', ' • ')),
         onTap: () {
           if (!isMobile) {
             setDetail(subPage, id);

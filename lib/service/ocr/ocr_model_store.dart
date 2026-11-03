@@ -109,8 +109,6 @@ class OcrModelStore {
     }
   }
 
-  static const version = 'ppocr-v4-mobile-1';
-  static const revision = '1cfba2e90fc938db55889873735088de210cc173';
   static const mirrorBase =
       'https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1';
   String downloadUrl(String file, OcrDownloadSource source) {

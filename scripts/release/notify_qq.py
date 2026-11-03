@@ -53,6 +53,9 @@ def main():
         reason = reason if reason in allowed else "Notification request failed"
         code = result.get("code")
         suffix = " (QQ code " + str(code) + ")" if isinstance(code, int) else ""
+        upstream = result.get("upstream_status")
+        if type(upstream) is int and 100 <= upstream <= 599:
+            suffix += " (GitHub HTTP " + str(upstream) + ")"
         raise RuntimeError(reason + suffix + "; HTTP " + str(error.code)) from None
     if not result.get("ok"):
         raise RuntimeError("QQ did not confirm the announcement")

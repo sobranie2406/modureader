@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
@@ -21,13 +22,14 @@ class _ReaderMenuOpacityTileState extends State<ReaderMenuOpacityTile> {
           return Column(mainAxisSize: MainAxisSize.min, children: [
             ListTile(
               enabled: !disabled,
-              title: Text(ModuStrings.text(
-                  context, '阅读弹出界面不透明度', 'Reading popup opacity')),
-              subtitle: Text(disabled
-                  ? ModuStrings.text(context, '电子墨水屏模式下固定为 100%',
-                      'Fixed at 100% in e-ink mode')
-                  : ModuStrings.text(
-                      context, '仅本设备 · 不同步', 'This device only · Not synced')),
+              title: SettingHelp(
+                  title: Text(ModuStrings.text(
+                      context, '阅读弹出界面不透明度', 'Reading popup opacity')),
+                  description: Text(disabled
+                      ? ModuStrings.text(context, '电子墨水屏模式下固定为 100%',
+                          'Fixed at 100% in e-ink mode')
+                      : ModuStrings.text(context, '仅本设备 · 不同步',
+                          'This device only · Not synced'))),
               trailing: Text('$percent%'),
             ),
             Slider(

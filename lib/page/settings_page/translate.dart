@@ -375,6 +375,7 @@ class _TranslateSettingState extends State<LanguageTranslateSetting> {
                 leading: const Icon(Icons.smart_toy_outlined),
                 title: Text(
                     ModuStrings.text(context, '翻译模型', 'Translation model')),
+                descriptionAsHelp: false,
                 description: aiModel == null
                     ? Text(ModuStrings.text(context, '请先在 AI 设置中配置服务商和模型',
                         'Configure a provider and model in AI settings first'))

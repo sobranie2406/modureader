@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
@@ -30,8 +31,7 @@ class _TtsBufferSettingsSectionState extends State<TtsBufferSettingsSection> {
     return CustomSettingsTile(
         child: ListTile(
       enabled: widget.online,
-      title: Text(title),
-      subtitle: Text(hint),
+      title: SettingHelp(title: Text(title), description: Text(hint)),
       trailing: DropdownButton<int>(
         key: ValueKey('tts-buffer-$key'),
         value: value,

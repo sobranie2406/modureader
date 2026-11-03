@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'reader_menu_appearance.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
@@ -310,56 +311,70 @@ class StyleWidgetState extends State<StyleWidget> {
               ))
           .toList(),
     );
-    final bodyFont = DropdownMenu<FontModel>(
-      key: ValueKey('reader-body-font-$selectedPath'),
-      enabled: !_document || _enabled,
-      label: Text(ModuStrings.text(context, '中文／正文字体', 'Chinese / body font')),
-      expandedInsets: const EdgeInsets.only(left: 5),
-      initialSelection: font,
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-        ),
-      ),
-      onSelected: (FontModel? font) async {
-        if (font == null) return;
-        if (document != null) {
-          await widget.saveDocumentStyle?.call(document
-              .withValue('serif', font.name == 'serif')
-              .withValue('font',
-                  ['system', 'serif'].contains(font.name) ? '' : font.path));
-          return;
-        }
-        if (font.name == 'newFont') {
-          // Hiding the toolbar disposes this StyleWidget. Keep the reader
-          // key, and apply even when this settings panel is no longer mounted.
-          final readerKey = widget.epubPlayerKey;
-          widget.hideAppBarAndBottomBar(false);
-          await importFont(onApplied: (imported) {
-            readerKey?.currentState?.changeFont(imported);
-          });
-          if (mounted) setState(() {});
-          return;
-        } else if (font.name == 'download') {
-          widget.hideAppBarAndBottomBar(false);
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const FontsSettingPage()),
-          );
-          return;
-        } else {
-          widget.epubPlayerKey?.currentState?.changeFont(font);
-          Prefs().font = font;
-        }
-      },
-      dropdownMenuEntries: fonts()
-          .map((font) => DropdownMenuEntry(
-                value: font,
-                label: font.label,
-                leadingIcon: leadingIcon(font.name),
-              ))
-          .toList(),
-    );
+    final bodyFont = fontPreviewBuilder(
+        font.litePath,
+        (family) => DropdownMenu<FontModel>(
+              textStyle: family == null ? null : TextStyle(fontFamily: family),
+              key: ValueKey('reader-body-font-$selectedPath'),
+              enabled: !_document || _enabled,
+              label: Text(
+                  ModuStrings.text(context, '中文／正文字体', 'Chinese / body font')),
+              expandedInsets: const EdgeInsets.only(left: 5),
+              initialSelection: font,
+              inputDecorationTheme: InputDecorationTheme(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(50),
+                ),
+              ),
+              onSelected: (FontModel? font) async {
+                if (font == null) return;
+                if (document != null) {
+                  await widget.saveDocumentStyle?.call(document
+                      .withValue('serif', font.name == 'serif')
+                      .withValue(
+                          'font',
+                          ['system', 'serif'].contains(font.name)
+                              ? ''
+                              : font.path));
+                  return;
+                }
+                if (font.name == 'newFont') {
+                  // Hiding the toolbar disposes this StyleWidget. Keep the reader
+                  // key, and apply even when this settings panel is no longer mounted.
+                  final readerKey = widget.epubPlayerKey;
+                  widget.hideAppBarAndBottomBar(false);
+                  await importFont(onApplied: (imported) {
+                    readerKey?.currentState?.changeFont(imported);
+                  });
+                  if (mounted) setState(() {});
+                  return;
+                } else if (font.name == 'download') {
+                  widget.hideAppBarAndBottomBar(false);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const FontsSettingPage()),
+                  );
+                  return;
+                } else {
+                  widget.epubPlayerKey?.currentState?.changeFont(font);
+                  Prefs().font = font;
+                }
+              },
+              dropdownMenuEntries: fonts()
+                  .map((font) => DropdownMenuEntry(
+                        value: font,
+                        label: font.label,
+                        labelWidget: FontNamePreview(font.label,
+                            filename:
+                                RegExp(r'\.(ttf|otf)$', caseSensitive: false)
+                                        .hasMatch(font.litePath)
+                                    ? font.litePath
+                                    : null),
+                        leadingIcon: leadingIcon(font.name),
+                      ))
+                  .toList(),
+            ));
     final fontAndConversion = Row(children: [
       Expanded(child: bodyFont),
       if (!_document)
@@ -394,39 +409,53 @@ class StyleWidgetState extends State<StyleWidget> {
     final current = choices.firstWhere(
         (font) => selected != null && font.litePath == selected.litePath,
         orElse: () => follow);
-    return DropdownMenu<FontModel>(
-      key: ValueKey('english-font-${current.litePath}'),
-      label: Text(ModuStrings.text(
-          context, '英文字体（字母、数字）', 'English font (letters, numbers)')),
-      expandedInsets: EdgeInsets.zero,
-      initialSelection: current,
-      inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(50))),
-      dropdownMenuEntries: choices
-          .map((font) => DropdownMenuEntry(value: font, label: font.label))
-          .toList(),
-      onSelected: (font) async {
-        if (font == null) return;
-        final readerKey = widget.epubPlayerKey;
-        if (font.name == 'newFont') {
-          widget.hideAppBarAndBottomBar(false);
-          await importFont(
-              target: FontTarget.english,
-              onApplied: (imported) {
-                readerKey?.currentState?.changeEnglishFont(imported);
-              });
-        } else if (font.name == 'download') {
-          widget.hideAppBarAndBottomBar(false);
-          await Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const FontsSettingPage()));
-        } else {
-          final selected = font.name == 'follow' ? null : font;
-          Prefs().englishFont = selected;
-          readerKey?.currentState?.changeEnglishFont(selected);
-        }
-        if (mounted) setState(() {});
-      },
-    );
+    return fontPreviewBuilder(
+        current.litePath,
+        (family) => DropdownMenu<FontModel>(
+              textStyle: family == null ? null : TextStyle(fontFamily: family),
+              key: ValueKey('english-font-${current.litePath}'),
+              label: Text(ModuStrings.text(
+                  context, '英文字体（字母、数字）', 'English font (letters, numbers)')),
+              expandedInsets: EdgeInsets.zero,
+              initialSelection: current,
+              inputDecorationTheme: InputDecorationTheme(
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(50))),
+              dropdownMenuEntries: choices
+                  .map((font) => DropdownMenuEntry(
+                      value: font,
+                      label: font.label,
+                      labelWidget: FontNamePreview(font.label,
+                          filename:
+                              RegExp(r'\.(ttf|otf)$', caseSensitive: false)
+                                      .hasMatch(font.litePath)
+                                  ? font.litePath
+                                  : null)))
+                  .toList(),
+              onSelected: (font) async {
+                if (font == null) return;
+                final readerKey = widget.epubPlayerKey;
+                if (font.name == 'newFont') {
+                  widget.hideAppBarAndBottomBar(false);
+                  await importFont(
+                      target: FontTarget.english,
+                      onApplied: (imported) {
+                        readerKey?.currentState?.changeEnglishFont(imported);
+                      });
+                } else if (font.name == 'download') {
+                  widget.hideAppBarAndBottomBar(false);
+                  await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const FontsSettingPage()));
+                } else {
+                  final selected = font.name == 'follow' ? null : font;
+                  Prefs().englishFont = selected;
+                  readerKey?.currentState?.changeEnglishFont(selected);
+                }
+                if (mounted) setState(() {});
+              },
+            ));
   }
 
   Padding sliders() {

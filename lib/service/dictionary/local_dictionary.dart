@@ -291,7 +291,9 @@ Future<void> _import(
     if (paths.isEmpty || paths.length > 1000) {
       throw const DictionaryFailure('files');
     }
-    if (paths.length == 1 && paths.single.toLowerCase().endsWith('.zip')) {
+    final fromArchive =
+        paths.length == 1 && paths.single.toLowerCase().endsWith('.zip');
+    if (fromArchive) {
       paths = await _unzip(paths.single, stage.path);
     }
     final mdx = paths.where((f) => f.toLowerCase().endsWith('.mdx')).toList();
@@ -373,7 +375,8 @@ Future<void> _import(
         } finally {
           await reader.close();
         }
-        await _importResources(db, paths, mdx.single, _dataLimit - totalBytes);
+        await _importResources(db, paths, mdx.single, _dataLimit - totalBytes,
+            fromArchive: fromArchive);
       } else {
         await _readStarDict(ifo.single, paths, stage.path, db, add);
       }
@@ -403,7 +406,8 @@ Future<void> _import(
 }
 
 Future<void> _importResources(
-    Database db, List<String> paths, String mdx, int budget) async {
+    Database db, List<String> paths, String mdx, int budget,
+    {required bool fromArchive}) async {
   final statement = db.prepare('INSERT INTO resources(path,data) VALUES(?,?)');
   var total = 0, count = 0;
   void add(String name, List<int> bytes) {
@@ -468,8 +472,12 @@ Future<void> _importResources(
         if (File(path).lengthSync() > dictionaryResourceLimit) {
           throw const DictionaryFailure('size');
         }
-        add(p.relative(path, from: p.dirname(mdx)),
-            await File(path).readAsBytes());
+        // Pickers may cache each loose file in a different temporary directory.
+        // Only archives retain the dictionary's original directory structure.
+        final name = fromArchive
+            ? p.relative(path, from: p.dirname(mdx))
+            : p.basename(path);
+        add(name, await File(path).readAsBytes());
       }
     }
   } finally {

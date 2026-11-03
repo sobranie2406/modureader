@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -353,10 +354,12 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                   children: [
                     const StopVectorizationButton(),
                     const SizedBox(height: 8),
-                    Text(ModuStrings.text(
-                        context,
-                        '停止当前和排队中的所有向量化任务，并关闭自动向量化，重启后不会自动续跑。保留已完成的索引和模型；需要时可从书籍菜单重新开始。',
-                        'Stop all running and queued indexing jobs and turn off automatic indexing so they do not restart with the app. Completed indexes and models are kept. Start again from a book’s menu when needed.')),
+                    SettingHelp(
+                        title: Text(ModuStrings.text(context, '说明', 'Help')),
+                        description: Text(ModuStrings.text(
+                            context,
+                            '停止当前和排队中的所有向量化任务，并关闭自动向量化，重启后不会自动续跑。保留已完成的索引和模型；需要时可从书籍菜单重新开始。',
+                            'Stop all running and queued indexing jobs and turn off automatic indexing so they do not restart with the app. Completed indexes and models are kept. Start again from a book’s menu when needed.'))),
                   ],
                 ),
               ),

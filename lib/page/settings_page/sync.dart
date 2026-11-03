@@ -240,6 +240,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             SettingsTile.switchTile(
               title: Text(ModuStrings.text(context, '同步服务配置、API Key 和密码',
                   'Sync service settings, API keys and passwords')),
+              descriptionAsHelp: false,
               description: Text(
                 Prefs().syncAiSettingsToWebdav
                     ? ModuStrings.text(
@@ -259,6 +260,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
               SettingsTile.navigation(
                 title: Text(ModuStrings.text(
                     context, '修改同步加密密码', 'Change sync encryption password')),
+                descriptionAsHelp: false,
                 description: Text(ModuStrings.text(
                     context,
                     '其他设备必须输入相同密码。密码无法找回。',

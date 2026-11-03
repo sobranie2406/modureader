@@ -15,6 +15,16 @@ class BookImportEntry {
 bool isSupportedBookFile(String name) => allowBookExtensions
     .contains(p.extension(name).replaceFirst('.', '').toLowerCase());
 
+String importedBookTitle(String filePath, String metadataTitle) {
+  // PDF producer metadata often contains garbled text or working names like P3.
+  if (p.extension(filePath).toLowerCase() == '.pdf' ||
+      metadataTitle == 'Unknown' ||
+      metadataTitle.trim().isEmpty) {
+    return p.basenameWithoutExtension(filePath);
+  }
+  return metadataTitle;
+}
+
 /// Enumerate without following links, reading book contents, or changing sources.
 /// Resolve duplicates so overlapping dropped folders do not import twice.
 Future<List<BookImportEntry>> discoverBookImportFiles(

@@ -1,9 +1,11 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'dart:io';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/main.dart';
 import 'package:anx_reader/page/settings_page/subpage/installed_fonts.dart';
+import 'package:anx_reader/page/settings_page/subpage/font_management.dart';
 import 'package:anx_reader/providers/fonts.dart';
 import 'package:anx_reader/service/installed_fonts.dart';
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
@@ -41,7 +43,8 @@ void main() {
     await root.delete(recursive: true);
   });
   Future<void> show(WidgetTester tester,
-      {DownloadStatus status = DownloadStatus.none}) async {
+      {DownloadStatus status = DownloadStatus.none,
+      Widget page = const InstalledFontsPage()}) async {
     await tester.pumpWidget(ProviderScope(
         overrides: [
           fontDownloadsProvider.overrideWith(() => _Downloads(status)),
@@ -51,10 +54,37 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: L10n.localizationsDelegates,
           supportedLocales: L10n.supportedLocales,
-          home: const InstalledFontsPage(),
+          home: page,
         )));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('font names use their installed face when preview is available',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+        overrides: [
+          fontPreviewProvider('example.ttf')
+              .overrideWith((ref) async => 'preview-face'),
+        ],
+        child: const MaterialApp(
+            home: Scaffold(
+                body: FontNamePreview('示例字体', filename: 'example.ttf')))));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.text('示例字体')).style?.fontFamily,
+        'preview-face');
+  });
+
+  testWidgets('font management groups actions and opens installed fonts',
+      (tester) async {
+    await show(tester, page: const FontManagementPage());
+    final rows = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+    expect(rows.map((row) => (row.title as Text).data),
+        ['Download Fonts', 'Import fonts', 'Manage installed fonts']);
+    await tester.tap(find.text('Manage installed fonts'));
+    await tester.pumpAndSettle();
+    expect(find.byType(InstalledFontsPage), findsOneWidget);
+    expect(find.text('import.ttf'), findsOneWidget);
+  });
 
   testWidgets(
       'cancel keeps file, confirm removes it, bundled has no delete button',

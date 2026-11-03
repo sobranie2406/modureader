@@ -73,9 +73,7 @@ void main() {
     expect(await destination.list().length, 1);
   });
 
-  test(
-      'batch applies only the last successful font, even if the last file fails',
-      () async {
+  test('batch installs fonts without changing the current font', () async {
     final first = await source('first.ttf', '第一');
     final second = await source('second.otf', '第二');
     final applied = <FontModel>[];
@@ -86,8 +84,43 @@ void main() {
     ], directory: destination, serverPort: 12345, onApplied: applied.add);
     expect(result.failed, 1);
     expect(result.font!.label, '第二');
-    expect(applied, hasLength(1));
+    expect(applied, isEmpty);
+    expect(result.imported, 2);
+    expect(result.applied, isFalse);
+    expect(Prefs().prefs.getString('font'), previousFont);
     expect(await destination.list().length, 2);
+  });
+
+  test('folder import with one font still preserves the current font',
+      () async {
+    final file = await source('only.ttf', '单个');
+    final result = await importFontFiles([file],
+        directory: destination,
+        serverPort: 12345,
+        applySingle: false,
+        onApplied: (_) => fail('Folder import must not change reading font'));
+    expect(result.imported, 1);
+    expect(result.applied, isFalse);
+    expect(Prefs().prefs.getString('font'), previousFont);
+  });
+
+  test('folder discovery includes nested TTF/OTF, skips other files and links',
+      () async {
+    await source('first.TTF', '第一');
+    final child = Directory('${root.path}/nested')..createSync();
+    await File('${child.path}/second.otf').writeAsBytes(namedFont('第二'));
+    await File('${child.path}/notes.txt').writeAsString('not a font');
+    if (!Platform.isWindows) {
+      await Link('${child.path}/loop').create(root.path);
+    }
+    final files = await discoverFontFiles(root);
+    expect(files.map((file) => file.name), ['first.TTF', 'second.otf']);
+    final result = await importFontFiles(files,
+        directory: destination, serverPort: 12345, applySingle: false);
+    expect(result.imported, 2);
+    expect(await destination.list().length, 2);
+    expect(Prefs().prefs.getString('font'), previousFont);
+    expect(await File('${root.path}/first.TTF').exists(), isTrue);
   });
 
   test('empty selection and all-failed import preserve previous font',

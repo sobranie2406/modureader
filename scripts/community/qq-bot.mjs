@@ -292,7 +292,14 @@ async function qqReleaseTrigger(request, env) {
     const response = await fetch('https://api.github.com/repos/sobranie2406/modureader/releases/' +
       (tag === 'latest' ? 'latest' : 'tags/' + encodeURIComponent(tag)),
       {headers:{accept:'application/vnd.github+json', 'user-agent':'ModuReader-QQ-helper'}});
-    if (!response.ok) return qqJSON({error:'Published release unavailable'}, 502);
+    if (!response.ok) {
+      const failure = {at:qqNow(), ok:false, test, stage:'github', status:response.status,
+        remaining:response.headers.get('x-ratelimit-remaining'),
+        reset:response.headers.get('x-ratelimit-reset')};
+      console.error('QQ release GitHub lookup failed', JSON.stringify(failure));
+      await qqPut(env, 'qq:last-release', failure, 86400*7);
+      return qqJSON({error:'Published release unavailable', upstream_status:response.status}, 502);
+    }
     const release = await response.json();
     if (release.draft || !release.published_at || !Number.isInteger(release.id) ||
         (tag !== 'latest' && release.tag_name !== tag)) return qqJSON({error:'Release is not published'}, 400);
@@ -300,7 +307,14 @@ async function qqReleaseTrigger(request, env) {
       // A release branch may announce only its published tag pointing at the signed build commit.
       const commit = await fetch('https://api.github.com/repos/sobranie2406/modureader/commits/' + encodeURIComponent(tag),
         {headers:{accept:'application/vnd.github+json', 'user-agent':'ModuReader-QQ-helper'}});
-      if (!commit.ok) return qqJSON({error:'Published release unavailable'}, 502);
+      if (!commit.ok) {
+      const failure = {at:qqNow(), ok:false, test, stage:'github', status:commit.status,
+        remaining:commit.headers.get('x-ratelimit-remaining'),
+        reset:commit.headers.get('x-ratelimit-reset')};
+      console.error('QQ release GitHub lookup failed', JSON.stringify(failure));
+      await qqPut(env, 'qq:last-release', failure, 86400*7);
+      return qqJSON({error:'Published release unavailable', upstream_status:commit.status}, 502);
+    }
       if ((await commit.json()).sha !== claims.sha) return qqJSON({error:'Unauthorized'}, 401);
     }
     const key = `qq:${test ? 'release-test' : 'release'}:${release.id}`;

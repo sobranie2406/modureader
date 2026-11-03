@@ -1,3 +1,4 @@
+import 'package:anx_reader/page/settings_page/appearance.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/models/theme_preset.dart';
@@ -22,6 +23,37 @@ void main() {
         home: const ThemeColorsPage(),
       );
 
+  testWidgets(
+      'appearance retains the schedule and custom hours alongside presets',
+      (tester) async {
+    await Prefs().saveThemeSchedule(start: 1260, end: 390);
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh'),
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: const Scaffold(body: AppearanceSetting()),
+    ));
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('scheduled-theme-enabled'));
+    final control = find.descendant(of: toggle, matching: find.byType(Switch));
+    expect(tester.widget<Switch>(control).value, isFalse);
+    await tester.tap(control);
+    await tester.pumpAndSettle();
+    expect(Prefs().scheduledTheme, isTrue);
+    final hours = find.byKey(const ValueKey('scheduled-theme-hours'));
+    expect(hours, findsOneWidget);
+    await tester.tap(hours);
+    await tester.pumpAndSettle();
+    expect(find.byType(TimePickerDialog), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(Prefs().nightStartMinute, 1260);
+    expect(Prefs().nightEndMinute, 390);
+    await Prefs().selectThemePreset(builtInThemePresetById('ink')!);
+    expect(Prefs().scheduledTheme, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final locale in ['zh', 'en']) {
     testWidgets('$locale: every preset is listed and the active one is checked',
         (tester) async {
@@ -33,7 +65,8 @@ void main() {
       await tester.pumpWidget(app(locale));
       await tester.pumpAndSettle();
       for (final preset in builtInThemePresets) {
-        expect(find.byKey(ValueKey('theme-preset-${preset.id}')), findsOneWidget,
+        expect(
+            find.byKey(ValueKey('theme-preset-${preset.id}')), findsOneWidget,
             reason: preset.id);
       }
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
@@ -51,7 +84,8 @@ void main() {
     await tester.pumpWidget(app('zh'));
     await tester.pumpAndSettle();
     final ocean = builtInThemePresetById('ocean')!;
-    await tester.ensureVisible(find.byKey(const ValueKey('theme-preset-ocean')));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('theme-preset-ocean')));
     await tester.tap(find.byKey(const ValueKey('theme-preset-ocean')));
     await tester.pumpAndSettle();
     expect(Prefs().themeColor.toARGB32(), ocean.colorValue);
@@ -85,8 +119,8 @@ void main() {
     Prefs().eInkMode = true;
     await tester.pumpWidget(app('zh'));
     await tester.pumpAndSettle();
-    final segmented = tester.widget<SegmentedButton<String>>(
-        find.byType(SegmentedButton<String>));
+    final segmented = tester
+        .widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>));
     expect(segmented.onSelectionChanged, isNull);
     expect(segmented.selected, {'light'});
     expect(tester.takeException(), isNull);
@@ -107,7 +141,8 @@ void main() {
     final toggle = find.byKey(const ValueKey('theme-applies-to-reader'));
     await tester.ensureVisible(toggle);
     expect(Prefs().themeAppliesToReader, isFalse);
-    await tester.tap(toggle);
+    await tester
+        .tap(find.descendant(of: toggle, matching: find.byType(Switch)));
     await tester.pumpAndSettle();
 
     expect(Prefs().themeAppliesToReader, isTrue);
@@ -144,11 +179,12 @@ void main() {
     expect(custom, hasLength(1));
     expect(custom.single.name, '我的主题');
     expect(Prefs().themePresetId, custom.single.id);
-    expect(
-        find.byKey(ValueKey('theme-preset-${custom.single.id}')), findsOneWidget);
+    expect(find.byKey(ValueKey('theme-preset-${custom.single.id}')),
+        findsOneWidget);
 
     // Deleting restores the default colour because the deleted theme was active.
-    await tester.tap(find.byKey(ValueKey('theme-preset-menu-${custom.single.id}')));
+    await tester
+        .tap(find.byKey(ValueKey('theme-preset-menu-${custom.single.id}')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('删除主题').last);
     await tester.pumpAndSettle();

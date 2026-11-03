@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
@@ -239,9 +240,9 @@ class CssVisualControls extends StatelessWidget {
                                             f.path
                                                 .split(Platform.pathSeparator)
                                                 .last),
-                                        child: Text(f.path
-                                            .split(Platform.pathSeparator)
-                                            .last))
+                                        child: FontNamePreview(
+                                            f.uri.pathSegments.last,
+                                            filename: f.uri.pathSegments.last))
                                 ]));
                     if (selected != null && context.mounted) {
                       change('fontFile', selected);

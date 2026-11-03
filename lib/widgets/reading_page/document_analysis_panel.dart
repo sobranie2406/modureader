@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
@@ -111,10 +112,12 @@ class _DocumentAnalysisPanelState extends State<DocumentAnalysisPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(ModuStrings.text(
-                context,
-                '仅在本机按需抽样，不上传文档，不启动 OCR 或向量化。检测结果为初步判断。',
-                'On-device sampling only. No upload, OCR or indexing. Results are provisional.')),
+            SettingHelp(
+                title: Text(ModuStrings.text(context, '说明', 'Help')),
+                description: Text(ModuStrings.text(
+                    context,
+                    '仅在本机按需抽样，不上传文档，不启动 OCR 或向量化。检测结果为初步判断。',
+                    'On-device sampling only. No upload, OCR or indexing. Results are provisional.'))),
             const SizedBox(height: 12),
             if (widget.saveOverride != null) ...[
               Text(ModuStrings.text(context, '本书类型标记（暂不改变阅读模式）',

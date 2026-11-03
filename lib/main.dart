@@ -253,6 +253,28 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp>
     with WidgetsBindingObserver, WindowListener {
   bool _closingWindow = false;
+  Timer? _themeScheduleTimer;
+  ThemeMode? _lastScheduledTheme;
+
+  void _checkThemeSchedule() {
+    final prefs = Prefs();
+    final mode = prefs.themeMode;
+    final changed = _lastScheduledTheme != null && _lastScheduledTheme != mode;
+    _lastScheduledTheme = mode;
+    _themeScheduleTimer?.cancel();
+    if (prefs.scheduledTheme &&
+        !prefs.eInkMode &&
+        (WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed)) {
+      final now = DateTime.now();
+      _themeScheduleTimer = Timer(
+          Duration(milliseconds: 60000 - now.second * 1000 - now.millisecond),
+          _checkThemeSchedule);
+    }
+    if (changed) prefs.notifyExternalChange();
+  }
+
   StreamSubscription<List<ConnectivityResult>>? _syncConnectivity;
 
   void _resumeAutomaticSync() {
@@ -275,6 +297,8 @@ class _MyAppState extends ConsumerState<MyApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     windowManager.addListener(this);
+    Prefs().addListener(_checkThemeSchedule);
+    _checkThemeSchedule();
     _syncConnectivity =
         Connectivity().onConnectivityChanged.listen((connections) {
       if (connections.any((value) => value != ConnectivityResult.none) &&
@@ -291,6 +315,8 @@ class _MyAppState extends ConsumerState<MyApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     windowManager.removeListener(this);
+    Prefs().removeListener(_checkThemeSchedule);
+    _themeScheduleTimer?.cancel();
     _syncConnectivity?.cancel();
     super.dispose();
   }
@@ -383,8 +409,10 @@ class _MyAppState extends ConsumerState<MyApp>
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
+      _themeScheduleTimer?.cancel();
       Sync().pauseAutomaticSync();
     } else if (state == AppLifecycleState.resumed) {
+      _checkThemeSchedule();
       if (AnxPlatform.isIOS) {
         Server().start();
       }

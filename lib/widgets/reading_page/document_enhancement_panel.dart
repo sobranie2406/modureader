@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:async';
@@ -333,11 +334,18 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                     ]);
                                   }),
                                 )),
-                          Text(tr('只改变显示，不修改原文件。漂白主要净化浅色纸张；复杂背景请保留原图。',
-                              'Display only; the source file stays unchanged. Whitening targets light paper. Keep the original for complex backgrounds.')),
-                          Text(tr(
-                              '扫描水印减淡：0 为关闭，适合浅色纸张上的淡灰、浅彩色水印。可能影响浅色正文或插图，请对照原图确认；深色或与文字重叠的水印不保证清除。',
-                              'Scan watermark fading: 0 is off. Targets faint gray or colored marks on light paper. It may affect pale text or illustrations; compare the original before confirming. Dark marks or marks overlapping text may remain.')),
+                          SettingHelp(
+                              title:
+                                  Text(ModuStrings.text(context, '说明', 'Help')),
+                              description: Text(tr(
+                                  '只改变显示，不修改原文件。漂白主要净化浅色纸张；复杂背景请保留原图。',
+                                  'Display only; the source file stays unchanged. Whitening targets light paper. Keep the original for complex backgrounds.'))),
+                          SettingHelp(
+                              title:
+                                  Text(ModuStrings.text(context, '说明', 'Help')),
+                              description: Text(tr(
+                                  '扫描水印减淡：0 为关闭，适合浅色纸张上的淡灰、浅彩色水印。可能影响浅色正文或插图，请对照原图确认；深色或与文字重叠的水印不保证清除。',
+                                  'Scan watermark fading: 0 is off. Targets faint gray or colored marks on light paper. It may affect pale text or illustrations; compare the original before confirming. Dark marks or marks overlapping text may remain.'))),
                         ])),
                     if (_failed)
                       TextButton(

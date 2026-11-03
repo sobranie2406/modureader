@@ -42,7 +42,9 @@ loads fall back to text. It has no app bridge or file access, blocks external
 network content/popups, and requires a user gesture for audio playback.
 
 Import a matching `name.mdd` (or numbered `name.1.mdd` parts) with the MDX, or
-select loose companion resources. Use a ZIP when resources use subdirectories;
+select loose companion resources. Loose files are imported by filename even
+when a system picker caches them in separate temporary directories.
+Use a ZIP when resources use subdirectories;
 the relative paths are preserved. Supported resources: PNG/JPEG/GIF/WebP/SVG,
 MP3/WAV/OGG/M4A/AAC, CSS/JS and WOFF/WOFF2/TTF. Actual media codecs depend on
 the platform WebView. Missing companion resources cannot be reconstructed.
@@ -71,7 +73,7 @@ The MDX parser dependency does not currently validate internal checksums. A succ
 - Dictionary names are database fields, not file paths. Removing a dictionary deletes only Modu's imported copy, not the original file.
 - Import builds in a temporary `.import-*` directory and publishes atomically after validation. Errors roll back and clean the temporary directory while preserving existing dictionaries. Forced process termination can leave a temporary directory but cannot publish an incomplete dictionary as usable.
 - StarDict validates companion files, entry counts, index length, record offsets, synonym targets and field boundaries.
-- Limits: 2 MiB per definition; 64 MiB for the StarDict index; 2 GiB for imported text/HTML/resources combined; two million entries; 256 MiB per MDD; 32 MiB per resource; 100,000 retained resources; 512 MiB for a ZIP; 2 GiB of extracted dictionary files. Extra temporary disk space is required.
+- Limits: 2 MiB per definition; 64 MiB for the StarDict index; 2 GiB for imported text/HTML/resources combined; two million entries; 256 MiB per MDX; 2 GiB per MDD; 32 MiB per resource; 100,000 retained resources; 512 MiB for a ZIP; 2 GiB of extracted dictionary files. Extra temporary disk space is required.
 - Failure messages show an error category, not raw dictionary text, paths or parser exception details.
 
 ## Verification scope
@@ -79,6 +81,15 @@ The MDX parser dependency does not currently validate internal checksums. A succ
 Existing automated tests use small self-generated dictionaries, without bundling or redistributing commercial dictionaries. Coverage includes MDX 1/2, UTF-8/UTF-16, zlib and redirect loops; StarDict text/compression/64-bit offsets/synonyms; ZIP; failed-import rollback; path validation; enable/disable/rename/delete; and mobile/desktop lookup dialogs.
 
 The 2026-10-10 development checks reran dictionary service and widget tests, including single/multiple selection, duplicate names, source attribution, license validation, request cancellation and online failures with local results preserved. Earlier smoke tests covered the online sources available at that time. Free Dictionary API has since been removed; only Chinese and English Wiktionary remain. These checks do not establish compatibility with every dictionary variant or device; no physical-device or large user-dictionary testing was performed for this change.
+
+The 2026-11-01 import fix was checked with separate picker-cache directories,
+including a local, user-supplied 大辞海 bundle: 258,893 entries and 8,097 retained
+resources imported successfully, with CSS content and image retrieval checked.
+The source dictionary is not included in the repository. Dictionary service tests
+passed, including both same-directory desktop selections and separate temporary
+directories. Android, iOS, Windows, macOS, Linux and HarmonyOS builds use the
+shared importer; the Harmony build adapters do not replace it. Per-platform
+physical-device verification and packaging remain pending.
 
 ## Implementation sources
 

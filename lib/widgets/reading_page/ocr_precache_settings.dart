@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
@@ -35,16 +36,15 @@ class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(ModuStrings.text(
-                    context, '后台预缓存 OCR', 'Background OCR cache')),
+                title: SettingHelpTitle(
+                    title: ModuStrings.text(
+                        context, '后台预缓存 OCR', 'Background OCR cache'),
+                    description: ModuStrings.text(
+                        context,
+                        '原页和重排阅读时，按原书页码逐页预处理，含当前页，最多 5 页；复用符合当前重排模式的缓存和校对稿。需要已安装的本地模型。',
+                        'Prefetch in original and reflow views by source page, up to 5 pages including the current page. Reuses saved text and edits compatible with the current reflow mode; uses an installed local model.')),
                 value: Prefs().ocrPrecacheEnabled,
                 onChanged: _saving ? null : (value) => _save(enabled: value)),
-            Text(
-                ModuStrings.text(
-                    context,
-                    '原页和重排阅读时，按原书页码逐页预处理，含当前页，最多 5 页；复用符合当前重排模式的缓存和校对稿。需要已安装的本地模型。',
-                    'Prefetch in original and reflow views by source page, up to 5 pages including the current page. Reuses saved text and edits compatible with the current reflow mode; uses an installed local model.'),
-                style: Theme.of(context).textTheme.bodySmall),
             if (Prefs().ocrPrecacheEnabled)
               Row(children: [
                 Expanded(

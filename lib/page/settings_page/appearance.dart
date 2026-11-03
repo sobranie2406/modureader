@@ -54,6 +54,40 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
     return '#$hex';
   }
 
+  TimeOfDay _time(int minute) =>
+      TimeOfDay(hour: minute ~/ 60, minute: minute % 60);
+
+  String _nightHours(BuildContext context) {
+    final prefs = Prefs();
+    final nextDay = prefs.nightEndMinute < prefs.nightStartMinute
+        ? ModuStrings.text(context, '次日 ', 'next day ')
+        : '';
+    return '${_time(prefs.nightStartMinute).format(context)} – $nextDay${_time(prefs.nightEndMinute).format(context)}';
+  }
+
+  Future<void> _editNightHours(BuildContext context) async {
+    final start = await showTimePicker(
+        context: context,
+        helpText: ModuStrings.text(context, '夜间开始时间', 'Night starts'),
+        initialTime: _time(Prefs().nightStartMinute));
+    if (start == null || !context.mounted) return;
+    final end = await showTimePicker(
+        context: context,
+        helpText: ModuStrings.text(context, '夜间结束时间', 'Night ends'),
+        initialTime: _time(Prefs().nightEndMinute));
+    if (end == null || !context.mounted) return;
+    final startMinute = start.hour * 60 + start.minute;
+    final endMinute = end.hour * 60 + end.minute;
+    if (startMinute == endMinute) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ModuStrings.text(
+              context, '开始和结束时间不能相同', 'Start and end times must differ'))));
+      return;
+    }
+    await Prefs().saveThemeSchedule(start: startMinute, end: endMinute);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final localeKey = appLocaleKey(Localizations.localeOf(context));
@@ -72,13 +106,34 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
         SettingsSection(
           title: Text(L10n.of(context).settingsAppearanceTheme),
           tiles: [
+            SettingsTile.switchTile(
+              key: const ValueKey('scheduled-theme-enabled'),
+              title: Text(ModuStrings.text(
+                  context, '按时间切换日夜模式', 'Scheduled day/night mode')),
+              description: Text(ModuStrings.text(
+                  context,
+                  '根据本机时间自动切换；墨水屏模式下不生效。',
+                  'Switch automatically using local time. Unavailable in E-Ink mode.')),
+              initialValue: Prefs().scheduledTheme,
+              enabled: !Prefs().eInkMode,
+              onToggle: (value) async {
+                await Prefs().saveThemeSchedule(enabled: value);
+                if (mounted) setState(() {});
+              },
+            ),
+            if (Prefs().scheduledTheme)
+              SettingsTile.navigation(
+                key: const ValueKey('scheduled-theme-hours'),
+                title: Text(ModuStrings.text(context, '夜间时段', 'Night hours')),
+                value: Text(_nightHours(context)),
+                enabled: !Prefs().eInkMode,
+                onPressed: _editNightHours,
+              ),
             SettingsTile.navigation(
                 title: Text(L10n.of(context).settingsAppearanceThemeColor),
                 leading: const Icon(Icons.color_lens),
                 value: Text(_activeThemeColorLabel(context)),
-                description: Text(ModuStrings.text(
-                    context,
-                    '明暗模式、预设与自定义配色',
+                description: Text(ModuStrings.text(context, '明暗模式、预设与自定义配色',
                     'Light/dark mode, presets and custom palettes')),
                 onPressed: (context) async {
                   await Navigator.of(context).push(MaterialPageRoute(

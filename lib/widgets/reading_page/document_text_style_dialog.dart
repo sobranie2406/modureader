@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'widget_title.dart';
 import 'reader_menu_group.dart';
 import 'package:flutter/material.dart';
@@ -240,7 +241,9 @@ class _DocumentTextStyleDialogState extends State<DocumentTextStyleDialog> {
                                     child: Text(t('使用上方字体', 'Use font above'))),
                                 for (final font in _fonts)
                                   DropdownMenuItem(
-                                      value: font, child: Text(font)),
+                                      value: font,
+                                      child: FontNamePreview(font,
+                                          filename: font)),
                               ],
                               onChanged: _saving
                                   ? null

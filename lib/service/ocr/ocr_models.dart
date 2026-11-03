@@ -11,8 +11,8 @@ class OcrModelSpec {
 
 abstract final class OcrModels {
   static const revision = '1cfba2e90fc938db55889873735088de210cc173';
-  static const defaultModel = OcrModelSpec('ppocr-v4-mobile-1',
-      'PP-OCRv4 中英文（推荐）', 'PP-OCRv4 Chinese / English (recommended)', {
+  static const v4Mobile = OcrModelSpec(
+      'ppocr-v4-mobile-1', 'PP-OCRv4 中英文', 'PP-OCRv4 Chinese / English', {
     'det.onnx': (
       'PP-OCRv4/ch_PP-OCRv4_det_infer.onnx',
       4745517,
@@ -24,28 +24,28 @@ abstract final class OcrModels {
       '48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b'
     ),
   });
+  static const defaultModel = OcrModelSpec(
+      'ppocr-v5-mobile-1',
+      'PP-OCRv5 移动版（推荐）',
+      'PP-OCRv5 Mobile (recommended)',
+      {
+        'det.onnx': (
+          'onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx',
+          4819576,
+          '4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae'
+        ),
+        'rec.onnx': (
+          'onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx',
+          16631306,
+          '5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5'
+        ),
+      },
+      revision: 'v3.9.2',
+      upstreamBase: 'https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve',
+      upstreamName: 'ModelScope');
   static const all = [
     defaultModel,
-    OcrModelSpec(
-        'ppocr-v5-mobile-1',
-        'PP-OCRv5 中英文（轻量新版）',
-        'PP-OCRv5 Chinese / English (new mobile)',
-        {
-          'det.onnx': (
-            'onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx',
-            4819576,
-            '4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae'
-          ),
-          'rec.onnx': (
-            'onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx',
-            16631306,
-            '5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5'
-          ),
-        },
-        revision: 'v3.9.2',
-        upstreamBase:
-            'https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve',
-        upstreamName: 'ModelScope'),
+    v4Mobile,
     OcrModelSpec('ppocr-v3-mobile-1', 'PP-OCRv3 中英文（更小）',
         'PP-OCRv3 Chinese / English (smaller)', {
       'det.onnx': (

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +17,11 @@ class _ReaderPopupHeightTileState extends State<ReaderPopupHeightTile> {
   Widget build(BuildContext context) =>
       Column(mainAxisSize: MainAxisSize.min, children: [
         ListTile(
-          title: Text(
-              ModuStrings.text(context, '弹出菜单高度上限', 'Maximum popup height')),
-          subtitle: Text(ModuStrings.text(
-              context, '仅本设备 · 不同步', 'This device only · Not synced')),
+          title: SettingHelp(
+              title: Text(ModuStrings.text(
+                  context, '弹出菜单高度上限', 'Maximum popup height')),
+              description: Text(ModuStrings.text(
+                  context, '仅本设备 · 不同步', 'This device only · Not synced'))),
           trailing: Text('$_percent%'),
         ),
         Slider(

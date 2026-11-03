@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
@@ -194,10 +195,12 @@ class _DictionarySettingsState extends State<DictionarySettings> {
               context, '字典来源与导入', 'Dictionary sources and import')),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(ModuStrings.text(
-                context,
-                '不预装本地词典数据。请导入有权使用的字典；可选择一本或多本进行离线查询，也可按需启用免费在线词典。本地字典及查询来源选择不参加 WebDAV 同步或设置备份。',
-                'No local dictionary data is bundled. Import dictionaries you are licensed to use; select one or more for offline lookup, or opt into free online dictionaries. Local dictionaries and source selections are excluded from WebDAV sync and settings backups.')),
+            SettingHelp(
+                title: Text(ModuStrings.text(context, '说明', 'Help')),
+                description: Text(ModuStrings.text(
+                    context,
+                    '不预装本地词典数据。请导入有权使用的字典；可选择一本或多本进行离线查询，也可按需启用免费在线词典。本地字典及查询来源选择不参加 WebDAV 同步或设置备份。',
+                    'No local dictionary data is bundled. Import dictionaries you are licensed to use; select one or more for offline lookup, or opt into free online dictionaries. Local dictionaries and source selections are excluded from WebDAV sync and settings backups.'))),
             TextButton.icon(
                 onPressed: _busy || _loading
                     ? null
@@ -206,10 +209,12 @@ class _DictionarySettingsState extends State<DictionarySettings> {
                 label: Text(ModuStrings.text(context, '查询来源 / 在线字典',
                     'Query sources / online dictionaries'))),
             const SizedBox(height: 12),
-            Text(ModuStrings.text(
-                context,
-                '支持 MDX 1/2（非 LZO、非加密正文，≤256 MiB），可同时选择同名 MDD（单个≤2 GiB）、图片、音频、CSS、JS；有子目录时请使用 ZIP 保留目录结构。原版内容在隔离窗口显示，只加载已导入资源，音频需点击播放；旧词典需重新导入。StarDict 2.4.2/3.0.0 仍显示文字释义；暂不支持 DSL。',
-                'Supports MDX 1/2 (no LZO or encrypted records, ≤256 MiB), with matching MDD (up to 2 GiB each), images, audio, CSS and JS. Use ZIP to preserve subdirectories. Original content opens in isolation using imported resources only; tap to play audio. Reimport old dictionaries. StarDict 2.4.2/3.0.0 remains text-only; DSL is unsupported.')),
+            SettingHelp(
+                title: Text(ModuStrings.text(context, '说明', 'Help')),
+                description: Text(ModuStrings.text(
+                    context,
+                    '支持 MDX 1/2（非 LZO、非加密正文，≤256 MiB），可同时选择同名 MDD（单个≤2 GiB）、图片、音频、CSS、JS；有子目录时请使用 ZIP 保留目录结构。原版内容在隔离窗口显示，只加载已导入资源，音频需点击播放；旧词典需重新导入。StarDict 2.4.2/3.0.0 仍显示文字释义；暂不支持 DSL。',
+                    'Supports MDX 1/2 (no LZO or encrypted records, ≤256 MiB), with matching MDD (up to 2 GiB each), images, audio, CSS and JS. Use ZIP to preserve subdirectories. Original content opens in isolation using imported resources only; tap to play audio. Reimport old dictionaries. StarDict 2.4.2/3.0.0 remains text-only; DSL is unsupported.'))),
             const SizedBox(height: 16),
             FilledButton.icon(
                 onPressed: _busy || _loading ? null : _import,

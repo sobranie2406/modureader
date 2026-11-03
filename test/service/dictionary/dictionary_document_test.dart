@@ -17,6 +17,49 @@ void main() {
   });
   tearDown(() => temp.deleteSync(recursive: true));
 
+  test('desktop-style loose files in one directory preserve CSS and images',
+      () async {
+    const markup = '<link rel="stylesheet" href="demo.css"><img src="pic.png">';
+    final main = mdx(temp, definitions: {'sample': markup});
+    final css = File(p.join(temp.path, 'demo.css'))
+      ..writeAsStringSync('p{color:red}');
+    final image = File(p.join(temp.path, 'pic.png'))
+      ..writeAsBytesSync([137, 80, 78, 71]);
+    await store.importFiles([main, css.path, image.path], 'Loose files');
+    final entry = (await store.lookup('sample')).single;
+    expect(entry.html, markup);
+    expect(await store.resource(entry.dictionaryId!, 'demo.css'),
+        utf8.encode('p{color:red}'));
+    expect(await store.resource(entry.dictionaryId!, 'pic.png'),
+        image.readAsBytesSync());
+  });
+
+  test('loose companions in separate picker cache directories import by name',
+      () async {
+    final mainDir = Directory(p.join(temp.path, 'file_picker', '100'))
+      ..createSync(recursive: true);
+    final mediaDir = Directory(p.join(temp.path, 'file_picker', '101'))
+      ..createSync(recursive: true);
+    final cssDir = Directory(p.join(temp.path, 'file_picker', '102'))
+      ..createSync(recursive: true);
+    const markup = '<link rel="stylesheet" href="demo.css"><img src="pic.png">';
+    final main = mdx(mainDir, definitions: {'sample': markup});
+    final media = mdx(mediaDir, utf16: true, resources: {
+      r'\pic.png': [137, 80, 78, 71]
+    });
+    final css = File(p.join(cssDir.path, 'demo.css'))
+      ..writeAsStringSync('p{color:red}');
+    await store.importFiles([main, css.path, media], 'Picker');
+    final entry = (await store.lookup('sample')).single;
+    expect(entry.html, markup);
+    expect(await store.resource(entry.dictionaryId!, 'demo.css'),
+        utf8.encode('p{color:red}'));
+    expect(await store.resource(entry.dictionaryId!, 'pic.png'),
+        [137, 80, 78, 71]);
+    expect([main, css.path, media].every((path) => File(path).existsSync()),
+        isTrue);
+  });
+
   test('old text-only databases stay readable without migration or HTML',
       () async {
     final main = mdx(temp, definitions: {'sample': '<p>旧词条</p>'});

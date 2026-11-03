@@ -25,6 +25,7 @@ class ReadingSyncSettings extends AbstractSettingsTile {
               key: const ValueKey('reading-timed-sync'),
               title: Text(ModuStrings.text(
                   context, '阅读时定时同步', 'Sync periodically while reading')),
+              descriptionAsHelp: enabled,
               description: Text(!enabled
                   ? (ModuStrings.text(context, '请先启用云端同步和自动同步。',
                       'Enable cloud sync and automatic sync first.'))

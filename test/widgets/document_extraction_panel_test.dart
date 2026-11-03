@@ -251,6 +251,8 @@ void main() {
         });
     expect(find.byTooltip('Read aloud'), findsNothing);
     await tap(tester, 'Preview extracted text');
+    await tester.ensureVisible(find.byTooltip('Read aloud'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Read aloud'));
     await tester.pumpAndSettle();
     expect(spoken, ['Recognized page 0']);
@@ -259,6 +261,8 @@ void main() {
     expect(stops, 1);
     expect(find.text('Recognized page 1'), findsOneWidget);
     expect(find.text('Narration controls'), findsNothing);
+    await tester.ensureVisible(find.byTooltip('Read aloud'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Read aloud'));
     await tester.pumpAndSettle();
     expect(spoken.last, 'Recognized page 1');

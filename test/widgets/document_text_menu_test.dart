@@ -64,7 +64,12 @@ void main() {
             final target = find.byKey(ValueKey(key));
             await tester.ensureVisible(target);
             await tester.pumpAndSettle();
-            await tester.tap(target);
+            final switchControl =
+                find.descendant(of: target, matching: find.byType(Switch));
+            final label =
+                find.descendant(of: target, matching: find.byType(Text)).first;
+            await tester.tap(
+                switchControl.evaluate().isNotEmpty ? switchControl : label);
             await tester.pumpAndSettle();
           }
           expect((reflows, extractions, exports, comparison), (1, 1, 1, true));

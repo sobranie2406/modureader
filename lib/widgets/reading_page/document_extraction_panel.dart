@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:convert';
@@ -570,11 +571,12 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                       leading: const Icon(Icons.edit_note),
                       onTap: _busy ? null : _editSavedPage),
                   ListTile(
-                      title: Text(t('重新识别本页', 'Recognize this page again')),
-                      subtitle: Text(
-                          t('确认后替换本页识别及编辑结果',
-                              'Confirm replacement of this page’s recognition and edits'),
-                          style: Theme.of(context).textTheme.bodySmall),
+                      title: SettingHelp(
+                          title: Text(t('重新识别本页', 'Recognize this page again')),
+                          description: Text(
+                              t('确认后替换本页识别及编辑结果',
+                                  'Confirm replacement of this page’s recognition and edits'),
+                              style: Theme.of(context).textTheme.bodySmall)),
                       leading: const Icon(Icons.refresh),
                       onTap: _busy ? null : _recognizeSavedPage),
                 ],
@@ -645,17 +647,20 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                     onChanged: (_) => setState(_clearResults),
                   ),
                 if (!_wholePage && !_multiple)
-                  Text(
-                      t('拖动框内移动区域，拖动四角调整大小',
-                          'Drag inside to move; drag a corner to resize.'),
-                      style: Theme.of(context).textTheme.bodySmall),
+                  SettingHelp(
+                      title: Text(ModuStrings.text(context, '说明', 'Help')),
+                      description: Text(
+                          t('拖动框内移动区域，拖动四角调整大小',
+                              'Drag inside to move; drag a corner to resize.'),
+                          style: Theme.of(context).textTheme.bodySmall)),
                 SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(t('强制 OCR', 'Force OCR')),
-                    subtitle: Text(
-                        t('默认优先使用文字层；识别在本机进行',
-                            'Prefer embedded text by default; OCR runs on this device.'),
-                        style: Theme.of(context).textTheme.bodySmall),
+                    title: SettingHelp(
+                        title: Text(t('强制 OCR', 'Force OCR')),
+                        description: Text(
+                            t('默认优先使用文字层；识别在本机进行',
+                                'Prefer embedded text by default; OCR runs on this device.'),
+                            style: Theme.of(context).textTheme.bodySmall)),
                     value: _forceOcr,
                     onChanged: _busy
                         ? null
@@ -712,10 +717,12 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                           label: Text(t('提取至 AI 输入框', 'Extract to AI draft'))),
                     ],
                   ]),
-              Text(
-                  t('填入后由你确认发送。OCR：PP-OCRv4 / RapidOCR · Apache-2.0',
-                      'Review before sending. OCR: PP-OCRv4 / RapidOCR · Apache-2.0'),
-                  style: Theme.of(context).textTheme.bodySmall),
+              SettingHelp(
+                  title: Text(ModuStrings.text(context, '说明', 'Help')),
+                  description: Text(
+                      t('填入后由你确认发送。OCR：PP-OCR / RapidOCR · Apache-2.0',
+                          'Review before sending. OCR: PP-OCR / RapidOCR · Apache-2.0'),
+                      style: Theme.of(context).textTheme.bodySmall)),
             ])),
       );
 }

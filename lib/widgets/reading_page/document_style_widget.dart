@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'reader_menu_appearance.dart';
 import 'document_text_menu.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -185,14 +186,15 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
       onTap: widget.player.isImageEpub
           ? () => _openEpubImages(editLayout: true)
           : () => _openPdfPreview(editLayout: true),
-      title: Text(ModuStrings.text(
-          context,
-          widget.player.isImageEpub ? '扫描图片裁边与分格' : 'PDF 裁边与分格',
-          widget.player.isImageEpub
-              ? 'Scanned image crop and panels'
-              : 'PDF crop and panels')),
-      subtitle: Text(ModuStrings.text(context, '自动裁边、留白、漫画与论文分栏在独立预览中调整',
-          'Auto crop, margins, comics and columns are adjusted in the separate preview')),
+      title: SettingHelp(
+          title: Text(ModuStrings.text(
+              context,
+              widget.player.isImageEpub ? '扫描图片裁边与分格' : 'PDF 裁边与分格',
+              widget.player.isImageEpub
+                  ? 'Scanned image crop and panels'
+                  : 'PDF crop and panels')),
+          description: Text(ModuStrings.text(context, '自动裁边、留白、漫画与论文分栏在独立预览中调整',
+              'Auto crop, margins, comics and columns are adjusted in the separate preview'))),
     );
     return DocumentPanelTheme(
       child: ReaderSettingsScrollView(

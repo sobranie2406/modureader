@@ -1,3 +1,4 @@
+import 'setting_help_title.dart';
 import 'package:flutter/material.dart';
 
 abstract class AbstractSettingsTile extends StatelessWidget {
@@ -13,6 +14,7 @@ class SettingsTile extends AbstractSettingsTile {
     this.value,
     required this.title,
     this.description,
+    this.descriptionAsHelp = true,
     this.onPressed,
     this.enabled = true,
     super.key,
@@ -29,6 +31,7 @@ class SettingsTile extends AbstractSettingsTile {
     this.value,
     required this.title,
     this.description,
+    this.descriptionAsHelp = true,
     this.onPressed,
     this.enabled = true,
     super.key,
@@ -47,6 +50,7 @@ class SettingsTile extends AbstractSettingsTile {
     this.trailing,
     required this.title,
     this.description,
+    this.descriptionAsHelp = true,
     this.onPressed,
     this.enabled = true,
     super.key,
@@ -66,6 +70,7 @@ class SettingsTile extends AbstractSettingsTile {
 
   /// The widget at the bottom of the [title]
   final Widget? description;
+  final bool descriptionAsHelp;
 
   /// A function that is called by tap on a tile
   final Function(BuildContext context)? onPressed;
@@ -81,6 +86,7 @@ class SettingsTile extends AbstractSettingsTile {
   Widget build(BuildContext context) {
     return AndroidSettingsTile(
       description: description,
+      descriptionAsHelp: descriptionAsHelp,
       onPressed: onPressed,
       onToggle: onToggle,
       tileType: tileType,
@@ -101,6 +107,7 @@ class AndroidSettingsTile extends StatelessWidget {
     required this.leading,
     required this.title,
     required this.description,
+    this.descriptionAsHelp = true,
     required this.onPressed,
     required this.onToggle,
     required this.value,
@@ -115,6 +122,7 @@ class AndroidSettingsTile extends StatelessWidget {
   final Widget? leading;
   final Widget? title;
   final Widget? description;
+  final bool descriptionAsHelp;
   final Function(BuildContext context)? onPressed;
   final Function(bool value)? onToggle;
   final Widget? value;
@@ -131,135 +139,130 @@ class AndroidSettingsTile extends StatelessWidget {
         ? onToggle == null && onPressed == null
         : onPressed == null;
 
-    return IgnorePointer(
-      ignoring: !enabled,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: cantShowAnimation
-              ? null
-              : () {
-                  if (tileType == SettingsTileType.switchTile) {
-                    onToggle?.call(!initialValue);
-                  } else {
-                    onPressed?.call(context);
-                  }
-                },
-          highlightColor: Theme.of(context).listTileTheme.selectedColor,
-          child: Row(
-            children: [
-              if (leading != null)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 8),
-                  child: IconTheme(
-                    data: IconTheme.of(context).copyWith(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: !enabled || cantShowAnimation
+            ? null
+            : () {
+                if (tileType == SettingsTileType.switchTile) {
+                  onToggle?.call(!initialValue);
+                } else {
+                  onPressed?.call(context);
+                }
+              },
+        highlightColor: Theme.of(context).listTileTheme.selectedColor,
+        child: Row(
+          children: [
+            if (leading != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 8),
+                child: IconTheme(
+                  data: IconTheme.of(context).copyWith(
+                    color: enabled
+                        ? Theme.of(context).iconTheme.color
+                        : Theme.of(context).disabledColor,
+                  ),
+                  child: leading!,
+                ),
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: 10,
+                  end: 8,
+                  bottom: 19 * scaleFactor,
+                  top: 19 * scaleFactor,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DefaultTextStyle(
+                      style: TextStyle(
+                        color: enabled
+                            ? Theme.of(context).textTheme.bodyLarge!.color!
+                            : Theme.of(context).disabledColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      child: description != null && descriptionAsHelp
+                          ? SettingHelp(
+                              title: title ?? const SizedBox(),
+                              description: description!)
+                          : title ?? const SizedBox(),
+                    ),
+                    if (value != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: DefaultTextStyle(
+                          style: TextStyle(
+                            color: enabled
+                                ? Theme.of(context).textTheme.bodySmall!.color!
+                                : Theme.of(context).disabledColor,
+                          ),
+                          child: value!,
+                        ),
+                      )
+                    else if (description != null && !descriptionAsHelp)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: DefaultTextStyle(
+                          style: TextStyle(
+                            color: enabled
+                                ? Theme.of(context).textTheme.bodySmall!.color!
+                                : Theme.of(context).disabledColor,
+                          ),
+                          child: description!,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (trailing != null && tileType == SettingsTileType.switchTile)
+              Row(
+                children: [
+                  trailing!,
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: Switch(
+                      value: initialValue,
+                      onChanged: enabled ? onToggle : null,
+                      activeThumbColor: enabled
+                          ? activeSwitchColor
+                          : Theme.of(context).disabledColor,
+                    ),
+                  ),
+                ],
+              )
+            else if (tileType == SettingsTileType.switchTile)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+                child: Switch(
+                  value: initialValue,
+                  onChanged: enabled ? onToggle : null,
+                  activeThumbColor: enabled
+                      ? activeSwitchColor
+                      : Theme.of(context).disabledColor,
+                ),
+              )
+            else if (tileType == SettingsTileType.navigationTile)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: trailing ??
+                    Icon(
+                      Icons.chevron_right_sharp,
                       color: enabled
                           ? Theme.of(context).iconTheme.color
                           : Theme.of(context).disabledColor,
                     ),
-                    child: leading!,
-                  ),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    start: 10,
-                    end: 8,
-                    bottom: 19 * scaleFactor,
-                    top: 19 * scaleFactor,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DefaultTextStyle(
-                        style: TextStyle(
-                          color: enabled
-                              ? Theme.of(context).textTheme.bodyLarge!.color!
-                              : Theme.of(context).disabledColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        child: title ?? Container(),
-                      ),
-                      if (value != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: DefaultTextStyle(
-                            style: TextStyle(
-                              color: enabled
-                                  ? Theme.of(context)
-                                      .textTheme
-                                      .bodySmall!
-                                      .color!
-                                  : Theme.of(context).disabledColor,
-                            ),
-                            child: value!,
-                          ),
-                        )
-                      else if (description != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: DefaultTextStyle(
-                            style: TextStyle(
-                              color: enabled
-                                  ? Theme.of(context)
-                                      .textTheme
-                                      .bodySmall!
-                                      .color!
-                                  : Theme.of(context).disabledColor,
-                            ),
-                            child: description!,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              if (trailing != null && tileType == SettingsTileType.switchTile)
-                Row(
-                  children: [
-                    trailing!,
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 8),
-                      child: Switch(
-                        value: initialValue,
-                        onChanged: onToggle,
-                        activeThumbColor: enabled
-                            ? activeSwitchColor
-                            : Theme.of(context).disabledColor,
-                      ),
-                    ),
-                  ],
-                )
-              else if (tileType == SettingsTileType.switchTile)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
-                  child: Switch(
-                    value: initialValue,
-                    onChanged: onToggle,
-                    activeThumbColor: enabled
-                        ? activeSwitchColor
-                        : Theme.of(context).disabledColor,
-                  ),
-                )
-              else if (tileType == SettingsTileType.navigationTile)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: trailing ??
-                      Icon(
-                        Icons.chevron_right_sharp,
-                        color: enabled
-                            ? Theme.of(context).iconTheme.color
-                            : Theme.of(context).disabledColor,
-                      ),
-                )
-              else if (trailing != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: trailing!,
-                )
-            ],
-          ),
+              )
+            else if (trailing != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: trailing!,
+              )
+          ],
         ),
       ),
     );

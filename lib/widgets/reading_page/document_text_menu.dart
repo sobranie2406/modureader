@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
 import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
@@ -49,9 +50,7 @@ class DocumentTextMenu extends StatelessWidget {
               color: onTap == null
                   ? theme.disabledColor
                   : theme.colorScheme.primary),
-          title: Text(title),
-          subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4), child: Text(description)),
+          title: SettingHelpTitle(title: title, description: description),
           trailing: const Icon(Icons.chevron_right, size: 20),
           enabled: onTap != null,
           onTap: onTap,
@@ -83,12 +82,11 @@ class DocumentTextMenu extends StatelessWidget {
                 key: const ValueKey('document-force-ocr-switch'),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                title: Text(text('强制 OCR 重排', 'Force OCR reflow')),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(text(
+                title: SettingHelpTitle(
+                  title: text('强制 OCR 重排', 'Force OCR reflow'),
+                  description: text(
                       '对整本书生效：重排及各页后台预缓存均使用 OCR，忽略文字层及其缓存；需要本地 OCR 模型',
-                      'Applies throughout this book: reflow and background prefetch use OCR on every page, ignoring embedded text and its cache. Requires a local OCR model.')),
+                      'Applies throughout this book: reflow and background prefetch use OCR on every page, ignoring embedded text and its cache. Requires a local OCR model.'),
                 ),
                 value: forceOcr,
                 onChanged: onForceOcrChanged,
@@ -99,11 +97,10 @@ class DocumentTextMenu extends StatelessWidget {
                   key: const ValueKey('document-comparison-switch'),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  title: Text(text('原页对照重排', 'Compare original and reflow')),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(text('竖屏上下，横屏左右',
-                        'Top/bottom in portrait, side by side in landscape')),
+                  title: SettingHelpTitle(
+                    title: text('原页对照重排', 'Compare original and reflow'),
+                    description: text('竖屏上下，横屏左右',
+                        'Top/bottom in portrait, side by side in landscape'),
                   ),
                   value: comparison,
                   onChanged: onComparisonChanged,

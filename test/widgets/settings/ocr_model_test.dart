@@ -105,7 +105,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.textContaining('SHA-256').last, findsOneWidget);
-    expect(find.textContaining('ch_PP-OCRv4_rec_infer.onnx'), findsOneWidget);
+    expect(find.textContaining('ch_PP-OCRv5_rec_mobile.onnx'), findsOneWidget);
     await tester.tap(find.text('取消').last);
     await tester.pumpAndSettle();
     expect(Prefs().ocrModelId, selected);
@@ -117,13 +117,13 @@ void main() {
   });
   test('settings defaults and selection persist without modifying vector model',
       () async {
-    expect(Prefs().ocrModelId, OcrModels.defaultModel.id);
+    expect(Prefs().ocrModelId, 'ppocr-v5-mobile-1');
     expect(Prefs().ocrModelDownloadSource, 'upstream');
     final vector = Prefs().vectorLocalModelId;
     await Prefs()
-        .saveOcrModelSettings(model: 'ppocr-v5-mobile-1', source: 'gitee');
+        .saveOcrModelSettings(model: 'ppocr-v4-mobile-1', source: 'gitee');
     await Prefs().initPrefs();
-    expect(Prefs().ocrModelId, 'ppocr-v5-mobile-1');
+    expect(Prefs().ocrModelId, 'ppocr-v4-mobile-1');
     expect(Prefs().ocrModelDownloadSource, 'gitee');
     expect(Prefs().vectorLocalModelId, vector);
     await expectLater(
@@ -131,9 +131,9 @@ void main() {
         throwsFormatException);
     await expectLater(
         Prefs().saveOcrModelSettings(
-            model: 'ppocr-v5-mobile-1', source: 'invalid'),
+            model: 'ppocr-v4-mobile-1', source: 'invalid'),
         throwsFormatException);
-    expect(Prefs().ocrModelId, 'ppocr-v5-mobile-1');
+    expect(Prefs().ocrModelId, 'ppocr-v4-mobile-1');
   });
 
   for (final locale in [const Locale('zh'), const Locale('en')]) {
@@ -168,9 +168,16 @@ void main() {
       await tester.ensureVisible(download);
       await tester.tap(download);
       await tester.pumpAndSettle();
-      expect(stores[1].downloads, 1);
-      expect(stores[1].downloadSource, OcrDownloadSource.gitee);
-      expect(stores[1].ready, isTrue);
+      expect(
+          stores.firstWhere((s) => s.model.id == 'ppocr-v5-mobile-1').downloads,
+          1);
+      expect(
+          stores
+              .firstWhere((s) => s.model.id == 'ppocr-v5-mobile-1')
+              .downloadSource,
+          OcrDownloadSource.gitee);
+      expect(stores.firstWhere((s) => s.model.id == 'ppocr-v5-mobile-1').ready,
+          isTrue);
       expect(Prefs().ocrModelId, 'ppocr-v5-mobile-1');
       expect(stores.where((store) => store.downloads != 0).length, 1);
       expect(tester.takeException(), isNull);

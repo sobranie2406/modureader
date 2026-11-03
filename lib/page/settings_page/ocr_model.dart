@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/reading_page/ocr_precache_settings.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -262,9 +263,11 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
           CustomSettingsTile(
               child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(t(
-                      '用于扫描书籍的文字识别、提取与重排。推荐 PP-OCRv4 中英文版；无需 API Key，下载后可离线使用。',
-                      'Recognize, extract and reflow text in scanned books. PP-OCRv4 Chinese / English is recommended. Works offline after download, without an API key.')))),
+                  child: SettingHelp(
+                      title: Text(ModuStrings.text(context, '说明', 'Help')),
+                      description: Text(t(
+                          '用于扫描书籍的文字识别、提取与重排。推荐 PP-OCRv5 移动版；无需 API Key，下载后可离线使用。',
+                          'Recognize, extract and reflow text in scanned books. PP-OCRv5 Mobile is recommended. Works offline after download, without an API key.'))))),
         ]),
         SettingsSection(
             title: Text(t('本地模型 · 按需下载', 'Local models · On-demand download')),

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
@@ -65,12 +66,13 @@ class _WereadSettingsPageState extends State<WereadSettingsPage> {
                     children: [
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(ModuStrings.text(
-                            context, '启用微信读书', 'Enable WeRead')),
-                        subtitle: Text(ModuStrings.text(
-                            context,
-                            '默认关闭，仅在本机生效。关闭后停止查询，保留关联及缓存。',
-                            'Off by default, per device. Turning off stops queries and retains saved links and data.')),
+                        title: SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, '启用微信读书', 'Enable WeRead')),
+                            description: Text(ModuStrings.text(
+                                context,
+                                '默认关闭，仅在本机生效。关闭后停止查询，保留关联及缓存。',
+                                'Off by default, per device. Turning off stops queries and retains saved links and data.'))),
                         value: Prefs().wereadEnabled,
                         onChanged:
                             _saving ? null : (value) => _save(enabled: value),

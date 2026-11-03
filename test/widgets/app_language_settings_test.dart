@@ -155,7 +155,7 @@ void main() {
                 tester.element(find.text(skill.localizedName(locale)))),
             TextDirection.rtl);
       }
-      await tester.tap(find.byKey(ValueKey('reading-skill-${skill.id}')));
+      await tester.tap(find.text(skill.localizedName(locale)));
       await tester.pumpAndSettle();
       final editor = tester.widget<TextField>(
           find.byKey(const ValueKey('reading-skill-prompt-editor')));

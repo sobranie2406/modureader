@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/ai_prompts.dart';
@@ -191,32 +192,21 @@ class _AiReadingSkillsSettingsState
         () => Prefs().readAnySkillOrder = entries.map((e) => e.id).toList());
   }
 
-  Widget _hint(String text) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline, size: 17),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _hint(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: SettingHelpTitle(
+            title: ModuStrings.text(context, '说明', 'Help'), description: text),
+      );
 
   Widget _builtInSkillTile(ReadAnySkill skill, int index, int count) {
     final enabled = Prefs().isReadAnySkillEnabled(skill.id);
     return ListTile(
       key: ValueKey('reading-skill-${skill.id}'),
       leading: Icon(_skillIcon(skill.id)),
-      title: Text(skill.localizedName(Localizations.localeOf(context))),
-      subtitle: Text(
-          skill.localizedDescription(Localizations.localeOf(context)),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis),
+      title: SettingHelp(
+          title: Text(skill.localizedName(Localizations.localeOf(context))),
+          description: Text(
+              skill.localizedDescription(Localizations.localeOf(context)))),
       onTap: () => _showBuiltInSkillDialog(skill),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -267,12 +257,13 @@ class _AiReadingSkillsSettingsState
     return ListTile(
       key: ValueKey('custom-reading-skill-${skill.id}'),
       leading: const Icon(Icons.person_outline),
-      title: Text(skill.name),
-      subtitle: Text(
-        skill.content,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: SettingHelp(
+          title: Text(skill.name),
+          description: Text(
+            skill.content,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          )),
       onTap: () => _showCustomSkillDialog(skill: skill),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,

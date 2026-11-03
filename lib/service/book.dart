@@ -589,12 +589,7 @@ Future<void> saveBook(
   Object? documentReadingMode,
   String? linkedPath,
 }) async {
-  // Extract original filename (without extension)
-  final fileNameWithoutExt = path.basenameWithoutExtension(file.path);
-
-  // Use original filename if title is invalid
-  final effectiveTitle =
-      (title == 'Unknown' || title.trim().isEmpty) ? fileNameWithoutExt : title;
+  final effectiveTitle = importedBookTitle(file.path, title);
 
   final newBookName =
       '${effectiveTitle.length > 20 ? effectiveTitle.substring(0, 20) : effectiveTitle}-${DateTime.now().microsecondsSinceEpoch}'

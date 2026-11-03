@@ -1,3 +1,4 @@
+import 'package:anx_reader/utils/theme_schedule.dart';
 import 'dart:convert';
 import 'package:anx_reader/service/translate/classical_translation.dart';
 import 'package:anx_reader/enums/app_layout_mode.dart';
@@ -560,7 +561,27 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get scheduledTheme => prefs.getBool('scheduledTheme') ?? false;
+  int get nightStartMinute =>
+      (prefs.getInt('nightStartMinute') ?? 1320).clamp(0, 1439);
+  int get nightEndMinute =>
+      (prefs.getInt('nightEndMinute') ?? 420).clamp(0, 1439);
+  bool get scheduledNight =>
+      isScheduledNight(DateTime.now(), nightStartMinute, nightEndMinute);
+
+  Future<void> saveThemeSchedule({bool? enabled, int? start, int? end}) async {
+    if (start != null) {
+      await prefs.setInt('nightStartMinute', start.clamp(0, 1439));
+    }
+    if (end != null) await prefs.setInt('nightEndMinute', end.clamp(0, 1439));
+    if (enabled != null) await prefs.setBool('scheduledTheme', enabled);
+    notifyListeners();
+  }
+
   ThemeMode get themeMode {
+    if (scheduledTheme && !eInkMode) {
+      return scheduledNight ? ThemeMode.dark : ThemeMode.light;
+    }
     String themeMode = prefs.getString('themeMode') ?? 'system';
     switch (themeMode) {
       case 'dark':
@@ -573,6 +594,7 @@ class Prefs extends ChangeNotifier {
   }
 
   Future<void> saveThemeModeToPrefs(String themeMode) async {
+    await prefs.setBool('scheduledTheme', false);
     await prefs.setString(
         'themeMode', themeMode == 'auto' ? 'system' : themeMode);
     notifyListeners();
@@ -1770,7 +1792,9 @@ class Prefs extends ChangeNotifier {
 
   // A non-destructive reading-only override. Keep the saved day colours,
   // background image and automatic-theme preference intact for restoration.
-  bool get readingNightMode => prefs.getBool('readingNightMode') ?? false;
+  bool get readingNightMode => scheduledTheme && !eInkMode
+      ? scheduledNight
+      : prefs.getBool('readingNightMode') ?? false;
 
   set readingNightMode(bool value) {
     prefs.setBool('readingNightMode', value);

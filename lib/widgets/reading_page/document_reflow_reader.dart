@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/service/reading/reflow_css.dart';
 import 'package:anx_reader/service/reading/text_filter.dart';
 import 'package:anx_reader/page/reading_page.dart' show epubPlayerKey;
@@ -971,9 +972,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
               if (widget.onComparisonChanged != null)
                 SwitchListTile(
                     key: const ValueKey('reflow-comparison-switch'),
-                    title: Text(t('原页对照', 'Compare with original')),
-                    subtitle: Text(t('竖屏上下，横屏左右；按原页码联动',
-                        'Top/bottom in portrait, side by side in landscape')),
+                    title: SettingHelp(
+                        title: Text(t('原页对照', 'Compare with original')),
+                        description: Text(t('竖屏上下，横屏左右；按原页码联动',
+                            'Top/bottom in portrait, side by side in landscape'))),
                     value: widget.comparison,
                     onChanged: widget.onComparisonChanged),
               Padding(
@@ -993,17 +995,19 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
               ListTile(
                   key: const ValueKey('export-saved-txt'),
                   leading: const Icon(Icons.file_download_outlined),
-                  title: Text(t('导出本书已保存文字', 'Export saved text')),
-                  subtitle: Text(t('按原始页码排列，优先导出编辑结果',
-                      'Original page order; edited text takes priority')),
+                  title: SettingHelp(
+                      title: Text(t('导出本书已保存文字', 'Export saved text')),
+                      description: Text(t('按原始页码排列，优先导出编辑结果',
+                          'Original page order; edited text takes priority'))),
                   onTap: _busy
                       ? null
                       : () => exportSavedDocumentText(context, widget.store)),
               ListTile(
                   leading: const Icon(Icons.refresh),
-                  title: Text(t('重新识别本页', 'Recognize this page again')),
-                  subtitle: Text(t('确认后替换本页识别及编辑结果，保留旧笔记',
-                      'Confirm replacement of this page’s recognition and edits; keep older notes')),
+                  title: SettingHelp(
+                      title: Text(t('重新识别本页', 'Recognize this page again')),
+                      description: Text(t('确认后替换本页识别及编辑结果，保留旧笔记',
+                          'Confirm replacement of this page’s recognition and edits; keep older notes'))),
                   onTap: _busy ? null : _recognizeAgain),
               if (widget.onExtract != null)
                 ListTile(

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:convert';
@@ -398,11 +399,13 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                         SwitchListTile.adaptive(
                             key: const ValueKey('auto-crop-enabled'),
                             contentPadding: EdgeInsets.zero,
-                            title: Text(tr('逐页自动裁边', 'Per-page auto crop')),
-                            subtitle: Text(
-                                tr('开启时默认应用全书；每页独立识别。拖动裁边框切换为手动裁边。',
-                                    'Enabling defaults to the whole document; detects each page independently. Drag the box to switch to manual cropping.'),
-                                style: Theme.of(context).textTheme.bodySmall),
+                            title: SettingHelp(
+                                title: Text(tr('逐页自动裁边', 'Per-page auto crop')),
+                                description: Text(
+                                    tr('开启时默认应用全书；每页独立识别。拖动裁边框切换为手动裁边。',
+                                        'Enabling defaults to the whole document; detects each page independently. Drag the box to switch to manual cropping.'),
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall)),
                             value: _layout.autoCrop,
                             onChanged: _saving || _busy || _failed || _detecting
                                 ? null
