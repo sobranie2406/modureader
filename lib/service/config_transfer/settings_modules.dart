@@ -38,7 +38,7 @@ fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode a
 classicalTranslationEngine classicalTranslationDirection classicalTranslationAiService classicalTranslationTextStyle languageTranslationTextStyle''',
   'webdav':
       '''webdavInfo s3Info syncProtocol autoSync onlySyncWhenWifi syncCompletedToast
-readingTimedSync readingSyncMinutes''',
+syncPreviewBeforeSync readingTimedSync readingSyncMinutes''',
   'remote-library-webdav': 'remoteLibraryConnection remoteLibraryViewOptions',
   'notes': '''quickMarkShowMenu autoMarkSelection annotationType annotationColor
 notesViewSortField notesViewSortDirection notesExportSortField notesExportSortDirection

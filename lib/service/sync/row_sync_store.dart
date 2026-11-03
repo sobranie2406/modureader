@@ -485,8 +485,14 @@ class RowSyncStore {
 
   /// Merge into live rows in one transaction, including changes made while
   /// the network request was in flight. No closing/replacing the live DB.
+  ///
+  /// [resolution] only affects records that exist on both sides with different
+  /// content (see [divergentSyncKeys]); it is chosen in the pre-sync preview.
+  /// A forced winner is written to the live row and published like any other
+  /// record, so the choice converges instead of being re-asked every sync.
   Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote,
-      {bool importOnlyMissingRecords = false}) async {
+      {bool importOnlyMissingRecords = false,
+      SyncConflictResolution resolution = SyncConflictResolution.newest}) async {
     remote = remote.map(normalizeRoundFields).toList();
     for (final record in remote) {
       validate(record);
@@ -494,6 +500,30 @@ class RowSyncStore {
     return db.transaction((txn) async {
       final local = await _snapshot(txn);
       var merged = mergeSyncRecords(local, remote);
+      if (resolution != SyncConflictResolution.newest) {
+        merged = resolveSyncConflicts(
+            local: local, remote: remote, merged: merged,
+            resolution: resolution);
+        if (resolution == SyncConflictResolution.preferLocal) {
+          // A preferred local record can still carry an older clock than the
+          // cloud copy. Re-stamp it, otherwise the next device to sync would
+          // simply keep its newer cloud value and the choice would flip back.
+          final keys = divergentSyncKeys(local, remote);
+          if (keys.isNotEmpty) {
+            await txn.execute(_tick);
+            final tick = (await txn.query(_control)).single['clock'] as int;
+            merged = [
+              for (final record in merged)
+                keys.contains(record.key)
+                    ? RowSyncRecord(record.kind, record.id, tick,
+                        _hash([record.revision, tick]), record.deleted,
+                        record.data,
+                        narration: record.narration)
+                    : record
+            ];
+          }
+        }
+      }
       if (importOnlyMissingRecords) {
         // A one-off external library import is not a remote editing device.
         // Resolve aliases first, then preserve the latest local records inside

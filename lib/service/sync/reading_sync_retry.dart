@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/sync_preview.dart';
 
 bool syncNetworkAllowed(List<ConnectivityResult> connections,
         {required bool onlyWifi}) =>
@@ -52,6 +53,8 @@ class ReadingSyncRetry {
       try {
         return await synchronize();
       } catch (error) {
+        // A declined sync preview is a user decision, not a transient failure.
+        if (error is SyncPreviewCancelled) rethrow;
         // A lost connection or changed Wi-Fi policy is a silent deferral.
         if (!active()) return false;
         if (reading() && (!await networkReady() || !active())) return false;

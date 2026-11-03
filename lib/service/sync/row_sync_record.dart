@@ -137,6 +137,75 @@ List<RowSyncRecord> mergeSyncRecords(
   return [for (final key in keys) result[key]!];
 }
 
+/// How records that exist on BOTH devices with different content are resolved.
+///
+/// `newest` keeps the operation clock ordering used by every other merge path.
+/// The two explicit choices only apply to [divergentSyncKeys]; records that
+/// exist on one side alone are always merged normally, so a preference can
+/// never delete a book, note or session that only one device knows about.
+enum SyncConflictResolution { newest, preferLocal, preferRemote }
+
+/// Keys that both sides published with different CONTENT.
+///
+/// Clock and revision are deliberately ignored: an unchanged record whose clock
+/// merely advanced (a re-stamp or a legacy migration) is not a conflict. This
+/// is the set a user is asked about BEFORE a merge. Encrypted AI/service
+/// settings are excluded (opaque envelopes differ on every re-encryption), as
+/// is the fixed root group row.
+Set<String> divergentSyncKeys(
+    Iterable<RowSyncRecord> local, Iterable<RowSyncRecord> remote) {
+  // Sort payload keys before encoding: identical content written by clients of
+  // different ages can carry a different JSON member order.
+  String content(RowSyncRecord record) {
+    final entries = record.data.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return jsonEncode([
+      record.deleted,
+      {for (final entry in entries) entry.key: entry.value},
+      record.narration?.encode(),
+    ]);
+  }
+
+  final index = {for (final record in local) record.key: record};
+  final keys = <String>{};
+  for (final record in remote) {
+    final existing = index[record.key];
+    if (existing == null ||
+        existing.kind == 'secret' ||
+        existing.key == 'group/root') {
+      continue;
+    }
+    if (content(existing) != content(record)) keys.add(record.key);
+  }
+  return keys;
+}
+
+/// Replaces the winning side for every divergent key. Callers pass the union
+/// produced by [mergeSyncRecords] so unrelated records are untouched.
+List<RowSyncRecord> resolveSyncConflicts({
+  required Iterable<RowSyncRecord> local,
+  required Iterable<RowSyncRecord> remote,
+  required Iterable<RowSyncRecord> merged,
+  required SyncConflictResolution resolution,
+}) {
+  final records = merged.toList();
+  if (resolution == SyncConflictResolution.newest) return records;
+  final keys = divergentSyncKeys(local, remote);
+  if (keys.isEmpty) return records;
+  final preferred = {
+    for (final record in resolution == SyncConflictResolution.preferLocal
+        ? local
+        : remote)
+      record.key: record
+  };
+  return [
+    for (final record in records)
+      keys.contains(record.key) && preferred.containsKey(record.key)
+          ? preferred[record.key]!
+          : record
+  ];
+}
+
 bool sameSyncRecords(Iterable<RowSyncRecord> a, Iterable<RowSyncRecord> b) {
   Map<String, String> indexed(Iterable<RowSyncRecord> records) => {
         for (final r in records) r.key: jsonEncode(r.toMap()),

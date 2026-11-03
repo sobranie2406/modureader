@@ -25,10 +25,13 @@ import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/sync_preview.dart';
+import 'package:anx_reader/widgets/sync/sync_preview_dialog.dart';
 import 'package:anx_reader/service/sync/reading_sync_retry.dart';
 import 'package:anx_reader/service/sync/pending_auto_sync.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/replaced_book_files.dart';
 import 'package:anx_reader/service/sync/local_book_download.dart';
@@ -85,6 +88,66 @@ class Sync extends _$Sync {
   Object? _automaticPolicy;
   SyncClientBase? _remoteListClient;
   Future<List<String>>? _remoteBookListing;
+  SyncPreview? _lastPreview;
+
+  /// Shows the read-only preview before the first write of a manual sync.
+  ///
+  /// The engine calls this after both libraries are loaded and before the local
+  /// database or the cloud is touched, so declining leaves both sides intact.
+  Future<SyncPreviewDecision> _confirmPreview(
+      SyncPreviewContext context) async {
+    final preview = buildSyncPreview(context: context);
+    _lastPreview = preview;
+    final dialogContext = navigatorKey.currentContext;
+    if (dialogContext == null || !dialogContext.mounted) {
+      return const SyncPreviewDecision(SyncConflictResolution.newest);
+    }
+    final resolution = await showSyncPreviewDialog(dialogContext, preview);
+    if (resolution == null) {
+      if (dialogContext.mounted) {
+        AnxToast.show(ModuStrings.text(
+            dialogContext,
+            '已取消同步，本机与云端都没有修改。',
+            'Sync cancelled. Nothing was changed locally or in the cloud.'));
+      }
+      return const SyncPreviewDecision.cancel();
+    }
+    return SyncPreviewDecision(resolution);
+  }
+
+  String _previewSummary(SyncPreview preview) {
+    final context = navigatorKey.currentContext!;
+    final parts = <String>[];
+    if (preview.addedBooks.isNotEmpty) {
+      parts.add(ModuStrings.text(
+          context,
+          '新增 ${preview.addedBooks.length} 本',
+          '${preview.addedBooks.length} added'));
+    }
+    if (preview.removedBooks.isNotEmpty) {
+      parts.add(ModuStrings.text(
+          context,
+          '移除 ${preview.removedBooks.length} 本',
+          '${preview.removedBooks.length} removed'));
+    }
+    if (preview.noteDelta != 0) {
+      final sign = preview.noteDelta > 0 ? '+' : '';
+      parts.add(ModuStrings.text(context, '笔记 $sign${preview.noteDelta}',
+          'notes $sign${preview.noteDelta}'));
+    }
+    final minutes = (preview.readingTimeDelta / 60).round();
+    if (minutes != 0) {
+      final sign = minutes > 0 ? '+' : '';
+      parts.add(ModuStrings.text(
+          context, '时长 $sign$minutes 分钟', 'time $sign$minutes min'));
+    }
+    if (parts.isEmpty) {
+      return ModuStrings.text(
+          context, '同步完成，两端已一致', 'Sync complete; both sides agree');
+    }
+    return ModuStrings.text(context, '同步完成：${parts.join(' · ')}',
+        'Synced: ${parts.join(' · ')}');
+  }
 
   bool get _chineseFeedback {
     final context = navigatorKey.currentContext;
@@ -96,6 +159,10 @@ class Sync extends _$Sync {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     return Prefs().webdavStatus &&
         Prefs().autoSync &&
+        // A confirmation cannot be shown for a background start. While the
+        // preview is enabled every merge has to be started and confirmed by the
+        // user, so automatic starts stay paused instead of merging silently.
+        !Prefs().syncPreviewBeforeSync &&
         (lifecycle == null || lifecycle == AppLifecycleState.resumed);
   }
 
@@ -327,6 +394,14 @@ class Sync extends _$Sync {
           completed ? RuntimeEvent.syncComplete : RuntimeEvent.syncPending,
           durationMs: diagnosticTimer.elapsedMilliseconds);
     } catch (e, stack) {
+      // Declining the preview is not a failure: nothing was written, and the
+      // user already received the "cancelled" confirmation.
+      if (e is SyncPreviewCancelled) {
+        RuntimeDiagnostics.record(RuntimeEvent.syncPending,
+            durationMs: diagnosticTimer.elapsedMilliseconds);
+        AnxLog.info('Sync cancelled before merge at the user\'s request');
+        return;
+      }
       RuntimeDiagnostics.record(RuntimeEvent.syncFailed,
           durationMs: diagnosticTimer.elapsedMilliseconds);
       // Avoid logging DioException.toString(): it can contain private URLs.
@@ -446,9 +521,17 @@ class Sync extends _$Sync {
     if (!(shouldStart?.call() ?? true)) return false;
     changeState(state.copyWith(isSyncing: true));
 
+    final preview = trigger == SyncTrigger.manual &&
+            Prefs().webdavStatus &&
+            Prefs().syncPreviewBeforeSync
+        ? _confirmPreview
+        : null;
+    _lastPreview = null;
+
     try {
       final assetListing = SyncAssetListing(client);
-      final outcome = await syncDatabase(direction, assetListing: assetListing);
+      final outcome = await syncDatabase(direction,
+          assetListing: assetListing, preview: preview);
       final hasPendingChanges =
           outcome == RowSyncOutcome.publishedWithPendingChanges;
       if (hasPendingChanges) await _pendingSync.request();
@@ -502,6 +585,11 @@ class Sync extends _$Sync {
       // Backup cleanup is now handled by DatabaseSyncManager
 
       if (!hasPendingChanges &&
+          preview != null &&
+          (_lastPreview?.hasChanges ?? false) &&
+          navigatorKey.currentContext != null) {
+        AnxToast.show(_previewSummary(_lastPreview!));
+      } else if (!hasPendingChanges &&
           _readingFeedback.success(
               reading: _isReading, enabled: Prefs().syncCompletedToast)) {
         AnxToast.show(syncSuccessMessage(chinese: _chineseFeedback));
@@ -567,7 +655,7 @@ class Sync extends _$Sync {
   }
 
   Future<RowSyncOutcome> syncDatabase(SyncDirection direction,
-      {SyncAssetListing? assetListing}) async {
+      {SyncAssetListing? assetListing, SyncPreviewHook? preview}) async {
     final client = _syncClient;
     if (client == null) {
       throw const SyncFeedbackFailure(SyncFailureCode.notConfigured);
@@ -580,6 +668,7 @@ class Sync extends _$Sync {
         client: client,
         cache: await getAnxCacheDir(),
         durableDirectory: await getAnxDataBasesDir(),
+        onPreview: preview,
         beforePublish: () => syncFiles(assetListing: assetListing),
         beforeMerge: _createMergeBackup,
         afterMerge: () async {
