@@ -30,14 +30,23 @@ ThemeData colorSchema(
   const einkForeground = Colors.black;
   final disableMotion = prefsNotifier.eInkMotionDisabled;
 
+  // Every preset paints the interface; user edits to a preset's canvas are
+  // applied through the preference override layer.
+  final preset = prefsNotifier.activeThemePreset;
+  final themedCanvas = isEinkMode || preset == null
+      ? null
+      : prefsNotifier.canvasForPreset(preset, brightness);
+
   final lightGropedBackground = const Color(0xFFFCFCFA);
   final darkGropedBackground =
       prefsNotifier.trueDarkMode ? Color(0xFF000000) : Color(0xFF1C1E1B);
   final gropedBackgroundColor = isEinkMode
       ? einkBackground
-      : isDark
-          ? darkGropedBackground
-          : lightGropedBackground;
+      : themedCanvas?.background ??
+          (isDark ? darkGropedBackground : lightGropedBackground);
+  final surfaceColor = isEinkMode
+      ? einkBackground
+      : themedCanvas?.surface ?? gropedBackgroundColor;
 
   var colorScheme = isEinkMode
       ? ColorScheme(
@@ -86,34 +95,48 @@ ThemeData colorSchema(
             ),
         };
   if (!isEinkMode) {
-    final ink = isDark ? const Color(0xFFE5E7DF) : const Color(0xFF283633);
+    final ink = themedCanvas?.text ??
+        (isDark ? const Color(0xFFE5E7DF) : const Color(0xFF283633));
     final accent = isDark ? const Color(0xFFB5C4A7) : const Color(0xFF197D74);
-    final selected = isDark ? const Color(0xFF303A2B) : const Color(0xFFE5F3EE);
+    final selected = themedCanvas?.navSelectedBg ??
+        (isDark ? const Color(0xFF303A2B) : const Color(0xFFE5F3EE));
+    final selectedText = themedCanvas?.navSelectedFg;
+    final muted = themedCanvas?.muted ??
+        (isDark ? const Color(0xFFA2A79B) : const Color(0xFF65716D));
     colorScheme = colorScheme.copyWith(
       primary: defaultPalette ? accent : null,
       onPrimary: defaultPalette
           ? (isDark ? const Color(0xFF263120) : const Color(0xFFFFFFFF))
           : null,
-      primaryContainer: defaultPalette ? selected : null,
-      onPrimaryContainer: defaultPalette ? ink : null,
+      primaryContainer:
+          defaultPalette || themedCanvas != null ? selected : null,
+      onPrimaryContainer: selectedText ?? (defaultPalette ? ink : null),
       secondary: defaultPalette ? accent : null,
       onSecondary: defaultPalette
           ? (isDark ? const Color(0xFF263120) : const Color(0xFFFFFFFF))
           : null,
-      secondaryContainer: defaultPalette ? selected : null,
-      onSecondaryContainer: defaultPalette ? ink : null,
+      secondaryContainer:
+          defaultPalette || themedCanvas != null ? selected : null,
+      onSecondaryContainer: selectedText ?? (defaultPalette ? ink : null),
       tertiary: defaultPalette ? accent : null,
-      tertiaryContainer: defaultPalette ? selected : null,
-      onTertiaryContainer: defaultPalette ? ink : null,
+      tertiaryContainer:
+          defaultPalette || themedCanvas != null ? selected : null,
+      onTertiaryContainer: selectedText ?? (defaultPalette ? ink : null),
       onSurface: ink,
-      onSurfaceVariant:
-          isDark ? const Color(0xFFA2A79B) : const Color(0xFF65716D),
-      surfaceContainerLowest: gropedBackgroundColor,
-      surfaceContainerLow: gropedBackgroundColor,
-      surfaceContainerHigh: gropedBackgroundColor,
-      surfaceContainerHighest: gropedBackgroundColor,
-      surfaceDim: gropedBackgroundColor,
-      surfaceBright: gropedBackgroundColor,
+      onSurfaceVariant: muted,
+      surface: themedCanvas == null ? null : surfaceColor,
+      surfaceContainer: themedCanvas == null ? null : surfaceColor,
+      surfaceContainerLowest:
+          themedCanvas == null ? gropedBackgroundColor : surfaceColor,
+      surfaceContainerLow:
+          themedCanvas == null ? gropedBackgroundColor : surfaceColor,
+      surfaceContainerHigh:
+          themedCanvas == null ? gropedBackgroundColor : surfaceColor,
+      surfaceContainerHighest:
+          themedCanvas == null ? gropedBackgroundColor : surfaceColor,
+      surfaceDim: themedCanvas == null ? gropedBackgroundColor : surfaceColor,
+      surfaceBright:
+          themedCanvas == null ? gropedBackgroundColor : surfaceColor,
       surfaceTint: Colors.transparent,
       outline: isDark ? const Color(0xFF777E70) : const Color(0xFF899A93),
       outlineVariant:
@@ -152,25 +175,25 @@ ThemeData colorSchema(
 
   return themeData
       .copyWith(
-          canvasColor: gropedBackgroundColor,
+          canvasColor: surfaceColor,
           navigationRailTheme: themeData.navigationRailTheme.copyWith(
-            backgroundColor: gropedBackgroundColor,
+            backgroundColor: surfaceColor,
           ),
           navigationBarTheme: themeData.navigationBarTheme.copyWith(
-            backgroundColor: gropedBackgroundColor,
+            backgroundColor: surfaceColor,
             surfaceTintColor: Colors.transparent,
           ),
           bottomNavigationBarTheme: themeData.bottomNavigationBarTheme.copyWith(
-            backgroundColor: gropedBackgroundColor,
+            backgroundColor: surfaceColor,
           ),
           cupertinoOverrideTheme: CupertinoThemeData(
             brightness: brightness,
             primaryColor: colorScheme.primary,
             scaffoldBackgroundColor: gropedBackgroundColor,
-            barBackgroundColor: gropedBackgroundColor,
+            barBackgroundColor: surfaceColor,
           ),
           cardTheme: CardThemeData(
-            color: isEinkMode ? Colors.transparent : gropedBackgroundColor,
+            color: isEinkMode ? Colors.transparent : surfaceColor,
             surfaceTintColor: Colors.transparent,
             elevation: menuElevation,
             shadowColor: menuShadow,
@@ -178,12 +201,13 @@ ThemeData colorSchema(
             clipBehavior: Clip.antiAlias,
           ),
           appBarTheme: themeData.appBarTheme.copyWith(
-            backgroundColor: gropedBackgroundColor,
+            backgroundColor: surfaceColor,
+            foregroundColor: themedCanvas?.text,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
           ),
           popupMenuTheme: PopupMenuThemeData(
-            color: gropedBackgroundColor,
+            color: surfaceColor,
             surfaceTintColor: Colors.transparent,
             elevation: menuElevation,
             shadowColor: menuShadow,
@@ -191,7 +215,7 @@ ThemeData colorSchema(
           ),
           menuTheme: MenuThemeData(
               style: MenuStyle(
-            backgroundColor: WidgetStatePropertyAll(gropedBackgroundColor),
+            backgroundColor: WidgetStatePropertyAll(surfaceColor),
             surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
             elevation: WidgetStatePropertyAll(menuElevation),
             shadowColor: WidgetStatePropertyAll(menuShadow),
@@ -246,7 +270,11 @@ ThemeData colorSchema(
           textTheme: isEinkMode
               ? themeData.textTheme.apply(
                   bodyColor: einkForeground, displayColor: einkForeground)
-              : themeData.textTheme,
+              : themedCanvas == null
+                  ? themeData.textTheme
+                  : themeData.textTheme.apply(
+                      bodyColor: themedCanvas.text,
+                      displayColor: themedCanvas.text),
           pageTransitionsTheme: disableMotion
               ? PageTransitionsTheme(builders: {
                   for (final platform in TargetPlatform.values)
@@ -290,7 +318,7 @@ ThemeData colorSchema(
           ),
           bottomSheetTheme: BottomSheetThemeData(
               clipBehavior: Clip.antiAlias,
-              backgroundColor: gropedBackgroundColor,
+              backgroundColor: surfaceColor,
               surfaceTintColor: Colors.transparent,
               elevation: menuElevation,
               shadowColor: menuShadow,
@@ -299,11 +327,11 @@ ThemeData colorSchema(
                     const BorderRadius.vertical(top: Radius.circular(24)),
                 side: BorderSide(color: colorScheme.outlineVariant),
               )),
-          drawerTheme: DrawerThemeData()
-              .copyWith(backgroundColor: gropedBackgroundColor),
+          drawerTheme:
+              DrawerThemeData().copyWith(backgroundColor: surfaceColor),
           dialogTheme: DialogThemeData(
               clipBehavior: Clip.antiAlias,
-              backgroundColor: gropedBackgroundColor,
+              backgroundColor: surfaceColor,
               surfaceTintColor: Colors.transparent,
               elevation: menuElevation,
               shadowColor: menuShadow,

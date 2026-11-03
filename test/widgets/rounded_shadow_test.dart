@@ -23,8 +23,9 @@ void main() {
     try {
       await Prefs().saveThemeModeToPrefs('light');
       const boundaryKey = ValueKey('shadow-preview');
+      late ThemeData theme;
       await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) {
-        final theme = colorSchema(Prefs(), context, Brightness.light);
+        theme = colorSchema(Prefs(), context, Brightness.light);
         return Theme(
           data: theme,
           child: Center(
@@ -95,7 +96,12 @@ void main() {
               reason:
                   'A displaced outer-blur cutout creates a second dark rim.');
         }
-        expect(redAt((box.center.dy - origin.dy - 25).round()), 252,
+        // The panel keeps the theme surface exactly; the preset canvas decides
+        // that colour, so read it instead of assuming the old near-white.
+        final expectedInterior =
+            (theme.colorScheme.surface.r * 255).round();
+        expect(redAt((box.center.dy - origin.dy - 25).round()),
+            expectedInterior,
             reason: 'The interior must retain the exact page background.');
         final menu = tester.getRect(find
             .descendant(

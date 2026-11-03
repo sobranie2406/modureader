@@ -90,10 +90,8 @@ void main() {
       await tester.pump();
       await tester.tap(mode);
       await tester.pumpAndSettle();
-      final themeChoice = tester.widget<SegmentedButton<String>>(
-          find.byType(SegmentedButton<String>));
-      expect(themeChoice.selected, {'light'});
-      expect(themeChoice.onSelectionChanged, isNull);
+      // The theme-mode selector now lives on the theme colour page; E-Ink
+      // disables it there (covered by the theme colour page tests).
       await tester.ensureVisible(animations);
       await tester.pump();
       expect(tester.widget<Switch>(animations).onChanged, isNotNull);

@@ -34,7 +34,7 @@ autoVectorizeOnImport autoSummaryPreviousContent autoAdjustReadingTheme readingN
 keyboardShortcutTurnPage swapPageTurnArea showMenuOnHover showActionLabels showBookFormatBadge showBookIndexBadge showBookTitleOnDefaultCover
 showAuthorOnDefaultCover openBookAnimation bookshelfListMode onlySyncWhenWifi useBookStyles bottomNavigatorShowNote
 bottomNavigatorShowRemote bottomNavigatorShowStatistics bottomNavigatorShowAI syncCompletedToast autoSync readingTimedSync
-isSystemTts showTextUnderIconButton notesExportMergeChapters verticalRedFrame enableJsForEpub
+isSystemTts showTextUnderIconButton notesExportMergeChapters verticalRedFrame enableJsForEpub themeAppliesToReader
 httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn continuousScroll scrollAutoAlign longPressSelectParagraph adjustableReaderPopups aiReadingSkillsVisible aiSkillTemplateDraft ocrPrecacheEnabled'''
             .split(RegExp(r'\s+')))
       key: 'bool',
@@ -58,7 +58,7 @@ userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnCo
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl
 customCSS customCssProfiles customCssDefaultIndices textAlignment bgimgFit aiPanelPosition codeHighlightTheme aiChatDisplayMode
-webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings selectionToolbar readerShortcuts bgimg pluginState ttsRoleConfig'''
+webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions selectionSearchSettings selectionToolbar readerShortcuts bgimg pluginState ttsRoleConfig themePresetId customThemePresets themePresetOverrides'''
             .split(RegExp(r'\s+')))
       key: 'string',
     'statisticsDashboardTiles': 'stringList',
@@ -93,7 +93,17 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
     }
     // Version 2 records explicit defaults as resets, instead of accidentally
     // retaining the receiving device's old values. Never reset absent secrets.
+    // Theme palettes are large JSON blobs and stay local unless the user
+    // actually customised them: an unconditional reset placeholder would add
+    // hundreds of bytes to every QR link for an empty value.
+    const optionalKeys = {
+      'themePresetId',
+      'customThemePresets',
+      'themePresetOverrides',
+      'themeAppliesToReader',
+    };
     for (final key in _types.keys) {
+      if (optionalKeys.contains(key)) continue;
       if (!isCredentialPreference(key)) {
         values.putIfAbsent(key, () => {'type': 'reset', 'value': null});
       }

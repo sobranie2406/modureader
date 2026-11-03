@@ -3,6 +3,7 @@ import 'package:anx_reader/service/translate/classical_translation.dart';
 import 'package:anx_reader/enums/app_layout_mode.dart';
 import 'package:anx_reader/models/reader_shortcuts.dart';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
+import 'package:anx_reader/models/theme_preset.dart';
 import 'package:anx_reader/models/tts_role_config.dart';
 import 'dart:core';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
@@ -350,18 +351,199 @@ class Prefs extends ChangeNotifier {
   }
 
   Color get themeColor {
-    int colorValue = prefs.getInt('themeColor') ?? 0xFF197D74;
+    int colorValue = prefs.getInt('themeColor') ?? defaultThemeSeed;
     return Color(colorValue);
   }
 
   Future<void> saveThemeToPrefs(int colorValue) async {
     await prefs.setInt('themeColor', colorValue);
+    // A raw colour is not a preset; drop the stale selection marker.
+    await prefs.remove(_themePresetIdKey);
     notifyListeners();
   }
 
   Future<void> resetThemeColor() async {
     await prefs.remove('themeColor');
+    await prefs.remove(_themePresetIdKey);
     notifyListeners();
+  }
+
+  // ============ Theme colour presets ============
+
+  static const _themePresetIdKey = 'themePresetId';
+  static const _customThemePresetsKey = 'customThemePresets';
+
+  /// Built-in selection id. Empty when the colour came from a raw picker or an
+  /// older version that only stored an integer.
+  String get themePresetId => prefs.getString(_themePresetIdKey) ?? '';
+
+  /// Preset shown as selected: explicit id, else the palette entry matching the
+  /// stored colour, else a custom preset with that colour.
+  ThemePreset? get activeThemePreset {
+    final id = themePresetId;
+    if (id.isNotEmpty) {
+      for (final preset in [...builtInThemePresets, ...customThemePresets]) {
+        if (preset.id == id) return preset;
+      }
+    }
+    final colorValue = themeColor.toARGB32();
+    final builtIn = builtInThemePresetForColor(colorValue);
+    if (builtIn != null) return builtIn;
+    for (final preset in customThemePresets) {
+      if (preset.colorValue == colorValue) return preset;
+    }
+    return null;
+  }
+
+  List<ThemePreset> get customThemePresets {
+    final raw = prefs.getString(_customThemePresetsKey);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      final presets = <ThemePreset>[];
+      for (final entry in decoded) {
+        final preset = ThemePreset.fromMap(entry);
+        if (preset != null) presets.add(preset);
+      }
+      return List.unmodifiable(presets);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Apply [preset] and remember which entry is selected.
+  Future<void> selectThemePreset(ThemePreset preset) async {
+    await prefs.setInt('themeColor', preset.colorValue);
+    await prefs.setString(_themePresetIdKey, preset.id);
+    if (themeAppliesToReader) await _applyReadThemeFromActivePreset();
+    notifyListeners();
+  }
+
+  static const _themeAppliesToReaderKey = 'themeAppliesToReader';
+
+  /// When on, switching presets also repaints the reader page background.
+  bool get themeAppliesToReader =>
+      prefs.getBool(_themeAppliesToReaderKey) ?? false;
+
+  Future<void> setThemeAppliesToReader(bool value) async {
+    await prefs.setBool(_themeAppliesToReaderKey, value);
+    if (value) await _applyReadThemeFromActivePreset();
+    notifyListeners();
+  }
+
+  /// Match the reader paper to the active canvas. E-Ink keeps its own scheme.
+  Future<void> _applyReadThemeFromActivePreset() async {
+    if (eInkMode) return;
+    final preset = activeThemePreset;
+    if (preset == null) return;
+    final canvas = canvasForPreset(preset, _effectiveBrightness);
+    saveReadThemeToPrefs(ReadTheme(
+      id: null,
+      backgroundColor: _hexColor(canvas.background),
+      textColor: _hexColor(canvas.text),
+      backgroundImagePath: readTheme.backgroundImagePath,
+    ));
+  }
+
+  // ============ Per-preset colour edits ============
+
+  static const _themePresetOverridesKey = 'themePresetOverrides';
+
+  Map<String, dynamic> _presetOverrides() {
+    final raw = prefs.getString(_themePresetOverridesKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  bool presetHasOverride(String presetId) =>
+      _presetOverrides().containsKey(presetId);
+
+  /// Canvas for [preset] in [brightness] with the user's edits applied.
+  ThemeCanvas canvasForPreset(ThemePreset preset, Brightness brightness) {
+    final entry = _presetOverrides()[preset.id];
+    if (entry is Map) {
+      final canvas = ThemeCanvas.fromMap(
+          entry[brightness == Brightness.dark ? 'dark' : 'light']);
+      if (canvas != null) return canvas;
+    }
+    return preset.canvasFor(brightness);
+  }
+
+  Future<void> savePresetCanvasOverride(
+      ThemePreset preset, Brightness brightness, ThemeCanvas canvas) async {
+    final data = _presetOverrides();
+    final entry = Map<String, dynamic>.from((data[preset.id] as Map?) ?? {});
+    entry[brightness == Brightness.dark ? 'dark' : 'light'] = canvas.toMap();
+    data[preset.id] = entry;
+    await prefs.setString(_themePresetOverridesKey, jsonEncode(data));
+    notifyListeners();
+  }
+
+  Future<void> resetPresetCanvasOverride(String presetId) async {
+    final data = _presetOverrides();
+    if (data.remove(presetId) == null) return;
+    await _writePresetOverrides(data);
+    notifyListeners();
+  }
+
+  Future<void> resetAllPresetOverrides() async {
+    await prefs.remove(_themePresetOverridesKey);
+    notifyListeners();
+  }
+
+  Future<void> _writePresetOverrides(Map<String, dynamic> data) async {
+    if (data.isEmpty) {
+      await prefs.remove(_themePresetOverridesKey);
+    } else {
+      await prefs.setString(_themePresetOverridesKey, jsonEncode(data));
+    }
+  }
+
+  Brightness get _effectiveBrightness => switch (themeMode) {
+        ThemeMode.dark => Brightness.dark,
+        ThemeMode.light => Brightness.light,
+        ThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      };
+
+  static String _hexColor(Color color) =>
+      color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
+
+  /// Insert or update a custom preset and select it.
+  Future<void> saveCustomThemePreset(ThemePreset preset) async {
+    final presets = [...customThemePresets];
+    final index = presets.indexWhere((entry) => entry.id == preset.id);
+    if (index >= 0) {
+      presets[index] = preset;
+    } else {
+      presets.add(preset);
+    }
+    await _writeCustomThemePresets(presets);
+    await selectThemePreset(preset);
+  }
+
+  Future<void> deleteCustomThemePreset(String id) async {
+    final presets = [...customThemePresets];
+    final removed = presets.where((preset) => preset.id != id).toList();
+    if (removed.length == presets.length) return;
+    await _writeCustomThemePresets(removed);
+    if (themePresetId == id) await prefs.remove(_themePresetIdKey);
+    notifyListeners();
+  }
+
+  Future<void> _writeCustomThemePresets(List<ThemePreset> presets) async {
+    if (presets.isEmpty) {
+      await prefs.remove(_customThemePresetsKey);
+      return;
+    }
+    await prefs.setString(_customThemePresetsKey,
+        jsonEncode([for (final preset in presets) preset.toMap()]));
   }
 
   Locale? get locale {
