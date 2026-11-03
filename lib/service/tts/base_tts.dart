@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:anx_reader/models/tts_role_config.dart';
 import 'tts_page_source.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,13 @@ enum TtsStateEnum { playing, stopped, paused, continued }
 
 abstract class BaseTts {
   TtsPageSource? pageSource;
+
+  /// Resolves narration/dialogue voices for the book currently being read.
+  /// The host sets it once; a null resolver keeps the single-voice behaviour.
+  TtsRoleConfig Function()? roleConfigResolver;
+
+  TtsRoleConfig get roleConfig =>
+      roleConfigResolver?.call() ?? TtsRoleConfig.disabled;
 
   /// Loading is separate from user intent: buffering must keep the background
   /// audio session playing, rather than release its foreground service.

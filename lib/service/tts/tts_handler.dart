@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/models/tts_role_config.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/tts_page_source.dart';
 import 'package:anx_reader/service/tts/tts_factory.dart';
 import 'package:anx_reader/service/tts/tts_media_state.dart';
@@ -47,6 +49,9 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         _stopReaderOverride = stopReader;
 
   BaseTts get tts => _ttsFactory.current;
+
+  /// Book currently attached to narration, used by per-book voice settings.
+  int? get playingBookId => int.tryParse(mediaItem.value?.id ?? '');
 
   Function? _getCurrentText;
   Function? _getNextText;
@@ -111,6 +116,20 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     _observedTts = tts;
     tts.ttsStateNotifier.addListener(_syncPlaybackState);
     tts.bufferingNotifier.addListener(_syncPlaybackState);
+    // Rebind on every backend switch: the factory may have created a new TTS.
+    if (tts is OnlineTts) tts.roleConfigResolver = _resolveRoleConfig;
+  }
+
+  /// Narration/dialogue voices for the book currently playing. Read on every
+  /// prefetch refill, so per-book changes reach the next collected passage.
+  TtsRoleConfig _resolveRoleConfig() {
+    try {
+      final bookId = int.tryParse(mediaItem.value?.id ?? '');
+      return Prefs().ttsRoleConfigForBook(bookId);
+    } catch (_) {
+      // Preferences may be unavailable during early startup.
+      return TtsRoleConfig.disabled;
+    }
   }
 
   void _syncPlaybackState() {

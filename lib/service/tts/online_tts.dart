@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:anx_reader/utils/platform_utils.dart';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
+import 'package:anx_reader/models/tts_role_config.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/page/reading_page.dart';
@@ -15,6 +16,7 @@ import 'package:anx_reader/service/tts/tts_service_provider.dart';
 import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
 import 'package:anx_reader/service/tts/tts_provider.dart';
 import 'package:anx_reader/service/tts/tts_text_filter.dart';
+import 'package:anx_reader/service/tts/tts_role_plan.dart';
 import 'package:anx_reader/service/tts/audio_mime_type.dart';
 import 'package:anx_reader/service/tts/models/tts_segment.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
@@ -234,19 +236,20 @@ class OnlineTts extends BaseTts {
       backend is EdgeTtsProvider ||
       backend is OpenAiTtsProvider ||
       backend is DashScopeTtsProvider;
-  double get _playbackRate {
+
+  double _playbackRateFor(double rate) {
     if (!rate.isFinite) return 1.0;
     if (backend is XiaomiMimoTtsProvider) return rate.clamp(0.1, 4.0);
     // Retain Edge's existing synthesis range. High speeds use 2x synthesis
     // plus local acceleration, rather than an unverified high-speed request.
     if (backend is EdgeTtsProvider) return rate.clamp(2.0, 4.0) / 2;
     if (backend is OpenAiTtsProvider || backend is DashScopeTtsProvider) {
-      return rate.clamp(0.1, 4.0) / _synthesisRate;
+      return rate.clamp(0.1, 4.0) / _synthesisRateFor(rate);
     }
     return 1.0;
   }
 
-  double get _synthesisRate {
+  double _synthesisRateFor(double rate) {
     if (backend is XiaomiMimoTtsProvider) return 1.0;
     if (backend is EdgeTtsProvider) return rate.clamp(0.1, 2.0);
     // APIs bottom out at 0.25x; local playback supplies the remaining slowdown.
@@ -255,6 +258,17 @@ class OnlineTts extends BaseTts {
     }
     return rate;
   }
+
+  double get _playbackRate => _playbackRateFor(rate);
+
+  double get _synthesisRate => _synthesisRateFor(rate);
+
+  /// Exposed for tests: a preview must come out at the original speed.
+  @visibleForTesting
+  double previewPlaybackRateFor(double rate) => _playbackRateFor(rate);
+
+  @visibleForTesting
+  double previewSynthesisRateFor(double rate) => _synthesisRateFor(rate);
 
   @override
   bool get isPlaying => ttsStateNotifier.value == TtsStateEnum.playing;
@@ -413,6 +427,28 @@ class OnlineTts extends BaseTts {
   }
 
   // ============ Producer: Prefetcher Loop ============
+  /// Reader passages represented in the buffer. A passage split into narration
+  /// and dialogue runs still counts once, so skipping the queued snapshot keeps
+  /// the same boundaries as before the split.
+  int get _bufferedCursorUnits =>
+      _buffer.where((segment) => segment.sentence.advanceCursor).length +
+      ((_currentSegment?.sentence.advanceCursor ?? false) ? 1 : 0);
+
+  TtsRolePlan _rolePlan() {
+    final config = roleConfig;
+    // Do not touch the backend at all while the feature is off.
+    if (!config.enabled) {
+      return TtsRolePlan(config: TtsRoleConfig.disabled, fallbackVoice: '');
+    }
+    var fallback = '';
+    try {
+      fallback = backend.getSelectedVoice();
+    } catch (_) {
+      // A missing selection surfaces as a synthesis configuration error later.
+    }
+    return TtsRolePlan(config: config, fallbackVoice: fallback);
+  }
+
   Future<void> _startPrefetcher() async {
     if (_isPrefetcherRunning) return;
     _isPrefetcherRunning = true;
@@ -439,8 +475,10 @@ class OnlineTts extends BaseTts {
         // Refill during playback, not only after the whole batch is exhausted.
         // The current passage and queued passages already belong to this
         // cursor, so skip them in the non-mutating reader snapshot below.
-        final queued = _buffer.length + (_currentSegment == null ? 0 : 1);
-        if (_advancingCursor || queued >= _bufferCapacity) {
+        // Count cursor units, not segments: one passage may be split into
+        // narration and dialogue runs that must be skipped together.
+        final queuedUnits = _bufferedCursorUnits;
+        if (_advancingCursor || queuedUnits >= _bufferCapacity) {
           await Future.delayed(const Duration(milliseconds: 50));
           continue;
         }
@@ -452,7 +490,7 @@ class OnlineTts extends BaseTts {
         // Never append a snapshot belonging to an older reader position.
         if (_shouldStop) break;
         if (_advancingCursor || revision != _cursorRevision) continue;
-        final sentences = collected.skip(queued).toList();
+        final sentences = collected.skip(queuedUnits).toList();
 
         if (sentences.isEmpty) {
           await Future.delayed(const Duration(milliseconds: 100));
@@ -460,20 +498,23 @@ class OnlineTts extends BaseTts {
         }
 
         // Create placeholder segments in ORDER first
+        final plan = _rolePlan();
         final newSegments = <TtsSegment>[];
         for (final sentence in sentences) {
           if (_shouldStop) break;
-          final segment = TtsSegment(sentence: sentence);
-          segment.fetchVersion = _audioFetchVersion;
-          newSegments.add(segment);
-          _buffer.add(segment); // Add in order!
+          for (final run in plan.expand(sentence)) {
+            final segment = TtsSegment(sentence: run);
+            segment.fetchVersion = _audioFetchVersion;
+            newSegments.add(segment);
+            _buffer.add(segment); // Add in order!
+          }
         }
 
         // Now fetch audio in batches to limit concurrency
         for (var i = 0; i < newSegments.length;) {
           if (_shouldStop) break;
           // Get the first passage ready before issuing speculative work.
-          final size = i == 0 && queued == 0 ? 1 : _batchSize;
+          final size = i == 0 && queuedUnits == 0 ? 1 : _batchSize;
           final batch = newSegments.skip(i).take(size).toList();
           final futures =
               batch.map((segment) => _fetchAudioForSegment(segment));
@@ -557,7 +598,11 @@ class OnlineTts extends BaseTts {
           return;
         }
         final currentBackend = backend;
-        final voice = currentBackend.getSelectedVoice();
+        // A passage may carry its own voice (narration vs quoted dialogue).
+        final sentenceVoice = segment.sentence.voice;
+        final voice = sentenceVoice != null && sentenceVoice.isNotEmpty
+            ? sentenceVoice
+            : currentBackend.getSelectedVoice();
         final bytes = await _untilStopped(_audioCache
             .synthesize(
               _ProviderAdapter(
@@ -762,8 +807,9 @@ class OnlineTts extends BaseTts {
             }
           }
         }
-        // Advance reader position
-        if (!_shouldStop) {
+        // Advance reader position. A passage split into several voices advances
+        // only once, on its final run.
+        if (!_shouldStop && segment.sentence.advanceCursor) {
           while (
               ttsStateNotifier.value == TtsStateEnum.paused && !_shouldStop) {
             await Future.delayed(const Duration(milliseconds: 30));
@@ -1068,23 +1114,31 @@ class OnlineTts extends BaseTts {
     }
   }
 
-  /// For testing a specific voice in settings
-  Future<void> speakWithVoice(String content, String voice) async {
+  /// For testing a specific voice in settings.
+  ///
+  /// A preview always speaks at the original 1.0x speed: the reader rate is a
+  /// playback preference, and hearing the sample at 2.5x says nothing about the
+  /// voice. Pitch still follows the user's setting.
+  Future<void> speakWithVoice(String content, String voice,
+      {double? rate}) async {
     await stop();
     final audioPlayer = await _ensurePlayer(preview: true);
+    final previewRate = rate ?? this.rate;
+    final synthesisRate = _synthesisRateFor(previewRate);
+    final playbackRate = _playbackRateFor(previewRate);
 
     final bytes =
-        await backend.speak(content, voice, _synthesisRate, _synthesisPitch);
+        await backend.speak(content, voice, synthesisRate, _synthesisPitch);
     if (bytes.isNotEmpty) {
       final source = BytesSource(bytes, mimeType: ttsAudioMimeType(bytes));
       if (_usesPlaybackRate) {
-        await audioPlayer.setPlaybackRate(_playbackRate);
+        await audioPlayer.setPlaybackRate(playbackRate);
       }
       await _applyLocalPitch(audioPlayer);
       await audioPlayer.play(source);
       if (_usesPlaybackRate) {
         // play() installs a new source and resets the native rate.
-        await audioPlayer.setPlaybackRate(_playbackRate);
+        await audioPlayer.setPlaybackRate(playbackRate);
       }
     }
   }
