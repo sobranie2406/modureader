@@ -1,11 +1,12 @@
 import 'package:anx_reader/service/sync/row_sync_record.dart';
 
 /// Read-only view of both libraries handed to the confirmation UI BEFORE the
-/// merge writes anything. The engine never applies these records by itself.
+/// library merge or cloud write. The engine never applies these records by itself.
 class SyncPreviewContext {
   const SyncPreviewContext({
     required this.local,
     required this.remote,
+    this.pendingRecords = const [],
     this.localChangedAt,
     this.remoteChangedAt,
     this.remoteFileAt,
@@ -14,6 +15,7 @@ class SyncPreviewContext {
 
   final List<RowSyncRecord> local;
   final List<RowSyncRecord> remote;
+  final List<RowSyncRecord> pendingRecords;
   final DateTime? localChangedAt;
   final DateTime? remoteChangedAt;
 
@@ -36,8 +38,8 @@ class SyncPreviewDecision {
 typedef SyncPreviewHook = Future<SyncPreviewDecision> Function(
     SyncPreviewContext context);
 
-/// Thrown to abort a synchronization after the user declined it. No database or
-/// cloud write has happened at this point; the next attempt starts over.
+/// Thrown to abort after the user declined, before any library merge or cloud
+/// write. Read caches and local sync metadata may already have been prepared.
 class SyncPreviewCancelled implements Exception {
   const SyncPreviewCancelled();
 
@@ -139,8 +141,7 @@ class SyncPreview {
   int get noteDelta => mergedNoteCount - localNoteCount;
   int get readingTimeDelta => mergedReadingSeconds - localReadingSeconds;
   int get uploadNoteDelta => mergedNoteCount - remoteNoteCount;
-  int get uploadReadingTimeDelta =>
-      mergedReadingSeconds - remoteReadingSeconds;
+  int get uploadReadingTimeDelta => mergedReadingSeconds - remoteReadingSeconds;
 
   bool get removesBooks => removedBooks.isNotEmpty;
 
@@ -182,7 +183,8 @@ SyncPreview buildSyncPreview({
   final merged = resolveSyncConflicts(
     local: local,
     remote: remote,
-    merged: mergeSyncRecords(local, remote),
+    merged: mergeSyncRecords(
+        local, mergeSyncRecords(remote, context.pendingRecords)),
     resolution: resolution,
   );
 
@@ -202,8 +204,7 @@ SyncPreview buildSyncPreview({
       required Map<String, double> after}) {
     final books = <SyncPreviewBook>[];
     for (final id in ids) {
-      final data =
-          mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
+      final data = mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
       if (data == null) continue;
       books.add(SyncPreviewBook(
         title: _title(data, id),
@@ -263,8 +264,7 @@ SyncPreview buildSyncPreview({
         before: const {}, after: mergedProgress),
     removedBooks: bookList(localVisible.difference(mergedVisible),
         before: localProgress, after: const {}),
-    progressChangedBooks: progressList(
-        mergedVisible.intersection(localVisible),
+    progressChangedBooks: progressList(mergedVisible.intersection(localVisible),
         before: localProgress, after: mergedProgress),
     uploadedBooks: bookList(mergedVisible.difference(remoteVisible),
         before: const {}, after: mergedProgress),
@@ -272,7 +272,8 @@ SyncPreview buildSyncPreview({
         before: remoteProgress, after: const {}),
     uploadedProgressChangedBooks: progressList(
         mergedVisible.intersection(remoteVisible),
-        before: remoteProgress, after: mergedProgress),
+        before: remoteProgress,
+        after: mergedProgress),
     localNoteCount: _noteCount(local),
     mergedNoteCount: _noteCount(merged),
     remoteNoteCount: _noteCount(remote),
@@ -290,7 +291,8 @@ String _title(Map<String, Object?> data, String id) {
   return title?.trim().isNotEmpty == true ? title! : id;
 }
 
-Map<String, Map<String, Object?>> _bookInfo(Iterable<RowSyncRecord> records) => {
+Map<String, Map<String, Object?>> _bookInfo(Iterable<RowSyncRecord> records) =>
+    {
       for (final record in records)
         if (record.kind == 'book' && !record.deleted) record.id: record.data
     };
@@ -322,9 +324,8 @@ Map<String, double> _progressByBook(Iterable<RowSyncRecord> records) {
   return progress;
 }
 
-int _noteCount(Iterable<RowSyncRecord> records) => records
-    .where((record) => record.kind == 'note' && !record.deleted)
-    .length;
+int _noteCount(Iterable<RowSyncRecord> records) =>
+    records.where((record) => record.kind == 'note' && !record.deleted).length;
 
 int _readingSeconds(Iterable<RowSyncRecord> records) {
   var total = 0;

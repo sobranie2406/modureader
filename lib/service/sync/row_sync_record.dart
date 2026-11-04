@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:anx_reader/models/narration_position.dart';
 import 'package:anx_reader/utils/reading_progress.dart';
 
@@ -150,8 +151,8 @@ enum SyncConflictResolution { newest, preferLocal, preferRemote }
 /// Clock and revision are deliberately ignored: an unchanged record whose clock
 /// merely advanced (a re-stamp or a legacy migration) is not a conflict. This
 /// is the set a user is asked about BEFORE a merge. Encrypted AI/service
-/// settings are excluded (opaque envelopes differ on every re-encryption), as
-/// is the fixed root group row.
+/// settings, root groups, identity aliases and irreversible deletions are
+/// excluded so a choice cannot undo the existing merge invariants.
 Set<String> divergentSyncKeys(
     Iterable<RowSyncRecord> local, Iterable<RowSyncRecord> remote) {
   // Sort payload keys before encoding: identical content written by clients of
@@ -172,7 +173,11 @@ Set<String> divergentSyncKeys(
     final existing = index[record.key];
     if (existing == null ||
         existing.kind == 'secret' ||
-        existing.key == 'group/root') {
+        existing.key == 'group/root' ||
+        bookSyncAliasTarget(existing) != null ||
+        bookSyncAliasTarget(record) != null ||
+        ((existing.deleted || record.deleted) &&
+            const ['note', 'time', 'tag'].contains(record.kind))) {
       continue;
     }
     if (content(existing) != content(record)) keys.add(record.key);
@@ -180,30 +185,46 @@ Set<String> divergentSyncKeys(
   return keys;
 }
 
-/// Replaces the winning side for every divergent key. Callers pass the union
-/// produced by [mergeSyncRecords] so unrelated records are untouched.
+/// Record a choice as a new operation, still respecting deletion, identity and
+/// legacy reading-time invariants understood by older clients.
 List<RowSyncRecord> resolveSyncConflicts({
   required Iterable<RowSyncRecord> local,
   required Iterable<RowSyncRecord> remote,
   required Iterable<RowSyncRecord> merged,
   required SyncConflictResolution resolution,
+  int? clock,
 }) {
   final records = merged.toList();
   if (resolution == SyncConflictResolution.newest) return records;
   final keys = divergentSyncKeys(local, remote);
   if (keys.isEmpty) return records;
   final preferred = {
-    for (final record in resolution == SyncConflictResolution.preferLocal
-        ? local
-        : remote)
+    for (final record
+        in resolution == SyncConflictResolution.preferLocal ? local : remote)
       record.key: record
   };
-  return [
-    for (final record in records)
-      keys.contains(record.key) && preferred.containsKey(record.key)
-          ? preferred[record.key]!
-          : record
-  ];
+  final nextClock = [...local, ...remote, ...records].fold<int>(
+          0, (value, record) => value > record.clock ? value : record.clock) +
+      1;
+  final stamp = clock != null && clock > nextClock ? clock : nextClock;
+  final choices = <RowSyncRecord>[];
+  for (final key in keys) {
+    final record = preferred[key]!;
+    final revision = sha256
+        .convert(utf8.encode(jsonEncode([record.toMap(), stamp])))
+        .toString();
+    choices.add(RowSyncRecord(
+        record.kind,
+        record.id,
+        stamp,
+        record.kind == 'position'
+            ? '$syncPositionResetPrefix$revision'
+            : revision,
+        record.deleted,
+        record.data,
+        narration: record.narration));
+  }
+  return mergeSyncRecords(records, choices);
 }
 
 bool sameSyncRecords(Iterable<RowSyncRecord> a, Iterable<RowSyncRecord> b) {

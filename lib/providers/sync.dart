@@ -31,7 +31,6 @@ import 'package:anx_reader/service/sync/reading_sync_retry.dart';
 import 'package:anx_reader/service/sync/pending_auto_sync.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/service/sync/row_sync_engine.dart';
 import 'package:anx_reader/service/sync/replaced_book_files.dart';
 import 'package:anx_reader/service/sync/local_book_download.dart';
@@ -93,25 +92,25 @@ class Sync extends _$Sync {
   /// Shows the read-only preview before the first write of a manual sync.
   ///
   /// The engine calls this after both libraries are loaded and before the local
-  /// database or the cloud is touched, so declining leaves both sides intact.
+  /// library is merged or cloud data is written.
   Future<SyncPreviewDecision> _confirmPreview(
       SyncPreviewContext context) async {
-    final preview = buildSyncPreview(context: context);
-    _lastPreview = preview;
     final dialogContext = navigatorKey.currentContext;
     if (dialogContext == null || !dialogContext.mounted) {
-      return const SyncPreviewDecision(SyncConflictResolution.newest);
+      return const SyncPreviewDecision.cancel();
     }
-    final resolution = await showSyncPreviewDialog(dialogContext, preview);
+    final resolution = await showSyncPreviewDialog(
+        dialogContext,
+        (resolution) =>
+            buildSyncPreview(context: context, resolution: resolution));
     if (resolution == null) {
       if (dialogContext.mounted) {
-        AnxToast.show(ModuStrings.text(
-            dialogContext,
-            '已取消同步，本机与云端都没有修改。',
-            'Sync cancelled. Nothing was changed locally or in the cloud.'));
+        AnxToast.show(ModuStrings.text(dialogContext, '已取消同步，未合并或上传书库数据。',
+            'Sync cancelled. No library data was merged or uploaded.'));
       }
       return const SyncPreviewDecision.cancel();
     }
+    _lastPreview = buildSyncPreview(context: context, resolution: resolution);
     return SyncPreviewDecision(resolution);
   }
 
@@ -132,19 +131,19 @@ class Sync extends _$Sync {
               60)
           .round();
       if (added > 0) {
-        parts.add(
-            ModuStrings.text(context, '新增 $added 本', '$added added'));
+        parts.add(ModuStrings.text(context, '新增 $added 本', '$added added'));
       }
       if (removed > 0) {
-        parts.add(ModuStrings.text(context, '移除 $removed 本', '$removed removed'));
+        parts.add(
+            ModuStrings.text(context, '移除 $removed 本', '$removed removed'));
       }
       if (notes != 0) {
         parts.add(ModuStrings.text(
             context, '笔记 ${signed(notes)}', 'notes ${signed(notes)}'));
       }
       if (minutes != 0) {
-        parts.add(ModuStrings.text(
-            context, '时长 ${signed(minutes)} 分钟', 'time ${signed(minutes)} min'));
+        parts.add(ModuStrings.text(context, '时长 ${signed(minutes)} 分钟',
+            'time ${signed(minutes)} min'));
       }
       return parts;
     }
@@ -160,8 +159,7 @@ class Sync extends _$Sync {
           'Synced: ${downloaded.join(' · ')}');
     }
     if (downloaded.isEmpty) {
-      return ModuStrings.text(
-          context, '已上传：${uploaded.join(' · ')}',
+      return ModuStrings.text(context, '已上传：${uploaded.join(' · ')}',
           'Uploaded: ${uploaded.join(' · ')}');
     }
     return ModuStrings.text(
@@ -502,37 +500,20 @@ class Sync extends _$Sync {
       client.requestPolicy.syncStarted();
       await client.requestPolicy.persist();
     }
-    await _createSyncDir();
-
+    final preview = trigger == SyncTrigger.manual &&
+            Prefs().webdavStatus &&
+            Prefs().syncPreviewBeforeSync
+        ? _confirmPreview
+        : null;
+    if (preview == null) await _prepareSyncWrites();
     AnxLog.info('Sync ping success');
 
-    // Materialize the selected AI service settings into the database before
-    // comparing timestamps. This makes API-key changes participate in the
-    // existing WebDAV database conflict flow without storing plaintext keys.
-    try {
-      await AiSettingsSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-      await TranslationUsageSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-    } on AiSyncPasswordMissingException {
-      AnxLog.warning('AI settings sync skipped: encryption password missing');
-      rethrow;
-    } catch (e) {
-      AnxLog.severe(
-          'Failed to prepare encrypted AI settings for sync: ${e.runtimeType}');
-      throw const SyncFeedbackFailure(SyncFailureCode.encryptionFailed);
-    }
-
     // Reject future formats. Never guess which whole database should win.
-    final remoteFiles = await client.safeReadDir(SyncPaths.root);
+    final remoteFiles = preview == null
+        ? await client.safeReadDir(SyncPaths.root)
+        : await client.readProps(SyncPaths.root) == null
+            ? []
+            : await client.readSyncDirectory(SyncPaths.root);
     for (final file in remoteFiles) {
       final match = RegExp(r'^database(\d+)\.db$').firstMatch(file.name ?? '');
       if (match != null && int.parse(match.group(1)!) > currentDbVersion) {
@@ -542,11 +523,6 @@ class Sync extends _$Sync {
     if (!(shouldStart?.call() ?? true)) return false;
     changeState(state.copyWith(isSyncing: true));
 
-    final preview = trigger == SyncTrigger.manual &&
-            Prefs().webdavStatus &&
-            Prefs().syncPreviewBeforeSync
-        ? _confirmPreview
-        : null;
     _lastPreview = null;
 
     try {
@@ -622,6 +598,34 @@ class Sync extends _$Sync {
     }
   }
 
+  Future<void> _prepareSyncWrites() async {
+    await _createSyncDir();
+
+    // Materialize encrypted settings before merging, after confirmation when
+    // requested, without storing plaintext keys.
+    try {
+      await AiSettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+      await TranslationUsageSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+    } on AiSyncPasswordMissingException {
+      AnxLog.warning('AI settings sync skipped: encryption password missing');
+      rethrow;
+    } catch (e) {
+      AnxLog.severe(
+          'Failed to prepare encrypted AI settings for sync: ${e.runtimeType}');
+      throw const SyncFeedbackFailure(SyncFailureCode.encryptionFailed);
+    }
+  }
+
   Future<void> syncFiles({SyncAssetListing? assetListing}) async {
     final client = _syncClient;
     if (client == null) return;
@@ -684,13 +688,20 @@ class Sync extends _$Sync {
     // Existing upload/download callers now converge records safely in both
     // directions; no entry point may overwrite a whole live library.
     try {
+      var prepared = preview == null;
       final outcome = await RowSyncEngine(
         store: RowSyncStore(await DBHelper().database),
         client: client,
         cache: await getAnxCacheDir(),
         durableDirectory: await getAnxDataBasesDir(),
         onPreview: preview,
-        beforePublish: () => syncFiles(assetListing: assetListing),
+        beforePublish: () async {
+          if (!prepared) {
+            await _prepareSyncWrites();
+            prepared = true;
+          }
+          await syncFiles(assetListing: assetListing);
+        },
         beforeMerge: _createMergeBackup,
         afterMerge: () async {
           // Round records arrive before/with the time rows; reconcile derived

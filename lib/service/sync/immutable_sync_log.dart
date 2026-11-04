@@ -39,9 +39,11 @@ class ImmutableSyncLog {
       file.isDir == false &&
       const {'.DS_Store', 'Thumbs.db', 'desktop.ini'}.contains(file.name);
 
-  Future<bool> resumePending() async {
-    if (!await pending.exists()) return false;
-    var published = false;
+  /// Verify recovery copies without publishing them before user confirmation.
+  Future<Map<String, File>> readPendingFiles() async {
+    if (!await pending.exists()) return {};
+    final files = <String, File>{};
+    var bytes = 0;
     await for (final entity in pending.list(followLinks: false)) {
       if (entity is! File) continue;
       final name = entity.uri.pathSegments.last;
@@ -51,14 +53,24 @@ class ImmutableSyncLog {
           (await sha256.bind(entity.openRead()).first).toString() != match[1]) {
         throw const FormatException('本机待同步记录校验失败，已停止同步');
       }
-      await _upload(entity, match[1]!);
-      published = true;
+      bytes += await entity.length();
+      if (bytes > maxScanBytes) throw const FormatException('本机待同步记录过大');
+      files[name] = entity;
     }
-    return published;
+    return files;
+  }
+
+  Future<bool> resumePending() async {
+    final files = await readPendingFiles();
+    for (final entry in files.entries) {
+      await _upload(entry.value, _batch.firstMatch(entry.key)![1]!);
+    }
+    return files.isNotEmpty;
   }
 
   Future<List<RowSyncRecord>> read({
     Future<void> Function(List<RowSyncRecord>)? onVerifiedBatch,
+    Map<String, File> pendingFiles = const {},
   }) async {
     _readFiles = null;
     _readRecords = null;
@@ -72,7 +84,10 @@ class ImmutableSyncLog {
         for (final entry in files.entries) {
           final name = entry.value.name!;
           final digest = _batch.firstMatch(name)![1]!;
-          final local = File('${verifiedCache.path}/$name');
+          // A failed PUT may leave partial remote bytes. Preview from the
+          // verified recovery copy; repair the cloud only after confirmation.
+          final local =
+              pendingFiles[name] ?? File('${verifiedCache.path}/$name');
           final cached = await local.exists() &&
               await local.length() <= maxBatchBytes &&
               (await sha256.bind(local.openRead()).first).toString() == digest;

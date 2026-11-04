@@ -188,8 +188,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                     'Preview and confirm before sync')),
                 description: Text(ModuStrings.text(
                     context,
-                    '手动同步前显示本机与云端的时间戳、书籍数量变动、阅读进度与笔记变化；取消则两边都不修改。开启后自动同步暂停，所有合并都需要确认。默认关闭。',
-                    'Shows local and cloud timestamps, book and reading-data changes before a manual sync; cancelling leaves both sides untouched. While enabled automatic sync stays paused so every merge is confirmed. Off by default.')),
+                    '手动同步前显示本机与云端的时间戳、书籍数量变动、阅读进度与笔记变化；取消则不合并或上传书库数据。开启后自动同步暂停，所有合并都需要确认。默认关闭。',
+                    'Shows local and cloud timestamps, book and reading-data changes before a manual sync; cancelling does not merge or upload library data. While enabled automatic sync stays paused so every merge is confirmed. Off by default.')),
                 leading: const Icon(Icons.fact_check_outlined),
                 initialValue: Prefs().syncPreviewBeforeSync,
                 enabled: Prefs().webdavStatus,

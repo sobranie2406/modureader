@@ -8,20 +8,20 @@ import 'package:intl/intl.dart';
 
 /// Asks the user to confirm a merge before anything is written. Returns the
 /// conflict preference, or null when the synchronization is cancelled.
-Future<SyncConflictResolution?> showSyncPreviewDialog(
-    BuildContext context, SyncPreview preview) {
+Future<SyncConflictResolution?> showSyncPreviewDialog(BuildContext context,
+    SyncPreview Function(SyncConflictResolution) buildPreview) {
   return showDialog<SyncConflictResolution>(
     animationStyle: AppMotion.style,
     context: context,
     barrierDismissible: false,
-    builder: (_) => SyncPreviewDialog(preview: preview),
+    builder: (_) => SyncPreviewDialog(buildPreview: buildPreview),
   );
 }
 
 class SyncPreviewDialog extends StatefulWidget {
-  const SyncPreviewDialog({super.key, required this.preview});
+  const SyncPreviewDialog({super.key, required this.buildPreview});
 
-  final SyncPreview preview;
+  final SyncPreview Function(SyncConflictResolution) buildPreview;
 
   @override
   State<SyncPreviewDialog> createState() => _SyncPreviewDialogState();
@@ -35,7 +35,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final preview = widget.preview;
+    final preview = widget.buildPreview(_resolution);
     final lastSynced = Prefs().lastUploadBookDate;
     return AlertDialog(
       key: const ValueKey('sync-preview-dialog'),
@@ -62,8 +62,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
               _timeRow(_text('上次成功同步', 'Last successful sync'), lastSynced),
               const Divider(height: 24),
               if (preview.remoteMissing)
-                Text(_text(
-                    '云端还没有同步数据：本次将建立云端记录，并把本机书籍上传。',
+                Text(_text('云端还没有同步数据：本次将建立云端记录，并把本机书籍上传。',
                     'The cloud has no data yet: this sync will create the cloud archive and upload this device\'s books.'))
               else
                 _bookDistribution(preview),
@@ -74,8 +73,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
                   subtitle: _text('云端 → 本机', 'Cloud → device'),
                   booksAdded: preview.addedBooks,
                   booksAddedTitle: _text('将加入书架', 'Will be added'),
-                  booksRemovedTitle:
-                      _text('将移出书架', 'Will be removed'),
+                  booksRemovedTitle: _text('将移出书架', 'Will be removed'),
                   booksRemoved: preview.removedBooks,
                   removeWarning: preview.removesBooks
                       ? _text(
@@ -149,7 +147,8 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
             time == null
                 ? _text('无记录', 'None')
                 : DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal()),
-            style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+            style:
+                const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
           ),
         ],
       ),
@@ -256,8 +255,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
             _readingRow(
               icon: Icons.timer_outlined,
               label: _text('阅读时长', 'Reading time'),
-              value:
-                  '${minutes >= 0 ? '+' : ''}$minutes ${_text('分钟', 'min')}',
+              value: '${minutes >= 0 ? '+' : ''}$minutes ${_text('分钟', 'min')}',
               color: minutes == 0 ? null : _deltaColor(minutes),
             ),
           ],
@@ -338,9 +336,8 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
     );
   }
 
-  Color _deltaColor(int minutes) => minutes > 0
-      ? Colors.green.shade700
-      : Theme.of(context).colorScheme.error;
+  Color _deltaColor(int minutes) =>
+      minutes > 0 ? Colors.green.shade700 : Theme.of(context).colorScheme.error;
 
   String _signed(int value) => value > 0 ? '+$value' : '$value';
 
@@ -355,8 +352,12 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
             style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(_text(
-          '有 ${preview.divergentRecords} 处记录两端都修改过（$kinds）。',
-          '${preview.divergentRecords} record(s) were changed on both devices ($kinds).',
+          '有 ${preview.divergentRecords} 处记录内容不一致（$kinds）。',
+          '${preview.divergentRecords} record(s) differ between devices ($kinds).',
+        )),
+        Text(_text(
+          '已彻底删除的笔记、时长和标签不会恢复；旧版累计时长仍保留较大值。',
+          'Permanently deleted notes, sessions and tags stay deleted; legacy cumulative reading time keeps the larger value.',
         )),
         const SizedBox(height: 8),
         SegmentedButton<SyncConflictResolution>(

@@ -20,9 +20,7 @@ SyncPreview preview({bool uploading = false}) => SyncPreview(
           ? const []
           : const [
               SyncPreviewBook(
-                  title: 'Cloud novel',
-                  filePath: 'file/cloud.epub',
-                  after: 0.4)
+                  title: 'Cloud novel', filePath: 'file/cloud.epub', after: 0.4)
             ],
       removedBooks: uploading
           ? const []
@@ -87,7 +85,8 @@ void main() {
         body: Builder(
           builder: (context) => TextButton(
             onPressed: () async {
-              onResult(await showSyncPreviewDialog(context, preview(uploading: uploading)));
+              onResult(await showSyncPreviewDialog(
+                  context, (_) => preview(uploading: uploading)));
             },
             child: const Text('open'),
           ),
@@ -110,8 +109,7 @@ void main() {
     expect(find.text('Will be added'), findsOneWidget);
     expect(find.text('· Cloud novel'), findsOneWidget);
     expect(find.text('Will be removed'), findsOneWidget);
-    expect(
-        find.textContaining('will leave this shelf'), findsOneWidget);
+    expect(find.textContaining('will leave this shelf'), findsOneWidget);
     expect(find.text('· Progress novel'), findsOneWidget);
     expect(find.text('20% → 75%'), findsOneWidget);
     expect(find.text('+3 (10 → 13)'), findsOneWidget);
@@ -187,8 +185,10 @@ void main() {
     expect(Prefs().syncPreviewBeforeSync, isFalse);
     Prefs().syncPreviewBeforeSync = true;
     expect(Prefs().syncPreviewBeforeSync, isTrue);
-    expect((await SharedPreferences.getInstance())
-        .getBool('syncPreviewBeforeSync'), isTrue);
+    expect(
+        (await SharedPreferences.getInstance())
+            .getBool('syncPreviewBeforeSync'),
+        isTrue);
     expect(settingsModuleForKey('syncPreviewBeforeSync'), 'webdav');
   });
 }
