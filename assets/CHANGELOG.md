@@ -1,10 +1,42 @@
 # Modu changelog
 
-Latest stable: **1.3.6+10168**. Latest preview: **1.3.5-beta.1+10166**. Updated 2026-11-01.
+Latest stable: **1.3.6+10168**. Latest preview: **1.3.7-beta.1+10169**. Updated 2026-11-03.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## Unreleased
+
+### English
+
+- Fix(sync): Keep cancelled previews from publishing pending records, make confirmed choices converge across devices without undoing deletion safeguards, back up forced merges and refresh previews when the strategy changes. Preserve the original sync flow while preview is off ([#71](https://github.com/sobranie2406/modureader/pull/71)).
+
+### 简体中文
+
+- Fix(sync): 取消预览时不再补传待同步记录；确认的冲突选择可跨设备保持一致并保留原有删除保护；强制合并前备份，切换策略时更新预览；关闭预览时保留原同步流程（[#71](https://github.com/sobranie2406/modureader/pull/71)）。
+
+## 1.3.7-beta.1
+
+### English
+
+- Feat(sync): Preview a manual cloud sync before it writes: local and cloud timestamps, book gains and removals, reading-progress and note changes, plus an explicit choice for records changed on both devices.
+
+- Feat(themes): Restore scheduled theme switching, keep the colour presets and consolidate reader appearance settings.
+
+- Feat(fonts): Manage installed fonts with batch import and previews, and compact setting help into anchored popovers.
+
+- Fix(ocr): Default new OCR selections to PP-OCRv5 Mobile, repair loose dictionary resources and keep imported PDF titles.
+
+### 简体中文
+
+- Feat(sync): 手动云端同步前显示预览：两端时间戳、书籍增删、阅读进度与笔记变化，并可对两端都改过的记录选择以本机或云端为准。
+
+- Feat(themes): 恢复定时切换主题，保留配色预设并整合阅读外观设置。
+
+- Feat(fonts): 支持字体批量导入、预览与管理，设置说明改为锚定式帮助弹层。
+
+- Fix(ocr): 新建 OCR 选择默认 PP-OCRv5 Mobile，修复词典资源散落与 PDF 导入标题。
 
 ## 1.3.6
 

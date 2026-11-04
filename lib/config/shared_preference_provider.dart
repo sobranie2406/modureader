@@ -2267,6 +2267,16 @@ class Prefs extends ChangeNotifier {
     return prefs.getBool('autoSync') ?? true;
   }
 
+  set syncPreviewBeforeSync(bool status) {
+    prefs.setBool('syncPreviewBeforeSync', status);
+    notifyListeners();
+  }
+
+  /// Off by default so an existing one-tap sync keeps its current behaviour.
+  bool get syncPreviewBeforeSync {
+    return prefs.getBool('syncPreviewBeforeSync') ?? false;
+  }
+
   bool get readingTimedSync => prefs.getBool('readingTimedSync') ?? false;
 
   set readingTimedSync(bool value) {

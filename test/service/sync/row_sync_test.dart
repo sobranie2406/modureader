@@ -707,8 +707,8 @@ void main() {
         contains('if (hasPendingChanges) await _pendingSync.request();'));
     expect(
         source,
-        contains(
-            'if (!hasPendingChanges &&\n          _readingFeedback.success('));
+        matches(RegExp(
+            r'!hasPendingChanges &&\s+_readingFeedback\.success\(')));
     expect(source, contains('return !hasPendingChanges;'));
     expect(
         source,

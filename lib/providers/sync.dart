@@ -25,6 +25,8 @@ import 'package:anx_reader/service/sync/sync_client_factory.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
 import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:anx_reader/service/sync/sync_preview.dart';
+import 'package:anx_reader/widgets/sync/sync_preview_dialog.dart';
 import 'package:anx_reader/service/sync/reading_sync_retry.dart';
 import 'package:anx_reader/service/sync/pending_auto_sync.dart';
 import 'package:anx_reader/service/sync/webdav_client.dart';
@@ -85,6 +87,86 @@ class Sync extends _$Sync {
   Object? _automaticPolicy;
   SyncClientBase? _remoteListClient;
   Future<List<String>>? _remoteBookListing;
+  SyncPreview? _lastPreview;
+
+  /// Shows the read-only preview before the first write of a manual sync.
+  ///
+  /// The engine calls this after both libraries are loaded and before the local
+  /// library is merged or cloud data is written.
+  Future<SyncPreviewDecision> _confirmPreview(
+      SyncPreviewContext context) async {
+    final dialogContext = navigatorKey.currentContext;
+    if (dialogContext == null || !dialogContext.mounted) {
+      return const SyncPreviewDecision.cancel();
+    }
+    final resolution = await showSyncPreviewDialog(
+        dialogContext,
+        (resolution) =>
+            buildSyncPreview(context: context, resolution: resolution));
+    if (resolution == null) {
+      if (dialogContext.mounted) {
+        AnxToast.show(ModuStrings.text(dialogContext, '已取消同步，未合并或上传书库数据。',
+            'Sync cancelled. No library data was merged or uploaded.'));
+      }
+      return const SyncPreviewDecision.cancel();
+    }
+    _lastPreview = buildSyncPreview(context: context, resolution: resolution);
+    return SyncPreviewDecision(resolution);
+  }
+
+  String _previewSummary(SyncPreview preview) {
+    final context = navigatorKey.currentContext!;
+    String signed(int value) => value > 0 ? '+$value' : '$value';
+    List<String> parts({required bool upload}) {
+      final parts = <String>[];
+      final added =
+          upload ? preview.uploadedBooks.length : preview.addedBooks.length;
+      final removed = upload
+          ? preview.cloudRemovedBooks.length
+          : preview.removedBooks.length;
+      final notes = upload ? preview.uploadNoteDelta : preview.noteDelta;
+      final minutes = ((upload
+                  ? preview.uploadReadingTimeDelta
+                  : preview.readingTimeDelta) /
+              60)
+          .round();
+      if (added > 0) {
+        parts.add(ModuStrings.text(context, '新增 $added 本', '$added added'));
+      }
+      if (removed > 0) {
+        parts.add(
+            ModuStrings.text(context, '移除 $removed 本', '$removed removed'));
+      }
+      if (notes != 0) {
+        parts.add(ModuStrings.text(
+            context, '笔记 ${signed(notes)}', 'notes ${signed(notes)}'));
+      }
+      if (minutes != 0) {
+        parts.add(ModuStrings.text(context, '时长 ${signed(minutes)} 分钟',
+            'time ${signed(minutes)} min'));
+      }
+      return parts;
+    }
+
+    final downloaded = parts(upload: false);
+    final uploaded = parts(upload: true);
+    if (downloaded.isEmpty && uploaded.isEmpty) {
+      return ModuStrings.text(
+          context, '同步完成，两端已一致', 'Sync complete; both sides agree');
+    }
+    if (uploaded.isEmpty) {
+      return ModuStrings.text(context, '同步完成：${downloaded.join(' · ')}',
+          'Synced: ${downloaded.join(' · ')}');
+    }
+    if (downloaded.isEmpty) {
+      return ModuStrings.text(context, '已上传：${uploaded.join(' · ')}',
+          'Uploaded: ${uploaded.join(' · ')}');
+    }
+    return ModuStrings.text(
+        context,
+        '同步完成：本机 ${downloaded.join(' · ')}；云端 ${uploaded.join(' · ')}',
+        'Synced: device ${downloaded.join(' · ')}; cloud ${uploaded.join(' · ')}');
+  }
 
   bool get _chineseFeedback {
     final context = navigatorKey.currentContext;
@@ -96,6 +178,10 @@ class Sync extends _$Sync {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     return Prefs().webdavStatus &&
         Prefs().autoSync &&
+        // A confirmation cannot be shown for a background start. While the
+        // preview is enabled every merge has to be started and confirmed by the
+        // user, so automatic starts stay paused instead of merging silently.
+        !Prefs().syncPreviewBeforeSync &&
         (lifecycle == null || lifecycle == AppLifecycleState.resumed);
   }
 
@@ -327,6 +413,14 @@ class Sync extends _$Sync {
           completed ? RuntimeEvent.syncComplete : RuntimeEvent.syncPending,
           durationMs: diagnosticTimer.elapsedMilliseconds);
     } catch (e, stack) {
+      // Declining the preview is not a failure: nothing was written, and the
+      // user already received the "cancelled" confirmation.
+      if (e is SyncPreviewCancelled) {
+        RuntimeDiagnostics.record(RuntimeEvent.syncPending,
+            durationMs: diagnosticTimer.elapsedMilliseconds);
+        AnxLog.info('Sync cancelled before merge at the user\'s request');
+        return;
+      }
       RuntimeDiagnostics.record(RuntimeEvent.syncFailed,
           durationMs: diagnosticTimer.elapsedMilliseconds);
       // Avoid logging DioException.toString(): it can contain private URLs.
@@ -406,37 +500,20 @@ class Sync extends _$Sync {
       client.requestPolicy.syncStarted();
       await client.requestPolicy.persist();
     }
-    await _createSyncDir();
-
+    final preview = trigger == SyncTrigger.manual &&
+            Prefs().webdavStatus &&
+            Prefs().syncPreviewBeforeSync
+        ? _confirmPreview
+        : null;
+    if (preview == null) await _prepareSyncWrites();
     AnxLog.info('Sync ping success');
 
-    // Materialize the selected AI service settings into the database before
-    // comparing timestamps. This makes API-key changes participate in the
-    // existing WebDAV database conflict flow without storing plaintext keys.
-    try {
-      await AiSettingsSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-      await TranslationUsageSyncService().prepareLocalDatabase(
-        enabled: Prefs().syncAiSettingsToWebdav,
-        password: Prefs().syncAiSettingsEncryptionPassword,
-      );
-    } on AiSyncPasswordMissingException {
-      AnxLog.warning('AI settings sync skipped: encryption password missing');
-      rethrow;
-    } catch (e) {
-      AnxLog.severe(
-          'Failed to prepare encrypted AI settings for sync: ${e.runtimeType}');
-      throw const SyncFeedbackFailure(SyncFailureCode.encryptionFailed);
-    }
-
     // Reject future formats. Never guess which whole database should win.
-    final remoteFiles = await client.safeReadDir(SyncPaths.root);
+    final remoteFiles = preview == null
+        ? await client.safeReadDir(SyncPaths.root)
+        : await client.readProps(SyncPaths.root) == null
+            ? []
+            : await client.readSyncDirectory(SyncPaths.root);
     for (final file in remoteFiles) {
       final match = RegExp(r'^database(\d+)\.db$').firstMatch(file.name ?? '');
       if (match != null && int.parse(match.group(1)!) > currentDbVersion) {
@@ -446,9 +523,12 @@ class Sync extends _$Sync {
     if (!(shouldStart?.call() ?? true)) return false;
     changeState(state.copyWith(isSyncing: true));
 
+    _lastPreview = null;
+
     try {
       final assetListing = SyncAssetListing(client);
-      final outcome = await syncDatabase(direction, assetListing: assetListing);
+      final outcome = await syncDatabase(direction,
+          assetListing: assetListing, preview: preview);
       final hasPendingChanges =
           outcome == RowSyncOutcome.publishedWithPendingChanges;
       if (hasPendingChanges) await _pendingSync.request();
@@ -502,6 +582,11 @@ class Sync extends _$Sync {
       // Backup cleanup is now handled by DatabaseSyncManager
 
       if (!hasPendingChanges &&
+          preview != null &&
+          (_lastPreview?.hasChanges ?? false) &&
+          navigatorKey.currentContext != null) {
+        AnxToast.show(_previewSummary(_lastPreview!));
+      } else if (!hasPendingChanges &&
           _readingFeedback.success(
               reading: _isReading, enabled: Prefs().syncCompletedToast)) {
         AnxToast.show(syncSuccessMessage(chinese: _chineseFeedback));
@@ -510,6 +595,34 @@ class Sync extends _$Sync {
     } finally {
       changeState(state.copyWith(isSyncing: false));
       // _deleteBackUpDb();
+    }
+  }
+
+  Future<void> _prepareSyncWrites() async {
+    await _createSyncDir();
+
+    // Materialize encrypted settings before merging, after confirmation when
+    // requested, without storing plaintext keys.
+    try {
+      await AiSettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+      await RemoteLibrarySettingsSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+      await TranslationUsageSyncService().prepareLocalDatabase(
+        enabled: Prefs().syncAiSettingsToWebdav,
+        password: Prefs().syncAiSettingsEncryptionPassword,
+      );
+    } on AiSyncPasswordMissingException {
+      AnxLog.warning('AI settings sync skipped: encryption password missing');
+      rethrow;
+    } catch (e) {
+      AnxLog.severe(
+          'Failed to prepare encrypted AI settings for sync: ${e.runtimeType}');
+      throw const SyncFeedbackFailure(SyncFailureCode.encryptionFailed);
     }
   }
 
@@ -567,7 +680,7 @@ class Sync extends _$Sync {
   }
 
   Future<RowSyncOutcome> syncDatabase(SyncDirection direction,
-      {SyncAssetListing? assetListing}) async {
+      {SyncAssetListing? assetListing, SyncPreviewHook? preview}) async {
     final client = _syncClient;
     if (client == null) {
       throw const SyncFeedbackFailure(SyncFailureCode.notConfigured);
@@ -575,12 +688,20 @@ class Sync extends _$Sync {
     // Existing upload/download callers now converge records safely in both
     // directions; no entry point may overwrite a whole live library.
     try {
+      var prepared = preview == null;
       final outcome = await RowSyncEngine(
         store: RowSyncStore(await DBHelper().database),
         client: client,
         cache: await getAnxCacheDir(),
         durableDirectory: await getAnxDataBasesDir(),
-        beforePublish: () => syncFiles(assetListing: assetListing),
+        onPreview: preview,
+        beforePublish: () async {
+          if (!prepared) {
+            await _prepareSyncWrites();
+            prepared = true;
+          }
+          await syncFiles(assetListing: assetListing);
+        },
         beforeMerge: _createMergeBackup,
         afterMerge: () async {
           // Round records arrive before/with the time rows; reconcile derived

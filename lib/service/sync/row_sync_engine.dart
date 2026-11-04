@@ -10,6 +10,7 @@ import 'package:anx_reader/service/sync/row_sync_record.dart';
 import 'package:anx_reader/service/sync/row_sync_store.dart';
 import 'package:anx_reader/service/sync/sync_client_base.dart';
 import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:anx_reader/service/sync/sync_preview.dart';
 import 'package:anx_reader/utils/log/common.dart';
 
 /// A clean SQLite transport: only portable records and opaque encrypted AI
@@ -81,7 +82,8 @@ class RowSyncArchive {
   }
 
   static Future<List<RowSyncRecord>> read(String path,
-      {bool legacy = false, Directory? databaseDirectory}) async {    // A bounded metadata-only database; an oversized/corrupt download cannot
+      {bool legacy = false, Directory? databaseDirectory}) async {
+    // A bounded metadata-only database; an oversized/corrupt download cannot
     // be mistaken for an empty cloud library.
     if (await File(path).length() > 64 * 1024 * 1024) {
       throw const FormatException('同步数据库超过 64 MiB 安全限制');
@@ -98,8 +100,8 @@ class RowSyncArchive {
       // OHOS resolves database paths relative to its own root; reuse the same
       // copy-to-temp path as read() instead of opening the staging file directly.
       await _withDatabasePath(path, writing: false, action: (local) async {
-        final db = await openDatabase(local, readOnly: true,
-            singleInstance: false);
+        final db =
+            await openDatabase(local, readOnly: true, singleInstance: false);
         try {
           version = await db.getVersion();
         } finally {
@@ -173,6 +175,7 @@ class RowSyncEngine {
       this.beforePublish,
       this.beforeMerge,
       this.afterMerge,
+      this.onPreview,
       this.maxAttempts = 3,
       this.validatorRetryDelay = const Duration(seconds: 1)});
   final RowSyncStore store;
@@ -182,6 +185,10 @@ class RowSyncEngine {
   final Future<void> Function()? beforePublish;
   final Future<void> Function()? beforeMerge;
   final Future<void> Function()? afterMerge;
+
+  /// Read-only confirmation invoked once per synchronization, after both sides
+  /// are fully loaded and before any library merge or cloud write.
+  final SyncPreviewHook? onPreview;
   final int maxAttempts;
   final Duration validatorRetryDelay;
   static final remotePath = SyncPaths.database('database8.db');
@@ -200,8 +207,7 @@ class RowSyncEngine {
     await client.downloadFile(remotePath, download);
     final version = await RowSyncArchive.versionOf(download);
     if (version != null && version > RowSyncArchive.databaseVersion) {
-      throw FormatException(
-          '云端同步数据版本过新（v$version），本机未做任何写入；请升级本机客户端');
+      throw FormatException('云端同步数据版本过新（v$version），本机未做任何写入；请升级本机客户端');
     }
   }
 
@@ -215,8 +221,7 @@ class RowSyncEngine {
         .toIso8601String()
         .replaceAll(':', '-')
         .replaceAll('.', '-');
-    final target =
-        p.join(directory.path, 'sync-v8-backup-$stamp-$attempt.db');
+    final target = p.join(directory.path, 'sync-v8-backup-$stamp-$attempt.db');
     await File(source).copy(target);
     AnxLog.info('Sync: pre-v9 remote archive backup kept at $target');
   }
@@ -264,17 +269,23 @@ class RowSyncEngine {
       // Read-only version gate BEFORE any asset/log write. A v9+ client must
       // never touch a cloud archive written by a future/uncoordinated format.
       await _preflightRemoteVersion(staging);
-      // Assets first: retrying after an interrupted transfer must not advertise
-      // unavailable books as synchronized. Still after the version gate.
-      await beforePublish?.call();
-      // Repair/replay pending log batches before listing the journal: a partial
-      // upload from a previous run is reinstated here (and never before the
-      // version gate above).
-      published = await log.resumePending();
+      if (onPreview == null) {
+        await beforePublish?.call();
+        published = await log.resumePending();
+      }
+      var pendingFiles =
+          onPreview == null ? <String, File>{} : await log.readPendingFiles();
+      final pendingRecords = <RowSyncRecord>[];
+      for (final file in pendingFiles.values) {
+        pendingRecords.addAll(await RowSyncArchive.read(file.path));
+      }
+      // A retry after a concurrent publish must not re-ask the same question.
+      var previewConfirmed = onPreview == null;
+      var previewResolution = SyncConflictResolution.newest;
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         // Both transports always consume the immutable log, including after
         // ETags recover. Otherwise intermittent capabilities split the library.
-        final journal = await log.read();
+        final journal = await log.read(pendingFiles: pendingFiles);
         final remote = await client.readProps(remotePath);
         var path = remotePath;
         var metadata = remote;
@@ -323,14 +334,47 @@ class RowSyncEngine {
         remoteRecords = mergeSyncRecords(remoteBaseline, []);
         final repairsRemoteIdentity =
             !sameSyncRecords(remoteBaseline, remoteRecords);
-        final local = await store.snapshot();
+        var local = await store.snapshot();
+        if (!previewConfirmed) {
+          final decision = await onPreview!(SyncPreviewContext(
+            local: local,
+            remote: remoteRecords,
+            pendingRecords: pendingRecords,
+            localChangedAt: latestSyncRecordTime(local),
+            remoteChangedAt: latestSyncRecordTime(remoteRecords),
+            remoteFileAt: metadata?.mTime,
+            remoteMissing: remote == null && journal.isEmpty,
+          ));
+          if (decision.cancelled) throw const SyncPreviewCancelled();
+          previewResolution =
+              decision.resolution ?? SyncConflictResolution.newest;
+          previewConfirmed = true;
+        }
+        // Assets first: retrying after an interrupted transfer must not advertise
+        // unavailable books as synchronized. Still after the read-only preview,
+        // so declining the merge uploads nothing.
+        if (onPreview != null) {
+          await beforePublish?.call();
+          if (pendingFiles.isNotEmpty) {
+            published = await log.resumePending() || published;
+            pendingFiles = {};
+          }
+          local = await store.snapshot();
+        }
+        final planned = resolveSyncConflicts(
+            local: local,
+            remote: remoteRecords,
+            merged: mergeSyncRecords(
+                local, mergeSyncRecords(remoteRecords, pendingRecords)),
+            resolution: previewResolution);
         if (!backedUp &&
-            remoteRecords.isNotEmpty &&
-            !sameSyncRecords(local, mergeSyncRecords(local, remoteRecords))) {
+            (remoteRecords.isNotEmpty || pendingRecords.isNotEmpty) &&
+            !sameSyncRecords(local, planned)) {
           await beforeMerge?.call();
           backedUp = true;
         }
-        var merged = await store.merge(remoteRecords);
+        var merged = await store.merge(remoteRecords,
+            resolution: previewResolution, pendingRecords: pendingRecords);
         // Metadata-only local migrations run after learning remote replacements
         // and before the unchanged fast path. Publish the repaired snapshot in
         // this same sync, without resurrecting an obsolete local book file.

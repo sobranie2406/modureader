@@ -137,7 +137,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(description), findsOneWidget);
     expect(Prefs().useBookStyles, before);
-    Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+    // Help text lives in an anchored popup menu; dismiss it with an outside tap.
+    await tester.tapAt(const Offset(4, 4));
     await tester.pumpAndSettle();
     expect(find.text(description), findsNothing);
     await tester.tap(find.byType(Switch).first);

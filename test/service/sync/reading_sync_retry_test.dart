@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:anx_reader/service/sync/reading_sync_retry.dart';
 import 'package:anx_reader/service/sync/sync_feedback.dart';
+import 'package:anx_reader/service/sync/sync_preview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -237,6 +238,27 @@ void main() {
         ),
         throwsA(isA<DioException>()));
     expect(calls, 1);
+  });
+
+  test('a declined sync preview is never retried as a reading failure',
+      () async {
+    var calls = 0;
+    var delays = 0;
+    await expectLater(
+        ReadingSyncRetry(delay: (_) async {
+          delays++;
+        }).run(
+          enabled: () => true,
+          reading: () => true,
+          networkReady: () async => true,
+          synchronize: () async {
+            calls++;
+            throw const SyncPreviewCancelled();
+          },
+        ),
+        throwsA(isA<SyncPreviewCancelled>()));
+    expect(calls, 1);
+    expect(delays, 0);
   });
 
   test(

@@ -485,15 +485,41 @@ class RowSyncStore {
 
   /// Merge into live rows in one transaction, including changes made while
   /// the network request was in flight. No closing/replacing the live DB.
+  ///
+  /// [resolution] only affects records that exist on both sides with different
+  /// content (see [divergentSyncKeys]); it is chosen in the pre-sync preview.
+  /// A forced winner is written to the live row and published like any other
+  /// record, so the choice converges instead of being re-asked every sync.
   Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote,
-      {bool importOnlyMissingRecords = false}) async {
+      {bool importOnlyMissingRecords = false,
+      List<RowSyncRecord> pendingRecords = const [],
+      SyncConflictResolution resolution =
+          SyncConflictResolution.newest}) async {
     remote = remote.map(normalizeRoundFields).toList();
-    for (final record in remote) {
+    for (final record in [...remote, ...pendingRecords]) {
       validate(record);
     }
     return db.transaction((txn) async {
       final local = await _snapshot(txn);
-      var merged = mergeSyncRecords(local, remote);
+      var merged = mergeSyncRecords(
+          local,
+          pendingRecords.isEmpty
+              ? remote
+              : mergeSyncRecords(remote, pendingRecords));
+      if (resolution != SyncConflictResolution.newest) {
+        final maxClock = [...local, ...remote, ...pendingRecords].fold<int>(
+            0, (value, record) => value > record.clock ? value : record.clock);
+        await txn
+            .rawUpdate('UPDATE $_control SET clock=MAX(clock,?)', [maxClock]);
+        await txn.execute(_tick);
+        final tick = (await txn.query(_control)).single['clock'] as int;
+        merged = resolveSyncConflicts(
+            local: local,
+            remote: remote,
+            merged: merged,
+            resolution: resolution,
+            clock: tick);
+      }
       if (importOnlyMissingRecords) {
         // A one-off external library import is not a remote editing device.
         // Resolve aliases first, then preserve the latest local records inside

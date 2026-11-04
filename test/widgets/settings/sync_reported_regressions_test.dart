@@ -61,7 +61,9 @@ void main() {
       (tester) async {
     final syncBefore = Prefs().getSyncInfo(SyncProtocol.webdav);
     await open(tester);
-    await tester.tap(find.byKey(const ValueKey('global-settings-backup')));
+    await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('global-settings-backup')),
+        matching: find.byType(Text)).first);
     await tester.pumpAndSettle();
     expect(find.byType(GlobalSettingsPage), findsOneWidget);
     expect(Prefs().webdavStatus, isFalse);
