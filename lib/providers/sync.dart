@@ -117,36 +117,57 @@ class Sync extends _$Sync {
 
   String _previewSummary(SyncPreview preview) {
     final context = navigatorKey.currentContext!;
-    final parts = <String>[];
-    if (preview.addedBooks.isNotEmpty) {
-      parts.add(ModuStrings.text(
-          context,
-          '新增 ${preview.addedBooks.length} 本',
-          '${preview.addedBooks.length} added'));
+    String signed(int value) => value > 0 ? '+$value' : '$value';
+    List<String> parts({required bool upload}) {
+      final parts = <String>[];
+      final added =
+          upload ? preview.uploadedBooks.length : preview.addedBooks.length;
+      final removed = upload
+          ? preview.cloudRemovedBooks.length
+          : preview.removedBooks.length;
+      final notes = upload ? preview.uploadNoteDelta : preview.noteDelta;
+      final minutes = ((upload
+                  ? preview.uploadReadingTimeDelta
+                  : preview.readingTimeDelta) /
+              60)
+          .round();
+      if (added > 0) {
+        parts.add(
+            ModuStrings.text(context, '新增 $added 本', '$added added'));
+      }
+      if (removed > 0) {
+        parts.add(ModuStrings.text(context, '移除 $removed 本', '$removed removed'));
+      }
+      if (notes != 0) {
+        parts.add(ModuStrings.text(
+            context, '笔记 ${signed(notes)}', 'notes ${signed(notes)}'));
+      }
+      if (minutes != 0) {
+        parts.add(ModuStrings.text(
+            context, '时长 ${signed(minutes)} 分钟', 'time ${signed(minutes)} min'));
+      }
+      return parts;
     }
-    if (preview.removedBooks.isNotEmpty) {
-      parts.add(ModuStrings.text(
-          context,
-          '移除 ${preview.removedBooks.length} 本',
-          '${preview.removedBooks.length} removed'));
-    }
-    if (preview.noteDelta != 0) {
-      final sign = preview.noteDelta > 0 ? '+' : '';
-      parts.add(ModuStrings.text(context, '笔记 $sign${preview.noteDelta}',
-          'notes $sign${preview.noteDelta}'));
-    }
-    final minutes = (preview.readingTimeDelta / 60).round();
-    if (minutes != 0) {
-      final sign = minutes > 0 ? '+' : '';
-      parts.add(ModuStrings.text(
-          context, '时长 $sign$minutes 分钟', 'time $sign$minutes min'));
-    }
-    if (parts.isEmpty) {
+
+    final downloaded = parts(upload: false);
+    final uploaded = parts(upload: true);
+    if (downloaded.isEmpty && uploaded.isEmpty) {
       return ModuStrings.text(
           context, '同步完成，两端已一致', 'Sync complete; both sides agree');
     }
-    return ModuStrings.text(context, '同步完成：${parts.join(' · ')}',
-        'Synced: ${parts.join(' · ')}');
+    if (uploaded.isEmpty) {
+      return ModuStrings.text(context, '同步完成：${downloaded.join(' · ')}',
+          'Synced: ${downloaded.join(' · ')}');
+    }
+    if (downloaded.isEmpty) {
+      return ModuStrings.text(
+          context, '已上传：${uploaded.join(' · ')}',
+          'Uploaded: ${uploaded.join(' · ')}');
+    }
+    return ModuStrings.text(
+        context,
+        '同步完成：本机 ${downloaded.join(' · ')}；云端 ${uploaded.join(' · ')}',
+        'Synced: device ${downloaded.join(' · ')}; cloud ${uploaded.join(' · ')}');
   }
 
   bool get _chineseFeedback {

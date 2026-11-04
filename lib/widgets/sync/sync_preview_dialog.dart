@@ -67,32 +67,55 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
                     'The cloud has no data yet: this sync will create the cloud archive and upload this device\'s books.'))
               else
                 _bookDistribution(preview),
-              if (preview.removesBooks) ...[
-                const SizedBox(height: 12),
-                _warning(
-                  theme,
-                  _text(
-                    '有 ${preview.removedBooks.length} 本书在云端已被删除，同步后将从本机书架移除。阅读记录仍保留在历史中。',
-                    '${preview.removedBooks.length} book(s) were deleted on another device and will leave this shelf. Reading history is kept.',
-                  ),
+              if (preview.hasDownloadChanges)
+                _directionSection(
+                  key: const ValueKey('sync-preview-download'),
+                  title: _text('同步到本机', 'To this device'),
+                  subtitle: _text('云端 → 本机', 'Cloud → device'),
+                  booksAdded: preview.addedBooks,
+                  booksAddedTitle: _text('将加入书架', 'Will be added'),
+                  booksRemovedTitle:
+                      _text('将移出书架', 'Will be removed'),
+                  booksRemoved: preview.removedBooks,
+                  removeWarning: preview.removesBooks
+                      ? _text(
+                          '有 ${preview.removedBooks.length} 本书在云端已被删除，同步后将从本机书架移除。阅读记录仍保留在历史中。',
+                          '${preview.removedBooks.length} book(s) were deleted on another device and will leave this shelf. Reading history is kept.')
+                      : null,
+                  progress: preview.progressChangedBooks,
+                  noteLabel: _text('笔记', 'Notes'),
+                  noteDelta: preview.noteDelta,
+                  noteBefore: preview.localNoteCount,
+                  noteAfter: preview.mergedNoteCount,
+                  timeDelta: preview.readingTimeDelta,
+                  theme: theme,
                 ),
-              ],
-              if (preview.addedBooks.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _bookList(
-                    _text('将加入书架', 'Will be added'), preview.addedBooks),
-              ],
-              if (preview.removedBooks.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _bookList(
-                    _text('将移出书架', 'Will be removed'), preview.removedBooks),
-              ],
-              if (preview.progressChangedBooks.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _progressList(preview.progressChangedBooks),
-              ],
-              const SizedBox(height: 12),
-              _readingData(preview),
+              if (preview.hasUploadChanges)
+                _directionSection(
+                  key: const ValueKey('sync-preview-upload'),
+                  title: _text('上传到云端', 'To the cloud'),
+                  subtitle: _text('本机 → 云端', 'Device → cloud'),
+                  booksAdded: preview.uploadedBooks,
+                  booksAddedTitle: _text('云端将新增', 'Cloud gains'),
+                  booksRemovedTitle: _text('云端将移除', 'Cloud loses'),
+                  booksRemoved: preview.cloudRemovedBooks,
+                  removeWarning: null,
+                  progress: preview.uploadedProgressChangedBooks,
+                  noteLabel: _text('云端笔记', 'Cloud notes'),
+                  noteDelta: preview.uploadNoteDelta,
+                  noteBefore: preview.remoteNoteCount,
+                  noteAfter: preview.mergedNoteCount,
+                  timeDelta: preview.uploadReadingTimeDelta,
+                  theme: theme,
+                ),
+              if (!preview.hasDownloadChanges &&
+                  !preview.hasUploadChanges &&
+                  !preview.remoteMissing)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(_text('两端数据一致，本次只会确认状态。',
+                      'Both sides already match; this sync only confirms the state.')),
+                ),
               if (preview.divergentRecords > 0) ...[
                 const Divider(height: 24),
                 _conflictSection(preview, theme),
@@ -175,6 +198,96 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
     );
   }
 
+  Widget _directionSection({
+    required Key key,
+    required String title,
+    required String subtitle,
+    required List<SyncPreviewBook> booksAdded,
+    required String booksAddedTitle,
+    required String booksRemovedTitle,
+    required List<SyncPreviewBook> booksRemoved,
+    required String? removeWarning,
+    required List<SyncPreviewBook> progress,
+    required String noteLabel,
+    required int noteDelta,
+    required int noteBefore,
+    required int noteAfter,
+    required int timeDelta,
+    required ThemeData theme,
+  }) {
+    final minutes = (timeDelta / 60).round();
+    final hasReadingChanges = noteDelta != 0 || minutes != 0;
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 6),
+              Text(subtitle, style: theme.textTheme.bodySmall),
+            ],
+          ),
+          if (removeWarning != null) ...[
+            const SizedBox(height: 6),
+            _warning(theme, removeWarning),
+          ],
+          if (booksAdded.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _bookList(booksAddedTitle, booksAdded),
+          ],
+          if (booksRemoved.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _bookList(booksRemovedTitle, booksRemoved),
+          ],
+          if (progress.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _progressList(progress),
+          ],
+          if (hasReadingChanges) ...[
+            const SizedBox(height: 6),
+            _readingRow(
+              icon: Icons.edit_note,
+              label: noteLabel,
+              value: '${_signed(noteDelta)} ($noteBefore → $noteAfter)',
+            ),
+            _readingRow(
+              icon: Icons.timer_outlined,
+              label: _text('阅读时长', 'Reading time'),
+              value:
+                  '${minutes >= 0 ? '+' : ''}$minutes ${_text('分钟', 'min')}',
+              color: minutes == 0 ? null : _deltaColor(minutes),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _readingRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label)),
+          Text(value,
+              style: color == null
+                  ? null
+                  : TextStyle(fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+
   Widget _bookList(String title, List<SyncPreviewBook> books) {
     const max = 6;
     return Column(
@@ -184,13 +297,14 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         for (final book in books.take(max))
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text('· ${book.title}', maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            child: Text('· ${book.title}',
+                maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
         if (books.length > max)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(_text('等 ${books.length} 本', 'and ${books.length - max} more'),
+            child: Text(
+                _text('等 ${books.length} 本', 'and ${books.length - max} more'),
                 style: Theme.of(context).textTheme.bodySmall),
           ),
       ],
@@ -216,8 +330,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
                 const SizedBox(width: 8),
-                Text('${percent(book.localProgress)} → '
-                    '${percent(book.remoteProgress)}'),
+                Text('${percent(book.before)} → ${percent(book.after)}'),
               ],
             ),
           ),
@@ -225,52 +338,9 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
     );
   }
 
-  Widget _readingData(SyncPreview preview) {
-    final minutes = (preview.readingTimeDelta / 60).round();
-    final deltaStyle = TextStyle(
-      fontWeight: FontWeight.bold,
-      color: deltaColor(preview.readingTimeDelta),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            children: [
-              const Icon(Icons.edit_note, size: 18),
-              const SizedBox(width: 8),
-              Expanded(child: Text(_text('笔记', 'Notes'))),
-              Text('${_signed(preview.noteDelta)} '
-                  '(${preview.localNoteCount} → ${preview.mergedNoteCount})'),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            children: [
-              const Icon(Icons.timer_outlined, size: 18),
-              const SizedBox(width: 8),
-              Expanded(child: Text(_text('阅读时长', 'Reading time'))),
-              Text(
-                '${minutes >= 0 ? '+' : ''}$minutes '
-                '${_text('分钟', 'min')}',
-                style: deltaStyle,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color deltaColor(int seconds) {
-    if (seconds == 0) return Theme.of(context).colorScheme.onSurface;
-    return seconds > 0
-        ? Colors.green.shade700
-        : Theme.of(context).colorScheme.error;
-  }
+  Color _deltaColor(int minutes) => minutes > 0
+      ? Colors.green.shade700
+      : Theme.of(context).colorScheme.error;
 
   String _signed(int value) => value > 0 ? '+$value' : '$value';
 

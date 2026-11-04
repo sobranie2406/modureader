@@ -100,7 +100,7 @@ void main() {
       ],
     );
     expect(preview.addedBooks, hasLength(1));
-    expect(preview.addedBooks.single.remoteProgress, 0.62);
+    expect(preview.addedBooks.single.after, 0.62);
     expect(preview.removedBooks, isEmpty);
   });
 
@@ -115,8 +115,8 @@ void main() {
     );
     expect(preview.progressChangedBooks, hasLength(1));
     final changed = preview.progressChangedBooks.single;
-    expect(changed.localProgress, 0.2);
-    expect(changed.remoteProgress, 0.62);
+    expect(changed.before, 0.2);
+    expect(changed.after, 0.62);
   });
 
   test('notes and reading time deltas come from the merged records', () {
@@ -133,6 +133,42 @@ void main() {
     );
     expect(preview.noteDelta, 1);
     expect(preview.readingTimeDelta, 300);
+  });
+
+  test('an uploading device reports its own changes as upload deltas', () {
+    // Regression: the uploading device used to see every delta as zero,
+    // because the preview only compared the merge result with local state.
+    final preview = previewOf(
+      [
+        book('a'),
+        life('a', deleted: false),
+        position('a', 0.5, clock: 3000),
+        note('a', 'n1'),
+        note('a', 'n2'),
+        note('a', 'n3'),
+        time('a', '2026-11-03', 600, clock: 3000),
+      ],
+      [
+        book('a'),
+        life('a', deleted: false),
+        position('a', 0.4, clock: 1000),
+        note('a', 'n1'),
+        time('a', '2026-11-03', 300),
+      ],
+    );
+    // Nothing new arrives here: the merge result is this device's own state.
+    expect(preview.hasDownloadChanges, isFalse);
+    expect(preview.noteDelta, 0);
+    expect(preview.readingTimeDelta, 0);
+    // The cloud receives the extra notes, reading time and newer progress.
+    expect(preview.hasUploadChanges, isTrue);
+    expect(preview.uploadNoteDelta, 2);
+    expect(preview.uploadReadingTimeDelta, 300);
+    expect(preview.uploadedProgressChangedBooks, hasLength(1));
+    final progress = preview.uploadedProgressChangedBooks.single;
+    expect(progress.before, 0.4);
+    expect(progress.after, 0.5);
+    expect(preview.hasChanges, isTrue);
   });
 
   test('divergent content is counted by kind and ignores clock drift', () {
