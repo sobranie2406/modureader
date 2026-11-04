@@ -14,11 +14,15 @@ Older sections retain their original version scope; they are not current accepta
 
 - Fix(sync): Keep cancelled previews from publishing pending records, make confirmed choices converge across devices without undoing deletion safeguards, back up forced merges and refresh previews when the strategy changes. Preserve the original sync flow while preview is off ([#71](https://github.com/sobranie2406/modureader/pull/71)).
 
+- Fix(tts): Give narration and dialogue independent speed multipliers, so voices with different natural tempos can be aligned instead of sounding like two different playback speeds.
+
 ### 简体中文
 
 - Feat(pdf): 原文对照重排支持拖动分隔条调节两侧比例；比例仅当前对照界面有效，不保存、不同步，重新打开恢复各占一半。
 
 - Fix(sync): 取消预览时不再补传待同步记录；确认的冲突选择可跨设备保持一致并保留原有删除保护；强制合并前备份，切换策略时更新预览；关闭预览时保留原同步流程（[#71](https://github.com/sobranie2406/modureader/pull/71)）。
+
+- Fix(tts): 多角色朗读支持旁白、对话独立语速倍率，可把自然语速不同的音色调成一致，不再出现两种播放速度。
 
 ## 1.3.7-beta.1
 

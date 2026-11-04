@@ -4,6 +4,7 @@ import 'package:anx_reader/models/tts_role_config.dart';
 import 'package:anx_reader/providers/tts_providers.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +80,59 @@ class _TtsRoleSettingsSectionState
   Future<void> _saveBook(TtsRoleBookOverride override) async {
     await Prefs().saveTtsRoleBookOverride(_bookId, override);
     if (mounted) setState(() {});
+  }
+
+  /// Per-role speed multiplier, relative to the reader's global speed.
+  Future<void> _pickRate({
+    required String title,
+    required double current,
+    required TtsRoleConfig Function(double rate) apply,
+  }) async {
+    var value = current;
+    final result = await showDialog<double>(
+      context: context,
+      animationStyle: AppMotion.style,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('×${value.toStringAsFixed(2)}',
+                  style: Theme.of(dialogContext).textTheme.headlineSmall),
+              Slider(
+                value: value,
+                min: TtsRoleConfig.minRate,
+                max: TtsRoleConfig.maxRate,
+                divisions: 30,
+                label: '×${value.toStringAsFixed(2)}',
+                onChanged: (next) => setDialogState(() => value = next),
+              ),
+              Text(ModuStrings.text(
+                  dialogContext,
+                  '相对于全局朗读速度。不同音色的自然语速不同，用这里的倍率把旁白和对话调到一致。',
+                  'Relative to the global narration speed. Voices have different natural tempos; use these multipliers to match narration and dialogue.')),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(1.0),
+              child: Text(ModuStrings.text(dialogContext, '重置', 'Reset')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(ModuStrings.text(dialogContext, '取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(value),
+              child: Text(ModuStrings.text(dialogContext, '确定', 'OK')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    await _save(apply(result));
   }
 
   Future<String?> _pickVoice({
@@ -251,8 +305,8 @@ class _TtsRoleSettingsSectionState
                         'The system engine cannot switch voices per sentence. Choose an online service first.')
                     : ModuStrings.text(
                         context,
-                        '引号内的对话用对话音色，其余用旁白音色。对话多的书会增加合成请求数；改音色后从下一段开始生效。',
-                        'Quoted dialogue uses the dialogue voice; the rest uses narration. Dialogue-heavy books need more synthesis requests.')),
+                        '引号内的对话用对话音色，其余用旁白音色。不同音色的自然语速不同，可用下方旁白/对话语速对齐；对话多的书会增加合成请求数；改音色后从下一段开始生效。',
+                        'Quoted dialogue uses the dialogue voice; the rest uses narration. Voices differ in natural tempo, so use the narration/dialogue speeds below to match them. Dialogue-heavy books need more synthesis requests.')),
                 initialValue: enabled,
                 enabled: !_systemEngine,
                 onToggle: (value) async {
@@ -276,6 +330,42 @@ class _TtsRoleSettingsSectionState
                   emptyLabel:
                       ModuStrings.text(context, '跟随旁白', 'Follow narration'),
                   onTap: _pickDialogue,
+                ),
+              if (enabled)
+                SettingsTile.navigation(
+                  key: const ValueKey('tts-role-narration-rate'),
+                  leading: const Icon(Icons.speed),
+                  title:
+                      Text(ModuStrings.text(context, '旁白语速', 'Narration speed')),
+                  value: Text('×${config.narrationRate.toStringAsFixed(2)}'),
+                  description: Text(ModuStrings.text(
+                      context,
+                      '不同音色的自然语速不同；用旁白/对话语速把两者调到一致。',
+                      'Voices have different natural tempos; match narration and dialogue with these speeds.')),
+                  onPressed: (_) => _pickRate(
+                    title: ModuStrings.text(
+                        context, '旁白语速', 'Narration speed'),
+                    current: config.narrationRate,
+                    apply: (rate) => config.copyWith(narrationRate: rate),
+                  ),
+                ),
+              if (enabled)
+                SettingsTile.navigation(
+                  key: const ValueKey('tts-role-dialogue-rate'),
+                  leading: const Icon(Icons.speed),
+                  title:
+                      Text(ModuStrings.text(context, '对话语速', 'Dialogue speed')),
+                  value: Text('×${config.dialogueRate.toStringAsFixed(2)}'),
+                  description: Text(ModuStrings.text(
+                      context,
+                      '只调整对话音色的倍率，用于对齐旁白的听感速度。',
+                      'Adjusts only the dialogue voice so it matches the narration pace.')),
+                  onPressed: (_) => _pickRate(
+                    title: ModuStrings.text(
+                        context, '对话语速', 'Dialogue speed'),
+                    current: config.dialogueRate,
+                    apply: (rate) => config.copyWith(dialogueRate: rate),
+                  ),
                 ),
             ],
           ),

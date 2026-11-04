@@ -143,4 +143,36 @@ void main() {
     expect(bookToggle, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('per-role speeds are editable and persist', (tester) async {
+    tester.view.physicalSize = const Size(360, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Prefs().ttsService = 'edge';
+    await Prefs().saveTtsRoleConfig(const TtsRoleConfig(
+      enabled: true,
+      narrationVoice: 'narrator',
+      dialogueVoice: 'dialogue',
+    ));
+
+    await tester.pumpWidget(app('zh'));
+    await tester.pumpAndSettle();
+    final dialogueRate = find.byKey(const ValueKey('tts-role-dialogue-rate'));
+    await tester.ensureVisible(dialogueRate);
+    expect(dialogueRate, findsOneWidget);
+
+    await tester.tap(dialogueRate);
+    await tester.pumpAndSettle();
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(1.2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+
+    expect(Prefs().ttsRoleConfig.dialogueRate, closeTo(1.2, .001));
+    expect(Prefs().ttsRoleConfig.narrationRate, 1.0);
+    expect(find.text('×1.20'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

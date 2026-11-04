@@ -4,6 +4,7 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/tts_role_config.dart';
 import 'package:anx_reader/service/tts/models/tts_segment.dart';
 import 'package:anx_reader/service/tts/models/tts_sentence.dart';
+import 'package:anx_reader/service/tts/edge_tts_backend.dart';
 import 'package:anx_reader/service/tts/models/tts_voice.dart';
 import 'package:anx_reader/service/tts/online_tts.dart';
 import 'package:anx_reader/service/tts/tts_service.dart';
@@ -17,7 +18,7 @@ class RecordingTtsProvider extends TtsServiceProvider {
   RecordingTtsProvider({this.selected = 'narrator'});
 
   final String selected;
-  final List<(String text, String voice)> calls = [];
+  final List<(String text, String voice, double rate)> calls = [];
 
   @override
   TtsService get service => TtsService.edge;
@@ -34,7 +35,7 @@ class RecordingTtsProvider extends TtsServiceProvider {
   @override
   Future<Uint8List> speak(
       String text, String? voice, double rate, double pitch) async {
-    calls.add((text, voice ?? ''));
+    calls.add((text, voice ?? '', rate));
     return Uint8List.fromList([1]);
   }
 }
@@ -106,5 +107,52 @@ void main() {
     expect(provider.calls.single.$1, '他说：“走吧。”');
     expect(provider.calls.single.$2, 'narrator');
     expect(advances, 1);
+  });
+
+  test('each role keeps its own speed multiplier on top of the global rate',
+      () async {
+    Prefs().ttsRate = 1.5;
+    final provider = RecordingTtsProvider();
+    final tts = OnlineTts.forTesting(
+      collect: (_) async =>
+          const [TtsSentence(text: '他说：“走吧。”', cfi: 'cfi-1')],
+      backend: provider,
+      play: (_) async {},
+    )..roleConfigResolver = () => const TtsRoleConfig(
+          enabled: true,
+          narrationVoice: 'narrator',
+          dialogueVoice: 'dialogue',
+          narrationRate: 0.9,
+          dialogueRate: 1.2,
+        );
+
+    await tts.init(() async => 'x', () async => '', () async => '');
+    await tts.speak().timeout(const Duration(seconds: 5));
+
+    expect(provider.calls, hasLength(2));
+    expect(provider.calls[0].$2, 'narrator');
+    expect(provider.calls[0].$3, closeTo(1.35, 0.0001));
+    expect(provider.calls[1].$2, 'dialogue');
+    expect(provider.calls[1].$3, closeTo(1.8, 0.0001));
+  });
+
+  test('playback stays inside the engine range after the role multiplier', () {
+    Prefs().ttsRate = 3.0;
+    final tts = OnlineTts.forTesting(
+      collect: (_) async => const [],
+      synthesize: (_) async => Uint8List.fromList([1]),
+      backend: EdgeTtsProvider(),
+    )..roleConfigResolver = () => const TtsRoleConfig(
+          enabled: true,
+          narrationVoice: 'narrator',
+          dialogueVoice: 'dialogue',
+          narrationRate: 0.9,
+          dialogueRate: 1.2,
+        );
+    // Edge synthesises up to 2x and accelerates locally beyond that.
+    expect(tts.rolePlaybackRateFor(TtsSpeakerRole.narration),
+        closeTo(1.35, .001));
+    expect(
+        tts.rolePlaybackRateFor(TtsSpeakerRole.dialogue), closeTo(1.8, .001));
   });
 }
