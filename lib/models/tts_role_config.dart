@@ -64,15 +64,39 @@ class TtsRoleConfig {
     this.enabled = false,
     this.narrationVoice = '',
     this.dialogueVoice = '',
+    this.narrationRate = 1.0,
+    this.dialogueRate = 1.0,
     this.characters = const [],
   });
 
   static const TtsRoleConfig disabled = TtsRoleConfig();
 
+  /// Range accepted for the per-role speed multipliers.
+  static const double minRate = 0.5;
+  static const double maxRate = 2.0;
+
   final bool enabled;
   final String narrationVoice;
   final String dialogueVoice;
+
+  /// Speed multiplier on top of the reader's global narration speed. Voices
+  /// have different natural tempos, so the same global rate can still sound
+  /// different between narration and dialogue; these factors let the two be
+  /// matched without changing either voice.
+  final double narrationRate;
+  final double dialogueRate;
   final List<TtsCharacterRole> characters;
+
+  /// Multiplier for [role]; characters follow the dialogue voice.
+  double rateFor(TtsSpeakerRole role) => switch (role) {
+        TtsSpeakerRole.narration => narrationRate,
+        TtsSpeakerRole.dialogue || TtsSpeakerRole.character => dialogueRate,
+      };
+
+  static double clampRate(Object? value) {
+    if (value is! num || !value.isFinite) return 1.0;
+    return value.toDouble().clamp(minRate, maxRate);
+  }
 
   /// True when the reader actually has to split text into different voices.
   bool get isDistinct {
@@ -98,12 +122,16 @@ class TtsRoleConfig {
     bool? enabled,
     String? narrationVoice,
     String? dialogueVoice,
+    double? narrationRate,
+    double? dialogueRate,
     List<TtsCharacterRole>? characters,
   }) {
     return TtsRoleConfig(
       enabled: enabled ?? this.enabled,
       narrationVoice: narrationVoice ?? this.narrationVoice,
       dialogueVoice: dialogueVoice ?? this.dialogueVoice,
+      narrationRate: clampRate(narrationRate ?? this.narrationRate),
+      dialogueRate: clampRate(dialogueRate ?? this.dialogueRate),
       characters: characters ?? this.characters,
     );
   }
@@ -112,6 +140,8 @@ class TtsRoleConfig {
         'enabled': enabled,
         'narrationVoice': narrationVoice,
         'dialogueVoice': dialogueVoice,
+        if (narrationRate != 1.0) 'narrationRate': narrationRate,
+        if (dialogueRate != 1.0) 'dialogueRate': dialogueRate,
         if (characters.isNotEmpty)
           'characters': [for (final character in characters) character.toMap()],
       };
@@ -130,6 +160,8 @@ class TtsRoleConfig {
       enabled: value['enabled'] == true,
       narrationVoice: _string(value['narrationVoice']),
       dialogueVoice: _string(value['dialogueVoice']),
+      narrationRate: clampRate(value['narrationRate']),
+      dialogueRate: clampRate(value['dialogueRate']),
       characters: List.unmodifiable(characters),
     );
   }
@@ -143,6 +175,8 @@ class TtsRoleConfig {
           other.enabled == enabled &&
           other.narrationVoice == narrationVoice &&
           other.dialogueVoice == dialogueVoice &&
+          other.narrationRate == narrationRate &&
+          other.dialogueRate == dialogueRate &&
           listEquals(other.characters, characters);
 
   @override
@@ -150,6 +184,8 @@ class TtsRoleConfig {
         enabled,
         narrationVoice,
         dialogueVoice,
+        narrationRate,
+        dialogueRate,
         Object.hashAll(characters),
       );
 }

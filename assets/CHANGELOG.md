@@ -6,6 +6,16 @@ Latest stable: **1.3.6+10168**. Latest preview: **1.3.7-beta.2+10170**. Updated 
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
+## Unreleased
+
+### English
+
+- Feat(tts): Add independent narration/dialogue speed multipliers, including when both roles use the same voice. Keep buffered audio and pause/resume speeds consistent when settings change.
+
+### 简体中文
+
+- Feat(tts): 多角色朗读支持旁白、对话独立语速倍率，相同音色也可分别调节；修复调整语速后的缓存及暂停、继续播放速度不一致的问题。
+
 ## 1.3.7-beta.2
 
 ### English

@@ -191,7 +191,7 @@ class OnlineTts extends BaseTts {
             !identical(player, _player)) {
           return;
         }
-        await player.setPlaybackRate(_playbackRate);
+        await player.setPlaybackRate(_playbackRateForSegment(_currentSegment));
         await _applyLocalPitch(player);
       }).catchError((Object error) {
         if (command == _commandVersion) _controlFailed(error);
@@ -204,10 +204,16 @@ class OnlineTts extends BaseTts {
   @override
   set rate(double rate) {
     if (!rate.isFinite || rate < 0.1 || rate > 4 || rate == this.rate) return;
-    final previousSynthesisRate = _synthesisRate;
+    final previousRate = this.rate;
     Prefs().ttsRate = rate;
-    if (_usesPlaybackRate && _synthesisRate == previousSynthesisRate) {
-      // Keep audio when only playback speed changes (MiMo, or Edge above 2x).
+    if (_buffer.any((segment) =>
+        _synthesisRateFor(previousRate * segment.roleRate) !=
+        _synthesisRateFor(rate * segment.roleRate))) {
+      _clearPendingAudio();
+    }
+    if (_usesPlaybackRate) {
+      // Only reuse audio at an unchanged synthesis rate, including slow roles
+      // whose effective Edge rate may remain below 2x even at a high global rate.
       final player = _player;
       final command = _commandVersion;
       unawaited(_serializeAudioControl(() async {
@@ -218,14 +224,11 @@ class OnlineTts extends BaseTts {
             _playbackCompleter?.isCompleted != false) {
           return;
         }
-        await player.setPlaybackRate(_playbackRate);
+        await player.setPlaybackRate(_playbackRateForSegment(_currentSegment));
       }).catchError((Object error) {
         if (command == _commandVersion) _controlFailed(error);
       }));
-      return;
     }
-    // Clear pending audio so it will be re-fetched with new rate
-    _clearPendingAudio();
   }
 
   @override
@@ -259,9 +262,37 @@ class OnlineTts extends BaseTts {
     return rate;
   }
 
-  double get _playbackRate => _playbackRateFor(rate);
+  /// Per-role multiplier from the multi-speaker configuration. Voices have
+  /// different natural tempos, so narration and dialogue can otherwise sound
+  /// like two different speeds even at the same global rate.
+  double _roleRateFactor(TtsSpeakerRole? role) {
+    if (role == null) return 1.0;
+    final config = roleConfig;
+    if (!config.enabled) return 1.0;
+    return config.rateFor(role);
+  }
 
-  double get _synthesisRate => _synthesisRateFor(rate);
+  double _effectiveRate(TtsSpeakerRole? role) => rate * _roleRateFactor(role);
+
+  double _playbackRateForRole(TtsSpeakerRole? role) =>
+      _playbackRateFor(_effectiveRate(role));
+
+  double _playbackRateForSegment(TtsSegment? segment) {
+    final effective = rate * (segment?.roleRate ?? 1);
+    final synthesized = segment?.synthesizedEffectiveRate;
+    // A rate change that needs new audio applies to the next passage. Pause,
+    // resume and local pitch changes must not reinterpret the active audio.
+    final playbackRate = synthesized != null &&
+            _synthesisRateFor(synthesized) != _synthesisRateFor(effective)
+        ? segment?.playbackRate ?? _playbackRateFor(synthesized)
+        : _playbackRateFor(effective);
+    segment?.playbackRate = playbackRate;
+    return playbackRate;
+  }
+
+  /// Exposed for tests: the effective playback rate for one speaker role.
+  @visibleForTesting
+  double rolePlaybackRateFor(TtsSpeakerRole role) => _playbackRateForRole(role);
 
   /// Exposed for tests: a preview must come out at the original speed.
   @visibleForTesting
@@ -418,6 +449,8 @@ class OnlineTts extends BaseTts {
     for (final segment in _buffer) {
       // Clear audio so it will be re-fetched
       segment.audio = null;
+      segment.synthesizedEffectiveRate = null;
+      segment.playbackRate = null;
       segment.isSilent = false;
       segment.error = null;
       segment.fetchVersion = _audioFetchVersion; // Mark with current version
@@ -503,7 +536,12 @@ class OnlineTts extends BaseTts {
         for (final sentence in sentences) {
           if (_shouldStop) break;
           for (final run in plan.expand(sentence)) {
-            final segment = TtsSegment(sentence: run);
+            final segment = TtsSegment(
+              sentence: run,
+              roleRate: plan.config.enabled && run.role != null
+                  ? plan.config.rateFor(run.role!)
+                  : 1,
+            );
             segment.fetchVersion = _audioFetchVersion;
             newSegments.add(segment);
             _buffer.add(segment); // Add in order!
@@ -580,6 +618,7 @@ class OnlineTts extends BaseTts {
       if (_shouldStop || segment.fetchVersion != targetVersion) return;
       if (segment.isReady) return;
       final watch = Stopwatch()..start();
+      final effectiveRate = rate * segment.roleRate;
       try {
         if (_synthesizeOverride != null) {
           final bytes =
@@ -591,6 +630,7 @@ class OnlineTts extends BaseTts {
                 TtsFailureReason.invalidAudio, 'Empty speech audio');
           }
           segment.audio = bytes;
+          segment.synthesizedEffectiveRate = effectiveRate;
           if (attempt > 0) {
             AnxLog.info(
                 'TTS fetch recovered: provider=$providerId fetch=$fetchId attempt=${attempt + 1}');
@@ -603,11 +643,12 @@ class OnlineTts extends BaseTts {
         final voice = sentenceVoice != null && sentenceVoice.isNotEmpty
             ? sentenceVoice
             : currentBackend.getSelectedVoice();
+        final synthesisRate = _synthesisRateFor(effectiveRate);
         final bytes = await _untilStopped(_audioCache
             .synthesize(
               _ProviderAdapter(
                 provider: currentBackend,
-                rate: _synthesisRate,
+                rate: synthesisRate,
                 pitch: _synthesisPitch,
                 voice: voice,
               ),
@@ -616,7 +657,7 @@ class OnlineTts extends BaseTts {
                 voice: voice,
                 model: currentBackend.serviceId,
                 parameters: {
-                  'rate': _synthesisRate.toStringAsFixed(4),
+                  'rate': synthesisRate.toStringAsFixed(4),
                   'pitch': _synthesisPitch.toStringAsFixed(4),
                   'config': currentBackend.cacheConfiguration(),
                 },
@@ -642,6 +683,7 @@ class OnlineTts extends BaseTts {
           segment.audio = bytes is Uint8List
               ? bytes.asUnmodifiableView()
               : Uint8List.fromList(bytes).asUnmodifiableView();
+          segment.synthesizedEffectiveRate = effectiveRate;
         }
         if (attempt > 0) {
           AnxLog.info(
@@ -763,8 +805,11 @@ class OnlineTts extends BaseTts {
             if (_playOverride != null) {
               await _playOverride!(segment);
             } else {
+              // Each role has its own multiplier, so compute the rate for this
+              // segment instead of reusing the global playback rate.
+              final playbackRate = _playbackRateForSegment(segment);
               if (_usesPlaybackRate) {
-                await audioPlayer!.setPlaybackRate(_playbackRate);
+                await audioPlayer!.setPlaybackRate(playbackRate);
               }
               await _applyLocalPitch(audioPlayer!);
               final stopTracking = _trackSpeechProgress(audioPlayer, segment);
@@ -774,7 +819,7 @@ class OnlineTts extends BaseTts {
                 // Re-apply it after play() so the next sentence keeps the
                 // speed shown in the slider.
                 if (_usesPlaybackRate) {
-                  await audioPlayer.setPlaybackRate(_playbackRate);
+                  await audioPlayer.setPlaybackRate(playbackRate);
                 }
                 await _playbackCompleter!.future;
               } finally {
@@ -1030,12 +1075,14 @@ class OnlineTts extends BaseTts {
           // the previous sentence. Only resume an unfinished active segment;
           // otherwise restore the loop state and let it play the next source.
           if (!_isPlayerRunning || _playbackCompleter?.isCompleted == false) {
+            // Keep the active role's multiplier across pause/resume.
+            final playbackRate = _playbackRateForSegment(_currentSegment);
             if (_usesPlaybackRate) {
-              await _player?.setPlaybackRate(_playbackRate);
+              await _player?.setPlaybackRate(playbackRate);
             }
             await _player?.resume();
             if (_usesPlaybackRate) {
-              await _player?.setPlaybackRate(_playbackRate);
+              await _player?.setPlaybackRate(playbackRate);
             }
           }
           if (command == _commandVersion && control == _controlVersion) {

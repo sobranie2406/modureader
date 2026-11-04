@@ -17,6 +17,8 @@ void main() {
       enabled: true,
       narrationVoice: 'zh-CN-YunxiNeural',
       dialogueVoice: 'zh-CN-XiaoxiaoNeural',
+      narrationRate: .9,
+      dialogueRate: 1.2,
       characters: [
         TtsCharacterRole(id: 'c1', name: '小明', voice: 'zh-CN-YunjianNeural'),
       ],
@@ -24,6 +26,19 @@ void main() {
     final decoded =
         TtsRoleConfig.fromMap(jsonDecode(jsonEncode(config.toMap())));
     expect(decoded, config);
+  });
+
+  test('per-role speeds clamp and default to the global speed', () {
+    final decoded =
+        TtsRoleConfig.fromMap({'narrationRate': 9.0, 'dialogueRate': 0.0});
+    expect(decoded.narrationRate, TtsRoleConfig.maxRate);
+    expect(decoded.dialogueRate, TtsRoleConfig.minRate);
+    expect(TtsRoleConfig.fromMap({'narrationRate': 'fast'}).narrationRate, 1.0);
+    expect(const TtsRoleConfig().toMap(), isNot(contains('narrationRate')));
+    const config = TtsRoleConfig(narrationRate: 0.9, dialogueRate: 1.2);
+    expect(config.rateFor(TtsSpeakerRole.narration), 0.9);
+    expect(config.rateFor(TtsSpeakerRole.dialogue), 1.2);
+    expect(config.rateFor(TtsSpeakerRole.character), 1.2);
   });
 
   test('malformed values fall back to a disabled configuration', () {

@@ -86,6 +86,27 @@ void main() {
       expect(runs.single.voice, 'same');
     });
 
+    test('identical voices still split when role speeds differ', () {
+      final runs = TtsRolePlan(
+        config: const TtsRoleConfig(enabled: true, dialogueRate: 1.2),
+        fallbackVoice: 'same',
+      ).expand(const TtsSentence(text: '他说：“走吧。”'));
+      expect(runs.map((run) => run.role),
+          [TtsSpeakerRole.narration, TtsSpeakerRole.dialogue]);
+      expect(runs.map((run) => run.voice), ['same', 'same']);
+      expect(runs.map((run) => run.advanceCursor), [false, true]);
+    });
+
+    test('equal non-default speeds apply even with inherited voices', () {
+      final runs = TtsRolePlan(
+        config: const TtsRoleConfig(
+            enabled: true, narrationRate: 1.2, dialogueRate: 1.2),
+        fallbackVoice: 'same',
+      ).expand(const TtsSentence(text: '他说：“走吧。”'));
+      expect(runs, hasLength(1));
+      expect(runs.single.role, TtsSpeakerRole.narration);
+    });
+
     test('following narration uses the configured voice without extra requests',
         () {
       final runs = TtsRolePlan(

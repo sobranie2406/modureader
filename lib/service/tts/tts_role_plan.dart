@@ -142,17 +142,21 @@ class TtsRolePlan {
   final String fallbackVoice;
   final TtsRoleSplitter _splitter;
 
-  bool get active => config.enabled && narrationVoice != dialogueVoice;
+  bool get active =>
+      config.enabled &&
+      (narrationVoice != dialogueVoice ||
+          config.narrationRate != config.dialogueRate);
 
   String get narrationVoice => config.narrationVoiceFor(fallbackVoice);
   String get dialogueVoice => config.dialogueVoiceFor(fallbackVoice);
 
   /// Returns one or more sentences. The input itself is returned untouched when
-  /// splitting cannot change the voice.
+  /// splitting cannot change the voice or speed.
   List<TtsSentence> expand(TtsSentence sentence) {
     if (!config.enabled) return [sentence];
     if (!active) {
-      if (narrationVoice.isEmpty || narrationVoice == fallbackVoice) {
+      if ((narrationVoice.isEmpty || narrationVoice == fallbackVoice) &&
+          config.narrationRate == 1) {
         return [sentence];
       }
       return [
