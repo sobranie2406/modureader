@@ -1,18 +1,22 @@
 # Modu changelog
 
-Latest stable: **1.3.6+10168**. Latest preview: **1.3.7-beta.1+10169**. Updated 2026-11-03.
+Latest stable: **1.3.6+10168**. Latest preview: **1.3.7-beta.2+10170**. Updated 2026-11-04.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
-## Unreleased
+## 1.3.7-beta.2
 
 ### English
+
+- Feat(pdf): Drag the divider to resize the original and reflow panes in comparison mode. The ratio is temporary, is not synced and resets to equal panes when comparison is reopened.
 
 - Fix(sync): Keep cancelled previews from publishing pending records, make confirmed choices converge across devices without undoing deletion safeguards, back up forced merges and refresh previews when the strategy changes. Preserve the original sync flow while preview is off ([#71](https://github.com/sobranie2406/modureader/pull/71)).
 
 ### 简体中文
+
+- Feat(pdf): 原文对照重排支持拖动分隔条调节两侧比例；比例仅当前对照界面有效，不保存、不同步，重新打开恢复各占一半。
 
 - Fix(sync): 取消预览时不再补传待同步记录；确认的冲突选择可跨设备保持一致并保留原有删除保护；强制合并前备份，切换策略时更新预览；关闭预览时保留原同步流程（[#71](https://github.com/sobranie2406/modureader/pull/71)）。
 
