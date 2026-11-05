@@ -1,10 +1,22 @@
 # Modu changelog
 
-Latest stable: **1.3.7+10171**. Latest preview: **1.3.8-beta.2+10173**. Updated 2026-11-05.
+Latest stable: **1.3.7+10171**. Latest preview: **1.3.8-beta.3+10174**. Updated 2026-11-05.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.3.8-beta.3
+
+### English
+
+- Fix(reader): Fall back to scroll animation when an older WebView lacks the animation completion promise, preventing page-turn failures while retaining compositor animation on supported WebViews.
+- Feat(notes): Add keyword search from the notes home page and current-book notes. Match excerpts, comments and chapter names, with results linking back to the original passage.
+
+### 简体中文
+
+- Fix(reader): 旧版 WebView 缺少动画完成回调时使用滚动动画，修复翻页报错；支持该能力的高版本继续保留原有动画优化。
+- Feat(notes): 笔记首页增加全部笔记搜索，阅读界面及单本书笔记页增加本书搜索；匹配摘录、批注和章节名称，点击结果可返回原文。
 
 ## 1.3.8-beta.2
 
