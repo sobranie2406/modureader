@@ -9,6 +9,8 @@ const { VerticalColumnRules } = await import(`data:text/javascript;base64,${Buff
 test('rules fill changing viewport height and retain glyph alignment during opening scale', () => {
   const dom = new JSDOM('<div id="layer"><iframe></iframe></div>');
   const { document } = dom.window;
+  // WebView 83 has no replaceChildren, including on SVG nodes.
+  delete dom.window.Element.prototype.replaceChildren;
   const renderer = document.createElement('div');
   renderer.vertical = true;
   renderer.setAttribute('vertical-column-rules', 'true');

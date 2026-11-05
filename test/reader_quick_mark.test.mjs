@@ -9,6 +9,8 @@ const { installQuickMark, rangeBetween, caretAt, continuousRange, planQuickMarkM
 
 function fixture() {
   const dom = new JSDOM('<p>一二三四五六七八九十</p><p>第二段内容</p>');
+  // Exercise preview, cancellation and disabled initialization on old WebViews.
+  delete dom.window.Element.prototype.replaceChildren;
   const doc = dom.window.document;
   const text = doc.querySelector('p').firstChild;
   const other = doc.querySelectorAll('p')[1].firstChild;

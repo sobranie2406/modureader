@@ -47,7 +47,7 @@ export class VerticalColumnRules {
   draw() {
     const enabled = this.renderer.vertical && this.renderer.getAttribute('vertical-column-rules') === 'true';
     this.svg.style.display = enabled ? 'block' : 'none';
-    if (!enabled) { this.svg.replaceChildren(); return; }
+    if (!enabled) { this.svg.textContent = ''; return; }
     const viewport = this.layer.getBoundingClientRect();
     const width = this.layer.clientWidth;
     const height = this.layer.clientHeight;
@@ -104,7 +104,8 @@ export class VerticalColumnRules {
           line.setAttribute(key, String(value));
         return line;
       });
-    this.svg.replaceChildren(...lines);
+    this.svg.textContent = '';
+    this.svg.append(...lines);
   }
 
   destroy() {

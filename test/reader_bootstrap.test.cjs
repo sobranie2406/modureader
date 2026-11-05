@@ -87,12 +87,16 @@ test('syntax and resource failures report once instead of waiting for metadata t
   assert.equal(reader.calls[0][0], 'onReaderLoadError');
 });
 
-test('all shipped legacy scripts exclude syntax newer than Chromium 70', () => {
+test('all shipped legacy scripts exclude modern syntax and unsupported replaceChildren calls', () => {
   for (const file of ['bundle.js', 'pdf-legacy.js', 'pdf-legacy.worker.js']) {
     const source = fs.readFileSync(path.join(root, 'dist', file), 'utf8');
     // BigInt literals are valid since Chromium 67, but were standardized in ES2020.
     const tree = acorn.parse(source, { ecmaVersion: 2020 });
     const visit = node => {
+      if (node.type === 'MemberExpression') {
+        const property = node.computed ? node.property.value : node.property.name;
+        assert.notEqual(property, 'replaceChildren', `${file}: unsupported DOM method`);
+      }
       assert.notEqual(node.type, 'ChainExpression', `${file}: optional chaining`);
       assert.ok(!(node.type === 'LogicalExpression' && node.operator === '??'), `${file}: nullish coalescing`);
       if (node.type === 'Literal' && typeof node.value === 'number') {

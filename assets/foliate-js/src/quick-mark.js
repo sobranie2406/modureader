@@ -110,9 +110,9 @@ export function installQuickMark(doc, { onCommit, onTap, onError = () => {} }) {
   const sheet = doc.createElement('style');
   sheet.textContent = 'html[data-modu-quick-mark="on"]{touch-action:none!important} html[data-modu-quick-mark="on"] body{-webkit-touch-callout:none!important}';
   const stop = e => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };
-  const clear = () => { gesture = null; layer.replaceChildren(); layer.remove(); };
+  const clear = () => { gesture = null; layer.textContent = ''; layer.remove(); };
   const paint = range => {
-    layer.replaceChildren();
+    layer.textContent = '';
     for (const rect of [...range.getClientRects()].slice(0, 1000)) {
       const mark = doc.createElement('div');
       Object.assign(mark.style, { position: 'absolute', left: `${rect.left}px`,

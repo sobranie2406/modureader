@@ -13752,7 +13752,7 @@ class FreeTextEditor extends _editor.AnnotationEditor {
     return this.div;
   }
   #setContent() {
-    this.editorDiv.replaceChildren();
+    this.editorDiv.textContent = '';
     if (!this.#content) {
       return;
     }
