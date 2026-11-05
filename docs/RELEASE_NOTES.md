@@ -1,58 +1,50 @@
-# Modu 1.3.6
+# Modu 1.3.7
 
-Build / 构建：**10168** · Stable / 正式版
+Build / 构建：**10171** · Stable / 正式版
 
 ### English
 
-- Fix(reader): Recover verified self-referencing EPUB note links so popups show the actual annotation instead of the source paragraph, preserving text layout and reading positions.
+- Feat(tts): Add optional narration/dialogue voices and independent speed multipliers, with per-book voice overrides and consistent buffered playback. ([PR #69](https://github.com/sobranie2406/modureader/pull/69) / [#74](https://github.com/sobranie2406/modureader/pull/74)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): Swipe through other images in the book from the enlarged image viewer, retaining zoom and sharing.
+- Feat(appearance): Add theme presets, custom palettes and optional reading-page colours. ([PR #70](https://github.com/sobranie2406/modureader/pull/70)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): Add text-filter profiles alongside CSS presets: hide matching text or its whole paragraph and skip filtered content during narration.
+- Feat(sync): Add optional manual-sync preview and conflict confirmation; preserve cancellation, deletion safeguards and cross-device convergence. ([PR #71](https://github.com/sobranie2406/modureader/pull/71) / [#73](https://github.com/sobranie2406/modureader/pull/73)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): Apply supported font, spacing, color and alignment CSS settings to PDF/OCR reflow, and turn reflow pages using the configured tap regions.
+- Feat(appearance): Restore scheduled day/night switching with custom hours, off by default.
 
-- Fix(pdf): Restore single-finger swipe paging in unzoomed single-page reading while preserving enlarged-page panning, pinch zoom and text selection.
+- Feat(reader): Consolidate font management with multiple-file/folder import and previews in the installed list and reader selectors.
 
-- Fix(sync): Keep success notices silent in every reader; retry failed sync three times before one notice with the reason, and silently defer offline or Wi-Fi-restricted attempts. Other screens retain their notices.
+- Feat(pdf): Resize original/reflow comparison panes by dragging the divider; the temporary ratio is neither saved nor synced.
 
-- Fix(dictionary): Allow MDD resource packages up to 2 GiB while retaining the 256 MiB MDX text limit and import validation.
+- Fix(reader): Hide More when all enabled toolbar actions fit, and show setting/PDF explanations through anchored question-mark popovers.
 
-- Fix(bookshelf): Restore scrolling to the last row of HarmonyOS book folders ([#65](https://github.com/sobranie2406/modureader/issues/65)). Thanks [@zggnice](https://github.com/zggnice) for the report.
+- Fix(dictionary): Import loose dictionary resources correctly when the Android picker caches files in separate folders.
 
-- Fix(appearance): Accept integer-valued cover widths after restart and recover invalid values, preventing blank bookshelf and appearance pages ([#67](https://github.com/sobranie2406/modureader/issues/67)). Thanks [@zggnice](https://github.com/zggnice).
+- Fix(pdf): Use the PDF filename for newly imported titles instead of unreliable embedded metadata. ([Issue #68](https://github.com/sobranie2406/modureader/issues/68)) Thanks [@h9413](https://github.com/h9413).
 
-- Fix(history): Keep wide-screen reading-history content aligned to the top.
-
-- Feat(update): Show all intervening stable-version changes when upgrading across multiple versions.
-
-- Chore(settings): Remove the ANX-backup import entry from Advanced settings.
+- Feat(ocr): Use PP-OCRv5 Mobile as the default for new model selections while retaining existing choices.
 
 ### 简体中文
 
-- Fix(reader): 兼容部分 EPUB 注释链接错误指向自身的情况，核实配对后显示真正的注释，保留正文排版与阅读定位。
+- Feat(tts): 新增可选的旁白／对话音色及独立语速倍率，支持按书覆盖音色，并保持缓存播放与暂停继续的速度一致。 ([PR #69](https://github.com/sobranie2406/modureader/pull/69) / [#74](https://github.com/sobranie2406/modureader/pull/74)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): 放大书中图片后可左右滑动浏览其他图片，保留缩放与分享。
+- Feat(appearance): 新增主题预设、自定义配色及可选的阅读页配色联动。 ([PR #70](https://github.com/sobranie2406/modureader/pull/70)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): CSS 方案中新增文字过滤模板，可隐藏匹配文字或所在整段，朗读同步跳过过滤内容。
+- Feat(sync): 新增可选的手动同步预览和冲突确认，保留取消、删除保护及跨设备一致性。 ([PR #71](https://github.com/sobranie2406/modureader/pull/71) / [#73](https://github.com/sobranie2406/modureader/pull/73)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
 
-- Feat(reader): PDF／OCR 重排支持适用的字号、间距、配色与对齐 CSS 设置，并可按已配置的点击区域翻页。
+- Feat(appearance): 恢复定时日夜切换，支持自定义时段，默认关闭。
 
-- Fix(pdf): 恢复 PDF 单页未放大时的单指滑动翻页，保留放大平移、双指缩放及划词选择。
+- Feat(reader): 整合字体管理，支持多文件／整文件夹导入，已安装列表和阅读选择器按字体样式预览。
 
-- Fix(sync): 所有阅读界面隐藏同步成功提示；失败后再重试 3 次，仍失败仅提醒一次并附原因；断网或不满足仅 Wi-Fi 条件时静默跳过，其他界面提示照旧。
+- Feat(pdf): 原文对照重排支持拖动分隔条调整比例，比例不记忆、不同步。
 
-- Fix(dictionary): MDD 资源包导入上限提高至 2 GiB，保留 MDX 正文 256 MiB 上限及导入校验。
+- Fix(reader): 顶部按钮全部显示时隐藏“更多”，设置及 PDF 菜单说明改为问号周边弹层。
 
-- Fix(bookshelf): 修复鸿蒙书架分组无法滚动到末行（[#65](https://github.com/sobranie2406/modureader/issues/65)）。感谢 [@zggnice](https://github.com/zggnice) 反馈。
+- Fix(dictionary): 修复安卓文件选择器将文件缓存到不同目录时，字典附属资源导入失败。
 
-- Fix(appearance): 兼容重启后以整数读取的封面宽度，并为异常值提供兜底，避免书架和外观页面空白（[#67](https://github.com/sobranie2406/modureader/issues/67)）。感谢 [@zggnice](https://github.com/zggnice)。
+- Fix(pdf): 新导入 PDF 使用文件名作为标题，避免内嵌元数据导致标题乱码。 ([Issue #68](https://github.com/sobranie2406/modureader/issues/68)) 感谢 [@h9413](https://github.com/h9413).
 
-- Fix(history): 阅读历史在宽屏下保持顶部对齐。
-
-- Feat(update): 跨版本升级后汇总展示原版本至当前版本之间的正式版更新说明。
-
-- Chore(settings): 移除高级设置中的 ANX 备份导入入口。
+- Feat(ocr): 新模型选择默认使用 PP-OCRv5 移动版，保留已有模型选择。
 
 ### Downloads / 下载
 
@@ -62,4 +54,4 @@ Nine architecture-specific packages, each with a SHA-256 sidecar. Existing autom
 
 iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing without notarization; Windows has no commercial Authenticode signature and requires WebView2. Linux DEB targets Debian 13. / iOS IPA 与鸿蒙 HAP 需自行签名；macOS 为临时签名、未公证；Windows 无商业 Authenticode 签名，需 WebView2；Linux DEB 面向 Debian 13。
 
-[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.6) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.6/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.6/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.6/NOTICE)
+[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.7) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.7/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.7/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.7/NOTICE)

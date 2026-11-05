@@ -1,20 +1,56 @@
 # Modu changelog
 
-Latest stable: **1.3.6+10168**. Latest preview: **1.3.7-beta.2+10170**. Updated 2026-11-04.
+Latest stable: **1.3.7+10171**. Latest preview: **1.3.7-beta.2+10170**. Updated 2026-11-05.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
-## Unreleased
+## 1.3.7
 
 ### English
 
-- Feat(tts): Add independent narration/dialogue speed multipliers, including when both roles use the same voice. Keep buffered audio and pause/resume speeds consistent when settings change.
+- Feat(tts): Add optional narration/dialogue voices and independent speed multipliers, with per-book voice overrides and consistent buffered playback. ([PR #69](https://github.com/sobranie2406/modureader/pull/69) / [#74](https://github.com/sobranie2406/modureader/pull/74)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(appearance): Add theme presets, custom palettes and optional reading-page colours. ([PR #70](https://github.com/sobranie2406/modureader/pull/70)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(sync): Add optional manual-sync preview and conflict confirmation; preserve cancellation, deletion safeguards and cross-device convergence. ([PR #71](https://github.com/sobranie2406/modureader/pull/71) / [#73](https://github.com/sobranie2406/modureader/pull/73)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(appearance): Restore scheduled day/night switching with custom hours, off by default.
+
+- Feat(reader): Consolidate font management with multiple-file/folder import and previews in the installed list and reader selectors.
+
+- Feat(pdf): Resize original/reflow comparison panes by dragging the divider; the temporary ratio is neither saved nor synced.
+
+- Fix(reader): Hide More when all enabled toolbar actions fit, and show setting/PDF explanations through anchored question-mark popovers.
+
+- Fix(dictionary): Import loose dictionary resources correctly when the Android picker caches files in separate folders.
+
+- Fix(pdf): Use the PDF filename for newly imported titles instead of unreliable embedded metadata. ([Issue #68](https://github.com/sobranie2406/modureader/issues/68)) Thanks [@h9413](https://github.com/h9413).
+
+- Feat(ocr): Use PP-OCRv5 Mobile as the default for new model selections while retaining existing choices.
 
 ### 简体中文
 
-- Feat(tts): 多角色朗读支持旁白、对话独立语速倍率，相同音色也可分别调节；修复调整语速后的缓存及暂停、继续播放速度不一致的问题。
+- Feat(tts): 新增可选的旁白／对话音色及独立语速倍率，支持按书覆盖音色，并保持缓存播放与暂停继续的速度一致。 ([PR #69](https://github.com/sobranie2406/modureader/pull/69) / [#74](https://github.com/sobranie2406/modureader/pull/74)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(appearance): 新增主题预设、自定义配色及可选的阅读页配色联动。 ([PR #70](https://github.com/sobranie2406/modureader/pull/70)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(sync): 新增可选的手动同步预览和冲突确认，保留取消、删除保护及跨设备一致性。 ([PR #71](https://github.com/sobranie2406/modureader/pull/71) / [#73](https://github.com/sobranie2406/modureader/pull/73)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh).
+
+- Feat(appearance): 恢复定时日夜切换，支持自定义时段，默认关闭。
+
+- Feat(reader): 整合字体管理，支持多文件／整文件夹导入，已安装列表和阅读选择器按字体样式预览。
+
+- Feat(pdf): 原文对照重排支持拖动分隔条调整比例，比例不记忆、不同步。
+
+- Fix(reader): 顶部按钮全部显示时隐藏“更多”，设置及 PDF 菜单说明改为问号周边弹层。
+
+- Fix(dictionary): 修复安卓文件选择器将文件缓存到不同目录时，字典附属资源导入失败。
+
+- Fix(pdf): 新导入 PDF 使用文件名作为标题，避免内嵌元数据导致标题乱码。 ([Issue #68](https://github.com/sobranie2406/modureader/issues/68)) 感谢 [@h9413](https://github.com/h9413).
+
+- Feat(ocr): 新模型选择默认使用 PP-OCRv5 移动版，保留已有模型选择。
 
 ## 1.3.7-beta.2
 

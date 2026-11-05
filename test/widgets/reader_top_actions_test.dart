@@ -85,7 +85,7 @@ void main() {
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    for (final width in [320.0, 390.0, 600.0, 1200.0, 360.0]) {
+    for (final width in [320.0, 390.0, 600.0, 959.0, 960.0, 1200.0, 360.0]) {
       await tester.pumpWidget(MaterialApp(
           home: Scaffold(
               body: Align(
@@ -114,8 +114,13 @@ void main() {
             )),
       ))));
       await tester.pumpAndSettle();
-      final count = ((width * .4 / 48).floor() - 1)
-          .clamp(0, ReaderTopAction.values.length);
+      final count = switch (width) {
+        320 => 1,
+        360 || 390 => 2,
+        600 => 4,
+        959 => 6,
+        _ => 8,
+      };
       expect(tester.getSize(find.byType(ReaderTopActions)).width,
           lessThanOrEqualTo(width * .4));
       expect(find.byType(BackButton), findsOneWidget);
@@ -125,10 +130,55 @@ void main() {
         expect(button, i < count ? findsOneWidget : findsNothing);
         if (i < count) expect(tester.getSize(button), const Size(48, 48));
       }
-      expect(tester.getSize(find.byKey(const ValueKey('reader-top-more'))),
-          const Size(48, 48));
+      final more = find.byKey(const ValueKey('reader-top-more'));
+      if (count < ReaderTopAction.values.length) {
+        expect(tester.getSize(more), const Size(48, 48));
+      } else {
+        expect(more, findsNothing);
+      }
       expect(tester.takeException(), isNull);
     }
+  });
+  testWidgets('More disappears as actions are hidden, including an empty bar',
+      (tester) async {
+    final actions = ReaderTopAction.values.take(3).toList();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topRight,
+          child: ReaderTopActions(
+            readerWidth: 240,
+            buttons: {
+              for (final action in actions)
+                action: IconButton(onPressed: () {}, icon: action.icon),
+            },
+            actions: {for (final action in actions) action: () {}},
+          ),
+        ),
+      ),
+    ));
+    final more = find.byKey(const ValueKey('reader-top-more'));
+    expect(more, findsOneWidget);
+
+    Prefs().readerToolbar =
+        ReaderTopActionsConfig(order: actions, hidden: {actions.last}).encode();
+    await tester.pump();
+    expect(more, findsNothing);
+    expect(find.byType(IconButton), findsNWidgets(2));
+    expect(tester.getSize(find.byType(ReaderTopActions)).width, 96);
+
+    Prefs().readerToolbar =
+        ReaderTopActionsConfig(order: actions, hidden: actions.toSet())
+            .encode();
+    await tester.pump();
+    expect(more, findsNothing);
+    expect(find.byType(IconButton), findsNothing);
+    expect(tester.getSize(find.byType(ReaderTopActions)).width, 0);
+
+    Prefs().readerToolbar = '{}';
+    await tester.pump();
+    expect(more, findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   testWidgets(
       'engine and direction persist; secrets obscured without sending requests',

@@ -88,35 +88,37 @@ class ReaderTopActions extends StatelessWidget {
       builder: (context, _) {
         final visible = ReaderTopActionsConfig.parse(Prefs().readerToolbar)
             .visible(buttons.keys);
-        // Reserve one full touch target for More; never shrink icons to fit.
+        final capacity = (readerWidth * .4 / kMinInteractiveDimension).floor();
+        final hasMore = visible.length > capacity;
+        // Reserve a touch target for More only when actions actually overflow.
         final directCount =
-            ((readerWidth * .4 / kMinInteractiveDimension).floor() - 1)
-                .clamp(0, visible.length);
+            hasMore ? (capacity - 1).clamp(0, visible.length) : visible.length;
         return Row(mainAxisSize: MainAxisSize.min, children: [
           for (final action in visible.take(directCount))
             SizedBox.square(
                 dimension: kMinInteractiveDimension, child: buttons[action]!),
-          SizedBox.square(
-              dimension: kMinInteractiveDimension,
-              child: PopupMenuButton<ReaderTopAction>(
-                key: const ValueKey('reader-top-more'),
-                tooltip: ModuStrings.text(context, '更多', 'More'),
-                icon: const Icon(Icons.more_vert),
-                clipBehavior: Clip.antiAlias,
-                popUpAnimationStyle: AppMotion.style,
-                onSelected: (action) => actions[action]?.call(),
-                itemBuilder: (_) => [
-                  for (final action in visible.skip(directCount))
-                    PopupMenuItem(
-                        value: action,
-                        enabled: actions[action] != null,
-                        child: Row(children: [
-                          action.icon,
-                          const SizedBox(width: 12),
-                          Flexible(child: Text(action.label(context)))
-                        ])),
-                ],
-              )),
+          if (hasMore)
+            SizedBox.square(
+                dimension: kMinInteractiveDimension,
+                child: PopupMenuButton<ReaderTopAction>(
+                  key: const ValueKey('reader-top-more'),
+                  tooltip: ModuStrings.text(context, '更多', 'More'),
+                  icon: const Icon(Icons.more_vert),
+                  clipBehavior: Clip.antiAlias,
+                  popUpAnimationStyle: AppMotion.style,
+                  onSelected: (action) => actions[action]?.call(),
+                  itemBuilder: (_) => [
+                    for (final action in visible.skip(directCount))
+                      PopupMenuItem(
+                          value: action,
+                          enabled: actions[action] != null,
+                          child: Row(children: [
+                            action.icon,
+                            const SizedBox(width: 12),
+                            Flexible(child: Text(action.label(context)))
+                          ])),
+                  ],
+                )),
         ]);
       });
 }
