@@ -9,8 +9,8 @@ final searchRepositoryProvider = Provider<SearchRepository>((ref) {
 
 final searchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 
-final searchResultProvider =
-    FutureProvider.autoDispose<SearchResultData>((ref) async {
+final searchResultProvider = FutureProvider.autoDispose
+    .family<SearchResultData, int?>((ref, bookId) async {
   final query = ref.watch(searchQueryProvider);
   final repository = ref.watch(searchRepositoryProvider);
   final trimmed = query.trim();
@@ -19,7 +19,7 @@ final searchResultProvider =
     return SearchResultData.empty;
   }
 
-  final result = await repository.search(trimmed);
+  final result = await repository.search(trimmed, bookId: bookId);
   final noteGroups = result.noteGroups
       .map(
         (entry) => SearchNoteGroup(

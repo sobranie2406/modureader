@@ -16,7 +16,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
-  const SearchPage({super.key});
+  const SearchPage({super.key, this.notesOnly = false, this.bookId});
+
+  final bool notesOnly;
+  final int? bookId;
 
   @override
   ConsumerState<SearchPage> createState() => _SearchPageState();
@@ -58,6 +61,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   void _clearQuery() {
+    _debounce?.cancel();
     _controller.clear();
     ref.read(searchQueryProvider.notifier).state = '';
   }
@@ -65,7 +69,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
-    final asyncResult = ref.watch(searchResultProvider);
+    final asyncResult = ref.watch(searchResultProvider(widget.bookId));
 
     var appBar = AppBar(
       forceMaterialTransparency: true,
@@ -76,7 +80,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           controller: _controller,
           focusNode: _focusNode,
           decoration: InputDecoration(
-            hintText: L10n.of(context).searchBooksOrNotes,
+            hintText: widget.notesOnly
+                ? (Localizations.localeOf(context).languageCode == 'zh'
+                    ? '搜索笔记：摘录、批注、章节'
+                    : 'Search notes: excerpts, comments, chapters')
+                : L10n.of(context).searchBooksOrNotes,
             prefixIcon: const Icon(Icons.search),
             suffixIcon: _controller.text.isEmpty
                 ? null
@@ -114,10 +122,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               child: Column(
                 spacing: 24,
                 children: [
-                  _SearchResult(
-                      title: L10n.of(context).books,
-                      empty: result.books.isEmpty,
-                      child: _SearchBookResult(books: result.books)),
+                  if (!widget.notesOnly)
+                    _SearchResult(
+                        title: L10n.of(context).books,
+                        empty: result.books.isEmpty,
+                        child: _SearchBookResult(books: result.books)),
                   _SearchResult(
                       title: L10n.of(context).notes,
                       empty: result.noteGroups.isEmpty,

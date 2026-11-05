@@ -1,3 +1,4 @@
+import 'package:anx_reader/page/search/search_page.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/constants/note_annotations.dart';
 import 'package:anx_reader/enums/hint_key.dart';
@@ -142,6 +143,14 @@ class BookNotesList extends ConsumerWidget {
 
     return Row(
       children: [
+        IconButton(
+          tooltip: Localizations.localeOf(context).languageCode == 'zh'
+              ? '搜索本书笔记'
+              : 'Search notes in this book',
+          icon: const Icon(Icons.search),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => SearchPage(notesOnly: true, bookId: book.id))),
+        ),
         const Spacer(),
         IconButton(
           onPressed: () => _showFilterSheet(context, ref),
