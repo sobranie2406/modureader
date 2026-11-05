@@ -1,10 +1,22 @@
 # Modu changelog
 
-Latest stable: **1.3.7+10171**. Latest preview: **1.3.8-beta.1+10172**. Updated 2026-11-05.
+Latest stable: **1.3.7+10171**. Latest preview: **1.3.8-beta.2+10173**. Updated 2026-11-05.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.3.8-beta.2
+
+### English
+
+- Fix(reader): Complete old-WebView compatibility for vertical column rules, quick marking and PDF annotations; verify generated scripts contain no unsupported replaceChildren calls.
+- Fix(tts): Use local speed control for OpenAI and compatible services like MiMo; support independent local pitch on Android and macOS, preserving cached audio and pause state.
+
+### 简体中文
+
+- Fix(reader): 补齐竖排栏线、快速划线及 PDF 批注的旧版 WebView 兼容修复，并检查生成脚本，解决 Beta 1 中仍然出现的章节加载失败。
+- Fix(tts): OpenAI 及兼容服务参照小米 TTS 使用本地变速；安卓和 Mac 支持独立本地音调调节，保留音频缓存及暂停状态。
 
 ## 1.3.8-beta.1
 
