@@ -44,6 +44,23 @@ void main() {
     expect(tts.previewPlaybackRateFor(2.5), 2.5);
   });
 
+  test('custom OpenAI endpoints use local speed over the full slider range',
+      () async {
+    await Prefs().saveOnlineTtsConfig(
+        'openai', {'url': 'https://tts.example/v1/audio/speech'});
+    final tts = ttsFor(OpenAiTtsProvider());
+    for (final rate in [0.1, 0.6, 1.0, 1.7, 4.0]) {
+      expect(tts.previewSynthesisRateFor(rate), 1.0);
+      expect(tts.previewPlaybackRateFor(rate), rate);
+    }
+  });
+
+  test('official OpenAI uses the same local speed as MiMo', () {
+    final tts = ttsFor(OpenAiTtsProvider());
+    expect(tts.previewSynthesisRateFor(1.7), 1.0);
+    expect(tts.previewPlaybackRateFor(1.7), 1.7);
+  });
+
   test('Edge keeps a bounded synthesis range and accelerates locally', () {
     final tts = ttsFor(EdgeTtsProvider());
     expect(tts.previewSynthesisRateFor(2.5), 2.0);

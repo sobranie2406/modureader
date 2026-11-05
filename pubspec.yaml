@@ -150,6 +150,8 @@ dependency_overrides:
     path: third_party/share_handler_android
   audioplayers_android:
     path: third_party/audioplayers_android
+  audioplayers_darwin:
+    path: third_party/audioplayers_darwin
   flutter_inappwebview_windows:
     path: third_party/flutter_inappwebview_windows
   hf_tokenizers:

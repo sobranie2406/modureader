@@ -76,6 +76,9 @@ void main() {
     expect(body['speed'], 1.3);
     expect(body['instructions'], startsWith('温暖柔和\n'));
     expect(body['instructions'], contains('lower pitch'));
+    expect(body['instructions'], contains('0.80 times'));
+    await provider.speak('正文', null, 1.3, 0.5);
+    expect(body['instructions'], contains('0.50 times'));
     expect(body['instructions'], isNot(contains('speed')));
   });
 

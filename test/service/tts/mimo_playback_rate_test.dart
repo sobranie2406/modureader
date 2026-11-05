@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/tts/openai_tts_backend.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
@@ -166,70 +167,92 @@ void main() {
     expect(tts.playbackError, isNull);
   });
 
-  test(
-      'Android MiMo pitch applies locally and preserves buffered audio and pause state',
-      () async {
-    const channel = MethodChannel('xyz.luan/audioplayers');
-    final native = NativePitchPlayer();
-    final pitches = <double>[];
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-      expect(call.method, 'setPitch');
-      expect(call.arguments['playerId'], native.playerId);
-      pitches.add(call.arguments['pitch'] as double);
-      return null;
+  for (final engine in ['MiMo', 'OpenAI', 'compatible OpenAI']) {
+    final customOpenAi = engine != 'MiMo';
+    test('local pitch preserves buffered audio and pause state ($engine)',
+        () async {
+      const channel = MethodChannel('xyz.luan/audioplayers');
+      final native = NativePitchPlayer();
+      final pitches = <double>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'setPitch');
+        expect(call.arguments['playerId'], native.playerId);
+        pitches.add(call.arguments['pitch'] as double);
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null));
+      await Prefs().saveOnlineTtsConfig('openai', {
+        'key': 'test-only',
+        'url': engine == 'OpenAI'
+            ? 'https://api.openai.com/v1/audio/speech'
+            : 'https://tts.example/v1/audio/speech',
+        'model': engine == 'OpenAI' ? 'gpt-4o-mini-tts' : 'tts-1',
+      });
+      final openai =
+          OpenAiTtsProvider.forTesting(client: MockClient((request) async {
+        requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+        return http.Response.bytes([73, 68, 51, 0], 200);
+      }));
+      var cursor = 0;
+      final tts = OnlineTts.forTesting(
+        backend: customOpenAi ? openai : provider,
+        localPitch: true,
+        createPlayer: () => native,
+        collect: (_) async =>
+            const [TtsSentence(text: '音调第一段'), TtsSentence(text: '音调第二段')],
+      );
+      addTearDown(tts.stop);
+      await tts.init(() async => '音调第一段',
+          () async => ++cursor < 2 ? '音调第二段' : '', () async => '');
+      final reading = tts.speak();
+      await until(() => native.playedRates.length == 1 && requests.length == 2);
+      expect(pitches, [1.0]);
+      for (final value in [0.5, 0.8, 1.1, 1.6, 2.0]) {
+        tts.pitch = value;
+        await until(() => pitches.last == value);
+      }
+      final changes = pitches.length;
+      for (final invalid in [2.0, 0.4, 2.1, double.nan, double.infinity]) {
+        tts.pitch = invalid;
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(pitches.length, changes);
+      expect(Prefs().ttsPitch, 2);
+      expect(requests.length, 2);
+      await tts.pause();
+      tts.pitch = 1.3;
+      await until(() => pitches.last == 1.3);
+      expect(tts.isPlaying, isFalse);
+      expect(native.resumes, 0);
+      await tts.resume();
+      expect(native.resumes, 1);
+      tts.rate = 1.7;
+      await until(() => native.rates.last == 1.7);
+      expect(pitches.last, 1.3);
+      native.completed.add(null);
+      await until(() => native.playedRates.length == 2);
+      expect(pitches.last, 1.3);
+      expect(requests.length, 2,
+          reason: 'pitch and speed reuse already synthesized passages');
+      for (final request in requests) {
+        expect(request.toString(), isNot(contains('默认的')));
+        if (customOpenAi) {
+          expect(request.containsKey('speed'), isFalse);
+          if (engine == 'OpenAI') {
+            expect(request['instructions'], isNot(contains('pitch')));
+          } else {
+            expect(request.containsKey('instructions'), isFalse);
+          }
+        }
+      }
+      native.completed.add(null);
+      await reading;
+      expect(tts.playbackError, isNull);
     });
-    addTearDown(() => TestDefaultBinaryMessengerBinding
-        .instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null));
-    var cursor = 0;
-    final tts = OnlineTts.forTesting(
-      backend: provider,
-      localPitch: true,
-      createPlayer: () => native,
-      collect: (_) async =>
-          const [TtsSentence(text: '音调第一段'), TtsSentence(text: '音调第二段')],
-    );
-    addTearDown(tts.stop);
-    await tts.init(() async => '音调第一段', () async => ++cursor < 2 ? '音调第二段' : '',
-        () async => '');
-    final reading = tts.speak();
-    await until(() => native.playedRates.length == 1 && requests.length == 2);
-    expect(pitches, [1.0]);
-    for (final value in [0.5, 0.8, 1.1, 1.6, 2.0]) {
-      tts.pitch = value;
-      await until(() => pitches.last == value);
-    }
-    final changes = pitches.length;
-    for (final invalid in [2.0, 0.4, 2.1, double.nan, double.infinity]) {
-      tts.pitch = invalid;
-    }
-    await Future<void>.delayed(Duration.zero);
-    expect(pitches.length, changes);
-    expect(Prefs().ttsPitch, 2);
-    expect(requests.length, 2);
-    await tts.pause();
-    tts.pitch = 1.3;
-    await until(() => pitches.last == 1.3);
-    expect(tts.isPlaying, isFalse);
-    expect(native.resumes, 0);
-    await tts.resume();
-    expect(native.resumes, 1);
-    tts.rate = 1.7;
-    await until(() => native.rates.last == 1.7);
-    expect(pitches.last, 1.3);
-    native.completed.add(null);
-    await until(() => native.playedRates.length == 2);
-    expect(pitches.last, 1.3);
-    expect(requests.length, 2,
-        reason: 'pitch and speed reuse already synthesized passages');
-    for (final request in requests) {
-      expect(request.toString(), isNot(contains('默认的')));
-    }
-    native.completed.add(null);
-    await reading;
-    expect(tts.playbackError, isNull);
-  });
+  }
 
   test('preview uses saved local speed and clamps legacy zero speed', () async {
     Prefs().ttsRate = 0;

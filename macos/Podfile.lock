@@ -164,7 +164,7 @@ SPEC CHECKSUMS:
   app_links: 05a6ec2341985eb05e9f97dc63f5837c39895c3f
   audio_service: aa99a6ba2ae7565996015322b0bb024e1d25c6fd
   audio_session: eaca2512cf2b39212d724f35d11f46180ad3a33e
-  audioplayers_darwin: 761f2948df701d05b5db603220c384fb55720012
+  audioplayers_darwin: 18e1a02e3e860f56bb836c35c22973eb0cb8fdd7
   battery_plus: f51ad29136e025b714b96f7d096f44f604615da7
   connectivity_plus: 4adf20a405e25b42b9c9f87feff8f4b6fde18a4e
   desktop_drop: e0b672a7d84c0a6cbc378595e82cdb15f2970a43

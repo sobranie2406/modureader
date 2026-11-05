@@ -68,8 +68,11 @@ void main() {
         addTearDown(tts.stop);
         tts.rate = speed;
         await tts.speakWithVoice('倍速回归测试', 'test-voice');
-        final synthesis =
-            name == 'Edge' ? speed.clamp(0.1, 2.0) : speed.clamp(0.25, 4.0);
+        final synthesis = name == 'Edge'
+            ? speed.clamp(0.1, 2.0)
+            : name == 'OpenAI'
+                ? 1.0
+                : speed.clamp(0.25, 4.0);
         expect(provider.requestedRates, [synthesis]);
         expect(player.playedRates.single, closeTo(speed / synthesis, 0.000001));
         expect(synthesis * player.playedRates.single, closeTo(speed, 0.000001));
@@ -93,21 +96,21 @@ void main() {
     final reading = tts.speak();
     await until(() => player.playedRates.isNotEmpty);
     tts.rate = 0.2;
-    await until(() => player.rates.last == 0.8);
-    expect(provider.requestedRates, [0.25]);
+    await until(() => player.rates.last == 0.2);
+    expect(provider.requestedRates, [1.0]);
     await tts.pause();
     tts.rate = 0.1;
     await Future<void>.delayed(Duration.zero);
-    expect(player.rates.last, 0.8);
+    expect(player.rates.last, 0.2);
     expect(player.resumes, 0);
     await tts.resume();
-    expect(player.rates.last, 0.4);
+    expect(player.rates.last, 0.1);
     player.completed.add(null);
     await reading;
     tts.rate = 0.3;
     await tts.speakWithVoice('恢复合成速度', 'test-voice');
-    expect(provider.requestedRates, [0.25, 0.3]);
-    expect(player.playedRates.last, 1);
+    expect(provider.requestedRates, [1.0, 1.0]);
+    expect(player.playedRates.last, 0.3);
   });
 
   test('Edge live 3x to 4x preserves audio and lower speed resets acceleration',

@@ -42,7 +42,7 @@ class OnlineTts extends BaseTts {
     Future<void> Function(TtsSegment)? play,
     AudioPlayer? player,
     AudioPlayer Function()? createPlayer,
-    bool? localPitch,
+    bool localPitch = false,
     Future<void> Function(TtsSegment)? highlight,
     Future<void> Function(TtsSentence, double)? followProgress,
   })  : assert(synthesize != null || backend != null),
@@ -90,8 +90,8 @@ class OnlineTts extends BaseTts {
   AudioPlayer Function()? _createPlayer;
   bool? _localPitchOverride;
   bool get _usesLocalPitch =>
-      backend is XiaomiMimoTtsProvider &&
-      (_localPitchOverride ?? AnxPlatform.isAndroid);
+      (backend is XiaomiMimoTtsProvider || backend is OpenAiTtsProvider) &&
+      (_localPitchOverride ?? (AnxPlatform.isAndroid || AnxPlatform.isMacOS));
   double get _synthesisPitch => _usesLocalPitch ? 1.0 : pitch;
 
   Future<void> _applyLocalPitch(AudioPlayer player) async {
@@ -240,9 +240,12 @@ class OnlineTts extends BaseTts {
       backend is OpenAiTtsProvider ||
       backend is DashScopeTtsProvider;
 
+  bool get _usesLocalSpeed =>
+      backend is XiaomiMimoTtsProvider || backend is OpenAiTtsProvider;
+
   double _playbackRateFor(double rate) {
     if (!rate.isFinite) return 1.0;
-    if (backend is XiaomiMimoTtsProvider) return rate.clamp(0.1, 4.0);
+    if (_usesLocalSpeed) return rate.clamp(0.1, 4.0);
     // Retain Edge's existing synthesis range. High speeds use 2x synthesis
     // plus local acceleration, rather than an unverified high-speed request.
     if (backend is EdgeTtsProvider) return rate.clamp(2.0, 4.0) / 2;
@@ -253,7 +256,7 @@ class OnlineTts extends BaseTts {
   }
 
   double _synthesisRateFor(double rate) {
-    if (backend is XiaomiMimoTtsProvider) return 1.0;
+    if (_usesLocalSpeed) return 1.0;
     if (backend is EdgeTtsProvider) return rate.clamp(0.1, 2.0);
     // APIs bottom out at 0.25x; local playback supplies the remaining slowdown.
     if (backend is OpenAiTtsProvider || backend is DashScopeTtsProvider) {

@@ -168,8 +168,8 @@ class OpenAiTtsProvider extends TtsServiceProvider {
     }
     if (pitch.isFinite && pitch != 1) {
       buffer.writeln(pitch > 1
-          ? 'Use a slightly higher pitch while keeping the voice natural.'
-          : 'Use a slightly lower pitch while keeping the voice natural.');
+          ? 'Use a higher pitch, at ${pitch.clamp(0.5, 2.0).toStringAsFixed(2)} times the default pitch. Keep the speaking pace and volume unchanged.'
+          : 'Use a lower pitch, at ${pitch.clamp(0.5, 2.0).toStringAsFixed(2)} times the default pitch. Keep the speaking pace and volume unchanged.');
     }
     return withStableNarration(buffer.toString());
   }
