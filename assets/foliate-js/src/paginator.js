@@ -647,23 +647,19 @@ export class Paginator extends HTMLElement {
                 var(--_top-margin)
                 1fr
                 var(--_bottom-margin);
-            &.vertical {
-                --_max-column-count-spread: var(--_max-column-count-portrait);
-                --_max-width: var(--_max-block-size);
-                --_max-height: calc(var(--_max-inline-size) * var(--_max-column-count-spread));
-            }
-            @container (orientation: portrait) {
-                & {
-                    --_max-column-count-spread: var(--_max-column-count-portrait);
-                }
-                &.vertical {
-                    --_max-column-count-spread: var(--_max-column-count);
-                }
-            }
+        }
+        #top.vertical {
+            --_max-column-count-spread: var(--_max-column-count-portrait);
+            --_max-width: var(--_max-block-size);
+            --_max-height: calc(var(--_max-inline-size) * var(--_max-column-count-spread));
+        }
+        @container (orientation: portrait) {
+            #top { --_max-column-count-spread: var(--_max-column-count-portrait); }
+            #top.vertical { --_max-column-count-spread: var(--_max-column-count); }
         }
         #background {
             position: absolute;
-            inset: 0;
+            top: 0; right: 0; bottom: 0; left: 0;
             pointer-events: none;
         }
         #container {
@@ -696,12 +692,12 @@ export class Paginator extends HTMLElement {
             display: grid;
             height: var(--_margin);
         }
-        :is(#header, #footer) > * {
+        #header > *, #footer > * {
             display: flex;
             align-items: center;
             min-width: 0;
         }
-        :is(#header, #footer) > * > * {
+        #header > * > *, #footer > * > * {
             width: 100%;
             overflow: hidden;
             white-space: nowrap;
@@ -907,6 +903,13 @@ export class Paginator extends HTMLElement {
 
     const { width, height } = this.#container.getBoundingClientRect()
     const size = vertical ? height : width
+    // Container queries are unavailable in older WebViews; ResizeObserver
+    // already reruns this layout when the reader's own dimensions change.
+    if (!globalThis.CSS?.supports?.('container-type', 'size')) {
+      this.#top.style.setProperty('--_max-column-count-spread',
+        (height > width) !== vertical
+          ? 'var(--_max-column-count-portrait)' : 'var(--_max-column-count)')
+    }
 
     const style = getComputedStyle(this.#top)
     const maxInlineSize = parseFloat(style.getPropertyValue('--_column-threshold')) || parseFloat(style.getPropertyValue('--_max-inline-size'))

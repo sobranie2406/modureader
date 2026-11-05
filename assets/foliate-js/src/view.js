@@ -123,11 +123,12 @@ export class View extends HTMLElement {
               .find(x => x.index === resolved.index)
             const el = resolved.anchor(doc)
             el.classList.add(activeClass)
-            lastActive = new WeakRef(el)
+            lastActive = typeof WeakRef === 'function' ? new WeakRef(el) : { deref: () => el }
           })
       })
       this.mediaOverlay.addEventListener('unhighlight', () => {
         lastActive?.deref()?.classList?.remove(activeClass)
+        lastActive = null
       })
     }
   }

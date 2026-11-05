@@ -13,7 +13,7 @@ const Harness = runInNewContext(`class Harness {
       'max-inline-size': '720px', 'max-column-count': '1',
       'top-margin': '20px', 'bottom-margin': '20px'};
     this.container = {style: {}, getBoundingClientRect: () => ({width: this.width, height: this.height})};
-    this.top = {style: {}, classList: {toggle() {}},
+    this.top = {style: {setProperty(key, value) {this[key] = value}}, classList: {toggle() {}},
       getPropertyValue: key => this.attrs[key.replace('--_', '')]};
   }
   applyBackground() {}
@@ -112,4 +112,16 @@ test('scrolled view applies the calculated width to the body, not an additional 
     assert.equal(view.document.documentElement.padding, `0 ${layout.gap}px`);
     assert.equal(fittedHeights.at(-1),800);
   }
+});
+
+test('legacy container-query fallback follows rotation and vertical writing', () => {
+  const reader = new Harness(600,900);
+  const value = () => reader.top.style['--_max-column-count-spread'];
+  reader.layout({vertical:false,rtl:false});
+  assert.equal(value(),'var(--_max-column-count-portrait)');
+  reader.width=900;reader.height=600;
+  reader.layout({vertical:false,rtl:false});
+  assert.equal(value(),'var(--_max-column-count)');
+  reader.layout({vertical:true,rtl:true});
+  assert.equal(value(),'var(--_max-column-count-portrait)');
 });

@@ -52,6 +52,7 @@ const Renderer = runInNewContext(`class Renderer {
   ${between('  #scrollPrev(distance)', '  prevSection()')}
 }; Renderer`, {wait: async () => {}, easeOutSine: x => x, CustomEvent: class {},
   animate: async (a,b,duration,ease,render) => render(b),
+  Animation: class {get finished() {return Promise.resolve()}},
   console, Promise, Math, Number, setTimeout, clearTimeout, lineAlignedOffset});
 
 test('single-section books stop on the last real page, including repeated clicks/keys', async () => {

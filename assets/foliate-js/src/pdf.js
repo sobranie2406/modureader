@@ -4,6 +4,9 @@ import { PageResourceCache, boundedRenderScale } from './page-resource-cache.js'
 import { createPdfRegionRenderer, createDocumentCanvas, encodeDocumentCanvas } from './pdf-region-renderer.js'
 import { extractPdfText } from './document-text-extraction.js'
 
+const compatiblePDFCSS = css => globalThis.CSS?.supports?.('selector(:is(*))')
+  ? css : css.replace(/:is\(/g, ':-webkit-any(')
+
 // https://github.com/mozilla/pdf.js/blob/f04967017f22e46d70d11468dd928b4cdc2f6ea1/web/text_layer_builder.css
 const textLayerBuilderCSS = `
 /* Copyright 2014 Mozilla Foundation
@@ -36,7 +39,7 @@ const textLayerBuilderCSS = `
 .textLayer {
   position: absolute;
   text-align: initial;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   overflow: hidden;
   opacity: 0.25;
   line-height: 1;
@@ -107,7 +110,7 @@ const textLayerBuilderCSS = `
 .textLayer .endOfContent {
   display: block;
   position: absolute;
-  inset: 100% 0 0;
+  top: 100%; right: 0; bottom: 0; left: 0;
   z-index: -1;
   cursor: default;
   user-select: none;
@@ -568,8 +571,8 @@ const renderPage = async (page, getImageBlob, frameOnly = false) => {
             margin: 0;
             padding: 0;
         }
-        ${textLayerBuilderCSS}
-        ${annotationLayerBuilderCSS}
+        ${compatiblePDFCSS(textLayerBuilderCSS)}
+        ${compatiblePDFCSS(annotationLayerBuilderCSS)}
         </style>
         <img data-document-base src="${src}" width="${viewport.width}" height="${viewport.height}">
         ${container.outerHTML}

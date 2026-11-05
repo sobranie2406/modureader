@@ -48,7 +48,7 @@ function renderWebChrome(renderer, style, active) {
       return element;
     };
     const root = make(renderer.shadowRoot,
-      'position:absolute;inset:0;z-index:2;user-select:none;overflow:hidden');
+      'position:absolute;top:0;right:0;bottom:0;left:0;z-index:2;user-select:none;overflow:hidden');
     root.id = 'vertical-page-chrome';
     const outer = make(root, 'position:absolute;border:3px solid #c91c24');
     const inner = make(root, 'position:absolute;border:1px solid #c91c24');

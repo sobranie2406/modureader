@@ -26,7 +26,7 @@ export function readerFontWeightCSS({ fontWeight = 400, simulateBold = false, us
     body :where(${preserved}) {
       -webkit-text-stroke-width: 0 !important;
     }` : '';
-  return `${marker}
+  const css = `${marker}
     body {
       font-weight: ${simulated ? 400 : weight} !important;
       font-synthesis: weight style !important;
@@ -37,6 +37,9 @@ export function readerFontWeightCSS({ fontWeight = 400, simulateBold = false, us
       font-synthesis: inherit !important;
     }
     ${strokeCSS}`;
+  if ((globalThis.CSS?.supports?.('selector(:where(*))') ?? true)) return css;
+  return css.replace(/body :where\(:not\([\s\S]*?\)\)/g, 'body [data-modu-reader-weight]')
+    .replace(/body :where\([^)]*\)/g, 'body [data-modu-preserved-weight]');
 }
 
 // Publisher inline !important beats any stylesheet. Temporarily remove only
@@ -45,6 +48,28 @@ export function readerFontWeightCSS({ fontWeight = 400, simulateBold = false, us
 // Restore it when following book styles again. Never modify the source file.
 export function prepareReaderFontWeight(doc, styles) {
   if (!doc?.body) return;
+  // Old WebViews discard an entire selector list containing :has/:where.
+  // Attribute markers keep the same matching rules without changing text/CFIs.
+  if (!doc.defaultView?.CSS?.supports?.('selector(:has(*))')) {
+    for (const el of doc.body.querySelectorAll('div,p')) {
+      el.toggleAttribute('data-modu-paragraph', el.localName === 'div' &&
+        !el.querySelector(':not(b):not(a):not(em):not(i):not(strong):not(u):not(span):not(modu-page-run)'));
+      const children = [...el.children];
+      const imageOnly = children.length === 1 && (children[0].localName === 'img' ||
+        (children[0].localName === 'span' && children[0].children.length === 1 && children[0].firstElementChild.localName === 'img'));
+      el.toggleAttribute('data-modu-image-paragraph', imageOnly ||
+        children.some(child => child.localName === 'img' && !child.classList.contains('has-text-siblings')) ||
+        (children.length === 2 && children[0].localName === 'a' && children[1].localName === 'img'));
+    }
+  }
+  if (!doc.defaultView?.CSS?.supports?.('selector(:where(*))')) {
+    for (const el of doc.body.querySelectorAll('*')) {
+      el.toggleAttribute('data-modu-reader-weight', !el.matches(preserved) && !el.closest('svg,math'));
+      el.toggleAttribute('data-modu-preserved-weight', el.matches(preserved));
+      el.toggleAttribute('data-modu-reader-color', el.matches('h1,h2,h3,h4,h5,h6,span,b,strong,em,i,u,small,cite,q,sup,sub') && !el.closest('a,svg,pre,code'));
+      el.toggleAttribute('data-modu-eink-color', !el.closest('svg,img,canvas,video'));
+    }
+  }
   if (!String(styles).includes(marker)) {
     for (const [el, { value, priority }] of savedWeights.get(doc) ?? []) {
       el.style.setProperty('font-weight', value, priority);

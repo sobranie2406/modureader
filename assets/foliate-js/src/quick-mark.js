@@ -106,7 +106,7 @@ export function installQuickMark(doc, { onCommit, onTap, onError = () => {} }) {
   const layer = doc.createElement('div');
   layer.dataset.moduQuickMark = 'preview';
   layer.setAttribute('aria-hidden', 'true');
-  layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
+  layer.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:2147483646;';
   const sheet = doc.createElement('style');
   sheet.textContent = 'html[data-modu-quick-mark="on"]{touch-action:none!important} html[data-modu-quick-mark="on"] body{-webkit-touch-callout:none!important}';
   const stop = e => { if (e.cancelable) e.preventDefault(); e.stopImmediatePropagation(); };

@@ -563,7 +563,7 @@ const getCSS = ({ fontSize,
 
     /* Publisher spans/headings can override the paragraph's inherited color. */
     ${useBookStyles || isPdf ? '' : `
-    body :is(h1, h2, h3, h4, h5, h6, span, b, strong, em, i, u, small, cite, q, sup, sub):not(:where(a *, svg *, pre *, code *)) {
+    ${(globalThis.CSS?.supports?.('selector(:where(*))') ?? true) ? 'body :is(h1, h2, h3, h4, h5, h6, span, b, strong, em, i, u, small, cite, q, sup, sub):not(:where(a *, svg *, pre *, code *))' : 'body [data-modu-reader-color]'} {
         color: var(--modu-reader-font-color, ${fontColor}) !important;
     }
     `}
@@ -595,7 +595,7 @@ const getCSS = ({ fontSize,
     }
     `}
 
-    p, li, blockquote, dd, div:not(:has(*:not(b, a, em, i, strong, u, span, modu-page-run))), font {
+    p, li, blockquote, dd, ${(globalThis.CSS?.supports?.('selector(:has(*))') ?? true) ? 'div:not(:has(*:not(b, a, em, i, strong, u, span, modu-page-run)))' : 'div[data-modu-paragraph]'}, font {
         color: var(--modu-reader-font-color, ${fontColor}) !important;
         ${useBookStyles ? '' : `line-height: ${spacing} !important;`}
         ${useBookStyles ? '' : `text-align: ${textAlign === 'auto' ? (justify ? 'justify' : 'start') : textAlign};`}
@@ -620,14 +620,14 @@ const getCSS = ({ fontSize,
 
 
     /*  Paragraphs containing only an image — don't change */
-    p:has(> img:only-child),
+    ${(globalThis.CSS?.supports?.('selector(:has(*))') ?? true) ? `p:has(> img:only-child),
     p:has(> span:only-child > img:only-child),
     p:has(> img:not(.has-text-siblings)),
     p:has(> a:first-child + img:last-child),
     div:has(> img:only-child),
     div:has(> span:only-child > img:only-child),
     div:has(> img:not(.has-text-siblings)),
-    div:has(> a:first-child + img:last-child)  {
+    div:has(> a:first-child + img:last-child)` : '[data-modu-image-paragraph]'}  {
         text-indent: initial !important;
         font-size: initial !important;
         height: initial !important;
@@ -714,7 +714,7 @@ const getCSS = ({ fontSize,
     ${customCSSEnabled && customCSS ? customCSS : ''}
     ${eInkMode === true && eInkDisableAnimations !== false ? reducedReaderMotionCSS : ''}
     ${eInkMode === true && !isPdf ? `
-    body, body *:not(:where(svg, svg *, img, canvas, video)) {
+    body, ${(globalThis.CSS?.supports?.('selector(:where(*))') ?? true) ? 'body *:not(:where(svg, svg *, img, canvas, video))' : 'body [data-modu-eink-color]'} {
         color: var(--modu-reader-font-color, ${fontColor}) !important;
     }
     ` : ''}

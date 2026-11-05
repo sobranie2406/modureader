@@ -2,9 +2,9 @@ const path = require('path');
 
 module.exports = {
   entry: {
-    bundle: ['core-js/stable', './src/book.js'],
-    'pdf-legacy': ['core-js/stable', './src/vendor/pdfjs/pdf.js'],
-    'pdf-legacy.worker': ['core-js/stable', './src/vendor/pdfjs/pdf.worker.js']
+    bundle: ['core-js/stable', './src/legacy-blob.js', './src/book.js'],
+    'pdf-legacy': ['core-js/stable', './src/legacy-blob.js', './src/vendor/pdfjs/pdf.js'],
+    'pdf-legacy.worker': ['core-js/stable', './src/legacy-blob.js', './src/vendor/pdfjs/pdf.worker.js']
   },
   output: {
     filename: '[name].js',

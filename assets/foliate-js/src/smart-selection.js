@@ -207,7 +207,7 @@ function installExpandedSelectionHandles(doc, { onDragStart, textSelectionHighli
       highlight = doc.createElement('div');
       highlight.dataset.selectionHighlight = '';
       highlight.setAttribute('aria-hidden', 'true');
-      highlight.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483646!important;';
+      highlight.style.cssText = 'all:initial!important;position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;pointer-events:none!important;z-index:2147483646!important;';
       highlight.attachShadow({ mode: 'open' });
       doc.documentElement.append(highlight);
     }
@@ -251,7 +251,7 @@ function installExpandedSelectionHandles(doc, { onDragStart, textSelectionHighli
     host = doc.createElement('div');
     host.dataset.moduSelectionHandles = '';
     host.setAttribute('aria-hidden', 'true'); // Native selection stays accessible.
-    host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483647!important;';
+    host.style.cssText = 'all:initial!important;position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;pointer-events:none!important;z-index:2147483647!important;';
     const root = host.attachShadow({ mode: 'open' });
     const css = doc.createElement('style');
     css.textContent = `

@@ -28,7 +28,7 @@ export class VerticalColumnRules {
     this.svg = layer.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.setAttribute('aria-hidden', 'true');
     this.svg.setAttribute('data-vertical-column-rules', '');
-    Object.assign(this.svg.style, { position: 'absolute', inset: '0', width: '100%',
+    Object.assign(this.svg.style, { position: 'absolute', top: '0', right: '0', bottom: '0', left: '0', width: '100%',
       height: '100%', pointerEvents: 'none', userSelect: 'none', overflow: 'hidden', zIndex: '1' });
     layer.append(this.svg);
     this.schedule = () => {
