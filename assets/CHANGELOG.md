@@ -1,10 +1,20 @@
 # Modu changelog
 
-Latest stable: **1.3.7+10171**. Latest preview: **1.3.7-beta.2+10170**. Updated 2026-11-05.
+Latest stable: **1.3.7+10171**. Latest preview: **1.3.8-beta.1+10172**. Updated 2026-11-05.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.3.8-beta.1
+
+### English
+
+- Fix(reader): Avoid unsupported DOM calls on older Android WebViews when drawing overlays, search/selection highlights and footnotes, preventing chapter-loading failures caused by `replaceChildren`.
+
+### 简体中文
+
+- Fix(reader): 阅读覆盖层、搜索／划词高亮及注释弹窗兼容旧版安卓 WebView，修复因不支持 `replaceChildren` 而出现的章节加载失败。
 
 ## 1.3.7
 
