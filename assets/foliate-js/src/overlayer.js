@@ -43,7 +43,7 @@ export class Overlayer {
             this.#doc.defaultView?.cancelAnimationFrame(this.#redrawFrame)
         this.#redrawFrame = null
         this.#map.clear()
-        this.#svg.replaceChildren()
+        this.#svg.textContent = ''
     }
     get #zoom() {
         // Safari does not zoom the client rects, while Chrome, Edge and Firefox does

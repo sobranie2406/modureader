@@ -124,6 +124,8 @@ test('native highlights use real ranges without changing text, CFI nodes, or sel
 
 test('fallback paints clipped text fragments without outer boxes and removes all artifacts',()=>{
   const dom=new JSDOM('<body><p>甲革<b>命乙</b></p></body>',{pretendToBeVisual:true});
+  // Reproduce the shipped WebView 83 DOM API, not jsdom's modern API.
+  delete dom.window.Element.prototype.replaceChildren;
   const doc=dom.window.document;
   const nodes=[doc.querySelector('p').firstChild,doc.querySelector('b').firstChild];
   const range=doc.createRange();range.setStart(nodes[0],1);range.setEnd(nodes[1],1);
@@ -146,6 +148,7 @@ test('fallback paints clipped text fragments without outer boxes and removes all
     assert.equal(rect.getAttribute('stroke'),null);
   }
   assert.equal(doc.body.innerHTML,before);
+  paint.redraw();assert.equal(svg.children.length,2);
   paint.clear();assert.equal(doc.querySelector('svg'),null);
   dom.window.close();
 });

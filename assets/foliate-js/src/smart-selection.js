@@ -211,7 +211,8 @@ function installExpandedSelectionHandles(doc, { onDragStart, textSelectionHighli
       highlight.attachShadow({ mode: 'open' });
       doc.documentElement.append(highlight);
     }
-    highlight.shadowRoot.replaceChildren(...rects.map(rect => {
+    highlight.shadowRoot.textContent = '';
+    highlight.shadowRoot.append(...rects.map(rect => {
       const box = doc.createElement('i');
       box.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;background:rgba(64,156,255,.35);pointer-events:none;`;
       return box;

@@ -80,7 +80,7 @@ export class FootnoteHandler extends EventTarget {
                             else range.selectNode(el)
                         }
                         const frag = range.extractContents()
-                        doc.body.replaceChildren()
+                        doc.body.textContent = ''
                         doc.body.appendChild(frag)
                     }
                     const detail = { view, doc, href, type, hidden, target: el, sourceFontSize }

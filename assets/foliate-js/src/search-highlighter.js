@@ -112,6 +112,8 @@ export class SearchHighlighter {
                 }
             }
         }
-        this.#svg.replaceChildren(fragment)
+        // Android WebView 83 lacks replaceChildren, including on SVG elements.
+        this.#svg.textContent = ''
+        this.#svg.append(fragment)
     }
 }

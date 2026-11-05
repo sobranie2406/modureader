@@ -833,7 +833,9 @@ const replaceFootnote = (view, sourceFontSize) => {
   footnoteSizing = null
   delete globalThis.footnoteSelection
   clearSelection()
-  footnoteDialog.querySelector('main').replaceChildren(view)
+  const footnoteMain = footnoteDialog.querySelector('main')
+  footnoteMain.textContent = ''
+  footnoteMain.append(view)
 
   view.addEventListener('load', (e) => {
     const { doc, index } = e.detail

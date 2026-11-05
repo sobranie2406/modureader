@@ -37,6 +37,7 @@ test('frame borders and scaling compose with SVG transforms instead of accumulat
 
 test('new marks, redraw and hit testing use the same coordinates after iframe scroll',async()=>{
   const dom=new JSDOM('<body><iframe></iframe></body>',{pretendToBeVisual:true});
+  delete dom.window.Element.prototype.replaceChildren;
   const host=dom.window.document,frame=host.querySelector('iframe'),doc=frame.contentDocument;
   doc.body.innerHTML='<p>测试批注与正文</p>';
   Object.defineProperties(frame,{offsetWidth:{value:400},offsetHeight:{value:2000}});
