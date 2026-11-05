@@ -32,3 +32,19 @@ test('reader and footnote styles carry E-Ink state and disable renderer turn ani
   assert.match(book, /eInkMode\s*:\s*style.eInkMode/);
   assert.equal((book.match(/eInkDisableAnimations: style.eInkDisableAnimations/g) ?? []).length, 2);
 });
+
+
+test('compositor paging requires a completion promise; legacy WebView keeps scroll animation', async () => {
+  const paginator = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8');
+  const start = paginator.indexOf('const transition = ') + 'const transition = '.length;
+  const end = paginator.indexOf('? (animation =', start);
+  const condition = paginator.slice(start, end).replaceAll('this.#', 'this.');
+  const supports = new Function('Animation', 'scrollProp', 'easing', 'easeOutSine', `return (${condition});`);
+  const renderer = {scrolled: false, vertical: false, view: {element: {animate() {}}}};
+  class LegacyAnimation {}
+  class ModernAnimation { get finished() { return Promise.resolve(); } }
+  const easing = () => {};
+  assert.equal(supports.call(renderer, LegacyAnimation, 'scrollLeft', easing, easing), false);
+  assert.equal(supports.call(renderer, undefined, 'scrollLeft', easing, easing), false);
+  assert.equal(supports.call(renderer, ModernAnimation, 'scrollLeft', easing, easing), true);
+});

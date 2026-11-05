@@ -1466,7 +1466,8 @@ export class Paginator extends HTMLElement {
       // and commit scrollLeft once, rather than repainting scroll offsets per frame.
       let animation
       const transition = !this.scrolled && !this.#vertical && scrollProp === 'scrollLeft' &&
-          this.#view?.element?.animate && easing === easeOutSine
+          this.#view?.element?.animate && typeof Animation !== 'undefined' &&
+          'finished' in Animation.prototype && easing === easeOutSine
         ? (animation = this.#view.element.animate([
           { transform: 'translate3d(0,0,0)' },
           { transform: `translate3d(${element[scrollProp] - offset}px,0,0)` },
