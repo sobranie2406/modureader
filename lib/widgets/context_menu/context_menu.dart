@@ -591,6 +591,7 @@ class _ContextMenuOverlayState extends State<ReaderContextMenuOverlay>
                               axis: widget.axis,
                               children: [
                                 ExcerptMenu(
+                                  selectionRect: widget.selectionRect,
                                   annoCfi: widget.annoCfi,
                                   annoContent: widget.annoContent,
                                   contextText: widget.contextText,

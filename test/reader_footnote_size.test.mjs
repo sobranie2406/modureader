@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const source = await readFile(new URL('../assets/foliate-js/src/footnote-size.js', import.meta.url), 'utf8');
-const { footnoteBoxSize, attachFootnoteSizing, footnoteFontSize } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const { footnoteBoxSize, attachFootnoteSizing, footnoteFontSize, footnoteBoxPosition, footnoteAnchorRect } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
 test('footnote type follows the reader at 80 percent without changing its size', async () => {
   for (const size of [.6, 1, 1.4, 2, 3, 5]) {
@@ -193,4 +193,36 @@ test('mobile sizing includes end padding in portrait and landscape without excee
       sizing.destroy();win.close();content.window.close();
     }
   }
+});
+
+
+test('annotation uses the nearest available corner in all four quadrants', () => {
+  for (const [x,y,left,top] of [[100,100,126,126],[900,100,594,126],[100,700,126,494],[900,700,594,494]]) {
+    const position = footnoteBoxPosition({width:1000,height:800,boxWidth:300,boxHeight:200,
+      anchor:{left:x,top:y,right:x+20,bottom:y+20}});
+    assert.deepEqual(position,{left,top});
+  }
+});
+test('annotation stays inside resized/zoomed viewports, with offscreen anchors centered', () => {
+  for (const [width,height] of [[390,844],[844,390],[320,480]]) {
+    const size=footnoteBoxSize({width,height,textLength:2000});
+    for (const x of [0,width/2,width-1]) for (const y of [0,height/2,height-1]) {
+      const pos=footnoteBoxPosition({width,height,left:30,top:20,boxWidth:size.width,boxHeight:size.height,
+        anchor:{left:x+30,right:x+31,top:y+20,bottom:y+21}});
+      assert.ok(pos.left>=30 && pos.top>=20);
+      assert.ok(pos.left+size.width<=width+30 && pos.top+size.height<=height+20);
+    }
+  }
+  assert.deepEqual(footnoteBoxPosition({width:800,height:600,boxWidth:200,boxHeight:100,
+    anchor:{left:-100,right:-90,top:10,bottom:20}}),{left:300,top:250});
+});
+test('annotation anchor coordinates account for nested scaled chapter frames', () => {
+  const root={};
+  const parent={frameElement:{offsetWidth:500,offsetHeight:400,clientLeft:0,clientTop:0,
+    getBoundingClientRect:()=>({left:20,top:30,width:1000,height:800}),ownerDocument:{defaultView:root}}};
+  const element={isConnected:true,ownerDocument:{defaultView:parent},
+    getBoundingClientRect:()=>({left:10,top:15,right:20,bottom:25})};
+  assert.deepEqual(footnoteAnchorRect(element,root),{left:40,top:60,right:60,bottom:80});
+  element.isConnected=false;
+  assert.equal(footnoteAnchorRect(element,root),null);
 });

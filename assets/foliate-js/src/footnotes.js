@@ -59,7 +59,7 @@ export class FootnoteHandler extends EventTarget {
         this.#view?.remove()
         this.#view = null
     }
-    #showFragment(book, { index, anchor }, href, sourceFontSize) {
+    #showFragment(book, { index, anchor }, href, sourceFontSize, sourceElement) {
         this.close()
         const request = this.#request
         const view = document.createElement('foliate-view')
@@ -83,7 +83,7 @@ export class FootnoteHandler extends EventTarget {
                         doc.body.textContent = ''
                         doc.body.appendChild(frag)
                     }
-                    const detail = { view, doc, href, type, hidden, target: el, sourceFontSize }
+                    const detail = { view, doc, href, type, hidden, target: el, sourceFontSize, sourceElement }
                     this.dispatchEvent(new CustomEvent('render', { detail }))
                     resolve()
                 } catch (e) {
@@ -118,7 +118,7 @@ export class FootnoteHandler extends EventTarget {
         const sourceFontSize = sourceBodyFontSize(img)
         return this.#showFragment(book, {
             index: 0, anchor: doc => doc.querySelector('[role="doc-footnote"]'),
-        }, null, sourceFontSize)
+        }, null, sourceFontSize, img)
     }
     handle(book, e) {
         const { a, href } = e.detail
@@ -127,14 +127,14 @@ export class FootnoteHandler extends EventTarget {
             e.preventDefault()
             const sourceFontSize = sourceBodyFontSize(a)
             return Promise.resolve(book.resolveHref(href)).then(target =>
-                this.#showFragment(book, target, href, sourceFontSize))
+                this.#showFragment(book, target, href, sourceFontSize, a))
         }
         else if (this.detectFootnotes && maybe()) {
             e.preventDefault()
             const sourceFontSize = sourceBodyFontSize(a)
             return Promise.resolve(book.resolveHref(href)).then(({ index, anchor }) => {
                 const target = { index, anchor: doc => extractFootnote(doc, anchor) }
-                return this.#showFragment(book, target, href, sourceFontSize)
+                return this.#showFragment(book, target, href, sourceFontSize, a)
             })
         }
     }

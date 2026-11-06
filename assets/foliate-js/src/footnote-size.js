@@ -69,7 +69,50 @@ export function footnoteBoxSize({ width, height, textLength = 0, fontSize = 16,
   return { width: boxWidth, height: boxHeight, maxHeight };
 }
 
-export function attachFootnoteSizing(dialog, doc, { desktop = false } = {}) {
+// Resolve through the chapter iframe(s), including fixed-layout scaling.
+export function footnoteAnchorRect(element, rootWindow) {
+  if (!element?.isConnected) return null;
+  let rect = element.getBoundingClientRect();
+  let win = element.ownerDocument.defaultView;
+  while (win && win !== rootWindow) {
+    const frame = win.frameElement;
+    if (!frame) return null;
+    const bounds = frame.getBoundingClientRect();
+    const sx = frame.offsetWidth ? bounds.width / frame.offsetWidth : 1;
+    const sy = frame.offsetHeight ? bounds.height / frame.offsetHeight : 1;
+    rect = {left: bounds.left + (rect.left + frame.clientLeft) * sx,
+      right: bounds.left + (rect.right + frame.clientLeft) * sx,
+      top: bounds.top + (rect.top + frame.clientTop) * sy,
+      bottom: bounds.top + (rect.bottom + frame.clientTop) * sy};
+    win = frame.ownerDocument.defaultView;
+  }
+  return rect;
+}
+
+export function footnoteBoxPosition({width, height, boxWidth, boxHeight,
+  anchor, left = 0, top = 0}) {
+  const inset = Math.min(12, width / 10, height / 10);
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const right = left + width, bottom = top + height;
+  if (!anchor || anchor.right < left || anchor.left > right ||
+      anchor.bottom < top || anchor.top > bottom) {
+    return {left: left + (width - boxWidth) / 2, top: top + (height - boxHeight) / 2};
+  }
+  const candidates = [];
+  for (const y of [anchor.bottom + 6, anchor.top - 6 - boxHeight]) {
+    for (const x of [anchor.right + 6, anchor.left - 6 - boxWidth]) {
+      const px = clamp(x, left + inset, right - inset - boxWidth);
+      const py = clamp(y, top + inset, bottom - inset - boxHeight);
+      const overlap = Math.max(0, Math.min(px + boxWidth, anchor.right) - Math.max(px, anchor.left))
+        * Math.max(0, Math.min(py + boxHeight, anchor.bottom) - Math.max(py, anchor.top));
+      candidates.push({left:px, top:py, overlap, displacement:Math.abs(px-x)+Math.abs(py-y)});
+    }
+  }
+  candidates.sort((a,b) => a.overlap-b.overlap || a.displacement-b.displacement);
+  return {left:candidates[0].left, top:candidates[0].top};
+}
+
+export function attachFootnoteSizing(dialog, doc, { desktop = false, sourceElement } = {}) {
   const win = dialog.ownerDocument.defaultView;
   const viewport = win.visualViewport;
   let frame = 0, disposed = false;
@@ -139,8 +182,12 @@ export function attachFootnoteSizing(dialog, doc, { desktop = false } = {}) {
     measureBlockSize?.dispose();
     set('width', size.width);
     set('height', size.height);
-    set('left', (viewport?.offsetLeft || 0) + width / 2);
-    set('top', (viewport?.offsetTop || 0) + height / 2);
+    const position = footnoteBoxPosition({width, height, boxWidth:size.width, boxHeight:size.height,
+      anchor:footnoteAnchorRect(sourceElement, win),
+      left:viewport?.offsetLeft || 0, top:viewport?.offsetTop || 0});
+    dialog.style.transform = 'none';
+    set('left', position.left);
+    set('top', position.top);
   };
   const schedule = () => { if (!disposed && !frame) frame = win.requestAnimationFrame(update); };
   const observer = new win.ResizeObserver(schedule);

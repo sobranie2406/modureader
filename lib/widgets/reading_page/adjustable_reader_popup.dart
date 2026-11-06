@@ -12,8 +12,16 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 Future<void> showAdjustableReaderPopup(BuildContext context,
     {required WidgetBuilder builder,
     bool readerAppearance = true,
+    Rect? selectionRect,
+    Color? barrierColor,
     double initialHeightFraction = 0.8}) async {
   final navigator = Navigator.of(context);
+  final overlayBox =
+      navigator.overlay?.context.findRenderObject() as RenderBox?;
+  final localSelection = selectionRect == null || overlayBox == null
+      ? selectionRect
+      : Rect.fromPoints(overlayBox.globalToLocal(selectionRect.topLeft),
+          overlayBox.globalToLocal(selectionRect.bottomRight));
   final menuTheme = readerAppearance
       ? ReaderMenuAppearance.theme(context)
       : Theme.of(context);
@@ -23,14 +31,17 @@ Future<void> showAdjustableReaderPopup(BuildContext context,
   final route = RawDialogRoute<void>(
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor:
-        Theme.of(context).bottomSheetTheme.modalBarrierColor ?? Colors.black54,
+    barrierColor: barrierColor ??
+        Theme.of(context).bottomSheetTheme.modalBarrierColor ??
+        Colors.black54,
     transitionDuration: AppMotion.duration(const Duration(milliseconds: 200)),
     pageBuilder: (context, animation, secondaryAnimation) => themes.wrap(
       Theme(
           data: menuTheme,
           child: AdjustableReaderPopup(
-              initialHeightFraction: initialHeightFraction, child: content)),
+              initialHeightFraction: initialHeightFraction,
+              selectionRect: localSelection,
+              child: content)),
     ),
   );
   await navigator.push(route);
@@ -41,9 +52,13 @@ Future<void> showAdjustableReaderPopup(BuildContext context,
 /// Geometry belongs to this route only, never to preferences or a shared cache.
 class AdjustableReaderPopup extends StatefulWidget {
   const AdjustableReaderPopup(
-      {super.key, required this.child, this.initialHeightFraction = 0.8});
+      {super.key,
+      required this.child,
+      this.initialHeightFraction = 0.8,
+      this.selectionRect});
   final Widget child;
   final double initialHeightFraction;
+  final Rect? selectionRect;
 
   @override
   State<AdjustableReaderPopup> createState() => _AdjustableReaderPopupState();
@@ -159,13 +174,35 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
         final width = math.min(maxWidth, available.width);
         final height = math.min(
             media.size.height * widget.initialHeightFraction, available.height);
-        final rect = _fit(
-            _rect ??
-                Rect.fromLTWH((available.width - width) / 2,
-                    available.height - height, width, height),
-            available);
+        final anchor = widget.selectionRect
+            ?.shift(-Offset(media.padding.left + 8, media.padding.top + 8));
+        var initial = Rect.fromLTWH((available.width - width) / 2,
+            available.height - height, width, height);
+        if (anchor != null) {
+          final below = available.height - anchor.bottom - 12;
+          final above = anchor.top - 12;
+          final placeBelow = below >= above;
+          final popupHeight =
+              math.min(height, math.max(320.0, placeBelow ? below : above));
+          initial = Rect.fromLTWH(
+              anchor.center.dx - width / 2,
+              placeBelow ? anchor.bottom + 12 : anchor.top - 12 - popupHeight,
+              width,
+              popupHeight);
+        }
+        final rect = _fit(_rect ?? initial, available);
         return Stack(children: [
+          if (anchor != null &&
+              (Offset.zero & available).overlaps(anchor) &&
+              !rect.overlaps(anchor))
+            Positioned.fill(
+                child: IgnorePointer(
+                    child: CustomPaint(
+              key: const ValueKey('reader-popup-selection-arrow'),
+              painter: _SelectionArrow(anchor, rect, theme.colorScheme.outline),
+            ))),
           Positioned.fromRect(
+            key: const ValueKey('reader-popup-position'),
             rect: rect,
             child: PointerInterceptor(
               child: Material(
@@ -283,4 +320,38 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
       }),
     );
   }
+}
+
+class _SelectionArrow extends CustomPainter {
+  const _SelectionArrow(this.anchor, this.popup, this.color);
+  final Rect anchor;
+  final Rect popup;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final below = popup.center.dy >= anchor.center.dy;
+    final target = below ? anchor.bottomCenter : anchor.topCenter;
+    final x = target.dx.clamp(popup.left + 24, popup.right - 24).toDouble();
+    final y = below ? popup.top : popup.bottom;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(x, y), target, paint);
+    final direction = (Offset(x, y) - target).direction;
+    final path = Path()
+      ..moveTo(target.dx + 8 * math.cos(direction - 0.5),
+          target.dy + 8 * math.sin(direction - 0.5))
+      ..lineTo(target.dx, target.dy)
+      ..lineTo(target.dx + 8 * math.cos(direction + 0.5),
+          target.dy + 8 * math.sin(direction + 0.5));
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_SelectionArrow oldDelegate) =>
+      anchor != oldDelegate.anchor ||
+      popup != oldDelegate.popup ||
+      color != oldDelegate.color;
 }

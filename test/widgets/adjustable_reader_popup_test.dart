@@ -59,6 +59,47 @@ void main() {
     await Prefs().initPrefs();
   });
 
+  testWidgets(
+      'anchored query keeps the reader clear, points to selection and dismisses outside',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1000, 900);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    for (final anchor in [
+      const Rect.fromLTWH(400, 100, 80, 30),
+      const Rect.fromLTWH(400, 760, 80, 30)
+    ]) {
+      await tester.pumpWidget(app(Builder(
+          builder: (context) => TextButton(
+              onPressed: () => showReaderPopup(context,
+                  selectionRect: anchor,
+                  barrierColor: Colors.transparent,
+                  initialHeightFraction: .45,
+                  builder: (_) => const TextField()),
+              child: const Text('Open anchored')))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open anchored'));
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(frame);
+      expect(rect.overlaps(anchor), false);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(1000));
+      expect(find.byKey(const ValueKey('reader-popup-selection-arrow')),
+          findsOneWidget);
+      final route =
+          ModalRoute.of(tester.element(find.byType(TextField)))! as PopupRoute;
+      expect(route.barrierColor, Colors.transparent);
+      await tester.enterText(find.byType(TextField), 'Draft');
+      await drag(tester, 'move', const Offset(30, 10));
+      expect(find.text('Draft'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(frame, findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('default off, only explicit popup mode enables the feature',
       (tester) async {
     expect(Prefs().adjustableReaderPopups, false);

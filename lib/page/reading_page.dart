@@ -295,6 +295,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       brightness: _documentBrightness(),
       onExtract: () => openDocumentExtraction(forceOcr: true),
       onQuery: (text, source, translation) => showReaderPopup(context,
+          barrierColor: Colors.transparent,
           allowWindowAdjustment: true,
           enableDrag: false,
           builder: (_) => UnifiedQuery(
@@ -1276,11 +1277,15 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _restoreReaderFocusAfterPanel();
   }
 
-  Future<void> showUnifiedQuery(String content, {String? contextText}) async {
+  Future<void> showUnifiedQuery(String content,
+      {String? contextText, Rect? selectionRect}) async {
     showOrHideAppBarAndBottomBar(false);
     try {
       await showReaderPopup(context,
           allowWindowAdjustment: true,
+          selectionRect: selectionRect,
+          barrierColor: Colors.transparent,
+          initialHeightFraction: selectionRect == null ? 0.8 : 0.45,
           enableDrag: false,
           builder: (_) =>
               UnifiedQuery(text: content, contextText: contextText));
@@ -1367,6 +1372,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       final prompt = generatePromptSummaryThePreviousContent(previousContent);
       await showReaderPopup(
         context,
+        barrierColor: Colors.transparent,
         builder: (context) => ProviderScope(
           overrides: [
             aiChatProvider(AiChatScope.selection).overrideWith(AiChat.new),
@@ -1549,6 +1555,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> showAiChat({
+    Rect? selectionRect,
     String draftScreen = 'reader',
     String? content,
     String? sourceText,
@@ -1595,6 +1602,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       }
       await showReaderPopup(navigatorKey.currentContext!,
           allowWindowAdjustment: true,
+          selectionRect: selectionRect,
+          barrierColor: Colors.transparent,
+          initialHeightFraction: selectionRect == null ? 0.8 : 0.45,
           builder: (context) => AiChatStream(
                 key: aiChatKey,
                 scope: AiChatScope.reader,

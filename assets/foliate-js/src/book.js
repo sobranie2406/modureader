@@ -913,12 +913,13 @@ class Reader {
       replaceFootnote(view, sourceFontSize)
     })
     this.#footnoteHandler.addEventListener('render', e => {
-      const { doc, sourceFontSize } = e.detail
+      const { doc, sourceFontSize, sourceElement } = e.detail
       applyFootnoteTypography(doc, sourceFontSize > 0
         ? sourceFontSize : footnoteFontSize(style.fontSize) * 16 / .8)
       footnoteSizing?.destroy()
       footnoteSizing = attachFootnoteSizing(footnoteDialog, doc, {
         desktop: style.desktopPageInput === true,
+        sourceElement,
       })
     })
     this.#originalContent = null

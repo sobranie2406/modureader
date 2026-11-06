@@ -26,6 +26,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:anx_reader/widgets/reading_page/selection_search_browser.dart';
 
 class ExcerptMenu extends StatefulWidget {
+  final Rect? selectionRect;
   final String annoCfi;
   final String annoContent;
   final String? contextText;
@@ -51,6 +52,7 @@ class ExcerptMenu extends StatefulWidget {
   const ExcerptMenu({
     super.key,
     required this.annoCfi,
+    this.selectionRect,
     required this.annoContent,
     this.contextText,
     this.id,
@@ -396,10 +398,14 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         final sourceContext = widget.contextText;
         widget.onClose();
         if (reader != null) {
-          await reader.showUnifiedQuery(text, contextText: sourceContext);
+          await reader.showUnifiedQuery(text,
+              contextText: sourceContext, selectionRect: widget.selectionRect);
         } else if (popupContext.mounted) {
           await showReaderPopup(popupContext,
               allowWindowAdjustment: true,
+              selectionRect: widget.selectionRect,
+              barrierColor: Colors.transparent,
+              initialHeightFraction: widget.selectionRect == null ? 0.8 : 0.45,
               enableDrag: false,
               builder: (_) =>
                   UnifiedQuery(text: text, contextText: sourceContext));
@@ -486,6 +492,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         widget.onClose();
         await reader?.showAiChat(
           draftScreen: 'selection.${item.id}',
+          selectionRect: widget.selectionRect,
           content: prompt,
           sourceText: text,
           sourceContext: item.scope == SelectionAiScope.context
