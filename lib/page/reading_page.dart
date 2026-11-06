@@ -295,7 +295,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       brightness: _documentBrightness(),
       onExtract: () => openDocumentExtraction(forceOcr: true),
       onQuery: (text, source, translation) => showReaderPopup(context,
-          barrierColor: Colors.transparent,
+          adjustableBarrierColor: Colors.transparent,
           allowWindowAdjustment: true,
           enableDrag: false,
           builder: (_) => UnifiedQuery(
@@ -1284,7 +1284,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       await showReaderPopup(context,
           allowWindowAdjustment: true,
           selectionRect: selectionRect,
-          barrierColor: Colors.transparent,
+          adjustableBarrierColor: Colors.transparent,
           initialHeightFraction: selectionRect == null ? 0.8 : 0.45,
           enableDrag: false,
           builder: (_) =>
@@ -1372,7 +1372,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       final prompt = generatePromptSummaryThePreviousContent(previousContent);
       await showReaderPopup(
         context,
-        barrierColor: Colors.transparent,
+        adjustableBarrierColor: Colors.transparent,
         builder: (context) => ProviderScope(
           overrides: [
             aiChatProvider(AiChatScope.selection).overrideWith(AiChat.new),
@@ -1603,7 +1603,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       await showReaderPopup(navigatorKey.currentContext!,
           allowWindowAdjustment: true,
           selectionRect: selectionRect,
-          barrierColor: Colors.transparent,
+          adjustableBarrierColor: Colors.transparent,
           initialHeightFraction: selectionRect == null ? 0.8 : 0.45,
           builder: (context) => AiChatStream(
                 key: aiChatKey,

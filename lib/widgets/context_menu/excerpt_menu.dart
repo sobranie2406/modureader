@@ -404,7 +404,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
           await showReaderPopup(popupContext,
               allowWindowAdjustment: true,
               selectionRect: widget.selectionRect,
-              barrierColor: Colors.transparent,
+              adjustableBarrierColor: Colors.transparent,
               initialHeightFraction: widget.selectionRect == null ? 0.8 : 0.45,
               enableDrag: false,
               builder: (_) =>

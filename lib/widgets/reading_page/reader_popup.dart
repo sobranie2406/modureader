@@ -86,14 +86,13 @@ Future<void> showReaderPopup(BuildContext context,
     bool readerAppearance = true,
     bool allowWindowAdjustment = false,
     Rect? selectionRect,
-    Color? barrierColor,
+    Color? adjustableBarrierColor,
     double initialHeightFraction = 0.8}) async {
-  if (selectionRect != null ||
-      (allowWindowAdjustment && Prefs().readerPopupAdjustmentEnabled)) {
+  if (allowWindowAdjustment && Prefs().readerPopupAdjustmentEnabled) {
     await showAdjustableReaderPopup(context,
         builder: builder,
         selectionRect: selectionRect,
-        barrierColor: barrierColor,
+        barrierColor: adjustableBarrierColor,
         initialHeightFraction: initialHeightFraction,
         readerAppearance: readerAppearance);
     return;
@@ -107,7 +106,6 @@ Future<void> showReaderPopup(BuildContext context,
   final content = Builder(builder: builder);
   await showModalBottomSheet<void>(
     sheetAnimationStyle: AppMotion.style,
-    barrierColor: barrierColor,
     backgroundColor: menuTheme.bottomSheetTheme.modalBackgroundColor ??
         menuTheme.bottomSheetTheme.backgroundColor,
     elevation: menuTheme.bottomSheetTheme.modalElevation ??

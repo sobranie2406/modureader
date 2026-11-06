@@ -66,6 +66,8 @@ void main() {
     tester.view.physicalSize = const Size(1000, 900);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    Prefs().aiChatDisplayMode = AiChatDisplayMode.popup;
+    Prefs().adjustableReaderPopups = true;
     for (final anchor in [
       const Rect.fromLTWH(400, 100, 80, 30),
       const Rect.fromLTWH(400, 760, 80, 30)
@@ -73,8 +75,9 @@ void main() {
       await tester.pumpWidget(app(Builder(
           builder: (context) => TextButton(
               onPressed: () => showReaderPopup(context,
+                  allowWindowAdjustment: true,
                   selectionRect: anchor,
-                  barrierColor: Colors.transparent,
+                  adjustableBarrierColor: Colors.transparent,
                   initialHeightFraction: .45,
                   builder: (_) => const TextField()),
               child: const Text('Open anchored')))));
@@ -97,6 +100,50 @@ void main() {
       await tester.pumpAndSettle();
       expect(frame, findsNothing);
       expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets(
+      'selection anchor never bypasses the adjustment switch or display mode',
+      (tester) async {
+    for (final mode in AiChatDisplayMode.values) {
+      for (final enabled in [false, true]) {
+        Prefs().aiChatDisplayMode = mode;
+        Prefs().adjustableReaderPopups = enabled;
+        await tester.pumpWidget(app(Builder(
+            builder: (context) => TextButton(
+                onPressed: () => showReaderPopup(context,
+                    allowWindowAdjustment: true,
+                    selectionRect: const Rect.fromLTWH(200, 100, 40, 20),
+                    adjustableBarrierColor: Colors.transparent,
+                    initialHeightFraction: .45,
+                    builder: (_) => const TextField()),
+                child: const Text('Open gated')))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open gated'));
+        await tester.pumpAndSettle();
+        final adjusted = enabled && mode == AiChatDisplayMode.popup;
+        expect(find.byType(AdjustableReaderPopup),
+            adjusted ? findsOneWidget : findsNothing);
+        expect(
+            find.byType(BottomSheet), adjusted ? findsNothing : findsOneWidget);
+        final route = ModalRoute.of(tester.element(find.byType(TextField)))!
+            as PopupRoute;
+        if (adjusted) {
+          expect(route.barrierColor, Colors.transparent);
+        } else {
+          expect(route.barrierColor?.a, greaterThan(0));
+          expect(find.byKey(const ValueKey('reader-popup-selection-arrow')),
+              findsNothing);
+          expect(
+              tester
+                  .getSize(find.byKey(const ValueKey('reader-popup-body')))
+                  .height,
+              ReaderPopup.height(tester.element(find.byType(TextField))));
+        }
+        Navigator.of(tester.element(find.byType(TextField))).pop();
+        await tester.pumpAndSettle();
+      }
     }
   });
 
