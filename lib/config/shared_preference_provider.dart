@@ -366,6 +366,7 @@ class Prefs extends ChangeNotifier {
   Future<void> resetThemeColor() async {
     await prefs.remove('themeColor');
     await prefs.remove(_themePresetIdKey);
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -417,7 +418,7 @@ class Prefs extends ChangeNotifier {
   Future<void> selectThemePreset(ThemePreset preset) async {
     await prefs.setInt('themeColor', preset.colorValue);
     await prefs.setString(_themePresetIdKey, preset.id);
-    if (themeAppliesToReader) await _applyReadThemeFromActivePreset();
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -429,16 +430,30 @@ class Prefs extends ChangeNotifier {
 
   Future<void> setThemeAppliesToReader(bool value) async {
     await prefs.setBool(_themeAppliesToReaderKey, value);
-    if (value) await _applyReadThemeFromActivePreset();
+    if (value) _applyReadThemeFromActivePreset();
     notifyListeners();
   }
 
+  /// Repaint a linked reader page after any input that shapes its palette.
+  void _refreshLinkedReadTheme() {
+    if (!themeAppliesToReader) return;
+    _applyReadThemeFromActivePreset();
+  }
+
   /// Match the reader paper to the active canvas. E-Ink keeps its own scheme.
-  Future<void> _applyReadThemeFromActivePreset() async {
+  ///
+  /// Mirrors [colorSchema]: the canvas of the brightness actually on screen,
+  /// with OLED black flattened the same way, so the paper never keeps the
+  /// palette of a previous light/dark mode.
+  void _applyReadThemeFromActivePreset() {
     if (eInkMode) return;
     final preset = activeThemePreset;
     if (preset == null) return;
-    final canvas = canvasForPreset(preset, _effectiveBrightness);
+    final brightness = _effectiveBrightness;
+    var canvas = canvasForPreset(preset, brightness);
+    if (brightness == Brightness.dark && trueDarkMode) {
+      canvas = canvas.copyWith(background: Colors.black);
+    }
     saveReadThemeToPrefs(ReadTheme(
       id: null,
       backgroundColor: _hexColor(canvas.background),
@@ -486,6 +501,7 @@ class Prefs extends ChangeNotifier {
     entry[brightness == Brightness.dark ? 'dark' : 'light'] = canvas.toMap();
     data[preset.id] = entry;
     await prefs.setString(_themePresetOverridesKey, jsonEncode(data));
+    if (activeThemePreset?.id == preset.id) _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -493,11 +509,13 @@ class Prefs extends ChangeNotifier {
     final data = _presetOverrides();
     if (data.remove(presetId) == null) return;
     await _writePresetOverrides(data);
+    if (activeThemePreset?.id == presetId) _refreshLinkedReadTheme();
     notifyListeners();
   }
 
   Future<void> resetAllPresetOverrides() async {
     await prefs.remove(_themePresetOverridesKey);
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -575,6 +593,7 @@ class Prefs extends ChangeNotifier {
     }
     if (end != null) await prefs.setInt('nightEndMinute', end.clamp(0, 1439));
     if (enabled != null) await prefs.setBool('scheduledTheme', enabled);
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -597,6 +616,7 @@ class Prefs extends ChangeNotifier {
     await prefs.setBool('scheduledTheme', false);
     await prefs.setString(
         'themeMode', themeMode == 'auto' ? 'system' : themeMode);
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 
@@ -1107,6 +1127,7 @@ class Prefs extends ChangeNotifier {
 
   set trueDarkMode(bool status) {
     prefs.setBool('trueDarkMode', status);
+    _refreshLinkedReadTheme();
     notifyListeners();
   }
 

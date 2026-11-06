@@ -54,6 +54,80 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the colour style header explains the six canvas colours',
+      (tester) async {
+    tester.view.physicalSize = const Size(420, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app('zh'));
+    await tester.pumpAndSettle();
+
+    final help = find.byKey(const ValueKey('theme-canvas-help'));
+    expect(help, findsOneWidget);
+    await tester.ensureVisible(help);
+    await tester.pumpAndSettle();
+    await tester.tap(
+        find.descendant(of: help, matching: find.byIcon(Icons.help_outline)));
+    await tester.pumpAndSettle();
+
+    for (final label in [
+      '背景',
+      '卡片与导航栏',
+      '正文文字',
+      '次要文字',
+      '选中项底色',
+      '选中项文字',
+    ]) {
+      expect(find.textContaining(label, findRichText: true), findsWidgets,
+          reason: label);
+    }
+    expect(find.textContaining('阅读页只取', findRichText: true), findsOneWidget);
+
+    // Tapping outside closes the popover and changes nothing.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('阅读页只取', findRichText: true), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the fine-tune dialog offers the same colour legend',
+      (tester) async {
+    tester.view.physicalSize = const Size(420, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app('zh'));
+    await tester.pumpAndSettle();
+
+    final menu = find.byKey(const ValueKey('theme-preset-menu-ink'));
+    await tester.ensureVisible(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('微调颜色（当前模式）').last);
+    await tester.pumpAndSettle();
+
+    final help = find.byKey(const ValueKey('theme-canvas-help-dialog'));
+    expect(help, findsOneWidget);
+    // Each row states what it paints without opening the popover.
+    expect(find.text('页面与书页的底色'), findsOneWidget);
+    expect(find.text('选中项上的文字与图标'), findsOneWidget);
+    await tester.tap(
+        find.descendant(of: help, matching: find.byIcon(Icons.help_outline)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('卡片与导航栏：', findRichText: true),
+        findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   for (final locale in ['zh', 'en']) {
     testWidgets('$locale: every preset is listed and the active one is checked',
         (tester) async {

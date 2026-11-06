@@ -10,11 +10,15 @@ Older sections retain their original version scope; they are not current accepta
 
 ### English
 
+- Feat(appearance): Explain what each palette colour paints from the Colour style header and the fine-tune dialog, and keep a linked reading page in step when colours are fine-tuned, light/dark is switched or OLED black turns on.
+- Fix(appearance): Stop the fine-tune colour dialog from failing its intrinsic layout on small screens.
 - Fix(reader): Fall back to scroll animation when an older WebView lacks the animation completion promise, preventing page-turn failures while retaining compositor animation on supported WebViews.
 - Feat(notes): Add keyword search from the notes home page and current-book notes. Match excerpts, comments and chapter names, with results linking back to the original passage.
 
 ### 简体中文
 
+- Feat(appearance): 主题颜色页的「色彩风格」标题与「微调颜色」窗口新增说明气泡，逐一解释六种颜色用在哪里；开启「同时应用到阅读页」后，微调配色、切换明暗或开启纯黑都会立刻刷新书页配色。
+- Fix(appearance): 修复「微调颜色」窗口在小屏幕上因列表测量失败而报错的问题。
 - Fix(reader): 旧版 WebView 缺少动画完成回调时使用滚动动画，修复翻页报错；支持该能力的高版本继续保留原有动画优化。
 - Feat(notes): 笔记首页增加全部笔记搜索，阅读界面及单本书笔记页增加本书搜索；匹配摘录、批注和章节名称，点击结果可返回原文。
 

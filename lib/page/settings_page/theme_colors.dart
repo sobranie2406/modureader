@@ -2,11 +2,93 @@ import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/theme_preset.dart';
 import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:anx_reader/widgets/settings/settings_tile.dart';
 import 'package:anx_reader/widgets/settings/settings_title.dart';
 import 'package:anx_reader/widgets/settings/theme_mode.dart';
 import 'package:flutter/material.dart';
+
+/// Explains which widgets each canvas colour paints.
+///
+/// The fine-tune rows carry a one-line hint; this popover spells out what
+/// "cards and bars" or "selected background" actually covers, and which two
+/// colours the reading page borrows.
+Widget _canvasColourLegend(BuildContext context) {
+  final zh = Localizations.localeOf(context).languageCode == 'zh';
+  final separator = zh ? '：' : ': ';
+  final style = Theme.of(context).textTheme.bodyMedium!;
+
+  final entries = <(String, String)>[
+    (
+      ModuStrings.text(context, '背景', 'Background'),
+      zh
+          ? '页面底色：书架、设置和列表背后的颜色；开启「同时应用到阅读页」后也是书页底色。'
+          : 'Page canvas behind the shelf, settings and lists; also the reader paper when the reader switch is on.'
+    ),
+    (
+      ModuStrings.text(context, '卡片与导航栏', 'Cards and bars'),
+      zh
+          ? '卡片、顶栏、底部导航、抽屉、弹窗和气泡菜单的底色。'
+          : 'Cards, app bars, bottom navigation, drawers, dialogs and popup menus.'
+    ),
+    (
+      ModuStrings.text(context, '正文文字', 'Body text'),
+      zh
+          ? '标题、正文和阅读页里的书籍文字。'
+          : 'Headings, body copy and the book text in the reader.'
+    ),
+    (
+      ModuStrings.text(context, '次要文字', 'Muted text'),
+      zh
+          ? '说明、时间、副标题等需要弱化的文字。'
+          : 'Hints, timestamps and subtitles that should recede.'
+    ),
+    (
+      ModuStrings.text(context, '选中项底色', 'Selected background'),
+      zh
+          ? '底部／侧边导航的当前项、列表选中行、开关打开时的填充。'
+          : 'The current tab, selected list rows and switch fills.'
+    ),
+    (
+      ModuStrings.text(context, '选中项文字', 'Selected text'),
+      zh
+          ? '上述选中项上的文字与图标。'
+          : 'Text and icons drawn on those selected items.'
+    ),
+  ];
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final entry in entries)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: RichText(
+            text: TextSpan(
+              style: style,
+              children: [
+                TextSpan(
+                  text: '${entry.$1}$separator',
+                  style: style.copyWith(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(text: entry.$2),
+              ],
+            ),
+          ),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          ModuStrings.text(context, '阅读页只取「背景」和「正文文字」。',
+              'The reader page only takes Background and Body text.'),
+          style: style.copyWith(fontStyle: FontStyle.italic),
+        ),
+      ),
+    ],
+  );
+}
 
 /// Theme hub: light/dark mode, preset palettes and custom themes.
 ///
@@ -270,8 +352,12 @@ class _ThemeColorsPageState extends State<ThemeColorsPage> {
                   ],
                 ),
                 SettingsSection(
-                  title:
-                      Text(ModuStrings.text(context, '色彩风格', 'Colour style')),
+                  title: SettingHelp(
+                    key: const ValueKey('theme-canvas-help'),
+                    title:
+                        Text(ModuStrings.text(context, '色彩风格', 'Colour style')),
+                    description: _canvasColourLegend(context),
+                  ),
                   tiles: [
                     for (final preset in palettes)
                       _presetTile(preset, active?.id == preset.id),
@@ -354,55 +440,73 @@ class _PresetColorDialogState extends State<_PresetColorDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
     final mode = widget.brightness == Brightness.dark
         ? ModuStrings.text(context, '深色', 'dark')
         : ModuStrings.text(context, '浅色', 'light');
-    final rows = <(String, Color, ThemeCanvas Function(ThemeCanvas, Color))>[
+    final rows =
+        <(String, String, Color, ThemeCanvas Function(ThemeCanvas, Color))>[
       (
         ModuStrings.text(context, '背景', 'Background'),
+        ModuStrings.text(context, '页面与书页的底色', 'Page and paper canvas'),
         _canvas.background,
         (c, v) => c.copyWith(background: v)
       ),
       (
         ModuStrings.text(context, '卡片与导航栏', 'Cards and bars'),
+        ModuStrings.text(
+            context, '卡片、顶栏、导航、弹层', 'Cards, bars, navigation, popups'),
         _canvas.surface,
         (c, v) => c.copyWith(surface: v)
       ),
       (
         ModuStrings.text(context, '正文文字', 'Body text'),
+        ModuStrings.text(
+            context, '标题、正文与书籍文字', 'Headings, body and book text'),
         _canvas.text,
         (c, v) => c.copyWith(text: v)
       ),
       (
         ModuStrings.text(context, '次要文字', 'Muted text'),
+        ModuStrings.text(
+            context, '说明、时间、副标题', 'Hints, timestamps, subtitles'),
         _canvas.muted,
         (c, v) => c.copyWith(muted: v)
       ),
       (
         ModuStrings.text(context, '选中项底色', 'Selected background'),
+        ModuStrings.text(
+            context, '当前导航项、选中行、开关', 'Current tab, selected rows, switches'),
         _canvas.navSelectedBg,
         (c, v) => c.copyWith(navSelectedBg: v)
       ),
       (
         ModuStrings.text(context, '选中项文字', 'Selected text'),
+        ModuStrings.text(
+            context, '选中项上的文字与图标', 'Text and icons on them'),
         _canvas.navSelectedFg,
         (c, v) => c.copyWith(navSelectedFg: v)
       ),
     ];
     return AlertDialog(
-      title: Text('${widget.preset.name} · $mode'),
+      title: SettingHelp(
+        key: const ValueKey('theme-canvas-help-dialog'),
+        title: Text('${widget.preset.name} · $mode'),
+        description: _canvasColourLegend(context),
+      ),
       content: SizedBox(
         width: 360,
-        child: ListView(
-          shrinkWrap: true,
+        // A plain Column keeps the dialog measurable: a shrink-wrapped
+        // viewport cannot answer the intrinsic queries AlertDialog makes.
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             for (final row in rows)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(row.$1),
-                trailing: CircleAvatar(radius: 12, backgroundColor: row.$2),
-                onTap: () => _pick(row.$1, row.$3, row.$2),
+                subtitle: Text(row.$2),
+                trailing: CircleAvatar(radius: 12, backgroundColor: row.$3),
+                onTap: () => _pick(row.$1, row.$4, row.$3),
               ),
           ],
         ),
@@ -428,7 +532,7 @@ class _PresetColorDialogState extends State<_PresetColorDialog> {
           child: Text(ModuStrings.text(context, '保存', 'Save')),
         ),
       ],
-      scrollable: zh,
+      scrollable: true,
     );
   }
 }
