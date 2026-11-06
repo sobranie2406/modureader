@@ -60,39 +60,38 @@ void main() {
     expect(invalid.level, 0.6);
   });
 
-  test(
-      'Android sets window brightness and null restores system, without dimming',
-      () async {
-    final calls = <MethodCall>[];
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(AppBrightness.channel, (call) async {
-      calls.add(call);
-      return null;
+  for (final mac in [false, true]) {
+    test('legacy ${mac ? 'macOS' : 'Android'} override is cleared once',
+        () async {
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(AppBrightness.channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() =>
+          messenger.setMockMethodCallHandler(AppBrightness.channel, null));
+      final c = await create(nativeWindow: !mac, nativeDimming: mac, settings: {
+        AppBrightness.levelKey: 0.01,
+        AppBrightness.followSystemKey: false,
+      });
+      expect(calls.single.arguments['brightness'], isNull);
+      for (final level in [0.0, 0.1, 0.4, 1.0]) {
+        c.setLevel(level);
+        await Future<void>.delayed(Duration.zero);
+        expect(c.dimOpacity, closeTo((1 - level).clamp(0, .95), .001));
+      }
+      c.setFollowSystem(true);
+      await c.save();
+      expect(calls.length, 1);
     });
-    addTearDown(
-        () => messenger.setMockMethodCallHandler(AppBrightness.channel, null));
-    final c = await create(nativeWindow: true);
-    expect(calls.single.arguments['brightness'], isNull);
-    for (final level in [0.0, 0.01, 0.1, 0.4, 1.0]) {
-      c.setLevel(level);
-      await Future<void>.delayed(Duration.zero);
-      expect(calls.last.method, 'setBrightness');
-      expect(calls.last.arguments['brightness'], level);
-      expect(c.dimOpacity, 0);
-    }
-    c.setFollowSystem(true);
-    await c.save();
-    await Future<void>.delayed(Duration.zero);
-    expect(calls.last.arguments['brightness'], isNull);
-  });
+  }
 
-  test('missing native bridge safely falls back to app dimming', () async {
+  test('missing legacy bridge does not prevent book-only dimming', () async {
     final c = await create(nativeWindow: true);
-    c.setLevel(0.4);
-    await Future<void>.delayed(Duration.zero);
-    expect(c.usesWindowBrightness, isFalse);
-    expect(c.dimOpacity, closeTo(0.6, 0.001));
+    c.setLevel(.4);
+    expect(c.dimOpacity, closeTo(.6, .001));
   });
 
   testWidgets(
@@ -102,6 +101,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.dark(),
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
@@ -145,6 +145,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     var refreshes = 0;
     await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.dark(),
       localizationsDelegates: L10n.localizationsDelegates,
       supportedLocales: L10n.supportedLocales,
       home: Scaffold(
@@ -240,6 +241,7 @@ void main() {
     var taps = 0;
     var builds = 0;
     await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.dark(),
       builder: (context, child) =>
           AppBrightnessLayer(controller: c, child: child!),
       home: Builder(builder: (context) {
@@ -259,83 +261,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('macOS dimming never paints Flutter over the native reader',
+  testWidgets(
+      'minimum dims only dark book content; menu and next route stay normal',
       (tester) async {
-    final calls = <MethodCall>[];
-    final messenger = tester.binding.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(AppBrightness.channel, (call) async {
-      calls.add(call);
-      return null;
-    });
-    addTearDown(
-        () => messenger.setMockMethodCallHandler(AppBrightness.channel, null));
-    final c = await create(nativeDimming: true, settings: {
-      AppBrightness.levelKey: 0.35,
-      AppBrightness.followSystemKey: false,
-    });
-    expect(calls.single.arguments['brightness'], 0.35);
-    final focus = FocusNode();
-    addTearDown(focus.dispose);
-    var taps = 0, keys = 0, builds = 0;
-    await tester.pumpWidget(MaterialApp(
-      builder: (_, child) => AppBrightnessLayer(controller: c, child: child!),
-      home: Builder(builder: (_) {
-        builds++;
-        return Focus(
-          focusNode: focus,
-          autofocus: true,
-          onKeyEvent: (_, event) {
-            if (event is KeyDownEvent) keys++;
-            return KeyEventResult.handled;
-          },
-          child:
-              GestureDetector(onTap: () => taps++, child: const Text('Reader')),
+    final c = await create();
+    c.setLevel(0);
+    var taps = 0;
+    Widget app(Brightness brightness) => MaterialApp(
+          theme: brightness == Brightness.dark
+              ? ThemeData.dark()
+              : ThemeData.light(),
+          home: Scaffold(
+              body: Builder(
+                  builder: (context) => Column(children: [
+                        Expanded(
+                            child: AppBrightnessLayer(
+                                controller: c,
+                                child: const Center(child: Text('Book')))),
+                        TextButton(
+                            onPressed: () => taps++,
+                            child: const Text('Brightness menu')),
+                        TextButton(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const Scaffold(body: Text('Shelf')))),
+                            child: const Text('Exit')),
+                      ]))),
         );
-      }),
-    ));
-    await tester.pump();
-    final initialBuilds = builds;
-    for (final value in [0.2, 0.6, 1.0]) {
-      c.setLevel(value);
-      await tester.pump();
-      expect(calls.last.arguments['brightness'], value);
-      expect(c.dimOpacity, 0);
-      expect(find.byKey(const ValueKey('app-flutter-brightness-dimmer')),
-          findsNothing);
-      final layer =
-          tester.widget<AppBrightnessLayer>(find.byType(AppBrightnessLayer));
-      expect(layer.build(tester.element(find.byType(AppBrightnessLayer))),
-          same(layer.child));
-      await tester.tap(find.text('Reader'));
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      expect(focus.hasPrimaryFocus, isTrue);
-    }
-    expect(taps, 3);
-    expect(keys, 3);
-    expect(builds, initialBuilds);
-    c.setFollowSystem(true);
-    await tester.pump();
-    expect(calls.last.arguments['brightness'], isNull);
-    expect(c.nativeDimmingUnavailable, isFalse);
+    final dimmer = find.byKey(const ValueKey('app-flutter-brightness-dimmer'));
+    await tester.pumpWidget(app(Brightness.light));
+    expect(dimmer, findsNothing);
+    await tester.pumpWidget(app(Brightness.dark));
+    await tester.pumpAndSettle();
+    expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.95, .001));
+    expect(tester.getRect(dimmer).bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('Brightness menu')).top));
+    await tester.tap(find.text('Brightness menu'));
+    expect(taps, 1);
+    await tester.tap(find.text('Exit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Shelf'), findsOneWidget);
+    expect(dimmer, findsNothing);
+    expect(c.level, 0);
   });
 
-  test('macOS bridge failure never restores an input-blocking Flutter overlay',
-      () async {
-    final c = await create(nativeDimming: true);
-    c.setLevel(0.2);
-    await Future<void>.delayed(Duration.zero);
-    expect(c.nativeDimmingUnavailable, isTrue);
-    expect(c.paintsFlutterDimming, isFalse);
-    expect(c.dimOpacity, 0);
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(
-        AppBrightness.channel, (_) async => null);
-    addTearDown(
-        () => messenger.setMockMethodCallHandler(AppBrightness.channel, null));
-    c.setLevel(0.5);
-    await Future<void>.delayed(Duration.zero);
-    expect(c.nativeDimmingUnavailable, isFalse);
-    expect(c.dimOpacity, 0);
+  testWidgets(
+      'light mode disables book dimming controls but keeps the moon available',
+      (tester) async {
+    final c = await create();
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.light(),
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: Scaffold(
+          body: BrightnessWidget(controller: c, onNightModeChanged: () {})),
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+    expect(
+        tester
+            .widget<IconButton>(find.byKey(const ValueKey('brightness-auto')))
+            .onPressed,
+        isNull);
+    expect(
+        tester
+            .widget<IconButton>(find.byKey(const ValueKey('brightness-night')))
+            .onPressed,
+        isNotNull);
   });
 }

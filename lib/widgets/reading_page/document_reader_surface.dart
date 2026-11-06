@@ -1,3 +1,5 @@
+import 'brightness_widget.dart';
+import 'package:anx_reader/service/app_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -100,7 +102,11 @@ class DocumentReaderSurfaceState extends State<DocumentReaderSurface> {
                   child: Column(children: [
                 ReaderMenuAppearance.wrap(
                     context, readingColors(widget.header)),
-                Expanded(flex: 5, child: readingColors(widget.body)),
+                Expanded(
+                    flex: 5,
+                    child: AppBrightnessLayer(
+                        controller: AppBrightness.instance,
+                        child: readingColors(widget.body))),
                 widget.navigation,
                 Expanded(
                     flex: 4,
@@ -213,8 +219,11 @@ class DocumentReaderSurfaceState extends State<DocumentReaderSurface> {
                                                           readingColors(
                                                               widget.header))),
                                               Expanded(
-                                                  child: readingColors(
-                                                      widget.body)),
+                                                  child: AppBrightnessLayer(
+                                                      controller: AppBrightness
+                                                          .instance,
+                                                      child: readingColors(
+                                                          widget.body))),
                                             ]),
                                             if (_menu != null) ...[
                                               Positioned.fill(

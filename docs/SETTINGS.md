@@ -119,7 +119,7 @@ Tap the text to open the bottom panel. Drag the progress slider to preview a cha
 - Android and iOS use one pair of touch handles. In paginated/swipe reading, drag an endpoint to the top/bottom page edge (left/right for vertical text) and hold for about 0.75 seconds. It flips once and freezes at the new page boundary; release and grab the visible handle again to continue selecting, without moving the other endpoint. In scrolling mode, hold near the edge for gradual auto-scroll and release to stop. Selection stays within one chapter; original-page PDF and desktop mouse selection retain their own interaction.
 - Unreleased: Horizontal paginated reading also accepts left/right edge dwell, with targets inside the screen safe area rather than the system gesture region. Single-column pages do not require hitting the exact final glyph; multi-column spreads still require reaching the selection boundary of the entire visible spread.
 - Mobile tap-only paging does not disable selection or continuous scrolling. Desktop arrow keys and eligible drags turn pages; selecting or typing is not treated as paging.
-- Reading brightness follows the system by default, with manual 0–100 adjustment. Android uses window brightness; other platforms dim the app without fully hiding the controls. This preference is local to the device.
+- Reading brightness follows the system by default. Manual 0–100 dimming applies only to book content in dark mode, including PDF and reflow. Menus, popups, floating controls and screens outside reading retain their brightness; light mode disables dimming. The level is saved locally and restored when dark mode returns.
 
 ## PDF and scanned-image books
 

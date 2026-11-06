@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:anx_reader/service/translate/official_api.dart';
 import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
@@ -2492,6 +2493,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     );
   }
 
+  bool _brightnessWebViewReady = false;
+
+  void _updateBookBrightness() {
+    if (!mounted || !_brightnessWebViewReady) return;
+    unawaited(webViewController
+        .evaluateJavascript(
+            source: AppBrightness.instance.readerDimmingScript(
+                darkMode: Theme.of(context).brightness == Brightness.dark))
+        .catchError((_) => null));
+  }
+
   Future<void> onWebViewCreated(InAppWebViewController controller) async {
     if (AnxPlatform.isAndroid) {
       await InAppWebViewController.setWebContentsDebuggingEnabled(
@@ -2499,6 +2511,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       );
     }
     webViewController = controller;
+    _brightnessWebViewReady = true;
+    _updateBookBrightness();
     setHandler(controller);
     _registerChapterContentBridge();
 
@@ -2541,6 +2555,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _updateBookBrightness();
     if (_readerReady) {
       final theme = readingThemeForDisplay(Prefs(),
           themes: widget.initialThemes, isDarkMode: isDarkMode);
@@ -2574,6 +2589,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     // the asynchronous WebView bridge or re-inspect the book on opening.
     documentReadingMode.value =
         DocumentReadingModeStore(Prefs().prefs).read(widget.book);
+    AppBrightness.instance.addListener(_updateBookBrightness);
     Prefs().addListener(_configureEinkPreferences);
     Prefs().addListener(_configureOcrPrecache);
     Prefs().addListener(_configureTranslationTextStyle);
@@ -2645,6 +2661,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   void dispose() {
     RuntimeDiagnostics.record(RuntimeEvent.reader, state: 'dispose_pending');
     detachNarration();
+    _brightnessWebViewReady = false;
+    AppBrightness.instance.removeListener(_updateBookBrightness);
     Prefs().removeListener(_configureEinkPreferences);
     Prefs().removeListener(_configureOcrPrecache);
     Prefs().removeListener(_configureTranslationTextStyle);
@@ -2913,6 +2931,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       BuildContext context, String url, String initialCfi) {
     final webView = RecoverableWebView(
       onGone: () {
+        _brightnessWebViewReady = false;
         _rendererRecoveryCfi = _progress.current?.position;
         _readerReady = false;
         _chapterLoading = false;

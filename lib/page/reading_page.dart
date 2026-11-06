@@ -1949,7 +1949,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       _documentPanel(textOnly: false),
                                 ),
                               IconButton(
-                                tooltip: L10n.of(context).readingBrightness,
+                                tooltip: ModuStrings.text(
+                                    context, '书籍亮度', 'Book brightness'),
                                 icon: const Icon(Icons.brightness_6_outlined),
                                 onPressed: () {
                                   setState(() {

@@ -11,7 +11,6 @@ import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/widgets/app_route_surface.dart';
 import 'package:anx_reader/utils/app_version.dart';
 import 'package:anx_reader/service/app_brightness.dart';
-import 'package:anx_reader/widgets/reading_page/brightness_widget.dart';
 import 'package:anx_reader/utils/reader_route_observer.dart';
 import 'package:anx_reader/service/feedback/crash_journal.dart';
 import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
@@ -458,40 +457,37 @@ class _MyAppState extends ConsumerState<MyApp>
             ],
             builder: (context, child) => AppRouteSurface(
                 child: EinkMotionScope(
-                    enabled: prefsNotifier.eInkMotionDisabled,
-                    child: AppBrightnessLayer(
-                      controller: AppBrightness.instance,
-                      child: FlutterSmartDialog.init(
-                        toastBuilder: (message) => Builder(
-                            builder: (context) =>
-                                AnxToast.content(context, message)),
-                        loadingBuilder: prefsNotifier.eInkMotionDisabled
-                            ? (message) => Material(
-                                  color: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    side: const BorderSide(color: Colors.black),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.hourglass_empty,
-                                            color: Colors.black),
-                                        if (message.isNotEmpty) ...[
-                                          const SizedBox(height: 12),
-                                          Text(message,
-                                              style: const TextStyle(
-                                                  color: Colors.black)),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                )
-                            : null,
-                      )(context, child),
-                    ))),
+              enabled: prefsNotifier.eInkMotionDisabled,
+              child: FlutterSmartDialog.init(
+                toastBuilder: (message) => Builder(
+                    builder: (context) => AnxToast.content(context, message)),
+                loadingBuilder: prefsNotifier.eInkMotionDisabled
+                    ? (message) => Material(
+                          color: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            side: const BorderSide(color: Colors.black),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.hourglass_empty,
+                                    color: Colors.black),
+                                if (message.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text(message,
+                                      style:
+                                          const TextStyle(color: Colors.black)),
+                                ],
+                              ],
+                            ),
+                          ),
+                        )
+                    : null,
+              )(context, child),
+            )),
             navigatorKey: navigatorKey,
             locale: prefsNotifier.locale,
             localeListResolutionCallback: _resolveLocale,

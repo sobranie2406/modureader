@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+const {JSDOM} = createRequire(`${process.env.MODU_JSDOM_ROOT || '/private/tmp/modu-pdf-js-tests'}/package.json`)('jsdom');
+const dart = readFileSync(new URL('../lib/service/app_brightness.dart', import.meta.url), 'utf8');
+const template = dart.split("return '''")[1].split("''';")[0];
+const script = opacity => template.replaceAll('$opacity', String(opacity));
+
+test('book dimmer stays below footnotes and cannot consume reader input', () => {
+  const dom = new JSDOM('<body><foliate-view></foliate-view><div id="footnote-dialog" style="position:fixed;z-index:1000">Note</div></body>', {runScripts:'outside-only'});
+  const doc = dom.window.document;
+  const book = doc.querySelector('foliate-view');
+  const note = doc.querySelector('#footnote-dialog');
+  dom.window.eval(script(0));
+  assert.equal(doc.querySelector('#modu-book-brightness'), null);
+  dom.window.eval(script(.95));
+  const dimmer = doc.querySelector('#modu-book-brightness');
+  assert.equal(dimmer.style.pointerEvents, 'none');
+  assert.equal(dimmer.style.position, 'fixed');
+  assert.ok(Number(dimmer.style.zIndex) < Number(note.style.zIndex));
+  assert.equal(dimmer.getAttribute('aria-hidden'), 'true');
+  assert.equal(note.parentElement, doc.body);
+  assert.equal(book.parentElement, doc.body);
+  for (const opacity of [.4, .8, 0]) dom.window.eval(script(opacity));
+  assert.equal(doc.querySelectorAll('#modu-book-brightness').length, 1);
+  assert.equal(dimmer.style.display, 'none');
+  assert.equal(book.getAttribute('style'), null);
+  assert.equal(note.style.filter, '');
+  dom.window.close();
+});

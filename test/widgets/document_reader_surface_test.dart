@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/read_theme.dart';
 import 'package:anx_reader/widgets/reading_page/document_reader_surface.dart';
@@ -7,6 +8,39 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets(
+      'dark reflow dims text only, leaving header and tools outside the layer',
+      (tester) async {
+    AppBrightness.instance.setLevel(0);
+    addTearDown(() => AppBrightness.instance.setFollowSystem(true));
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.dark(),
+      home: const Scaffold(
+          body: DocumentReaderSurface(
+        header: Text('Reader header'),
+        body: Center(child: Text('Book text')),
+        navigation: SizedBox(),
+        tools: Text('Tools remain bright'),
+        style: SizedBox(),
+      )),
+    ));
+    await tester.pumpAndSettle();
+    final dimmer = find.byKey(const ValueKey('app-flutter-brightness-dimmer'));
+    expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.95, .001));
+    expect(
+        tester.getRect(dimmer).top,
+        greaterThanOrEqualTo(
+            tester.getRect(find.text('Reader header')).bottom));
+    final before = tester.getRect(dimmer);
+    await tester.tap(find.byKey(const ValueKey('document-tools-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tools remain bright'), findsOneWidget);
+    expect(find.descendant(of: find.byType(BottomSheet), matching: dimmer),
+        findsNothing);
+    expect(tester.getRect(dimmer), before);
+    expect(tester.takeException(), isNull);
+  });
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
