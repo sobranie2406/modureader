@@ -9,6 +9,8 @@ import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
 import 'package:anx_reader/service/dictionary/online_dictionary.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:anx_reader/utils/toast/common.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DictionaryLookup extends StatefulWidget {
@@ -143,6 +145,26 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
     if (mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
           content: Text(t('无法打开来源链接。', 'Could not open source link.'))));
+    }
+  }
+
+  Future<void> _copy(DictionaryEntry entry) async {
+    final text = [
+      entry.word,
+      compactDictionaryText(entry.definition),
+      '${t('来源', 'Source')}：${entry.dictionary}',
+      if (entry.attribution != null) entry.attribution!,
+      if (entry.sourceUri != null) entry.sourceUri.toString(),
+      if (entry.license != null) entry.license!,
+      if (entry.licenseUri != null) entry.licenseUri.toString(),
+    ].where((part) => part.isNotEmpty).join('\n\n');
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) AnxToast.show(t('已复制', 'Copied'));
+    } catch (_) {
+      if (mounted) {
+        AnxToast.show(t('复制失败，请重试', 'Could not copy. Please retry.'));
+      }
     }
   }
 
@@ -341,6 +363,14 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                                                 _open(entry.licenseUri!),
                                             child: Text(entry.license!)),
                                     ]),
+                                  Align(
+                                      alignment: AlignmentDirectional.centerEnd,
+                                      child: IconButton(
+                                          tooltip: t('复制词条与释义',
+                                              'Copy entry and definition'),
+                                          onPressed: () => _copy(entry),
+                                          icon: const Icon(Icons.copy_outlined,
+                                              size: 20))),
                                 ]))),
                 ])),
       ]);
