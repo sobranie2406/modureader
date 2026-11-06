@@ -201,7 +201,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await Prefs().prefs.setString('sortField', 'title');
     await Prefs().prefs.setString('sortOrder', 'ascending');
-    final books = List.generate(6, (index) => book(index + 1, group: 2));
+    final books = List.generate(9, (index) => book(index + 1, group: 2));
     store.entries = [books];
     await tester.pumpWidget(app(
         Center(
@@ -225,8 +225,8 @@ void main() {
     await tester.pumpAndSettle();
     final position = tester.state<ScrollableState>(scrollable).position;
     expect(position.pixels, greaterThan(0));
-    expect(item(6).hitTestable(), findsOneWidget);
-    expect(tester.getBottomLeft(item(6)).dy,
+    expect(item(9).hitTestable(), findsOneWidget);
+    expect(tester.getBottomLeft(item(9)).dy,
         lessThanOrEqualTo(tester.getBottomLeft(scrollable).dy + 1));
     expect(tester.takeException(), isNull);
     expect(store.moves, isEmpty);

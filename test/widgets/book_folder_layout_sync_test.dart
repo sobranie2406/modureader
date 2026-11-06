@@ -54,6 +54,38 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  for (final width in [320.0, 360.0, 390.0, 430.0, 844.0]) {
+    testWidgets(
+        'cover width 120 keeps shelf column density in folder at $width',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Prefs().bookCoverWidth = 120;
+      final books = List.generate(6, (i) => book(i + 1, i));
+      await tester.pumpWidget(app(
+          BookOpenedFolder(books: books, groupName: 'Folder'),
+          books: _Books(books)));
+      await tester.pumpAndSettle();
+      final grid = tester.widget<GridView>(find.byType(GridView));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(
+          delegate.crossAxisCount,
+          width < 360
+              ? 2
+              : width < 600
+                  ? 3
+                  : 4);
+      final gridRect = tester.getRect(find.byType(GridView));
+      final cardWidth = (gridRect.width - (delegate.crossAxisCount - 1) * 10) /
+          delegate.crossAxisCount;
+      expect(cardWidth, inInclusiveRange(96, 123));
+      expect(gridRect.left, greaterThanOrEqualTo(0));
+      expect(gridRect.right, lessThanOrEqualTo(width));
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('an open folder replaces its old snapshot after sync',
       (tester) async {
     final books = [book(1, 100), book(2, 200)];

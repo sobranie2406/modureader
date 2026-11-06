@@ -156,22 +156,30 @@ class _BookOpenedFolderState extends ConsumerState<BookOpenedFolder> {
           .single;
     }
     final media = MediaQuery.of(context);
-    // Size the dialog around its cards, rather than stretching a partial row.
+    const outerInset = 12.0;
+    const contentInset = 12.0;
+    const horizontalInsets = 2 * (outerInset + contentInset);
     final availableWidth = math.max(
-        0.0, math.min(520.0, media.size.width - media.padding.horizontal - 88));
+        0.0,
+        math.min(520.0,
+            media.size.width - media.padding.horizontal - horizontalInsets));
     final coverWidth = Prefs().bookCoverWidth.clamp(80.0, 260.0);
+    // Match the shelf's viewport-based column count. Dialog padding must not
+    // drop a whole column; cards can shrink slightly to fit the inner grid.
     final columns = math.max(
         1,
         math.min(math.max(2, books.length),
-            ((availableWidth + 10) / (coverWidth + 10)).round()));
+            ((availableWidth + horizontalInsets) / coverWidth).floor()));
     final contentWidth = math.min(availableWidth,
         math.max(240.0, columns * coverWidth + (columns - 1) * 10));
     final dialog = AlertDialog(
       // OHOS defaults to an outer scroll view; the grid needs bounded height.
       scrollable: false,
-      insetPadding: const EdgeInsets.all(24),
-      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      insetPadding: const EdgeInsets.all(outerInset),
+      contentPadding:
+          const EdgeInsets.fromLTRB(contentInset, 12, contentInset, 20),
+      actionsPadding:
+          const EdgeInsets.fromLTRB(contentInset, 0, contentInset, 16),
       title: selectionMode
           ? Text(ModuStrings.format(
               context, '已选 {count} 本', '{count} books selected',
