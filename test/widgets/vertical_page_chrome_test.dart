@@ -1,3 +1,4 @@
+import 'package:anx_reader/models/reading_info.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/widgets/reading_page/vertical_page_chrome.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,57 @@ void main() {
     expect(chrome.toWebStyle(const Locale('zh', 'TW'))['remaining'], '本章剩餘四十頁');
     expect(chrome.toWebStyle(const Locale('en'))['progress'], '45·1239');
   });
+  test(
+      'old metadata settings retain defaults; custom color and opacity are bounded',
+      () {
+    final old = ReadingInfoModel.fromJson({
+      'header': {'fontSize': 12}
+    });
+    expect(old.header.font, '');
+    expect(old.header.color, '');
+    expect(old.header.opacity, isNull);
+    expect(old.header.textColor(Colors.red).a, closeTo(150 / 255, .001));
+    expect(old.header.textColor(Colors.red, defaultOpacity: 180 / 255).a,
+        closeTo(180 / 255, .001));
+    final custom =
+        old.header.copyWith(font: 'example.ttf', color: '#123456', opacity: .8);
+    expect(custom.textColor(Colors.red),
+        const Color(0xFF123456).withValues(alpha: .8));
+    expect(custom.copyWith(opacity: 2).textColor(Colors.red).a, 1);
+    expect(
+        custom
+            .copyWith(color: 'bad', opacity: double.nan)
+            .textColor(Colors.red)
+            .r,
+        Colors.red.r);
+  });
+
+  testWidgets('vertical header/footer use independent fonts and colors',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: VerticalPageChrome(
+      geometry: VerticalPageGeometry(EdgeInsets.zero, 12, 14),
+      chapterTitle: 'Title',
+      remainingPages: 4,
+      currentPage: 1,
+      totalPages: 5,
+      color: Colors.black,
+      redFrame: false,
+      headerFont: 'system',
+      footerFont: '',
+      headerColor: Colors.red,
+      footerColor: Colors.blue,
+    )));
+    final title = tester.widget<Text>(find.text('Title'));
+    final footer = tester.widget<Text>(find.text('1·5'));
+    expect(title.style!.color, Colors.red);
+    expect(footer.style!.color, Colors.blue);
+    expect(title.style!.fontFamily, '');
+    expect(footer.style!.fontFamily, isNull);
+    expect(title.style!.fontSize, 12);
+    expect(footer.style!.fontSize, 14);
+  });
+
   test('Chinese numbers preserve units and zeros', () {
     for (final entry in {
       0: '零',

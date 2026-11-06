@@ -1,3 +1,7 @@
+import 'package:anx_reader/models/reading_info.dart';
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
+import 'package:anx_reader/service/installed_fonts.dart';
+import 'package:anx_reader/service/book_player/reader_font_response.dart';
 import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:anx_reader/service/translate/official_api.dart';
@@ -175,11 +179,35 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         color: Color(int.parse('0x${textColor ?? Prefs().readTheme.textColor}'))
             .withAlpha(180),
         redFrame: Prefs().verticalRedFrame,
+        headerFont: _infoFont(Prefs().readingInfo.header.font),
+        footerFont: _infoFont(Prefs().readingInfo.footer.font),
+        headerColor: Prefs().readingInfo.header.textColor(
+            Color(int.parse('0x${textColor ?? Prefs().readTheme.textColor}')),
+            defaultOpacity: 180 / 255),
+        footerColor: Prefs().readingInfo.footer.textColor(
+            Color(int.parse('0x${textColor ?? Prefs().readTheme.textColor}')),
+            defaultOpacity: 180 / 255),
       );
 
-  Map<String, dynamic>? get _webVerticalChrome => AnxPlatform.isMacOS
-      ? _verticalChrome.toWebStyle(Localizations.localeOf(context))
-      : null;
+  String _infoFont(String font) {
+    if (font.isNotEmpty) return font;
+    final saved = Prefs().prefs.getString('font');
+    if (saved == null) return '';
+    return FontModel.fromJson(saved, serverPort: 0).litePath;
+  }
+
+  Map<String, dynamic>? get _webVerticalChrome {
+    if (!AnxPlatform.isMacOS) return null;
+    final chrome = _verticalChrome;
+    return {
+      ...chrome.toWebStyle(Localizations.localeOf(context)),
+      for (final entry
+          in {'header': chrome.headerFont, 'footer': chrome.footerFont}.entries)
+        '${entry.key}FontUrl': isLocalFontFilename(entry.value)
+            ? readerFontUrl(entry.value, Server().port)
+            : '',
+    };
+  }
 
   OverlayEntry? contextMenuEntry;
   bool showHistory = false;
@@ -2788,12 +2816,21 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (_verticalPage) {
       return AnxPlatform.isMacOS ? const SizedBox.shrink() : _verticalChrome;
     }
+    final info = Prefs().readingInfo;
+    return fontPreviewBuilder(
+        _infoFont(info.header.font),
+        (headerFamily) => fontPreviewBuilder(
+            _infoFont(info.footer.font),
+            (footerFamily) =>
+                _horizontalReadingInfo(headerFamily, footerFamily)));
+  }
+
+  Widget _horizontalReadingInfo(String? headerFamily, String? footerFamily) {
     if (chapterCurrentPage == 0 && percentage == 0.0) {
       return const SizedBox();
     }
 
-    final readingInfoColor = Color(int.parse('0x$textColor')).withAlpha(150);
-    final iconColor = Color(int.parse('0x$textColor'));
+    final bodyColor = Color(int.parse('0x$textColor'));
 
     Widget getWidget(ReadingInfoEnum readingInfoEnum, TextStyle textStyle) {
       final chapterTitleWidget = Text(
@@ -2821,8 +2858,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             if (level == null) return const SizedBox.shrink();
             return ReadingBatteryIndicator(
                 level: level,
-                color: iconColor,
-                fontSize: textStyle.fontSize ?? 10);
+                color: textStyle.color ?? bodyColor,
+                fontSize: textStyle.fontSize ?? 10,
+                fontFamily: textStyle.fontFamily);
           });
 
       Widget batteryAndTimeWidget() => Row(
@@ -2858,13 +2896,17 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     final readingInfo = Prefs().readingInfo;
 
     final headerTextStyle = TextStyle(
-      color: readingInfoColor,
+      color: readingInfo.header.textColor(bodyColor),
       fontSize: readingInfo.header.fontSize,
+      fontFamily:
+          headerFamily ?? (readingInfo.header.font == 'system' ? '' : null),
       height: 1.2,
     );
     final footerTextStyle = TextStyle(
-      color: readingInfoColor,
+      color: readingInfo.footer.textColor(bodyColor),
       fontSize: readingInfo.footer.fontSize,
+      fontFamily:
+          footerFamily ?? (readingInfo.footer.font == 'system' ? '' : null),
       height: 1.2,
     );
 

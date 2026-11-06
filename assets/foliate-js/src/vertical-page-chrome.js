@@ -36,6 +36,9 @@ function renderWebChrome(renderer, style, active) {
   const data = style.verticalPageChrome;
   let nodes = chromeNodes.get(renderer);
   if (!active || !data || !renderer.shadowRoot) {
+    for (const face of [nodes?.headerFace, nodes?.footerFace]) {
+      if (face) renderer.ownerDocument.fonts?.delete(face);
+    }
     nodes?.root.remove();
     chromeNodes.delete(renderer);
     return;
@@ -84,12 +87,31 @@ function renderWebChrome(renderer, style, active) {
     Object.assign(box.style, {top: `${insets.top + 8}px`, bottom: `${insets.bottom + 8}px`,
       [side]: `${safe[side] + 15}px`, width: `${Math.max(0, insets[side] - safe[side] - 23)}px`});
   }
+  const fonts = renderer.ownerDocument.fonts;
+  for (const section of ['header', 'footer']) {
+    const url = data[`${section}FontUrl`] || '';
+    const key = `${section}FontUrl`;
+    if (nodes[key] === url) continue;
+    nodes[key] = url;
+    const faceKey = `${section}Face`;
+    if (nodes[faceKey]) fonts?.delete(nodes[faceKey]);
+    nodes[faceKey] = null;
+    if (url && fonts && typeof FontFace === 'function') {
+      const face = new FontFace(`modu-${section}-font`, `url(${JSON.stringify(url)})`);
+      nodes[faceKey] = face;
+      fonts.add(face);
+      face.load().catch(() => {}); // Missing device-local fonts use the fallback.
+    }
+  }
   const texts = [data.title, data.remaining, data.progress];
   nodes.labels.forEach((label, i) => {
     const text = String(texts[i] ?? '');
     if (label.textContent !== text) label.textContent = text;
-    Object.assign(label.style, {color: data.color || 'inherit',
-      opacity: String(Math.min(1, Math.max(0, Number(data.opacity) || 0))),
+    const section = i === 0 ? 'header' : 'footer';
+    Object.assign(label.style, {color: data[`${section}Color`] || data.color || 'inherit',
+      fontFamily: data[`${section}FontUrl`] ? `modu-${section}-font, sans-serif`
+        : data[`${section}Font`] === 'system' ? 'sans-serif' : 'inherit',
+      opacity: String(Math.min(1, Math.max(0, Number(data[`${section}Opacity`] ?? data.opacity) || 0))),
       fontSize: `${Math.max(8, bounded(i === 0 ? data.headerFontSize : data.footerFontSize))}px`,
       textOrientation: data.chinese ? 'upright' : 'mixed'});
   });

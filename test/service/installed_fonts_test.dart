@@ -43,6 +43,12 @@ void main() {
           'a': {'font': filename, 'size': 28, 'margin': 33},
           'b': {'font': 'other.otf', 'size': 16},
         }));
+    await prefs.setString(
+        'readingInfo',
+        jsonEncode({
+          'header': {'font': filename, 'color': '#123456', 'opacity': .7},
+          'footer': {'font': 'other.otf', 'fontSize': 14},
+        }));
     final events = <String>[];
     final subscription = removedFonts.listen(events.add);
     final changed = await removeInstalledFont(filename, directory: fonts);
@@ -58,6 +64,10 @@ void main() {
     expect(jsonDecode(prefs.getString('documentTextStyles')!), {
       'a': {'font': '', 'size': 28, 'margin': 33},
       'b': {'font': 'other.otf', 'size': 16},
+    });
+    expect(jsonDecode(prefs.getString('readingInfo')!), {
+      'header': {'font': '', 'color': '#123456', 'opacity': .7},
+      'footer': {'font': 'other.otf', 'fontSize': 14},
     });
     expect(events, [filename]);
     await subscription.cancel();

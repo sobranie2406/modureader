@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'dart:async';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/reading_info.dart';
@@ -21,6 +23,47 @@ void main() {
     await Prefs().initPrefs();
   });
   tearDown(() => messenger.setMockMethodCallHandler(batteryChannel, null));
+
+  testWidgets(
+      'real horizontal reader uses independent imported fonts and colors',
+      (tester) async {
+    final player = EpubPlayerState()
+      ..chapterCurrentPage = 1
+      ..percentage = .25
+      ..chapterTitle = 'Chapter'
+      ..textColor = '000000';
+    Prefs().readingInfo = const ReadingInfoModel(
+      header: ReadingInfoSectionModel(
+          left: ReadingInfoEnum.chapterTitle,
+          font: 'header.ttf',
+          color: '#123456',
+          opacity: .3,
+          fontSize: 12),
+      footer: ReadingInfoSectionModel(
+          right: ReadingInfoEnum.bookProgress,
+          font: 'footer.otf',
+          color: '#abcdef',
+          opacity: .8,
+          fontSize: 14),
+    );
+    await tester.pumpWidget(ProviderScope(overrides: [
+      fontPreviewProvider('header.ttf')
+          .overrideWith((ref) async => 'HeaderFixture'),
+      fontPreviewProvider('footer.otf')
+          .overrideWith((ref) async => 'FooterFixture'),
+    ], child: MaterialApp(home: Scaffold(body: player.readingInfoWidget()))));
+    await tester.pumpAndSettle();
+    final header = tester.widget<Text>(find.text('Chapter')).style!;
+    final footer = tester.widget<Text>(find.text('25.00%')).style!;
+    expect(header.fontFamily, 'HeaderFixture');
+    expect(footer.fontFamily, 'FooterFixture');
+    expect(header.fontSize, 12);
+    expect(footer.fontSize, 14);
+    expect(header.color, const Color(0xff123456).withValues(alpha: .3));
+    expect(footer.color, const Color(0xffabcdef).withValues(alpha: .8));
+    expect(Prefs().prefs.getString('font'), isNull);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final direction in TextDirection.values) {
     for (final slot in [0, 2]) {

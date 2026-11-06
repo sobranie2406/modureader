@@ -8,11 +8,13 @@ class ReadingBatteryIndicator extends StatelessWidget {
     required this.level,
     required this.color,
     this.fontSize = 10,
+    this.fontFamily,
   });
 
   final int level;
   final Color color;
   final double fontSize;
+  final String? fontFamily;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class ReadingBatteryIndicator extends StatelessWidget {
                     textScaler: TextScaler.noScaling,
                     style: TextStyle(
                         color: color,
+                        fontFamily: fontFamily,
                         fontSize: height * .8,
                         height: 1,
                         fontWeight: FontWeight.normal)),

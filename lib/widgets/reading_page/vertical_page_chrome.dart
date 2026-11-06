@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -69,12 +70,18 @@ class VerticalPageChrome extends StatelessWidget {
       required this.currentPage,
       required this.totalPages,
       required this.color,
-      required this.redFrame});
+      required this.redFrame,
+      this.headerFont = '',
+      this.footerFont = '',
+      this.headerColor,
+      this.footerColor});
   final VerticalPageGeometry geometry;
   final String chapterTitle;
   final int remainingPages, currentPage, totalPages;
   final Color color;
+  final Color? headerColor, footerColor;
   final bool redFrame;
+  final String headerFont, footerFont;
 
   /// macOS draws this chrome inside WKWebView. A full-window Flutter paint
   /// layer above a platform view can intercept native mouse events even when
@@ -99,9 +106,17 @@ class VerticalPageChrome extends StatelessWidget {
       'chinese': chinese,
       'headerFontSize': geometry.headerFontSize,
       'footerFontSize': geometry.footerFontSize,
+      'headerFont': headerFont,
+      'footerFont': footerFont,
       'color':
           '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
       'opacity': color.a,
+      'headerColor':
+          '#${((headerColor ?? color).toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0')}',
+      'footerColor':
+          '#${((footerColor ?? color).toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0')}',
+      'headerOpacity': (headerColor ?? color).a,
+      'footerOpacity': (footerColor ?? color).a,
       'safe': {
         'left': geometry.safe.left,
         'right': geometry.safe.right,
@@ -119,32 +134,41 @@ class VerticalPageChrome extends StatelessWidget {
     final progress = labels['progress'] as String;
     Widget column(String text, double fontSize,
             {bool chineseText = true,
+            String font = '',
+            Color? textColor,
             Alignment alignment = Alignment.topCenter}) =>
-        LayoutBuilder(builder: (context, constraints) {
-          final style =
-              TextStyle(fontSize: fontSize, color: color, height: 1.1);
-          if (!chineseText) {
-            return Align(
-                alignment: alignment,
-                child: RotatedBox(
-                    quarterTurns: 1,
-                    child: Text(text,
-                        style: style,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textScaler: TextScaler.noScaling)));
-          }
-          return Align(
-              alignment: alignment,
-              child: Text(text.characters.join('\n'),
-                  semanticsLabel: text,
-                  textAlign: TextAlign.center,
-                  style: style,
-                  textScaler: TextScaler.noScaling,
-                  maxLines: math.max(
-                      1, (constraints.maxHeight / (fontSize * 1.1)).floor()),
-                  overflow: TextOverflow.ellipsis));
-        });
+        fontPreviewBuilder(
+            font,
+            (family) => LayoutBuilder(builder: (context, constraints) {
+                  final style = TextStyle(
+                      fontSize: fontSize,
+                      color: textColor ?? color,
+                      height: 1.1,
+                      fontFamily: family ?? (font == 'system' ? '' : null));
+                  if (!chineseText) {
+                    return Align(
+                        alignment: alignment,
+                        child: RotatedBox(
+                            quarterTurns: 1,
+                            child: Text(text,
+                                style: style,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textScaler: TextScaler.noScaling)));
+                  }
+                  return Align(
+                      alignment: alignment,
+                      child: Text(text.characters.join('\n'),
+                          semanticsLabel: text,
+                          textAlign: TextAlign.center,
+                          style: style,
+                          textScaler: TextScaler.noScaling,
+                          maxLines: math.max(
+                              1,
+                              (constraints.maxHeight / (fontSize * 1.1))
+                                  .floor()),
+                          overflow: TextOverflow.ellipsis));
+                }));
     return IgnorePointer(
         child: SizedBox.expand(
             child: Stack(children: [
@@ -163,12 +187,16 @@ class VerticalPageChrome extends StatelessWidget {
                 child: Align(
                     alignment: Alignment.topCenter,
                     child: column(remaining, geometry.footerFontSize,
+                        font: footerFont,
+                        textColor: footerColor,
                         chineseText: chinese))),
             const SizedBox(height: 12),
             Expanded(
                 child: Align(
                     alignment: Alignment.bottomCenter,
                     child: column(progress, geometry.footerFontSize,
+                        font: footerFont,
+                        textColor: footerColor,
                         chineseText: chinese,
                         alignment: Alignment.bottomCenter))),
           ])),
@@ -180,6 +208,8 @@ class VerticalPageChrome extends StatelessWidget {
           child: Align(
               alignment: Alignment.topCenter,
               child: column(chapterTitle, geometry.headerFontSize,
+                  font: headerFont,
+                  textColor: headerColor,
                   chineseText: chinese))),
     ])));
   }

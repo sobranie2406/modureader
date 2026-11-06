@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:anx_reader/models/reading_info.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -48,6 +51,81 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  }
+
+  for (final menu in [false, true]) {
+    testWidgets('header/footer typography controls are independent: menu=$menu',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: L10n.localizationsDelegates,
+        supportedLocales: L10n.supportedLocales,
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: ReadingMoreSettings(readerMenu: menu))),
+      ));
+      await tester.pumpAndSettle();
+      final fontTile = find.ancestor(
+          of: find.text('字体').first, matching: find.byType(ListTile));
+      await tester.ensureVisible(fontTile);
+      await tester.tap(fontTile);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('系统字体').last);
+      await tester.pumpAndSettle();
+      expect(Prefs().readingInfo.header.font, 'system');
+      expect(Prefs().readingInfo.footer.font, '');
+      final colorTile = find.byKey(const ValueKey('reading-info-color-页眉设置'));
+      await tester.ensureVisible(colorTile);
+      await tester.tap(colorTile);
+      await tester.pumpAndSettle();
+      tester
+          .widget<ColorPicker>(find.byType(ColorPicker))
+          .onColorChanged(const Color(0xff123456));
+      await tester.tap(find
+          .text(L10n.of(tester.element(find.byType(ColorPicker))).commonOk)
+          .last);
+      await tester.pumpAndSettle();
+      expect(Prefs().readingInfo.header.color, '#123456');
+      expect(Prefs().readingInfo.footer.color, '');
+      final opacityRow = find
+          .ancestor(of: find.text('不透明度 (%)').last, matching: find.byType(Row))
+          .first;
+      tester
+          .widget<Slider>(
+              find.descendant(of: opacityRow, matching: find.byType(Slider)))
+          .onChanged!(80);
+      await tester.pumpAndSettle();
+      expect(Prefs().readingInfo.footer.opacity, .8);
+      expect(Prefs().readingInfo.header.opacity, isNull);
+      final saved = ReadingInfoModel.fromJson(
+          jsonDecode(jsonEncode(Prefs().readingInfo)));
+      expect(saved, Prefs().readingInfo);
+      final marginRow =
+          find.ancestor(of: find.text('上边距'), matching: find.byType(Row)).first;
+      tester
+          .widget<Slider>(
+              find.descendant(of: marginRow, matching: find.byType(Slider)))
+          .onChanged!(24);
+      await tester.pumpAndSettle();
+      final reset = find.byKey(const ValueKey('reading-info-reset-页眉设置'));
+      await tester.ensureVisible(reset);
+      await tester.tap(reset);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cancel-color-reset')));
+      await tester.pumpAndSettle();
+      expect(Prefs().readingInfo.header.color, '#123456');
+      await tester.tap(reset);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('confirm-color-reset')));
+      await tester.pumpAndSettle();
+      expect(Prefs().readingInfo.header.font, '');
+      expect(Prefs().readingInfo.header.color, '');
+      expect(Prefs().readingInfo.header.opacity, isNull);
+      expect(Prefs().readingInfo.header.fontSize, 10);
+      expect(Prefs().readingInfo.header.verticalMargin, 24);
+      expect(Prefs().readingInfo.footer, saved.footer);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('header and footer margins name their actual edges',

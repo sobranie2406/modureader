@@ -45,12 +45,13 @@ Future<Set<String>> removeInstalledFont(String filename,
     'languageTranslationTextStyle',
     'classicalTranslationTextStyle',
     'documentTextStyles',
+    'readingInfo',
   ]) {
     final raw = prefs.getString(key);
     if (raw == null) continue;
     final decoded = jsonDecode(raw);
     if (decoded is! Map<String, dynamic>) continue;
-    if (key == 'documentTextStyles') {
+    if (key == 'documentTextStyles' || key == 'readingInfo') {
       var changed = false;
       for (final style in decoded.values.whereType<Map>()) {
         if (style['font'] == filename) {

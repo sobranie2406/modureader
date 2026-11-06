@@ -1,3 +1,9 @@
+import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
+import 'package:anx_reader/models/text_color.dart';
+import 'package:anx_reader/service/installed_fonts.dart';
+import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:anx_reader/utils/font_parser.dart';
+import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import '../reader_menu_appearance.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import '../reader_menu_group.dart';
@@ -439,10 +445,30 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Row(children: [
+                  Expanded(
+                      child: Text(title,
+                          style: Theme.of(context).textTheme.titleMedium)),
+                  TextButton.icon(
+                    key: ValueKey('reading-info-reset-$title'),
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: Text(
+                        ModuStrings.text(context, '恢复默认', 'Restore default')),
+                    onPressed: () async {
+                      if (!await confirmColorReset(
+                              context,
+                              ModuStrings.text(
+                                  context,
+                                  '恢复此项的默认字体、字号、颜色和不透明度？显示内容、边距和另一项设置保持不变。',
+                                  'Restore this section’s default font, size, colour and opacity? Content, margins and the other section stay unchanged.')) ||
+                          !context.mounted) {
+                        return;
+                      }
+                      setState(() => onChanged(section.copyWith(
+                          font: '', fontSize: 10, color: '', opacity: null)));
+                    },
+                  ),
+                ]),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -512,6 +538,90 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
                   divisions: 40,
                   onChanged: (value) =>
                       onChanged(section.copyWith(rightMargin: value)),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(ModuStrings.text(context, '字体', 'Font')),
+                  subtitle: FontNamePreview(
+                      section.font.isEmpty
+                          ? ModuStrings.text(context, '跟随正文', 'Follow body')
+                          : section.font == 'system'
+                              ? L10n.of(context).systemFont
+                              : section.font,
+                      filename: section.font),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final fonts = installedFontFiles(getFontDir());
+                    final choices = <String, String>{
+                      '': ModuStrings.text(context, '跟随正文', 'Follow body'),
+                      'system': L10n.of(context).systemFont,
+                      for (final file in fonts)
+                        file.uri.pathSegments.last: getFontNameFromFile(file),
+                    };
+                    Widget dialog(BuildContext dialogContext) => SimpleDialog(
+                          title: Text(
+                              '$title · ${ModuStrings.text(context, '字体', 'Font')}'),
+                          children: [
+                            for (final entry in choices.entries)
+                              SimpleDialogOption(
+                                onPressed: () =>
+                                    Navigator.pop(dialogContext, entry.key),
+                                child: Row(children: [
+                                  Expanded(
+                                      child: FontNamePreview(entry.value,
+                                          filename: entry.key)),
+                                  if (section.font == entry.key)
+                                    const Icon(Icons.check),
+                                ]),
+                              ),
+                          ],
+                        );
+                    final font = isReading
+                        ? await showReaderDialog<String>(
+                            context: context, builder: dialog)
+                        : await showDialog<String>(
+                            context: context, builder: dialog);
+                    if (font != null && context.mounted) {
+                      setState(() => onChanged(section.copyWith(font: font)));
+                    }
+                  },
+                ),
+                ListTile(
+                  key: ValueKey('reading-info-color-$title'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(ModuStrings.text(context, '字体颜色', 'Font colour')),
+                  subtitle: Text(
+                      section.color.isEmpty || !validTextColor(section.color)
+                          ? ModuStrings.text(context, '跟随正文', 'Follow body')
+                          : section.color.toUpperCase()),
+                  trailing: CircleAvatar(
+                      radius: 12,
+                      backgroundColor: section
+                          .textColor(Theme.of(context).colorScheme.onSurface)
+                          .withAlpha(255)),
+                  onTap: () async {
+                    final color = await showRgbColorPicker(
+                        context: context,
+                        initialColor: section
+                            .textColor(Theme.of(context).colorScheme.onSurface)
+                            .withAlpha(255),
+                        allowAlpha: false);
+                    if (color == null || !context.mounted) {
+                      return;
+                    }
+                    setState(() => onChanged(section.copyWith(
+                        color:
+                            '#${(color.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}')));
+                  },
+                ),
+                buildSettingSlider(
+                  label: ModuStrings.text(context, '不透明度 (%)', 'Opacity (%)'),
+                  value: section.textColor(Colors.black).a * 100,
+                  min: 0,
+                  max: 100,
+                  divisions: 100,
+                  onChanged: (value) =>
+                      onChanged(section.copyWith(opacity: value / 100)),
                 ),
                 buildSettingSlider(
                   label: L10n.of(context).readingPageFontSize,

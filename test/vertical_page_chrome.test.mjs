@@ -73,3 +73,48 @@ test('background is painted once across the renderer, not only inside its padded
   const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   assert.doesNotMatch(book, /documentElement\.style\.backgroundColor = 'grey'/);
 });
+
+test('web header/footer fonts, colors and opacity update without duplicate font loads', async () => {
+  const {createRequire} = await import('node:module');
+  const {JSDOM} = createRequire(`${process.env.MODU_JSDOM_ROOT || '/private/tmp/modu-reader-regression'}/package.json`)('jsdom');
+  const dom = new JSDOM('<body><div id="renderer"></div></body>');
+  const r = dom.window.document.querySelector('#renderer');
+  r.attachShadow({mode: 'open'});
+  const faces = new Set();
+  Object.defineProperty(r.ownerDocument, 'fonts', {value: faces});
+  let loads = 0;
+  const original = globalThis.FontFace;
+  globalThis.FontFace = class {
+    constructor(family, source) {this.family = family; this.source = source;}
+    load() {loads++; return Promise.resolve(this);}
+  };
+  try {
+    const data = {title: 'Chapter', remaining: '2 pages', progress: '1·3',
+      headerFontSize: 12, footerFontSize: 14,
+      headerColor: '#123456', footerColor: '#abcdef',
+      headerOpacity: .3, footerOpacity: .8,
+      headerFontUrl: 'http://127.0.0.1:1234/header.ttf',
+      footerFontUrl: 'http://127.0.0.1:1234/footer.ttf'};
+    const style = {writingMode:'vertical-rl', verticalPageInsets:{left:44,right:44,top:18,bottom:18}, verticalPageChrome:data};
+    applyVerticalPageChrome(r, style);
+    const labels = [...r.shadowRoot.querySelectorAll('div')].filter(e => e.style.writingMode);
+    assert.equal(labels[0].style.fontFamily, 'modu-header-font, sans-serif');
+    assert.equal(labels[1].style.fontFamily, 'modu-footer-font, sans-serif');
+    assert.equal(labels[0].style.opacity, '0.3');
+    assert.equal(labels[2].style.opacity, '0.8');
+    assert.equal(labels[0].style.color, 'rgb(18, 52, 86)');
+    assert.equal(labels[1].style.color, 'rgb(171, 205, 239)');
+    applyVerticalPageChrome(r, style);
+    assert.equal(loads, 2);
+    assert.equal(faces.size, 2);
+    applyVerticalPageChrome(r, {...style, verticalPageChrome:{...data, headerFontUrl:'', headerFont:'system', headerOpacity:0}});
+    assert.equal(labels[0].style.fontFamily, 'sans-serif');
+    assert.equal(labels[0].style.opacity, '0');
+    assert.equal(faces.size, 1);
+    applyVerticalPageChrome(r, {writingMode:'horizontal-tb'});
+    assert.equal(faces.size, 0);
+  } finally {
+    globalThis.FontFace = original;
+    dom.window.close();
+  }
+});
