@@ -20,6 +20,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 Future<void> showSelectionSearchBrowser(BuildContext context,
         {required String text}) =>
     showReaderPopup(context,
+        dimContent: true,
         allowWindowAdjustment: true,
         // Swiping search results must scroll the page, not dismiss its sheet.
         enableDrag: false,

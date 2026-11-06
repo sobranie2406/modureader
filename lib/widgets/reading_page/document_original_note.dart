@@ -1,3 +1,4 @@
+import 'reader_content_brightness.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -81,74 +82,83 @@ class _DocumentOriginalNoteState extends State<DocumentOriginalNote> {
 
   @override
   Widget build(BuildContext context) => Dialog(
-        child: SizedBox(
-            width: 800,
-            height: ReaderPopup.height(context),
-            child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(
-                            '${t('原书第', 'Original page')} ${widget.anchor.page + 1}',
-                            style: readerSubmenuTitleStyle(context))),
-                    IconButton(
-                        tooltip: t('关闭', 'Close'),
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close))
-                  ]),
-                  Text(widget.anchor.rects.isEmpty
-                      ? t('该笔记没有可靠的图像位置，仅显示原页，不自动匹配文字。',
-                          'This note has no reliable image position. Only the source page is shown; text is not rematched.')
-                      : t('框线为保存时的原图行／文字块位置，不随重新识别改变。可缩放核对。',
-                          'Boxes show the original saved lines/text blocks, unchanged by OCR. Pinch to inspect.')),
-                  const SizedBox(height: 8),
-                  Expanded(
-                      child: _failed
-                          ? Center(
-                              child: TextButton.icon(
-                                  onPressed: _load,
-                                  icon: const Icon(Icons.refresh),
-                                  label: Text(t('原图加载失败，重试',
-                                      'Could not load source image. Retry'))))
-                          : _bytes == null
-                              ? const Center(
-                                  child: EinkStaticIndicator(
-                                      child: CircularProgressIndicator()))
-                              : LayoutBuilder(builder: (context, constraints) {
-                                  final width = math.min(constraints.maxWidth,
-                                      constraints.maxHeight * _ratio);
-                                  return InteractiveViewer(
-                                      maxScale: 8,
-                                      child: Center(
-                                          child: SizedBox(
-                                              width: width,
-                                              height: width / _ratio,
-                                              child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    Image.memory(_bytes!,
-                                                        fit: BoxFit.fill,
-                                                        errorBuilder: (_, error,
-                                                                stack) =>
-                                                            Center(
-                                                                child: Text(t(
-                                                                    '无法显示原图',
-                                                                    'Cannot display source image')))),
-                                                    IgnorePointer(
-                                                        child: CustomPaint(
-                                                            key: const ValueKey(
-                                                                'original-note-regions'),
-                                                            painter: DocumentOriginalNotePainter(
-                                                                widget.anchor
-                                                                    .rects,
-                                                                Theme.of(
-                                                                        context)
-                                                                    .colorScheme
-                                                                    .primary))),
-                                                  ]))));
-                                })),
-                ]))),
+        backgroundColor: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        child: ReaderContentBrightness(
+            backgroundColor: Theme.of(context).dialogTheme.backgroundColor ??
+                Theme.of(context).colorScheme.surface,
+            child: SizedBox(
+                width: 800,
+                height: ReaderPopup.height(context),
+                child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text(
+                                '${t('原书第', 'Original page')} ${widget.anchor.page + 1}',
+                                style: readerSubmenuTitleStyle(context))),
+                        IconButton(
+                            tooltip: t('关闭', 'Close'),
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close))
+                      ]),
+                      Text(widget.anchor.rects.isEmpty
+                          ? t('该笔记没有可靠的图像位置，仅显示原页，不自动匹配文字。',
+                              'This note has no reliable image position. Only the source page is shown; text is not rematched.')
+                          : t('框线为保存时的原图行／文字块位置，不随重新识别改变。可缩放核对。',
+                              'Boxes show the original saved lines/text blocks, unchanged by OCR. Pinch to inspect.')),
+                      const SizedBox(height: 8),
+                      Expanded(
+                          child: _failed
+                              ? Center(
+                                  child: TextButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text(t('原图加载失败，重试',
+                                          'Could not load source image. Retry'))))
+                              : _bytes == null
+                                  ? const Center(
+                                      child: EinkStaticIndicator(
+                                          child: CircularProgressIndicator()))
+                                  : LayoutBuilder(
+                                      builder: (context, constraints) {
+                                      final width = math.min(
+                                          constraints.maxWidth,
+                                          constraints.maxHeight * _ratio);
+                                      return InteractiveViewer(
+                                          maxScale: 8,
+                                          child: Center(
+                                              child: SizedBox(
+                                                  width: width,
+                                                  height: width / _ratio,
+                                                  child: Stack(
+                                                      fit: StackFit.expand,
+                                                      children: [
+                                                        Image.memory(_bytes!,
+                                                            fit: BoxFit.fill,
+                                                            errorBuilder: (_,
+                                                                    error,
+                                                                    stack) =>
+                                                                Center(
+                                                                    child: Text(t(
+                                                                        '无法显示原图',
+                                                                        'Cannot display source image')))),
+                                                        IgnorePointer(
+                                                            child: CustomPaint(
+                                                                key: const ValueKey(
+                                                                    'original-note-regions'),
+                                                                painter: DocumentOriginalNotePainter(
+                                                                    widget
+                                                                        .anchor
+                                                                        .rects,
+                                                                    Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .primary))),
+                                                      ]))));
+                                    })),
+                    ])))),
       );
 }
 

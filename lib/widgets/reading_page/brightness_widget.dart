@@ -17,29 +17,26 @@ class AppBrightnessLayer extends StatelessWidget {
   final AppBrightness controller;
 
   @override
-  Widget build(BuildContext context) =>
-      Theme.of(context).brightness != Brightness.dark
-          ? child
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                child,
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: ExcludeSemantics(
-                      child: ListenableBuilder(
-                        listenable: controller,
-                        builder: (_, __) => ColoredBox(
-                          key: const ValueKey('app-flutter-brightness-dimmer'),
-                          color: Colors.black
-                              .withValues(alpha: controller.dimOpacity),
-                        ),
-                      ),
-                    ),
+  Widget build(BuildContext context) => Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ExcludeSemantics(
+                child: ListenableBuilder(
+                  listenable: controller,
+                  builder: (_, __) => ColoredBox(
+                    key: const ValueKey('app-flutter-brightness-dimmer'),
+                    color:
+                        Colors.black.withValues(alpha: controller.dimOpacity),
                   ),
                 ),
-              ],
-            );
+              ),
+            ),
+          ),
+        ],
+      );
 }
 
 class BrightnessWidget extends StatelessWidget {
@@ -55,7 +52,6 @@ class BrightnessWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return ListenableBuilder(
       listenable: Listenable.merge([controller, Prefs()]),
       builder: (context, _) => SingleChildScrollView(
@@ -75,10 +71,8 @@ class BrightnessWidget extends StatelessWidget {
                           const BoxConstraints(minWidth: 48, minHeight: 48),
                       icon: const Icon(Icons.brightness_auto_outlined),
                       selectedIcon: const Icon(Icons.brightness_auto),
-                      onPressed: dark
-                          ? () => controller
-                              .setFollowSystem(!controller.followSystem)
-                          : null,
+                      onPressed: () =>
+                          controller.setFollowSystem(!controller.followSystem),
                     ),
                     Expanded(
                       child: Slider(
@@ -88,9 +82,7 @@ class BrightnessWidget extends StatelessWidget {
                         value: controller.level * 100,
                         label: '${(controller.level * 100).round()}%',
                         semanticFormatterCallback: (v) => '${v.round()}%',
-                        onChanged: dark
-                            ? (value) => controller.setLevel(value / 100)
-                            : null,
+                        onChanged: (value) => controller.setLevel(value / 100),
                         onChangeEnd: (_) => unawaited(controller.save()),
                       ),
                     ),
@@ -123,12 +115,12 @@ class BrightnessWidget extends StatelessWidget {
                 SettingHelp(
                     title: Text(
                         ModuStrings.text(
-                            context, '深色模式书籍亮度', 'Dark-mode book brightness'),
+                            context, '阅读内容亮度', 'Reading content brightness'),
                         style: Theme.of(context).textTheme.bodySmall),
                     description: Text(ModuStrings.text(
                         context,
-                        '仅在深色模式下调暗书籍内容。菜单、工具栏、弹窗及退出阅读后的界面不受影响；100% 保持系统亮度。',
-                        'Dims book content only in dark mode. Menus, toolbars, popups and screens outside reading are unaffected. 100% preserves system brightness.'))),
+                        '浅色和深色模式均可调暗书籍、注释及查询、字典、AI 等内容窗口。所有操作菜单、工具栏和非阅读界面保持系统亮度；100% 不调暗。',
+                        'Dims books, footnotes and content windows such as search, dictionaries and AI in both light and dark modes. All menus, toolbars and screens outside reading follow system brightness. 100% applies no dimming.'))),
               ],
             )),
       ),

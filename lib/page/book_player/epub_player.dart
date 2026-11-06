@@ -2499,8 +2499,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (!mounted || !_brightnessWebViewReady) return;
     unawaited(webViewController
         .evaluateJavascript(
-            source: AppBrightness.instance.readerDimmingScript(
-                darkMode: Theme.of(context).brightness == Brightness.dark))
+            source: AppBrightness.instance.readerDimmingScript())
         .catchError((_) => null));
   }
 

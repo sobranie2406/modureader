@@ -1,3 +1,4 @@
+import 'reader_content_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -10,8 +11,9 @@ import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
 
 /// Shared geometry for reader query and settings panels.
 class ReaderPopup extends StatelessWidget {
-  const ReaderPopup({super.key, required this.child});
+  const ReaderPopup({super.key, required this.child, this.dimContent = false});
   final Widget child;
+  final bool dimContent;
 
   static BoxConstraints constraints(BuildContext context) =>
       Theme.of(context).bottomSheetTheme.constraints ??
@@ -29,6 +31,13 @@ class ReaderPopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final theme = Theme.of(context);
+    final content = RepaintBoundary(
+      child: ScrollConfiguration(
+        behavior: const AppScrollBehavior(symmetricGutter: true),
+        child: Padding(padding: const EdgeInsets.only(top: 8), child: child),
+      ),
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
       child: PointerInterceptor(
@@ -41,12 +50,14 @@ class ReaderPopup extends StatelessWidget {
           child: MediaQuery.removeViewInsets(
             context: context,
             removeBottom: true,
-            child: RepaintBoundary(
-              child: ScrollConfiguration(
-                  behavior: const AppScrollBehavior(symmetricGutter: true),
-                  child: Padding(
-                      padding: const EdgeInsets.only(top: 8), child: child)),
-            ),
+            child: dimContent
+                ? ReaderContentBrightness(
+                    backgroundColor:
+                        theme.bottomSheetTheme.modalBackgroundColor ??
+                            theme.bottomSheetTheme.backgroundColor ??
+                            theme.colorScheme.surface,
+                    child: content)
+                : content,
           ),
         ),
       ),
@@ -84,6 +95,7 @@ Future<void> showReaderPopup(BuildContext context,
     {required WidgetBuilder builder,
     bool enableDrag = true,
     bool readerAppearance = true,
+    bool dimContent = false,
     bool allowWindowAdjustment = false,
     Rect? selectionRect,
     Color? adjustableBarrierColor,
@@ -91,6 +103,7 @@ Future<void> showReaderPopup(BuildContext context,
   if (allowWindowAdjustment && Prefs().readerPopupAdjustmentEnabled) {
     await showAdjustableReaderPopup(context,
         builder: builder,
+        dimContent: dimContent,
         selectionRect: selectionRect,
         barrierColor: adjustableBarrierColor,
         initialHeightFraction: initialHeightFraction,
@@ -106,8 +119,10 @@ Future<void> showReaderPopup(BuildContext context,
   final content = Builder(builder: builder);
   await showModalBottomSheet<void>(
     sheetAnimationStyle: AppMotion.style,
-    backgroundColor: menuTheme.bottomSheetTheme.modalBackgroundColor ??
-        menuTheme.bottomSheetTheme.backgroundColor,
+    backgroundColor: dimContent
+        ? Colors.transparent
+        : menuTheme.bottomSheetTheme.modalBackgroundColor ??
+            menuTheme.bottomSheetTheme.backgroundColor,
     elevation: menuTheme.bottomSheetTheme.modalElevation ??
         menuTheme.bottomSheetTheme.elevation,
     context: context,
@@ -118,7 +133,9 @@ Future<void> showReaderPopup(BuildContext context,
     clipBehavior: Clip.antiAlias,
     builder: (context) {
       route = ModalRoute.of(context);
-      return Theme(data: menuTheme, child: ReaderPopup(child: content));
+      return Theme(
+          data: menuTheme,
+          child: ReaderPopup(dimContent: dimContent, child: content));
     },
   );
   // Native reader views must not regain focus during the reverse animation.

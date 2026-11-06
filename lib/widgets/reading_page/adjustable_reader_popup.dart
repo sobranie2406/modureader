@@ -1,3 +1,4 @@
+import 'reader_content_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'dart:math' as math;
 
@@ -12,6 +13,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 Future<void> showAdjustableReaderPopup(BuildContext context,
     {required WidgetBuilder builder,
     bool readerAppearance = true,
+    bool dimContent = false,
     Rect? selectionRect,
     Color? barrierColor,
     double initialHeightFraction = 0.8}) async {
@@ -39,6 +41,7 @@ Future<void> showAdjustableReaderPopup(BuildContext context,
       Theme(
           data: menuTheme,
           child: AdjustableReaderPopup(
+              dimContent: dimContent,
               initialHeightFraction: initialHeightFraction,
               selectionRect: localSelection,
               child: content)),
@@ -54,9 +57,11 @@ class AdjustableReaderPopup extends StatefulWidget {
   const AdjustableReaderPopup(
       {super.key,
       required this.child,
+      this.dimContent = false,
       this.initialHeightFraction = 0.8,
       this.selectionRect});
   final Widget child;
+  final bool dimContent;
   final double initialHeightFraction;
   final Rect? selectionRect;
 
@@ -65,6 +70,13 @@ class AdjustableReaderPopup extends StatefulWidget {
 }
 
 class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
+  Widget _content(ThemeData theme, Widget child) => widget.dimContent
+      ? ReaderContentBrightness(
+          backgroundColor: theme.bottomSheetTheme.backgroundColor ??
+              theme.colorScheme.surface,
+          child: child)
+      : child;
+
   Rect? _rect;
   Rect? _gestureRect;
   Offset? _gestureOrigin;
@@ -207,112 +219,118 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
             child: PointerInterceptor(
               child: Material(
                 key: const ValueKey('adjustable-reader-popup-frame'),
-                color: theme.bottomSheetTheme.backgroundColor ??
-                    theme.colorScheme.surface,
+                color: widget.dimContent
+                    ? Colors.transparent
+                    : theme.bottomSheetTheme.backgroundColor ??
+                        theme.colorScheme.surface,
                 elevation: theme.bottomSheetTheme.elevation ?? 4,
                 shape: theme.bottomSheetTheme.shape ??
                     RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24)),
                 clipBehavior: Clip.antiAlias,
-                child: Stack(children: [
-                  Padding(
-                    // Reserve resize hit areas; they never cover text or buttons.
-                    padding: const EdgeInsets.fromLTRB(12, 24, 12, 24),
-                    child: Column(children: [
-                      SizedBox(
-                          height: 36,
-                          child: Row(children: [
-                            Expanded(
-                                child: _handle('move', rect, available,
-                                    cursor: SystemMouseCursors.move,
-                                    child: Center(
-                                        child: Container(
-                                            width: 40,
-                                            height: 4,
-                                            decoration: BoxDecoration(
-                                                color:
-                                                    theme.colorScheme.outline,
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        2)))))),
-                            IconButton(
-                              key: const ValueKey('reader-popup-close'),
-                              tooltip: MaterialLocalizations.of(context)
-                                  .closeButtonTooltip,
-                              padding: EdgeInsets.zero,
-                              iconSize: 20,
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ])),
-                      Expanded(
-                          child: LayoutBuilder(builder: (context, constraints) {
-                        // A short landscape/keyboard viewport must still allow
-                        // access to tool headers and input controls.
-                        final contentHeight =
-                            math.max(240.0, constraints.maxHeight);
-                        return SingleChildScrollView(
-                          primary: false,
-                          child: SizedBox(
-                            height: contentHeight,
-                            child: MediaQuery(
-                              data: MediaQuery.of(context)
-                                  .removeViewInsets(removeBottom: true)
-                                  .copyWith(
-                                      size: Size(
-                                          constraints.maxWidth, contentHeight),
-                                      padding: EdgeInsets.zero,
-                                      viewPadding: EdgeInsets.zero),
-                              child: RepaintBoundary(
-                                  child: ScrollConfiguration(
-                                      behavior: const AppScrollBehavior(
-                                          symmetricGutter: true),
-                                      child: widget.child)),
-                            ),
-                          ),
-                        );
-                      })),
-                    ]),
-                  ),
-                  Positioned(
-                      left: 0,
-                      top: 24,
-                      bottom: 24,
-                      width: 12,
-                      child: _handle('left', rect, available,
-                          cursor: SystemMouseCursors.resizeLeftRight)),
-                  Positioned(
-                      right: 0,
-                      top: 24,
-                      bottom: 24,
-                      width: 12,
-                      child: _handle('right', rect, available,
-                          cursor: SystemMouseCursors.resizeLeftRight)),
-                  Positioned(
-                      left: 24,
-                      right: 24,
-                      bottom: 0,
-                      height: 12,
-                      child: _handle('bottom', rect, available,
-                          cursor: SystemMouseCursors.resizeUpDown)),
-                  for (final edge in [
-                    'top-left',
-                    'top-right',
-                    'bottom-left',
-                    'bottom-right'
-                  ])
-                    Positioned(
-                        left: edge.contains('left') ? 0 : null,
-                        right: edge.contains('right') ? 0 : null,
-                        top: edge.contains('top') ? 0 : null,
-                        bottom: edge.contains('bottom') ? 0 : null,
-                        width: 24,
-                        height: 24,
-                        child: _handle(edge, rect, available,
-                            cursor: edge == 'top-left' || edge == 'bottom-right'
-                                ? SystemMouseCursors.resizeUpLeftDownRight
-                                : SystemMouseCursors.resizeUpRightDownLeft)),
-                ]),
+                child: _content(
+                    theme,
+                    Stack(children: [
+                      Padding(
+                        // Reserve resize hit areas; they never cover text or buttons.
+                        padding: const EdgeInsets.fromLTRB(12, 24, 12, 24),
+                        child: Column(children: [
+                          SizedBox(
+                              height: 36,
+                              child: Row(children: [
+                                Expanded(
+                                    child: _handle('move', rect, available,
+                                        cursor: SystemMouseCursors.move,
+                                        child: Center(
+                                            child: Container(
+                                                width: 40,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                    color: theme
+                                                        .colorScheme.outline,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2)))))),
+                                IconButton(
+                                  key: const ValueKey('reader-popup-close'),
+                                  tooltip: MaterialLocalizations.of(context)
+                                      .closeButtonTooltip,
+                                  padding: EdgeInsets.zero,
+                                  iconSize: 20,
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  icon: const Icon(Icons.close),
+                                ),
+                              ])),
+                          Expanded(child:
+                              LayoutBuilder(builder: (context, constraints) {
+                            // A short landscape/keyboard viewport must still allow
+                            // access to tool headers and input controls.
+                            final contentHeight =
+                                math.max(240.0, constraints.maxHeight);
+                            return SingleChildScrollView(
+                              primary: false,
+                              child: SizedBox(
+                                height: contentHeight,
+                                child: MediaQuery(
+                                  data: MediaQuery.of(context)
+                                      .removeViewInsets(removeBottom: true)
+                                      .copyWith(
+                                          size: Size(constraints.maxWidth,
+                                              contentHeight),
+                                          padding: EdgeInsets.zero,
+                                          viewPadding: EdgeInsets.zero),
+                                  child: RepaintBoundary(
+                                      child: ScrollConfiguration(
+                                          behavior: const AppScrollBehavior(
+                                              symmetricGutter: true),
+                                          child: widget.child)),
+                                ),
+                              ),
+                            );
+                          })),
+                        ]),
+                      ),
+                      Positioned(
+                          left: 0,
+                          top: 24,
+                          bottom: 24,
+                          width: 12,
+                          child: _handle('left', rect, available,
+                              cursor: SystemMouseCursors.resizeLeftRight)),
+                      Positioned(
+                          right: 0,
+                          top: 24,
+                          bottom: 24,
+                          width: 12,
+                          child: _handle('right', rect, available,
+                              cursor: SystemMouseCursors.resizeLeftRight)),
+                      Positioned(
+                          left: 24,
+                          right: 24,
+                          bottom: 0,
+                          height: 12,
+                          child: _handle('bottom', rect, available,
+                              cursor: SystemMouseCursors.resizeUpDown)),
+                      for (final edge in [
+                        'top-left',
+                        'top-right',
+                        'bottom-left',
+                        'bottom-right'
+                      ])
+                        Positioned(
+                            left: edge.contains('left') ? 0 : null,
+                            right: edge.contains('right') ? 0 : null,
+                            top: edge.contains('top') ? 0 : null,
+                            bottom: edge.contains('bottom') ? 0 : null,
+                            width: 24,
+                            height: 24,
+                            child: _handle(edge, rect, available,
+                                cursor: edge == 'top-left' ||
+                                        edge == 'bottom-right'
+                                    ? SystemMouseCursors.resizeUpLeftDownRight
+                                    : SystemMouseCursors
+                                        .resizeUpRightDownLeft)),
+                    ])),
               ),
             ),
           ),

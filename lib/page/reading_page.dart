@@ -295,6 +295,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       brightness: _documentBrightness(),
       onExtract: () => openDocumentExtraction(forceOcr: true),
       onQuery: (text, source, translation) => showReaderPopup(context,
+          dimContent: true,
           adjustableBarrierColor: Colors.transparent,
           allowWindowAdjustment: true,
           enableDrag: false,
@@ -1261,6 +1262,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       {String? contextText}) async {
     showOrHideAppBarAndBottomBar(false);
     await showReaderPopup(context,
+        dimContent: true,
         allowWindowAdjustment: true,
         builder: (_) => TranslationMenu(
               content: content,
@@ -1272,6 +1274,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> showSelectionDictionary(String content) async {
     showOrHideAppBarAndBottomBar(false);
     await showReaderPopup(context,
+        dimContent: true,
         allowWindowAdjustment: true,
         builder: (_) => DictionaryLookup(word: content));
     _restoreReaderFocusAfterPanel();
@@ -1282,6 +1285,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     showOrHideAppBarAndBottomBar(false);
     try {
       await showReaderPopup(context,
+          dimContent: true,
           allowWindowAdjustment: true,
           selectionRect: selectionRect,
           adjustableBarrierColor: Colors.transparent,
@@ -1372,6 +1376,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       final prompt = generatePromptSummaryThePreviousContent(previousContent);
       await showReaderPopup(
         context,
+        dimContent: true,
         adjustableBarrierColor: Colors.transparent,
         builder: (context) => ProviderScope(
           overrides: [
@@ -1601,6 +1606,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         if (!mounted) return;
       }
       await showReaderPopup(navigatorKey.currentContext!,
+          dimContent: true,
           allowWindowAdjustment: true,
           selectionRect: selectionRect,
           adjustableBarrierColor: Colors.transparent,

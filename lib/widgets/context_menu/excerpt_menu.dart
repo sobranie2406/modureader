@@ -402,6 +402,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
               contextText: sourceContext, selectionRect: widget.selectionRect);
         } else if (popupContext.mounted) {
           await showReaderPopup(popupContext,
+              dimContent: true,
               allowWindowAdjustment: true,
               selectionRect: widget.selectionRect,
               adjustableBarrierColor: Colors.transparent,
@@ -434,6 +435,7 @@ class ExcerptMenuState extends State<ExcerptMenu> {
           await reader.showSelectionDictionary(text);
         } else if (popupContext.mounted) {
           await showReaderPopup(popupContext,
+              dimContent: true,
               allowWindowAdjustment: true,
               builder: (_) => DictionaryLookup(word: text));
         }

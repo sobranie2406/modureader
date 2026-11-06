@@ -1,3 +1,4 @@
+import 'reader_content_brightness.dart';
 import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -52,24 +53,29 @@ Future<void> showBookSearchDialog(
           );
           return Dialog(
             key: const ValueKey('book-search-dialog'),
+            backgroundColor: Colors.transparent,
             alignment: const Alignment(0, -0.55),
             insetPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             clipBehavior: Clip.antiAlias,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: PointerInterceptor(
-              child: SizedBox(
-                width: 680,
-                height: height,
-                // Landscape keyboards may leave less room than the search
-                // header. Keep every control reachable instead of overflowing.
-                child: SingleChildScrollView(
-                  child:
-                      SizedBox(height: math.max(208.0, height), child: search),
-                ),
-              ),
-            ),
+            child: ReaderContentBrightness(
+                backgroundColor:
+                    Theme.of(context).dialogTheme.backgroundColor ??
+                        Theme.of(context).colorScheme.surface,
+                child: PointerInterceptor(
+                  child: SizedBox(
+                    width: 680,
+                    height: height,
+                    // Landscape keyboards may leave less room than the search
+                    // header. Keep every control reachable instead of overflowing.
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                          height: math.max(208.0, height), child: search),
+                    ),
+                  ),
+                )),
           );
         }),
       ),

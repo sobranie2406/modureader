@@ -7,7 +7,7 @@ const dart = readFileSync(new URL('../lib/service/app_brightness.dart', import.m
 const template = dart.split("return '''")[1].split("''';")[0];
 const script = opacity => template.replaceAll('$opacity', String(opacity));
 
-test('book dimmer stays below footnotes and cannot consume reader input', () => {
+test('book dimmer covers footnotes and cannot consume reader input', () => {
   const dom = new JSDOM('<body><foliate-view></foliate-view><div id="footnote-dialog" style="position:fixed;z-index:1000">Note</div></body>', {runScripts:'outside-only'});
   const doc = dom.window.document;
   const book = doc.querySelector('foliate-view');
@@ -18,7 +18,7 @@ test('book dimmer stays below footnotes and cannot consume reader input', () => 
   const dimmer = doc.querySelector('#modu-book-brightness');
   assert.equal(dimmer.style.pointerEvents, 'none');
   assert.equal(dimmer.style.position, 'fixed');
-  assert.ok(Number(dimmer.style.zIndex) < Number(note.style.zIndex));
+  assert.ok(Number(dimmer.style.zIndex) > Number(note.style.zIndex));
   assert.equal(dimmer.getAttribute('aria-hidden'), 'true');
   assert.equal(note.parentElement, doc.body);
   assert.equal(book.parentElement, doc.body);

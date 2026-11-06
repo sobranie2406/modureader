@@ -262,7 +262,7 @@ void main() {
   });
 
   testWidgets(
-      'minimum dims only dark book content; menu and next route stay normal',
+      'minimum dims book content in both themes; menu and next route stay normal',
       (tester) async {
     final c = await create();
     c.setLevel(0);
@@ -292,7 +292,7 @@ void main() {
         );
     final dimmer = find.byKey(const ValueKey('app-flutter-brightness-dimmer'));
     await tester.pumpWidget(app(Brightness.light));
-    expect(dimmer, findsNothing);
+    expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.95, .001));
     await tester.pumpWidget(app(Brightness.dark));
     await tester.pumpAndSettle();
     expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.95, .001));
@@ -308,7 +308,7 @@ void main() {
   });
 
   testWidgets(
-      'light mode disables book dimming controls but keeps the moon available',
+      'light mode enables brightness and auto controls as well as the moon',
       (tester) async {
     final c = await create();
     await tester.pumpWidget(MaterialApp(
@@ -319,12 +319,12 @@ void main() {
           body: BrightnessWidget(controller: c, onNightModeChanged: () {})),
     ));
     await tester.pumpAndSettle();
-    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNotNull);
     expect(
         tester
             .widget<IconButton>(find.byKey(const ValueKey('brightness-auto')))
             .onPressed,
-        isNull);
+        isNotNull);
     expect(
         tester
             .widget<IconButton>(find.byKey(const ValueKey('brightness-night')))

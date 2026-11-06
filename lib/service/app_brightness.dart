@@ -28,17 +28,17 @@ class AppBrightness extends ChangeNotifier {
   double get level => _level;
   double get dimOpacity => _followSystem ? 0 : (1 - _level).clamp(0.0, 0.95);
 
-  // Paint inside the reader DOM, below footnotes, to preserve native WebView
+  // Paint inside the reader DOM, including footnotes, to preserve native WebView
   // hit testing on macOS. Fixed positioning does not affect book pagination.
-  String readerDimmingScript({required bool darkMode}) {
-    final opacity = darkMode ? dimOpacity : 0.0;
+  String readerDimmingScript() {
+    final opacity = dimOpacity;
     return '''(function () {
       var dimmer = document.getElementById('modu-book-brightness');
       if (!dimmer && $opacity > 0 && document.body) {
         dimmer = document.createElement('div');
         dimmer.id = 'modu-book-brightness';
         dimmer.setAttribute('aria-hidden', 'true');
-        dimmer.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:999;';
+        dimmer.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:1001;';
         document.body.appendChild(dimmer);
       }
       if (dimmer) {

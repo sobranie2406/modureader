@@ -366,6 +366,7 @@ void main() {
       await tester.pumpWidget(app(Builder(
           builder: (context) => TextButton(
               onPressed: () => showReaderPopup(context,
+                  dimContent: true,
                   builder: (_) =>
                       DictionaryLookup(word: 'apple', store: store)),
               child: const Text('Open')))));

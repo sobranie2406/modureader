@@ -28,11 +28,12 @@ final frame = find.byKey(const ValueKey('adjustable-reader-popup-frame'));
 Finder handle(String edge) => find.byKey(ValueKey('reader-popup-$edge'));
 
 Future<void> open(WidgetTester tester,
-    {bool allow = true, Widget? body}) async {
+    {bool allow = true, bool dimContent = false, Widget? body}) async {
   await tester.pumpWidget(app(Builder(
       builder: (context) => TextButton(
             onPressed: () => showReaderPopup(context,
                 allowWindowAdjustment: allow,
+                dimContent: dimContent,
                 enableDrag: false,
                 builder: (_) => body ?? const TextField()),
             child: const Text('Open'),
@@ -274,6 +275,7 @@ void main() {
       Prefs().aiChatDisplayMode = AiChatDisplayMode.popup;
       Prefs().adjustableReaderPopups = true;
       await open(tester,
+          dimContent: true,
           body: tool == 'translation'
               ? TranslationMenu(
                   content: 'Selected text',
