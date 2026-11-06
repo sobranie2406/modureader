@@ -7,6 +7,7 @@ import 'package:anx_reader/widgets/dictionary/dictionary_sources.dart';
 import 'package:anx_reader/widgets/dictionary/dictionary_original.dart';
 import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
 import 'package:anx_reader/service/dictionary/online_dictionary.dart';
+import 'package:anx_reader/service/dictionary/dictionary_source_registry.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,6 +44,14 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
   String? _error;
   int _generation = 0;
   String t(String zh, String en) => dictionaryLabel(context, zh, en);
+
+  /// Labels come from the registry so a future plugin source renders here too;
+  /// the enum is only iterated for stable ordering.
+  String _label(OnlineDictionary source) {
+    final entry = DictionarySourceRegistry.current.byId(source.name);
+    if (entry == null) return t(source.zh, source.en);
+    return t(entry.labelZh, entry.labelEn);
+  }
   @override
   void initState() {
     super.initState();
@@ -257,12 +266,12 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                       Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
-                              '${t(source.zh, source.en)} · ${t('查询中…', 'Looking up…')}')),
+                              '${_label(source)} · ${t('查询中…', 'Looking up…')}')),
                   for (final source in OnlineDictionary.values)
                     if (_failed.contains(source))
                       ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(t(source.zh, source.en)),
+                          title: Text(_label(source)),
                           subtitle: Text(t('在线查询暂不可用（网络、限流或数据许可校验失败），本地结果不受影响。',
                               'Online lookup unavailable (network, rate limit or data/license validation). Local results are unaffected.')),
                           trailing: TextButton(
@@ -271,7 +280,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                   for (final source in _preferences.online)
                     if (_onlineEntries[source]?.isEmpty == true)
                       Text(
-                          '${t(source.zh, source.en)} · ${t('未找到词条', 'No entry found')}'),
+                          '${_label(source)} · ${t('未找到词条', 'No entry found')}'),
                   if (!_busy && _error == null)
                     for (final dictionary in _dictionaries)
                       if (dictionary.enabled &&

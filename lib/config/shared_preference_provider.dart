@@ -53,6 +53,7 @@ import 'package:anx_reader/models/window_info.dart';
 import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
 import 'package:anx_reader/service/ai/reading_prompt_overrides.dart';
 import 'package:anx_reader/service/translate/index.dart';
+import 'package:anx_reader/service/tts/tts_service.dart';
 import 'package:anx_reader/utils/get_current_language_code.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/widgets/reading_page/style_widget.dart';
@@ -982,12 +983,14 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The selected speech service id.
+  ///
+  /// Retired providers ('aliyun'/'azure') are registry aliases of 'system', so a
+  /// value written by an older installation still resolves. The stored token is
+  /// left alone: P2 reads old tokens and writes old tokens.
   String get ttsService {
     String? service = prefs.getString('ttsService');
-    if (service != null) {
-      // Removed legacy providers may still be stored by an older installation.
-      return const {'aliyun', 'azure'}.contains(service) ? 'system' : service;
-    }
+    if (service != null) return _normalizeTtsService(service);
 
     // Migration/Fallback
     bool isSystem = prefs.getBool('isSystemTts') ??
@@ -995,12 +998,14 @@ class Prefs extends ChangeNotifier {
     if (!isSystem) {
       // Check if there was an online service set
       String? online = prefs.getString('onlineTtsService');
-      if (online != null) {
-        return const {'aliyun', 'azure'}.contains(online) ? 'system' : online;
-      }
+      if (online != null) return _normalizeTtsService(online);
     }
     return 'system';
   }
+
+  /// Maps a stored id onto a service this build can run.
+  static String _normalizeTtsService(String id) =>
+      TtsRegistry.current.resolveService(id)?.name ?? 'system';
 
   Map<String, dynamic> getOnlineTtsConfig(String serviceId) {
     String? json = prefs.getString('onlineTtsConfig_$serviceId');
@@ -1724,25 +1729,26 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tool ids the user enabled.
+  ///
+  /// Unknown ids are **kept** (P2): a tool this build does not ship may belong
+  /// to a newer version, and dropping it here would lose the selection. Tools
+  /// are filtered when they are built, not when they are read. An empty stored
+  /// list therefore means "the user enabled nothing", which is distinct from a
+  /// missing key ("never configured" → defaults).
   List<String> get enabledAiToolIds {
     final stored = prefs.getStringList(_enabledAiToolsKey);
     if (stored == null) {
-      return AiToolRegistry.defaultEnabledToolIds();
+      return AiToolRegistry.current.defaultEnabledToolIds();
     }
-    if (stored.isEmpty) {
-      return const [];
-    }
-    final sanitized = AiToolRegistry.sanitizeIds(stored);
-    if (sanitized.isEmpty && stored.isNotEmpty) {
-      return AiToolRegistry.defaultEnabledToolIds();
-    }
-    return sanitized;
+    if (stored.isEmpty) return const [];
+    return AiToolRegistry.current.sanitizeIds(stored);
   }
 
   set enabledAiToolIds(List<String> ids) {
     prefs.setStringList(
       _enabledAiToolsKey,
-      AiToolRegistry.sanitizeIds(ids),
+      AiToolRegistry.current.sanitizeIds(ids),
     );
     notifyListeners();
   }

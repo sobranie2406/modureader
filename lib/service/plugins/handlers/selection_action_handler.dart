@@ -7,6 +7,7 @@ import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
 import 'package:anx_reader/service/plugins/handlers/plugin_locale.dart';
 import 'package:anx_reader/service/plugins/plugin_contribution_handler.dart';
+import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:crypto/crypto.dart';
 
 /// Materialises `selectionAction` contributions as ordinary custom AI
@@ -151,10 +152,26 @@ class SelectionActionContributionHandler implements PluginContributionHandler {
       ));
     }
 
-    await Prefs()
-        .saveSelectionToolbar(config.copyWith(items: List.unmodifiable(next)));
+    // Skip a write when the toolbar already matches, so re-enabling a plugin
+    // whose actions are unchanged does not churn preferences and notify every
+    // listener for nothing.
+    if (!_sameItems(config.items, next)) {
+      await Prefs().saveSelectionToolbar(
+          config.copyWith(items: List.unmodifiable(next)));
+    }
     return applied;
   }
+
+  /// Actions are stored in preferences, not an in-memory registry.
+  @override
+  bool get runtimeOnly => false;
+
+  /// Actions persist in selectionToolbar, so a missing id means the
+  /// contribution was removed and has to be re-materialised.
+  @override
+  bool isApplied(AppliedContribution applied) =>
+      applied.kind == kind &&
+      Prefs().selectionToolbar.items.any((item) => item.id == applied.id);
 
   @override
   Future<void> remove(List<AppliedContribution> applied) async {
@@ -204,7 +221,28 @@ class SelectionActionContributionHandler implements PluginContributionHandler {
   }
 
   static String toolbarIdFor(String pluginId, String actionId) =>
-      'custom-plugin:$pluginId:$actionId';
+      PluginPromptTemplate.actionId(pluginId, actionId);
+
+  static bool _sameItems(
+      List<SelectionToolbarItem> a, List<SelectionToolbarItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final left = a[i];
+      final right = b[i];
+      if (left.id != right.id ||
+          left.action != right.action ||
+          left.name != right.name ||
+          left.icon != right.icon ||
+          left.prompt != right.prompt ||
+          left.scope != right.scope ||
+          left.enabled != right.enabled ||
+          left.webSearch != right.webSearch ||
+          left.skillId != right.skillId) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   static String _hash(String canonical) =>
       sha256.convert(utf8.encode(canonical)).toString();

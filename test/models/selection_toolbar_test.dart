@@ -326,6 +326,17 @@ void main() {
     const SelectionToolbarConfig(colors: ['FFFFFF', 'FFFFFF']),
     const SelectionToolbarConfig(items: []),
     const SelectionToolbarConfig(annotations: []),
+    SelectionToolbarConfig(annotations: [
+      own,
+      ...SelectionToolbarConfig.defaultAnnotations.skip(1),
+    ]),
+    SelectionToolbarConfig(items: [
+      SelectionToolbarConfig.defaultAnnotations.first,
+      ...SelectionToolbarConfig.initialItems.skip(1),
+    ], annotations: [
+      SelectionToolbarConfig.initialItems.first,
+      ...SelectionToolbarConfig.defaultAnnotations.skip(1),
+    ]),
     SelectionToolbarConfig(items: [
       ...SelectionToolbarConfig.initialItems,
       own.copyWith(prompt: '')

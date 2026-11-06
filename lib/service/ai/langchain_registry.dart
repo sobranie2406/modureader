@@ -153,8 +153,8 @@ class LangchainAiRegistry {
           )
           .toList(growable: false);
       final toolContext = AiToolContext(ref: ref!);
-      tools = AiToolRegistry.buildTools(toolContext, enabledIds);
-      final enabledDefs = AiToolRegistry.definitions
+      tools = AiToolRegistry.current.buildTools(toolContext, enabledIds);
+      final enabledDefs = AiToolRegistry.current.definitions
           .where((def) => enabledIds.contains(def.id))
           .toList(growable: false);
       systemMessage = _buildAgentSystemMessage(

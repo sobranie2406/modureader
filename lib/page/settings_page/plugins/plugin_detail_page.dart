@@ -5,6 +5,7 @@ import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/plugin_manifest.dart';
 import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/models/selection_toolbar.dart';
+import 'package:anx_reader/page/settings_page/plugins/plugin_labels.dart';
 import 'package:anx_reader/page/settings_page/plugins/plugins_page.dart';
 import 'package:anx_reader/service/config/config_item.dart';
 import 'package:anx_reader/service/plugins/handlers/selection_action_handler.dart';
@@ -52,6 +53,7 @@ class PluginDetailPage extends StatelessWidget {
                     if (host.manifestFor(pluginId)?.settings.isNotEmpty ??
                         false)
                       _settingsSection(context),
+                    _readmeSection(context),
                     _diagnosticSection(context, record),
                   ],
                 ),
@@ -101,7 +103,7 @@ class PluginDetailPage extends StatelessWidget {
         else
           for (final capability in capabilities)
             _valueTile(
-                context, _capabilityLabel(context, capability), capability),
+                context, pluginCapabilityLabel(context, capability), capability),
       ],
     );
   }
@@ -178,8 +180,7 @@ class PluginDetailPage extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return SettingsSection(
-      title: Text(ModuStrings.text(context, '预留配置（仅保存，不影响当前提示词）',
-          'Reserved settings (stored only; do not affect prompts)')),
+      title: Text(ModuStrings.text(context, '插件设置', 'Settings')),
       tiles: [
         CustomSettingsTile(
           child: Padding(
@@ -189,6 +190,38 @@ class PluginDetailPage extends StatelessWidget {
               pluginId: manifest.id,
               manifest: manifest,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _readmeSection(BuildContext context) {
+    final record = host.byId(pluginId);
+    if (record == null || !record.isUsable) return const SizedBox.shrink();
+    return SettingsSection(
+      title: Text(ModuStrings.text(context, '包内 README', 'Package README')),
+      tiles: [
+        CustomSettingsTile(
+          child: FutureBuilder<String?>(
+            future: host.readmeFor(pluginId),
+            builder: (context, snapshot) {
+              final readme = snapshot.data;
+              if (readme == null || readme.trim().isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(ModuStrings.text(context,
+                      '插件包没有提供 README。', 'This package has no README.')),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: SelectableText(
+                  readme,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -232,21 +265,6 @@ class PluginDetailPage extends StatelessWidget {
         subtitle: SelectableText(value),
       ),
     );
-  }
-
-  String _capabilityLabel(BuildContext context, String capability) {
-    switch (capability) {
-      case kAiPromptPackCapability:
-        return ModuStrings.text(
-            context, '添加 AI 提示词模板', 'Add AI prompt templates');
-      case kSelectionActionCapability:
-        return ModuStrings.text(
-            context, '添加划词工具栏动作', 'Add selection toolbar actions');
-      case 'storage:plugin':
-        return ModuStrings.text(context, '使用插件私有目录', 'Use plugin storage');
-      default:
-        return capability;
-    }
   }
 }
 
@@ -361,6 +379,22 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
           defaultValue: description == null || description.isEmpty
               ? resolvedLabel
               : description,
+        );
+      case PluginSettingType.secret:
+        // Secrets are never edited through the ordinary config form: that map
+        // is exported and backed up. Until P3c adds the device-only entry field,
+        // the row states what is required instead of pretending to store it.
+        return ConfigItem(
+          key: spec.key,
+          label: resolvedLabel,
+          type: ConfigItemType.tip,
+          defaultValue: ModuStrings.text(
+            context,
+            '此插件需要填写密钥。密钥仅保存在本机，不会随设置或备份导出；填写功能将在网络插件正式启用时提供。',
+            'This plugin needs a key. Keys stay on this device and are never '
+                'exported with settings or backups; entry becomes available when '
+                'network plugins are enabled.',
+          ),
         );
     }
   }

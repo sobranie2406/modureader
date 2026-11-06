@@ -5,8 +5,9 @@ import 'package:anx_reader/models/plugin_manifest.dart';
 /// Validation and encoding for the per-plugin `pluginConfig_<id>` preference.
 ///
 /// Only values the user changed are stored; absent keys keep the manifest
-/// default. Settings are primitive values (no password type), so a settings
-/// backup can carry them without extra credential handling.
+/// default. Settings are primitive values, never credentials: `secret` entries
+/// are rejected outright and live under `pluginSecret_<id>` instead, so this
+/// object can keep travelling in settings backups without credential handling.
 class PluginConfig {
   const PluginConfig._();
 
@@ -90,6 +91,12 @@ class PluginConfig {
         case PluginSettingType.tip:
           throw const FormatException(
               'Plugin tip settings cannot store values');
+        case PluginSettingType.secret:
+          // Secrets live under pluginSecret_<id>; encountering one here means a
+          // backup or a hand-edited payload tried to smuggle a credential into
+          // the ordinary configuration object.
+          throw const FormatException(
+              'Plugin secrets cannot be stored in plugin settings');
       }
     }
   }
@@ -109,6 +116,8 @@ class PluginConfig {
         PluginSettingType.select =>
           value is String && spec.options.contains(value),
         PluginSettingType.tip => false,
+        // Secrets are never part of this map, even if an old payload has one.
+        PluginSettingType.secret => false,
       };
       if (!valid) values.remove(spec.key);
     }

@@ -47,6 +47,7 @@ Other guides are maintained as a single English edition. Release notes from 1.2.
 - [Architecture/source audit](PROJECT_AUDIT.md)
 - [Plugin system P0–P1 execution plan](development/plugin-system-p0-p1.md)
 - [Plugin system P2–P3 design: registries and declarative network plugins](development/plugin-system-p2-p3.md)
+- [P3 network plugin security review](development/plugin-p3-security-review.md)
 - [Demo books](examples/README.md) · [Screenshots and artwork](images/README.md)
 - [Upstream attribution](../UPSTREAM.md) · [NOTICE](../NOTICE) · [License](../LICENSE)
 

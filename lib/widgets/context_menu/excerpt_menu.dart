@@ -10,6 +10,7 @@ import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
 import 'package:anx_reader/page/reading_page.dart';
 import 'package:anx_reader/service/tts/tts_handler.dart';
 import 'package:anx_reader/service/ocr/document_reflow_store.dart';
+import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:anx_reader/utils/env_var.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/widgets/book_share/excerpt_share_service.dart';
@@ -487,10 +488,15 @@ class ExcerptMenuState extends State<ExcerptMenu> {
         break;
       case 'ai':
       case 'aiCommand':
-        final prompt = item.prompt.isEmpty
+        final template = item.prompt.isEmpty
+            ? item.prompt
+            : PluginPromptTemplate.renderForId(item.id, item.prompt);
+        final prompt = template.isEmpty
             ? text
-            : item.promptForSelection(text,
-                locale: Localizations.localeOf(context));
+            : item
+                .copyWith(prompt: template)
+                .promptForSelection(text,
+                    locale: Localizations.localeOf(context));
         widget.onClose();
         await reader?.showAiChat(
           draftScreen: 'selection.${item.id}',

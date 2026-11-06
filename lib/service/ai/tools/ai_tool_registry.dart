@@ -21,6 +21,8 @@ import 'package:anx_reader/service/ai/tools/repository/groups_repository.dart';
 import 'package:anx_reader/service/ai/tools/repository/notes_repository.dart';
 import 'package:anx_reader/service/ai/tools/repository/reading_history_repository.dart';
 import 'package:anx_reader/service/ai/tools/repository/tag_repository.dart';
+import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:langchain_core/tools.dart';
 
@@ -66,8 +68,99 @@ class AiToolDefinition {
       l10n == null ? '' : description(l10n);
 }
 
+/// A tool registered with the app. Tools are built in only: plugins cannot
+/// register executable tools in P2 (script tools arrive with a separate
+/// permission in a later phase).
+class AiToolEntry implements RegistryEntry {
+  const AiToolEntry({
+    required this.definition,
+    this.owner = const RegistryOwner.builtIn(),
+  });
+
+  final AiToolDefinition definition;
+
+  @override
+  String get id => definition.id;
+
+  @override
+  RegistryDomain get domain => RegistryDomain.aiTool;
+
+  @override
+  final RegistryOwner owner;
+
+  @override
+  List<String> get aliases => const [];
+}
+
 class AiToolRegistry {
-  static final List<AiToolDefinition> _definitions = [
+  AiToolRegistry(Iterable<AiToolDefinition> definitions) {
+    for (final definition in definitions) {
+      register(definition);
+    }
+  }
+
+  /// Production table. Built-in ids are frozen: they are persisted in
+  /// 'enabledAiTools', so a rename would silently disable a tool for existing
+  /// users. Add entries, never rename them.
+  static final AiToolRegistry instance = AiToolRegistry(_builtInDefinitions);
+
+  /// Registry backing every lookup. Tests replace it with an injected instance
+  /// and must restore it afterwards.
+  static AiToolRegistry _current = instance;
+
+  static AiToolRegistry get current => _current;
+
+  @visibleForTesting
+  static void useForTesting(AiToolRegistry registry) => _current = registry;
+
+  @visibleForTesting
+  static void resetForTesting() => _current = instance;
+
+  final HostRegistry<AiToolEntry> registry =
+      HostRegistry<AiToolEntry>(RegistryDomain.aiTool);
+
+  void register(AiToolDefinition definition, {RegistryOwner? owner}) {
+    registry.register(AiToolEntry(
+      definition: definition,
+      owner: owner ?? const RegistryOwner.builtIn(),
+    ));
+  }
+
+  /// Built-in entries only, in registration order.
+  List<AiToolDefinition> get definitions => [
+        for (final entry in registry.all)
+          if (entry.owner is BuiltInOwner) entry.definition,
+      ];
+
+  AiToolDefinition? byId(String id) => registry.resolve(id)?.definition;
+
+  List<String> defaultEnabledToolIds() =>
+      definitions.map((definition) => definition.id).toList(growable: false);
+
+  /// Storage sanitiser: drops duplicates but **keeps unknown ids**, so a tool
+  /// that is temporarily unavailable (disabled plugin, newer app version) does
+  /// not lose its saved selection. Unknown ids are filtered when tools are
+  /// built, never when they are read from storage.
+  List<String> sanitizeIds(List<String> ids) => ids.toSet().toList(growable: false);
+
+  List<Tool> buildTools(
+    AiToolContext context,
+    List<String> enabledIds,
+  ) {
+    final enabled = enabledIds.toSet();
+    return definitions
+        .where((definition) => enabled.contains(definition.id))
+        .map((definition) => definition.build(context))
+        .toList(growable: false);
+  }
+
+  String displayNameForId(String id, {L10n? l10n}) =>
+      byId(id)?.displayNameOrDefault(l10n) ?? id;
+
+  String descriptionForId(String id, {L10n? l10n}) =>
+      byId(id)?.descriptionOrDefault(l10n) ?? '';
+
+  static final List<AiToolDefinition> _builtInDefinitions = [
     calculatorToolDefinition,
     currentTimeToolDefinition,
     mindmapToolDefinition,
@@ -84,44 +177,4 @@ class AiToolRegistry {
     booksTagsListToolDefinition,
     applyBookTagsToolDefinition,
   ];
-
-  static final Map<String, AiToolDefinition> _definitionMap = {
-    for (final def in _definitions) def.id: def,
-  };
-
-  static List<AiToolDefinition> get definitions =>
-      List<AiToolDefinition>.unmodifiable(_definitions);
-
-  static AiToolDefinition? byId(String id) => _definitionMap[id];
-
-  static List<String> defaultEnabledToolIds() =>
-      _definitions.map((def) => def.id).toList(growable: false);
-
-  static List<String> sanitizeIds(List<String> ids) {
-    final seen = <String>{};
-    final filtered = <String>[];
-    for (final id in ids) {
-      if (_definitionMap.containsKey(id) && seen.add(id)) {
-        filtered.add(id);
-      }
-    }
-    return filtered;
-  }
-
-  static List<Tool> buildTools(
-    AiToolContext context,
-    List<String> enabledIds,
-  ) {
-    final enabled = enabledIds.toSet();
-    return _definitions
-        .where((def) => enabled.contains(def.id))
-        .map((def) => def.build(context))
-        .toList(growable: false);
-  }
-
-  static String displayNameForId(String id, {L10n? l10n}) =>
-      _definitionMap[id]?.displayNameOrDefault(l10n) ?? id;
-
-  static String descriptionForId(String id, {L10n? l10n}) =>
-      _definitionMap[id]?.descriptionOrDefault(l10n) ?? '';
 }

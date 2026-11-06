@@ -6,6 +6,7 @@ import 'package:anx_reader/models/plugin_state.dart';
 import 'package:anx_reader/models/user_prompt.dart';
 import 'package:anx_reader/service/plugins/handlers/plugin_locale.dart';
 import 'package:anx_reader/service/plugins/plugin_contribution_handler.dart';
+import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:crypto/crypto.dart';
 
 /// Materialises `aiSkill` contributions as ordinary user prompts.
@@ -124,6 +125,16 @@ class AiPromptContributionHandler implements PluginContributionHandler {
     return applied;
   }
 
+  /// Prompts are stored in preferences, not an in-memory registry.
+  @override
+  bool get runtimeOnly => false;
+
+  /// Prompts persist in userPrompts, so a missing id means the contribution
+  /// was removed (settings import) and has to be re-materialised.
+  @override
+  bool isApplied(AppliedContribution applied) =>
+      applied.kind == kind && Prefs().userPrompts.any((p) => p.id == applied.id);
+
   @override
   Future<void> remove(List<AppliedContribution> applied) async {
     final promptEntries = applied.where((entry) => entry.kind == kind).toList();
@@ -170,7 +181,7 @@ class AiPromptContributionHandler implements PluginContributionHandler {
   }
 
   static String promptIdFor(String pluginId, String skillId) =>
-      'plugin:$pluginId:$skillId';
+      PluginPromptTemplate.promptId(pluginId, skillId);
 
   static String contentHash(String content) =>
       sha256.convert(utf8.encode(content)).toString();

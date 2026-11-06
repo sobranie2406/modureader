@@ -183,11 +183,13 @@ void validateSettingsValue(String key, dynamic value,
   if (key.startsWith('onlineTtsConfig_')) {
     final data = TtsConfigTransfer.defaults();
     final id = key.substring('onlineTtsConfig_'.length);
-    if (TtsConfigTransfer.services.contains(id)) {
+    // A provider this build knows is validated strictly; an unknown one keeps
+    // its object shape so reinstalling or upgrading cannot silently drop it.
+    if (TtsConfigTransfer.isKnownProvider(id)) {
       data['providers'][id]['config'] = object();
       TtsConfigTransfer.validate(data);
     } else {
-      object(); // Preserve old provider configuration without selecting it.
+      object();
     }
   }
   if (key == 'webdavInfo') {

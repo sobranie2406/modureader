@@ -188,6 +188,12 @@ class _RecordingHandler implements PluginContributionHandler {
   Set<String> get requiredCapabilities => const {};
 
   @override
+  bool isApplied(AppliedContribution applied) => true;
+
+  @override
+  bool get runtimeOnly => false;
+
+  @override
   void validate(
       PluginManifest manifest, List<PluginContribution> contributions) {}
 

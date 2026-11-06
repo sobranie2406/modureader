@@ -2,10 +2,18 @@ import 'dart:convert';
 import 'package:anx_reader/models/tts_buffer_settings.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/tts/tts_service.dart';
 
 /// A complete, versioned snapshot. Parsing never changes preferences or starts TTS.
 class TtsConfigTransfer {
-  static const services = ['system', 'edge', 'dashscope', 'xiaomi', 'openai'];
+  /// The five built-in providers, in the fixed order an export writes them so
+  /// an older build can read a backup produced by a newer one. Sourced from the
+  /// registry so adding a provider cannot silently drop its configuration.
+  static List<String> get services => TtsRegistry.transferOrder;
+
+  /// True when [id] is a built-in provider this build can configure. Unknown
+  /// ids keep their stored shape instead of being validated or dropped.
+  static bool isKnownProvider(String id) => services.contains(id);
 
   static Map<String, dynamic> defaults() => {
         'version': 1,
@@ -39,7 +47,14 @@ class TtsConfigTransfer {
       };
 
   static Map<String, dynamic> validate(Map<String, dynamic> data) {
-    if (data['version'] != 1 || !services.contains(data['service'])) {
+    // The selected service must be one this build can run; an unknown id is a
+    // corrupt or newer snapshot, not a provider to preserve.
+    // Retired ids ('aliyun'/'azure') are accepted and normalised to 'system' so
+    // an old backup still imports instead of failing the whole snapshot.
+    final service = data['service'];
+    if (data['version'] != 1 ||
+        service is! String ||
+        TtsRegistry.current.resolveService(service) == null) {
       throw const FormatException(
           '不支持的朗读配置版本或服务 / Unsupported TTS configuration');
     }
@@ -54,11 +69,31 @@ class TtsConfigTransfer {
     final rawProviders = data['providers'];
     if (data['allowMixWithOtherAudio'] is! bool ||
         rawProviders is! Map ||
-        rawProviders.length != services.length ||
         !services.every(rawProviders.containsKey)) {
       throw const FormatException('朗读配置不完整 / Incomplete TTS configuration');
     }
     final providers = <String, dynamic>{};
+    // Providers this build does not know are validated for shape only and then
+    // carried through untouched: they cannot run here, but dropping them would
+    // lose a configuration that a newer build (or the plugin that owns it) can
+    // still use.
+    for (final id in rawProviders.keys) {
+      if (services.contains(id)) continue;
+      final raw = rawProviders[id];
+      if (raw is! Map || raw['voice'] is! String || raw['config'] is! Map) {
+        throw const FormatException('语音配置无效 / Invalid voice configuration');
+      }
+      for (final entry in (raw['config'] as Map).entries) {
+        if (entry.key is! String || entry.value is! String) {
+          throw const FormatException(
+              '接口配置无效 / Invalid service configuration');
+        }
+      }
+      providers[id as String] = {
+        'config': Map<String, dynamic>.from(raw['config'] as Map),
+        'voice': raw['voice'],
+      };
+    }
     for (final id in services) {
       final raw = rawProviders[id];
       if (raw is! Map || raw['voice'] is! String || raw['config'] is! Map) {
@@ -112,16 +147,21 @@ class TtsConfigTransfer {
   /// The caller stops the player before applying and refreshes it afterwards.
   static Future<void> apply(Prefs prefs, Map<String, dynamic> data) async {
     final valid = validate(data);
+    // Normalise a retired id ('aliyun'/'azure') on the way in; keep any id this
+    // build does not know, because the snapshot is the user's configuration.
+    final service =
+        TtsRegistry.current.resolveService(valid['service'] as String);
     final values = <String, Object>{
-      'ttsService': valid['service'],
+      'ttsService': service!.name,
       'ttsVolume': valid['volume'],
       'ttsPitch': valid['pitch'],
       'ttsRate': valid['rate'],
       'ttsBufferSettings': jsonEncode(valid['buffer']),
       'allowMixWithOtherAudio': valid['allowMixWithOtherAudio'],
-      for (final id in services)
-        'onlineTtsConfig_$id': jsonEncode(valid['providers'][id]['config']),
-      for (final id in services)
+      for (final id in (valid['providers'] as Map<String, dynamic>).keys)
+        'onlineTtsConfig_$id':
+            jsonEncode(valid['providers'][id]['config']),
+      for (final id in (valid['providers'] as Map<String, dynamic>).keys)
         'ttsVoiceModel_$id': valid['providers'][id]['voice'],
     };
     final previous = {for (final key in values.keys) key: prefs.prefs.get(key)};

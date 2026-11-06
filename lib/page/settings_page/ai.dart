@@ -30,7 +30,7 @@ class _AISettingsState extends ConsumerState<AISettings> {
     final l10n = L10n.of(context);
     ref.watch(aiProvidersProvider);
 
-    final toolDefs = AiToolRegistry.definitions;
+    final toolDefs = AiToolRegistry.current.definitions;
     final enabledToolIds = Prefs().enabledAiToolIds;
 
     final toolsTile = CustomSettingsTile(

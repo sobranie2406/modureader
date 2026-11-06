@@ -4,7 +4,17 @@
 > precedence: no third-party sources, network plugins or script execution are
 > enabled by the current experimental switch.
 
-Status: design draft, pending review · 2026-10-24 · baseline `3cdf7365` (P1 implemented; the working tree also contains uncommitted P1b/P1c changes) · this document defines P2/P3 only, with no implementation
+Status: partially implemented and reviewed · 2026-11-06. PR #72 provides
+installation previews, prompt setting substitution, built-in registries, and
+network parsing/transport helpers. Network plugins remain unavailable in
+`PluginHost` (preview, install, enable and startup reconciliation). The lookup
+handler, explicit network consent, device-local secret entry, end-to-end
+cancellation/DNS deadlines and device verification must land before enabling
+`net:http`. Script execution, signatures and a developer CLI are not part of
+this implementation; the existing trusted-package catalog remains authoritative.
+
+The numbered sections below retain the design roadmap; they are not a statement
+that every phase is implemented.
 
 This document continues [Plugin system P0–P1 execution plan](plugin-system-p0-p1.md). P2 turns the dispatch paths for translation, speech (TTS), dictionaries, AI tools/skills and the selection toolbar into registries keyed by stable IDs. P3 opens **declarative network plugins** on top of those registries, starting with dictionary HTTP sources. The P4 WebView script host and P5 signing/ecosystem work are out of scope.
 
@@ -41,13 +51,14 @@ Neither adjustment changes the conclusions "target form C, script host in P4, We
 - Plugin host: `lib/service/plugins/plugin_host.dart`, with install/enable/disable/uninstall/upgrade, `PluginStatus`, startup reconciliation and the `AppliedContribution` hash guard.
 - Contribution registry: `lib/service/plugins/plugin_contribution_handler.dart` + `plugin_contributions.dart`, resolving handlers by `kind`; P1 registers `aiSkill` and `selectionAction`.
 - Plugin state: the single `pluginState` key plus `pluginConfig_<id>`; P1 already wires both into settings export and strict validation.
-- Built-in dispatch is still enum/static-table based:
-  - Translation: the `switch` in `TranslateService.provider` (`lib/service/translate/index.dart:29-50`).
-  - TTS: the `switch` in `TtsService.provider` (`lib/service/tts/tts_service.dart:19-32`).
-  - Dictionary: `enum OnlineDictionary` and host construction by enum inside `OnlineDictionaryService.lookup` (`lib/service/dictionary/online_dictionary.dart:8-40`).
-  - AI tools: the static `_definitions` in `AiToolRegistry` (`lib/service/ai/tools/ai_tool_registry.dart:69-127`).
-  - Reading skills: the `const readAnySkills` static list (`lib/service/ai/readany_skills.dart:44-181`).
-  - Selection toolbar: the static `defaultItems` / `templateItems` / `iconIds` / `skillIds` and `validate()` in `SelectionToolbarConfig` (`lib/models/selection_toolbar.dart:133-310`).
+- Built-in dispatch state (**P2a/P2b/P2c landed: all six domains are registry-based**):
+  - Translation: `TranslateRegistry.current` wraps `HostRegistry<TranslateProviderEntry>`; the enum stays only because its `name` is the persisted token. `microsoft` is an alias of `microsoftApi`, and picker orders are explicit lists rather than registration order (`lib/service/translate/translate_registry.dart`).
+  - TTS: `TtsRegistry.current` wraps `HostRegistry<TtsProviderEntry>`; `aliyun`/`azure` are aliases of `system`, and the transfer snapshot keeps the historical five-provider order while preserving unknown providers on import (`lib/service/tts/tts_service.dart`, `lib/service/config_transfer/tts_config_transfer.dart`).
+  - Dictionary: `DictionarySourceRegistry.current` wraps `HostRegistry<DictionarySourceEntry>`. Built-in tokens (`online:wiktionaryZh`, `local:<uuid>`) are unchanged; unknown tokens (including `online:plugin:...`) are kept in storage and hidden from the UI so reinstalling a plugin restores the selection (`lib/service/dictionary/dictionary_source_registry.dart`).
+  - AI tools: `AiToolRegistry.current` wraps `HostRegistry<AiToolEntry>`; ids unchanged and persisted on purpose (`lib/service/ai/tools/ai_tool_registry.dart`).
+  - Reading skills: `ReadingSkillRegistry.current` wraps `HostRegistry<ReadingSkillEntry>` and keeps retired prompts visible to recognition only (`lib/service/ai/reading_skill_registry.dart`).
+  - Selection toolbar: `SelectionToolbarConfig.validate()` no longer compares list identities (`identical(defaults, defaultItems)`); built-in identity comes from `ToolbarCatalog` in `lib/models/toolbar_action_definition.dart`, wrapped by `ToolbarRegistry` (`lib/service/registry/toolbar_registry.dart`). The model layer stays free of service imports.
+- Contribution lifecycle (P2a): `PluginContributionHandler` gained `isApplied` and `runtimeOnly`; `PluginHost` no longer switches on `kind`. Declarative kinds keep P1's "rebuild only when every entry is gone" rule, runtime-only kinds are rebuilt on every start.
 - Network: existing dictionaries call `Dio` directly (`online_dictionary.dart:42-80`); there is no shared plugin network exit, no domain allowlist, no quota and no secret isolation.
 
 ### 0.5 Next steps
@@ -1083,6 +1094,10 @@ Overall rollback principle: P2 reverts code only; P3 first removes the capabilit
 - Do not assume OHOS network behaviour matches Android exactly; P3 needs real-device validation of proxy, TLS and timeouts on OHOS.
 
 ### 10.4 Open questions
+
+The P3 items below (JSON vs HTML, secret export, backup domains, restart-persistent
+quotas, dedicated HTTP client) are analysed in [the P3 security review](plugin-p3-security-review.md) §9,
+which is the gate for P3a.
 
 1. Should P3's `dictionarySource` support JSON only, or also a minimal HTML text extraction in v1? This document defaults to JSON-only.
 2. Should plugin secrets be exported when `includeSecrets=true`? This document defaults to **never export**; if maintainers want exportable secrets, that needs a separate security review and a second UI confirmation.

@@ -31,7 +31,9 @@ Future<bool> showDictionarySources(
               });
               try {
                 await DictionaryPreferences(
-                        localIds: selected.toSet(), online: online.toSet())
+                        localIds: selected.toSet(),
+                        online: online.toSet(),
+                        unknownTokens: prefs.unknownTokens)
                     .save();
                 changed = true;
               } catch (_) {

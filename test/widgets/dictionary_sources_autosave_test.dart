@@ -9,7 +9,9 @@ void main() {
   testWidgets(
       'local selections persist before closing, barrier dismissal reports changes',
       (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      dictionaryPreferencesKey: ['local:*', 'online:plugin:example:dictionary'],
+    });
     bool? changed;
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -28,6 +30,8 @@ void main() {
     await tester.pumpAndSettle();
     expect((await DictionaryPreferences.load()).localIds, {'b'});
     expect((await DictionaryPreferences.load()).online, isEmpty);
+    expect((await DictionaryPreferences.load()).unknownTokens,
+        {'online:plugin:example:dictionary'});
     expect(find.text('Apply'), findsNothing);
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();

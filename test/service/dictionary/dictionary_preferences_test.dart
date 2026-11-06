@@ -1,6 +1,8 @@
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
 import 'package:anx_reader/service/dictionary/online_dictionary.dart';
+import 'package:anx_reader/service/dictionary/dictionary_source_registry.dart';
+import 'package:anx_reader/service/registry/host_registry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,23 +17,56 @@ void main() {
     expect(p.localIds, isNull);
     expect(p.online, isEmpty);
   });
-  test(
-      'removed online source is ignored without changing local or wiki choices',
+  test('an unrecognised source is hidden from the UI but kept in storage',
       () async {
+    // A source can be missing because a plugin is uninstalled, not because the
+    // user removed it. Dropping the token would silently lose the selection and
+    // reinstalling would not restore it (P2 §4.4.6).
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(dictionaryPreferencesKey,
         ['local:one', 'online:freeEnglish', 'online:wiktionaryZh']);
     final loaded = await DictionaryPreferences.load();
     expect(loaded.localIds, {'one'});
     expect(loaded.online, {OnlineDictionary.wiktionaryZh});
+    expect(loaded.unknownTokens, {'online:freeEnglish'});
     await loaded.save();
     expect(prefs.getStringList(dictionaryPreferencesKey),
-        ['local:one', 'online:wiktionaryZh']);
+        ['local:one', 'online:wiktionaryZh', 'online:freeEnglish']);
+
     await prefs.setStringList(
         dictionaryPreferencesKey, ['local:*', 'online:freeEnglish']);
     final removedOnly = await DictionaryPreferences.load();
     expect(removedOnly.localIds, isNull);
     expect(removedOnly.online, isEmpty);
+    expect(removedOnly.unknownTokens, {'online:freeEnglish'});
+  });
+
+  test('a plugin-style source token is preserved without resolving', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(dictionaryPreferencesKey,
+        ['online:plugin:com.example.pack:en', 'online:wiktionaryEn']);
+    final loaded = await DictionaryPreferences.load();
+    expect(loaded.online, {OnlineDictionary.wiktionaryEn});
+    expect(loaded.unknownTokens, {'online:plugin:com.example.pack:en'});
+  });
+  test('registered plugin tokens also survive loading and saving', () async {
+    final registry = DictionarySourceRegistry([
+      const DictionarySourceEntry(
+        id: 'plugin:com.example.pack:en',
+        labelZh: '例',
+        labelEn: 'Example',
+        kind: DictionarySourceKind.plugin,
+        owner: RegistryOwner.plugin('com.example.pack'),
+      ),
+    ]);
+    DictionarySourceRegistry.useForTesting(registry);
+    addTearDown(() => DictionarySourceRegistry.useForTesting(null));
+    final prefs = await SharedPreferences.getInstance();
+    const token = 'online:plugin:com.example.pack:en';
+    await prefs.setStringList(dictionaryPreferencesKey, ['local:*', token]);
+    final loaded = await DictionaryPreferences.load();
+    await loaded.save();
+    expect(prefs.getStringList(dictionaryPreferencesKey), ['local:*', token]);
   });
   test('empty, single and multiple local selections survive reload', () async {
     for (final ids in [

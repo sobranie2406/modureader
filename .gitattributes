@@ -1,5 +1,9 @@
 *.js linguist-detectable=false
 
+# Plugin packages are verified byte for byte against the built-in trust
+# catalog, so reviewed sources must keep their LF bytes on every platform.
+docs/examples/plugins/** text eol=lf
+
 # ignore diff for generated files
 *.gen.dart binary
 *.gen.dart linguist-generated=true

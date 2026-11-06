@@ -233,7 +233,7 @@ Field rules:
 | `minAppVersion` | optional; parsed with `pub_semver`; rejected when higher than the current version |
 | `capabilities` | see §3.4; P1 opens `ai:prompt-pack` and `ui:selection-action` |
 | `contributes` | ≤ 40 items; `kind` values in §3.3 |
-| `settings` | optional; rendered on the details page from P1b, types limited to `text`/`number`/`toggle`/`select`/`tip`; `password` is unsupported (plaintext credential risk, see §5.2) |
+| `settings` | optional; rendered on the details page from P1b, types limited to `text`/`number`/`toggle`/`select`/`tip`; `password` is unsupported (plaintext credential risk, see §5.2). Since P1.5, prompts and selection actions may reference `{setting.<key>}`; the placeholder is resolved when the contribution runs, not when it is installed, so stored content keeps the template and the uninstall hash guard stays meaningful |
 | `hostApi` | optional, default 1; this round accepts only 1 |
 
 ### 3.3 Contribution types (opened by phase)
