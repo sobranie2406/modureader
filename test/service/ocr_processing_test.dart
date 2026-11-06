@@ -9,6 +9,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  test('official V6 sidecar alphabet includes CTC blank and trailing space',
+      () {
+    final chars = List.generate(10, (i) => String.fromCharCode(65 + i));
+    final config = 'PostProcess:\n  name: CTCLabelDecode\n  character_dict:\n'
+        '${chars.map((c) => '  - $c\n').join()}';
+    expect(ocrAlphabetFromConfig(config), ['', ...chars, ' ']);
+    for (final bad in [
+      '',
+      'PostProcess: {}',
+      config.replaceAll('CTCLabelDecode', 'Other')
+    ]) {
+      expect(() => ocrAlphabetFromConfig(bad), throwsFormatException);
+    }
+  });
+  test('V6 detector thresholds are opt-in, legacy thresholds remain unchanged',
+      () {
+    final map = List<double>.filled(32 * 32, 0);
+    for (var y = 10; y < 16; y++) {
+      for (var x = 5; x < 22; x++) {
+        map[y * 32 + x] = .47;
+      }
+    }
+    expect(ocrBoxes(map, 32, 32, 320, 320), isEmpty);
+    expect(
+        ocrBoxes(map, 32, 32, 320, 320,
+            detectionThreshold: .2, boxThreshold: .45),
+        hasLength(1));
+  });
   test('model metadata reader rejects malformed and missing alphabets', () {
     for (final bytes in [
       <int>[],

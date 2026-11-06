@@ -108,6 +108,7 @@ dependencies:
   web_socket_channel: ^3.0.2
   crypto: ^3.0.6
   cryptography: ^2.7.0
+  yaml: 3.1.3
   flutter_onnxruntime: 1.8.4 # Windows dispatcher adapter is based on this version.
   hf_tokenizers: ^1.2.1
   audioplayers: ^6.4.0

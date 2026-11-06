@@ -68,7 +68,7 @@ class OcrModelStore {
       final dir = await root();
       final targets = <(String, FileSystemEntityType)>[];
       for (final name in model.files.keys) {
-        if (!RegExp(r'^[a-zA-Z0-9_-]+\.onnx$').hasMatch(name)) {
+        if (!RegExp(r'^[a-zA-Z0-9_-]+\.(onnx|yml)$').hasMatch(name)) {
           throw StateError('Invalid OCR model filename');
         }
         for (final suffix in ['', '.part']) {
@@ -114,9 +114,12 @@ class OcrModelStore {
   String downloadUrl(String file, OcrDownloadSource source) {
     final spec = model.files[file];
     if (spec == null) throw ArgumentError.value(file, 'file');
+    final absolute = Uri.parse(spec.$1).hasScheme;
     return source == OcrDownloadSource.gitee
-        ? '$mirrorBase/${model.id}-${model.revision}-${spec.$1.split('/').last}'
-        : '${model.upstreamBase}/${model.revision}/${spec.$1}';
+        ? '$mirrorBase/${model.id}-${model.revision}-${absolute ? file : spec.$1.split('/').last}'
+        : absolute
+            ? spec.$1
+            : '${model.upstreamBase}/${model.revision}/${spec.$1}';
   }
 
   static bool allowedDownloadUri(Uri uri, OcrDownloadSource source) {

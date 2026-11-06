@@ -50,7 +50,9 @@ Settings → OCR Model selects the model and download source. V4 is the recommen
 
 | Model | Detection + recognition download | Upstream | Alternative |
 | --- | --- | --- | --- |
-| PP-OCRv4 Chinese/English (recommended) | 14.9 MiB | Hugging Face | Gitee |
+| PP-OCRv6 Small (default) | 29.7 MiB | PaddlePaddle Hugging Face | Gitee |
+| PP-OCRv6 Medium (higher accuracy) | 132.3 MiB | PaddlePaddle Hugging Face | Gitee |
+| PP-OCRv4 Chinese/English | 14.9 MiB | Hugging Face | Gitee |
 | PP-OCRv5 Chinese/English mobile | 20.5 MiB | ModelScope | Gitee |
 | PP-OCRv3 Chinese/English | 12.5 MiB | Hugging Face | Gitee |
 | PP-OCRv3 English | 10.9 MiB | Hugging Face | Gitee |
@@ -79,3 +81,15 @@ flutter test --no-pub test/service/ocr_model_store_test.dart test/widgets/settin
 The downloader accepts only HTTPS redirects allowed for the selected source and does not silently switch on failure. Recognition uses at most two CPU threads. V5's larger alphabet has corresponding input-width and output-tensor limits to bound single-line inference output.
 
 In 1.2.0, Text Reflow/OCR Reflow process the current page or its whole saved crop directly into the reader. Only Extract opens region selection and can populate an editable AI draft without sending. See [scanned-document status](SCANNED_DOCUMENT_DEVELOPMENT.md) for current scope and earlier cancellation/restoration history.
+
+### V6 mirror additions
+
+V6 uses official PaddlePaddle ONNX exports and a small `rec.yml` character dictionary. All three files per model are required for offline import. Source revisions, sizes and SHA-256 hashes are pinned in [ocr-v6-manifest.json](ocr-v6-manifest.json). These weights remain on demand and do not increase installer size.
+
+Stage each original file under `<source>/<model-id>/<local>` (for example, `ppocr-v6-small-1/rec.yml`), then run:
+
+```sh
+python3 scripts/release/ocr_model_mirror.py --v6-only --source <source> --output <output>
+```
+
+Upload the generated V6 attachments to the existing `ocr-v1` release. Keep all V3/V4/V5 files and metadata. The V6 manifest, checksums and source notice have separate filenames, and the existing PaddleOCR Apache-2.0 license applies.

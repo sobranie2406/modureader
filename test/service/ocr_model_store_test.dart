@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:anx_reader/service/ocr/ocr_model_store.dart';
@@ -99,13 +100,12 @@ void main() {
     await store.withModelFiles(() async {}); // failed deletion releases lock
   });
 
-  test('catalog contains four small packs with fixed identities and hashes',
-      () {
-    expect(OcrModels.all.length, 4);
-    expect(OcrModels.all.map((m) => m.id).toSet().length, 4);
+  test('catalog retains legacy packs and adds pinned V6 models', () {
+    expect(OcrModels.all.length, 6);
+    expect(OcrModels.all.map((m) => m.id).toSet().length, 6);
     expect(OcrModels.byId('unknown'), OcrModels.defaultModel);
     for (final model in OcrModels.all) {
-      expect(model.totalBytes, lessThan(22 * 1024 * 1024));
+      expect(model.totalBytes, lessThan(150 * 1024 * 1024));
       expect(model.files.keys, containsAll(['det.onnx', 'rec.onnx']));
       for (final spec in model.files.values) {
         expect(spec.$3, matches(RegExp(r'^[0-9a-f]{64}$')));
@@ -114,10 +114,70 @@ void main() {
       for (final source in OcrDownloadSource.values) {
         final uri = Uri.parse(store.downloadUrl('rec.onnx', source));
         expect(OcrModelStore.allowedDownloadUri(uri, source), isTrue);
-        expect(uri.path, contains(model.revision));
+        if (!model.files['rec.onnx']!.$1.startsWith('https://') ||
+            source == OcrDownloadSource.gitee) {
+          expect(uri.path, contains(model.revision));
+        }
       }
       store.close();
     }
+  });
+
+  test('V6 manifest agrees with catalog and has unique mirror URLs', () async {
+    final manifest =
+        jsonDecode(await File('docs/ocr-v6-manifest.json').readAsString());
+    final mirrors = <String>{};
+    for (final entry in manifest['models']) {
+      final model = OcrModels.byId(entry['id']);
+      final store = OcrModelStore(model: model);
+      addTearDown(store.close);
+      expect(model.files.length, entry['files'].length);
+      for (final file in entry['files']) {
+        final name = file['local'] as String;
+        expect(model.files[name]!.$2, file['size']);
+        expect(model.files[name]!.$3, file['sha256']);
+        expect(store.downloadUrl(name, OcrDownloadSource.upstream),
+            file['source']);
+        final mirror = store.downloadUrl(name, OcrDownloadSource.gitee);
+        expect(mirror, file['mirror']);
+        expect(mirrors.add(mirror), isTrue);
+      }
+    }
+    expect(mirrors.length, 6);
+  });
+
+  test('offline import requires sidecar and deletion removes it safely',
+      () async {
+    final files = {
+      'det.onnx': [1, 2],
+      'rec.onnx': [3, 4],
+      'rec.yml': [5, 6]
+    };
+    final spec = OcrModelSpec('test-v6', 'test', 'test', {
+      for (final entry in files.entries)
+        entry.key: (
+          entry.key,
+          entry.value.length,
+          sha256.convert(entry.value).toString()
+        ),
+    });
+    final store = OcrModelStore(
+        model: spec, directory: Directory('${dir.path}/installed'));
+    addTearDown(store.close);
+    final inputs = <File>[];
+    for (final entry in files.entries) {
+      inputs.add(
+          await File('${dir.path}/${entry.key}').writeAsBytes(entry.value));
+    }
+    await expectLater(
+        store.importFiles(inputs.take(2).toList()), throwsFormatException);
+    expect(await store.available(), isFalse);
+    await store.importFiles(inputs);
+    await store.verify();
+    expect(await store.available(), isTrue);
+    await store.deleteDownloaded();
+    expect(await File('${dir.path}/installed/rec.yml').exists(), isFalse);
+    expect(await inputs.last.exists(), isTrue);
   });
 
   test('both sources restrict redirect origins and require HTTPS', () {

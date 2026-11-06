@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'ocr_model_store.dart';
+import 'ocr_models.dart';
 import 'ocr_processing.dart';
 import 'ocr_model_metadata.dart';
 import 'document_text_geometry.dart';
@@ -54,7 +55,7 @@ class LocalOcrService {
       final token = RootIsolateToken.instance;
       if (token == null) throw StateError('OCR worker unavailable');
       worker = await Isolate.spawn(
-          _ocrWorker, [port.sendPort, token, root.path, image],
+          _ocrWorker, [port.sendPort, token, root.path, image, store.model.id],
           onError: port.sendPort, onExit: port.sendPort);
       await for (final event in port) {
         if (event is SendPort) {
@@ -94,7 +95,10 @@ void _ocrWorker(List<Object?> args) async {
   Object? result;
   try {
     final path = args[2] as String;
-    final alphabet = ocrAlphabet(await File('$path/rec.onnx').readAsBytes());
+    final model = OcrModels.byId(args[4] as String);
+    final alphabet = model.files.containsKey('rec.yml')
+        ? ocrAlphabetFromConfig(await File('$path/rec.yml').readAsString())
+        : ocrAlphabet(await File('$path/rec.onnx').readAsBytes());
     if (Platform.isAndroid) {
       await android.invokeMethod<void>('load', {'path': path});
     } else {
@@ -142,6 +146,8 @@ void _ocrWorker(List<Object?> args) async {
     result = [
       'result',
       (await recognizeOcrImageWithRegions(args[3] as Uint8List, alphabet, run,
+              detectionThreshold: model.detectionThreshold,
+              boxThreshold: model.boxThreshold,
               cancelled: () => cancelled,
               progress: (n, total) => reply.send(['progress', n, total])))
           .toJson()

@@ -105,7 +105,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.textContaining('SHA-256').last, findsOneWidget);
-    expect(find.textContaining('ch_PP-OCRv5_rec_mobile.onnx'), findsOneWidget);
+    expect(find.textContaining('rec.yml / inference.yml'), findsOneWidget);
     await tester.tap(find.text('取消').last);
     await tester.pumpAndSettle();
     expect(Prefs().ocrModelId, selected);
@@ -117,7 +117,7 @@ void main() {
   });
   test('settings defaults and selection persist without modifying vector model',
       () async {
-    expect(Prefs().ocrModelId, 'ppocr-v5-mobile-1');
+    expect(Prefs().ocrModelId, 'ppocr-v6-small-1');
     expect(Prefs().ocrModelDownloadSource, 'upstream');
     final vector = Prefs().vectorLocalModelId;
     await Prefs()
@@ -136,6 +136,13 @@ void main() {
     expect(Prefs().ocrModelId, 'ppocr-v4-mobile-1');
   });
 
+  test('explicit V5 choice survives the V6 default change', () async {
+    SharedPreferences.setMockInitialValues({'ocrModelId': 'ppocr-v5-mobile-1'});
+    await Prefs().initPrefs();
+    expect(Prefs().ocrModelId, OcrModels.v5Mobile.id);
+    expect(OcrModels.defaultModel, OcrModels.v6Small);
+  });
+
   for (final locale in [const Locale('zh'), const Locale('en')]) {
     testWidgets('small-screen layout and opt-in downloads $locale',
         (tester) async {
@@ -149,9 +156,9 @@ void main() {
         stores.add(store);
         return store;
       }, locale: locale);
-      expect(stores.length, 4);
+      expect(stores.length, 6);
       expect(stores.every((store) => store.downloads == 0), isTrue);
-      expect(find.byType(Card), findsNWidgets(4));
+      expect(find.byType(Card), findsNWidgets(6));
       await tester
           .ensureVisible(find.byKey(const ValueKey('ocr-source-gitee')));
       await tester.tap(find.byKey(const ValueKey('ocr-source-gitee')));
@@ -166,6 +173,7 @@ void main() {
       final download =
           find.byKey(const ValueKey('ocr-download-ppocr-v5-mobile-1'));
       await tester.ensureVisible(download);
+      await tester.pumpAndSettle();
       await tester.tap(download);
       await tester.pumpAndSettle();
       expect(
@@ -193,6 +201,7 @@ void main() {
         (model) => model.id == store.model.id ? store : FakeOcrStore(model));
     final download = find.byKey(ValueKey('ocr-download-${store.model.id}'));
     await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
     await tester.tap(download);
     await tester.pump();
     expect(store.token?.isCancelled, isFalse);
@@ -249,6 +258,7 @@ void main() {
     expect(download, findsOneWidget);
     expect(button, findsNothing);
     await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
     await tester.tap(download);
     await tester.pumpAndSettle();
     expect(selected.ready, isTrue);
@@ -296,6 +306,7 @@ void main() {
     await tester.pump();
     final cancel = find.byKey(ValueKey('ocr-cancel-${store.model.id}'));
     await tester.ensureVisible(cancel);
+    await tester.pump();
     await tester.tap(cancel);
     await tester.pumpAndSettle();
     expect(store.token!.isCancelled, isTrue);
@@ -303,6 +314,7 @@ void main() {
     store.pending = null;
     store.failDownload = true;
     await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
     await tester.tap(download);
     await tester.pumpAndSettle();
     expect(find.textContaining('下载或校验失败'), findsOneWidget);

@@ -1,0 +1,66 @@
+{
+  "license": "Apache-2.0",
+  "upstream": "https://github.com/PaddlePaddle/PaddleOCR",
+  "models": [
+    {
+      "id": "ppocr-v6-small-1",
+      "revision": "v6-1",
+      "files": [
+        {
+          "local": "det.onnx",
+          "name": "ppocr-v6-small-1-v6-1-det.onnx",
+          "size": 9880512,
+          "sha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/28fe5895c24fd108c19eb3e8479f4ab385fbfc62/inference.onnx",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-small-1-v6-1-det.onnx"
+        },
+        {
+          "local": "rec.onnx",
+          "name": "ppocr-v6-small-1-v6-1-rec.onnx",
+          "size": 21159378,
+          "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/b8f84f0b80c529de40b4fbb3544b84fa7233a513/inference.onnx",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-small-1-v6-1-rec.onnx"
+        },
+        {
+          "local": "rec.yml",
+          "name": "ppocr-v6-small-1-v6-1-rec.yml",
+          "size": 150579,
+          "sha256": "ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/b8f84f0b80c529de40b4fbb3544b84fa7233a513/inference.yml",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-small-1-v6-1-rec.yml"
+        }
+      ]
+    },
+    {
+      "id": "ppocr-v6-medium-1",
+      "revision": "v6-1",
+      "files": [
+        {
+          "local": "det.onnx",
+          "name": "ppocr-v6-medium-1-v6-1-det.onnx",
+          "size": 62032837,
+          "sha256": "eb13b44b25bb36f89528b68720af8a61d9cf381176107f465db1757b65d086e1",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx/resolve/61323801669c338b7891481ec7bac61ce31b576a/inference.onnx",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-medium-1-v6-1-det.onnx"
+        },
+        {
+          "local": "rec.onnx",
+          "name": "ppocr-v6-medium-1-v6-1-rec.onnx",
+          "size": 76554979,
+          "sha256": "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-medium-1-v6-1-rec.onnx"
+        },
+        {
+          "local": "rec.yml",
+          "name": "ppocr-v6-medium-1-v6-1-rec.yml",
+          "size": 150580,
+          "sha256": "991b700facf5b50a7de193468207d5f4255b538dde0d312ae3b7c7a9b6873129",
+          "source": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.yml",
+          "mirror": "https://gitee.com/sobranie2406/modu-models/releases/download/ocr-v1/ppocr-v6-medium-1-v6-1-rec.yml"
+        }
+      ]
+    }
+  ]
+}

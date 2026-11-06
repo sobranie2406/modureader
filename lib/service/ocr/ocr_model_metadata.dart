@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:yaml/yaml.dart';
 
 /// Apple ONNX bindings do not expose metadata. Read only the pinned model's
 /// ModelProto.metadata_props (14); skip tensor/graph payloads without copying.
@@ -87,4 +88,24 @@ class _ProtoReader {
         throw const FormatException('Invalid model field');
     }
   }
+}
+
+/// Official V6 exports keep their alphabet in the accompanying inference YAML.
+/// Read the small, hash-verified sidecar instead of copying the large model.
+List<String> ocrAlphabetFromConfig(String config) {
+  if (utf8.encode(config).length > 512 * 1024) {
+    throw const FormatException('OCR config too large');
+  }
+  final data = loadYaml(config);
+  final post = data is Map ? data['PostProcess'] : null;
+  final chars = post is Map ? post['character_dict'] : null;
+  if (post is! Map ||
+      post['name'] != 'CTCLabelDecode' ||
+      chars is! List ||
+      chars.length < 10 ||
+      chars.length > 22000 ||
+      chars.any((c) => c is! String || c.isEmpty)) {
+    throw const FormatException('Invalid OCR alphabet');
+  }
+  return ['', ...chars.cast<String>(), ' '];
 }

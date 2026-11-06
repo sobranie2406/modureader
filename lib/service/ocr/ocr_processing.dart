@@ -31,13 +31,14 @@ Float32List ocrTensor(img.Image image,
 /// Bounded DB probability components for upright printed lines. This is not a
 /// semantic table/layout model. Users can crop one column before recognizing.
 List<OcrBox> ocrBoxes(
-    List<double> values, int w, int h, int originalW, int originalH) {
+    List<double> values, int w, int h, int originalW, int originalH,
+    {double detectionThreshold = .3, double boxThreshold = .5}) {
   if (w <= 0 || h <= 0 || w * h > 1024 * 1024 || values.length != w * h) {
     throw const FormatException('Invalid detection map');
   }
   final seen = Uint8List(w * h), queue = Int32List(w * h), boxes = <OcrBox>[];
   for (var start = 0; start < values.length; start++) {
-    if (seen[start] != 0 || values[start] < .3) continue;
+    if (seen[start] != 0 || values[start] < detectionThreshold) continue;
     var head = 0,
         tail = 1,
         left = start % w,
@@ -59,14 +60,17 @@ List<OcrBox> ocrBoxes(
           final xx = x + dx, yy = y + dy;
           if (xx < 0 || xx >= w || yy < 0 || yy >= h) continue;
           final n = yy * w + xx;
-          if (seen[n] == 0 && values[n] >= .3) {
+          if (seen[n] == 0 && values[n] >= detectionThreshold) {
             seen[n] = 1;
             queue[tail++] = n;
           }
         }
       }
     }
-    if (tail < 6 || score / tail < .5 || right - left < 2 || bottom - top < 2) {
+    if (tail < 6 ||
+        score / tail < boxThreshold ||
+        right - left < 2 ||
+        bottom - top < 2) {
       continue;
     }
     final pad = (bottom - top + 1) * .55;
@@ -134,6 +138,8 @@ Future<String> recognizeOcrImage(
 Future<DocumentTextResult> recognizeOcrImageWithRegions(
     Uint8List bytes, List<String> alphabet, OcrRun run,
     {required bool Function() cancelled,
+    double detectionThreshold = .3,
+    double boxThreshold = .5,
     void Function(int, int)? progress}) async {
   void check() {
     if (cancelled()) throw StateError('OCR cancelled');
@@ -162,8 +168,9 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   if (det.$2.length != 4 || det.$2[0] != 1 || det.$2[1] != 1) {
     throw const FormatException('Invalid OCR detector');
   }
-  final boxes =
-      ocrBoxes(det.$1, det.$2[3], det.$2[2], image.width, image.height);
+  final boxes = ocrBoxes(
+      det.$1, det.$2[3], det.$2[2], image.width, image.height,
+      detectionThreshold: detectionThreshold, boxThreshold: boxThreshold);
   final lines = <String>[];
   final regions = <DocumentTextRegion>[];
   var offset = 0;

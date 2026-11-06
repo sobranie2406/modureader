@@ -48,6 +48,8 @@ void validateSettingsValue(String key, dynamic value,
     'vectorModelDownloadSource': ['huggingFace', 'gitee'],
     'ocrModelDownloadSource': ['upstream', 'gitee'],
     'ocrModelId': [
+      'ppocr-v6-small-1',
+      'ppocr-v6-medium-1',
       'ppocr-v4-mobile-1',
       'ppocr-v5-mobile-1',
       'ppocr-v3-mobile-1',

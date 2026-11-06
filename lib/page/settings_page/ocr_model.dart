@@ -266,8 +266,8 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                   child: SettingHelp(
                       title: Text(ModuStrings.text(context, '说明', 'Help')),
                       description: Text(t(
-                          '用于扫描书籍的文字识别、提取与重排。推荐 PP-OCRv5 移动版；无需 API Key，下载后可离线使用。',
-                          'Recognize, extract and reflow text in scanned books. PP-OCRv5 Mobile is recommended. Works offline after download, without an API key.'))))),
+                          '用于扫描书籍的文字识别、提取与重排。默认推荐 PP-OCRv6 Small，高精度可选 Medium，保留 V5；无需 API Key，下载后可离线使用。',
+                          'Recognize, extract and reflow text in scanned books. PP-OCRv6 Small is the default; Medium offers higher accuracy, and V5 remains available. Works offline after download, without an API key.'))))),
         ]),
         SettingsSection(
             title: Text(t('本地模型 · 按需下载', 'Local models · On-demand download')),

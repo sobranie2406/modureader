@@ -90,6 +90,23 @@ void main() {
         for (final key in Prefs().prefs.getKeys()) key: Prefs().prefs.get(key),
       };
 
+  for (final modelId in [
+    'ppocr-v6-small-1',
+    'ppocr-v6-medium-1',
+    'ppocr-v5-mobile-1'
+  ]) {
+    test('OCR model $modelId survives settings backup and restore', () async {
+      await initialize(
+          {'ocrModelId': modelId, 'ocrModelDownloadSource': 'gitee'});
+      final data = await GlobalSettingsTransfer.decode(
+          await GlobalSettingsTransfer.export(Prefs()));
+      await initialize({});
+      await GlobalSettingsTransfer.apply(Prefs(), data);
+      expect(Prefs().ocrModelId, modelId);
+      expect(Prefs().ocrModelDownloadSource, 'gitee');
+    });
+  }
+
   for (final module in GlobalSettingsTransfer.scopes.skip(1)) {
     test('$module: file, link and QR roundtrip, scoped restore and isolation',
         () async {

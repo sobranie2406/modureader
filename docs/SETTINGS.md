@@ -144,9 +144,9 @@ The brightness panel's moon button inverts PDF page colours and turns the surrou
 
 ### OCR models
 
-Unreleased: each OCR card has **Offline import**, on desktop and mobile. Select the complete detection and recognition ONNX files together (upstream names or `det.onnx` / `rec.onnx`). Only the exact catalogue version passes the pinned size/SHA-256 checks. Import does not select a different model; use **Use** afterward if needed. No network is accessed during import. ZIPs and download fragments are not accepted.
+Unreleased: each OCR card has **Offline import**, on desktop and mobile. Select the complete detection and recognition ONNX files together, plus the matching `rec.yml` (upstream `inference.yml`) dictionary configuration for V6 (upstream names or `det.onnx` / `rec.onnx`). Only the exact catalogue version passes the pinned size/SHA-256 checks. Import does not select a different model; use **Use** afterward if needed. No network is accessed during import. ZIPs and download fragments are not accepted.
 
-Open **Settings → OCR model**. **PP-OCRv4 Chinese / English** is recommended; v5 mobile Chinese / English, v3 Chinese / English and v3 English are also available. Weights are downloaded on demand, not bundled. Choose upstream or the Gitee mirror: v4 / v3 use Hugging Face upstream, while v5 uses ModelScope.
+Open **Settings → OCR model**. **PP-OCRv6 Small** is the default recommendation; **V6 Medium** is the higher-accuracy option. V5 mobile, V4 and V3 remain available. An explicitly saved model selection is preserved. Weights are downloaded on demand, not bundled. Choose upstream or the Gitee mirror: V6 / v4 / v3 use Hugging Face upstream, while v5 uses ModelScope.
 
 Cards support download-and-use, selection, verification, cancellation and deletion. Files must pass size and SHA-256 checks before use. Deleting a downloaded model does not delete books. Recognition runs locally and needs no OCR API key. Model choice and source settings can be backed up; model files are not transferred in global settings backups. Review small text, complex columns and poor-quality scans manually.
 

@@ -70,9 +70,36 @@ def prepare(source, output):
     print(f'Prepared {len(sums)} verified model files and 4 metadata/license files: {output}')
 
 
+def prepare_v6(source, output):
+    manifest_path = ROOT / 'docs/ocr-v6-manifest.json'
+    manifest = json.loads(manifest_path.read_text())
+    output.mkdir(parents=True, exist_ok=True)
+    sums = []
+    for model in manifest['models']:
+        for item in model['files']:
+            path = source / model['id'] / item['local']
+            with path.open('rb') as file:
+                if (path.stat().st_size != item['size'] or
+                        hashlib.file_digest(file, 'sha256').hexdigest() != item['sha256']):
+                    raise ValueError(f'Invalid OCR file: {path}')
+            shutil.copy2(path, output / item['name'])
+            sums.append(f"{item['sha256']}  {item['name']}")
+    shutil.copy2(manifest_path, output / manifest_path.name)
+    shutil.copy2(ROOT / 'LICENSES/PaddleOCR-Apache-2.0.txt', output / 'PaddleOCR-Apache-2.0.txt')
+    (output / 'OCR-v6-SHA256SUMS.txt').write_text('\n'.join(sums) + '\n')
+    (output / 'OCR-v6-SOURCE.txt').write_text(
+        'PP-OCRv6 Small and Medium, copyright PaddlePaddle/PaddleOCR contributors.\n'
+        'Apache-2.0; see PaddleOCR-Apache-2.0.txt.\n'
+        'Official ONNX exports and recognition configurations: https://huggingface.co/PaddlePaddle\n'
+        'Pinned source revisions, sizes and SHA-256: ocr-v6-manifest.json.\n'
+        'Files are copied without modification. Preserve all existing V3/V4/V5 mirror files.\n')
+    print(f'Prepared {len(sums)} verified V6 files and notices: {output}')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=ROOT / 'build/ocr-model-mirror')
+    parser.add_argument('--v6-only', action='store_true')
     args = parser.parse_args()
-    prepare(args.source, args.output)
+    (prepare_v6 if args.v6_only else prepare)(args.source, args.output)
