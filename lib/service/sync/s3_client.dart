@@ -174,6 +174,18 @@ class S3SyncClient extends SyncClientBase {
 
   Future<({List<RemoteFile> files, bool exists})> _list(String path,
       {bool probe = false}) async {
+    final encoded = _settings.useEncodedListingNames;
+    try {
+      return await _listPages(path, probe: probe, requestEncoding: encoded);
+    } on _S3ListingEncodingException {
+      if (!encoded) rethrow;
+      // Discard all partial pages before retrying with literal XML names.
+      return _listPages(path, probe: probe, requestEncoding: false);
+    }
+  }
+
+  Future<({List<RemoteFile> files, bool exists})> _listPages(String path,
+      {required bool probe, required bool requestEncoding}) async {
     final raw = _settings.key(path);
     final prefix = raw.endsWith('/') ? raw : '$raw/';
     final seenTokens = <String>{};
@@ -186,7 +198,7 @@ class S3SyncClient extends SyncClientBase {
         if (v2) 'list-type': '2',
         'prefix': prefix,
         'delimiter': '/',
-        if (_settings.useEncodedListingNames) 'encoding-type': 'url',
+        if (requestEncoding) 'encoding-type': 'url',
         'max-keys': probe ? '1' : '1000',
         if (token != null) (v2 ? 'continuation-token' : 'marker'): token,
       });
@@ -202,10 +214,19 @@ class S3SyncClient extends SyncClientBase {
       final encoded = value(document, 'EncodingType') == 'url';
       String decode(String? text) {
         if (text == null) throw const FormatException('Missing S3 object name');
-        return encoded ? Uri.decodeComponent(text) : text;
+        if (!encoded) return text;
+        try {
+          return Uri.decodeComponent(text);
+        } on ArgumentError {
+          throw const _S3ListingEncodingException();
+        } on FormatException {
+          throw const _S3ListingEncodingException();
+        }
       }
 
-      if (decode(value(document, 'Prefix')) != prefix) {
+      final returnedPrefix = value(document, 'Prefix');
+      // RustFS echoes the request prefix literally even with EncodingType=url.
+      if (returnedPrefix != prefix && decode(returnedPrefix) != prefix) {
         throw const FormatException('S3 server returned an unexpected prefix');
       }
       for (final item in document.childElements) {
@@ -373,6 +394,13 @@ class S3SyncClient extends SyncClientBase {
       await original.writeAsString(content, flush: true);
       attempted = true;
       await uploadFile(original.path, remote);
+      final listing = await readDir('modu/.test');
+      if (!listing.any((file) =>
+          file.path == remote &&
+          file.isDir == false &&
+          file.size == utf8.encode(content).length)) {
+        throw const FormatException('S3 probe listing check failed');
+      }
       await downloadFile(remote, '${work.path}/result');
       if (await File('${work.path}/result').readAsString() != content) {
         throw const FormatException('S3 probe integrity check failed');
@@ -391,4 +419,9 @@ class S3SyncClient extends SyncClientBase {
       await work.delete(recursive: true);
     }
   }
+}
+
+class _S3ListingEncodingException extends FormatException {
+  const _S3ListingEncodingException()
+      : super('Invalid S3 listing URL encoding');
 }

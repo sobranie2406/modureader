@@ -33,6 +33,10 @@ class S3Fixture {
   bool corruptDownload = false;
   bool markerProbeReportsComplete = false;
   bool formEncodedNames = false;
+  bool literalPrefix = false;
+  bool brokenEncodedSecondPage = false;
+  bool omitProbeObject = false;
+  final listQueries = <Map<String, String>>[];
   String xml(String text) => const HtmlEscape().convert(text);
   Future<void> start() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -58,6 +62,7 @@ class S3Fixture {
       }
       if (request.method == 'GET' &&
           request.uri.queryParameters.containsKey('prefix')) {
+        listQueries.add(Map.of(request.uri.queryParameters));
         if (listingOverride != null) {
           response.write(listingOverride);
           await response.close();
@@ -81,6 +86,7 @@ class S3Fixture {
           entries[slash < 0 ? key : '$prefix${rest.substring(0, slash + 1)}'] =
               slash >= 0;
         }
+        if (omitProbeObject && prefix.endsWith('/.test/')) entries.clear();
         final keys = entries.keys.toList()..sort();
         final continuation = request.uri.queryParameters['continuation-token'];
         final marker = request.uri.queryParameters['marker'];
@@ -102,7 +108,7 @@ class S3Fixture {
         final more = !markerOnlyProbe && start + page.length < keys.length;
         response.write(
             '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
-            '<Prefix>${xml(encodeName(prefix))}</Prefix>'
+            '<Prefix>${xml(literalPrefix ? prefix : encodeName(prefix))}</Prefix>'
             '${encoded ? '<EncodingType>url</EncodingType>' : ''}'
             '<IsTruncated>$more</IsTruncated>');
         for (final key in page) {
@@ -111,7 +117,7 @@ class S3Fixture {
                 '<CommonPrefixes><Prefix>${xml(encodeName(key))}</Prefix></CommonPrefixes>');
           } else {
             response.write(
-                '<Contents><Key>${xml(encodeName(key))}</Key><Size>${objects[key]!.length}</Size>'
+                '<Contents><Key>${xml(encoded && brokenEncodedSecondPage && start > 0 ? 'bad%' : encodeName(key))}</Key><Size>${objects[key]!.length}</Size>'
                 '<ETag>"${md5.convert(objects[key]!)}"</ETag></Contents>');
           }
         }
@@ -290,6 +296,86 @@ void main() {
         expect(await client.safeReadDir('modu/empty'), isEmpty);
       }
     });
+    test('RustFS literal prefix keeps encoded keys and pagination intact',
+        () async {
+      server.literalPrefix = true;
+      final names = {
+        '中文.epub',
+        '全角　空格.txt',
+        'a b.txt',
+        'a+b.txt',
+        'a%.txt',
+        'a%20b.txt',
+        'a%2Fb.txt'
+      };
+      for (final root in ['Books/中文 +%', 'Books/a%20b', 'Books/a%2Fb']) {
+        server.objects.clear();
+        for (final name in names) {
+          server.objects['$root/data/file/$name'] = utf8.encode(name);
+        }
+        server.objects['$root/子目录 +%/child'] = [1];
+        for (final version in ['v1', 'v2']) {
+          final client =
+              server.client({'remoteRoot': root, 'listVersion': version});
+          final files = await client.readDir('modu/data/file');
+          expect(files.map((f) => f.name).toSet(), names);
+          expect((await client.readDir('modu')).map((f) => f.name),
+              contains('子目录 +%'));
+          for (final file in files) {
+            await client.downloadFile(file.path!, '${temp.path}/result');
+            expect(await File('${temp.path}/result').readAsString(), file.name);
+          }
+        }
+      }
+      expect(
+          server.listQueries.every((q) => q['encoding-type'] == 'url'), true);
+    });
+
+    test('invalid encoding on page two restarts once from the first page',
+        () async {
+      server.brokenEncodedSecondPage = true;
+      final names = {'a b.txt', 'a+b.txt', 'a%20b.txt', 'a%2Fb.txt', '中文%.txt'};
+      for (final name in names) {
+        server.objects['Books/中文/$name'] = [1];
+      }
+      for (final version in ['v1', 'v2']) {
+        server.listQueries.clear();
+        final files =
+            await server.client({'listVersion': version}).readDir('modu');
+        expect(files.map((f) => f.name).toSet(), names);
+        final literal = server.listQueries
+            .where((q) => !q.containsKey('encoding-type'))
+            .toList();
+        expect(literal.length, 3);
+        expect(literal.first.containsKey('marker'), false);
+        expect(literal.first.containsKey('continuation-token'), false);
+        expect(
+            server.listQueries.where((q) => q['encoding-type'] == 'url').length,
+            2);
+      }
+    });
+
+    test('invalid encoding that persists fails without exposing object names',
+        () async {
+      server.listingOverride = '<ListBucketResult><Prefix>Books/中文/</Prefix>'
+          '<EncodingType>url</EncodingType><IsTruncated>false</IsTruncated>'
+          '<Contents><Key>private-secret%</Key><Size>1</Size></Contents></ListBucketResult>';
+      await expectLater(
+          server.client().readDir('modu'),
+          throwsA(isA<FormatException>().having((e) => e.toString(),
+              'safe error', isNot(contains('private-secret')))));
+      expect(server.listQueries.length, 2);
+    });
+
+    test('capability check detects missing listing and cleans its own probe',
+        () async {
+      server.omitProbeObject = true;
+      server.objects['outside/untouched'] = [1];
+      await expectLater(
+          server.client().testFullCapabilities(), throwsFormatException);
+      expect(server.objects.keys, ['outside/untouched']);
+    });
+
     test('RainYun listings preserve spaces, literal plus and percent names',
         () async {
       server.formEncodedNames = true;
