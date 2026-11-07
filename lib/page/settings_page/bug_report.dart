@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'dart:convert';
 
 import 'package:anx_reader/utils/app_motion.dart';
@@ -184,8 +185,7 @@ class _BugReportSettingsState extends State<BugReportSettings> {
     try {
       await Clipboard.setData(ClipboardData(text: value));
       if (mounted) {
-        setState(() => _status = _tr('报告已复制，请注意剪贴板隐私。',
-            'Report copied. Please keep your clipboard private.'));
+        setState(() => _status = _tr('报告已复制。', 'Report copied.'));
       }
     } catch (_) {
       if (mounted) {
@@ -259,9 +259,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                         if (report.runtimeLog != null) ...[
                           if (report.runtimeLogNeedsAttachment) ...[
                             const SizedBox(height: 12),
-                            Text(_tr(
-                                '运行日志较长，不会截断后粘贴。请预览并导出 TXT，再手动附加到 GitHub；仅复制报告不会附带该文件。',
-                                'The runtime log is too long to paste inline. Preview and export TXT, then attach it on GitHub. Copying the report does not attach the file.')),
+                            Text(_tr("请导出日志 TXT，并在 GitHub 附加文件。",
+                                "Export the log as TXT and attach it on GitHub.")),
                             ExpansionTile(
                               title: Text(
                                   _tr('预览完整运行日志', 'Preview full runtime log')),
@@ -291,14 +290,12 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                                     'feedback-log-export-status')),
                         ],
                         const SizedBox(height: 16),
-                        Text(_tr(
-                            '在 GitHub 可添加截图或可公开分享的示例。请先搜索重复反馈；每条反馈只描述一个问题或建议。',
-                            'Attach screenshots or shareable examples on GitHub. Search for duplicates first; keep each report to one bug or idea.')),
+                        Text(_tr("可在 GitHub 添加截图。",
+                            "You can add screenshots on GitHub.")),
                         if (report.needsClipboard) ...[
                           const SizedBox(height: 16),
-                          Text(_tr(
-                              '报告附带日志或内容较长，确认后复制完整内容并打开 GitHub，请手动粘贴。日志不会写入网址或浏览器历史。',
-                              'This report includes diagnostics or is long. After confirmation, copy it and open GitHub, then paste manually. Diagnostics never enter URLs or browser history.')),
+                          Text(_tr("报告将复制到剪贴板，请在 GitHub 粘贴后提交。",
+                              "Paste the copied report on GitHub to submit it.")),
                         ],
                       ],
                     ),
@@ -339,8 +336,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
       if (!mounted) return;
       setState(() => _status = path == null || path.isEmpty
           ? _tr('已取消导出。', 'Export cancelled.')
-          : _tr('日志已导出，请在 GitHub 手动附加该 TXT 文件；不会自动上传。',
-              'Log exported. Attach the TXT file on GitHub manually; nothing was uploaded.'));
+          : _tr("日志已导出，请在 GitHub 附加 TXT 文件。",
+              "Log exported. Attach the TXT file on GitHub."));
     } catch (_) {
       if (!mounted) return;
       setState(() => _status = _tr('日志导出失败，可重试；预览内容仍保留。',
@@ -387,9 +384,11 @@ class _BugReportSettingsState extends State<BugReportSettings> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_tr(
-                    '填写问题并预览后，前往默读 GitHub 仓库确认提交（需要 GitHub 账号）。截图可在 GitHub 页面添加。',
-                    'Describe and preview your report, then confirm it in the Modu GitHub repository (GitHub account required). Attach screenshots on GitHub.')),
+                SettingHelp(
+                    title: Text(
+                        ModuStrings.text(context, "提交反馈", "Submit feedback")),
+                    description: Text(_tr("预览报告后，前往 GitHub 提交。",
+                        "Preview your report, then submit it on GitHub."))),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 12,
@@ -416,14 +415,16 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                 ),
                 const SizedBox(height: 8),
                 Text(_type == FeedbackType.bug
-                    ? _tr('已有功能出错请选择 Bug；希望新增或改进功能请选择功能建议。',
-                        'Choose Bug for a broken feature, or Feature request for a new or improved capability.')
-                    : _tr('描述使用场景和希望实现的效果，无需填写重现步骤或附带崩溃日志。',
-                        'Describe your use case and the desired feature. Reproduction steps and crash logs are not needed.')),
+                    ? _tr("功能出错选 Bug，新增或改进选功能建议。",
+                        "Choose Bug for errors or Feature request for improvements.")
+                    : _tr("描述使用场景和希望实现的效果。",
+                        "Describe how you would use the feature.")),
                 if (_type == FeedbackType.bug)
-                  Text(_tr(
-                      'Bug 报告默认附带崩溃诊断与脱敏运行日志，可分别取消。运行日志来自“高级 → 日志”，仅提取本次启动的安全诊断字段，省略原始消息、正文、地址和凭据。提交前请预览；长日志可导出 TXT 后手动附加到 GitHub，不自动上传。提交后公开可见。',
-                      'Bug reports include crash and sanitized runtime logs by default; each can be unchecked. Runtime logs use Advanced > Logs, extracting safe diagnostic fields from this session only, excluding raw messages, content, addresses and credentials. Preview before submission; export long logs as TXT and attach on GitHub manually. Nothing uploads automatically. Submitted reports are public.')),
+                  SettingHelp(
+                      title: Text(
+                          ModuStrings.text(context, "报告内容", "Report contents")),
+                      description: Text(_tr("提交前可预览报告，并选择附带的日志。",
+                          "Preview your report and choose which logs to include."))),
                 Wrap(
                   spacing: 8,
                   children: [
@@ -483,9 +484,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                     contentPadding: EdgeInsets.zero,
                     title: Text(_tr(
                         '附带崩溃日志（可选）', 'Include crash diagnostics (optional)')),
-                    subtitle: Text(_tr(
-                        '包含当前平台可用的退出原因、内存采样、向量化进度和脱敏原生堆栈。Apple 报告可能延迟；Linux 需要系统保留记录。强制退出不保证有堆栈。提交后公开，请先预览。',
-                        'Includes available exit reasons, memory samples, index checkpoints and sanitized native frames. Apple delivery can be delayed; Linux requires retained system records. Force-kills may have no stack. Preview before public submission.')),
+                    subtitle:
+                        Text(_tr("附带崩溃时的诊断信息。", "Include crash diagnostics.")),
                     value: _includeCrashLog,
                     onChanged: _busy
                         ? null
@@ -509,9 +509,8 @@ class _BugReportSettingsState extends State<BugReportSettings> {
                     contentPadding: EdgeInsets.zero,
                     title: Text(_tr('附带运行日志（可选）',
                         'Include runtime diagnostics (optional)')),
-                    subtitle: Text(_tr(
-                        '包含本次运行的事件摘要及最近最多 1000 条脱敏详细日志（256 Ki 字符上限）：错误类型、已识别原因、HTTP 状态、数据库错误码及代码堆栈。未识别的私人消息省略；每次重启自动清空。长日志在提交预览中导出 TXT。',
-                        'Session events plus up to 1,000 sanitized detailed log entries (256 Ki characters): error types, recognized causes, HTTP status, database codes and code frames. Unrecognized private messages are omitted. Cleared on every restart. Export long logs as TXT in the submission preview.')),
+                    subtitle: Text(_tr("附带本次运行的日志，可在预览中导出 TXT。",
+                        "Include this session’s log. Export it as TXT from the preview.")),
                     value: _includeRuntimeLog,
                     onChanged: _busy
                         ? null

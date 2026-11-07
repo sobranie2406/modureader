@@ -32,8 +32,8 @@ class _ExperimentalSettingsState extends State<ExperimentalSettings> {
                 context, '开启实验性插件？', 'Enable experimental plugins?')),
             content: Text(ModuStrings.text(
                 context,
-                '插件仍在实验阶段，可能存在兼容性问题，请先备份设置。仅允许项目内置审核清单中的插件，安装和启用时校验文件指纹，不支持第三方插件。当前仅支持声明式提示词和划词动作，不执行插件代码；使用 AI 动作时，相关阅读内容会发送给你选择的 AI 服务。关闭此功能将停用插件，保留插件文件、配置及你编辑过的普通条目。是否确认开启？',
-                'Plugins are experimental; back up settings first. Only plugins in the project-reviewed built-in catalog are accepted, with file verification on install and enable. Third-party plugins are not supported. Only declarative prompts and selection actions are supported; no plugin code runs. Using AI actions sends relevant reading content to your selected AI service. Turning this off disables plugins but keeps packages, configuration and edited ordinary entries. Enable anyway?')),
+                "开启后可安装项目提供的提示词包和划词动作。使用 AI 动作时，会把所选内容发送给你配置的 AI 服务。",
+                "Install prompt packs and selection actions provided by the project. AI actions send selected text to your configured AI service.")),
             scrollable: true,
             actions: [
               TextButton(
@@ -76,9 +76,7 @@ class _ExperimentalSettingsState extends State<ExperimentalSettings> {
                   leading: const Icon(Icons.extension_outlined),
                   title: Text(ModuStrings.text(context, '插件', 'Plugins')),
                   description: Text(ModuStrings.text(
-                      context,
-                      '默认关闭。只在本设备确认开启，不随设置备份自动启用。',
-                      'Off by default. Requires consent on this device; backups cannot enable it.')),
+                      context, "在此设备上启用插件。", "Enable plugins on this device.")),
                   initialValue: enabled,
                   enabled: !_busy && PluginHost.isEnabled,
                   onToggle: _toggle,

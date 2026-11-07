@@ -161,7 +161,8 @@ void main() {
       await tester.ensureVisible(delete);
       await tester.tap(delete);
       await tester.pumpAndSettle();
-      expect(find.textContaining('书籍和已有索引不会删除'), findsOneWidget);
+      expect(find.text('删除本机的 ${LocalEmbeddingModels.all.first.name} 模型和分词器？'),
+          findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       expect(store.deletes, 0);

@@ -256,8 +256,7 @@ class XiaomiMimoTtsProvider extends ReadAnyCompatibleTtsProvider {
   String get providerName => 'Xiaomi MiMo';
 
   @override
-  String get providerDescription =>
-      '小米官方聊天语音接口：内置音色或文字设计音色。语速设置控制本地播放倍率；安卓直接调整播放音高，其他平台通过风格指令控制音高。仅播放 MP3/WAV，旧 AAC/PCM 配置自动改用 MP3。不支持声音克隆。';
+  String get providerDescription => '选择小米预置音色，或用文字描述设计声音。';
 
   @override
   String get defaultBaseUrl => 'https://api.xiaomimimo.com';

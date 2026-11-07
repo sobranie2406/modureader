@@ -141,10 +141,6 @@ class _ClassicalTranslationSettingsState
                 icon: const Icon(Icons.settings_outlined),
                 label: Text(label('配置翻译服务', 'Configure translation service'))),
           const SizedBox(height: 8),
-          Text(
-              label('仅手动启动后发送待译内容；修改设置不会自动发起请求。',
-                  'Text is sent only after you start translation. Changing settings never sends a request.'),
-              style: Theme.of(context).textTheme.bodySmall),
         ]);
   }
 }

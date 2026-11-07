@@ -1708,10 +1708,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     _syncRefreshRetry?.cancel();
     if (++_syncRestoreAttempts >= 3) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ModuStrings.text(
-              context,
-              '同步后的阅读或朗读位置暂时无法打开，请重新打开书籍。未覆盖云端进度。',
-              'Could not restore the synced reading or narration position. Reopen the book; synced progress was not overwritten.'))));
+          content: Text(ModuStrings.text(context, "无法打开同步位置，请重新打开书籍。",
+              "Reopen the book to restore the synced position."))));
       return;
     }
     _syncRefreshRetry = Timer(const Duration(milliseconds: 400), () {

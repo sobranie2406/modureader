@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
@@ -62,10 +63,12 @@ class _CssProfileApplicationState extends State<CssProfileApplication> {
                     : (v) =>
                         change(v, selection.activeIndices, selection.index))
           ]),
-          Text(ModuStrings.text(
-              context,
-              '选择即应用，可叠加多套。参数与代码请在“设置 → 阅读 → CSS 设置”中调整。',
-              'Select to apply multiple templates. Edit parameters and code in Settings → Reading → CSS settings.')),
+          SettingHelp(
+              title: Text(ModuStrings.text(context, "使用方案", "Apply profiles")),
+              description: Text(ModuStrings.text(
+                  context,
+                  "选择即可应用。到“设置 → 阅读 → CSS 设置”编辑方案。",
+                  "Select a profile to apply it. Edit profiles in Settings → Reading → CSS."))),
           Wrap(spacing: 8, runSpacing: 4, children: [
             for (var i = 0; i < profiles.length; i++)
               if (!profiles[i].isEmpty)

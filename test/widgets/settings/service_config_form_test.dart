@@ -32,6 +32,47 @@ void main() {
     ));
   }
 
+  for (final type in ConfigItemType.values) {
+    testWidgets('$type guidance is hidden until help is opened',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const hint = 'Choose the setting for your service.';
+      items = [
+        ConfigItem(
+          key: 'setting',
+          label: 'Setting',
+          type: type,
+          description: hint,
+          defaultValue: switch (type) {
+            ConfigItemType.tip => hint,
+            ConfigItemType.range => 2.0,
+            ConfigItemType.toggle || ConfigItemType.checkbox => false,
+            _ => 'one'
+          },
+          min: 1,
+          max: 3,
+          step: 1,
+          options: [
+            {'value': 'one', 'label': 'One'},
+            {'value': 'two', 'label': 'Two'}
+          ],
+        )
+      ];
+      await open(tester);
+      await tester.pumpAndSettle();
+      expect(find.text(hint), findsNothing);
+      await tester.tap(find.byIcon(Icons.help_outline));
+      await tester.pumpAndSettle();
+      expect(find.text(hint), findsOneWidget);
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      expect(find.text(hint), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final label in ['Model', 'Key', 'Count']) {
     testWidgets('$label preserves mid-text selection after parent draft echo',
         (tester) async {

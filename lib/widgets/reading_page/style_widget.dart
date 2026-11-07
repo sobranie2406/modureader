@@ -505,10 +505,8 @@ class StyleWidgetState extends State<StyleWidget> {
         ),
         if (!_document)
           Tooltip(
-            message: ModuStrings.text(
-                context,
-                '用描边附加加粗。1.0 为原样，1.1–2.0 逐档加粗；不能将固定粗体变细。',
-                'Add thickness with a text stroke. 1.0 keeps the original; 1.1–2.0 adds boldness. Fixed bold fonts cannot be made thinner.'),
+            message: ModuStrings.text(context, "1.0 为原字重，调高可加粗文字。",
+                "1.0 keeps the original weight. Increase it for bolder text."),
             child: Semantics(
               key: const ValueKey('reading-simulated-bold-toggle'),
               button: true,

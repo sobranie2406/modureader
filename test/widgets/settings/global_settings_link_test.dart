@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'dart:io';
 import 'dart:math';
 
@@ -122,9 +123,10 @@ void main() {
       expect(find.byIcon(Icons.qr_code_2), findsNothing);
       expect(find.byIcon(Icons.image_search), findsNothing);
       await reveal(tester, find.byType(SwitchListTile));
-      final credentialDescription = tester
-          .widget<SwitchListTile>(find.byType(SwitchListTile))
-          .subtitle as Text;
+      final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(tile.subtitle, isNull);
+      final credentialDescription =
+          (tile.title as SettingHelp).description as Text;
       expect(credentialDescription.data,
           isNot(matches(RegExp(r'QR|二维码', caseSensitive: false))));
       for (final label in [
@@ -141,7 +143,16 @@ void main() {
           find.text(
               catalog['ui_settings_link_title']!.replaceAll('{scope}', scope)),
           findsOneWidget);
+      expect(find.text(catalog['ui_settings_link_help']!), findsNothing);
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byIcon(Icons.help_outline)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
       expect(find.text(catalog['ui_settings_link_help']!), findsOneWidget);
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
       expect(find.byType(Image), findsNothing);
       expect(picker.calls, 0);
       await tap(tester, ModuStrings.label(locale, '关闭', 'Close'));

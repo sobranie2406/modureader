@@ -95,10 +95,8 @@ class _WereadLinkPageState extends State<WereadLinkPage> {
                   const Divider(),
                   wereadPublication(context, info),
                   const SizedBox(height: 12),
-                  Text(ModuStrings.text(
-                      context,
-                      '请核对 ISBN、译者、出版社和出版时间。本地未保存完整版本信息，不能自动确认同版。关联不会覆盖本地封面、简介、评分或书评。',
-                      'Verify ISBN, translator, publisher and publication date. Complete local edition metadata is unavailable, so editions cannot be confirmed automatically. Linking does not replace local metadata, ratings or reviews.')),
+                  Text(ModuStrings.text(context, "请核对书名、作者和版本后关联。",
+                      "Check the title, author and edition before linking.")),
                 ]));
         if (mounted && confirmed && valid()) Navigator.pop(context, info);
       });

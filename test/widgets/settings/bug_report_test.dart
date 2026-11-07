@@ -146,8 +146,7 @@ void main() {
     await click(tester, 'Preview and submit');
     expect(exported, isNull);
     expect(opened, isEmpty);
-    expect(find.textContaining('Copying the report does not attach'),
-        findsOneWidget);
+    expect(find.textContaining('Export the log as TXT'), findsOneWidget);
     log = 'LATER_NOT_REVIEWED';
     await click(tester, 'Export sanitized runtime log TXT');
     expect(exported, snapshot);

@@ -114,10 +114,8 @@ class _DocumentAnalysisPanelState extends State<DocumentAnalysisPanel> {
           children: [
             SettingHelp(
                 title: Text(ModuStrings.text(context, '说明', 'Help')),
-                description: Text(ModuStrings.text(
-                    context,
-                    '仅在本机按需抽样，不上传文档，不启动 OCR 或向量化。检测结果为初步判断。',
-                    'On-device sampling only. No upload, OCR or indexing. Results are provisional.'))),
+                description: Text(ModuStrings.text(context, "检查书籍的文字层和页面类型。",
+                    "Inspect the book’s text layer and page types."))),
             const SizedBox(height: 12),
             if (widget.saveOverride != null) ...[
               Text(ModuStrings.text(context, '本书类型标记（暂不改变阅读模式）',

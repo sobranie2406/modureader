@@ -252,9 +252,11 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                                           _schedule();
                                         },
                                 ),
-                                Text(tr(
-                                    '选择策略后调整漂白强度；文字净底会淡化纸色，也可能影响浅色插图，请对照原图。',
-                                    'Adjust whitening strength after selecting a strategy. Text cleanup removes paper colour and may alter pale illustrations; compare the original.')),
+                                SettingHelp(
+                                    title: Text(ModuStrings.text(
+                                        context, "调整效果", "Adjust enhancement")),
+                                    description: Text(tr("调整强度，并对照原图查看效果。",
+                                        "Adjust the strength and compare with the original."))),
                               ],
                             ),
                           ),
@@ -337,15 +339,13 @@ class _DocumentEnhancementPanelState extends State<DocumentEnhancementPanel> {
                           SettingHelp(
                               title:
                                   Text(ModuStrings.text(context, '说明', 'Help')),
-                              description: Text(tr(
-                                  '只改变显示，不修改原文件。漂白主要净化浅色纸张；复杂背景请保留原图。',
-                                  'Display only; the source file stays unchanged. Whitening targets light paper. Keep the original for complex backgrounds.'))),
+                              description: Text(tr("淡化纸张底色，改善文字对比。",
+                                  "Lighten the paper background to improve text contrast."))),
                           SettingHelp(
                               title:
                                   Text(ModuStrings.text(context, '说明', 'Help')),
-                              description: Text(tr(
-                                  '扫描水印减淡：0 为关闭，适合浅色纸张上的淡灰、浅彩色水印。可能影响浅色正文或插图，请对照原图确认；深色或与文字重叠的水印不保证清除。',
-                                  'Scan watermark fading: 0 is off. Targets faint gray or colored marks on light paper. It may affect pale text or illustrations; compare the original before confirming. Dark marks or marks overlapping text may remain.'))),
+                              description: Text(tr("调高可减淡浅色水印，0 为关闭。",
+                                  "Increase to lighten faint watermarks. Set to 0 to turn off."))),
                         ])),
                     if (_failed)
                       TextButton(

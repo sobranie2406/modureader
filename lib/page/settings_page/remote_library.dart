@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
@@ -66,8 +67,8 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
       }
       if (mounted) {
         setState(() => _message = save
-            ? ModuStrings.text(context, '连接和密码已保存在本机，请到首页“远程书库”连接。',
-                'Connection and password saved on this device. Open Remote library to connect.')
+            ? ModuStrings.text(context, "连接已保存，请到“远程书库”打开。",
+                "Connection saved. Open Remote library to browse.")
             : ModuStrings.text(context, '连接成功，目录可读取（未写入任何远程文件）。',
                 'Connected. Directory is readable; no remote files were written.'));
       }
@@ -100,8 +101,8 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(ModuStrings.text(context, '连接远程书籍目录，只浏览和下载，不会修改服务器文件。',
-                'Browse and download from a remote book directory without modifying server files.')),
+            Text(ModuStrings.text(context, "浏览并下载服务器上的书籍。",
+                "Browse and download books from your server.")),
             const SizedBox(height: 16),
             TextField(
                 controller: _url,
@@ -154,14 +155,18 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                 onChanged: _busy ? null : (v) => setState(() => _http = v),
                 title: Text(ModuStrings.text(
                     context, '允许 HTTP 明文连接', 'Allow unencrypted HTTP')),
-                subtitle: Text(ModuStrings.text(
+                subtitle: SettingHelp(
+                    title:
+                        Text(ModuStrings.text(context, "连接方式", "Connection")),
+                    description: Text(ModuStrings.text(context,
+                        "建议使用 HTTPS 连接。", "Use HTTPS for this connection.")))),
+            SettingHelp(
+                title:
+                    Text(ModuStrings.text(context, "同步连接", "Sync connection")),
+                description: Text(ModuStrings.text(
                     context,
-                    '风险：账号、密码和文件可能被网络中的其他人读取。优先使用 HTTPS 和专用只读账号。',
-                    'Risk: credentials and files may be intercepted. Prefer HTTPS and a dedicated read-only account.'))),
-            Text(ModuStrings.text(
-                context,
-                '服务器地址、用户名和密码保存在本机应用配置中，重启后仍保留，本地不额外加密。开启「同步 → 同步 API Key」后，书库配置和密码会跟随自动同步加密上传，各设备需使用相同同步加密密码。导出设置备份时勾选「包含服务配置与 API Key（加密）」即可备份书库配置。清除连接也会同步清除其他已开启此开关设备的书库配置，不删除书籍。',
-                'The server, username and password persist locally without additional local encryption. Enable Sync → Sync API keys to include this connection in encrypted automatic sync; devices must use the same encryption password. For backups, select the encrypted service settings option. Clearing this connection also propagates to other opted-in devices; books are kept.')),
+                    "在“同步”中开启敏感数据同步，可同步书库连接。",
+                    "Enable Sensitive data sync in Sync settings to share this connection."))),
           ],
         ),
       ),
@@ -194,8 +199,8 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                                           'Clear library connection?')),
                                       content: Text(ModuStrings.text(
                                           context,
-                                          '清除连接配置及密码。开启「同步 API Key」时，下次同步也会清除其他已开启此开关设备的书库配置。不删除本地书籍或服务器文件。',
-                                          'Clear the connection and password. If Sync API keys is enabled, the next sync also clears this connection on other opted-in devices. Books and server files are kept.')),
+                                          "清除连接和密码？开启同步的设备也会更新。",
+                                          "Clear the connection and password? This also updates devices with sync enabled.")),
                                       actions: [
                                         TextButton(
                                             onPressed: () =>

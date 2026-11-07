@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'widget_title.dart';
 import 'reader_menu_group.dart';
@@ -153,14 +154,17 @@ class _DocumentTextStyleDialogState extends State<DocumentTextStyleDialog> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                  Text(t('以下排版参数仅用于本书识别后的文字和重排预览，不改变原版 PDF 或其他书籍的排版。',
-                      'Typography below affects only this book’s extracted text and reflow, not the original PDF or other books.')),
+                  SettingHelp(
+                      title:
+                          Text(ModuStrings.text(context, "文字样式", "Text style")),
+                      description: Text(t("调整本书重排文字的样式。",
+                          "Style the reflowed text in this book."))),
                   Padding(
                       padding: EdgeInsets.symmetric(
                           vertical: 12, horizontal: _style.margin.clamp(0, 40)),
                       child: Text(
-                          t('文字识别之后，可以按照自己的阅读习惯调整样式。\n让阅读更清晰、更舒适。',
-                              'Adjust the recognized text to suit your reading preferences.\nMake reading clearer and more comfortable.'),
+                          t("文字识别之后，可以按照自己的阅读习惯调整样式。\n让阅读更清晰、更舒适。",
+                              "Adjust the recognized text to suit your reading preferences.\nMake reading clearer and more comfortable."),
                           key: const ValueKey('ocr-style-preview'),
                           style: _style.textStyle,
                           textAlign: _style.alignment)),
@@ -195,10 +199,6 @@ class _DocumentTextStyleDialogState extends State<DocumentTextStyleDialog> {
                             decimals: 0),
                         _slider('weight', t('字体粗细', 'Font weight'),
                             _style.weight, .5, 2, 15),
-                        Text(
-                            t('实际粗细取决于字体支持；思源宋体内置常规和粗体。',
-                                'Weight depends on the font; Source Han Serif includes regular and bold faces.'),
-                            style: Theme.of(context).textTheme.bodySmall),
                         _slider('height', t('行间距', 'Line spacing'),
                             _style.height, 1.2, 2.4, 12),
                         _slider('spacing', t('字间距', 'Letter spacing'),
@@ -266,8 +266,6 @@ class _DocumentTextStyleDialogState extends State<DocumentTextStyleDialog> {
                       ],
                     ),
                   ),
-                  Text(t('配色和背景与电子书共用，字号等排版参数仅用于本书重排。',
-                      'Colors and backgrounds are shared with ebooks; typography applies only to this book’s reflow.')),
                   const ReaderMenuGroup(
                       padding: EdgeInsets.all(12),
                       child: DocumentAppearanceControls()),

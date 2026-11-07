@@ -29,10 +29,8 @@ class ReadingSyncSettings extends AbstractSettingsTile {
               description: Text(!enabled
                   ? (ModuStrings.text(context, '请先启用云端同步和自动同步。',
                       'Enable cloud sync and automatic sync first.'))
-                  : (ModuStrings.text(
-                      context,
-                      '仅前台阅读时计时；退出书籍、切换其他页面或锁屏后暂停。使用双向合并，同步已保存的笔记、阅读进度及其他正常同步内容；不自动保存编辑草稿。',
-                      'Runs only while reading in the foreground. Pauses on other pages or in the background. Merges saved notes, reading positions and normal sync data; unsaved drafts are not submitted.'))),
+                  : (ModuStrings.text(context, "阅读时按设定间隔同步笔记和进度。",
+                      "Sync notes and progress at the selected interval while reading."))),
               leading: const Icon(Icons.schedule),
               initialValue: prefs.readingTimedSync,
               enabled: enabled,
@@ -44,10 +42,8 @@ class ReadingSyncSettings extends AbstractSettingsTile {
               title: Text(
                   ModuStrings.text(context, '阅读同步间隔', 'Reading sync interval')),
               value: Text(duration(prefs.readingSyncMinutes)),
-              description: Text(ModuStrings.text(
-                  context,
-                  '进入或恢复阅读后等待一个完整间隔；同步期间不重复发起，结束后重新计时。遵循“仅 Wi-Fi”设置。',
-                  'Waits a full interval on entry or resume. No overlapping runs; restarts the interval after completion. Respects Wi-Fi-only sync.')),
+              description: Text(ModuStrings.text(context, '选择两次自动同步之间的间隔。',
+                  'Choose the interval between automatic syncs.')),
               leading: const Icon(Icons.timer_outlined),
               enabled: enabled && prefs.readingTimedSync,
               onPressed: (_) async {

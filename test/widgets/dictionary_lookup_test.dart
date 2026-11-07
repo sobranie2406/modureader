@@ -268,7 +268,7 @@ void main() {
     online.result.completeError(Exception('private response body'));
     await tester.pumpAndSettle();
     expect(find.text('apple; apple tree'), findsOneWidget);
-    expect(find.textContaining('在线查询暂不可用'), findsOneWidget);
+    expect(find.textContaining('在线查询失败'), findsOneWidget);
     expect(find.textContaining('private response body'), findsNothing);
     expect(tester.takeException(), isNull);
   });

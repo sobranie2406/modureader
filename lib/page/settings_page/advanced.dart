@@ -182,8 +182,8 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
                   L10n.of(context).settingsAdvancedEnableJavascriptForEpub),
               description: Text(ModuStrings.text(
                   context,
-                  '仅允许可信 EPUB 内附的脚本。关闭不影响阅读器自身脚本；更改后请重新打开书籍。部分 WebKit 平台需保留事件兼容权限，但关闭时仍清理并禁用书籍脚本。',
-                  'Only enable scripts in trusted EPUBs. Reader-owned scripts remain active. Reopen the book after changes. WebKit retains event compatibility permission, while book scripts are still sanitized and blocked when disabled.')),
+                  "允许 EPUB 中的交互脚本。修改后请重新打开书籍。",
+                  "Allow interactive scripts in EPUB books. Reopen the book after changing this setting.")),
               leading: const Icon(Icons.code),
               initialValue: Prefs().enableJsForEpub,
               onToggle: (value) {
@@ -200,8 +200,10 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
               title: Text(L10n.of(context).settingsAdvancedHttpProxyEnabled),
               leading: const Icon(Icons.wifi_tethering),
               initialValue: Prefs().httpProxyEnabled,
-              description: const Text(
-                  '应用网络请求使用 HTTP 代理，连接失败不会自动直连。阅读器 WebView 和外部浏览器请使用系统代理。'),
+              description: Text(ModuStrings.text(
+                  context,
+                  '为应用连接设置 HTTP 代理。阅读器和浏览器使用系统代理。',
+                  'Set an HTTP proxy for app connections. The reader and browser use the system proxy.')),
               onToggle: (value) {
                 Prefs().httpProxyEnabled = value;
                 setState(() {});

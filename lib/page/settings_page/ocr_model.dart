@@ -148,8 +148,8 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
       }
     } catch (_) {
       if (mounted && !token.isCancelled) {
-        setState(() => _errors[model.id] = t('下载或校验失败，请重试或切换下载源。已校验的文件会保留。',
-            'Download or verification failed. Retry or switch source. Verified files are retained.'));
+        setState(() => _errors[model.id] = t("下载失败，请重试或切换下载源。",
+            "Download failed. Try again or change the download source."));
       }
     } finally {
       if (mounted) {
@@ -179,7 +179,7 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
         builder: (context) => AlertDialog(
               title: Text(t('删除已下载模型？', 'Delete downloaded model?')),
               content: Text(
-                  '${t(model.name, model.englishName)}\n\n${t('仅删除本机该 OCR 模型文件，释放存储空间。书籍、已识别内容和模型选择保持不变；再次使用前需要重新下载。', 'Only this OCR model’s local files will be removed. Books, recognized text and model selection are preserved. Download it again before using it.')}'),
+                  '${t(model.name, model.englishName)}\n\n${t("删除本机 OCR 模型？再次使用前需重新下载。", "Delete this OCR model? Download it again when needed.")}'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -245,9 +245,8 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errors[model.id] = t(
-            '导入失败。请选择本型号的全部完整文件，大小和 SHA-256 必须与下载版本一致；请先停止识别或下载后重试。',
-            'Import failed. Select all complete files for this model with matching size and SHA-256. Stop recognition or downloads and retry.'));
+        setState(() => _errors[model.id] = t("导入失败，请选择所选型号的完整模型文件。",
+            "Import failed. Select all files for the chosen model."));
       }
     } finally {
       if (mounted) setState(() => _importingId = null);
@@ -266,8 +265,8 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                   child: SettingHelp(
                       title: Text(ModuStrings.text(context, '说明', 'Help')),
                       description: Text(t(
-                          '用于扫描书籍的文字识别、提取与重排。默认推荐 PP-OCRv6 Small，高精度可选 Medium，保留 V5；无需 API Key，下载后可离线使用。',
-                          'Recognize, extract and reflow text in scanned books. PP-OCRv6 Small is the default; Medium offers higher accuracy, and V5 remains available. Works offline after download, without an API key.'))))),
+                          "识别扫描书籍中的文字。Small 适合日常使用，Medium 适合精细识别。",
+                          "Recognize text in scanned books. Use Small for everyday reading or Medium for finer recognition."))))),
         ]),
         SettingsSection(
             title: Text(t('本地模型 · 按需下载', 'Local models · On-demand download')),
@@ -311,10 +310,14 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                             _modelCard(model),
                             const SizedBox(height: 10)
                           ],
-                          Text(
-                              t('模型按需下载，不内置在安装包中。只下载所选模型，文件经大小与 SHA-256 校验后使用。切换下载源不会重复下载已校验文件，失败不会自动更换来源。请保持此页打开，离开会取消下载。模型选择和下载源随全局设置备份，模型文件不随备份传输。',
-                                  'Models are not bundled. Only the chosen pack is downloaded and verified by size and SHA-256. Switching sources reuses verified files; failures never silently switch sources. Keep this page open; leaving cancels the download. Settings backups include the selection and source, not model files.'),
-                              style: Theme.of(context).textTheme.bodySmall),
+                          SettingHelp(
+                              title: Text(ModuStrings.text(
+                                  context, "下载模型", "Download models")),
+                              description: Text(
+                                  t("选择模型后下载，完成前请保持此页打开。",
+                                      "Choose a model and download it. Keep this page open until it finishes."),
+                                  style:
+                                      Theme.of(context).textTheme.bodySmall)),
                         ],
                       ))),
             ]),

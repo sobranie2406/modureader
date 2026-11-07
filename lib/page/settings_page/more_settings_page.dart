@@ -195,14 +195,13 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
               },
               if (PluginHost.isEnabled)
                 {
-                  "title": ModuStrings.text(context, '实验性功能', 'Experimental features'),
+                  "title": ModuStrings.text(
+                      context, '实验性功能', 'Experimental features'),
                   "icon": Icons.science_outlined,
                   "sections": const ExperimentalSettings(),
                   "subtitles": [
-                    ModuStrings.text(
-                        context,
-                        '插件 · 默认关闭 · 开启前确认风险',
-                        'Plugins · Off by default · Confirmation required'),
+                    ModuStrings.text(context, '插件 · 提示词包 · 划词动作',
+                        'Plugins · Prompt packs · Selection actions'),
                   ],
                 },
               {

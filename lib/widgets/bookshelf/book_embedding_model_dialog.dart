@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -119,14 +120,13 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
                                           context, '尚未配置', 'Not configured')
                                 })),
                         const SizedBox(height: 12),
-                        Text(ModuStrings.text(
-                            context,
-                            '仅影响本书，不修改全局设置。保存不会自动开始任务；已有索引需在书籍菜单中重新向量化。模型不匹配期间，AI 检索仅使用关键词，避免混用向量。',
-                            'Only affects this book, not global settings. Saving does not start a task; rebuild existing embeddings from the book menu. While models differ, AI retrieval uses keywords only to avoid mixing vectors.')),
-                        Text(ModuStrings.text(
-                            context,
-                            '远程模型会发送书籍片段到配置的服务商。本书选择不另存 API 密钥；全局向量功能关闭时，本书也不进行向量推理。',
-                            'Remote models send book excerpts to the configured provider. This book does not store a separate API key. Disabling global embeddings also disables vector inference for this book.')),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "应用模型", "Apply model")),
+                            description: Text(ModuStrings.text(
+                                context,
+                                "保存模型后，在书籍菜单中重新向量化。",
+                                "Save the model, then reindex from the book menu."))),
                         if (busy)
                           Text(ModuStrings.text(
                               context,

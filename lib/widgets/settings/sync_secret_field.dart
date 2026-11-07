@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 
@@ -42,8 +43,11 @@ class _SyncSecretFieldState extends State<SyncSecretField> {
         onFieldSubmitted: widget.onSubmitted,
         decoration: InputDecoration(
           labelText: widget.label,
-          helperText: widget.helperText,
-          helperMaxLines: 3,
+          helper: (widget.helperText) == null
+              ? null
+              : SettingHelpTitle(
+                  title: ModuStrings.text(context, "说明", "Help"),
+                  description: (widget.helperText)!),
           errorText: widget.errorText,
           border: const OutlineInputBorder(),
           suffixIcon: IconButton(

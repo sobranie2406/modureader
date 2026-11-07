@@ -155,7 +155,7 @@ void main() {
           findsOneWidget);
       if (entry.value) {
         expect(find.textContaining('/document/'), findsNothing);
-        expect(find.textContaining('系统保存窗口选择的位置'), findsOneWidget);
+        expect(find.textContaining('已保存到你选择的目录'), findsOneWidget);
         expect(destination.status(zh: true), isNot(contains(entry.key)));
       }
       await tester.tap(find.text(entry.value ? '复制文件名' : '复制保存位置'));

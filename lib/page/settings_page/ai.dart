@@ -136,10 +136,8 @@ class _AISettingsState extends ConsumerState<AISettings> {
               },
               title: Text(ModuStrings.text(
                   context, '允许移动和调整弹窗大小', 'Move and resize popups')),
-              description: Text(ModuStrings.text(
-                  context,
-                  '适用于划词功能弹窗。拖动顶部移动，拖动两侧、底边或四角调整大小；每次打开恢复默认位置和大小。',
-                  'For selection tool popups. Drag the top to move, or the sides, bottom and corners to resize. Each opening restores the default position and size.')),
+              description: Text(ModuStrings.text(context, "拖动顶部移动窗口，拖动边缘调整大小。",
+                  "Drag the top to move the window or its edges to resize it.")),
             ),
           if (Prefs().aiChatDisplayMode != AiChatDisplayMode.popup)
             aiPanelPositionTile(),
@@ -161,8 +159,8 @@ class _AISettingsState extends ConsumerState<AISettings> {
                       ModuStrings.text(context, '保留对话历史', 'Keep chat history')),
                   description: Text(ModuStrings.text(
                       context,
-                      '对话保存在本机数据目录，不随缓存清理，也不会按缓存数量自动删除。可在 AI 对话历史中单独管理。',
-                      'Chats are stored locally and are not removed when clearing the cache or changing its size limit. Manage them separately in AI chat history.'))),
+                      "在“AI 对话历史”中查看和管理对话。",
+                      "View and manage conversations in AI chat history."))),
             ),
           ),
         ],

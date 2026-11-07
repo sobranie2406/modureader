@@ -23,10 +23,8 @@ class TapOnlyPageTurnTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       title: SettingHelpTitle(
           title: ModuStrings.text(context, '仅点击翻页', 'Tap-only page turning'),
-          description: ModuStrings.text(
-              context,
-              '开启后，分页模式下滑动、拖动不翻页，也不触发上下拉手势；关闭后可滑动翻页。不影响选词、快速标记和滚动阅读模式。',
-              'In page mode, disable swipe navigation and pull gestures. Turn off to allow swipes. Text selection, quick mark and scrolling mode are unchanged.')),
+          description: ModuStrings.text(context, "分页阅读时，仅点击翻页。",
+              "Use taps to turn pages in paginated reading.")),
       value: value,
       onChanged: onChanged,
     );

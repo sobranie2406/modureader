@@ -52,6 +52,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
     if (entry == null) return t(source.zh, source.en);
     return t(entry.labelZh, entry.labelEn);
   }
+
   @override
   void initState() {
     super.initState();
@@ -272,8 +273,8 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                       ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(_label(source)),
-                          subtitle: Text(t('在线查询暂不可用（网络、限流或数据许可校验失败），本地结果不受影响。',
-                              'Online lookup unavailable (network, rate limit or data/license validation). Local results are unaffected.')),
+                          subtitle: Text(t("在线查询失败，请重试。",
+                              "Online lookup failed. Try again.")),
                           trailing: TextButton(
                               onPressed: _search,
                               child: Text(t('重试', 'Retry')))),
@@ -334,8 +335,8 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
                                         entry.definition.isEmpty
                                             ? ModuStrings.text(
                                                 context,
-                                                '此词条没有文字释义，可能仅包含暂不支持的多媒体资源。',
-                                                'No text definition; this entry may contain unsupported media only.')
+                                                "此词条没有文字释义。",
+                                                "This entry has no text definition.")
                                             : entry.dictionaryId != null
                                                 ? compactDictionaryText(
                                                     entry.definition)

@@ -597,8 +597,8 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                 Text(t('正在提取第 ${_activePage! + 1} 页',
                     'Extracting page ${_activePage! + 1}')),
               if (_reflow) ...[
-                Text(t('核对提取结果后填入 AI 输入框，不会自动发送。',
-                    'Review the extracted text before filling the AI draft. It is not sent automatically.')),
+                Text(t('核对文字后，可填入 AI 输入框。',
+                    'Review the text, then add it to the AI draft.')),
               ] else ...[
                 Wrap(spacing: 8, children: [
                   ChoiceChip(
@@ -672,9 +672,8 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
               if (_needsModel)
                 Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Text(t(
-                        '此区域需要 OCR。请先下载已选模型，再点击提取。可在设置 → 离线本地模型设置 → OCR 模型中选择模型及下载源；识别在本机进行，不上传书页。',
-                        'OCR is needed. Download the selected model, then extract again. Choose a model and source in Settings → Offline local model settings → OCR model. Recognition stays on this device; book pages are not uploaded.'))),
+                    child: Text(t("请先下载 OCR 模型，再点击提取。",
+                        "Download an OCR model, then extract the text."))),
               if (_error != null)
                 Text(
                     _activePage == null

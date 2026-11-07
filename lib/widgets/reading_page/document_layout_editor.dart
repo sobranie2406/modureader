@@ -204,10 +204,9 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
       });
       _change(crop);
       setState(() => _cropNotice = detection['detected'] == true
-          ? tr('已识别当前页。确定后，所选范围内的每一页都会独立识别并自动裁边，不会共用当前裁边框。',
-              'Current page detected. After confirming, each page in the selected scope is detected and cropped independently.')
-          : tr('空白、满版或边界不明确，保留完整原页，可手动调整。',
-              'Blank, full-bleed or uncertain border. Keeping the full page; adjust manually if needed.'));
+          ? tr("所选范围内的每页将自动识别裁边。",
+              "Detect crop edges separately for each page in the selected range.")
+          : tr("请手动调整裁边框。", "Adjust the crop frame manually."));
     } catch (_) {
       if (mounted && generation == _generation) {
         setState(() => _cropNotice = tr('自动裁边失败，原草稿未改动，请重试。',
@@ -402,8 +401,8 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                             title: SettingHelp(
                                 title: Text(tr('逐页自动裁边', 'Per-page auto crop')),
                                 description: Text(
-                                    tr('开启时默认应用全书；每页独立识别。拖动裁边框切换为手动裁边。',
-                                        'Enabling defaults to the whole document; detects each page independently. Drag the box to switch to manual cropping.'),
+                                    tr("自动识别每页裁边；拖动裁边框可改为手动。",
+                                        "Detect page edges automatically, or drag the crop frame to adjust them."),
                                     style:
                                         Theme.of(context).textTheme.bodySmall)),
                             value: _layout.autoCrop,
@@ -465,10 +464,13 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                                           refresh: true),
                               icon: const Icon(Icons.add)),
                         ]),
-                        Text(
-                            tr('留白用于保护页码、脚注和文字边缘。自动模式随翻页识别；手动拖框后只使用固定裁边。',
-                                'Margin protects page numbers, footnotes and text edges. Automatic mode detects each page; dragging the box uses a fixed manual crop.'),
-                            style: Theme.of(context).textTheme.bodySmall),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "裁边留白", "Crop margins")),
+                            description: Text(
+                                tr("增加留白可保留页码和脚注。",
+                                    "Add margins to keep page numbers and footnotes."),
+                                style: Theme.of(context).textTheme.bodySmall)),
                         if (_cropNotice != null) Text(_cropNotice!),
                         Wrap(spacing: 8, children: [
                           ActionChip(
@@ -581,16 +583,22 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                                       _change(_layout.copyWith(order: value));
                                     }
                                   }),
-                        Text(tr('拖动四角调整裁边，拖动框内移动。按原页比例保存，不使用毫米单位。',
-                            'Drag corners to crop; drag inside to move. Saved as page proportions, not millimetres.')),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "调整裁边", "Adjust crop")),
+                            description: Text(tr("拖动四角调整裁边，拖动框内移动。",
+                                "Drag a corner to resize the crop, or drag inside to move it."))),
                         const SizedBox(height: 8),
-                        Text(
-                            _paired
-                                ? tr('奇偶页分别调整；只保存本次调整的范围，替换范围内的单页设置。',
-                                    'Edit odd/even pages separately. Only edited scopes are saved, replacing their per-page overrides.')
-                                : tr('全书设置会替换所有单页及奇偶页设置。取消不会保存。',
-                                    'Whole document replaces all page and parity overrides. Cancel saves nothing.'),
-                            style: Theme.of(context).textTheme.bodySmall),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "应用范围", "Page range")),
+                            description: Text(
+                                _paired
+                                    ? tr("分别调整奇数页和偶数页。",
+                                        "Adjust odd and even pages separately.")
+                                    : tr("应用到全书会替换已有裁边设置。",
+                                        "Applying to the whole book replaces existing crop settings."),
+                                style: Theme.of(context).textTheme.bodySmall)),
                       ])))));
 
   Widget _canvas() => LayoutBuilder(builder: (context, constraints) {
@@ -714,10 +722,12 @@ class _DocumentLayoutEditorState extends State<DocumentLayoutEditor> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                  tr('保存到本书；开启“按裁边与分格阅读”后应用于正文。不会修改源文件。',
-                      'Saved for this book. Enable “Read cropped panels” here to apply it to reading. The source file is unchanged.'),
-                  style: Theme.of(context).textTheme.bodySmall)),
+              child: SettingHelp(
+                  title: Text(ModuStrings.text(context, "应用裁边", "Apply crop")),
+                  description: Text(
+                      tr("保存后，开启“按裁边与分格阅读”查看效果。",
+                          "Save, then enable cropped and panel reading to apply it."),
+                      style: Theme.of(context).textTheme.bodySmall))),
           OverflowBar(alignment: MainAxisAlignment.end, children: [
             TextButton(
                 onPressed: _saving || _detecting

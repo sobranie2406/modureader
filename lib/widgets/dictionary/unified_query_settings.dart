@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -67,8 +68,6 @@ class _UnifiedQuerySettingsState extends State<UnifiedQuerySettings> {
               : t(section.zh, section.en))),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         if (section == null) ...[
-          Text(t('选择综合页汇总的内容。其他标签仍可单独打开；关闭汇总不会删除字典或服务设置。',
-              'Choose results for the overview. Other tabs remain available; disabling a summary does not delete sources.')),
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(t('拖动调整汇总顺序，调整后使用自定义排序。',
@@ -113,9 +112,10 @@ class _UnifiedQuerySettingsState extends State<UnifiedQuerySettings> {
               }),
           SwitchListTile(
               key: const ValueKey('query-smart-order'),
-              title: Text(t('按查询文本智能排序', 'Order by query text')),
-              subtitle: Text(t('开启后在本机按查询文本排序，不调用 AI；关闭后使用自定义顺序。',
-                  'On: local query-text rules, without AI. Off: your custom order.')),
+              title: SettingHelp(
+                  title: Text(t('按查询文本智能排序', 'Order by query text')),
+                  description: Text(t("按相关程度排序；关闭后使用自定义顺序。",
+                      "Sort by relevance, or turn off to use your own order."))),
               value: prefs.smartOrder,
               onChanged: (v) {
                 setState(() => prefs.smartOrder = v);
@@ -185,8 +185,6 @@ class _UnifiedQuerySettingsState extends State<UnifiedQuerySettings> {
                 setState(() => prefs.baiduLink = v);
                 save();
               }),
-          Text(t('开启百科后，进入综合查询即自动查询，仅发送查询词。百度百科通过原站阅读，不抓取或绕过验证。',
-              'Enabled encyclopedia sources are queried automatically when opening Look up; only the query is sent. Baidu opens the original website.')),
         ],
         if (section == null || section == QuerySection.dictionary)
           destination(t('字典与查询来源', 'Dictionaries and sources'),

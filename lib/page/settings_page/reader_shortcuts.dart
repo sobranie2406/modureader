@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/reader_shortcuts.dart';
@@ -68,8 +69,10 @@ class _ReaderShortcutsSettingsState extends State<ReaderShortcutsSettings> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: Text(t('自定义按键', 'Keyboard shortcuts'))),
         body: ListView(padding: const EdgeInsets.all(16), children: [
-          Text(t('用于桌面端和安卓实体键盘。每项最多绑定 8 个按键；输入文字、选词或弹窗时不触发。朗读按键只控制已启动的朗读。',
-              'For desktop and Android physical keyboards. Assign up to 8 shortcuts per action. Inactive while editing, selecting text or using dialogs. Narration controls require an active narration session.')),
+          SettingHelp(
+              title: Text(ModuStrings.text(context, "设置快捷键", "Set shortcuts")),
+              description: Text(t("选择操作后按下要绑定的按键。",
+                  "Select an action, then press a key to bind it."))),
           for (final action in ReaderAction.values)
             SettingsSection.content(
                 title: Text(t(action.zh, action.en)),

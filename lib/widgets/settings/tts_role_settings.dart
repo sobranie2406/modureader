@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/tts_role_config.dart';
@@ -109,10 +110,13 @@ class _TtsRoleSettingsSectionState
                 label: '×${value.toStringAsFixed(2)}',
                 onChanged: (next) => setDialogState(() => value = next),
               ),
-              Text(ModuStrings.text(
-                  dialogContext,
-                  '相对于全局朗读速度。不同音色的自然语速不同，用这里的倍率把旁白和对话调到一致。',
-                  'Relative to the global narration speed. Voices have different natural tempos; use these multipliers to match narration and dialogue.')),
+              SettingHelp(
+                  title: Text(
+                      ModuStrings.text(context, "速度校准", "Rate calibration")),
+                  description: Text(ModuStrings.text(
+                      dialogContext,
+                      "调整倍率，使旁白和对话速度一致。",
+                      "Adjust the rate to match narration and dialogue."))),
             ],
           ),
           actions: [
@@ -302,12 +306,10 @@ class _TtsRoleSettingsSectionState
                 title: Text(ModuStrings.text(
                     context, '旁白与对话分音色', 'Separate narration and dialogue')),
                 description: Text(_systemEngine
-                    ? ModuStrings.text(context, '系统朗读暂不支持逐句切换音色，请先选择在线朗读服务。',
-                        'The system engine cannot switch voices per sentence. Choose an online service first.')
-                    : ModuStrings.text(
-                        context,
-                        '引号内的对话用对话音色，其余用旁白音色。不同音色的自然语速不同，可用下方旁白/对话语速对齐；对话多的书会增加合成请求数；改音色后从下一段开始生效。',
-                        'Quoted dialogue uses the dialogue voice; the rest uses narration. Voices differ in natural tempo, so use the narration/dialogue speeds below to match them. Dialogue-heavy books need more synthesis requests.')),
+                    ? ModuStrings.text(context, '请先选择在线朗读服务。',
+                        'Choose an online speech service first.')
+                    : ModuStrings.text(context, "引号内使用对话音色，其余使用旁白音色。",
+                        "Use the dialogue voice inside quotation marks and the narrator voice elsewhere.")),
                 initialValue: enabled,
                 enabled: !_systemEngine,
                 onToggle: (value) async {
@@ -341,8 +343,8 @@ class _TtsRoleSettingsSectionState
                   value: Text('×${config.narrationRate.toStringAsFixed(2)}'),
                   description: Text(ModuStrings.text(
                       context,
-                      '不同音色的自然语速不同；用旁白/对话语速把两者调到一致。',
-                      'Voices have different natural tempos; match narration and dialogue with these speeds.')),
+                      "调整旁白和对话的倍率，使听感速度一致。",
+                      "Adjust narrator and dialogue rates to match their pace.")),
                   onPressed: (_) => _pickRate(
                     title: ModuStrings.text(context, '旁白语速', 'Narration speed'),
                     current: config.narrationRate,
@@ -356,10 +358,8 @@ class _TtsRoleSettingsSectionState
                   title:
                       Text(ModuStrings.text(context, '对话语速', 'Dialogue speed')),
                   value: Text('×${config.dialogueRate.toStringAsFixed(2)}'),
-                  description: Text(ModuStrings.text(
-                      context,
-                      '只调整对话音色的倍率，用于对齐旁白的听感速度。',
-                      'Adjusts only the dialogue voice so it matches the narration pace.')),
+                  description: Text(ModuStrings.text(context, "调整对话音色的朗读速度。",
+                      "Adjust the dialogue voice’s rate.")),
                   onPressed: (_) => _pickRate(
                     title: ModuStrings.text(context, '对话语速', 'Dialogue speed'),
                     current: config.dialogueRate,
@@ -386,9 +386,7 @@ class _TtsRoleSettingsSectionState
           title: Text(ModuStrings.text(
               context, '这本书使用独立音色', 'Use custom voices for this book')),
           description: Text(ModuStrings.text(
-              context,
-              '只影响当前正在朗读的这本书；关闭后跟随全局设置。',
-              'Affects only the book being narrated; off follows the global setting.')),
+              context, "为当前书籍单独设置音色。", "Set voices for this book.")),
           initialValue: custom,
           onToggle: (value) async {
             if (!value) {

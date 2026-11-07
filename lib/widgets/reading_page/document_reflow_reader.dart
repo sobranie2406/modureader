@@ -880,8 +880,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _shownSelection = null;
       setState(() {
         if (anchor != null && !anchor.matches(result)) {
-          _error = t('已返回原书页码，但重排文字版本不同，未强行定位标注。',
-              'Returned to the source page. Text has changed; the annotation was not applied to a different passage.');
+          _error = t("已返回笔记所在的原书页。", "Returned to the note’s original page.");
         }
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -897,8 +896,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       if (active()) setState(() => _needsModel = true);
     } catch (_) {
       if (active()) {
-        setState(() => _error = t('本页重排失败，已保留原阅读位置。请重试、用左右箭头切换页面或返回原页。',
-            'Could not reflow this page. Your position is unchanged. Retry, use the arrows to switch pages, or return to the original.'));
+        setState(() => _error =
+            t("重排失败，请重试或切换页面。", "Reflow failed. Try again or switch pages."));
       }
     } finally {
       if (widget.modelStore == null) model.close();
@@ -1456,8 +1455,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                     _error ??
-                        t('本页需要 OCR，请先在离线本地模型设置中下载模型。识别在本机完成。',
-                            'This page needs OCR. Download a model in Offline local model settings; recognition runs locally.'),
+                        t("请先在“离线本地模型”中下载 OCR 模型。",
+                            "Download an OCR model in Offline models first."),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: foreground))),

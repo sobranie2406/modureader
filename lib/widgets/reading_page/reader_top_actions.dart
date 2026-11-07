@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'dart:convert';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -141,10 +142,10 @@ class _ReaderTopActionsSettingsState extends State<ReaderTopActionsSettings> {
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(ModuStrings.text(
-            context,
-            '按顺序显示已启用的按钮，功能区（含「更多」）最多占阅读区域宽度的 40%，其余放入「更多」。返回按钮独立保留。拖动右侧手柄排序。',
-            'Enabled actions appear in order within 40% of the reading area width, including More. Remaining actions go in More. Back stays separate. Drag the handles to reorder.')),
+        SettingHelp(
+            title: Text(ModuStrings.text(context, "排列按钮", "Arrange buttons")),
+            description: Text(ModuStrings.text(context, "拖动手柄排序，放不下的按钮收进“更多”。",
+                "Drag the handles to reorder. Extra buttons appear in More."))),
         ReorderableListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),

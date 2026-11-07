@@ -345,10 +345,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
         if (!await _confirm(
             _text('导入 ${additions.length} 套方案？',
                 'Import ${additions.length} profiles?'),
-            ModuStrings.text(
-                context,
-                '仅填入空位，默认停用，不覆盖已有方案。请仅导入可信 CSS；启用后其中的图片或字体网址可能发起网络请求。',
-                'Only empty slots are used; imported profiles stay disabled. Import trusted CSS only: enabled styles may request remote images or fonts.'))) {
+            ModuStrings.text(context, "导入后，勾选要启用的 CSS 方案。",
+                "Select the CSS profiles you want to enable after importing them."))) {
           return;
         }
         await _append(additions);
@@ -435,10 +433,8 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
       ),
       const SizedBox(height: 8),
       Text(
-          ModuStrings.text(
-              context,
-              '按名称管理模板，可同时启用多套；修改会影响使用它的书籍。内置与导入模板默认停用，最多保存 32 套。',
-              'Manage named templates; multiple templates can be active. Shared edits affect books using them. Built-ins and imports start disabled. Up to 32 templates.'),
+          ModuStrings.text(context, "可同时启用多套方案，点击名称编辑。",
+              "Enable multiple profiles and tap a name to edit it."),
           style: Theme.of(context).textTheme.bodySmall),
       Wrap(spacing: 8, children: [
         TextButton.icon(
@@ -642,11 +638,6 @@ class _CustomCSSEditorState extends State<CustomCSSEditor> {
               context, '自定义 CSS 代码（高级）', 'Custom CSS code (advanced)')),
           initiallyExpanded: _cssController.text.isNotEmpty,
           children: [
-            Text(_highlight
-                ? ModuStrings.text(context, '局部高亮填写 CSS 声明，不加选择器和花括号。',
-                    'For highlights, enter declarations without selectors or braces.')
-                : ModuStrings.text(context, '保留原有代码，附加在图形参数之后；作用范围由代码选择器决定。',
-                    'Original code is preserved and follows visual settings. Code selectors determine its scope.')),
             SizedBox(
                 height: 200,
                 child: TextField(

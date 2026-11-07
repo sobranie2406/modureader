@@ -158,7 +158,15 @@ void main() {
     expect(find.text('Update available'), findsOneWidget);
     expect(find.text('Release information source: GitHub'), findsOneWidget);
     expect(find.textContaining('Checking and downloading use the same source'),
-        findsOneWidget);
+        findsNothing);
+    const hint = 'Download, then follow the system installation prompts.';
+    expect(find.text(hint), findsNothing);
+    await tester.tap(find.byIcon(Icons.help_outline).first);
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsNothing);
   });
 
   testWidgets('displays mirror metadata source without claiming installation',
@@ -193,7 +201,8 @@ void main() {
     await show(tester, c);
     expect(find.text('Release page'), findsOneWidget);
     expect(find.text('Download update'), findsNothing);
-    expect(find.textContaining('No matching package'), findsOneWidget);
+    expect(find.textContaining('No package is available for this device'),
+        findsOneWidget);
   });
 
   testWidgets('check failure is visible and retryable, not up to date',
@@ -231,8 +240,7 @@ void main() {
     expect(c.error, isEmpty);
   });
 
-  testWidgets(
-      'iOS exposes export and signing limitation, not direct installation',
+  testWidgets('iOS offers export and on-demand signing instructions',
       (tester) async {
     final c = AppUpdateController(
         transport: FakeTransport(),
@@ -244,7 +252,11 @@ void main() {
     await show(tester, c);
     expect(find.text('Export IPA'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
-    expect(find.textContaining('iOS cannot install'), findsOneWidget);
+    expect(find.textContaining('iOS cannot install'), findsNothing);
+    await tester.tap(find.byIcon(Icons.help_outline).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Download the IPA, then sign and install it.'),
+        findsOneWidget);
   });
 
   testWidgets(
@@ -276,12 +288,13 @@ void main() {
     expect(find.text('Install update'), findsNothing);
     expect(find.text('/synthetic/quarantined.dmg'), findsNothing);
     expect(find.text('Downloaded; SHA-256 verified'), findsNothing);
-    expect(find.textContaining('cannot monitor its progress'), findsOneWidget);
+    expect(find.textContaining('cannot monitor its progress'), findsNothing);
     await tester.ensureVisible(find.text('Download in browser'));
     await tester.tap(find.text('Download in browser'));
     await tester.pumpAndSettle();
     expect(opened.single.toString(), t.value.asset!.url);
-    expect(find.textContaining('GitHub download opened'), findsOneWidget);
+    expect(
+        find.textContaining('Download opened in your browser'), findsOneWidget);
     expect(c.downloaded, isNull);
     expect(find.text('Download from Gitee'), findsNothing);
     await choose(tester, 'update-source', 'Gitee');
@@ -297,7 +310,8 @@ void main() {
     expect(t.browserRequests, [false, true]);
     expect(t.browserFallback, [false, false]);
     expect(t.checkRequests, [UpdateSource.github, UpdateSource.gitee]);
-    expect(find.textContaining('Gitee download opened'), findsOneWidget);
+    expect(
+        find.textContaining('Download opened in your browser'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
   });
 }

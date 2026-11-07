@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
@@ -96,8 +97,8 @@ class _AnxBackupImportPageState extends ConsumerState<AnxBackupImportPage> {
       return ModuStrings.text(context, '文件读取或写入失败，请检查权限及剩余空间。',
           'File access failed. Check permissions and free disk space.');
     }
-    return ModuStrings.text(context, '导入未完成，现有数据库未被替换。请确认备份完整、版本兼容后重试。',
-        'Import did not complete. Your database was not replaced. Check backup integrity and version compatibility.');
+    return ModuStrings.text(context, "导入失败，请检查备份文件后重试。",
+        "Import failed. Check the backup file and try again.");
   }
 
   Future<void> _import() async {
@@ -151,34 +152,20 @@ class _AnxBackupImportPageState extends ConsumerState<AnxBackupImportPage> {
             title: Text(ModuStrings.text(
                 context, '导入 ANX Reader 的备份文件', 'Import ANX Reader backup'))),
         body: ListView(padding: const EdgeInsets.all(20), children: [
-          Text(ModuStrings.text(context, '操作步骤', 'Steps'),
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(ModuStrings.text(
-              context,
-              '1. 在 ANX Reader 中下载需要迁移的书籍。\n2. 打开 ANX Reader「设置 → 同步 → 导出与导入 → 导出」，保存 ZIP 备份（不同版本菜单名称可能略有差异）。\n3. 将 ZIP 保存到当前设备，不要解压或修改文件。\n4. 在此选择备份，检查识别结果后点击「开始导入」。',
-              '1. Download the books to migrate in ANX Reader.\n2. In ANX Reader, open Settings → Sync → Export and Import → Export, and save the ZIP backup (menu labels may vary).\n3. Save the ZIP on this device; do not extract or modify it.\n4. Select the backup here, review the results and start importing.')),
+          SettingHelp(
+              title: Text(ModuStrings.text(context, "导入步骤", "Import steps")),
+              description: Text(ModuStrings.text(
+                  context,
+                  "在 ANX 下载书籍并导出 ZIP 备份，在此选择备份后开始导入。",
+                  "Download your books in ANX and export a ZIP backup, then select it here to import."))),
           const SizedBox(height: 20),
-          Text(ModuStrings.text(context, '导入范围与限制', 'Scope and limitations'),
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(ModuStrings.text(
-              context,
-              '• 导入书籍文件、封面、笔记/高亮、阅读进度、阅读时长、文件夹和标签。\n• 不导入 ANX 的账号、密码、API 密钥、同步配置、AI 聊天记录、字体、主题或其他应用设置。\n• 仅支持原版 ANX ZIP 备份，内部数据库版本为 7（不是 ANX 应用版本号）；不接受单独的 DB、加密 ZIP 或修改版数据库。\n• 已删除书籍不导入；备份缺少正文文件的书籍及其笔记、记录会跳过，并显示书名。请在 ANX 下载完整后重新备份。\n• 相同文件内容识别为同一本书，保留默读已有进度、笔记修改和文件夹安排。重复导入同一备份不会重复创建同一记录，不会用旧备份覆盖已有数据。\n• 不改动原 ZIP，不直接访问 ANX 私有目录。导入前自动备份默读数据库，完成后显示备份位置。\n• 请预留足够空间用于解压、文件复制及数据库备份；准备阶段只校验，不会替换现有书库。',
-              '• Imports book files, covers, notes/highlights, reading position/time, folders and tags.\n• Does not import accounts, passwords, API keys, sync configuration, AI chats, fonts, themes or other app settings.\n• Supports original ANX ZIP backups with database schema version 7 (not the app version). Standalone DBs, encrypted ZIPs and modified databases are not supported.\n• Deleted books are excluded. Books without their actual files, and their notes/history, are skipped and listed. Download them in ANX and export again.\n• Identical contents are deduplicated. Existing Modu positions, note edits and folder assignments are preserved. Reimporting the same backup does not recreate the same records or overwrite existing data.\n• The ZIP is unchanged; ANX private storage is never accessed. A local Modu database backup is created before importing, with its location shown afterwards.\n• Allow space for extraction, copies and the database backup. Preparation only validates the backup.')),
+          SettingHelp(
+              title: Text(ModuStrings.text(context, "导入内容", "Import contents")),
+              description: Text(ModuStrings.text(
+                  context,
+                  "导入书籍、笔记和阅读记录。请先在 ANX 下载需要迁移的书籍。",
+                  "Import books, notes and reading history. Download the books in ANX first."))),
           const SizedBox(height: 20),
-          ExpansionTile(
-            title: Text(ModuStrings.text(
-                context, '文件大小与兼容限制', 'Size and compatibility limits')),
-            children: [
-              Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(ModuStrings.text(
-                      context,
-                      'ZIP 最多 10 万个条目，展开后不超过 20 GiB；数据库及 WAL 各不超过 256 MiB，每张数据表最多 20 万行。旧系统若不支持安全数据库快照，会终止导入。备份可能包含敏感设置，请妥善保管。',
-                      'Maximum 100,000 ZIP entries and 20 GiB expanded; database/WAL each up to 256 MiB, up to 200,000 rows per table. Import stops if an older system cannot create a safe database snapshot. Backups may contain sensitive settings; store them securely.')))
-            ],
-          ),
           OutlinedButton.icon(
               onPressed: _busy ? null : _pick,
               icon: const Icon(Icons.file_open_outlined),

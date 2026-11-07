@@ -142,8 +142,8 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             ModuStrings.text(context, '清除朗读设置？', 'Clear speech settings?')),
         content: Text(ModuStrings.text(
             context,
-            '将停止朗读，清除所有朗读服务的 API Key、接口配置、声音选择和未保存修改，并恢复默认语速、音调、音量及系统朗读。不影响 AI、书籍、笔记或同步设置。',
-            'Stop speech, remove all TTS keys, service configurations, voice selections and drafts, and restore default rate, pitch, volume and system speech. AI, books, notes and sync settings are unchanged.')),
+            "清除所有朗读服务配置和 API Key，并恢复默认朗读设置？",
+            "Clear all speech service settings and API keys, and reset playback settings?")),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -182,10 +182,12 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
             padding: const EdgeInsets.all(16),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(ModuStrings.text(
-                  context,
-                  '接口修改请先保存，再获取声音或试听。请在“全局设置备份”中使用设置文件或 modu 链接迁移已保存设置；跨设备系统声音可能需要重新选择。',
-                  'Save service edits before loading voices or previewing. Transfer saved settings in Global settings backup via settings files or modu links. System voices may need reselection on another device.')),
+              SettingHelp(
+                  title: Text(ModuStrings.text(context, "使用方法", "How to use")),
+                  description: Text(ModuStrings.text(
+                      context,
+                      "修改后先保存，再获取音色或试听。",
+                      "Save your changes before loading voices or previewing speech."))),
               const SizedBox(height: 12),
               Wrap(spacing: 10, runSpacing: 10, children: [
                 FilledButton.icon(

@@ -157,8 +157,7 @@ void main() {
       await preview(tester, GlobalSettingsTransfer.link(file));
       expect(find.textContaining('文件中包含的账号及密钥也会一并恢复'), findsNothing);
       expect(
-          find.textContaining(
-              includeSecrets ? '仅恢复文件实际包含的账号、密钥及供应商配置' : '迁移开关已关闭'),
+          find.textContaining(includeSecrets ? '恢复备份中的账号和密钥配置' : '本次跳过账号和密钥配置'),
           findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
@@ -175,7 +174,7 @@ void main() {
     await tester.tap(find.byType(SwitchListTile));
     await tester.pumpAndSettle();
     await preview(tester, GlobalSettingsTransfer.link(file));
-    expect(find.textContaining('本次内容不包含账号或密钥配置'), findsOneWidget);
+    expect(find.textContaining('此备份没有账号或密钥配置'), findsOneWidget);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

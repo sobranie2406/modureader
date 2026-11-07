@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/widgets/home_navigation_metrics.dart';
@@ -553,10 +554,12 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
             Padding(
                 padding: EdgeInsets.fromLTRB(
                     8, 8, 8, 8 + HomeNavigationClearance.of(context)),
-                child: Text(
-                    ModuStrings.text(context, '下载期间离开此标签页会取消下载；导入开始后请等待完成。',
-                        'Leaving this tab cancels a download; please wait once import starts.'),
-                    style: Theme.of(context).textTheme.bodySmall)),
+                child: SettingHelp(
+                    title: Text(ModuStrings.text(context, "下载", "Download")),
+                    description: Text(
+                        ModuStrings.text(context, "下载完成前请保持此页打开。",
+                            "Keep this page open until the download finishes."),
+                        style: Theme.of(context).textTheme.bodySmall))),
         ]));
   }
 }

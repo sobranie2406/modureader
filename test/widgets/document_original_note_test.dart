@@ -70,7 +70,8 @@ void main() {
       cancelRender: () {},
     )));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Only the source page'), findsOneWidget);
+    expect(find.textContaining('This note has no reliable image position'),
+        findsNothing);
     final painter = tester
         .widget<CustomPaint>(
             find.byKey(const ValueKey('original-note-regions')))

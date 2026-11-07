@@ -67,9 +67,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
       }
     } catch (_) {
       if (mounted) {
-        AnxToast.show(_label(
-            '导入失败。请选择本型号的完整模型和分词器，大小和 SHA-256 必须与下载版本一致；请先停止向量化或下载后重试。',
-            'Import failed. Select the complete model and tokenizer with matching size and SHA-256. Stop indexing or downloads and retry.'));
+        AnxToast.show(_label("导入失败，请选择所选型号的模型和分词器文件。",
+            "Import failed. Select the model and tokenizer files for the chosen model."));
       }
     } finally {
       if (mounted) setState(() => _importingId = null);
@@ -277,8 +276,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         title: Text(
             ModuStrings.text(context, '删除已下载模型？', 'Delete downloaded model?')),
         content: Text(_label(
-          '将删除本机的 ${model.name} 模型及分词器，释放存储空间。书籍和已有索引不会删除，模型选择保持不变。使用该模型进行语义检索或向量化前，需要重新下载。',
-          'Remove ${model.name} and its tokenizer from this device to free storage. Books, existing indexes and model selections are preserved. Download it again before semantic search or indexing with this model.',
+          '删除本机的 ${model.name} 模型和分词器？',
+          'Delete ${model.name} and its tokenizer from this device?',
         )),
         actions: [
           TextButton(
@@ -341,10 +340,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
               },
               title: Text(ModuStrings.text(
                   context, '导入后自动向量化', 'Vectorize after import')),
-              description: Text(ModuStrings.text(
-                  context,
-                  '新导入书籍会在后台排队建立索引。关闭后停止自动任务及其排队；手动任务不受影响。',
-                  'New books are indexed in the background. Turning this off cancels automatic jobs, including queued ones, but keeps manual jobs.')),
+              description: Text(ModuStrings.text(context, "导入新书后，自动在后台建立索引。",
+                  "Build an index in the background after importing a book.")),
             ),
             CustomSettingsTile(
               child: Padding(
@@ -358,8 +355,8 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
                         title: Text(ModuStrings.text(context, '说明', 'Help')),
                         description: Text(ModuStrings.text(
                             context,
-                            '停止当前和排队中的所有向量化任务，并关闭自动向量化，重启后不会自动续跑。保留已完成的索引和模型；需要时可从书籍菜单重新开始。',
-                            'Stop all running and queued indexing jobs and turn off automatic indexing so they do not restart with the app. Completed indexes and models are kept. Start again from a book’s menu when needed.'))),
+                            "停止全部向量化任务并关闭自动向量化。",
+                            "Stop all indexing tasks and turn off automatic indexing."))),
                   ],
                 ),
               ),
@@ -471,13 +468,14 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
           const SizedBox(height: 8),
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: Text(
-              ModuStrings.text(
-                  context,
-                  '安装包不内嵌模型。请选择下载源，再按需下载所选模型及分词器；下载会消耗流量，请保持页面打开直到完成。文件经大小与 SHA-256 校验后可离线使用，无需 API Key。旧版已准备的完整模型继续复用。Gitee 镜像不可用时，可切换 Hugging Face；不会自动更换下载源。自动向量化默认关闭，启动或索引不会自动下载模型。切换模型后请重新向量化已有书籍。',
-                  'Models are not bundled. Select a source and download only the model and tokenizer you need. Downloads consume data; keep this page open until complete. Files are verified by size and SHA-256 and then work offline without API keys. Existing verified models are reused. Switch to Hugging Face if the mirror is unavailable; sources never switch silently. Automatic indexing is off and neither startup nor indexing downloads models automatically. Reindex books after switching models.'),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            child: SettingHelp(
+                title:
+                    Text(ModuStrings.text(context, "下载模型", "Download models")),
+                description: Text(
+                  ModuStrings.text(context, "下载完成前请保持此页打开。切换模型后，请重新向量化书籍。",
+                      "Keep this page open until the download finishes. Reindex your books after switching models."),
+                  style: Theme.of(context).textTheme.bodySmall,
+                )),
           ),
         ],
       ),
@@ -649,7 +647,11 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
     InputDecoration decoration(String label, {String? helper}) {
       return InputDecoration(
         labelText: label,
-        helperText: helper,
+        helper: (helper) == null
+            ? null
+            : SettingHelpTitle(
+                title: ModuStrings.text(context, "说明", "Help"),
+                description: helper),
         border: const OutlineInputBorder(),
       );
     }

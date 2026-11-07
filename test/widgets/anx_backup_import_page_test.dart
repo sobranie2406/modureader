@@ -20,13 +20,15 @@ void main() {
           find.text(
               chinese ? '导入 ANX Reader 的备份文件' : 'Import ANX Reader backup'),
           findsOneWidget);
-      expect(find.textContaining(chinese ? '不要解压' : 'do not extract'),
-          findsOneWidget);
-      final limits = find.textContaining(chinese ? 'API 密钥' : 'API keys');
-      await tester.ensureVisible(limits);
-      expect(limits, findsOneWidget);
-      expect(
-          find.textContaining(chinese ? '版本为 7' : 'version 7'), findsOneWidget);
+      final instructions = find.textContaining(
+          chinese ? '在 ANX 下载书籍并导出 ZIP' : 'Download your books in ANX');
+      expect(instructions, findsNothing);
+      await tester.tap(find.byIcon(Icons.help_outline).first);
+      await tester.pumpAndSettle();
+      expect(instructions, findsOneWidget);
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      expect(instructions, findsNothing);
       final picker =
           find.text(chinese ? '选择 ANX 备份 ZIP' : 'Select ANX backup ZIP');
       await tester.scrollUntilVisible(picker, 350);

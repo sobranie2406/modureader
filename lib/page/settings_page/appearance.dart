@@ -165,10 +165,8 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               key: const ValueKey('eink-disable-animations'),
               title: Text(ModuStrings.text(
                   context, '关闭所有动画', 'Disable all animations')),
-              description: Text(ModuStrings.text(
-                  context,
-                  '仅在 E-Ink 模式下生效。关闭后恢复原有动画设置，不改变黑白显示和屏幕刷新设置。',
-                  'Only applies in E-Ink mode. Turn off to restore your animation settings without changing monochrome display or screen refresh.')),
+              description: Text(ModuStrings.text(context, "关闭墨水屏模式下的界面动画。",
+                  "Turn off interface animations in E-Ink mode.")),
               leading: const Icon(Icons.animation),
               initialValue: Prefs().eInkDisableAnimations,
               enabled: Prefs().eInkMode,
@@ -215,10 +213,8 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               SettingsTile.navigation(
                   title: Text(L10n.of(context).settingsAppearanceLanguage),
                   value: Text(languageSubtitle),
-                  description: Text(ModuStrings.text(
-                      context,
-                      '界面与内置提示词使用所选语言，用户自定义的提示词保持不变。',
-                      'The interface and built-in prompts use this language. Custom prompts remain unchanged.')),
+                  description: Text(ModuStrings.text(context, "选择界面和内置提示词的语言。",
+                      "Choose the language for the interface and built-in prompts.")),
                   leading: const Icon(Icons.language),
                   onPressed: (context) {
                     showLanguagePickerDialog(context);
@@ -226,10 +222,8 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               SettingsTile.switchTile(
                 title:
                     Text(L10n.of(context).settingsAppearanceOpenBookAnimation),
-                description: Text(ModuStrings.text(
-                    context,
-                    '控制从书架进入书籍时的滑入、封面过渡和淡出。关闭后直接进入阅读，不影响正文翻页设置。',
-                    'Animate opening books from the library. Turn off for instant navigation; page-turn settings are unchanged.')),
+                description: Text(ModuStrings.text(context, "设置打开书籍时的过渡动画。",
+                    "Set the transition used when opening a book.")),
                 leading: const Icon(Icons.animation),
                 initialValue: Prefs().openBookAnimation,
                 onToggle: (bool value) {
@@ -240,8 +234,8 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
               ),
               SettingsTile.switchTile(
                 title: Text(L10n.of(context).settingsAdvancedAutoHideBottomBar),
-                description: Text(ModuStrings.text(context,
-                    '仅用于窄窗口的底部导航栏，不影响桌面侧边栏。', '仅用于窄窗口的底部导航栏，不影响桌面侧边栏。')),
+                description: Text(ModuStrings.text(context, "自动隐藏底部导航栏。",
+                    "Hide the bottom navigation bar automatically.")),
                 leading: const Icon(Icons.vertical_align_bottom),
                 initialValue: Prefs().autoHideBottomBar,
                 onToggle: (value) {
@@ -335,9 +329,7 @@ class _AppearanceSettingState extends State<AppearanceSetting> {
                 title: Text(ModuStrings.text(
                     context, '显示已索引标签', 'Show indexed labels')),
                 description: Text(ModuStrings.text(
-                    context,
-                    '显示书籍的已索引标记。关闭不影响索引、索引进度或失败提示。',
-                    'Show indexed labels on books. Hiding them keeps indexes, indexing progress and failure notices.')),
+                    context, "显示已建立索引的书籍。", "Mark books that have an index.")),
                 leading: const Icon(Icons.fact_check_outlined),
                 initialValue: Prefs().showBookIndexBadge,
                 onToggle: (bool value) {

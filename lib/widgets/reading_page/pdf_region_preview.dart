@@ -333,8 +333,8 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                 child: _failed || _unsupported
                     ? Column(mainAxisSize: MainAxisSize.min, children: [
                         Text(_unsupported
-                            ? tr('本页包含文字或暂不支持的图片排版，请返回原文或选择其他页。',
-                                'This page contains text or an unsupported image layout. Return to the original reader or select another page.')
+                            ? tr('请返回原文或选择其他页。',
+                                'Return to the original reader or select another page.')
                             : tr('预览失败，原文件未改动。',
                                 'Preview failed. The source is unchanged.')),
                         TextButton(
@@ -391,15 +391,16 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                           _timer?.cancel();
                           _generation++;
                           widget.cancelRender();
-                          final result = await showReaderDialog<DocumentEnhancement>(
-                              animationStyle: AppMotion.style,
-                              context: context,
-                              builder: (_) => DocumentEnhancementPanel(
-                                  initial: _enhancement,
-                                  render: (request) => widget
-                                      .render({...request, 'page': _page}),
-                                  cancelRender: widget.cancelRender,
-                                  save: widget.saveEnhancement!));
+                          final result =
+                              await showReaderDialog<DocumentEnhancement>(
+                                  animationStyle: AppMotion.style,
+                                  context: context,
+                                  builder: (_) => DocumentEnhancementPanel(
+                                      initial: _enhancement,
+                                      render: (request) => widget
+                                          .render({...request, 'page': _page}),
+                                      cancelRender: widget.cancelRender,
+                                      save: widget.saveEnhancement!));
                           if (!mounted) return;
                           setState(() {
                             _editing = false;
@@ -424,12 +425,6 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                         _setZoom(1);
                       }),
           ]),
-          Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                  tr('临时预览：放大后拖动查看，不改变阅读进度、原文件或批注。',
-                      'Temporary preview: zoom and drag. Reading position, source and annotations stay unchanged.'),
-                  style: Theme.of(context).textTheme.bodySmall)),
           if (widget.saveLayout != null)
             Align(
                 alignment: Alignment.centerRight,
@@ -485,8 +480,8 @@ class _PdfRegionPreviewState extends State<PdfRegionPreview> {
                       child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                              tr('此章节含文字或不是可识别的纯图片页。请关闭此界面返回原正文，或使用下方按钮查看其他章节；没有删除或跳过正文。',
-                                  'This section contains text or is not a supported image-only page. Close to read the original, or browse another section below. No content has been removed.'),
+                              tr("请返回原文，或切换到其他章节查看图片。",
+                                  "Return to the original text or switch chapters to view images."),
                               textAlign: TextAlign.center))),
                 if (_failed)
                   Center(

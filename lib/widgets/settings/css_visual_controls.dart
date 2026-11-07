@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/settings/font_name_preview.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -159,8 +160,6 @@ class CssVisualControls extends StatelessWidget {
         ]);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(ModuStrings.text(context, '关闭模块即跟随书籍原样式；自定义代码在图形参数之后叠加。',
-          'Disabled modules inherit book styles. Custom code follows the visual settings.')),
       group(ModuStrings.text(context, '文字与背景', 'Text and background'), [
         color('color', ModuStrings.text(context, '自定义文字颜色', 'Text color'),
             '#a05000'),
@@ -180,8 +179,6 @@ class CssVisualControls extends StatelessWidget {
         }),
         if (style.values['decoration'] == 'svg' && !highlight) ...[
           image('underlineImage', true),
-          Text(ModuStrings.text(context, 'SVG 下划线与背景图使用同一背景层；启用时优先显示 SVG。',
-              'SVG underline takes precedence over the background image.')),
         ],
         color(
             'decorationColor',
@@ -261,8 +258,11 @@ class CssVisualControls extends StatelessWidget {
                   onPressed: () => change('fontFile', null),
                   icon: const Icon(Icons.clear)),
           ]),
-          Text(ModuStrings.text(context, '自定义字体优先于通用字体。导出仅包含文件名，其他设备需另行导入同名字体。',
-              'Custom fonts take precedence. Exports include filenames only; import matching fonts on other devices.')),
+          SettingHelp(
+              title: Text(
+                  ModuStrings.text(context, "跨设备字体", "Fonts across devices")),
+              description: Text(ModuStrings.text(context, "在其他设备使用时，请导入同名字体。",
+                  "Import the same font on your other devices."))),
           number('weight', ModuStrings.text(context, '字重', 'Weight'), 400, '',
               divisions: 8),
           number('size', ModuStrings.text(context, '字号', 'Size'), 20, 'px',
@@ -285,11 +285,7 @@ class CssVisualControls extends StatelessWidget {
           number('paragraphGap',
               ModuStrings.text(context, '段落间距', 'Paragraph gap'), 0.6, 'em'),
         ]),
-      ] else
-        Text(ModuStrings.text(
-            context,
-            '局部正则高亮仅支持颜色、背景色与下划线，不更改正文节点；字体、图片、SVG 和偏移仅用于排版模板。',
-            'Regex highlights preserve text nodes and support colors and underlines only. Fonts, images, SVG and offset require a layout template.')),
+      ]
     ]);
   }
 }

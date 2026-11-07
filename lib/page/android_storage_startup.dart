@@ -69,9 +69,7 @@ class _AndroidStorageStartupState extends State<AndroidStorageStartup> {
                     Text(
                         _storageError == null
                             ? ModuStrings.text(
-                                context,
-                                '正在准备应用数据…\n首次迁移到 Android/data 可能需要一些时间。',
-                                'Preparing app data…\nThe first migration to Android/data may take some time.')
+                                context, "正在迁移应用数据…", "Moving app data…")
                             : _storageError!
                                 ? ModuStrings.text(
                                     context,
@@ -84,8 +82,8 @@ class _AndroidStorageStartupState extends State<AndroidStorageStartup> {
                         textAlign: TextAlign.center),
                     const SizedBox(height: 12),
                     Text(
-                        ModuStrings.text(context, '不会清空书库。迁移完成前请勿卸载应用或手动移动文件。',
-                            'Your library will not be cleared. Do not uninstall the app or move files manually before migration finishes.'),
+                        ModuStrings.text(context, "迁移完成前请勿卸载应用或移动文件。",
+                            "Keep the app installed and leave its files in place until migration finishes."),
                         textAlign: TextAlign.center),
                     if (!_running)
                       TextButton(

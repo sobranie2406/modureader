@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
@@ -56,19 +57,13 @@ class AppUpdateDialog extends StatelessWidget {
 
   String _message(BuildContext c, String code) => switch (code) {
         'browser_required' => ModuStrings.text(
-            c,
-            '请通过浏览器重新下载 DMG，不要使用旧的应用内下载缓存。',
-            'Download the DMG again in your browser; do not reuse an old in-app download.'),
+            c, "请通过浏览器重新下载 DMG。", "Download the DMG again using your browser."),
         'browser_open_failed' => ModuStrings.text(c, '无法打开默认浏览器，请重试或手动访问官方发布页。',
             'Could not open the default browser. Retry or visit the official release page.'),
-        'browser_github_opened' => ModuStrings.text(
-            c,
-            '已将 GitHub 下载链接交给浏览器，请在浏览器中查看下载；若失败，可将“更新来源”切换为 Gitee，重新检查后下载。',
-            'GitHub download opened in your browser. Check the download there; if it fails, select Gitee as the update source, check again, then download.'),
-        'browser_gitee_opened' => ModuStrings.text(
-            c,
-            '已将 Gitee 下载链接交给浏览器，请在浏览器中查看下载。',
-            'Gitee download opened in your browser. Check the download there.'),
+        'browser_github_opened' =>
+          ModuStrings.text(c, "已在浏览器开始下载。", "Download opened in your browser."),
+        'browser_gitee_opened' =>
+          ModuStrings.text(c, "已在浏览器开始下载。", "Download opened in your browser."),
         'integrity' => ModuStrings.text(c, '发布信息或安装包校验失败，已阻止安装。请重新检查并下载。',
             'Release or installer verification failed. Installation blocked; check and download again.'),
         'rate_limit' => ModuStrings.text(c, '更新服务器暂时限制请求，请稍后重试。',
@@ -79,16 +74,14 @@ class AppUpdateDialog extends StatelessWidget {
             'No stable release is currently available.'),
         'storage' => ModuStrings.text(c, '无法保存安装包，请检查剩余空间和文件权限。',
             'Cannot save the installer. Check free space and file permissions.'),
-        'installer' => ModuStrings.text(
-            c,
-            '无法打开安装器，或 Android 包名、签名、版本不匹配。请使用官方安装包。',
-            'Installer could not open, or Android package/signature/version does not match. Use an official package.'),
+        'installer' => ModuStrings.text(c, "无法打开安装器，请重新下载官方安装包。",
+            "Could not open the installer. Download the official package again."),
         'permission_required' => ModuStrings.text(
             c,
             '请在系统设置允许安装此来源的应用，返回后再次点击安装。',
             'Allow installation from this source in system settings, then return and tap Install again.'),
-        'opened' => ModuStrings.text(c, '已打开系统安装界面，请按提示操作；这不表示安装已完成。',
-            'The system installer was opened. Follow its instructions; installation is not yet confirmed.'),
+        'opened' => ModuStrings.text(c, "请按系统提示完成安装。",
+            "Follow the system prompts to finish installing."),
         'exported' => ModuStrings.text(c, '已打开 IPA 导出菜单；需自行签名后安装。',
             'IPA export opened. You must sign it yourself before installation.'),
         _ => ModuStrings.text(c, '更新请求失败，请检查网络或代理后重试。',
@@ -96,26 +89,16 @@ class AppUpdateDialog extends StatelessWidget {
       };
 
   String _instructions(BuildContext c) => switch (controller.platform) {
-        'android' => ModuStrings.text(
-            c,
-            '安装需要系统确认；首次使用可能需要允许安装此来源的应用。不会卸载旧版或删除书库。',
-            'Installation requires system confirmation and possibly permission for this source. Your existing app and library will not be uninstalled.'),
-        'macos' => ModuStrings.text(
-            c,
-            '使用默认浏览器下载 DMG，避免应用内下载触发 macOS 沙盒隔离。不要使用旧的应用内下载缓存。下载后打开 DMG，退出默读，再将新应用拖入“应用程序”替换旧版，书库数据不变。当前发行包未经 Apple 公证。',
-            'Download the DMG using your default browser to avoid macOS sandbox quarantine. Do not reuse an old in-app download. Open the DMG, quit Modu, and drag the new app into Applications to replace it; your library is preserved. Current packages are not Apple-notarized.'),
+        'android' => ModuStrings.text(c, "下载后按系统提示安装。",
+            "Download, then follow the system installation prompts."),
+        'macos' => ModuStrings.text(c, "下载 DMG 后退出默读，将新应用拖入“应用程序”替换旧版。",
+            "Download the DMG, quit Modu, then drag the new app into Applications to replace it."),
         'windows' => ModuStrings.text(
-            c,
-            '打开安装程序后按系统提示覆盖安装；如提示应用正在运行，请先完成同步并退出默读。',
-            'Follow the installer to update. If prompted, finish syncing and quit Modu first.'),
-        'linux' => ModuStrings.text(
-            c,
-            'DEB 面向 Debian 13，由系统软件安装器完成更新；未配置安装器时请自行安装已下载的 DEB。',
-            'DEB packages target Debian 13. Use your system package installer, or install the downloaded DEB manually.'),
+            c, "退出默读后，运行安装程序。", "Quit Modu, then run the installer."),
+        'linux' => ModuStrings.text(c, "打开下载的 DEB 文件，用系统安装器安装。",
+            "Open the downloaded DEB with your system installer."),
         'ios' => ModuStrings.text(
-            c,
-            '此发行渠道提供未签名 IPA，iOS 不允许在应用内直接安装。可下载并导出，再自行签名安装。',
-            'This channel provides unsigned IPA files. iOS cannot install them directly in-app. Download/export and sign them yourself.'),
+            c, "下载 IPA 后，签名安装。", "Download the IPA, then sign and install it."),
         _ => ModuStrings.text(c, '请在发布页查看适合此设备的安装方式。',
             'See the release page for supported installation methods.'),
       };
@@ -187,9 +170,7 @@ class AppUpdateDialog extends StatelessWidget {
               EnvVar.isStoreBuild || EnvVar.isFdroid || EnvVar.isOhosStore;
           final status = switch (phase) {
             UpdatePhase.idle => ModuStrings.text(
-                context,
-                '每次启动自动检查正式版本，不会自动下载或安装。',
-                'Checks for stable releases on each launch. Downloads and installation require your action.'),
+                context, "启动时自动检查更新。", "Check for updates on launch."),
             UpdatePhase.checking =>
               ModuStrings.text(context, '正在检查版本…', 'Checking for updates…'),
             UpdatePhase.current => ModuStrings.text(
@@ -214,7 +195,12 @@ class AppUpdateDialog extends StatelessWidget {
               ModuStrings.text(context, '更新未完成', 'Update could not complete'),
           };
           return AlertDialog(
-            title: Text(ModuStrings.text(context, '版本检查与更新', 'App updates')),
+            title: SettingHelpTitle(
+                title: ModuStrings.text(context, '版本检查与更新', 'App updates'),
+                description: storeBuild
+                    ? ModuStrings.text(context, '请在原应用商店更新。',
+                        'Update through the store you installed from.')
+                    : _instructions(context)),
             content: SizedBox(
                 width: 480,
                 child: SingleChildScrollView(
@@ -259,18 +245,14 @@ class AppUpdateDialog extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(ModuStrings.text(
                               context,
-                              '尚无匹配当前架构且带有效校验信息的安装包，请查看发布页。',
-                              'No matching package with valid verification metadata. See the release page.'))),
+                              "暂无此设备的安装包，请查看发布页。",
+                              "No package is available for this device. Check the release page."))),
                     if (c.release?.asset case final asset?)
                       Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(
                               '${asset.name}\n${(asset.size / 1024 / 1024).toStringAsFixed(1)} MiB')),
                     const SizedBox(height: 12),
-                    Text(storeBuild
-                        ? ModuStrings.text(context, '商店版本请通过原应用商店更新，不进行侧载安装。',
-                            'Update store builds through their original store, not sideloading.')
-                        : _instructions(context)),
                     if (!browserDownload && c.downloaded != null)
                       Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -283,22 +265,9 @@ class AppUpdateDialog extends StatelessWidget {
                         children: [SelectableText(c.release!.notes)],
                       ),
                     const SizedBox(height: 8),
-                    Text(
-                        browserDownload
-                            ? ModuStrings.text(
-                                context,
-                                '检查与下载使用同一来源，默认优先 GitHub。检查时连接失败、超时或服务不可用会整体切换为 Gitee；手动切换来源后请重新检查再下载。下载由浏览器完成，默读无法监测其后续进度，也不会显示下载完成或 SHA-256 校验通过。不发送书籍、笔记或账号密钥。',
-                                'Checking and downloading use the same source, with GitHub preferred by default. If a check cannot reach GitHub, both switch to Gitee. Check again after changing sources before downloading. Your browser handles the download; Modu cannot monitor its progress or verify the downloaded file. No books, notes or account keys are sent.')
-                            : ModuStrings.text(
-                                context,
-                                '检查与下载使用同一来源，默认优先 GitHub。检查时连接失败、超时或服务不可用会整体切换为 Gitee；手动切换来源后请重新检查再下载。下载后必须通过文件大小与 SHA-256 校验。不发送书籍、笔记或账号密钥。',
-                                'Checking and downloading use the same source, with GitHub preferred by default. If a check cannot reach GitHub, both switch to Gitee. Check again after changing sources before downloading. File size and SHA-256 verification are required. No books, notes or account keys are sent.'),
-                        style: Theme.of(context).textTheme.bodySmall),
                     if (phase == UpdatePhase.downloading)
-                      Text(ModuStrings.text(
-                          context,
-                          '关闭此窗口后下载继续，可从“关于默读”返回查看或取消。',
-                          'Closing this dialog keeps downloading. Return from About to view progress or cancel.')),
+                      Text(ModuStrings.text(context, "下载将在后台继续。",
+                          "The download continues in the background.")),
                     const SizedBox(height: 12),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       OutlinedButton(

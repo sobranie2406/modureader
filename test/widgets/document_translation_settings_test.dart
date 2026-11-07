@@ -151,8 +151,13 @@ void main() {
       ))),
     ));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Translate visible reflow paragraphs'),
-        findsOneWidget);
+    const guidance = 'Translate visible paragraphs and continue as you scroll.';
+    expect(find.text(guidance), findsNothing);
+    await tester.tap(find.byIcon(Icons.help_outline).first);
+    await tester.pumpAndSettle();
+    expect(find.text(guidance), findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Translate visible content'));
     await tester.pumpAndSettle();
     expect(calls, [(TranslationModeEnum.bilingual, false)]);

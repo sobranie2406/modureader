@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/translate/translation_usage.dart';
@@ -103,13 +104,11 @@ class _TranslationUsageCardState extends State<TranslationUsageCard> {
                     Text(
                         '${format.format(used)} / ${format.format(quota)} ${label('字符', 'characters')} · ${(ratio * 100).toStringAsFixed(1)}%'),
                     const SizedBox(height: 8),
-                    Text(label(
-                        '仅统计 Modu 成功收到结果的请求；语种翻译与文言文翻译合并计算。需各设备更新并开启「AI 服务设置同步」，完成同步后汇总相同配置的用量。微软不同密钥分别统计。',
-                        'Counts requests successfully received by Modu, across language and classical translation. Update each device and enable AI service settings sync; totals combine matching configurations after sync. Different Microsoft keys are counted separately.')),
+                    SettingHelp(
+                        title: Text(ModuStrings.text(context, "用量统计", "Usage")),
+                        description: Text(label("开启服务设置同步，可汇总各设备的翻译用量。",
+                            "Enable service settings sync to combine translation usage across devices."))),
                     const SizedBox(height: 8),
-                    Text(label(
-                        '这是估算进度，不是官方余额。历史调用、其他应用、超时或取消后服务端已计费的请求可能未计入；官方结算周期可能不同。参考额度不会阻止超额调用或改变服务套餐。',
-                        'This is an estimate, not an official balance. Earlier calls, other apps, and requests billed after timeout or cancellation may be missing. Official billing periods can differ. The reference allowance does not block excess requests or change your plan.')),
                     Wrap(spacing: 8, children: [
                       TextButton(
                           onPressed: configured

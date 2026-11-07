@@ -119,8 +119,8 @@ class BrightnessWidget extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodySmall),
                     description: Text(ModuStrings.text(
                         context,
-                        '浅色和深色模式均可调暗书籍、注释及查询、字典、AI 等内容窗口。所有操作菜单、工具栏和非阅读界面保持系统亮度；100% 不调暗。',
-                        'Dims books, footnotes and content windows such as search, dictionaries and AI in both light and dark modes. All menus, toolbars and screens outside reading follow system brightness. 100% applies no dimming.'))),
+                        "调节书籍和内容窗口的明暗，菜单保持系统亮度。",
+                        "Dim books and content windows while keeping menus at system brightness."))),
               ],
             )),
       ),

@@ -355,10 +355,6 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
           '有 ${preview.divergentRecords} 处记录内容不一致（$kinds）。',
           '${preview.divergentRecords} record(s) differ between devices ($kinds).',
         )),
-        Text(_text(
-          '已彻底删除的笔记、时长和标签不会恢复；旧版累计时长仍保留较大值。',
-          'Permanently deleted notes, sessions and tags stay deleted; legacy cumulative reading time keeps the larger value.',
-        )),
         const SizedBox(height: 8),
         SegmentedButton<SyncConflictResolution>(
           key: const ValueKey('sync-preview-resolution'),

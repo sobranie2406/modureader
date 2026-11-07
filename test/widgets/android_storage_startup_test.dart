@@ -58,10 +58,7 @@ void main() {
       await renderStartup(tester);
       final context = tester.element(find.byType(Column));
       expect(
-          find.text(ModuStrings.text(
-              context,
-              '正在准备应用数据…\n首次迁移到 Android/data 可能需要一些时间。',
-              'Preparing app data…\nThe first migration to Android/data may take some time.')),
+          find.text(ModuStrings.text(context, "正在迁移应用数据…", "Moving app data…")),
           findsOneWidget);
       pending.completeError(StateError('private fixture details'));
       await tester.pump();

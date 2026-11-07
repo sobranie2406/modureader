@@ -187,14 +187,12 @@ class _TtsWidgetState extends State<TtsWidget> {
                             ? SettingHelpTitle(
                                 title: L10n.of(context).ttsType,
                                 description: _pageSource != null
-                                    ? ModuStrings.text(
-                                        context,
-                                        '仅朗读当前重排页，读完停止；换页或退出重排会停止朗读。',
-                                        'Read this reflow page only, then stop. Changing pages or leaving reflow stops narration.')
+                                    ? ModuStrings.text(context, "朗读当前重排页。",
+                                        "Read the current reflowed page aloud.")
                                     : ModuStrings.text(
                                         context,
-                                        '连贯朗读：同段相邻句合成，高亮和前后跳转按小段；长段自动拆分。',
-                                        'Continuous narration: adjacent sentences are grouped. Highlighting and Previous/Next follow each group; long paragraphs are split.'))
+                                        "按段落连贯朗读，可用前后按钮跳转。",
+                                        "Read in passages. Use the previous and next buttons to navigate."))
                             : Text(L10n.of(context).ttsType)),
                     Flexible(
                         child: GestureDetector(

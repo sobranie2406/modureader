@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
@@ -83,8 +84,8 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                 : error is FormatException
                     ? t('设置格式无效或内容过大，请检查备份文件；长链接请改用文件迁移。',
                         'Invalid or oversized settings. Check the backup; use a file instead of a long link.')
-                    : t('设置处理失败，并非一定是存储权限问题。请导出日志以便排查。',
-                        'Settings processing failed; this may not be a storage permission issue. Export logs for diagnosis.'));
+                    : t("设置处理失败，请重试或导出日志反馈。",
+                        "Could not process settings. Try again or export the log for feedback."));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -111,10 +112,13 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
                             child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                              Text(ModuStrings.text(
-                                  context,
-                                  '请勿公开分享。在“全局设置备份”粘贴完整链接即可导入；设置较多时推荐使用设置文件。',
-                                  'Keep private. Paste the complete link in Global settings backup to import it. Use a settings file for larger backups.')),
+                              SettingHelp(
+                                  title: Text(ModuStrings.text(
+                                      context, "导入链接", "Import link")),
+                                  description: Text(ModuStrings.text(
+                                      context,
+                                      "在另一台设备的“全局设置备份”中粘贴链接。请勿公开分享。",
+                                      "Paste the link in Global settings backup on the other device. Keep it private."))),
                               const SizedBox(height: 12),
                               ConstrainedBox(
                                   constraints:
@@ -213,15 +217,13 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
     final scopeLabel = scopes.map(_scopeLabel).join(t('、', ', '));
     final disablesSync = GlobalSettingsTransfer.disablesSync(values);
     final credentialNotice = !_includeSecrets
-        ? ModuStrings.text(
-            context,
-            '账号、密码和 API Key 迁移开关已关闭：含凭据的配置将被跳过，本机已有账号与密钥保持不变。',
-            'Credential transfer is off: credential-bearing configurations are skipped and existing local accounts and keys stay unchanged.')
+        ? ModuStrings.text(context, "本次跳过账号和密钥配置。",
+            "Account and key settings will be skipped.")
         : values.keys.any(isCredentialPreference)
-            ? ModuStrings.text(context, '仅恢复文件实际包含的账号、密钥及供应商配置；未包含的配置保持不变。',
-                'Restore only the accounts, keys and provider configurations actually included; other configurations stay unchanged.')
-            : ModuStrings.text(context, '本次内容不包含账号或密钥配置，本机已有账号与密钥保持不变。',
-                'This content contains no account or key configurations. Existing local accounts and keys stay unchanged.');
+            ? ModuStrings.text(context, "恢复备份中的账号和密钥配置。",
+                "Restore account and key settings from the backup.")
+            : ModuStrings.text(context, "此备份没有账号或密钥配置。",
+                "This backup contains no account or key settings.");
     final confirmed = await showDialog<bool>(
         animationStyle: AppMotion.style,
         context: context,
@@ -283,24 +285,25 @@ class _GlobalSettingsPageState extends ConsumerState<GlobalSettingsPage> {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(ModuStrings.text(
-                      context,
-                      '一次迁移全部全局设置，支持设置文件和 modu 链接，推荐使用文件备份。兼容旧版 AI、朗读、同步及书库链接，导入前会显示实际包含的设置。',
-                      'Transfer all global settings via settings files or modu links. Files are recommended for backups. Older AI, speech, sync and library links remain supported; actual contents are shown before import.')),
-                  const SizedBox(height: 12),
-                  Text(ModuStrings.text(
-                      context,
-                      '包含外观、阅读排版、CSS 方案、AI 技能、朗读、翻译及其他通用设置。不包含书籍、笔记、聊天记录、阅读进度、字体/背景图片文件、字典或向量模型。',
-                      'Export appearance, reading layout, CSS profiles, AI skills, speech, translation and general preferences. Books, notes, chats, reading progress, fonts/background files, dictionaries and vector models are not included.')),
+                  SettingHelp(
+                      title: Text(ModuStrings.text(
+                          context, "迁移设置", "Transfer settings")),
+                      description: Text(ModuStrings.text(
+                          context,
+                          "导出设置文件或链接，在另一台设备导入。",
+                          "Export a settings file or link, then import it on the other device."))),
                   const SizedBox(height: 16),
                   SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(ModuStrings.text(context, '包含账号、密码和 API Key',
-                          'Include accounts, passwords and API keys')),
-                      subtitle: Text(ModuStrings.text(
-                          context,
-                          '默认关闭：导出时排除、导入时跳过含凭据的 API 供应商和服务器配置，保留本机已有账号与密钥。开启后会一并迁移，文件和 modu 链接包含可还原的明文凭据，请勿公开分享。此开关不改变同步加密设置，同步加密密码不导出。自定义 CSS、提示词及网址请勿填写私密凭据。',
-                          'Off by default: omit credential-bearing API/server configurations on export and skip them on import, preserving local accounts and keys. When enabled, transfers contain plaintext credentials. Keep them private. Sync encryption is unchanged and its password is never exported. Do not place private credentials in custom CSS, prompts or URLs.')),
+                      title: SettingHelp(
+                          title: Text(ModuStrings.text(
+                              context,
+                              '包含账号、密码和 API Key',
+                              'Include accounts, passwords and API keys')),
+                          description: Text(ModuStrings.text(
+                              context,
+                              "包含账号、密码和 API Key，请勿公开分享导出的文件或链接。",
+                              "Includes accounts, passwords and API keys. Keep exported files and links private."))),
                       value: _includeSecrets,
                       onChanged: _busy
                           ? null

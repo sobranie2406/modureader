@@ -137,6 +137,10 @@ Widget app(Widget body) => MaterialApp(
     home: body);
 
 void main() {
+  setUpAll(() async {
+    await L10n.delegate.load(const Locale('en'));
+    await L10n.delegate.load(const Locale('zh', 'CN'));
+  });
   setUp(() async {
     SharedPreferences.setMockInitialValues(
         {'wereadEnabled': true, 'wereadApiKey': 'wrk-test'});
@@ -167,6 +171,35 @@ void main() {
     expect(titles[index - 1], L10n.of(context).settingsBookshelfCover);
     expect(titles[index + 1],
         L10n.of(context).settingsAppearanceBottomNavigatorShow);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('WeRead guidance stays in help on a narrow large-text screen',
+      (tester) async {
+    await size(tester, width: 320);
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: L10n.supportedLocales,
+      localizationsDelegates: L10n.localizationsDelegates,
+      builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!),
+      home: const WereadSettingsPage(),
+    ));
+    await tester.pumpAndSettle();
+    const hint = '保存 API Key 后，关联书籍即可查看评分和书评。';
+    expect(find.text(hint), findsNothing);
+    expect(find.textContaining('所有参与密钥同步的设备'), findsNothing);
+    expect(find.textContaining('不上传本地正文'), findsNothing);
+    await tester.tap(find.byIcon(Icons.help_outline).first);
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsOneWidget);
+    expect(Prefs().wereadEnabled, true);
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsNothing);
+    expect(find.text('保存 API Key'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -361,7 +394,8 @@ void main() {
     api.fail = true;
     await tester.tap(find.text('Refresh book information'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Saved data'), findsOneWidget);
+    expect(find.textContaining('WeRead information is unavailable'),
+        findsOneWidget);
     expect(WereadData.content(store.data, 'info')['title'], 'Candidate');
     api.pendingInfo = Completer();
     await tester.tap(find.text('Refresh book information'));

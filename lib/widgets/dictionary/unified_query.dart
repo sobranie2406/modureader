@@ -493,8 +493,6 @@ class _EncyclopediaState extends State<_Encyclopedia> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (widget.wikipedia) ...[
-              Text(t('向维基百科自动查询，仅发送查询词，不发送上下文。',
-                  'Automatically queries Wikipedia with the query only, never book context.')),
               TextButton(
                   onPressed: busy ? null : search,
                   child: Text(busy

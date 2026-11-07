@@ -32,7 +32,16 @@ void main() {
     expect(
         tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, true);
     expect(find.byType(TextField), findsNothing);
-    expect(find.textContaining('plaintext'), findsOneWidget);
+    expect(find.textContaining('plaintext'), findsNothing);
+    final help = find.descendant(
+        of: find.byType(SwitchListTile),
+        matching: find.byIcon(Icons.help_outline));
+    await tester.tap(help);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Keep exported files and links private'),
+        findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
     expect(find.text('Export modu link'), findsOneWidget);
     expect(find.text('Export global settings file'), findsOneWidget);
     expect(find.text('Restore settings from file'), findsOneWidget);

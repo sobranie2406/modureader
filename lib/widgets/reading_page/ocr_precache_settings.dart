@@ -39,10 +39,8 @@ class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
                 title: SettingHelpTitle(
                     title: ModuStrings.text(
                         context, '后台预缓存 OCR', 'Background OCR cache'),
-                    description: ModuStrings.text(
-                        context,
-                        '原页和重排阅读时，按原书页码逐页预处理，含当前页，最多 5 页；复用符合当前重排模式的缓存和校对稿。需要已安装的本地模型。',
-                        'Prefetch in original and reflow views by source page, up to 5 pages including the current page. Reuses saved text and edits compatible with the current reflow mode; uses an installed local model.')),
+                    description: ModuStrings.text(context, "提前识别当前页及后续页面，加快重排。",
+                        "Recognize the current and following pages in advance for faster reflow.")),
                 value: Prefs().ocrPrecacheEnabled,
                 onChanged: _saving ? null : (value) => _save(enabled: value)),
             if (Prefs().ocrPrecacheEnabled)
@@ -90,7 +88,7 @@ class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
                     return Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                            '$message\n${cache.running ? ModuStrings.text(context, '正在处理第 ${cache.currentPage! + 1} 页${cache.progress == null ? '' : '（${cache.progress!.$1}/${cache.progress!.$2}）'}；不会因普通翻页重来。', 'Processing page ${cache.currentPage! + 1}${cache.progress == null ? '' : ' (${cache.progress!.$1}/${cache.progress!.$2})'}; normal navigation does not restart it.') : ModuStrings.text(context, '符合当前重排模式的缓存和校对稿直接跳过；当前任务完成后，按最新页码和缓存页数处理缺失页。', 'Saved text and edits compatible with the current reflow mode are skipped. After the current task finishes, missing pages follow the latest page and cache window.')}',
+                            '$message\n${cache.running ? ModuStrings.text(context, '正在处理第 ${cache.currentPage! + 1} 页${cache.progress == null ? '' : '（${cache.progress!.$1}/${cache.progress!.$2}）'}', 'Processing page ${cache.currentPage! + 1}${cache.progress == null ? '' : ' (${cache.progress!.$1}/${cache.progress!.$2})'}') : ModuStrings.text(context, "已缓存的页面自动跳过。", "Cached pages are skipped.")}',
                             style: Theme.of(context).textTheme.bodySmall));
                   }),
           ]));

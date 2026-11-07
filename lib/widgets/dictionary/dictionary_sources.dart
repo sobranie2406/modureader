@@ -1,3 +1,5 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
 import 'package:anx_reader/service/dictionary/local_dictionary.dart';
 import 'package:anx_reader/service/dictionary/online_dictionary.dart';
@@ -60,8 +62,11 @@ Future<bool> showDictionarySources(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text(t('可勾选一本或多本字典。不会改变导入文件或字典的启用状态。',
-                                'Select one or more dictionaries. Imported files and enabled states are unchanged.')),
+                            SettingHelp(
+                                title: Text(ModuStrings.text(
+                                    context, "选择字典", "Choose dictionaries")),
+                                description: Text(t("可同时选择多本字典。",
+                                    "Select one or more dictionaries."))),
                             const SizedBox(height: 12),
                             Text(t('本地字典', 'Local dictionaries')),
                             Wrap(children: [
@@ -98,9 +103,11 @@ Future<bool> showDictionarySources(
                                           })),
                             const Divider(),
                             Text(t('免费在线字典', 'Free online dictionaries')),
-                            Text(t(
-                                '启用后会向所选服务发送查询词及网络请求信息，不发送书籍正文。需联网；不可用时仍可查本地字典。',
-                                'When enabled, sends the query and network request information to selected services, never book text. Requires internet; local dictionaries remain available if a service fails.')),
+                            SettingHelp(
+                                title: Text(ModuStrings.text(
+                                    context, "在线查询", "Online lookup")),
+                                description: Text(t("在线查询会将查询词发送给所选服务。",
+                                    "Online lookup sends your query to the selected service."))),
                             for (final s in OnlineDictionary.values)
                               CheckboxListTile(
                                   contentPadding: EdgeInsets.zero,

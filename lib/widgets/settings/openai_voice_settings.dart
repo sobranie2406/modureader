@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/tts/openai_voice_presets.dart';
 import 'package:flutter/material.dart';
@@ -52,19 +53,20 @@ class _OpenAiVoiceSettingsState extends State<OpenAiVoiceSettings> {
         type: MaterialType.transparency,
         child: SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
-          title: Text(ModuStrings.text(
-              context, '启用语音提示词', 'Enable speech instructions')),
+          title: SettingHelp(
+              title: Text(ModuStrings.text(
+                  context, '启用语音提示词', 'Enable speech instructions')),
+              description: Text(legacy
+                  ? ModuStrings.text(
+                      context,
+                      'tts-1 / tts-1-hd 不支持提示词；保留描述但不发送。',
+                      'tts-1 / tts-1-hd do not support instructions. Your description is kept but not sent.')
+                  : ModuStrings.text(context, "接口支持 instructions 时，可用提示词调整声音。",
+                      "Use voice instructions if your service supports them."))),
           value: enabled,
           onChanged: legacy
               ? null
               : (value) => _change('instructionsEnabled', value.toString()),
-          subtitle: Text(legacy
-              ? ModuStrings.text(context, 'tts-1 / tts-1-hd 不支持提示词；保留描述但不发送。',
-                  'tts-1 / tts-1-hd do not support instructions. Your description is kept but not sent.')
-              : ModuStrings.text(
-                  context,
-                  '第三方接口若不支持 instructions，可关闭此项；已写的描述会保留。',
-                  'Turn off if your provider does not support instructions. Your description will be retained.')),
         ),
       ),
       const SizedBox(height: 12),
@@ -74,11 +76,6 @@ class _OpenAiVoiceSettingsState extends State<OpenAiVoiceSettings> {
         isExpanded: true,
         decoration: InputDecoration(
           labelText: ModuStrings.text(context, '描述预设', 'Description template'),
-          helperText: ModuStrings.text(
-              context,
-              '默读提供的可编辑模板，选择后替换下方描述，不改变 Voice 音色。',
-              'Editable Modu templates replace the description without changing Voice.'),
-          helperMaxLines: 3,
         ),
         items: [
           DropdownMenuItem(
@@ -107,11 +104,6 @@ class _OpenAiVoiceSettingsState extends State<OpenAiVoiceSettings> {
           border: const OutlineInputBorder(),
           labelText: ModuStrings.text(context, '语音描述 / 朗读风格（可选）',
               'Speech description / style (optional)'),
-          helperText: ModuStrings.text(
-              context,
-              '描述音色质感、语气、情绪、语速或停顿。留空使用默认风格，提示词不会拼入朗读正文。',
-              'Describe timbre, tone, emotion, pace or pauses. Leave empty for the default style. Instructions are not added to the spoken text.'),
-          helperMaxLines: 4,
         ),
         onChanged: (value) => _change('instructions', value),
       ),
@@ -122,8 +114,8 @@ class _OpenAiVoiceSettingsState extends State<OpenAiVoiceSettings> {
                   _prompt.isEmpty ? null : () => _change('instructions', ''),
               child: Text(
                   ModuStrings.text(context, '清空描述', 'Clear description')))),
-      Text(ModuStrings.text(context, '常用提示词（点击追加，可继续编辑）',
-          'Prompt suggestions (tap to append, then edit)')),
+      Text(ModuStrings.text(
+          context, '常用提示词', 'Prompt suggestions (tap to append, then edit)')),
       const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 4, children: [
         for (final entry in OpenAiVoicePresets.phrases.entries)
@@ -141,14 +133,12 @@ class _OpenAiVoiceSettingsState extends State<OpenAiVoiceSettings> {
               }),
       ]),
       const SizedBox(height: 8),
-      Text(ModuStrings.text(
-          context,
-          '同段相邻句合成，高亮和前后跳转按小段，长段自动拆分。启用提示词时自动附加匀速听书要求（留空描述也会发送）；实际效果取决于模型。关闭提示词或使用 tts-1 / tts-1-hd 时不发送。',
-          'Adjacent sentences are synthesized as passages, with passage highlighting and navigation; long paragraphs are split. When instructions are enabled, steady narration is requested even with an empty description. Results depend on the model. No instructions are sent when disabled or for tts-1 / tts-1-hd.')),
-      Text(ModuStrings.text(
-          context,
-          '效果取决于服务商和模型，提示词不能代替 Voice 音色或克隆声音。使用提示词控制语速、音高时，请把播放器语速与音调设为 1.0，避免冲突。点击“保存设置”后生效。',
-          'Results depend on the provider and model; prompts do not replace Voice or clone a voice. Set the player rate and pitch to 1.0 when controlling them with text to avoid conflicts. Use Save settings to apply.')),
+      SettingHelp(
+          title: Text(ModuStrings.text(context, "声音设置", "Voice settings")),
+          description: Text(ModuStrings.text(
+              context,
+              "修改描述后点击“保存设置”。用描述控制语速和音高时，将播放器倍率设为 1.0。",
+              "Save settings after editing. Set playback rate and pitch to 1.0 when controlling them through instructions."))),
     ]);
   }
 }

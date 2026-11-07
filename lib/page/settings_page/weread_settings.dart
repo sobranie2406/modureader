@@ -71,8 +71,8 @@ class _WereadSettingsPageState extends State<WereadSettingsPage> {
                                 context, '启用微信读书', 'Enable WeRead')),
                             description: Text(ModuStrings.text(
                                 context,
-                                '默认关闭，仅在本机生效。关闭后停止查询，保留关联及缓存。',
-                                'Off by default, per device. Turning off stops queries and retains saved links and data.'))),
+                                "保存 API Key 后，关联书籍即可查看评分和书评。",
+                                "Save your API key, then link a book to see its ratings and reviews."))),
                         value: Prefs().wereadEnabled,
                         onChanged:
                             _saving ? null : (value) => _save(enabled: value),
@@ -123,16 +123,6 @@ class _WereadSettingsPageState extends State<WereadSettingsPage> {
                           }
                         },
                       ),
-                      Text(ModuStrings.text(
-                          context,
-                          '使用微信读书官方接口。仅发送检索的书名、作者或关联的 bookId，不上传本地正文、笔记和书评。\n\n'
-                              'API Key 纳入全局设置的敏感数据：备份须勾选包含账号密钥；云端同步须先启用“敏感数据同步”并设置独立加密密码。'
-                              '所有参与密钥同步的设备需更新到支持微信读书的版本。\n\n'
-                              '关联和已加载的外部资料随原书同步；未下载的书不下载这些缓存。关闭本开关不会关闭已单独启用的敏感数据同步。',
-                          'Uses official WeRead APIs. Only search titles, authors and linked book IDs are sent; local book text, notes and reviews are never uploaded to WeRead.\n\n'
-                              'The API Key is sensitive global configuration: exporting it requires the include-credentials option; cloud transfer requires Sensitive data sync and a separate encryption password. '
-                              'Update every participating device to a version supporting WeRead.\n\n'
-                              'Links and loaded external data sync with downloaded books. Disabling this connection does not disable separately enabled sensitive data sync.')),
                       if (_message != null)
                         Padding(
                             padding: const EdgeInsets.only(top: 16),

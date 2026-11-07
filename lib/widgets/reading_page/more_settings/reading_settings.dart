@@ -457,10 +457,8 @@ class _ReadingMoreSettingsState extends State<ReadingMoreSettings> {
                     onPressed: () async {
                       if (!await confirmColorReset(
                               context,
-                              ModuStrings.text(
-                                  context,
-                                  '恢复此项的默认字体、字号、颜色和不透明度？显示内容、边距和另一项设置保持不变。',
-                                  'Restore this section’s default font, size, colour and opacity? Content, margins and the other section stay unchanged.')) ||
+                              ModuStrings.text(context, "恢复默认字体、字号、颜色和不透明度？",
+                                  "Reset the font, size, color and opacity?")) ||
                           !context.mounted) {
                         return;
                       }

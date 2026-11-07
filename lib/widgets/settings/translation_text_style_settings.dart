@@ -160,10 +160,10 @@ class _TranslationTextStyleSettingsState
                       children: [
                         Text(
                             widget.classical
-                                ? t('只调整文言文译文，不改变原文或语种翻译。已生成译文同步更新，不重新请求翻译。',
-                                    'Applies only to Classical Chinese output, not the original or language translation. Existing output updates without another request.')
-                                : t('只调整语种译文，不改变原文或文言文翻译。已生成译文同步更新，不重新请求翻译。',
-                                    'Applies only to language translation output, not the original or Classical Chinese translation. Existing output updates without another request.'),
+                                ? t("调整文言文译文的字体和颜色。",
+                                    "Set the font and colors for classical Chinese translations.")
+                                : t("调整译文的字体和颜色。",
+                                    "Set the font and colors for translations."),
                             style: Theme.of(context).textTheme.bodySmall),
                         const SizedBox(height: 12),
                         Text(t('译文预览', 'Translation preview'),

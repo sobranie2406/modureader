@@ -33,7 +33,7 @@ class _InstalledFontsPageState extends ConsumerState<InstalledFontsPage> {
       builder: (context) => AlertDialog(
         title: Text(t('移除字体？', 'Remove font?')),
         content: Text(
-            '$filename\n\n${t('仅删除应用内的字体副本，不删除原始导入文件。使用此字体的正文、译文或重排内容将回退到默认字体，其他外观设置保持不变。可重新下载或导入。', 'Only the app’s copy will be deleted. The original imported file is kept. Text using this font will fall back to its default font; other appearance settings are preserved. You can download or import it again.')}'),
+            '$filename\n\n${t("删除此字体？正在使用它的内容将改用默认字体。", "Delete this font? Text using it will switch to the default font.")}'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -98,8 +98,8 @@ class _InstalledFontsPageState extends ConsumerState<InstalledFontsPage> {
                 children: [
                   Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text(t('管理下载和导入的字体。系统字体与应用内置字体不可移除。',
-                          'Manage downloaded and imported fonts. System and bundled fonts cannot be removed.'))),
+                      child: Text(t("管理下载和导入的字体。",
+                          "Manage downloaded and imported fonts."))),
                   if (downloading)
                     Padding(
                         padding: const EdgeInsets.all(16),

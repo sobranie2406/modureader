@@ -164,8 +164,8 @@ class _WereadBookCardState extends State<WereadBookCard> {
         final confirmed = await confirmWeread(
             context,
             ModuStrings.text(context, '解除微信读书关联？', 'Unlink WeRead?'),
-            Text(ModuStrings.text(context, '解除操作会随原书同步。本地评分、书评及已采用的封面和简介保持不变。',
-                'Unlinking syncs with this book. Personal ratings, reviews and adopted metadata stay unchanged.')));
+            Text(ModuStrings.text(context, "解除书籍关联？此操作会同步到其他设备。",
+                "Unlink this book? The change will sync to other devices.")));
         if (!confirmed || !valid()) return;
         final data = await _store.bind(null);
         if (valid()) setState(() => _data = data);
@@ -331,8 +331,8 @@ class _WereadBookCardState extends State<WereadBookCard> {
         _time(name),
         if (name == 'highlights')
           Text(
-              ModuStrings.text(context, '仅供参考，不对应本地页码或选区，也不会写入本地笔记。',
-                  'Reference only: positions do not map to local pages or selections and are not added to your notes.'),
+              ModuStrings.text(context, "热门划线来自微信读书。",
+                  "Popular highlights are from WeRead."),
               style: Theme.of(context).textTheme.bodySmall),
         Align(
             alignment: Alignment.centerLeft,

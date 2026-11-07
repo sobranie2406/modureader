@@ -102,8 +102,8 @@ class PluginDetailPage extends StatelessWidget {
           )
         else
           for (final capability in capabilities)
-            _valueTile(
-                context, pluginCapabilityLabel(context, capability), capability),
+            _valueTile(context, pluginCapabilityLabel(context, capability),
+                capability),
       ],
     );
   }
@@ -125,10 +125,8 @@ class PluginDetailPage extends StatelessWidget {
           CustomSettingsTile(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(ModuStrings.text(
-                  context,
-                  '当前没有已生效的贡献。启用插件后，它添加的提示词会出现在 AI 提示词列表中。',
-                  'No active contributions. Enable the plugin to add its prompts to the AI prompt list.')),
+              child: Text(ModuStrings.text(context, "启用插件后，可在 AI 提示词列表中使用。",
+                  "Enable the plugin to use its AI prompts.")),
             ),
           )
         else
@@ -210,8 +208,8 @@ class PluginDetailPage extends StatelessWidget {
               if (readme == null || readme.trim().isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(ModuStrings.text(context,
-                      '插件包没有提供 README。', 'This package has no README.')),
+                  child: Text(ModuStrings.text(context, '插件包没有提供 README。',
+                      'This package has no README.')),
                 );
               }
               return Padding(
@@ -390,10 +388,8 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
           type: ConfigItemType.tip,
           defaultValue: ModuStrings.text(
             context,
-            '此插件需要填写密钥。密钥仅保存在本机，不会随设置或备份导出；填写功能将在网络插件正式启用时提供。',
-            'This plugin needs a key. Keys stay on this device and are never '
-                'exported with settings or backups; entry becomes available when '
-                'network plugins are enabled.',
+            "此配置需要密钥。",
+            "This setting requires a key.",
           ),
         );
     }

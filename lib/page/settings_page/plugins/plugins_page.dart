@@ -47,10 +47,8 @@ class _PluginSettingsState extends State<PluginSettings> {
                 leading: const Icon(Icons.add_box_outlined),
                 title:
                     Text(ModuStrings.text(context, '安装插件…', 'Install plugin…')),
-                description: Text(ModuStrings.text(
-                    context,
-                    '仅接受 Modu 项目可信清单中已审核的插件，逐文件校验 SHA-256。第三方或被修改的包不可安装，不执行脚本。',
-                    'Only project-reviewed packages in the built-in catalog are accepted, with per-file SHA-256 checks. Third-party or modified packages are rejected. No scripts run.')),
+                description: Text(ModuStrings.text(context, "安装项目提供的提示词包和划词动作。",
+                    "Install prompt packs and selection actions provided by the project.")),
                 enabled: !_busy,
                 onPressed: _busy ? null : (_) => _install(),
               ),
@@ -60,9 +58,7 @@ class _PluginSettingsState extends State<PluginSettings> {
                     padding: const EdgeInsets.all(16),
                     child: Text(
                       ModuStrings.text(
-                          context,
-                          '还没有安装插件。插件由 manifest.json 声明的贡献组成，例如 AI 提示词模板或划词工具栏动作。',
-                          'No plugins installed yet. A plugin is a manifest.json with declarative contributions, such as AI prompt templates or selection toolbar actions.'),
+                          context, "还没有安装插件。", "No plugins installed yet."),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -104,10 +100,8 @@ class _PluginSettingsState extends State<PluginSettings> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    ModuStrings.text(
-                        context,
-                        '插件包必须是小于 5 MB 的 zip，包含 manifest.json 与可选的 LICENSE、README.md。每个包必须声明 SPDX 许可证。',
-                        'A package is a zip under 5 MB with manifest.json and optional LICENSE/README.md. Every package must declare an SPDX license.'),
+                    ModuStrings.text(context, "选择下载的 .moduplugin 或 ZIP 插件包。",
+                        "Choose a downloaded .moduplugin or ZIP package."),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -184,10 +178,8 @@ class _PluginSettingsState extends State<PluginSettings> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(ModuStrings.text(context, '卸载插件？', 'Uninstall plugin?')),
-        content: Text(ModuStrings.text(
-            context,
-            '将删除插件文件，以及它添加且未被编辑过的提示词和划词动作。你编辑过的内容会保留为普通条目。',
-            'This deletes the plugin files and any of its prompts or toolbar actions you have not edited. Edited entries are kept as normal entries.')),
+        content: Text(ModuStrings.text(context, "卸载插件及其添加的内容？已编辑的条目会保留。",
+            "Uninstall the plugin and its additions? Edited entries will be kept.")),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

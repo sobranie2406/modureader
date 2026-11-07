@@ -76,10 +76,8 @@ class TextColorSetting extends StatelessWidget {
                     onPressed: () async {
                       if (await confirmColorReset(
                               context,
-                              ModuStrings.text(
-                                  context,
-                                  '恢复此项字体颜色？其他字体与颜色设置保持不变。',
-                                  'Restore this font colour? Other font and colour settings will not change.')) &&
+                              ModuStrings.text(context, "恢复默认字体颜色？",
+                                  "Reset the text color?")) &&
                           context.mounted) {
                         Navigator.pop(context, '');
                       }

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:math';
@@ -129,10 +130,8 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ModuStrings.text(
-              context,
-              '已安排迁移，请完全退出并重新打开默读。校验成功后切换路径，原数据保留。',
-              'Migration scheduled. Close and reopen Modu. Switch paths only after verification; original data is retained.'))));
+          content: Text(ModuStrings.text(context, "请退出并重新打开默读，完成迁移。",
+              "Quit and reopen Modu to finish moving your data."))));
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -179,8 +178,8 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
                         Text(ModuStrings.text(context, '清理缓存', 'Clear cache')),
                     content: Text(ModuStrings.text(
                         context,
-                        '将清理可重新生成的临时数据。书籍、笔记、AI 对话历史、已下载模型和向量索引不会删除。请在导入、同步和下载完成后清理。',
-                        'This clears regenerable temporary data. Books, notes, AI chat history, downloaded models and vector indexes are kept. Wait for imports, sync and downloads to finish before clearing.')),
+                        "清理临时文件？请先等待导入、同步和下载完成。",
+                        "Clear temporary files? Wait for imports, sync and downloads to finish first.")),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
@@ -326,10 +325,14 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
           tiles: [
             CustomSettingsTile(
                 child: ListTile(
-              title: Text(
-                  ModuStrings.text(context, '应用数据目录', 'App data directory')),
-              subtitle: Text(
-                  '${_currentStoragePath ?? "..."}\n${ModuStrings.text(context, '书籍、字体、数据库、模型和索引保存在此目录。卸载应用会删除此目录；部分系统仍限制文件管理器访问 Android/data。账号设置和密钥仍保存在应用私有区域。', 'Books, fonts, databases, models and indexes are stored here. Uninstalling deletes this directory; some systems restrict file manager access to Android/data. Account settings and keys remain in private app storage.')}'),
+              title: SettingHelp(
+                  title: Text(ModuStrings.text(
+                      context, '应用数据目录', 'App data directory')),
+                  description: SettingHelp(
+                      title: Text(
+                          ModuStrings.text(context, "数据目录", "Data folder")),
+                      description: Text(
+                          '${_currentStoragePath ?? "..."}\n${ModuStrings.text(context, "书籍及应用数据保存在此目录，卸载前请备份。", "Books and app data are stored here. Back up before uninstalling.")}'))),
             )),
           ],
         ),
@@ -346,10 +349,8 @@ class _StorageSettingsState extends ConsumerState<StorageSettings>
                   // Current storage path
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(ModuStrings.text(
-                        context,
-                        '迁移在下次启动时执行，完成前继续使用当前目录。原目录保留为恢复副本，目标目录须为空。',
-                        'Migration runs on the next launch. The current directory stays active until completion and is retained as a recovery copy. Choose an empty destination.')),
+                    child: Text(ModuStrings.text(context, "选择空文件夹，重启默读后开始迁移。",
+                        "Choose an empty folder, then restart Modu to move your data.")),
                   ),
                   ListTile(
                     title: Text(L10n.of(context).storageCurrentPath),

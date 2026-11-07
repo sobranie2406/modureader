@@ -104,7 +104,8 @@ void main() {
     await tester.tap(button);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('SHA-256').last, findsOneWidget);
+    expect(find.textContaining('同时选择所选型号的全部模型文件'), findsOneWidget);
+    expect(find.textContaining('SHA-256'), findsNothing);
     expect(find.textContaining('rec.yml / inference.yml'), findsOneWidget);
     await tester.tap(find.text('取消').last);
     await tester.pumpAndSettle();
@@ -317,7 +318,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(download);
     await tester.pumpAndSettle();
-    expect(find.textContaining('下载或校验失败'), findsOneWidget);
+    expect(find.textContaining('下载失败'), findsOneWidget);
     expect(Prefs().ocrModelId, selected);
     expect(tester.takeException(), isNull);
   });

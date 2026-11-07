@@ -84,9 +84,8 @@ class DocumentTextMenu extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 title: SettingHelpTitle(
                   title: text('强制 OCR 重排', 'Force OCR reflow'),
-                  description: text(
-                      '对整本书生效：重排及各页后台预缓存均使用 OCR，忽略文字层及其缓存；需要本地 OCR 模型',
-                      'Applies throughout this book: reflow and background prefetch use OCR on every page, ignoring embedded text and its cache. Requires a local OCR model.'),
+                  description: text("全书使用 OCR 识别文字。",
+                      "Use OCR for text throughout the book."),
                 ),
                 value: forceOcr,
                 onChanged: onForceOcrChanged,

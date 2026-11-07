@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/service/translate/classical_translation.dart';
 import 'package:anx_reader/widgets/settings/classical_translation_settings.dart';
@@ -362,10 +363,6 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                     label: Text(ModuStrings.text(
                         context, '配置翻译服务', 'Configure translation service')),
                   )),
-                  Text(
-                      ModuStrings.text(context, '仅手动启动后发送待译内容；修改设置不会自动发起请求。',
-                          'Text is sent only after you start translation. Changing settings never sends a request.'),
-                      style: theme.textTheme.bodySmall),
                 ],
                 SettingsTile.navigation(
                   key: ValueKey(widget.classical
@@ -459,18 +456,13 @@ class _TranslationWidgetState extends State<TranslationWidget> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            widget.onTranslatePage != null
-                ? ModuStrings.text(
-                    context,
-                    '仅翻译重排界面的可见段落，滚动时逐段加载。优先使用已保存的编辑稿，否则使用识别文字。翻原书页或停止后恢复原文；译文不会写入 OCR 缓存和笔记。内容会发送给所选翻译引擎。',
-                    'Translate visible reflow paragraphs, loading more as you scroll. Saved edits take precedence over recognized text. Turning the source page or stopping restores the original. Translation never overwrites OCR or notes. Text is sent to the selected translation service.')
-                : ModuStrings.text(
-                    context,
-                    '仅在你启动后翻译可见段落，滚动时逐段加载，不会一次发送整章。可随时停止；关闭书籍后停止，重新打开不会自动继续。',
-                    'Translate visible paragraphs only after you start; scrolling loads them one at a time. Stop at any time. Closing the book stops translation; reopening never resumes it automatically.'),
-            style: theme.textTheme.bodySmall,
-          ),
+          SettingHelp(
+              title: Text(ModuStrings.text(context, "翻译方法", "Translation")),
+              description: Text(
+                ModuStrings.text(context, "翻译可见段落，滚动时继续翻译。",
+                    "Translate visible paragraphs and continue as you scroll."),
+                style: theme.textTheme.bodySmall,
+              )),
         ],
       ),
     );

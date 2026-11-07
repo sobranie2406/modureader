@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -197,9 +198,17 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
                       decoration: InputDecoration(
                         labelText: l10n.settingsAiProviderUrl,
                         border: const OutlineInputBorder(),
-                        helperText: _selectedProtocol == AiProtocol.openai
-                            ? l10n.settingsAiProviderUrlHint
-                            : null,
+                        helper: (_selectedProtocol == AiProtocol.openai
+                                    ? l10n.settingsAiProviderUrlHint
+                                    : null) ==
+                                null
+                            ? null
+                            : SettingHelpTitle(
+                                title: ModuStrings.text(context, "说明", "Help"),
+                                description:
+                                    (_selectedProtocol == AiProtocol.openai
+                                        ? l10n.settingsAiProviderUrlHint
+                                        : null)!),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -321,10 +330,8 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
         builder: (context) => AlertDialog(
               title: Text(
                   ModuStrings.text(context, '恢复默认值？', 'Restore defaults?')),
-              content: Text(ModuStrings.text(
-                  context,
-                  '恢复此内置供应商的名称、接口地址、协议、默认模型、温度、Token 数、上下文轮数和推理设置。将清空全部已保存的 API Key（包括旧版配置中的密钥），重置密钥轮换位置，并恢复默认的“启用”状态。当前页面未保存的修改将被放弃，之后需要重新填写 API Key。确认后立即保存，不会发起网络请求。',
-                  'Restore this built-in provider’s name, endpoint, protocol, default model and model parameters. All saved API keys (including legacy credentials) will be cleared, key rotation reset, and the provider enabled by default. Unsaved edits will be discarded. You will need to enter an API key again. Changes are saved immediately; no network request is sent.')),
+              content: Text(ModuStrings.text(context, "恢复默认配置并清空此供应商的 API Key？",
+                  "Reset this provider’s settings and clear its API keys?")),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -502,16 +509,17 @@ class _AiProviderDetailPageState extends ConsumerState<AiProviderDetailPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  ModuStrings.text(
-                      context,
-                      '自动不发送推理控制参数，不等于关闭。关闭会请求模型停用推理，可用于减少全文翻译等待；翻译会沿用所选模型的此项设置，也影响该模型的其他 AI 请求。低/中/高适用于支持 reasoning_effort 的接口。部分模型强制推理或不支持关闭参数，需改回自动或换用支持的模型；不保证一定提速。',
-                      'Auto omits reasoning controls; it does not turn reasoning off. Off requests non-reasoning output and may reduce full-text translation latency. Translation and other AI requests use the selected model’s setting. Low/medium/high require reasoning_effort support. Some models require reasoning or reject disable parameters: use Auto or a compatible model. Speed gains are not guaranteed.'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
+                child: SettingHelp(
+                    title: Text(ModuStrings.text(
+                        context, "推理设置", "Reasoning settings")),
+                    description: Text(
+                      ModuStrings.text(context, "选择模型的推理强度。不确定时选“自动”。",
+                          "Choose the model’s reasoning level. Use Auto if unsure."),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    )),
               ),
             ],
           ),

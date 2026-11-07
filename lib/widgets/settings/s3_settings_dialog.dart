@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/sync/s3_client.dart';
@@ -26,27 +27,23 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
   String get _providerHelp => switch (provider) {
         'aws' => tr('选择桶实际所在区域，Endpoint 与 Region 必须一致。',
             'Use the bucket’s actual region; Endpoint and Region must match.'),
-        'aliyun' => tr(
-            '使用 s3.oss-区域.aliyuncs.com，不是普通 OSS 端点。部分账号/地域需绑定自定义域名和 HTTPS 证书，请按控制台及官方访问规则填写。',
-            'Use s3.oss-REGION.aliyuncs.com, not the native OSS endpoint. Some accounts/regions require a custom domain and HTTPS certificate; follow your console and official access rules.'),
-        'tencent' => tr(
-            '桶名必须包含 -APPID，例如 books-1250000000。新桶使用虚拟主机寻址；COS 支持 AWS V2/V4 签名。',
-            'Include -APPID in the bucket name, e.g. books-1250000000. New buckets use virtual-host addressing; COS supports AWS V2/V4 signing.'),
+        'aliyun' => tr("填写 OSS 的 S3 端点：s3.oss-区域.aliyuncs.com。",
+            "Enter the OSS S3 endpoint: s3.oss-REGION.aliyuncs.com."),
+        'tencent' => tr("桶名需包含 APPID，例如 books-1250000000。",
+            "Include the APPID in the bucket name, for example books-1250000000."),
         'r2' => tr(
             '将 <account-id> 替换为 Cloudflare 账户 ID，Region 填 auto。使用 R2 的 S3 访问密钥，不是普通 API Token。',
             'Replace <account-id> with your Cloudflare account ID; set Region to auto. Use R2 S3 access credentials, not a general API token.'),
-        'rainyun' => tr('请使用雨云控制台的 S3 端点；官方示例 Region 为 rainyun，使用路径式寻址。',
-            'Use the S3 endpoint from the RainYun console. Its official example uses Region rainyun and path-style addressing.'),
-        'qiniu' => tr('填写空间概览中的“S3 空间名”，可能不同于普通空间名称。S3 端点和区域需对应空间所在区域。',
-            'Use the S3 space name from the space overview; it may differ from the regular name. Match the S3 endpoint and region to your space.'),
-        'baidu' => tr(
-            '使用 S3 兼容端点（如 s3.bj.bcebos.com），不是普通 BOS 端点。按桶所在区域修改，使用虚拟主机寻址和 V4 签名。',
-            'Use the S3-compatible endpoint (e.g. s3.bj.bcebos.com), not the native BOS endpoint. Match your bucket region and use virtual-host addressing with V4 signing.'),
-        'volcengine' => tr(
-            '使用 tos-s3-区域.volces.com。TOS 的 S3 接口不支持路径式寻址，请使用虚拟主机寻址。',
-            'Use tos-s3-REGION.volces.com. TOS S3 endpoints require virtual-host addressing, not path style.'),
-        _ => tr('用于 MinIO 等 S3 兼容服务，请按服务商文档填写。华为 OBS 不支持路径式寻址，且本应用尚未完成其兼容性验证。',
-            'For MinIO and other S3-compatible services, follow the provider’s documentation. Huawei OBS does not support path-style addressing and has not been validated with this app.'),
+        'rainyun' => tr("填写雨云控制台提供的 S3 端点，区域填写 rainyun。",
+            "Use the S3 endpoint from the RainYun console and rainyun as the region."),
+        'qiniu' => tr("填写空间概览中的“S3 空间名”、端点和区域。",
+            "Copy the S3 space name, endpoint and region from the space overview."),
+        'baidu' => tr("填写所在区域的 S3 端点，例如 s3.bj.bcebos.com。",
+            "Enter your region’s S3 endpoint, such as s3.bj.bcebos.com."),
+        'volcengine' => tr("填写 tos-s3-区域.volces.com，选择虚拟主机寻址。",
+            "Enter tos-s3-REGION.volces.com and select virtual-host addressing."),
+        _ => tr("填写服务商提供的 S3 兼容端点。",
+            "Enter the S3-compatible endpoint provided by your service."),
       };
   @override
   void initState() {
@@ -139,9 +136,8 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
       }
       return true;
     } catch (_) {
-      setState(() => message = tr(
-          '请检查 Endpoint（不含桶名和路径）、桶名、区域及目录。HTTP 需明确开启；目录不能包含空段、. 或 ..。',
-          'Check the service endpoint (no bucket/path), bucket, region and prefix. HTTP requires opt-in; empty, dot and parent path segments are not allowed.'));
+      setState(() => message = tr("请检查端点、桶名、区域和同步目录。",
+          "Check the endpoint, bucket, region and sync folder."));
       return false;
     }
   }
@@ -172,8 +168,11 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
                   enableSuggestions: !secret,
                   decoration: InputDecoration(
                       labelText: label,
-                      helperText: helper,
-                      helperMaxLines: 5,
+                      helper: (helper) == null
+                          ? null
+                          : SettingHelpTitle(
+                              title: ModuStrings.text(context, "说明", "Help"),
+                              description: helper),
                       border: const OutlineInputBorder()),
                   validator: (value) =>
                       !optional && (value?.trim().isEmpty ?? true)
@@ -211,9 +210,11 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
                   child: Form(
                       key: _form,
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Text(tr(
-                            '填写已创建的私有桶和限定权限的访问密钥，不会自动创建或清空桶。测试仅在同步目录内创建、读回并删除随机测试文件。',
-                            'Use an existing private bucket and a scoped access key. No bucket is created or cleared. Testing creates, reads and removes only a random probe inside the sync prefix.')),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "连接步骤", "Connection steps")),
+                            description: Text(tr("填写桶名和访问密钥后，点击“测试连接”。",
+                                "Enter the bucket name and access keys, then test the connection."))),
                         choice('provider', tr('服务商预设', 'Provider preset'),
                             provider, {
                           for (final preset in S3Preset.values)
@@ -240,14 +241,15 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
                           }
                           credentialRevision++;
                         }),
-                        Text(_providerHelp),
+                        SettingHelp(
+                            title: Text(tr("端点填写", "Endpoint")),
+                            description: Text(_providerHelp)),
                         field(
                             'endpoint',
                             tr('服务端点 Endpoint（HTTPS）',
                                 'Service endpoint (HTTPS)'),
-                            helper: tr(
-                                '预设为示例，请按实际区域修改。不填写控制台地址、桶名或对象路径；已绑定桶的自定义域名请在高级设置中选择。',
-                                'Presets are examples; use your actual region. Exclude console URLs, bucket names and object paths. Select custom-domain addressing below for bucket-bound domains.')),
+                            helper: tr("按实际区域填写端点，桶名在下方单独填写。",
+                                "Enter the endpoint for your region. Enter the bucket name separately below.")),
                         field(
                             'region',
                             tr('区域 Region（按服务商要求填写）',
@@ -273,9 +275,6 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
                                 ? 'SecretKey'
                                 : 'Secret Access Key',
                             secret: true),
-                        Text(tr(
-                            '连接密钥仅保存在本机，不随“同步服务配置、API Key 和密码”开关上传。切换服务商会清空表单中的桶和密钥；取消不影响已保存的配置。',
-                            'Connection keys stay on this device and are excluded from encrypted service-settings sync. Changing provider clears the bucket and credentials in this form; Cancel keeps saved settings.')),
                         ExpansionTile(
                           key: const ValueKey('s3-advanced'),
                           title: Text(tr('高级设置', 'Advanced settings')),
@@ -328,9 +327,12 @@ class _S3SettingsDialogState extends State<S3SettingsDialog> {
                                     : (v) => setState(() => insecure = v)),
                           ],
                         ),
-                        Text(tr(
-                            '各设备需使用相同桶和前缀。切换后不会搬运旧云端的书籍，云端专有书请先下载。使用不可变同步记录，避免直接覆盖共享数据库；不与 ReadAny / Readest 的数据库格式互通。单文件暂限 5 GiB。',
-                            'Use the same bucket and prefix on every device. Switching does not migrate remote-only books; download them first. Immutable sync records avoid replacing a shared database. ReadAny / Readest database formats are not interchangeable. Single files are limited to 5 GiB.')),
+                        SettingHelp(
+                            title: Text(ModuStrings.text(
+                                context, "同步目录", "Sync folder")),
+                            description: Text(tr(
+                                "各设备使用相同的桶和目录。切换前请下载只保存在云端的书籍。",
+                                "Use the same bucket and folder on each device. Download cloud-only books before switching."))),
                         if (busy)
                           const Padding(
                               padding: EdgeInsets.all(12),

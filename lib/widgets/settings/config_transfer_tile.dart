@@ -145,8 +145,8 @@ class ConfigTransferTile extends AbstractSettingsTile {
                 ] else ...[
                   Text(
                     qrError ??
-                        ModuStrings.text(context, '当前平台暂不支持二维码，请复制配置代码。',
-                            'QR export is unavailable on this platform. Copy the code instead.'),
+                        ModuStrings.text(context, '请复制下方配置代码。',
+                            'Copy the configuration code below.'),
                     style:
                         TextStyle(color: Theme.of(context).colorScheme.error),
                   ),

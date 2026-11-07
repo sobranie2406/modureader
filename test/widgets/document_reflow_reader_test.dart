@@ -1798,7 +1798,7 @@ void main() {
           recognize: content);
       expect(pages, isEmpty);
       expect(find.text('2 / 3'), findsOneWidget);
-      expect(find.textContaining('Could not reflow'), findsOneWidget);
+      expect(find.textContaining('Reflow failed'), findsOneWidget);
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
       expect(requested, [1, 1]);

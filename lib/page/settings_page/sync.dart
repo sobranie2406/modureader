@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:convert';
@@ -119,10 +120,13 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                       : null,
                 ),
                 const SizedBox(height: 8),
-                Text(ModuStrings.text(
-                    context,
-                    '两种服务的连接配置分别保留。升级后沿用原 WebDAV 设置；切换前请关闭同步并等待传输结束，不会自动搬运云端文件。下方同步选项为两种服务共用。',
-                    'Connection settings are kept separately. Existing WebDAV settings survive upgrades. Turn sync off and wait for transfers before switching; cloud files are not migrated. Sync options below are shared by both backends.')),
+                SettingHelp(
+                    title: Text(
+                        ModuStrings.text(context, "切换服务", "Switch services")),
+                    description: Text(ModuStrings.text(
+                        context,
+                        "切换同步服务前，请关闭同步并等待传输结束。",
+                        "Turn off sync and wait for transfers to finish before switching services."))),
               ],
             ),
           ),
@@ -138,14 +142,12 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                     : L10n.of(context).settingsSyncWebdav),
                 leading: const Icon(Icons.cloud),
                 description: s3
-                    ? Text(ModuStrings.text(
-                        context,
-                        '同步书籍、封面、阅读记录及已启用的加密设置。使用独立不可变记录，上传后读回校验，不直接覆盖共享数据库。各设备使用相同的桶和同步前缀。',
-                        'Sync books, covers, reading records and opted-in encrypted settings through immutable records with read-back verification. All devices must use the same bucket and prefix.'))
+                    ? Text(ModuStrings.text(context, "各设备填写相同的桶和同步目录。",
+                        "Use the same bucket and sync folder on each device."))
                     : Text(ModuStrings.text(
                         context,
-                        '同步目录：modu。按稳定标识合并书籍、笔记、书签，阅读位置取最近一次操作，阅读时长按记录去重，删除标记防止旧内容复活。字体不参与同步。可靠 ETag 模式：隔离探测确认条件写入可靠后，以 database8.db 为主，合并已有日志，条件写入并读回验证后清理已覆盖日志。不可靠 ETag 兼容模式：使用 record-log-v1 独立记录文件；累计达到 64 个批次后自动合并，上传并读回验证后清理已覆盖的旧文件，不覆盖共享数据库。两种模式都保留删除标记，不删除书籍、封面或旧 database7.db。请先备份并更新所有设备，再恢复同步。旧版每日累计时长按同书同日较大值迁移。',
-                        'Sync folder: modu. Records merge by stable identity, reading positions use the latest operation, and reading sessions are deduplicated. Fonts stay local. Reliable ETag mode: isolated probes verify conditional writes; database8.db is the primary archive, and covered logs are removed only after a conditional update and read-back verification. Compatibility mode: immutable record-log-v1 batches are compacted at 64 batches; covered inputs are removed only after uploading and verifying their replacement, without overwriting the shared database. Both modes retain tombstones and leave books, covers and legacy database7.db untouched. Back up and update all devices before syncing. Legacy daily totals use the larger value per book/day.')),
+                        "各设备连接同一同步目录，即可同步书籍、笔记和阅读进度。",
+                        "Connect each device to the same folder to sync books, notes and reading progress.")),
                 value: Text(
                     Prefs().getSyncInfo(protocol)[s3 ? 'bucket' : 'url'] ??
                         ModuStrings.text(context, '未设置', 'Not configured')),
@@ -184,12 +186,12 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                 }),
             SettingsTile.switchTile(
                 key: const ValueKey('sync-preview-before-sync'),
-                title: Text(ModuStrings.text(context, '同步前预览并确认',
-                    'Preview and confirm before sync')),
+                title: Text(ModuStrings.text(
+                    context, '同步前预览并确认', 'Preview and confirm before sync')),
                 description: Text(ModuStrings.text(
                     context,
-                    '手动同步前显示本机与云端的时间戳、书籍数量变动、阅读进度与笔记变化；取消则不合并或上传书库数据。开启后自动同步暂停，所有合并都需要确认。默认关闭。',
-                    'Shows local and cloud timestamps, book and reading-data changes before a manual sync; cancelling does not merge or upload library data. While enabled automatic sync stays paused so every merge is confirmed. Off by default.')),
+                    "同步前预览变化并确认。开启后改为手动同步。",
+                    "Review changes before syncing. Enabling this switches to manual sync.")),
                 leading: const Icon(Icons.fact_check_outlined),
                 initialValue: Prefs().syncPreviewBeforeSync,
                 enabled: Prefs().webdavStatus,
@@ -215,10 +217,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             SettingsTile.switchTile(
                 title: Text(ModuStrings.text(
                     context, '同步成功提示', 'Sync success notification')),
-                description: Text(ModuStrings.text(
-                    context,
-                    '仅在同步成功时提示；失败始终显示原因。同步过程中不弹出提示。',
-                    'Notify on success only; failures always show a reason. No in-progress notifications.')),
+                description: Text(ModuStrings.text(context, "同步成功后显示提示。",
+                    "Show a message after a successful sync.")),
                 leading: const Icon(Icons.notifications),
                 initialValue: Prefs().syncCompletedToast,
                 onToggle: (bool value) {
@@ -232,10 +232,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
                         isJianguoyunWebdav(
                             Prefs().getSyncInfo(SyncProtocol.webdav)['url'] ??
                                 '')
-                    ? Text(ModuStrings.text(
-                        context,
-                        '已识别坚果云：自动同步至少间隔 10 分钟，期间改动合并同步。本机同账号每滚动 30 分钟最多发出 480 次请求，预算和服务器冷却在重启后保留。“立即同步”只跳过自动同步间隔，不跳过请求预算或冷却。其他设备和应用仍可能占用服务端额度。',
-                        'Jianguoyun detected: automatic syncs are at least 10 minutes apart and changes are batched. This device allows up to 480 requests per account in a rolling 30-minute window. The budget and server cooldown survive restarts. Sync now bypasses only the automatic interval, not the budget or cooldown. Other devices and apps may still use the server quota.'))
+                    ? Text(ModuStrings.text(context, "坚果云自动同步间隔至少为 10 分钟。",
+                        "Automatic sync with Nutstore runs at least 10 minutes apart."))
                     : null,
                 leading: const Icon(Icons.sync),
                 initialValue: Prefs().autoSync,
@@ -261,17 +259,13 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
             SettingsTile.switchTile(
               title: Text(ModuStrings.text(context, '同步服务配置、API Key 和密码',
                   'Sync service settings, API keys and passwords')),
-              descriptionAsHelp: false,
+              descriptionAsHelp: true,
               description: Text(
                 Prefs().syncAiSettingsToWebdav
-                    ? ModuStrings.text(
-                        context,
-                        '已开启：AI、翻译、向量、在线语音、微信读书 API Key 及远程书库配置（含密钥和书库密码）加密后随当前云端服务同步。不包含 WebDAV / 对象存储的连接凭据。',
-                        'Enabled: AI, translation, vector, online speech, WeRead API Key and remote library settings (including keys and library passwords) are encrypted and synced through the selected cloud service. WebDAV / object-storage connection credentials are excluded.')
-                    : ModuStrings.text(
-                        context,
-                        '默认关闭。开启需设置独立同步加密密码并确认风险；此密码不是 WebDAV 密码或对象存储密钥。两种同步方式共用此开关。',
-                        'Off by default. Requires a separate sync encryption password and risk confirmation, not your WebDAV password or object-storage key. This switch is shared by both backends.'),
+                    ? ModuStrings.text(context, "服务配置和 API Key 已开启加密同步。",
+                        "Service settings and API keys are synced with encryption.")
+                    : ModuStrings.text(context, "设置独立密码后，可加密同步服务配置和 API Key。",
+                        "Set a separate password to sync service settings and API keys with encryption."),
               ),
               leading: const Icon(Icons.key_outlined),
               initialValue: Prefs().syncAiSettingsToWebdav,
@@ -281,7 +275,7 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
               SettingsTile.navigation(
                 title: Text(ModuStrings.text(
                     context, '修改同步加密密码', 'Change sync encryption password')),
-                descriptionAsHelp: false,
+                descriptionAsHelp: true,
                 description: Text(ModuStrings.text(
                     context,
                     '其他设备必须输入相同密码。密码无法找回。',
@@ -502,10 +496,8 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
           builder: (context) => AlertDialog(
                 title: Text(ModuStrings.text(
                     context, '数据库备份导入', 'Import database backup')),
-                content: Text(ModuStrings.text(
-                    context,
-                    '恢复会替换现有书库、笔记和备份中的设置。程序会先校验备份并保留旧目录的恢复副本。是否继续？',
-                    'Restoring replaces your library, notes and backed-up settings. The backup is validated first, and a recovery copy of the old directory is kept. Continue?')),
+                content: Text(ModuStrings.text(context, "恢复备份将替换当前书库、笔记和设置。继续？",
+                    "Restoring this backup replaces your library, notes and settings. Continue?")),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -636,22 +628,21 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
               if (widget.exporting)
                 CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(ModuStrings.text(
-                        context,
-                        '包含服务配置、API Key 和密码（加密）',
-                        'Include service settings, API keys and passwords (encrypted)')),
-                    subtitle: Text(ModuStrings.text(
-                        context,
-                        '默认不导出 AI、翻译、语音、向量、WebDAV、对象存储和远程书库的配置与凭据。勾选后包含密码、API Key 和对象存储密钥并加密设置。书籍、笔记和一般设置仍会导出。',
-                        'AI, translation, speech, vector, WebDAV, object storage and remote library settings and credentials are excluded by default. Enable this to include passwords, API keys and object-storage keys in encrypted settings. Books, notes and general settings are always exported.')),
+                    title: SettingHelp(
+                        title: Text(ModuStrings.text(
+                            context,
+                            '包含服务配置、API Key 和密码（加密）',
+                            'Include service settings, API keys and passwords (encrypted)')),
+                        description: Text(ModuStrings.text(
+                            context,
+                            "将账号、密码和 API Key 加密保存到备份。",
+                            "Include encrypted accounts, passwords and API keys in the backup."))),
                     value: _include,
                     onChanged: (value) =>
                         setState(() => _include = value ?? false)),
               if (!widget.exporting || _include) ...[
-                Text(ModuStrings.text(
-                    context,
-                    '设置使用 AES-256-GCM 加密；书籍、笔记和 AI 对话历史不加密。请使用独立强密码，遗失密码无法恢复密钥。密码不会写入备份。',
-                    'Settings use AES-256-GCM encryption; books, notes and AI chat history are not encrypted. Use a unique strong password. Keys cannot be recovered if the password is lost. The password is not stored in the backup.')),
+                Text(ModuStrings.text(context, "请记住此密码，恢复加密设置时需要使用。",
+                    "Keep this password. You will need it to restore encrypted settings.")),
                 SyncSecretField(
                     controller: _password,
                     label: ModuStrings.text(context, '备份密码', 'Backup password'),
@@ -752,23 +743,19 @@ class _AiSyncPasswordDialogState extends State<_AiSyncPasswordDialog> {
           children: [
             if (widget.confirmRisk) ...[
               Text(
-                ModuStrings.text(
-                    context,
-                    '开启后，AI、翻译、向量、在线语音服务的配置及 API Key、微信读书 API Key，以及远程书库配置和密码，会使用 AES-256-GCM 加密并随当前云端服务同步。不包含 WebDAV / 对象存储连接凭据。此开关及加密密码为两种同步方式共用。',
-                    'AI, translation, vector, online speech, WeRead API Key and remote library settings, API keys and library passwords are encrypted with AES-256-GCM and synced through the selected cloud service. WebDAV / object-storage credentials are excluded. Both backends share this switch and encryption password.'),
+                ModuStrings.text(context, "使用独立密码，加密同步服务配置、密码和 API Key。",
+                    "Use a separate password to encrypt synced service settings, passwords and API keys."),
               ),
               const SizedBox(height: 10),
               Text(
-                ModuStrings.text(
-                    context,
-                    '风险：加密不能代替可信的云端服务。弱密码可能被猜出；任何得到同步数据和正确密码的人都能读取密钥。请使用独立强密码，不要复用服务商登录密码或访问密钥，并妥善保管。',
-                    'Risk: encryption does not replace a trusted cloud service. Anyone with the synced data and correct password can read the keys. Use and protect a strong, unique password, not your provider login password or access key.'),
+                ModuStrings.text(context, "请妥善保管密码，其他设备需输入相同密码。",
+                    "Keep your password safe. Enter the same password on your other devices."),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
               const SizedBox(height: 14),
             ] else ...[
-              Text(ModuStrings.text(context, '修改后，其他设备也必须改用新密码。旧密码无法恢复新上传的数据。',
-                  'After changing it, other devices must use the new password. The old password cannot decrypt newly uploaded data.')),
+              Text(ModuStrings.text(context, "修改后，请在其他设备更新密码。",
+                  "Update the password on your other devices after changing it.")),
               const SizedBox(height: 14),
             ],
             SyncSecretField(
@@ -892,10 +879,8 @@ Future<void> showWebdavDialog(BuildContext context) async {
           ? SyncSecretField(
               controller: controller,
               label: labelText,
-              helperText: ModuStrings.text(
-                  context,
-                  '坚果云请填写应用密码，不是登录密码。连接凭据仅保存在本机。',
-                  'For Jianguoyun use an app password, not your login password. Connection credentials stay on this device.'),
+              helperText: ModuStrings.text(context, '坚果云请填写应用密码。',
+                  'For Nutstore, enter an app password.'),
             )
           : TextField(
               autocorrect: false,

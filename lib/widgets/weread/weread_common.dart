@@ -11,8 +11,8 @@ String wereadError(BuildContext context, Object error) {
         'WeRead requires a client update. Requests stopped.'),
     'invalidQuery' => ModuStrings.text(context, '请输入书名或作者（不超过 500 字）。',
         'Enter a title or author (up to 500 characters).'),
-    _ => ModuStrings.text(context, '微信读书资料暂不可用，已保留原资料，不影响本地阅读。',
-        'WeRead data is unavailable. Saved data and local reading are unaffected.'),
+    _ => ModuStrings.text(context, "微信读书资料暂不可用，请稍后重试。",
+        "WeRead information is unavailable. Try again later."),
   };
 }
 

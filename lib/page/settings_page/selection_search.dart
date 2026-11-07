@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -83,10 +84,8 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(ModuStrings.text(
-                      context,
-                      '选词搜索将在默读内打开。选择默认引擎，也可以在搜索窗口中随时切换。关键词会发送给所选网站，网站可用性取决于网络。',
-                      'Selection search opens inside Modu. Choose a default or switch in the search window. The selected website receives your query; availability depends on your network.')),
+                  Text(ModuStrings.text(context, "选择默认搜索引擎，也可在搜索窗口中切换。",
+                      "Choose a default search engine, or switch engines in the search window.")),
                   const SizedBox(height: 16),
                   for (final engine in config.engines)
                     ListTile(
@@ -123,10 +122,13 @@ class _SelectionSearchSettingsState extends State<SelectionSearchSettings> {
                       label: Text(ModuStrings.text(
                           context, '添加自定义搜索引擎', 'Add custom search engine'))),
                   const SizedBox(height: 12),
-                  Text(ModuStrings.text(
-                      context,
-                      '可添加最多 20 个自定义引擎。使用 {query} 表示选中的文字，例如 https://www.baidu.com/s?wd={query}。配置可随全局设置导出。',
-                      'Add up to 20 engines. Use {query} for selected text, e.g. https://www.baidu.com/s?wd={query}. These settings are included in global settings exports.')),
+                  SettingHelp(
+                      title:
+                          Text(ModuStrings.text(context, "网址格式", "URL format")),
+                      description: Text(ModuStrings.text(
+                          context,
+                          "网址中用 {query} 表示选中文字，例如 https://www.baidu.com/s?wd={query}。",
+                          "Use {query} for selected text in the URL, for example https://www.baidu.com/s?wd={query}."))),
                   if (_error != null)
                     Text(_error!,
                         style: TextStyle(

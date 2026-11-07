@@ -1,3 +1,5 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/service/config/config_item.dart';
 import 'package:flutter/material.dart';
@@ -119,7 +121,11 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
         return TextField(
           decoration: InputDecoration(
             labelText: item.label,
-            helperText: item.description,
+            helper: (item.description) == null
+                ? null
+                : SettingHelpTitle(
+                    title: ModuStrings.text(context, "说明", "Help"),
+                    description: (item.description)!),
             border: const OutlineInputBorder(),
           ),
           controller: _controllers[item.key],
@@ -136,7 +142,11 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
           obscureText: !isVisible,
           decoration: InputDecoration(
             labelText: item.label,
-            helperText: item.description,
+            helper: (item.description) == null
+                ? null
+                : SettingHelpTitle(
+                    title: ModuStrings.text(context, "说明", "Help"),
+                    description: (item.description)!),
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: Icon(
@@ -153,7 +163,11 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
         return TextField(
           decoration: InputDecoration(
             labelText: item.label,
-            helperText: item.description,
+            helper: (item.description) == null
+                ? null
+                : SettingHelpTitle(
+                    title: ModuStrings.text(context, "说明", "Help"),
+                    description: (item.description)!),
             border: const OutlineInputBorder(),
           ),
           keyboardType: TextInputType.number,
@@ -196,13 +210,9 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
             if (item.description != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  item.description!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                child: SettingHelpTitle(
+                    title: ModuStrings.text(context, '说明', 'Help'),
+                    description: item.description!),
               ),
             Slider(
               value: currentValue.clamp(min, max),
@@ -219,8 +229,10 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
 
       case ConfigItemType.toggle:
         return SwitchListTile(
-          title: Text(item.label),
-          subtitle: item.description != null ? Text(item.description!) : null,
+          title: item.description == null
+              ? Text(item.label)
+              : SettingHelpTitle(
+                  title: item.label, description: item.description!),
           value: _currentConfig[item.key] ?? item.defaultValue ?? false,
           onChanged: (value) => _updateConfig(item.key, value),
         );
@@ -238,7 +250,11 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
         return DropdownButtonFormField<String>(
           decoration: InputDecoration(
             labelText: item.label,
-            helperText: item.description,
+            helper: (item.description) == null
+                ? null
+                : SettingHelpTitle(
+                    title: ModuStrings.text(context, "说明", "Help"),
+                    description: (item.description)!),
             border: const OutlineInputBorder(),
           ),
           initialValue: currentValue,
@@ -278,7 +294,9 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
                 if (item.description != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(item.description!),
+                    child: SettingHelpTitle(
+                        title: ModuStrings.text(context, "说明", "Help"),
+                        description: item.description!),
                   ),
                 ...item.options!.map((option) {
                   return RadioListTile<dynamic>(
@@ -291,8 +309,10 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
 
       case ConfigItemType.checkbox:
         return CheckboxListTile(
-          title: Text(item.label),
-          subtitle: item.description != null ? Text(item.description!) : null,
+          title: item.description == null
+              ? Text(item.label)
+              : SettingHelpTitle(
+                  title: item.label, description: item.description!),
           value: _currentConfig[item.key] ?? item.defaultValue ?? false,
           onChanged: (value) {
             if (value != null) {
@@ -307,19 +327,9 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.defaultValue?.toString() ?? '',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
+              SettingHelpTitle(
+                  title: item.label,
+                  description: item.defaultValue?.toString() ?? ''),
               if (item.link != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 28.0, top: 4.0),

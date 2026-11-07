@@ -14,7 +14,7 @@ Future<List<File>?> pickOfflineModelFiles(
     builder: (context) => AlertDialog(
       title: Text(t('离线导入 · $model', 'Offline import · $model')),
       content: Text(
-          '$instructions\n\n${t('请同时选择全部完整文件（非压缩包或下载分片）。仅接受与本应用下载版本完全一致的文件，按大小和 SHA-256 校验；无需联网。导入不改变当前模型选择。', 'Select all complete files together (not archives or download parts). Only the exact downloadable version is accepted, verified by size and SHA-256, without network access. Import does not change the selected model.')}'),
+          '$instructions\n\n${t("同时选择所选型号的全部模型文件。", "Select all files for the chosen model.")}'),
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(context, false),

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
 import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
@@ -117,10 +118,7 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
             onChanged: (value) {
               if (value != null) _change('voice', value);
             },
-          )
-        else
-          Text(ModuStrings.text(context, '此模式通过描述设计声音，不使用预置音色。切回时保留原音色选择。',
-              'Design a voice with text. The preset voice is retained for switching back, but is not sent in this mode.')),
+          ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           key: ValueKey('mimo-template-$design-$selected'),
@@ -129,9 +127,6 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
           decoration: InputDecoration(
             labelText:
                 ModuStrings.text(context, '描述预设', 'Description template'),
-            helperText: ModuStrings.text(context, '默读提供的可编辑模板；选择后替换下方描述。',
-                'Editable Modu templates. Selecting one replaces the description below.'),
-            helperMaxLines: 3,
           ),
           items: [
             DropdownMenuItem(
@@ -165,14 +160,6 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
                     context, '音色描述（必填）', 'Voice description (required)')
                 : ModuStrings.text(
                     context, '语音描述 / 朗读风格（可选）', 'Speech style (optional)'),
-            helperText: design
-                ? ModuStrings.text(
-                    context,
-                    '建议 1–4 句，描述性别、年龄感、音色、语气和节奏，避免相互矛盾。',
-                    'Use 1–4 sentences about gender, age, timbre, tone and pace. Avoid conflicting descriptions.')
-                : ModuStrings.text(context, '描述语气、情绪和节奏；留空使用音色默认风格。',
-                    'Describe tone, emotion and pace, or leave empty for the default style.'),
-            helperMaxLines: 4,
             errorText: design && _prompt.trim().isEmpty
                 ? ModuStrings.text(context, '请填写描述或选择一个预设',
                     'Enter a description or select a template')
@@ -181,8 +168,8 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
           onChanged: (value) => _change('stylePrompt', value),
         ),
         const SizedBox(height: 12),
-        Text(ModuStrings.text(context, '常用提示词（点击追加，可继续编辑）',
-            'Prompt suggestions (tap to append, then edit)')),
+        Text(ModuStrings.text(
+            context, '常用提示词', 'Prompt suggestions (tap to append, then edit)')),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -205,14 +192,12 @@ class _MimoVoiceSettingsState extends State<MimoVoiceSettings> {
           ],
         ),
         const SizedBox(height: 8),
-        Text(ModuStrings.text(
-            context,
-            '同一自然段内相邻句合成，高亮和前后跳转按小段，长段自动拆分。自动附加匀速听书要求，不改写已保存的描述；实际音色与节奏仍取决于模型。',
-            'Adjacent sentences in one paragraph are synthesized together. Highlighting and navigation follow each passage; long paragraphs are split. Steady narration instructions are added without changing your saved description. Voice and timing still depend on the model.')),
-        Text(ModuStrings.text(
-            context,
-            '描述不会作为正文朗读。语速在本地按 0.1 档调节播放倍速（0.1–4.0 倍，也可直接输入），立即生效，无需重新生成语音。1 倍是接口返回音频的原始速度；描述中的快慢节奏仍可能影响原始音频。音高仍由提示词控制，本地音调范围 0.5–2.0 倍。修改描述后点击“保存设置”生效。',
-            'Descriptions are instructions, not spoken text. Playback rate is adjusted locally in 0.1 steps (0.1–4.0×, or typed directly) and applies immediately without regenerating speech. 1× is the original generated speed; timing instructions can still affect that audio. Pitch remains prompt-controlled; the local pitch range is 0.5–2.0×. Save settings to apply description changes.')),
+        SettingHelp(
+            title: Text(ModuStrings.text(context, "声音设置", "Voice settings")),
+            description: Text(ModuStrings.text(
+                context,
+                "修改描述后点击“保存设置”。朗读时可直接调整语速和音调。",
+                "Save your description, then adjust rate and pitch during narration."))),
       ],
     );
   }

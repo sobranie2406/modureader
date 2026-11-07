@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -143,10 +144,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
         builder: (context) => AlertDialog(
                 title: Text(ModuStrings.text(
                     context, '恢复默认工具栏？', 'Restore default toolbar?')),
-                content: Text(ModuStrings.text(
-                    context,
-                    '恢复内置按钮、预设模板和颜色；预设 AI 模板默认关闭，自建 AI 命令保留。',
-                    'Reset built-in actions, templates and colours. AI templates start disabled; your own commands are kept.')),
+                content: Text(ModuStrings.text(context, "恢复内置按钮和颜色，保留自建 AI 命令？",
+                    "Reset built-in buttons and colors while keeping custom AI commands?")),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -301,10 +300,13 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(ModuStrings.text(
-                              context,
-                              '自定义划词菜单的按钮显示和顺序。长按卡片或拖动左侧手柄排序，点击编辑图标调整参数。',
-                              'Choose which selection actions appear and in what order. Hold a card or drag its handle; edit parameters using the pencil.')),
+                          SettingHelp(
+                              title: Text(ModuStrings.text(
+                                  context, "排列按钮", "Arrange actions")),
+                              description: Text(ModuStrings.text(
+                                  context,
+                                  "拖动手柄排序，点击编辑按钮调整。",
+                                  "Drag the handles to reorder. Tap Edit to change an action."))),
                           const SizedBox(height: 12),
                           SwitchListTile(
                               key: const ValueKey('selection-toolbar-enabled'),
@@ -361,8 +363,8 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                                   'Visible action count')),
                               subtitle: Text(ModuStrings.text(
                                   context,
-                                  '其余已启用按钮放入“更多”，小屏幕会自动减少直接显示数量。',
-                                  'Remaining enabled actions appear under More. Smaller screens fit fewer buttons.')),
+                                  "放不下的按钮收进“更多”。",
+                                  "Extra buttons appear in More.")),
                               trailing: DropdownButton<int>(
                                   key: const ValueKey(
                                       'selection-toolbar-visible-count'),
@@ -417,10 +419,6 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                 child: SettingsSectionTitle(
                     child: Text(ModuStrings.text(
                         context, '批注工具', 'Annotation tools')))),
-            _section(Text(
-                ModuStrings.text(context, '单独控制批注栏的按钮和顺序，不影响已有笔记。',
-                    'Configure the annotation row without changing existing notes.'),
-                style: Theme.of(context).textTheme.bodySmall)),
             _list(config.annotations, true),
             SliverToBoxAdapter(
                 child: SettingsSectionTitle(
@@ -430,8 +428,10 @@ class _SelectionToolbarSettingsState extends State<SelectionToolbarSettings> {
                 config.items.where((i) => !primaryIds.contains(i.id)).toList(),
                 false,
                 optional: true),
-            _section(Text(ModuStrings.value(Localizations.localeOf(context),
-                'selection_ai_help', 'AI 模板默认关闭，可分别选择内容范围和联网搜索，用户改动随全局设置备份。'))),
+            _section(SettingHelpTitle(
+                title: ModuStrings.text(context, 'AI 模板', 'AI templates'),
+                description: ModuStrings.value(Localizations.localeOf(context),
+                    'selection_ai_help', '启用模板后，可设置内容范围和联网搜索。'))),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         );
@@ -582,14 +582,11 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                         onChanged: (_) => setState(() => _textEdited = true),
                         maxLength: 30,
                         decoration: InputDecoration(
-                            labelText: ModuStrings.text(context, '名称', 'Name'),
-                            hintText: widget.item == null
-                                ? null
-                                : selectionToolbarLabel(context, widget.item!),
-                            helperText: widget.item?.isCustom == false
-                                ? ModuStrings.text(context, '留空使用默认名称',
-                                    'Leave blank for the default name')
-                                : null)),
+                          labelText: ModuStrings.text(context, '名称', 'Name'),
+                          hintText: widget.item == null
+                              ? null
+                              : selectionToolbarLabel(context, widget.item!),
+                        )),
                     const SizedBox(height: 12),
                     Text(ModuStrings.text(context, '图标', 'Icon')),
                     Wrap(spacing: 4, children: [
@@ -666,33 +663,42 @@ class _ToolbarItemEditorState extends State<_ToolbarItemEditor> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                          key: const ValueKey('toolbar-prompt'),
-                          controller: _prompt,
-                          onChanged: (_) => setState(() => _textEdited = true),
-                          minLines: 5,
-                          maxLines: 12,
-                          maxLength: 8000,
-                          decoration: InputDecoration(
-                              labelText:
-                                  ModuStrings.text(context, '提示词', 'Prompt'),
-                              border: const OutlineInputBorder(),
-                              helperText: ModuStrings.text(
-                                  context,
-                                  '用 {selection} 引用选中文字；没有占位符也会附上原文。',
-                                  'Use {selection} for selected text. Text is also included without a placeholder.'))),
+                      Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                                key: const ValueKey('toolbar-prompt'),
+                                controller: _prompt,
+                                onChanged: (_) =>
+                                    setState(() => _textEdited = true),
+                                minLines: 5,
+                                maxLines: 12,
+                                maxLength: 8000,
+                                decoration: InputDecoration(
+                                  labelText: ModuStrings.text(
+                                      context, '提示词', 'Prompt'),
+                                  border: const OutlineInputBorder(),
+                                )),
+                            SettingHelpTitle(
+                                title: ModuStrings.text(context, "说明", "Help"),
+                                description: ModuStrings.text(
+                                    context,
+                                    '用 {selection} 引用选中文字；没有占位符也会附上原文。',
+                                    'Use {selection} for selected text. Text is also included without a placeholder.'))
+                          ]),
                       CheckboxListTile(
                         key: const ValueKey('toolbar-ai-web-search'),
                         contentPadding: EdgeInsets.zero,
                         value: _webSearch,
-                        title: Text(ModuStrings.value(
-                            Localizations.localeOf(context),
-                            'selection_ai_web_search',
-                            '联网搜索')),
-                        subtitle: Text(ModuStrings.value(
-                            Localizations.localeOf(context),
-                            'selection_ai_web_search_help',
-                            '勾选后检索公开词典／百科并交给当前模型整理，附来源；无需额外 API Key。')),
+                        title: SettingHelpTitle(
+                            title: ModuStrings.value(
+                                Localizations.localeOf(context),
+                                'selection_ai_web_search',
+                                '联网搜索'),
+                            description: ModuStrings.value(
+                                Localizations.localeOf(context),
+                                'selection_ai_web_search_help',
+                                '查询词典和百科，由 AI 整理并附上来源。')),
                         onChanged: (value) {
                           setState(() => _webSearch = value!);
                           _saveOptions();

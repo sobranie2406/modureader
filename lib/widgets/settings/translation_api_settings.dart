@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/service/translate/index.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -105,9 +106,10 @@ class _TranslationApiSettingsState extends State<TranslationApiSettings> {
             field('baidu_appid', 'APP ID'),
             field('baidu_key', label('密钥', 'Secret key'), secret: true),
             const SizedBox(height: 8),
-            Text(label(
-                '在百度翻译开放平台开通「通用文本翻译」，填写该服务的 APP ID 和密钥（不是百度智能云 API Key）。按账户套餐计费／抵扣免费额度；应用按标准版速率逐段请求。',
-                'Enable General Text Translation on Baidu Translate and enter its APP ID and secret (not a Baidu AI Cloud API key). Your account quota and billing apply; requests are paced for the standard tier.')),
+            SettingHelp(
+                title: Text(ModuStrings.text(context, "获取密钥", "Get a key")),
+                description: Text(label("在百度翻译开放平台开通“通用文本翻译”，填写 APP ID 和密钥。",
+                    "Enable General Text Translation on Baidu Translate and enter its APP ID and secret key."))),
             TextButton(
                 onPressed: () => launchUrl(
                     Uri.parse('https://fanyi-api.baidu.com/doc_bd/21'),
@@ -123,9 +125,10 @@ class _TranslationApiSettingsState extends State<TranslationApiSettings> {
             field('microsoft_region',
                 label('资源区域（例如 eastasia）', 'Resource region (e.g. eastasia)')),
             const SizedBox(height: 8),
-            Text(label(
-                '在 Azure 创建 Translator 资源，在「密钥和终结点」复制密钥和区域。区域资源／多服务资源必须填对应区域；全局单服务资源可留空或填 global。使用官方全球文本翻译端点；免费额度取决于所选套餐，不会自动切换付费套餐。',
-                'Create an Azure Translator resource; copy its key and region from Keys and Endpoint. Regional/multi-service resources require their region; global single-service resources can leave it blank or use global. Uses the official global text endpoint. Free allowance depends on your tier; the app does not change your plan.')),
+            SettingHelp(
+                title: Text(ModuStrings.text(context, "获取密钥", "Get a key")),
+                description: Text(label("在 Azure 的 Translator 资源中复制密钥和区域。",
+                    "Copy the key and region from your Azure Translator resource."))),
             TextButton(
                 onPressed: () => launchUrl(
                     Uri.parse(

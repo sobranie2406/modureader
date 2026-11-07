@@ -85,8 +85,8 @@ class _ThemeColorsPageState extends State<ThemeColorsPage> {
   Future<void> _restoreDefault() async {
     if (!await confirmColorReset(
       context,
-      ModuStrings.text(context, '恢复默认主题颜色？其他外观设置不会改变。',
-          'Restore the default theme colour? Other appearance settings will not change.'),
+      ModuStrings.text(
+          context, '恢复默认主题颜色？', 'Restore the default theme colour?'),
     )) {
       return;
     }
@@ -97,8 +97,8 @@ class _ThemeColorsPageState extends State<ThemeColorsPage> {
   Future<void> _resetAllPresets() async {
     if (!await confirmColorReset(
       context,
-      ModuStrings.text(context, '把所有预设的自定义颜色恢复成出厂值？你自定义的主题不会删除。',
-          'Reset every preset colour to the factory values? Your custom themes are kept.'),
+      ModuStrings.text(
+          context, "恢复所有预设的默认颜色？", "Reset the colors of all presets?"),
     )) {
       return;
     }
@@ -250,8 +250,8 @@ class _ThemeColorsPageState extends State<ThemeColorsPage> {
                           context, '同时应用到阅读页', 'Also apply to the reader')),
                       description: Text(ModuStrings.text(
                           context,
-                          '切换主题时把阅读页的背景和正文颜色也换成这套配色；阅读页仍可在阅读设置里单独调整。',
-                          'Switching themes also recolours the reading page background and text. The reading page can still be adjusted separately.')),
+                          "阅读页随主题切换背景和文字颜色。",
+                          "Apply the theme’s background and text colors to reading.")),
                       initialValue: Prefs().themeAppliesToReader,
                       enabled: !Prefs().eInkMode,
                       onToggle: (value) async {

@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/service/translate/classical_translation.dart';
 import 'package:anx_reader/widgets/settings/translation_api_settings.dart';
 import 'package:anx_reader/utils/app_motion.dart';
@@ -169,8 +170,8 @@ class _TranslateSettingState extends State<LanguageTranslateSetting> {
 
   String _serviceDescription(TranslateService service) {
     if (service.isWebView) {
-      return ModuStrings.text(context, '官方网页翻译，无需 API Key；仅用于选词弹窗，全文翻译使用独立引擎。',
-          'Official translation page, no API key. Selection only; full-text translation uses a separate engine.');
+      return ModuStrings.text(context, "在划词窗口使用网页翻译。",
+          "Use web translation in the selection window.");
     }
     return switch (service) {
       TranslateService.microsoftFree =>
@@ -432,10 +433,12 @@ class _TranslateSettingState extends State<LanguageTranslateSetting> {
                           labelText: ModuStrings.text(
                               context, 'DeepL 请求地址', 'DeepL request URL'),
                           hintText: 'https://api-free.deepl.com/v2',
-                          helperText: ModuStrings.text(
-                              context,
-                              '支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址',
-                              'Supports official DeepL, a DeepLX base URL, or a full /translate URL'),
+                          helper: SettingHelpTitle(
+                              title: ModuStrings.text(context, "说明", "Help"),
+                              description: ModuStrings.text(
+                                  context,
+                                  '支持官方 DeepL、DeepLX 基础地址或完整 /translate 地址',
+                                  'Supports official DeepL, a DeepLX base URL, or a full /translate URL')),
                           border: const OutlineInputBorder(),
                         ),
                         onChanged: (_) => _saveDeepLConfig(),

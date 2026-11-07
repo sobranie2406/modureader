@@ -1,3 +1,5 @@
+import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -493,7 +495,9 @@ class _ChapterSplitRuleEditorPageState
               errorText: evaluation != null && !evaluation.isValid
                   ? evaluation.errorMessage ?? L10n.of(context).invalidPattern
                   : null,
-              helperText: L10n.of(context).dartStyleRegularExpression,
+              helper: SettingHelpTitle(
+                  title: ModuStrings.text(context, "说明", "Help"),
+                  description: L10n.of(context).dartStyleRegularExpression),
             ),
             maxLines: 3,
             minLines: 1,

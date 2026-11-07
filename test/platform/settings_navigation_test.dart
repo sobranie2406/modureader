@@ -162,6 +162,6 @@ void main() {
     expect(settings, isNot(contains('const CssSettings()')));
     expect(reading, contains("ValueKey('reading-css-settings')"));
     expect(reading, contains('sections: const CssSettings()'));
-    expect(guidance, contains('Settings → Reading → CSS settings'));
+    expect(guidance, contains('Settings → Reading → CSS'));
   });
 }

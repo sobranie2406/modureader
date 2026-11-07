@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import '../reader_menu_group.dart';
 import 'dart:io';
@@ -463,10 +464,13 @@ class _BgimgSelectorState extends ConsumerState<BgimgSelector> {
           if (Prefs().autoAdjustReadingTheme)
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(ModuStrings.text(
-                  context,
-                  '手动选择背景后将关闭跟随系统的阅读主题，可在更多设置中重新开启。',
-                  'Selecting a background turns off automatic reading themes. You can enable them again in More settings.')),
+              child: SettingHelp(
+                  title: Text(
+                      ModuStrings.text(context, "背景设置", "Background settings")),
+                  description: Text(ModuStrings.text(
+                      context,
+                      "已切换为手动背景，可在更多设置中恢复跟随系统。",
+                      "Switched to a manual background. Restore Follow system in More settings."))),
             ),
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.5,

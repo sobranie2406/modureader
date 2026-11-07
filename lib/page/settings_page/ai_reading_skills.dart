@@ -157,10 +157,8 @@ class _AiReadingSkillsSettingsState
               color: Colors.transparent,
               child: Column(
                 children: [
-                  _hint(ModuStrings.text(
-                      context,
-                      '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。',
-                      '这些提示词由自动回忆、翻译等内置功能使用，不会显示为阅读技能按钮。')),
+                  _hint(ModuStrings.text(context, "自动回忆、翻译等内置功能使用的提示词。",
+                      "Prompts used by built-in features such as recall and translation.")),
                   for (final item in _featurePrompts)
                     ListTile(
                       key: ValueKey('reading-feature-${item.prompt.name}'),

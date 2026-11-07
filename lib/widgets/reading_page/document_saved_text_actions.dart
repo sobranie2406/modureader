@@ -12,10 +12,8 @@ Future<bool> confirmDocumentRecognition(BuildContext context) async =>
         builder: (context) => AlertDialog(
               title: Text(ModuStrings.text(
                   context, '重新 OCR 本页？', 'Recognize this page again?')),
-              content: Text(ModuStrings.text(
-                  context,
-                  '成功后将替换本页已保存的识别文字和编辑结果，其他页不受影响。失败或取消会保留原结果；旧笔记及原图位置仍保留。',
-                  'Success replaces this page’s saved recognition and edits. Other pages are unchanged. Failure or cancellation keeps the current result; older notes and source positions are retained.')),
+              content: Text(ModuStrings.text(context, "替换本页已保存的识别文字和编辑结果？",
+                  "Replace this page’s saved recognized text and edits?")),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -52,8 +50,8 @@ Future<DocumentReflowPage?> editSavedDocumentPage(BuildContext context,
                 if (context.mounted) {
                   update(() {
                     saving = false;
-                    error = t('保存失败。请检查内容是否为空、存储空间或本页是否已更新；编辑内容仍保留在此处。',
-                        'Could not save. Check for empty text, storage space or a changed page. Your draft is still here.');
+                    error = t("保存失败，请检查内容和可用空间后重试。",
+                        "Could not save. Check the text and available space, then retry.");
                   });
                 }
               }
@@ -69,8 +67,6 @@ Future<DocumentReflowPage?> editSavedDocumentPage(BuildContext context,
                       width: 640,
                       height: MediaQuery.sizeOf(context).height * .55,
                       child: Column(children: [
-                        Text(t('只修改保存的文字，不改变 PDF 原文件。旧笔记保留原版本；改写的文字不强行匹配原图位置。',
-                            'Edits do not change the PDF. Old notes retain their version; rewritten text is not forcibly mapped to image positions.')),
                         const SizedBox(height: 12),
                         Expanded(
                             child: TextField(

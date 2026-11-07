@@ -62,12 +62,14 @@ class _TtsBufferSettingsSectionState extends State<TtsBufferSettingsSection> {
               CustomSettingsTile(
                   child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(widget.online
-                    ? tr(
-                        '缓冲量、合成字数、并发和段落停顿在停止后重新开始朗读时生效；暂停继续保持原设置。预合成可能产生额外用量，并发过高可能触发服务限流。',
-                        'Buffering, text limits, concurrency and paragraph pauses apply after stopping and restarting speech, not pause/resume. Prefetching may incur extra usage; high concurrency may trigger service limits.')
-                    : tr('系统 TTS 由设备语音引擎管理，不应用以下在线预合成设置。切换到在线朗读后可调整。',
-                        'System TTS is managed by the device engine. Switch to an online service to adjust these pre-synthesis settings.')),
+                child: SettingHelp(
+                    title: Text(
+                        ModuStrings.text(context, "缓冲设置", "Buffer settings")),
+                    description: Text(widget.online
+                        ? tr("修改后停止朗读，再重新开始即可生效。",
+                            "Stop and restart narration to apply these changes.")
+                        : tr("选择在线朗读服务后，可调整预合成设置。",
+                            "Select an online speech service to adjust pre-synthesis settings."))),
               )),
               _choice(
                   'ahead',
@@ -79,8 +81,8 @@ class _TtsBufferSettingsSectionState extends State<TtsBufferSettingsSection> {
               _choice(
                   'maxCharacters',
                   tr('单次合成字数上限', 'Maximum characters per request'),
-                  tr('按自然段和句子边界分段，长句安全拆分；这是上限，不强行凑满。',
-                      'Respects paragraphs and sentence boundaries; long sentences are split. This is a limit, not a target.'),
+                  tr("设置每段合成文字的字数上限。",
+                      "Set the maximum text length per synthesis request."),
                   settings.maxCharacters,
                   [100, 240, 400, 600, 1000, 1500, 2000]),
               _choice(
@@ -93,15 +95,14 @@ class _TtsBufferSettingsSectionState extends State<TtsBufferSettingsSection> {
               _choice(
                   'paragraphPauseMs',
                   tr('段落停顿（毫秒）', 'Paragraph pause (ms)'),
-                  tr('只在自然段末尾额外停顿，不在长段落的拆分处停顿。',
-                      'Extra pause at paragraph ends, not between chunks of a long paragraph.'),
+                  tr("设置自然段之间的停顿。", "Set the pause between paragraphs."),
                   settings.paragraphPauseMs,
                   [0, 100, 200, 300, 500, 1000, 2000, 3000]),
               _choice(
                   'cacheMinutes',
                   tr('音频缓存保留时间（分钟）', 'Audio cache retention (minutes)'),
-                  tr('立即生效。0：停止朗读时清理。仅内存缓存，上限 32 MiB；退出应用不保留。',
-                      'Applies immediately. 0 clears on stop. Memory only, up to 32 MiB; not retained after app exit.'),
+                  tr("设置音频缓存保留时长，0 表示停止朗读时清理。",
+                      "Set how long to keep cached audio. Use 0 to clear it when narration stops."),
                   settings.cacheMinutes,
                   [0, 5, 10, 30, 60, 120]),
               CustomSettingsTile(
@@ -111,8 +112,7 @@ class _TtsBufferSettingsSectionState extends State<TtsBufferSettingsSection> {
                         key: const ValueKey('tts-clear-cache'),
                         leading: const Icon(Icons.delete_outline),
                         title: Text(tr('清理音频缓存', 'Clear audio cache')),
-                        subtitle: Text(tr('可复用缓存 $size MiB；不打断当前朗读，已准备的播放队列保留。',
-                            '$size MiB reusable cache; current playback and prepared queue are retained.')),
+                        subtitle: Text(tr('缓存 $size MiB', '$size MiB cached')),
                         onTap: () {
                           OnlineTts.clearCachedAudio();
                           setState(() {});
