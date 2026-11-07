@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/enums/version_check_type.dart';
 import 'package:anx_reader/main.dart';
@@ -9,29 +11,31 @@ import 'package:anx_reader/utils/log/common.dart';
 class InitializationCheck {
   static String? _lastVersion;
   static String? _currentVersion;
+  static Future<void>? _checking;
+  static bool _showingUpdate = false;
 
   static Future<String> get lastVersion async {
-    if (_lastVersion == null) {
-      await _checkVersion();
-    }
-    return _lastVersion!;
+    if (_lastVersion == null) await _checkVersion();
+    return _lastVersion ?? _currentVersion!;
   }
 
   static Future<String> get currentVersion async {
-    if (_currentVersion == null) {
-      await _checkVersion();
-    }
+    if (_currentVersion == null) await _checkVersion();
     return _currentVersion!;
   }
 
-  static Future<void> check() async {
+  static Future<void> check() =>
+      _checking ??= _runCheck().whenComplete(() => _checking = null);
+
+  static Future<void> _runCheck() async {
+    if (_showingUpdate) return;
     final result = await _checkVersion();
     AnxLog.info('Version check result: $result');
     if (result == VersionCheckType.firstLaunch) {
-      Prefs().lastAppVersion = _currentVersion;
+      await Prefs().saveLastAppVersion(_currentVersion!);
       _handleNormalStartup();
     } else if (result == VersionCheckType.updated) {
-      _handleUpdateAvailable();
+      unawaited(_handleUpdateAvailable(_lastVersion!, _currentVersion!));
     } else {
       _handleNormalStartup();
     }
@@ -40,37 +44,39 @@ class InitializationCheck {
   static Future<VersionCheckType> _checkVersion() async {
     _lastVersion = Prefs().lastAppVersion;
     _currentVersion = await getAppVersion();
-    if (_lastVersion == null) {
-      return VersionCheckType.firstLaunch;
-    } else {
-      if (_lastVersion != _currentVersion) {
-        return VersionCheckType.updated;
-      } else {
-        return VersionCheckType.normal;
-      }
-    }
+    if (_lastVersion == null) return VersionCheckType.firstLaunch;
+    return _lastVersion != _currentVersion
+        ? VersionCheckType.updated
+        : VersionCheckType.normal;
   }
 
-  static Future<void> _handleUpdateAvailable() async {
-    final lv = await lastVersion;
-    final cv = await currentVersion;
-    AnxLog.info('Version update detected: $lv -> $cv');
-    Future.delayed(const Duration(milliseconds: 800), () {
-      showCupertinoSheet(
-        context: navigatorKey.currentContext!,
-        scrollableBuilder: (BuildContext context, ScrollController controller) {
-          Widget widgetBuilder(BuildContext context) => ChangelogScreen(
-                lastVersion: lv,
-                currentVersion: cv,
-                onComplete: () {
-                  Prefs().lastAppVersion = cv;
-                  Navigator.pop(context);
-                },
-              );
-          return widgetBuilder(context);
-        },
+  static Future<void> _handleUpdateAvailable(
+      String previous, String current) async {
+    _showingUpdate = true;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      final context = navigatorKey.currentContext;
+      if (context == null || !context.mounted) return;
+      final dismissed = showCupertinoSheet<void>(
+        context: context,
+        scrollableBuilder: (sheetContext, controller) => ChangelogScreen(
+          lastVersion: previous,
+          currentVersion: current,
+          onComplete: () => Navigator.pop(sheetContext),
+        ),
       );
-    });
+      // Back, swipe-to-dismiss and process exit must not show the same notes again.
+      try {
+        await Prefs().saveLastAppVersion(current);
+      } catch (_) {
+        AnxLog.warning('Could not persist the displayed release notes version');
+      }
+      await dismissed;
+    } catch (_) {
+      AnxLog.warning('Could not open release notes');
+    } finally {
+      _showingUpdate = false;
+    }
   }
 
   static void _handleNormalStartup() {

@@ -560,7 +560,6 @@ Future<void> _showChangelog(BuildContext context) async {
             lastVersion: lastVersion,
             currentVersion: currentVersion,
             onComplete: () {
-              Prefs().lastAppVersion = currentVersion;
               Navigator.pop(sheetContext);
             },
           );

@@ -66,6 +66,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'lastAppVersion',
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
@@ -103,6 +104,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'lastAppVersion',
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
@@ -2703,6 +2705,13 @@ class Prefs extends ChangeNotifier {
 
   String? get lastAppVersion {
     return prefs.getString('lastAppVersion');
+  }
+
+  Future<void> saveLastAppVersion(String version) async {
+    if (!await prefs.setString('lastAppVersion', version)) {
+      throw StateError('Cannot save displayed release notes version');
+    }
+    notifyListeners();
   }
 
   set lastAppVersion(String? version) {
