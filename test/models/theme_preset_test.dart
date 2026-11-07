@@ -125,6 +125,118 @@ void main() {
         canvas.background);
   });
 
+  test('the linked reader page follows later palette changes', () async {
+    final prefs = Prefs();
+    final ink = builtInThemePresetById('ink')!;
+    await prefs.saveThemeModeToPrefs('light');
+    await prefs.selectThemePreset(ink);
+    await prefs.setThemeAppliesToReader(true);
+    expect(prefs.readTheme.backgroundColor, 'FFF3E9D6');
+    expect(prefs.readTheme.textColor, 'FF332A1E');
+
+    // Fine-tuning the active preset repaints the paper at once, and keeps the
+    // rest of the canvas override for the interface.
+    await prefs.savePresetCanvasOverride(
+        ink,
+        Brightness.light,
+        prefs
+            .canvasForPreset(ink, Brightness.light)
+            .copyWith(background: const Color(0xFF203040)));
+    expect(prefs.readTheme.backgroundColor, 'FF203040');
+    expect(prefs.readTheme.textColor, 'FF332A1E');
+
+    // Editing a preset that is not selected must not leak into the reader.
+    await prefs.savePresetCanvasOverride(
+        builtInThemePresetById('ocean')!,
+        Brightness.light,
+        prefs
+            .canvasForPreset(builtInThemePresetById('ocean')!, Brightness.light)
+            .copyWith(background: const Color(0xFF102030)));
+    expect(prefs.readTheme.backgroundColor, 'FF203040');
+
+    // Switching the interface to dark must swap the paper, not keep the light
+    // canvas that was stored when the switch was turned on.
+    await prefs.saveThemeModeToPrefs('dark');
+    expect(prefs.readTheme.backgroundColor, 'FF15120D');
+    expect(prefs.readTheme.textColor, 'FFEDE4D3');
+
+    // OLED black flattens the paper exactly like the interface.
+    prefs.trueDarkMode = true;
+    expect(prefs.readTheme.backgroundColor, 'FF000000');
+
+    // Resetting the override restores the factory canvas.
+    await prefs.resetPresetCanvasOverride(ink.id);
+    expect(prefs.readTheme.backgroundColor, 'FF000000');
+    prefs.trueDarkMode = false;
+    expect(prefs.readTheme.backgroundColor, 'FF15120D');
+  });
+
+  test('an unlinked reader page keeps its own theme', () async {
+    final prefs = Prefs();
+    await prefs.selectThemePreset(builtInThemePresetById('ink')!);
+    await prefs.saveThemeModeToPrefs('light');
+    final before = prefs.readTheme.backgroundColor;
+    await prefs.setThemeAppliesToReader(false);
+    await prefs.saveThemeModeToPrefs('dark');
+    expect(prefs.readTheme.backgroundColor, before);
+  });
+
+  testWidgets(
+      'environment refresh follows system brightness without duplicate notifications',
+      (tester) async {
+    final prefs = Prefs();
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await prefs.saveThemeModeToPrefs('system');
+    await prefs.selectThemePreset(builtInThemePresetById('ink')!);
+    await prefs.setThemeAppliesToReader(true);
+    var notifications = 0;
+    void listener() => notifications++;
+    prefs.addListener(listener);
+    addTearDown(() => prefs.removeListener(listener));
+
+    prefs.refreshLinkedReadTheme();
+    expect(notifications, 0);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    prefs.refreshLinkedReadTheme();
+    expect(prefs.readTheme.backgroundColor, 'FF15120D');
+    expect(notifications, 1);
+    prefs.refreshLinkedReadTheme();
+    expect(notifications, 1);
+
+    prefs.eInkMode = true;
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    prefs.refreshLinkedReadTheme();
+    expect(prefs.readTheme.backgroundColor, 'FF15120D');
+    prefs.eInkMode = false;
+    expect(prefs.readTheme.backgroundColor, 'FFF3E9D6');
+
+    await prefs.setThemeAppliesToReader(false);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    prefs.refreshLinkedReadTheme();
+    expect(prefs.readTheme.backgroundColor, 'FFF3E9D6');
+  });
+
+  test(
+      'environment refresh reevaluates the schedule and preserves the background image',
+      () async {
+    final prefs = Prefs();
+    await prefs.selectThemePreset(builtInThemePresetById('ink')!);
+    prefs.saveReadThemeToPrefs(
+        prefs.readTheme..backgroundImagePath = 'paper.png');
+    await prefs.setThemeAppliesToReader(true);
+    final minute = DateTime.now().hour * 60 + DateTime.now().minute;
+    await prefs.saveThemeSchedule(
+        enabled: true, start: (minute + 1435) % 1440, end: (minute + 5) % 1440);
+    expect(prefs.readTheme.backgroundColor, 'FF15120D');
+    // Change the effective period without going through the setting callback.
+    await prefs.prefs.setInt('nightStartMinute', (minute + 5) % 1440);
+    await prefs.prefs.setInt('nightEndMinute', (minute + 10) % 1440);
+    prefs.refreshLinkedReadTheme();
+    expect(prefs.readTheme.backgroundColor, 'FFF3E9D6');
+    expect(prefs.readTheme.backgroundImagePath, 'paper.png');
+  });
+
   test('a preset round-trips through JSON', () {
     const preset = ThemePreset(
         id: 'custom_1', name: '夜晚', nameEn: '', colorValue: 0xFF123456);

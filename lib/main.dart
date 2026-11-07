@@ -258,7 +258,7 @@ class _MyAppState extends ConsumerState<MyApp>
   void _checkThemeSchedule() {
     final prefs = Prefs();
     final mode = prefs.themeMode;
-    final changed = _lastScheduledTheme != null && _lastScheduledTheme != mode;
+    final changed = _lastScheduledTheme != mode;
     _lastScheduledTheme = mode;
     _themeScheduleTimer?.cancel();
     if (prefs.scheduledTheme &&
@@ -271,7 +271,10 @@ class _MyAppState extends ConsumerState<MyApp>
           Duration(milliseconds: 60000 - now.second * 1000 - now.millisecond),
           _checkThemeSchedule);
     }
-    if (changed) prefs.notifyExternalChange();
+    if (changed) {
+      prefs.refreshLinkedReadTheme();
+      prefs.notifyExternalChange();
+    }
   }
 
   StreamSubscription<List<ConnectivityResult>>? _syncConnectivity;
@@ -401,6 +404,11 @@ class _MyAppState extends ConsumerState<MyApp>
   }
 
   @override
+  void didChangePlatformBrightness() {
+    Prefs().refreshLinkedReadTheme();
+  }
+
+  @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     RuntimeDiagnostics.record(RuntimeEvent.lifecycle, state: state.name);
     if (state == AppLifecycleState.detached) CrashJournal.closeSession();
@@ -412,6 +420,7 @@ class _MyAppState extends ConsumerState<MyApp>
       Sync().pauseAutomaticSync();
     } else if (state == AppLifecycleState.resumed) {
       _checkThemeSchedule();
+      Prefs().refreshLinkedReadTheme();
       if (AnxPlatform.isIOS) {
         Server().start();
       }

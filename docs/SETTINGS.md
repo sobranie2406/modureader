@@ -54,7 +54,7 @@ Menus use page-coloured rounded groups with content-driven heights and matching 
 
 Appearance → Display → Interface layout offers Auto / Wide / Narrow and remembers your choice. Auto preserves each screen's existing available-width threshold of more than 600 logical pixels. Manual choices apply to navigation, settings, history, notes and book details, without changing reader column settings.
 
-The default light theme uses paper white and jade green; format and indexing badges retain their distinct colours. Appearance → Theme colour → Restore default resets only the app accent after confirmation. The outlined Background / Text colour controls in reader styles each offer a confirmed reset of that colour without overwriting the other.
+The default light theme uses paper white and jade green; format and indexing badges retain their distinct colours. Appearance → Theme colour → Restore default restores the default palette after confirmation; linked reading colours follow it. The outlined Background / Text colour controls in reader styles each offer a confirmed reset of that colour without overwriting the other. A question mark on the Colour style header and in the fine-tune dialog names the widget each palette colour paints; with Also apply to the reader on, switching brightness, OLED black or fine-tuning colours refreshes the paper immediately.
 
 Text/OCR reflow provides page-local narration and current-page translation (corrected text first), translation-only/bilingual views and the shared selection toolbar. Original PDF/scanned pages do not narrate. Text → Export saved book text offers TXT or Markdown in original page order.
 
