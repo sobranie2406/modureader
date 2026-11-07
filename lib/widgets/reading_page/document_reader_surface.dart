@@ -232,8 +232,8 @@ class DocumentReaderSurfaceState extends State<DocumentReaderSurface> {
                                                       behavior: HitTestBehavior
                                                           .opaque,
                                                       child: ColoredBox(
-                                                          color: Colors.black
-                                                              .withAlpha(30)))),
+                                                          color: Colors
+                                                              .transparent))),
                                               Align(
                                                   alignment:
                                                       Alignment.bottomCenter,

@@ -1,4 +1,5 @@
 import 'reader_content_brightness.dart';
+import 'package:anx_reader/service/app_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'dart:math' as math;
 
@@ -33,9 +34,7 @@ Future<void> showAdjustableReaderPopup(BuildContext context,
   final route = RawDialogRoute<void>(
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: barrierColor ??
-        Theme.of(context).bottomSheetTheme.modalBarrierColor ??
-        Colors.black54,
+    barrierColor: Colors.transparent,
     transitionDuration: AppMotion.duration(const Duration(milliseconds: 200)),
     pageBuilder: (context, animation, secondaryAnimation) => themes.wrap(
       Theme(
@@ -204,15 +203,39 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
         }
         final rect = _fit(_rect ?? initial, available);
         return Stack(children: [
-          if (anchor != null &&
-              (Offset.zero & available).overlaps(anchor) &&
-              !rect.overlaps(anchor))
-            Positioned.fill(
-                child: IgnorePointer(
-                    child: CustomPaint(
-              key: const ValueKey('reader-popup-selection-arrow'),
-              painter: _SelectionArrow(anchor, rect, theme.colorScheme.outline),
-            ))),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ListenableBuilder(
+                listenable: AppBrightness.instance,
+                builder: (context, _) {
+                  final surface = theme.bottomSheetTheme.backgroundColor ??
+                      theme.colorScheme.surface;
+                  final dim = widget.dimContent
+                      ? AppBrightness.instance.dimOpacity
+                      : 0.0;
+                  final color = Color.from(
+                      alpha: surface.a,
+                      red: surface.r * (1 - dim),
+                      green: surface.g * (1 - dim),
+                      blue: surface.b * (1 - dim));
+                  return CustomPaint(
+                    key: const ValueKey('reader-popup-bubble'),
+                    painter: ReaderPopupBubblePainter(
+                      popup: rect,
+                      target: anchor != null &&
+                              (Offset.zero & available).overlaps(anchor)
+                          ? (initial.center.dy >= anchor.center.dy
+                              ? anchor.bottomCenter
+                              : anchor.topCenter)
+                          : null,
+                      color: color,
+                      elevation: theme.bottomSheetTheme.elevation ?? 4,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
           Positioned.fromRect(
             key: const ValueKey('reader-popup-position'),
             rect: rect,
@@ -223,10 +246,10 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
                     ? Colors.transparent
                     : theme.bottomSheetTheme.backgroundColor ??
                         theme.colorScheme.surface,
-                elevation: theme.bottomSheetTheme.elevation ?? 4,
-                shape: theme.bottomSheetTheme.shape ??
-                    RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24)),
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24)),
                 clipBehavior: Clip.antiAlias,
                 child: _content(
                     theme,
@@ -340,36 +363,62 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
   }
 }
 
-class _SelectionArrow extends CustomPainter {
-  const _SelectionArrow(this.anchor, this.popup, this.color);
-  final Rect anchor;
+/// Paint the tail and the shared shadow; the clipped Material paints the body.
+class ReaderPopupBubblePainter extends CustomPainter {
+  const ReaderPopupBubblePainter(
+      {required this.popup,
+      required this.target,
+      required this.color,
+      required this.elevation});
   final Rect popup;
+  final Offset? target;
   final Color color;
+  final double elevation;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final below = popup.center.dy >= anchor.center.dy;
-    final target = below ? anchor.bottomCenter : anchor.topCenter;
-    final x = target.dx.clamp(popup.left + 24, popup.right - 24).toDouble();
-    final y = below ? popup.top : popup.bottom;
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(x, y), target, paint);
-    final direction = (Offset(x, y) - target).direction;
-    final path = Path()
-      ..moveTo(target.dx + 8 * math.cos(direction - 0.5),
-          target.dy + 8 * math.sin(direction - 0.5))
-      ..lineTo(target.dx, target.dy)
-      ..lineTo(target.dx + 8 * math.cos(direction + 0.5),
-          target.dy + 8 * math.sin(direction + 0.5));
-    canvas.drawPath(path, paint);
+  Path get body => Path()
+    ..addRRect(RRect.fromRectAndRadius(popup, const Radius.circular(24)));
+
+  Path get silhouette {
+    final tip = target;
+    final outline = body;
+    if (tip == null || popup.contains(tip)) return outline;
+    // Keep the root clear of the rounded corners, on the nearest facing edge.
+    final horizontal = tip.dx < popup.left || tip.dx > popup.right;
+    final vertical = tip.dy < popup.top || tip.dy > popup.bottom;
+    final dx = math.max(popup.left - tip.dx, tip.dx - popup.right);
+    final dy = math.max(popup.top - tip.dy, tip.dy - popup.bottom);
+    late Offset first, last;
+    if (horizontal && (!vertical || dx > dy)) {
+      final y = tip.dy.clamp(popup.top + 36, popup.bottom - 36).toDouble();
+      final x = tip.dx < popup.left ? popup.left + 1 : popup.right - 1;
+      first = Offset(x, y - 10);
+      last = Offset(x, y + 10);
+    } else {
+      final x = tip.dx.clamp(popup.left + 36, popup.right - 36).toDouble();
+      final y = tip.dy < popup.top ? popup.top + 1 : popup.bottom - 1;
+      first = Offset(x - 10, y);
+      last = Offset(x + 10, y);
+    }
+    final tail = Path()
+      ..moveTo(first.dx, first.dy)
+      ..lineTo(tip.dx, tip.dy)
+      ..lineTo(last.dx, last.dy)
+      ..close();
+    return Path.combine(PathOperation.union, outline, tail);
   }
 
   @override
-  bool shouldRepaint(_SelectionArrow oldDelegate) =>
-      anchor != oldDelegate.anchor ||
+  void paint(Canvas canvas, Size size) {
+    final outline = silhouette;
+    canvas.drawShadow(outline, Colors.black, elevation, color.a < 1);
+    canvas.drawPath(Path.combine(PathOperation.difference, outline, body),
+        Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(ReaderPopupBubblePainter oldDelegate) =>
+      target != oldDelegate.target ||
       popup != oldDelegate.popup ||
-      color != oldDelegate.color;
+      color != oldDelegate.color ||
+      elevation != oldDelegate.elevation;
 }

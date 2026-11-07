@@ -20,6 +20,22 @@ void main() {
     await Prefs().initPrefs();
   });
 
+  testWidgets('reader nested menus stay clear at every opacity',
+      (tester) async {
+    for (final opacity in [100, 50]) {
+      Prefs().readerMenuOpacityPercent = opacity;
+      await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) {
+        final outside = Theme.of(context);
+        final reader = ReaderMenuAppearance.theme(context);
+        expect(reader.bottomSheetTheme.modalBarrierColor, Colors.transparent);
+        expect(reader.dialogTheme.barrierColor, Colors.transparent);
+        expect(outside.bottomSheetTheme.modalBarrierColor, isNull);
+        expect(outside.dialogTheme.barrierColor, isNull);
+        return const SizedBox();
+      })));
+    }
+  });
+
   test('opacity is bounded, persists locally and never imports or exports',
       () async {
     final prefs = Prefs();

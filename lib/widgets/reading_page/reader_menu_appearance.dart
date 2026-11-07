@@ -18,7 +18,13 @@ class ReaderMenuAppearance extends ThemeExtension<ReaderMenuAppearance> {
   }
 
   static ThemeData theme(BuildContext context) {
-    final base = Theme.of(context);
+    final original = Theme.of(context);
+    final base = original.copyWith(
+      bottomSheetTheme: original.bottomSheetTheme
+          .copyWith(modalBarrierColor: Colors.transparent),
+      dialogTheme:
+          original.dialogTheme.copyWith(barrierColor: Colors.transparent),
+    );
     final opacity =
         Prefs().eInkMode ? 1.0 : Prefs().readerMenuOpacityPercent / 100;
     if (opacity == 1) return base;
@@ -85,7 +91,7 @@ Future<T?> showReaderDialog<T>(
       barrierDismissible: barrierDismissible,
       useRootNavigator: useRootNavigator,
       requestFocus: requestFocus,
-      barrierColor: barrierColor,
+      barrierColor: Colors.transparent,
       animationStyle: animationStyle,
       builder: (_) => Theme(data: menuTheme, child: Builder(builder: builder)));
 }

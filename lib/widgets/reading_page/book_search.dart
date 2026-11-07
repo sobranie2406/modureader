@@ -24,7 +24,6 @@ Future<void> showBookSearchDialog(
     context: context,
     useRootNavigator: false,
     requestFocus: true,
-    barrierColor: Colors.black26,
     builder: (dialogContext) => UncontrolledProviderScope(
       container: container,
       child: CallbackShortcuts(

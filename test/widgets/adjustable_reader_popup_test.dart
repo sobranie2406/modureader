@@ -60,6 +60,36 @@ void main() {
     await Prefs().initPrefs();
   });
 
+  test('bubble tail joins each edge and keeps all four corners rounded', () {
+    const popup = Rect.fromLTWH(100, 100, 320, 400);
+    for (final target in [
+      const Offset(220, 60),
+      const Offset(220, 550),
+      const Offset(60, 220),
+      const Offset(470, 220),
+    ]) {
+      final painter = ReaderPopupBubblePainter(
+          popup: popup, target: target, color: Colors.white, elevation: 4);
+      final path = painter.silhouette;
+      expect(path.contains(popup.center), true);
+      final root = Offset(target.dx.clamp(popup.left, popup.right),
+          target.dy.clamp(popup.top, popup.bottom));
+      expect(path.contains(Offset.lerp(target, root, .1)!), true);
+      for (final corner in [
+        popup.topLeft,
+        popup.topRight,
+        popup.bottomLeft,
+        popup.bottomRight
+      ]) {
+        expect(path.contains(Offset.lerp(corner, popup.center, .005)!), false);
+      }
+      expect(path.computeMetrics().length, 1);
+    }
+    final covered = ReaderPopupBubblePainter(
+        popup: popup, target: popup.center, color: Colors.white, elevation: 4);
+    expect(covered.silhouette.getBounds(), popup);
+  });
+
   testWidgets(
       'anchored query keeps the reader clear, points to selection and dismisses outside',
       (tester) async {
@@ -85,18 +115,28 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Open anchored'));
       await tester.pumpAndSettle();
+      final material = tester.widget<Material>(frame);
+      expect((material.shape! as RoundedRectangleBorder).borderRadius,
+          BorderRadius.circular(24));
+      expect(material.clipBehavior, Clip.antiAlias);
+      final bubble = find.byKey(const ValueKey('reader-popup-bubble'));
+      final beforePainter = tester.widget<CustomPaint>(bubble).painter!
+          as ReaderPopupBubblePainter;
       final rect = tester.getRect(frame);
       expect(rect.overlaps(anchor), false);
       expect(rect.left, greaterThanOrEqualTo(0));
       expect(rect.right, lessThanOrEqualTo(1000));
-      expect(find.byKey(const ValueKey('reader-popup-selection-arrow')),
-          findsOneWidget);
+      expect(find.byKey(const ValueKey('reader-popup-bubble')), findsOneWidget);
       final route =
           ModalRoute.of(tester.element(find.byType(TextField)))! as PopupRoute;
       expect(route.barrierColor, Colors.transparent);
       await tester.enterText(find.byType(TextField), 'Draft');
       await drag(tester, 'move', const Offset(30, 10));
       expect(find.text('Draft'), findsOneWidget);
+      final afterPainter = tester.widget<CustomPaint>(bubble).painter!
+          as ReaderPopupBubblePainter;
+      expect(afterPainter.target, beforePainter.target);
+      expect(afterPainter.popup, isNot(beforePainter.popup));
       await tester.tapAt(const Offset(20, 20));
       await tester.pumpAndSettle();
       expect(frame, findsNothing);
@@ -133,9 +173,9 @@ void main() {
         if (adjusted) {
           expect(route.barrierColor, Colors.transparent);
         } else {
-          expect(route.barrierColor?.a, greaterThan(0));
-          expect(find.byKey(const ValueKey('reader-popup-selection-arrow')),
-              findsNothing);
+          expect(route.barrierColor, Colors.transparent);
+          expect(
+              find.byKey(const ValueKey('reader-popup-bubble')), findsNothing);
           expect(
               tester
                   .getSize(find.byKey(const ValueKey('reader-popup-body')))

@@ -119,6 +119,7 @@ Future<void> showReaderPopup(BuildContext context,
   final content = Builder(builder: builder);
   await showModalBottomSheet<void>(
     sheetAnimationStyle: AppMotion.style,
+    barrierColor: Colors.transparent,
     backgroundColor: dimContent
         ? Colors.transparent
         : menuTheme.bottomSheetTheme.modalBackgroundColor ??
