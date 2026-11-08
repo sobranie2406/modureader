@@ -1,5 +1,4 @@
-import 'package:anx_reader/service/app_brightness.dart';
-import 'reader_content_brightness.dart';
+import 'package:anx_reader/widgets/reading_page/reader_web_brightness.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/widgets/webview/recoverable_webview.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -44,7 +43,9 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
   late SelectionSearchConfig _config = Prefs().selectionSearchSettings;
   late Uri _uri = _config.selected.search(widget.text);
   InAppWebViewController? _controller;
-  AppBrightness? contentBrightness;
+  late final _webBrightness = ReaderWebBrightness((script) async {
+    await _controller?.evaluateJavascript(source: script);
+  });
   bool _back = false, _forward = false;
   int _progress = 0;
   String? _message;
@@ -88,33 +89,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final surface =
-        context.findAncestorWidgetOfExactType<ReaderContentBrightness>();
-    final nextBrightness = !kIsWeb &&
-            defaultTargetPlatform == TargetPlatform.android &&
-            surface != null
-        ? surface.controller ?? AppBrightness.instance
-        : null;
-    if (!identical(contentBrightness, nextBrightness)) {
-      contentBrightness?.removeListener(_updateBrightness);
-      contentBrightness = nextBrightness;
-      contentBrightness?.addListener(_updateBrightness);
-    }
-    unawaited(_updateBrightness());
-  }
-
-  Future<void> _updateBrightness() async {
-    final web = _controller;
-    if (web == null || contentBrightness == null) return;
-    // Android hybrid WebViews bypass Flutter's parent Opacity layer.
-    final opacity = 1 - (contentBrightness?.dimOpacity ?? 0);
-    try {
-      await web.evaluateJavascript(
-          source:
-              "document.documentElement.style.setProperty('opacity', '$opacity', 'important');");
-    } catch (_) {
-      // The document may be navigating; onLoadStop reapplies the current value.
-    }
+    _webBrightness.bind(context);
   }
 
   void _changeZoom(int percent) {
@@ -130,7 +105,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
 
   @override
   void dispose() {
-    contentBrightness?.removeListener(_updateBrightness);
+    _webBrightness.dispose();
     _query.dispose();
     super.dispose();
   }
@@ -406,6 +381,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                         initialUserScripts:
                                             UnmodifiableListView([_zoomScript]),
                                         initialSettings: InAppWebViewSettings(
+                                          useHybridComposition: false,
                                           userAgent: popupWebUserAgent,
                                           preferredContentMode:
                                               UserPreferredContentMode.MOBILE,
@@ -475,7 +451,7 @@ class _SelectionSearchBrowserState extends State<SelectionSearchBrowser> {
                                             setState(() => _progress = 100);
                                           }
                                           await _applyZoom();
-                                          await _updateBrightness();
+                                          await _webBrightness.apply();
                                           await _history(controller, url);
                                         },
                                         onUpdateVisitedHistory:

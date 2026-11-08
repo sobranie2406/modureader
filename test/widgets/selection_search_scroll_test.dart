@@ -230,13 +230,12 @@ void main() {
         controller, WebUri('https://www.baidu.com/'));
     await tester.pumpAndSettle();
     expect(native.evaluated, contains(selectionSearchZoomScript(80)));
+    final scriptCount = native.evaluated.length;
     AppBrightness.instance.setLevel(.2);
     await tester.pumpAndSettle();
-    expect(native.evaluated.last, contains("setProperty('opacity'"));
-    expect(native.evaluated.last, contains('0.19999999999999996'));
+    expect(native.evaluated.length, scriptCount);
+    expect(platform.latestParams!.initialSettings!.useHybridComposition, false);
     AppBrightness.instance.setFollowSystem(true);
-    await tester.pumpAndSettle();
-    expect(native.evaluated.last, contains("'1.0'"));
     expect(native.scripts, hasLength(1));
     await tester.drag(
         find.byKey(const ValueKey('web-results')), const Offset(0, -200));

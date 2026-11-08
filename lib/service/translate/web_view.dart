@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/reading_page/reader_web_brightness.dart';
 import 'dart:collection';
 import 'package:anx_reader/widgets/webview/recoverable_webview.dart';
 import 'dart:async';
@@ -85,6 +86,22 @@ class _WebTranslationViewState extends State<WebTranslationView> {
   late int _zoomPercent = Prefs().webTranslationZoomPercent;
   Future<void> _zoomQueue = Future<void>.value();
   String? _error;
+  late final _webBrightness = ReaderWebBrightness((script) async {
+    await _controller?.evaluateJavascript(source: script);
+  });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _webBrightness.bind(context);
+  }
+
+  @override
+  void dispose() {
+    _webBrightness.dispose();
+    super.dispose();
+  }
+
   static const _layoutGroup = 'modu-web-translation-layout';
   UserScript get _layoutScript => UserScript(
         groupName: _layoutGroup,
@@ -169,6 +186,7 @@ class _WebTranslationViewState extends State<WebTranslationView> {
               initialUrlRequest: URLRequest(url: WebUri(widget.url)),
               initialUserScripts: UnmodifiableListView([_layoutScript]),
               initialSettings: InAppWebViewSettings(
+                useHybridComposition: false,
                 userAgent: popupWebUserAgent,
                 preferredContentMode: UserPreferredContentMode.MOBILE,
                 isInspectable: kDebugMode,
@@ -203,6 +221,7 @@ class _WebTranslationViewState extends State<WebTranslationView> {
                 unawaited(installWebScrollbar(controller,
                     reducedMotion: MediaQuery.disableAnimationsOf(context)));
                 await _applyZoom();
+                await _webBrightness.apply();
                 if (!mounted || controller != _controller) return;
                 final script = widget.prefill;
                 if (script != null) {
