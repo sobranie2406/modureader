@@ -258,6 +258,19 @@ void main() {
     await mount(tester, immediate: true, popup: true);
     expect(find.byType(ReaderPopup), findsOneWidget);
     expect(find.byType(AiChatStream), findsOneWidget);
+    final draftSwitch =
+        find.byKey(const ValueKey('ai-skill-template-draft-switch'));
+    expect(draftSwitch, findsNothing);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const ValueKey('ai-chat-options')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(draftSwitch, findsOneWidget);
+    final previousDraft = tester.widget<SwitchListTile>(draftSwitch).value;
+    await tester.tap(draftSwitch);
+    await tester.pump();
+    expect(tester.widget<SwitchListTile>(draftSwitch).value, !previousDraft);
+
     expect(chat.requests, hasLength(1));
     expect(chat.requests.single.skill, 'selection_toolbar');
     expect(chat.requests.single.source, '原文 {selection}');

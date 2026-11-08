@@ -14,6 +14,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 Future<void> showAdjustableReaderPopup(BuildContext context,
     {required WidgetBuilder builder,
     bool readerAppearance = true,
+    bool compactChrome = false,
     bool dimContent = false,
     Rect? selectionRect,
     Color? barrierColor,
@@ -40,6 +41,7 @@ Future<void> showAdjustableReaderPopup(BuildContext context,
       Theme(
           data: menuTheme,
           child: AdjustableReaderPopup(
+              compactChrome: compactChrome,
               dimContent: dimContent,
               initialHeightFraction: initialHeightFraction,
               selectionRect: localSelection,
@@ -57,10 +59,12 @@ class AdjustableReaderPopup extends StatefulWidget {
       {super.key,
       required this.child,
       this.dimContent = false,
+      this.compactChrome = false,
       this.initialHeightFraction = 0.8,
       this.selectionRect});
   final Widget child;
   final bool dimContent;
+  final bool compactChrome;
   final double initialHeightFraction;
   final Rect? selectionRect;
 
@@ -256,10 +260,14 @@ class _AdjustableReaderPopupState extends State<AdjustableReaderPopup> {
                     Stack(children: [
                       Padding(
                         // Reserve resize hit areas; they never cover text or buttons.
-                        padding: const EdgeInsets.fromLTRB(12, 24, 12, 24),
+                        padding: EdgeInsets.fromLTRB(
+                            12,
+                            widget.compactChrome ? 8 : 24,
+                            12,
+                            widget.compactChrome ? 12 : 24),
                         child: Column(children: [
                           SizedBox(
-                              height: 36,
+                              height: widget.compactChrome ? 28 : 36,
                               child: Row(children: [
                                 Expanded(
                                     child: _handle('move', rect, available,

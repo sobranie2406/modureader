@@ -1,3 +1,5 @@
+import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:anx_reader/widgets/reading_page/adjustable_reader_popup.dart';
 import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
@@ -198,6 +200,10 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
     ));
     if (mounted) setState(() {});
   }
+
+  bool get _compactPopup =>
+      context.findAncestorWidgetOfExactType<ReaderPopup>() != null ||
+      context.findAncestorWidgetOfExactType<AdjustableReaderPopup>() != null;
 
   double _fontSize = 14.0;
   String? _readerSourceText;
@@ -1023,6 +1029,14 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
         offset.dy + size.height + 1,
       ),
       items: [
+        if (_compactPopup && widget.showSkillControls && !widget.inlineResults)
+          PopupMenuItem(
+            enabled: false,
+            child: SkillTemplateDraftTile(
+                compact: true,
+                screen: _draftScreen,
+                legacyDefault: widget.initialDraftOnly),
+          ),
         PopupMenuItem(
           enabled: false,
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1234,6 +1248,7 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!compact &&
+                    !_compactPopup &&
                     !widget.inlineResults &&
                     widget.showSkillControls)
                   SkillTemplateDraftTile(
@@ -1272,12 +1287,12 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
                           ])
                         : null,
                   ),
-                  maxLines: compact ? 1 : 5,
+                  maxLines: compact ? 1 : (_compactPopup ? 3 : 5),
                   minLines: 1,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _sendMessage(),
                 ),
-                if (!compact) const SizedBox(height: 4),
+                if (!compact && !_compactPopup) const SizedBox(height: 4),
                 if (!compact)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1387,6 +1402,8 @@ class AiChatStreamState extends ConsumerState<AiChatStream> {
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
+        toolbarHeight: _compactPopup ? 44 : null,
+        titleSpacing: _compactPopup ? 8 : null,
         title: Text(widget.title ??
             (_isKnowledge
                 ? ModuStrings.text(context, 'AI 知识', 'AI Knowledge')

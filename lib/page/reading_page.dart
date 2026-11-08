@@ -1606,6 +1606,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         if (!mounted) return;
       }
       await showReaderPopup(navigatorKey.currentContext!,
+          compactChrome: true,
           dimContent: true,
           allowWindowAdjustment: true,
           selectionRect: selectionRect,
