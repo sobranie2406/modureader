@@ -1,3 +1,6 @@
+import 'package:anx_reader/models/book.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/service/receive_file/external_book_inbox.dart';
 import 'package:anx_reader/utils/log/common.dart';
 import 'package:anx_reader/utils/app_motion.dart';
@@ -22,8 +25,11 @@ bool _pickingBooks = false;
 
 Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     {bool folder = false,
-    bool inPlace = false,
+    bool? inPlace,
+    Book? relinkBook,
     List<String>? droppedPaths}) async {
+  final useInPlace =
+      droppedPaths == null && (inPlace ?? Prefs().inPlaceImportEnabled);
   if (_pickingBooks) return;
   _pickingBooks = true;
   final mobileFolder = folder && (Platform.isAndroid || Platform.isIOS);
@@ -33,13 +39,15 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       externalBookInbox.add(entries.map((entry) => entry.id));
       return;
     }
-    if (inPlace && !Platform.isIOS) return;
+
     List<BookImportEntry>? entries;
-    if (inPlace) {
+    if (useInPlace && !(Platform.isWindows || Platform.isLinux)) {
       entries = await _withImportProgress(
           context,
           () => MobileBookFolder.pick(
-              files: !folder, extensions: IosLinkedBooks.extensions));
+              files: !folder,
+              inPlace: true,
+              extensions: IosLinkedBooks.extensions));
     } else if (mobileFolder) {
       entries = await _withImportProgress(context, MobileBookFolder.pick);
     } else if (folder) {
@@ -69,14 +77,23 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
               picked.files.map((e) => e.path!).toList()));
     }
     if (entries == null || !context.mounted) return;
+    if (useInPlace) {
+      entries = entries
+          .where((entry) => IosLinkedBooks.extensions
+              .contains(entry.name.split('.').last.toLowerCase()))
+          .toList();
+      if (BookSources.store == null) {
+        throw StateError('Local source storage unavailable');
+      }
+    }
     if (entries.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(ModuStrings.text(
               context,
-              inPlace
+              useInPlace
                   ? '原位添加支持 EPUB、PDF、MOBI、AZW3、FB2；其他格式请用普通导入。'
                   : '没有找到支持的书籍文件',
-              inPlace
+              useInPlace
                   ? 'In-place reading supports EPUB, PDF, MOBI, AZW3 and FB2. Use normal import for other formats.'
                   : 'No supported books found'))));
       return;
@@ -84,33 +101,78 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     final selected = await showDialog<List<BookImportEntry>>(
       animationStyle: AppMotion.style,
       context: context,
-      builder: (_) => BookImportSelection(entries: entries!, inPlace: inPlace),
+      builder: (_) =>
+          BookImportSelection(entries: entries!, inPlace: useInPlace),
     );
     if (selected == null || selected.isEmpty || !context.mounted) return;
-    if (inPlace) {
+    if (relinkBook != null && selected.length != 1) {
+      throw const FileSystemException('Select one matching original');
+    }
+    if (useInPlace) {
       var failed = 0;
       await _withImportProgress(context, () async {
         for (final entry in selected) {
           String? key;
           try {
-            key = await IosLinkedBooks.link(entry.id);
+            final desktop = Platform.isWindows || Platform.isLinux;
+            if (desktop) {
+              key =
+                  'file/linked-${DateTime.now().microsecondsSinceEpoch}.${entry.name.split('.').last.toLowerCase()}';
+              IosLinkedBooks.registerPath(key, entry.id);
+            } else {
+              key = await IosLinkedBooks.link(entry.id);
+            }
             final file = File(IosLinkedBooks.resolve(key)!);
             final md5 = await MD5Service.calculateFileMd5(file.path);
             if (md5 == null) {
               throw const FileSystemException('Cannot verify book');
             }
-            final existing = await bookDao.getBookByMd5(md5);
-            // Keep existing imported files and records; renew missing links only.
-            if (existing != null &&
-                !existing.isDeleted &&
-                await File(existing.fileFullPath).exists()) {
-              await IosLinkedBooks.forget(key);
+            if (relinkBook != null &&
+                md5.toLowerCase() != relinkBook.md5?.toLowerCase()) {
+              throw const FileSystemException(
+                  'Selected file does not match this book');
+            }
+            final existing = relinkBook ?? await bookDao.getBookByMd5(md5);
+            if (existing != null && !existing.isDeleted) {
+              if (!context.mounted) break;
+              final replace = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                        title: Text(ModuStrings.text(
+                            context, '关联已有书籍', 'Link existing book')),
+                        content: Text(ModuStrings.text(
+                            context,
+                            '改为从所选原文件读取？笔记和进度保留。',
+                            'Read from the selected original? Notes and progress are kept.')),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text(
+                                  ModuStrings.text(context, '跳过', 'Skip'))),
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child:
+                                  Text(ModuStrings.text(context, '关联', 'Link')))
+                        ],
+                      ));
+              if (replace != true) continue;
+              final previous = BookSources.store!
+                      .read(existing.md5, existing.filePath)?['locator'] ??
+                  existing.filePath;
+              await BookSources.store!.save(existing.md5, existing.filePath,
+                  kind: 'linked', locator: desktop ? file.path : key);
+              // The old internal copy is retained until an explicit cleanup;
+              // switching sources never removes the only verified copy.
               key = null;
+              if (IosLinkedBooks.isLinked(previous)) {
+                await IosLinkedBooks.forget(previous);
+              }
               continue;
             }
             await getBookMetadata(file,
                 md5: md5,
                 linkedPath: key,
+                sourceName: entry.name,
                 sourceFormat: entry.name.split('.').last.toLowerCase());
             key = null; // The saved book now owns this bookmark.
           } catch (_) {
@@ -161,7 +223,8 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     }
   } finally {
     try {
-      if (mobileFolder || inPlace) {
+      if (mobileFolder ||
+          (useInPlace && !(Platform.isWindows || Platform.isLinux))) {
         await MobileBookFolder.release();
       }
     } finally {
@@ -222,10 +285,10 @@ class _BookImportSelectionState extends State<BookImportSelection> {
                     return Text(ModuStrings.text(
                         context,
                         widget.inPlace
-                            ? '原位读取 EPUB、PDF、MOBI、AZW3、FB2，不复制原书。仅本机授权，不上传原书或包含在备份中；封面和索引仍占空间。移动或删除原文件可能导致无法阅读。TXT、Markdown、UMD 需使用普通导入以转换格式。'
+                            ? '只读原文件，不上传原书；笔记和进度照常同步。TXT、Markdown、UMD 请关闭原位开关后导入。'
                             : '支持 EPUB、MOBI、AZW3、FB2、PDF、TXT、Markdown、UMD。文件夹包含子文件夹，原文件保持不变。',
                         widget.inPlace
-                            ? 'Read EPUB, PDF, MOBI, AZW3 and FB2 in place without copying. Access is device-local; originals are not uploaded or included in backups. Covers and indexes still use space. Moving or deleting originals can break access. Use normal import for TXT, Markdown and UMD conversion.'
+                            ? 'Read originals without uploading them. Notes and progress still sync. Turn off in-place adding to import TXT, Markdown or UMD.'
                             : 'EPUB, MOBI, AZW3, FB2, PDF, TXT, Markdown and UMD. Includes subfolders; original files are kept.'));
                   }
                   if (index == 1) {

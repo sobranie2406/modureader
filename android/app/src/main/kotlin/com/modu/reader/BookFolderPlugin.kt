@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
+import org.json.JSONObject
 import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
@@ -24,6 +28,33 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
     private var binding: ActivityPluginBinding? = null
     private var pending: MethodChannel.Result? = null
     private var extensions = emptySet<String>()
+    private var pickingFiles = false
+    private var inPlace = false
+    private var selectionRoot: Uri? = null
+    private val acquiredRoots = mutableSetOf<Uri>()
+    private val handles = linkedMapOf<String, ParcelFileDescriptor>()
+    private val links get() = context.getSharedPreferences("moduLinkedBooksV1", Context.MODE_PRIVATE)
+
+    private fun openLink(key: String, record: JSONObject): String {
+        check(key.matches(Regex("file/linked-[a-zA-Z0-9-]+\\.(epub|pdf|mobi|azw3|fb2)")))
+        val descriptor = context.contentResolver.openFileDescriptor(Uri.parse(record.getString("uri")), "r")
+            ?: error("Original unavailable")
+        try {
+            // Reject pipe-only providers rather than silently copying the book.
+            Os.lseek(descriptor.fileDescriptor, 0, OsConstants.SEEK_SET)
+            val folder = File(context.cacheDir, "linked-book-access")
+            folder.mkdirs()
+            val target = File(folder, key.substringAfter('/'))
+            target.delete()
+            Os.symlink("/proc/self/fd/${descriptor.fd}", target.absolutePath)
+            check(OsConstants.S_ISREG(Os.fstat(descriptor.fileDescriptor).st_mode))
+            handles.put(key, descriptor)?.close()
+            return target.absolutePath
+        } catch (error: Exception) {
+            descriptor.close()
+            throw error
+        }
+    }
     private val entries = linkedMapOf<String, Pair<Uri, String>>()
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -44,15 +75,67 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
                 }
                 entries.clear()
                 extensions = (call.argument<List<String>>("extensions") ?: emptyList()).toSet()
+                pickingFiles = call.argument<Boolean>("files") == true
+                inPlace = call.argument<Boolean>("inPlace") == true
                 pending = result
                 try {
-                    activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                    activity.startActivityForResult(Intent(if (pickingFiles) Intent.ACTION_OPEN_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                        if (pickingFiles) {
+                            type = "*/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        if (inPlace) addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                     }, REQUEST)
                 } catch (_: Exception) {
                     pending = null
                     result.error("PICK_FAILED", "Unable to open folder picker", null)
                 }
+            }
+            "link" -> worker.execute {
+                try {
+                    val entry = entries[call.argument<String>("id")] ?: error("Unknown selection")
+                    val key = "file/linked-${UUID.randomUUID()}.${entry.second.substringAfterLast('.').lowercase()}"
+                    val record = JSONObject().put("uri", entry.first.toString())
+                        .put("root", (if (pickingFiles) entry.first else selectionRoot).toString())
+                    val root = Uri.parse(record.getString("root"))
+                    context.contentResolver.takePersistableUriPermission(root, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    acquiredRoots.add(root)
+                    val path = openLink(key, record)
+                    if (!links.edit().putString(key, record.toString()).commit()) {
+                        handles.remove(key)?.close()
+                        File(path).delete()
+                        error("Unable to save access")
+                    }
+                    main.post { result.success(mapOf("key" to key, "path" to path)) }
+                } catch (_: Exception) {
+                    main.post { result.error("LINK_FAILED", "Original does not support persistent random access. Import a copy instead.", null) }
+                }
+            }
+            "restoreLinks" -> worker.execute {
+                val restored = mutableMapOf<String, String>()
+                for ((key, value) in links.all) {
+                    try { restored[key] = openLink(key, JSONObject(value as String)) } catch (_: Exception) { }
+                }
+                main.post { result.success(restored) }
+            }
+            "forgetLink" -> worker.execute {
+                val key = call.argument<String>("key") ?: ""
+                handles.remove(key)?.close()
+                if (key.startsWith("file/linked-") && !key.contains("..")) {
+                    File(context.cacheDir, "linked-book-access/${key.substringAfter('/')}").delete()
+                }
+                val previous = links.getString(key, null)
+                links.edit().remove(key).commit()
+                if (previous != null) {
+                    val root = JSONObject(previous).optString("root")
+                    val retained = links.all.values.any { JSONObject(it as String).optString("root") == root }
+                    if (!retained) try {
+                        context.contentResolver.releasePersistableUriPermission(Uri.parse(root), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) { }
+                }
+                main.post { result.success(null) }
             }
             "copy" -> {
                 val ids = call.argument<List<String>>("ids") ?: emptyList()
@@ -80,6 +163,13 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
                 }
             }
             "release" -> worker.execute {
+                for (root in acquiredRoots) {
+                    val retained = links.all.values.any { JSONObject(it as String).optString("root") == root.toString() }
+                    if (!retained) try {
+                        context.contentResolver.releasePersistableUriPermission(root, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) { }
+                }
+                acquiredRoots.clear()
                 entries.clear()
                 main.post { result.success(null) }
             }
@@ -91,14 +181,33 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
         if (requestCode != REQUEST) return false
         val result = pending ?: return true
         pending = null
-        val tree = data?.data
+        val tree = data?.data ?: data?.clipData?.getItemAt(0)?.uri
         if (resultCode != Activity.RESULT_OK || tree == null) {
             result.success(null)
             return true
         }
         worker.execute {
             try {
+                selectionRoot = tree
                 val found = mutableListOf<Map<String, String>>()
+                fun add(uri: Uri, name: String, label: String) {
+                    if (name.contains('/') || name.contains('\\') || name.substringAfterLast('.', "").lowercase() !in extensions) return
+                    val key = found.size.toString()
+                    entries[key] = Pair(uri, name)
+                    found.add(mapOf("id" to key, "name" to name, "label" to label))
+                }
+                if (pickingFiles) {
+                    val uris = linkedSetOf<Uri>()
+                    data?.data?.let { uris.add(it) }
+                    data?.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
+                    for (uri in uris) {
+                        context.contentResolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use {
+                            if (it.moveToFirst()) add(uri, it.getString(0), it.getString(0))
+                        }
+                    }
+                    main.post { result.success(found) }
+                    return@execute
+                }
                 val visited = mutableSetOf<String>()
                 fun visit(id: String, prefix: String) {
                     if (!visited.add(id)) return
@@ -117,9 +226,7 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
                             if (it.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
                                 visit(childId, label)
                             } else if (name.substringAfterLast('.', "").lowercase() in extensions) {
-                                val key = found.size.toString()
-                                entries[key] = Pair(DocumentsContract.buildDocumentUriUsingTree(tree, childId), name)
-                                found.add(mapOf("id" to key, "name" to name, "label" to label))
+                                add(DocumentsContract.buildDocumentUriUsingTree(tree, childId), name, label)
                             }
                         }
                     }
@@ -150,6 +257,7 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
     }
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        worker.execute { handles.values.forEach { it.close() }; handles.clear() }
         worker.shutdown()
     }
     companion object { private const val REQUEST = 48129 }

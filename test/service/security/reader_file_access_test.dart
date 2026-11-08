@@ -24,6 +24,17 @@ void main() {
     expect(registry.resolve(temporary), isNull);
     expect(registry.resolve(token), isNotNull);
   });
+  test('authorized access alias is preserved and retargeting revokes access', () async {
+    final source = await File('${root.path}/original.epub').writeAsString('book');
+    final other = await File('${root.path}/other.epub').writeAsString('other');
+    final alias = await Link('${root.path}/access.epub').create(source.path);
+    final registry = ReaderFileAccess();
+    final token = registry.register(File(alias.path));
+    expect(registry.resolve(token)!.path, alias.path);
+    expect(await registry.resolve(token)!.readAsString(), 'book');
+    await alias.update(other.path);
+    expect(registry.resolve(token), isNull);
+  });
   test('directory containment rejects traversal and escaping symlinks',
       () async {
     final inside = await Directory('${root.path}/inside').create();

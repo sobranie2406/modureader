@@ -290,7 +290,7 @@ void main() {
     expect(find.byType(BookCover), findsNothing);
     expect(find.byTooltip('书籍操作'), findsNothing);
     await openBookMenu(tester);
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
     expect(find.byType(PopupMenuItem<BookAction>), findsNothing);
@@ -470,7 +470,7 @@ void main() {
     expect(find.text('选择'), findsOneWidget);
     expect(find.byTooltip('书籍操作'), findsNothing);
     await openBookMenu(tester);
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
     expect(find.byType(PopupMenuItem<BookAction>), findsNothing);
@@ -501,7 +501,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('书籍操作'), findsNothing);
     await openBookMenu(tester);
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
     expect(File(book.fileFullPath).existsSync(), isTrue);
@@ -653,7 +653,7 @@ void main() {
     await mount(tester);
     await openBookMenu(tester);
     await tester.pumpAndSettle();
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     final labels = tester
         .widgetList<PopupMenuItem<BookAction>>(
             find.byType(PopupMenuItem<BookAction>))
@@ -665,13 +665,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(actions(tester), isEmpty);
     await openBookMenu(tester);
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
     await mount(tester, bottom: true);
     await openBookMenu(tester);
     await tester.pumpAndSettle();
-    expect(actions(tester), BookAction.values);
+    expect(actions(tester), BookAction.values.where((action) => ![BookAction.relink, BookAction.copyInternal, BookAction.removeDevice, BookAction.downloadInternal].contains(action)).toList());
     expect(
         tester
             .widgetList<PopupMenuItem<BookAction>>(

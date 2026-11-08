@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/read_only_book_file.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -38,7 +39,7 @@ Future<({String identity, String md5})> _bookDigests(Book book) async {
     final strongValue = _DigestValue(), legacyValue = _DigestValue();
     final strong = sha256.startChunkedConversion(strongValue);
     final legacy = md5.startChunkedConversion(legacyValue);
-    await for (final chunk in File(path).openRead()) {
+    await for (final chunk in readOnlyBookFile(path).openRead()) {
       strong.add(chunk);
       legacy.add(chunk);
     }

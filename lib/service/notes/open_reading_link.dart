@@ -77,8 +77,8 @@ Future<void> openReadingLink(
     if (!await File(book.fileFullPath).exists()) {
       if (!context.mounted) return;
       if (book.isLinked) {
-        await explain(tr('原位书籍的授权仅在原设备有效，请通过书架“原位添加”重新选择原书；其他平台请普通导入。',
-            'In-place access is device-local. Add the original in place again from the shelf, or import it normally on other platforms.'));
+        await explain(tr('请在书籍菜单中选择“重新关联原文件”，关联同一本书后即可返回原文。',
+            'Relink the same original from the book menu, then open the passage again.'));
         return;
       }
       final download = await showDialog<bool>(

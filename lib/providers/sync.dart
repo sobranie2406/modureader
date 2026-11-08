@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/sync/book_cloud_deletions.dart';
 import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
@@ -534,6 +535,11 @@ class Sync extends _$Sync {
       if (hasPendingChanges) await _pendingSync.request();
 
       await syncFiles(assetListing: assetListing);
+      if (!hasPendingChanges) {
+        await BookCloudDeletions(
+                io.File(getBasePath('book_cloud_deletions.json')))
+            .apply(client, await bookDao.selectAllBooks());
+      }
       await DocumentReflowSync(
         client: client,
         cache: await getAnxCacheDir(),
@@ -626,6 +632,16 @@ class Sync extends _$Sync {
     }
   }
 
+  Future<void> queueCloudBookDeletion(Iterable<Book> books) async {
+    final client = _syncClient;
+    if (client == null || !client.isConfigured) {
+      throw StateError('Sync is not configured');
+    }
+    await BookCloudDeletions(io.File(getBasePath('book_cloud_deletions.json')))
+        .enqueue(client, books);
+    await _pendingSync.request();
+  }
+
   Future<void> syncFiles({SyncAssetListing? assetListing}) async {
     final client = _syncClient;
     if (client == null) return;
@@ -633,7 +649,8 @@ class Sync extends _$Sync {
     AnxLog.info('Sync: syncFiles');
     final localBooks = await bookDao.selectNotDeleteBooks();
     final bookFiles = {
-      for (final book in localBooks.where((book) => !book.isLinked))
+      for (final book in localBooks
+          .where((book) => !book.isLinked && !book.isRemovedLocally))
         book.filePath: book.fileFullPath
     };
     final currentBooks = bookFiles.keys.toList();
@@ -864,9 +881,9 @@ class Sync extends _$Sync {
     }
   }
 
-  Future<void> downloadBook(Book book) async {
+  Future<void> downloadBook(Book book, {bool asInternalCopy = false}) async {
     try {
-      await _downloadBook(book);
+      await _downloadBook(book, asInternalCopy: asInternalCopy);
     } catch (e) {
       // Error handling is done in _downloadBook
     }
@@ -989,19 +1006,20 @@ class Sync extends _$Sync {
     }
   }
 
-  Future<void> _downloadBook(Book book) async {
+  Future<void> _downloadBook(Book book, {bool asInternalCopy = false}) async {
     try {
       // A shelf widget can still hold the pre-replacement filename.
       book = await bookDao.selectBookById(book.id);
       if (book.isDeleted) return;
-      if (book.isLinked) {
+      if (book.isLinked && !asInternalCopy) {
         throw StateError(
             '原位书籍未上传原书，请在当前设备重新授权或普通导入。 / Add the original in place or import it on this device.');
       }
       final remotePath = SyncPaths.data(book.filePath);
       final localPath = getBasePath(book.filePath);
       await downloadFile(remotePath, localPath, expectedMd5: book.md5);
-      await BookSources.store?.remove(book.md5, book.filePath);
+      await BookSources.store?.save(book.md5, book.filePath,
+          kind: 'internal', locator: book.filePath);
       await _cleanupReplacedLocalBooks();
       try {
         final client = _syncClient;

@@ -62,7 +62,7 @@ void main() {
   });
 
   test(
-      'restore follows refreshed paths; revoked access falls back only to owned storage',
+      'restore follows refreshed paths; revoked access cannot fall back to an unrelated owned file',
       () async {
     final book = Book.mock().copyWith(filePath: key);
     final moved = await original.rename('${root.path}/moved.epub');
@@ -71,7 +71,8 @@ void main() {
     expect(book.fileFullPath, moved.path);
     bookmarks.clear();
     await IosLinkedBooks.restore();
-    expect(book.fileFullPath, getBasePath(key));
+    expect(book.fileFullPath, contains('/.unlinked/'));
+    await File(getBasePath(key)).writeAsString('stale copy');
     expect(await File(book.fileFullPath).exists(), false);
     expect(await moved.readAsString(), 'book');
   });

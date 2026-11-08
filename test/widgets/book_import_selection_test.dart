@@ -62,10 +62,10 @@ void main() {
             body: BookImportSelection(inPlace: true, entries: [
       BookImportEntry(id: 'a', name: 'book.epub', label: 'book.epub'),
     ]))));
-    expect(find.textContaining('without copying'), findsOneWidget);
-    expect(find.textContaining('not uploaded or included in backups'),
+    expect(find.textContaining('without uploading'), findsOneWidget);
+    expect(find.textContaining('Notes and progress still sync'),
         findsOneWidget);
-    expect(find.textContaining('TXT, Markdown and UMD'), findsOneWidget);
+    expect(find.textContaining('TXT, Markdown or UMD'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   testWidgets(

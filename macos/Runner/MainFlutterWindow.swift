@@ -19,6 +19,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     ExternalBookFiles.shared.register(flutterViewController.engine.binaryMessenger)
+    LinkedBookFiles.shared.register(flutterViewController.engine.binaryMessenger)
     registerConfigTransferChannel(flutterViewController)
     registerBrightnessChannel(flutterViewController)
     registerWordSelectionChannel(flutterViewController)

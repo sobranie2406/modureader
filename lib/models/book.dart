@@ -71,6 +71,8 @@ class Book {
         getBasePath(filePath);
   }
 
+  bool get isRemovedLocally => BookSources.isRemoved(md5, filePath);
+
   bool get isLinked => BookSources.isLinked(md5, filePath);
 
   Map<String, Object?> toMap() {

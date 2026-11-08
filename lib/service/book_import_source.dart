@@ -128,10 +128,12 @@ class MobileBookFolder {
 
   static Future<List<BookImportEntry>?> pick(
       {bool files = false,
+      bool inPlace = false,
       List<String> extensions = allowBookExtensions}) async {
     final result = await channel.invokeListMethod<dynamic>('pick', {
       'extensions': extensions,
       'files': files,
+      'inPlace': inPlace,
     });
     return result
         ?.map((dynamic item) => BookImportEntry(

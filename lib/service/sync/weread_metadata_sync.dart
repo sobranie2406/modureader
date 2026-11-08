@@ -38,9 +38,7 @@ class WereadMetadataSync {
     try {
       final localBooks = <Book>[];
       for (final book in books) {
-        if (!book.isDeleted &&
-            _md5.hasMatch(book.md5?.toLowerCase() ?? '') &&
-            await sourceFile(book).exists()) {
+        if (!book.isDeleted && _md5.hasMatch(book.md5?.toLowerCase() ?? '')) {
           localBooks.add(book);
         }
       }
@@ -59,7 +57,6 @@ class WereadMetadataSync {
                   entry.name!,
             };
       for (final book in localBooks) {
-        if (!await sourceFile(book).exists()) continue;
         final id = book.md5!.toLowerCase();
         final local = store(book);
         if (WereadData.revision(await local.read()) == null &&

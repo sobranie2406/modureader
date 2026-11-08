@@ -55,15 +55,15 @@ void main() {
   });
 
   test(
-      'remote-only books never download metadata; downloading original enables it',
+      'metadata syncs without downloading the original',
       () async {
     await store(a, bookA).bind({'bookId': 'wr1'});
     await sync(a, bookA);
     await File('${b.path}/50.epub').delete();
     final downloads = client.downloads;
     await sync(b, bookB);
-    expect(client.downloads, downloads);
-    expect(WereadData.bookId(await store(b, bookB).read()), null);
+    expect(client.downloads, greaterThan(downloads));
+    expect(WereadData.bookId(await store(b, bookB).read()), 'wr1');
     await File('${b.path}/50.epub').writeAsBytes([1]);
     await sync(b, bookB);
     expect(WereadData.bookId(await store(b, bookB).read()), 'wr1');

@@ -611,7 +611,8 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
                 icon: const Icon(Icons.add),
                 tooltip: ModuStrings.text(context, '导入书籍', 'Import books'),
                 onSelected: (mode) => pickBooksForImport(context, ref,
-                    folder: mode.isOdd, inPlace: mode >= 2),
+                    folder: mode.isOdd,
+                    inPlace: mode >= 2 || Prefs().inPlaceImportEnabled),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                       value: 0,

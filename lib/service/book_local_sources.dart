@@ -45,7 +45,8 @@ class BookLocalSources {
   static void _validate(Map<String, String> entry) {
     final kind = entry['kind'];
     final locator = entry['locator'];
-    if (!const ['internal', 'linked'].contains(kind) ||
+    if (!const ['internal', 'linked', 'unlinked', 'internal-removed']
+            .contains(kind) ||
         locator == null ||
         locator.isEmpty ||
         locator.contains('\u0000')) {
@@ -100,11 +101,18 @@ class BookSources {
 
   static String? resolve(String? md5, String remotePath, String library) {
     final source = _store?.read(md5, remotePath);
-    if (source == null) return IosLinkedBooks.resolve(remotePath);
+    final missing = p.join(library, '.unlinked', p.basename(remotePath));
+    if (source == null) {
+      return IosLinkedBooks.resolve(remotePath) ??
+          (IosLinkedBooks.isLinked(remotePath) ? missing : null);
+    }
     final locator = source['locator']!;
     if (source['kind'] == 'internal') return p.join(library, locator);
+    if (isRemoved(md5, remotePath)) {
+      return p.join(library, '.unlinked', p.basename(remotePath));
+    }
     if (IosLinkedBooks.isLinked(locator)) {
-      return IosLinkedBooks.resolve(locator);
+      return IosLinkedBooks.resolve(locator) ?? missing;
     }
     return p.isAbsolute(locator) ? locator : null;
   }
@@ -113,8 +121,13 @@ class BookSources {
     final source = _store?.read(md5, remotePath);
     return source == null
         ? IosLinkedBooks.isLinked(remotePath)
-        : source['kind'] == 'linked';
+        : const ['linked', 'unlinked'].contains(source['kind']);
   }
+
+  static bool isRemoved(String? md5, String remotePath) => const [
+        'unlinked',
+        'internal-removed'
+      ].contains(_store?.read(md5, remotePath)?['kind']);
 
   /// Preserve the local source before the synced asset key changes. Does not
   /// change the incoming payload, clocks, or replacement/identity protocol.
@@ -145,9 +158,18 @@ class BookSources {
 
   static Future<void> initialize(Directory library) async {
     _store = null;
+    _loadError = null;
     final next =
         BookLocalSources(File(p.join(library.path, 'book_sources.json')));
-    await next.load();
-    _store = next;
+    try {
+      await next.load();
+      _store = next;
+    } on TypeError catch (error) {
+      _loadError = error;
+    } on FormatException catch (error) {
+      _loadError = error;
+    } on FileSystemException catch (error) {
+      _loadError = error;
+    }
   }
 }

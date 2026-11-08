@@ -1,3 +1,4 @@
+import LinkedBookFilesPlugin from '../plugins/LinkedBookFilesPlugin';
 import { Want, AbilityConstant } from '@kit.AbilityKit';
 import ExternalBookFilesPlugin from '../plugins/ExternalBookFilesPlugin';
 
@@ -21,6 +22,7 @@ export default class EntryAbility extends FlutterAbility {
     GeneratedPluginRegistrant.registerWith(flutterEngine)
     flutterEngine.getPlugins()?.add(ExternalBookFilesPlugin.shared)
     flutterEngine.getPlugins()?.add(new FileExportPlugin())
+    flutterEngine.getPlugins()?.add(new LinkedBookFilesPlugin())
     flutterEngine.getPlugins()?.add(new ReaderWakelockPlugin())
     flutterEngine.getPlugins()?.add(new ReaderCutoutPlugin())
   }

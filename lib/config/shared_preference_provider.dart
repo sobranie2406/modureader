@@ -2186,7 +2186,7 @@ class Prefs extends ChangeNotifier {
     );
   }
 
-  // Device-local gate; the full in-place import settings UI is not enabled yet.
+  // Device-local setting; never included in synchronization or backups.
   bool get inPlaceImportEnabled =>
       prefs.getBool('inPlaceImportEnabled') ?? false;
 

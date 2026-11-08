@@ -8,8 +8,16 @@ class IosLinkedBooks {
   static const extensions = ['epub', 'pdf', 'mobi', 'azw3', 'fb2'];
   static final Map<String, String> _paths = {};
 
-  static bool isLinked(String path) => path.startsWith('file/ios-linked-');
+  static bool isLinked(String path) =>
+      path.startsWith('file/ios-linked-') || path.startsWith('file/linked-');
   static String? resolve(String path) => _paths[path];
+
+  static void registerPath(String key, String path) {
+    if (!isLinked(key) || !File(path).isAbsolute) {
+      throw const FileSystemException('Invalid original path');
+    }
+    _paths[key] = path;
+  }
 
   static Future<void> restore() async {
     final paths = await channel.invokeMapMethod<String, String>('restoreLinks');
@@ -35,7 +43,13 @@ class IosLinkedBooks {
 
   static Future<void> forget(String key) async {
     if (!isLinked(key)) return;
-    if (!Platform.isIOS && !_paths.containsKey(key)) return;
+    if (!(Platform.isIOS ||
+        Platform.isAndroid ||
+        Platform.isMacOS ||
+        Platform.operatingSystem == 'ohos')) {
+      _paths.remove(key);
+      return;
+    }
     await channel.invokeMethod<void>('forgetLink', {'key': key});
     _paths.remove(key);
   }

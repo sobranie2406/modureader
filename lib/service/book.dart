@@ -1,3 +1,4 @@
+import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/service/book_import_source.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
@@ -518,14 +519,41 @@ Future<void> pushToReadingPage(
 
   if (!File(book.fileFullPath).existsSync()) {
     if (book.isLinked) {
-      AnxToast.show(ModuStrings.text(
-          context,
-          '原书不可访问。iOS 请通过“原位添加”重新授权，其他平台请普通导入原书。',
-          'Original unavailable. Add it in place again on iOS, or import it normally on other platforms.'));
+      final relink = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+                title: Text(ModuStrings.text(
+                    context, '原书不可访问', 'Original unavailable')),
+                content: Text(ModuStrings.text(context, '选择同一本书重新关联，笔记和进度会保留。',
+                    'Select the same book to restore access. Notes and progress are kept.')),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text(ModuStrings.text(context, '重新关联', 'Relink')))
+                ],
+              ));
+      if (relink == true && context.mounted) {
+        await pickBooksForImport(context, ref, inPlace: true, relinkBook: book);
+      }
       return;
     }
     ref.read(syncProvider.notifier).downloadBook(book);
     return;
+  }
+
+  if (book.isLinked && book.md5 != null) {
+    final currentHash = await MD5Service.calculateFileMd5(book.fileFullPath);
+    if (currentHash?.toLowerCase() != book.md5!.toLowerCase()) {
+      if (context.mounted) {
+        AnxToast.show(ModuStrings.text(context, '原文件内容已改变，请重新添加为新书；原有笔记和进度已保留。',
+            'The original has changed. Add it as a new book; existing notes and progress are kept.'));
+      }
+      return;
+    }
+    if (!context.mounted) return;
   }
 
   ref.read(aiChatProvider(AiChatScope.reader).notifier).clear();
@@ -589,8 +617,9 @@ Future<void> saveBook(
   String? sourceFormat,
   Object? documentReadingMode,
   String? linkedPath,
+  String? sourceName,
 }) async {
-  final effectiveTitle = importedBookTitle(file.path, title);
+  final effectiveTitle = importedBookTitle(sourceName ?? file.path, title);
 
   final newBookName =
       '${effectiveTitle.length > 20 ? effectiveTitle.substring(0, 20) : effectiveTitle}-${DateTime.now().microsecondsSinceEpoch}'
@@ -604,7 +633,8 @@ Future<void> saveBook(
   if (linkedPath != null && IosLinkedBooks.resolve(linkedPath) != file.path) {
     throw const FileSystemException('Invalid linked book access');
   }
-  final dbFilePath = linkedPath ?? 'file/$newBookName.$extension';
+  // The cloud asset key must not encode this device's source or permission.
+  final dbFilePath = 'file/$newBookName.$extension';
   final filePath = getBasePath(dbFilePath);
   String dbCoverPath = 'cover/$newBookName';
   // final coverPath = getBasePath(dbCoverPath);
@@ -626,6 +656,10 @@ Future<void> saveBook(
       author: provideBook?.author ?? author,
       isDeleted: false,
       rating: provideBook?.rating ?? 0.0,
+      groupId: provideBook?.groupId ?? 0,
+      review: provideBook?.review ?? '',
+      currentRound: provideBook?.currentRound ?? 1,
+      description: provideBook?.description ?? description,
       md5: md5,
       createTime: provideBook?.createTime ?? DateTime.now(),
       updateTime: DateTime.now());
@@ -643,8 +677,10 @@ Future<void> saveBook(
     rethrow;
   }
   if (linkedPath != null) {
-    await BookSources.store
-        ?.save(md5, dbFilePath, kind: 'linked', locator: linkedPath);
+    await BookSources.store?.save(md5, dbFilePath,
+        kind: 'linked',
+        locator:
+            (Platform.isWindows || Platform.isLinux) ? file.path : linkedPath);
   } else {
     await BookSources.store
         ?.save(md5, dbFilePath, kind: 'internal', locator: dbFilePath);
@@ -687,6 +723,7 @@ Future<void> getBookMetadata(
   bool classificationOnly = false,
   bool inspectDocumentOnImport = true,
   String? linkedPath,
+  String? sourceName,
 }) async {
   if (classificationOnly && (book == null || coverOnly)) {
     throw ArgumentError('Classification requires an existing book');
@@ -784,6 +821,7 @@ Future<void> getBookMetadata(
         sourceMd5: sourceMd5,
         sourceFormat: sourceFormat,
         linkedPath: linkedPath,
+        sourceName: sourceName,
         documentReadingMode: metadata['documentReadingMode']);
     ref?.read(bookListProvider.notifier).refresh();
   } finally {

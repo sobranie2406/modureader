@@ -58,6 +58,7 @@ class BookSourceFormat {
   }
 
   Future<String> resolve(Book book) {
+    if (book.isLinked) return Future.value(format(book));
     if (path.extension(book.filePath).toLowerCase() != '.epub') {
       return Future.value(format(book));
     }

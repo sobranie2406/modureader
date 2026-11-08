@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/read_only_book_file.dart';
 import 'dart:io';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/dao/book.dart';
@@ -10,7 +11,7 @@ import 'package:crypto/crypto.dart';
 class MD5Service {
   static Future<String?> calculateFileMd5(String filePath) async {
     try {
-      final file = File(filePath);
+      final file = readOnlyBookFile(filePath);
       if (!await file.exists()) {
         return null;
       }

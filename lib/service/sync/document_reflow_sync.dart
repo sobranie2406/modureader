@@ -45,9 +45,7 @@ class DocumentReflowSync {
   Future<void> _sync(Iterable<Book> books) async {
     final candidates = <Book>[];
     for (final book in books) {
-      if (!book.isDeleted &&
-          _bookId.hasMatch(book.md5?.toLowerCase() ?? '') &&
-          await sourceFile(book).exists()) {
+      if (!book.isDeleted && _bookId.hasMatch(book.md5?.toLowerCase() ?? '')) {
         candidates.add(book);
       }
     }
@@ -67,7 +65,6 @@ class DocumentReflowSync {
                   entry.name!
             };
       for (final book in candidates) {
-        if (!await sourceFile(book).exists()) continue;
         final id = book.md5!.toLowerCase();
         final local = store(book);
         final data = await local.syncSnapshot();

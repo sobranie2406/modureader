@@ -154,7 +154,10 @@ Future<void> main(List<String> arguments) async {
       await prefs.setBool('storageMigrationSucceeded', committed);
     }
   }
-  if (Platform.isIOS) {
+  if (Platform.isIOS ||
+      Platform.isAndroid ||
+      Platform.isMacOS ||
+      AnxPlatform.isOhos) {
     try {
       await IosLinkedBooks.restore();
     } catch (_) {

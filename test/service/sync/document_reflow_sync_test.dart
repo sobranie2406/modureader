@@ -84,7 +84,7 @@ void main() {
   });
 
   test(
-      'remote-only original never downloads OCR; downloading the original enables it',
+      'OCR syncs even when the original is not available on this device',
       () async {
     await store(a, bookA).save(page(0, '随原书缓存'), '', onlyIfAbsent: true);
     await sync(a, bookA);
@@ -92,8 +92,8 @@ void main() {
     await source.delete();
     final downloads = client.downloads;
     await sync(b, bookB);
-    expect(client.downloads, downloads);
-    expect(await store(b, bookB).read(0, ''), isNull);
+    expect(client.downloads, greaterThan(downloads));
+    expect((await store(b, bookB).read(0, ''))!.text, '随原书缓存');
     await source.writeAsBytes([1, 2, 3]);
     await sync(b, bookB);
     expect((await store(b, bookB).read(0, ''))!.text, '随原书缓存');

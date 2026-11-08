@@ -1,3 +1,5 @@
+import 'package:anx_reader/providers/sync.dart';
+import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'package:anx_reader/service/book_local_sources.dart';
@@ -112,6 +114,7 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
   final list = books.toList(growable: false);
   if (list.isEmpty) return false;
 
+  var deleteCloud = false;
   final confirmed = await showDialog<bool>(
         animationStyle: AppMotion.style,
         context: context,
@@ -121,26 +124,41 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
               : ModuStrings.format(
                   dialogContext, '删除 {count} 本书', 'Delete {count} books',
                   values: {'count': list.length})),
-          content: Text(
-            list.any((book) => book.isLinked)
-                ? ModuStrings.text(
-                    dialogContext,
-                    '确定删除所选书籍吗？将删除书架记录、封面、本地索引及默读内的副本。原位添加的外部原书会保留。',
-                    'Delete the selected books, covers, local indexes and copies stored in Modu? External originals added in place are kept.')
-                : (list.length == 1
-                    ? ModuStrings.format(
-                        dialogContext,
-                        '确定删除《{title}》吗？书籍文件及本地向量索引也会被删除。',
-                        'Delete “{title}”? The book file and local vector index will also be deleted.',
-                        values: {
-                            'title': list.first.title
-                          })
-                    : ModuStrings.format(
-                        dialogContext,
-                        '确定删除所选 {count} 本书吗？书籍文件及本地向量索引也会被删除。',
-                        'Delete the {count} selected books? Their files and local vector indexes will also be deleted.',
-                        values: {'count': list.length})),
-          ),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(
+              list.any((book) => book.isLinked)
+                  ? ModuStrings.text(
+                      dialogContext,
+                      '确定删除所选书籍吗？将删除书架记录、封面、本地索引及默读内的副本。原位添加的外部原书会保留。',
+                      'Delete the selected books, covers, local indexes and copies stored in Modu? External originals added in place are kept.')
+                  : (list.length == 1
+                      ? ModuStrings.format(
+                          dialogContext,
+                          '确定删除《{title}》吗？书籍文件及本地向量索引也会被删除。',
+                          'Delete “{title}”? The book file and local vector index will also be deleted.',
+                          values: {
+                              'title': list.first.title
+                            })
+                      : ModuStrings.format(
+                          dialogContext,
+                          '确定删除所选 {count} 本书吗？书籍文件及本地向量索引也会被删除。',
+                          'Delete the {count} selected books? Their files and local vector indexes will also be deleted.',
+                          values: {'count': list.length})),
+            ),
+            if (Prefs().webdavStatus)
+              StatefulBuilder(
+                  builder: (context, setState) => CheckboxListTile(
+                        value: deleteCloud,
+                        onChanged: (value) =>
+                            setState(() => deleteCloud = value ?? false),
+                        title: Text(ModuStrings.text(
+                            context, '同时删除云端副本', 'Also delete cloud copies')),
+                        subtitle: Text(ModuStrings.text(
+                            context,
+                            '外部原书保留；离线时在下次同步处理。',
+                            'External originals are kept. Offline deletions run on the next sync.')),
+                      )),
+          ]),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -157,6 +175,9 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
       false;
   if (!confirmed) return false;
 
+  if (deleteCloud) {
+    await ref.read(syncProvider.notifier).queueCloudBookDeletion(list);
+  }
   await deleteBooksFromBookshelf(ref, list);
   return true;
 }

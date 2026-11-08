@@ -1,3 +1,7 @@
+import 'package:anx_reader/service/read_only_book_file.dart';
+import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
+import 'package:anx_reader/service/book_source_actions.dart';
+import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io';
@@ -51,6 +55,10 @@ enum BookAction {
   share,
   replace,
   release,
+  relink,
+  copyInternal,
+  removeDevice,
+  downloadInternal,
   delete
 }
 
@@ -143,9 +151,17 @@ class BookBottomSheet extends ConsumerWidget {
     }
 
     Future<void> handleShare() async {
+      var sharePath = book.fileFullPath;
+      if (book.isLinked) {
+        // Recipients cannot use this process's read-only descriptor/bookmark.
+        final folder = await (await getAnxTempDir()).createTemp('share-book-');
+        sharePath = (await readOnlyBookFile(sharePath)
+                .copy(p.join(folder.path, p.basename(book.filePath))))
+            .path;
+      }
       await shareFile(
         title: '${book.title}.${book.filePath.split('.').last}',
-        filePath: book.fileFullPath,
+        filePath: sharePath,
       );
     }
 
@@ -338,68 +354,120 @@ class BookBottomSheet extends ConsumerWidget {
             tooltip: ModuStrings.text(context, '书籍操作', 'Book actions'),
             color: Theme.of(context).colorScheme.surfaceContainer,
             onSelected: (action) async {
-              switch (action) {
-                case BookAction.details:
-                  handleDetail(context);
-                  break;
-                case BookAction.pin:
-                  try {
+              try {
+                switch (action) {
+                  case BookAction.relink:
+                    await pickBooksForImport(context, ref,
+                        inPlace: true, relinkBook: book);
+                    break;
+                  case BookAction.copyInternal:
+                    await copyLinkedBookToLibrary(book);
+                    await ref.read(bookListProvider.notifier).refresh();
+                    ref.invalidate(syncStatusProvider);
+                    break;
+                  case BookAction.downloadInternal:
                     await ref
-                        .read(bookshelfPinsProvider.notifier)
-                        .setPinned(bookPinKey(book), !pinned);
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    AnxToast.show(ModuStrings.text(context, '置顶设置保存失败，请重试',
-                        'Could not save pin. Please retry.'));
-                  }
-                  break;
-                case BookAction.vectorize:
-                  await queueBookForVectorization(book);
-                  break;
-                case BookAction.scanned:
-                  try {
-                    final store = DocumentReadingModeStore(Prefs().prefs);
-                    final enabled =
-                        store.read(book) != DocumentReadingMode.imageEpub;
-                    if (enabled) {
-                      await PdfReadingStateStore(Prefs().prefs)
-                          .setEnabled(customCssBookKey(book), true);
+                        .read(syncProvider.notifier)
+                        .downloadBook(book, asInternalCopy: true);
+                    break;
+                  case BookAction.removeDevice:
+                    final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                              title: Text(ModuStrings.text(context, '仅从本机移除',
+                                  'Remove from this device')),
+                              content: Text(ModuStrings.text(
+                                  context,
+                                  book.isLinked
+                                      ? '解除本机关联，外部原书、笔记和进度保留。'
+                                      : '删除本机副本，笔记和进度保留。请先确认其他位置有原书。',
+                                  'Remove local access or the internal copy. Notes and progress are kept. Keep another copy of the book.')),
+                              actions: [
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: Text(ModuStrings.text(
+                                        context, '取消', 'Cancel'))),
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: Text(ModuStrings.text(
+                                        context, '移除', 'Remove')))
+                              ],
+                            ));
+                    if (confirmed == true) {
+                      await removeBookFromDevice(book);
+                      await ref.read(bookListProvider.notifier).refresh();
+                      ref.invalidate(syncStatusProvider);
                     }
-                    await store.setScanned(book, enabled);
-                    Prefs().notifyExternalChange();
-                    ref.read(bookListProvider.notifier).refresh();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(ModuStrings.text(
-                              context,
-                              '阅读类型已保存，下次打开书籍时生效',
-                              'Reading type saved. Applies when you reopen the book.'))));
+                    break;
+                  case BookAction.details:
+                    handleDetail(context);
+                    break;
+                  case BookAction.pin:
+                    try {
+                      await ref
+                          .read(bookshelfPinsProvider.notifier)
+                          .setPinned(bookPinKey(book), !pinned);
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      AnxToast.show(ModuStrings.text(context, '置顶设置保存失败，请重试',
+                          'Could not save pin. Please retry.'));
                     }
-                  } catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(ModuStrings.text(
-                              context,
-                              '阅读类型保存失败，请重试',
-                              'Could not save reading type. Please retry.'))));
+                    break;
+                  case BookAction.vectorize:
+                    await queueBookForVectorization(book);
+                    break;
+                  case BookAction.scanned:
+                    try {
+                      final store = DocumentReadingModeStore(Prefs().prefs);
+                      final enabled =
+                          store.read(book) != DocumentReadingMode.imageEpub;
+                      if (enabled) {
+                        await PdfReadingStateStore(Prefs().prefs)
+                            .setEnabled(customCssBookKey(book), true);
+                      }
+                      await store.setScanned(book, enabled);
+                      Prefs().notifyExternalChange();
+                      ref.read(bookListProvider.notifier).refresh();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(ModuStrings.text(
+                                context,
+                                '阅读类型已保存，下次打开书籍时生效',
+                                'Reading type saved. Applies when you reopen the book.'))));
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(ModuStrings.text(
+                                context,
+                                '阅读类型保存失败，请重试',
+                                'Could not save reading type. Please retry.'))));
+                      }
                     }
-                  }
-                  break;
-                case BookAction.vectorModel:
-                  await showBookEmbeddingModelDialog(context, book);
-                  break;
-                case BookAction.share:
-                  await handleShare();
-                  break;
-                case BookAction.replace:
-                  await handleReplace(context);
-                  break;
-                case BookAction.release:
-                  handleUpload(context);
-                  break;
-                case BookAction.delete:
-                  await handleDelete(context);
-                  break;
+                    break;
+                  case BookAction.vectorModel:
+                    await showBookEmbeddingModelDialog(context, book);
+                    break;
+                  case BookAction.share:
+                    await handleShare();
+                    break;
+                  case BookAction.replace:
+                    await handleReplace(context);
+                    break;
+                  case BookAction.release:
+                    handleUpload(context);
+                    break;
+                  case BookAction.delete:
+                    await handleDelete(context);
+                    break;
+                }
+              } catch (error) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('$error')));
+                }
               }
             },
             itemBuilder: (context) => [
@@ -447,6 +515,34 @@ class BookBottomSheet extends ConsumerWidget {
                       !active &&
                       !book.isLinked),
               const PopupMenuDivider(),
+              if (Prefs().inPlaceImportEnabled) ...[
+                entry(
+                    BookAction.relink,
+                    Icons.link,
+                    ModuStrings.text(
+                        context,
+                        book.isLinked ? '重新关联原文件' : '关联本地原书',
+                        book.isLinked
+                            ? 'Relink original'
+                            : 'Link local original'),
+                    enabled: !active),
+                if (book.isLinked && local)
+                  entry(BookAction.copyInternal, Icons.copy_outlined,
+                      ModuStrings.text(context, '复制到默读', 'Copy into Modu'),
+                      enabled: !active),
+                if (!local && Prefs().webdavStatus)
+                  entry(
+                      BookAction.downloadInternal,
+                      Icons.download,
+                      ModuStrings.text(
+                          context, '下载内部副本', 'Download internal copy')),
+                entry(
+                    BookAction.removeDevice,
+                    Icons.link_off,
+                    ModuStrings.text(
+                        context, '仅从本机移除', 'Remove from this device'),
+                    enabled: !active),
+              ],
               entry(BookAction.delete, Icons.delete_outline,
                   L10n.of(context).commonDelete),
             ],
