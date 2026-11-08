@@ -7,6 +7,13 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:anx_reader/utils/log/common.dart';
+
+class BaiduAuthRetryableException extends RemoteLibraryException {
+  const BaiduAuthRetryableException()
+      : super('授权服务暂时无法连接，请稍后重试。',
+            'Authorization service temporarily unavailable. Please retry.');
+}
 
 /// No Baidu app secret or refresh token is distributed with the client.
 class BaiduAuth {
@@ -54,6 +61,11 @@ class BaiduAuth {
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) rethrow;
       final code = error.response?.statusCode;
+      AnxLog.warning(
+          'Baidu authorization $path: ${error.type.name}, HTTP $code');
+      if (code == null || code == 408 || code == 429 || (code >= 500)) {
+        throw const BaiduAuthRetryableException();
+      }
       throw RemoteLibraryException(
           code == 401
               ? '授权已失效，请重新连接百度网盘。'

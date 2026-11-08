@@ -26,6 +26,30 @@ void main() {
   });
   tearDown(() => auth.close());
 
+  test('temporary network failures can retry but invalid sessions cannot',
+      () async {
+    for (final status in <int?>[null, 503, 401]) {
+      final client = Dio()
+        ..interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+          handler.reject(DioException(
+              requestOptions: options,
+              type: status == null
+                  ? DioExceptionType.connectionTimeout
+                  : DioExceptionType.badResponse,
+              response: status == null
+                  ? null
+                  : Response(requestOptions: options, statusCode: status)));
+        }));
+      final failing = BaiduAuth(client: client);
+      addTearDown(failing.close);
+      await expectLater(
+          failing.claim('ticket', 'proof', CancelToken()),
+          status == 401
+              ? throwsA(isNot(isA<BaiduAuthRetryableException>()))
+              : throwsA(isA<BaiduAuthRetryableException>()));
+    }
+  });
+
   test(
       'device session restored securely, concurrent token loads coalesce and cache',
       () async {

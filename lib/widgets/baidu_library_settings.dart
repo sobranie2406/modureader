@@ -15,17 +15,42 @@ class BaiduLibrarySettings extends StatefulWidget {
   State<BaiduLibrarySettings> createState() => _BaiduLibrarySettingsState();
 }
 
-class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings> {
+class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
+    with WidgetsBindingObserver {
   final _auth = BaiduAuth();
   CancelToken? _cancel;
   bool _loading = true, _connected = false, _busy = false;
   String? _message;
+  Completer<void>? _resumeSignal;
   String t(String cn, String en) => ModuStrings.text(context, cn, en);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _restore();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final signal = _resumeSignal;
+      if (signal != null && !signal.isCompleted) signal.complete();
+    }
+  }
+
+  bool get _foreground =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  Future<void> _waitForPoll(CancelToken cancel) async {
+    final signal = _resumeSignal = Completer<void>();
+    await Future.any([
+      Future<void>.delayed(const Duration(seconds: 5)),
+      signal.future,
+      cancel.whenCancel,
+    ]);
+    if (identical(_resumeSignal, signal)) _resumeSignal = null;
   }
 
   Future<void> _restore() async {
@@ -62,14 +87,24 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings> {
             '请在百度页面完成授权，然后返回默读。', 'Authorize on Baidu, then return to Modu.'));
       }
       final deadline = DateTime.now().add(const Duration(minutes: 5));
+      var failures = 0;
       while (
           mounted && !cancel.isCancelled && DateTime.now().isBefore(deadline)) {
-        await Future.any([
-          Future<void>.delayed(const Duration(seconds: 5)),
-          cancel.whenCancel
-        ]);
+        if (!_foreground) {
+          await _waitForPoll(cancel);
+          continue;
+        }
         if (!mounted || cancel.isCancelled) return;
-        if (await _auth.claim(flow.ticket, proof, cancel)) {
+        bool connected;
+        try {
+          connected = await _auth.claim(flow.ticket, proof, cancel);
+          failures = 0;
+        } on BaiduAuthRetryableException {
+          if (_foreground && ++failures >= 3) rethrow;
+          await _waitForPoll(cancel);
+          continue;
+        }
+        if (connected) {
           if (mounted) {
             setState(() {
               _connected = true;
@@ -79,6 +114,7 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings> {
           }
           return;
         }
+        await _waitForPoll(cancel);
       }
       if (mounted && !cancel.isCancelled) {
         setState(() => _message =
@@ -119,6 +155,7 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cancel?.cancel();
     _auth.close();
     super.dispose();
