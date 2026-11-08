@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:anx_reader/service/ios_linked_books.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book.dart';
@@ -45,18 +47,24 @@ class BookTypeBadges extends StatefulWidget {
 
 class _BookTypeBadgesState extends State<BookTypeBadges> {
   late Future<String> _format;
+  late Future<bool> _available;
+
+  void _load() {
+    _format = BookSourceFormat(Prefs().prefs).resolve(widget.book);
+    _available = File(widget.book.fileFullPath).exists();
+  }
 
   @override
   void initState() {
     super.initState();
-    _format = BookSourceFormat(Prefs().prefs).resolve(widget.book);
+    _load();
   }
 
   @override
   void didUpdateWidget(BookTypeBadges oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.book, widget.book)) {
-      _format = BookSourceFormat(Prefs().prefs).resolve(widget.book);
+      _load();
     }
   }
 
@@ -79,7 +87,7 @@ class _BookTypeBadgesState extends State<BookTypeBadges> {
                     const Color(0xFFAC5B00)
                   ),
               ];
-              if (labels.isEmpty) return const SizedBox.shrink();
+
               return IgnorePointer(
                   child: LayoutBuilder(builder: (context, constraints) {
                 return Wrap(
@@ -87,6 +95,31 @@ class _BookTypeBadgesState extends State<BookTypeBadges> {
                   runSpacing: 4,
                   verticalDirection: VerticalDirection.up,
                   children: [
+                    FutureBuilder<bool>(
+                      future: _available,
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        final linked =
+                            IosLinkedBooks.isLinked(widget.book.filePath);
+                        final available = snapshot.data!;
+                        final label = linked
+                            ? ModuStrings.text(
+                                context,
+                                available ? '原位' : '原位·未关联',
+                                available ? 'Linked' : 'Linked · unavailable')
+                            : ModuStrings.text(
+                                context,
+                                available ? '内部' : '内部·无文件',
+                                available
+                                    ? 'Internal'
+                                    : 'Internal · unavailable');
+                        return Text(label,
+                            style: TextStyle(
+                                fontSize: 10,
+                                color:
+                                    Theme.of(context).colorScheme.onSurface));
+                      },
+                    ),
                     for (final (label, color) in labels)
                       ConstrainedBox(
                         constraints:

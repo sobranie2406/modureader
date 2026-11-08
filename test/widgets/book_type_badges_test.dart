@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:anx_reader/service/ios_linked_books.dart';
+import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/custom_css_profile.dart';
@@ -18,6 +22,47 @@ void main() {
   });
   Book book(String extension) =>
       Book.mock()..filePath = 'file/example.$extension';
+  testWidgets('storage badges distinguish source and availability',
+      (tester) async {
+    final oldPath = documentPath;
+    final dir = Directory.systemTemp.createTempSync('modu-badge-');
+    documentPath = dir.path;
+    final file = File('${dir.path}/file/internal.pdf')
+      ..createSync(recursive: true);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            IosLinkedBooks.channel,
+            (MethodCall call) async => {
+                  'file/ios-linked-present.pdf': file.path,
+                });
+    await IosLinkedBooks.restore();
+    Prefs().showBookFormatBadge = false;
+    for (final entry in {
+      'file/internal.pdf': 'Internal',
+      'file/missing.pdf': 'Internal · unavailable',
+      'file/ios-linked-present.pdf': 'Linked',
+      'file/ios-linked-missing.pdf': 'Linked · unavailable',
+    }.entries) {
+      await tester.pumpWidget(MaterialApp(
+          home: BookTypeBadges(book: Book.mock()..filePath = entry.key)));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      });
+      await tester.pump();
+      expect(find.text(entry.value), findsOneWidget);
+      expect(find.text('PDF'), findsNothing);
+    }
+    await tester.pumpWidget(const SizedBox());
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            IosLinkedBooks.channel, (_) async => <String, String>{});
+    await IosLinkedBooks.restore();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(IosLinkedBooks.channel, null);
+    documentPath = oldPath;
+    dir.deleteSync(recursive: true);
+  });
+
   test('book formats retain their semantic colours independently of theme', () {
     const colours = {
       'PDF': Color(0xFF2463CB),
