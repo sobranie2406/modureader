@@ -70,6 +70,7 @@ const Set<String> _prefsImportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
+  'inPlaceImportEnabled',
   'wereadEnabled',
   'pendingStorageMigration',
   'storageMigrationSucceeded',
@@ -108,6 +109,7 @@ const Set<String> _prefsExportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
+  'inPlaceImportEnabled',
   'wereadEnabled',
   'pendingStorageMigration',
   'storageMigrationSucceeded',
@@ -2182,6 +2184,15 @@ class Prefs extends ChangeNotifier {
       prefs.getString('bookshelfFolderStyle') ??
           BookshelfFolderStyle.stacked.code,
     );
+  }
+
+  // Device-local gate; the full in-place import settings UI is not enabled yet.
+  bool get inPlaceImportEnabled =>
+      prefs.getBool('inPlaceImportEnabled') ?? false;
+
+  set inPlaceImportEnabled(bool value) {
+    prefs.setBool('inPlaceImportEnabled', value);
+    notifyListeners();
   }
 
   set showBookFormatBadge(bool status) {

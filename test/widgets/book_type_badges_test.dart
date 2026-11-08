@@ -49,7 +49,14 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 30));
       });
       await tester.pump();
+      expect(Prefs().inPlaceImportEnabled, isFalse);
+      expect(find.text(entry.value), findsNothing);
+      Prefs().inPlaceImportEnabled = true;
+      await tester.pumpAndSettle();
       expect(find.text(entry.value), findsOneWidget);
+      Prefs().inPlaceImportEnabled = false;
+      await tester.pump();
+      expect(find.text(entry.value), findsNothing);
       expect(find.text('PDF'), findsNothing);
     }
     await tester.pumpWidget(const SizedBox());

@@ -88,6 +88,9 @@ class _BookTypeBadgesState extends State<BookTypeBadges> {
                   ),
               ];
 
+              if (labels.isEmpty && !Prefs().inPlaceImportEnabled) {
+                return const SizedBox.shrink();
+              }
               return IgnorePointer(
                   child: LayoutBuilder(builder: (context, constraints) {
                 return Wrap(
@@ -95,31 +98,32 @@ class _BookTypeBadgesState extends State<BookTypeBadges> {
                   runSpacing: 4,
                   verticalDirection: VerticalDirection.up,
                   children: [
-                    FutureBuilder<bool>(
-                      future: _available,
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const SizedBox.shrink();
-                        final linked =
-                            IosLinkedBooks.isLinked(widget.book.filePath);
-                        final available = snapshot.data!;
-                        final label = linked
-                            ? ModuStrings.text(
-                                context,
-                                available ? '原位' : '原位·未关联',
-                                available ? 'Linked' : 'Linked · unavailable')
-                            : ModuStrings.text(
-                                context,
-                                available ? '内部' : '内部·无文件',
-                                available
-                                    ? 'Internal'
-                                    : 'Internal · unavailable');
-                        return Text(label,
-                            style: TextStyle(
-                                fontSize: 10,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface));
-                      },
-                    ),
+                    if (Prefs().inPlaceImportEnabled)
+                      FutureBuilder<bool>(
+                        future: _available,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox.shrink();
+                          final linked =
+                              IosLinkedBooks.isLinked(widget.book.filePath);
+                          final available = snapshot.data!;
+                          final label = linked
+                              ? ModuStrings.text(
+                                  context,
+                                  available ? '原位' : '原位·未关联',
+                                  available ? 'Linked' : 'Linked · unavailable')
+                              : ModuStrings.text(
+                                  context,
+                                  available ? '内部' : '内部·无文件',
+                                  available
+                                      ? 'Internal'
+                                      : 'Internal · unavailable');
+                          return Text(label,
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface));
+                        },
+                      ),
                     for (final (label, color) in labels)
                       ConstrainedBox(
                         constraints:
