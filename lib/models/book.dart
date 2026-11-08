@@ -1,5 +1,5 @@
 import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/service/ios_linked_books.dart';
+import 'package:anx_reader/service/book_local_sources.dart';
 
 class Book {
   int id;
@@ -67,8 +67,11 @@ class Book {
   }
 
   String get fileFullPath {
-    return IosLinkedBooks.resolve(filePath) ?? getBasePath(filePath);
+    return BookSources.resolve(md5, filePath, documentPath) ??
+        getBasePath(filePath);
   }
+
+  bool get isLinked => BookSources.isLinked(md5, filePath);
 
   Map<String, Object?> toMap() {
     return {

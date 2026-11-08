@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:anx_reader/service/ios_linked_books.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/models/book.dart';
@@ -103,8 +102,7 @@ class _BookTypeBadgesState extends State<BookTypeBadges> {
                         future: _available,
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) return const SizedBox.shrink();
-                          final linked =
-                              IosLinkedBooks.isLinked(widget.book.filePath);
+                          final linked = widget.book.isLinked;
                           final available = snapshot.data!;
                           final label = linked
                               ? ModuStrings.text(

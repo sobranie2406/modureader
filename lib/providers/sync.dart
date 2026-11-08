@@ -1,7 +1,7 @@
+import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
-import 'package:anx_reader/service/ios_linked_books.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:io' as io;
 import 'package:anx_reader/service/book.dart' show getBookMetadata;
@@ -631,7 +631,12 @@ class Sync extends _$Sync {
     if (client == null) return;
 
     AnxLog.info('Sync: syncFiles');
-    List<String> currentBooks = await bookDao.getCurrentBooks();
+    final localBooks = await bookDao.selectNotDeleteBooks();
+    final bookFiles = {
+      for (final book in localBooks.where((book) => !book.isLinked))
+        book.filePath: book.fileFullPath
+    };
+    final currentBooks = bookFiles.keys.toList();
     List<String> currentCover =
         (await bookDao.getCurrentCover()).where((p) => p.isNotEmpty).toList();
 
@@ -661,7 +666,7 @@ class Sync extends _$Sync {
       currentPaths: currentBooks,
       listedPaths: remoteBooksName,
       onRemotePresent: listing.uploaded,
-      localFile: (path) => io.File(getBasePath(path)),
+      localFile: (path) => io.File(bookFiles[path]!),
       upload: (local, remote) async {
         await uploadFile(local, remote);
         listing.uploaded(remote.substring('${SyncPaths.root}/data/'.length));
@@ -868,7 +873,7 @@ class Sync extends _$Sync {
   }
 
   Future<void> releaseBook(Book book) async {
-    if (IosLinkedBooks.isLinked(book.filePath)) {
+    if (book.isLinked) {
       AnxToast.show(ModuStrings.text(
           navigatorKey.currentContext!,
           '原位书籍未复制到默读，无需释放原书空间。',
@@ -891,13 +896,14 @@ class Sync extends _$Sync {
           durableDirectory: await getAnxDataBasesDir(),
         ).sync([book]);
       }
-      await io.File(getBasePath(book.filePath)).delete();
+      await io.File(book.fileFullPath).delete();
+      await BookSources.store?.remove(book.md5, book.filePath);
     }
 
     Future<void> uploadBook() async {
       try {
         final remotePath = SyncPaths.data(book.filePath);
-        final localPath = getBasePath(book.filePath);
+        final localPath = book.fileFullPath;
         await uploadFile(localPath, remotePath);
       } catch (e) {
         AnxToast.show(
@@ -969,7 +975,8 @@ class Sync extends _$Sync {
         files: getFileDir(),
         isInUse: (path) {
           final reading = ref.read(currentReadingProvider);
-          return reading.isReading && reading.book?.filePath == path;
+          return (BookSources.store?.ownedPaths.contains(path) ?? false) ||
+              (reading.isReading && reading.book?.filePath == path);
         },
       );
       if (count > 0) {
@@ -987,13 +994,14 @@ class Sync extends _$Sync {
       // A shelf widget can still hold the pre-replacement filename.
       book = await bookDao.selectBookById(book.id);
       if (book.isDeleted) return;
-      if (IosLinkedBooks.isLinked(book.filePath)) {
+      if (book.isLinked) {
         throw StateError(
             '原位书籍未上传原书，请在当前设备重新授权或普通导入。 / Add the original in place or import it on this device.');
       }
       final remotePath = SyncPaths.data(book.filePath);
       final localPath = getBasePath(book.filePath);
       await downloadFile(remotePath, localPath, expectedMd5: book.md5);
+      await BookSources.store?.remove(book.md5, book.filePath);
       await _cleanupReplacedLocalBooks();
       try {
         final client = _syncClient;

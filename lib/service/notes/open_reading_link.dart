@@ -1,6 +1,5 @@
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
-import 'package:anx_reader/service/ios_linked_books.dart';
 
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/main.dart';
@@ -77,7 +76,7 @@ Future<void> openReadingLink(
     if (book == null || !context.mounted) return;
     if (!await File(book.fileFullPath).exists()) {
       if (!context.mounted) return;
-      if (IosLinkedBooks.isLinked(book.filePath)) {
+      if (book.isLinked) {
         await explain(tr('原位书籍的授权仅在原设备有效，请通过书架“原位添加”重新选择原书；其他平台请普通导入。',
             'In-place access is device-local. Add the original in place again from the shelf, or import it normally on other platforms.'));
         return;

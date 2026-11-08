@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/service/book_import_source.dart';
 import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
 import 'package:anx_reader/utils/app_motion.dart';
@@ -516,7 +517,7 @@ Future<void> pushToReadingPage(
   }
 
   if (!File(book.fileFullPath).existsSync()) {
-    if (IosLinkedBooks.isLinked(book.filePath)) {
+    if (book.isLinked) {
       AnxToast.show(ModuStrings.text(
           context,
           '原书不可访问。iOS 请通过“原位添加”重新授权，其他平台请普通导入原书。',
@@ -640,6 +641,13 @@ Future<void> saveBook(
       if (await savedCover.exists()) await savedCover.delete();
     }
     rethrow;
+  }
+  if (linkedPath != null) {
+    await BookSources.store
+        ?.save(md5, dbFilePath, kind: 'linked', locator: linkedPath);
+  } else {
+    await BookSources.store
+        ?.save(md5, dbFilePath, kind: 'internal', locator: dbFilePath);
   }
   // Persist only after database identity and the final local path are known.
   // A cache failure must not discard an otherwise successfully imported book.

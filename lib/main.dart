@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/service/receive_file/external_book_inbox.dart';
 import 'package:anx_reader/service/receive_file/receive_share.dart';
@@ -198,6 +199,7 @@ Future<void> _startConfiguredApp() async {
   // If no migration needed, initialize paths normally
   if (!_needsMigration) {
     await initBasePath();
+    await BookSources.initialize(Directory(documentPath));
     await AnxLog.init();
     AnxError.init();
     await DBHelper().initDB();
@@ -541,6 +543,7 @@ class _MigrationWrapperState extends State<_MigrationWrapper> {
   Future<void> _onMigrationComplete() async {
     // Initialize paths and DB after migration
     await initBasePath();
+    await BookSources.initialize(Directory(documentPath));
     await AnxLog.init();
     AnxError.init();
     await DBHelper().initDB();

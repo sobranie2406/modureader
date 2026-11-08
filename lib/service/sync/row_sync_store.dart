@@ -1,3 +1,5 @@
+import 'package:anx_reader/service/book_local_sources.dart';
+import 'package:anx_reader/utils/get_path/get_base_path.dart';
 import 'dart:convert';
 import 'package:anx_reader/models/narration_position.dart';
 import 'package:crypto/crypto.dart';
@@ -501,6 +503,17 @@ class RowSyncStore {
     }
     return db.transaction((txn) async {
       final local = await _snapshot(txn);
+      // Capture before alias rebinding can retire the row holding our locator.
+      final incomingHashes = {
+        for (final r in remote.where((r) => r.kind == 'book'))
+          (r.data['file_md5'] as String? ?? '').toLowerCase()
+      };
+      for (final row in await txn.query('tb_books')) {
+        if (incomingHashes
+            .contains((row['file_md5'] as String? ?? '').toLowerCase())) {
+          await BookSources.retain(row, documentPath);
+        }
+      }
       var merged = mergeSyncRecords(
           local,
           pendingRecords.isEmpty
@@ -628,8 +641,15 @@ class RowSyncStore {
             final previous =
                 await txn.query('tb_books', where: 'id=?', whereArgs: [id]);
             if (previous.length == 1) {
-              await ReplacedBookFiles.record(
-                  txn, previous.single, values['file_path'] as String);
+              final oldHash =
+                  (previous.single['file_md5'] as String? ?? '').toLowerCase();
+              final newHash =
+                  (values['file_md5'] as String? ?? '').toLowerCase();
+              // Same content with a different asset name is not a replacement.
+              if (oldHash.isEmpty || oldHash != newHash) {
+                await ReplacedBookFiles.record(
+                    txn, previous.single, values['file_path'] as String);
+              }
             }
           }
           await txn

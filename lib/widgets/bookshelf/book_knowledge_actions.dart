@@ -1,7 +1,6 @@
 import 'package:anx_reader/utils/app_motion.dart';
 import 'dart:io';
-import 'package:anx_reader/service/ios_linked_books.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
 
 import 'package:anx_reader/dao/book.dart';
@@ -123,7 +122,7 @@ Future<bool> confirmAndDeleteBooksFromBookshelf(
                   dialogContext, '删除 {count} 本书', 'Delete {count} books',
                   values: {'count': list.length})),
           content: Text(
-            list.any((book) => IosLinkedBooks.isLinked(book.filePath))
+            list.any((book) => book.isLinked)
                 ? ModuStrings.text(
                     dialogContext,
                     '确定删除所选书籍吗？将删除书架记录、封面、本地索引及默读内的副本。原位添加的外部原书会保留。',
@@ -173,8 +172,8 @@ Future<void> deleteBooksFromBookshelf(
     await bookKnowledgeIndexQueue.cancelAndRemove(book.id);
     await bookDao.setDeleted(book.id, true);
     // Delete only owned storage, never the security-scoped original.
-    await _deleteIfPresent(File(getBasePath(book.filePath)));
-    await IosLinkedBooks.forget(book.filePath);
+    if (!book.isLinked) await _deleteIfPresent(File(book.fileFullPath));
+    await BookSources.forget(book.md5, book.filePath);
     await _deleteIfPresent(File(book.coverFullPath));
     await BookKnowledgeIndexService().deleteIndex(book);
   }
