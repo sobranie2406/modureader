@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   announce:
-    if: github.repository == 'sobranie2406/modureader'
+    if: github.repository == 'sobranie2406/modureader' && (github.event_name != 'release' || !github.event.release.prerelease)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
