@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:anx_reader/utils/toast/common.dart';
@@ -23,8 +24,8 @@ class _Paths extends PathProviderPlatform {
 }
 
 class _Library extends WebdavLibrary {
-  _Library()
-      : super(const LibraryConnection(url: 'https://example.com/books/'));
+  _Library({String url = 'https://example.com/books/'})
+      : super(LibraryConnection(url: url));
   int listings = 0;
   bool failFolder = false;
   Completer<List<LibraryEntry>>? scan;
@@ -80,6 +81,23 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
     await LibraryConnectionStore.clear();
+  });
+  testWidgets(
+      'host-root library renders and opens folders without negative skip',
+      (tester) async {
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/'));
+    final library = _Library(url: 'https://example.com/');
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => library))));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('A.epub'), findsOneWidget);
+    await tester.tap(find.text('folder'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('/folder/'), findsOneWidget);
   });
   testWidgets(
       'folder import uses multi-select, downloads only after confirmation, and continues after failure',
@@ -290,37 +308,57 @@ void main() {
     Widget page() => ProviderScope(
         child: MaterialApp(
             home: RemoteLibraryPage(clientFactory: (_) => library)));
-    List<String> names() => tester
-        .widgetList<ListTile>(find.byType(ListTile))
-        .map((tile) => (tile.title! as Text).data!)
-        .toList();
+    Future<List<String>> names() async {
+      final scrollable = find
+          .descendant(
+              of: find.byType(ListView), matching: find.byType(Scrollable))
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(0);
+      await tester.pump();
+      final found = <String>{};
+      for (var i = 0; i < 10; i++) {
+        found.addAll(tester
+            .widgetList<ListTile>(find.byType(ListTile))
+            .map((tile) => (tile.title! as Text).data!));
+        if (position.pixels >= position.maxScrollExtent) break;
+        position.jumpTo((position.pixels + position.viewportDimension)
+            .clamp(0, position.maxScrollExtent));
+        await tester.pump();
+      }
+      expect(position.pixels, position.maxScrollExtent);
+      position.jumpTo(0);
+      await tester.pump();
+      return found.toList();
+    }
+
     await tester.pumpWidget(page());
     await tester.pumpAndSettle();
-    expect(names(), ['folder', 'A.epub', 'B.pdf', 'unknown.txt']);
+    expect(await names(), ['folder', 'A.epub', 'B.pdf', 'unknown.txt']);
     await tester.tap(find.byKey(const ValueKey('library-sort-field')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Date added').last);
     await tester.pumpAndSettle();
-    expect(names(), ['folder', 'B.pdf', 'A.epub', 'unknown.txt']);
+    expect(await names(), ['folder', 'B.pdf', 'A.epub', 'unknown.txt']);
     expect(find.textContaining('server creation time'), findsOneWidget);
     expect(find.textContaining('Not provided'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('library-sort-direction')));
     await tester.pumpAndSettle();
-    expect(names(), ['folder', 'A.epub', 'B.pdf', 'unknown.txt']);
+    expect(await names(), ['folder', 'A.epub', 'B.pdf', 'unknown.txt']);
     expect(find.text('Descending'), findsOneWidget);
     expect(library.listings, 1); // Sort is local, not another network request.
     await tester.tap(find.byKey(const ValueKey('library-file-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('PDF').last);
     await tester.pumpAndSettle();
-    expect(names(), ['folder', 'B.pdf']);
+    expect(await names(), ['folder', 'B.pdf']);
     await tester.enterText(find.byType(TextField), 'b.PDF');
     await tester.pumpAndSettle();
-    expect(names(), ['B.pdf']);
+    expect(await names(), ['B.pdf']);
     await tester.enterText(find.byType(TextField), '');
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
-    expect(names(), ['folder', 'B.pdf']);
+    expect(await names(), ['folder', 'B.pdf']);
     expect(library.listings, 2);
     final saved = await LibraryViewOptionsStore.load();
     expect(saved.sort, LibrarySortField.createdAt);
@@ -332,7 +370,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Descending'), findsOneWidget);
     expect(find.text('Date added'), findsOneWidget);
-    expect(names(), ['folder', 'B.pdf']);
+    expect(await names(), ['folder', 'B.pdf']);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+      'Baidu and WebDAV share Remote while retaining WebDAV configuration',
+      (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    await LibraryConnectionStore.save(const LibraryConnection(
+        url: 'https://example.com/books/', password: 'test-password'));
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(clientFactory: (_) => _Library()))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Baidu Netdisk'));
+    await tester.pumpAndSettle();
+    expect(find.text('Connect Baidu Netdisk'), findsOneWidget);
+    expect((await LibraryConnectionStore.load())!.password, 'test-password');
+    await tester.tap(find.text('WebDAV', skipOffstage: false));
+    await tester.pumpAndSettle();
+    expect(find.text('A.epub'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

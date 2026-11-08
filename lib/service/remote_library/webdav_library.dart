@@ -135,7 +135,52 @@ class LibraryEntry {
       allowBookExtensions.contains(name.split('.').last.toLowerCase());
 }
 
-class WebdavLibrary {
+abstract class RemoteLibrary {
+  Uri get root;
+  bool contains(Uri uri);
+  Future<List<LibraryEntry>> list(Uri directory, {CancelToken? cancelToken});
+  Future<void> download(LibraryEntry entry, File target, CancelToken cancel,
+      void Function(int received, int total) onProgress);
+  void close();
+
+  /// Sequential Depth-1 requests keep directory imports read-only and bounded.
+  Future<List<LibraryEntry>> discoverBooks(Uri directory,
+      {required CancelToken cancelToken}) async {
+    if (!contains(directory)) throw const FormatException('Invalid directory');
+    final pending = <(Uri, int)>[(directory, 0)];
+    final visited = <Uri>{};
+    final books = <Uri, LibraryEntry>{};
+    while (pending.isNotEmpty) {
+      if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+      final (current, depth) = pending.removeLast();
+      if (!visited.add(current)) continue;
+      if (depth > 32 || visited.length > 10000) {
+        throw const LibraryListingException('scanLimit');
+      }
+      for (final entry in await list(current, cancelToken: cancelToken)) {
+        if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+        if (entry.name.startsWith('.')) continue;
+        if (entry.isDirectory) {
+          pending.add((entry.uri, depth + 1));
+        } else if (entry.isBook) {
+          books[entry.uri] = entry;
+          if (books.length > 50000) {
+            throw const LibraryListingException('scanLimit');
+          }
+        }
+      }
+    }
+    return books.values.toList()
+      ..sort((a, b) => a.uri.path.compareTo(b.uri.path));
+  }
+}
+
+class RemoteLibraryException implements Exception {
+  const RemoteLibraryException(this.chinese, this.english);
+  final String chinese, english;
+}
+
+class WebdavLibrary extends RemoteLibrary {
   WebdavLibrary(LibraryConnection connection)
       : root = connection.root,
         _dio = Dio(BaseOptions(
@@ -150,11 +195,13 @@ class WebdavLibrary {
                   'Basic ${base64Encode(utf8.encode('${connection.username}:${connection.password}'))}',
           },
         ));
+  @override
   final Uri root;
   final Dio _dio;
   static const maxBookBytes = 512 * 1024 * 1024;
   static const maxListingBytes = 32 * 1024 * 1024;
 
+  @override
   bool contains(Uri uri) =>
       uri.scheme == root.scheme &&
       uri.origin == root.origin &&
@@ -170,6 +217,7 @@ class WebdavLibrary {
     }
   }
 
+  @override
   Future<List<LibraryEntry>> list(Uri directory,
       {CancelToken? cancelToken}) async {
     _check(directory);
@@ -260,37 +308,7 @@ class WebdavLibrary {
           : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
-  /// Sequential Depth-1 requests keep directory imports read-only and bounded.
-  Future<List<LibraryEntry>> discoverBooks(Uri directory,
-      {required CancelToken cancelToken}) async {
-    _check(directory);
-    final pending = <(Uri, int)>[(directory, 0)];
-    final visited = <Uri>{};
-    final books = <Uri, LibraryEntry>{};
-    while (pending.isNotEmpty) {
-      if (cancelToken.isCancelled) throw cancelToken.cancelError!;
-      final (current, depth) = pending.removeLast();
-      if (!visited.add(current)) continue;
-      if (depth > 32 || visited.length > 10000) {
-        throw const LibraryListingException('scanLimit');
-      }
-      for (final entry in await list(current, cancelToken: cancelToken)) {
-        if (cancelToken.isCancelled) throw cancelToken.cancelError!;
-        if (entry.name.startsWith('.')) continue;
-        if (entry.isDirectory) {
-          pending.add((entry.uri, depth + 1));
-        } else if (entry.isBook) {
-          books[entry.uri] = entry;
-          if (books.length > 50000) {
-            throw const LibraryListingException('scanLimit');
-          }
-        }
-      }
-    }
-    return books.values.toList()
-      ..sort((a, b) => a.uri.path.compareTo(b.uri.path));
-  }
-
+  @override
   Future<void> download(LibraryEntry entry, File target, CancelToken cancel,
       void Function(int received, int total) onProgress) async {
     _check(entry.uri);
@@ -340,6 +358,7 @@ class WebdavLibrary {
     }
   }
 
+  @override
   void close() => _dio.close(force: true);
 }
 
@@ -359,6 +378,9 @@ DateTime? _propertyDate(Iterable<XmlElement> properties) {
 }
 
 String libraryError(Object error, bool zh, {bool listing = false}) {
+  if (error is RemoteLibraryException) {
+    return zh ? error.chinese : error.english;
+  }
   if (error is LibraryListingException) {
     if (error.reason == 'tooLarge') {
       return zh

@@ -7,6 +7,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   flutter_inappwebview_linux
   flutter_onnxruntime
+  flutter_secure_storage_linux
   gtk
   screen_retriever_linux
   sqlite3_flutter_libs
