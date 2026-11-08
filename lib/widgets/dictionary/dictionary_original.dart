@@ -1,3 +1,5 @@
+import 'package:anx_reader/service/app_brightness.dart';
+import 'package:anx_reader/widgets/reading_page/reader_content_brightness.dart';
 import 'dart:async';
 import 'package:anx_reader/utils/webView/web_scrollbar.dart';
 
@@ -27,6 +29,7 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
   bool failed = false, measuring = false;
   double height = 48;
   double fontSize = 14;
+  AppBrightness? contentBrightness;
   String foreground = '202124';
   // ponytail: cap native surface size; exceptionally long entries scroll inside.
   static const maxHeight = 8000.0;
@@ -40,6 +43,19 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final surface =
+        context.findAncestorWidgetOfExactType<ReaderContentBrightness>();
+    final nextBrightness = !kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android &&
+            surface != null
+        ? surface.controller ?? AppBrightness.instance
+        : null;
+    if (!identical(contentBrightness, nextBrightness)) {
+      contentBrightness?.removeListener(_updateBrightness);
+      contentBrightness = nextBrightness;
+      contentBrightness?.addListener(_updateBrightness);
+    }
+    unawaited(_updateBrightness());
     fontSize = MediaQuery.textScalerOf(context).scale(14);
     foreground = (Theme.of(context).colorScheme.onSurface.toARGB32() & 0xffffff)
         .toRadixString(16)
@@ -48,6 +64,20 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
     // Read layout from the host, never expose a JS handler to dictionary scripts.
     if (TickerMode.valuesOf(context).enabled) {
       timer = Timer.periodic(const Duration(seconds: 1), (_) => _measure());
+    }
+  }
+
+  Future<void> _updateBrightness() async {
+    final web = controller;
+    if (web == null || contentBrightness == null) return;
+    // Android hybrid WebViews bypass Flutter's parent Opacity layer.
+    final opacity = 1 - (contentBrightness?.dimOpacity ?? 0);
+    try {
+      await web.evaluateJavascript(
+          source:
+              "document.documentElement.style.setProperty('opacity', '$opacity', 'important');");
+    } catch (_) {
+      // The document may be navigating; onLoadStop reapplies the current value.
     }
   }
 
@@ -90,6 +120,7 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
   @override
   void dispose() {
     timer?.cancel();
+    contentBrightness?.removeListener(_updateBrightness);
     controller = null;
     document?.close();
     super.dispose();
@@ -123,6 +154,7 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
               }
             : const {},
         initialSettings: InAppWebViewSettings(
+          useHybridComposition: true,
           javaScriptBridgeEnabled: false,
           javaScriptCanOpenWindowsAutomatically: false,
           supportMultipleWindows: true,
@@ -145,6 +177,7 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
           if (!mounted) return;
           unawaited(installWebScrollbar(controller,
               reducedMotion: MediaQuery.disableAnimationsOf(context)));
+          await _updateBrightness();
           await _measure();
         },
         onContentSizeChanged: (_, __, ___) => _measure(),

@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/app_brightness.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
@@ -228,7 +229,14 @@ void main() {
     platform.latestParams!.onLoadStop!(
         controller, WebUri('https://www.baidu.com/'));
     await tester.pumpAndSettle();
-    expect(native.evaluated.last, selectionSearchZoomScript(80));
+    expect(native.evaluated, contains(selectionSearchZoomScript(80)));
+    AppBrightness.instance.setLevel(.2);
+    await tester.pumpAndSettle();
+    expect(native.evaluated.last, contains("setProperty('opacity'"));
+    expect(native.evaluated.last, contains('0.19999999999999996'));
+    AppBrightness.instance.setFollowSystem(true);
+    await tester.pumpAndSettle();
+    expect(native.evaluated.last, contains("'1.0'"));
     expect(native.scripts, hasLength(1));
     await tester.drag(
         find.byKey(const ValueKey('web-results')), const Offset(0, -200));
