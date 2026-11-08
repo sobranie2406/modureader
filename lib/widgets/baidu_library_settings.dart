@@ -78,13 +78,14 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
       final proof = BaiduAuth.newProof();
       final flow = await _auth.start(proof, cancel);
       if (cancel.isCancelled || !mounted) return;
-      if (!await launchUrl(flow.url, mode: LaunchMode.externalApplication)) {
+      if (!await launchUrl(flow.url, mode: LaunchMode.inAppBrowserView)) {
         throw const RemoteLibraryException(
             '无法打开百度授权页面。', 'Cannot open Baidu authorization.');
       }
       if (mounted) {
         setState(() => _message = t(
-            '请在百度页面完成授权，然后返回默读。', 'Authorize on Baidu, then return to Modu.'));
+            '请在百度页面完成授权，关闭授权页后即可连接。',
+            'Authorize on Baidu, then close the authorization page to connect.'));
       }
       final deadline = DateTime.now().add(const Duration(minutes: 5));
       var failures = 0;
