@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:anx_reader/l10n/modu_strings.dart';
 import 'package:anx_reader/service/remote_library/baidu_auth.dart';
@@ -6,18 +7,22 @@ import 'package:anx_reader/service/remote_library/webdav_library.dart';
 import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/widgets/settings/settings_section.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BaiduLibrarySettings extends StatefulWidget {
-  const BaiduLibrarySettings({super.key});
+  const BaiduLibrarySettings({super.key, this.auth});
+  @visibleForTesting
+  final BaiduAuth? auth;
   @override
   State<BaiduLibrarySettings> createState() => _BaiduLibrarySettingsState();
 }
 
 class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
     with WidgetsBindingObserver {
-  final _auth = BaiduAuth();
+  late final _auth = widget.auth ?? BaiduAuth();
   CancelToken? _cancel;
   bool _loading = true, _connected = false, _busy = false;
   String? _message;
@@ -68,6 +73,10 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
   }
 
   Future<void> _login() async {
+    _BaiduAuthorizationBrowser? browser;
+    final systemBrowser = Platform.operatingSystem != 'ohos' &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
     final cancel = CancelToken();
     _cancel = cancel;
     setState(() {
@@ -76,22 +85,34 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
     });
     try {
       final proof = BaiduAuth.newProof();
-      final flow = await _auth.start(proof, cancel);
+      final flow = await _auth.start(proof, cancel,
+          mobile: systemBrowser || Platform.operatingSystem == 'ohos');
       if (cancel.isCancelled || !mounted) return;
-      if (!await launchUrl(flow.url, mode: LaunchMode.inAppBrowserView)) {
+      if (systemBrowser && await ChromeSafariBrowser.isAvailable()) {
+        if (cancel.isCancelled || !mounted) return;
+        browser = _BaiduAuthorizationBrowser(() {
+          final signal = _resumeSignal;
+          if (signal != null && !signal.isCompleted) signal.complete();
+        });
+        await browser.open(url: WebUri(flow.url.toString()));
+      } else if (!await launchUrl(flow.url,
+          mode: LaunchMode.inAppBrowserView)) {
         throw const RemoteLibraryException(
             '无法打开百度授权页面。', 'Cannot open Baidu authorization.');
       }
       if (mounted) {
         setState(() => _message = t(
-            '请在百度页面完成授权，关闭授权页后即可连接。',
-            'Authorize on Baidu, then close the authorization page to connect.'));
+            browser != null ? '授权完成后会自动返回。' : '请在百度页面完成授权，然后返回默读。',
+            browser != null
+                ? 'You will return automatically after authorization.'
+                : 'Authorize on Baidu, then return to Modu.'));
       }
       final deadline = DateTime.now().add(const Duration(minutes: 5));
       var failures = 0;
       while (
           mounted && !cancel.isCancelled && DateTime.now().isBefore(deadline)) {
-        if (!_foreground) {
+        // Custom Tabs pauses the Flutter activity while our login page is open.
+        if (!_foreground && (browser == null || browser.dismissed)) {
           await _waitForPoll(cancel);
           continue;
         }
@@ -101,7 +122,7 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
           connected = await _auth.claim(flow.ticket, proof, cancel);
           failures = 0;
         } on BaiduAuthRetryableException {
-          if (_foreground && ++failures >= 3) rethrow;
+          if (++failures >= 3) rethrow;
           await _waitForPoll(cancel);
           continue;
         }
@@ -115,6 +136,7 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
           }
           return;
         }
+        if (browser?.dismissed == true) return;
         await _waitForPoll(cancel);
       }
       if (mounted && !cancel.isCancelled) {
@@ -127,6 +149,13 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
             error, Localizations.localeOf(context).languageCode == 'zh'));
       }
     } finally {
+      if (browser != null && !browser.dismissed) {
+        try {
+          await browser.close();
+        } catch (_) {
+          // Closing the page must not undo a securely saved device session.
+        }
+      }
       if (mounted) {
         setState(() {
           _busy = false;
@@ -198,4 +227,16 @@ class _BaiduLibrarySettingsState extends State<BaiduLibrarySettings>
                 child: Text(_message!)),
         ]),
       );
+}
+
+class _BaiduAuthorizationBrowser extends ChromeSafariBrowser {
+  _BaiduAuthorizationBrowser(this.onDismissed);
+  final VoidCallback onDismissed;
+  bool dismissed = false;
+
+  @override
+  void onClosed() {
+    dismissed = true;
+    onDismissed();
+  }
 }

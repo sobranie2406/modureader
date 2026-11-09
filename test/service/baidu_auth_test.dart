@@ -76,6 +76,15 @@ void main() {
         (await auth.start(proof, CancelToken())).url.host, 'openapi.baidu.com');
     expect((requests.single.data as Map)['challenge'], hasLength(64));
     expect(requests.single.data.toString(), isNot(contains(proof)));
+    final mobile = (await auth.start(proof, CancelToken(), mobile: true)).url;
+    expect(mobile.queryParameters['login_type'], 'sms');
+    expect(mobile.queryParameters['display'], 'mobile');
+    expect(mobile.queryParameters['state'], 'test-ticket');
+    expect(mobile.queryParameters['redirect_uri'],
+        '${BaiduAuth.origin}/oauth/baidu/callback');
+    final desktop = (await auth.start(proof, CancelToken())).url;
+    expect(desktop.queryParameters['qrcode'], '1');
+    expect(desktop.queryParameters['display'], 'page');
     response =
         (_) => {'ticket': 'test-ticket', 'authorize_url': 'https://evil.test/'};
     await expectLater(auth.start(proof, CancelToken()), throwsFormatException);

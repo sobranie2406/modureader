@@ -84,8 +84,8 @@ class BaiduAuth {
         .replaceAll('=', '');
   }
 
-  Future<({String ticket, Uri url})> start(
-      String proof, CancelToken cancel) async {
+  Future<({String ticket, Uri url})> start(String proof, CancelToken cancel,
+      {bool mobile = false}) async {
     final data = await _post('/v1/start',
         {'challenge': sha256.convert(utf8.encode(proof)).toString()}, cancel);
     final ticket = data['ticket'] as String;
@@ -101,7 +101,15 @@ class BaiduAuth {
         uri.queryParameters['state'] != ticket) {
       throw const FormatException('Invalid authorization URL');
     }
-    return (ticket: ticket, url: uri);
+    return (
+      ticket: ticket,
+      url: uri.replace(queryParameters: {
+        ...uri.queryParameters,
+        'display': mobile ? 'mobile' : 'page',
+        'login_type': 'sms',
+        if (!mobile) 'qrcode': '1',
+      })
+    );
   }
 
   Future<bool> claim(String ticket, String proof, CancelToken cancel) async {
