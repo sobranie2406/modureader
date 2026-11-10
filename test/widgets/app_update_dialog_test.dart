@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:anx_reader/main.dart' show navigatorKey;
 import 'package:anx_reader/service/update/app_update.dart';
+import 'package:anx_reader/utils/check_update.dart';
 import 'package:anx_reader/widgets/settings/app_update_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeTransport extends UpdateTransport {
   UpdateRelease value = const UpdateRelease('1.0.9', 'Changes',
@@ -313,5 +317,46 @@ void main() {
     expect(
         find.textContaining('Download opened in your browser'), findsOneWidget);
     expect(find.text('Install update'), findsNothing);
+  });
+
+  testWidgets('manual-only preference gates startup checks and their dialogs',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = Prefs();
+    prefs.prefs = await SharedPreferences.getInstance();
+    final transport = FakeTransport();
+    final controller = AppUpdateController(
+        transport: transport,
+        platform: 'android',
+        installedVersion: () async => '1.0.8');
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    expect(prefs.manualUpdateCheckOnly, isFalse);
+    prefs.manualUpdateCheckOnly = true;
+    await checkUpdate(false, controller: controller);
+    expect(transport.checkRequests, isEmpty);
+    expect(find.byType(AppUpdateDialog), findsNothing);
+
+    final manual = checkUpdate(true, controller: controller);
+    await tester.pumpAndSettle();
+    expect(transport.checkRequests, hasLength(1));
+    expect(find.text('Update available'), findsOneWidget);
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    await manual;
+
+    prefs.manualUpdateCheckOnly = false;
+    transport.gate = Completer<UpdateRelease>();
+    final startup = checkUpdate(false, controller: controller);
+    await tester.pump();
+    expect(transport.checkRequests, hasLength(2));
+    prefs.manualUpdateCheckOnly = true;
+    transport.gate!.complete(transport.value);
+    await tester.pumpAndSettle();
+    expect(find.byType(AppUpdateDialog), findsNothing);
+    await startup;
   });
 }

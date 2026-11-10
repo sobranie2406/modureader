@@ -169,8 +169,8 @@ class AppUpdateDialog extends StatelessWidget {
           final storeBuild =
               EnvVar.isStoreBuild || EnvVar.isFdroid || EnvVar.isOhosStore;
           final status = switch (phase) {
-            UpdatePhase.idle => ModuStrings.text(
-                context, "启动时自动检查更新。", "Check for updates on launch."),
+            UpdatePhase.idle =>
+              ModuStrings.text(context, '尚未检查更新', 'Updates not checked yet'),
             UpdatePhase.checking =>
               ModuStrings.text(context, '正在检查版本…', 'Checking for updates…'),
             UpdatePhase.current => ModuStrings.text(

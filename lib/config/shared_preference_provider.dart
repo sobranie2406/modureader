@@ -2669,6 +2669,14 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get manualUpdateCheckOnly =>
+      prefs.getBool('manualUpdateCheckOnly') ?? false;
+
+  set manualUpdateCheckOnly(bool value) {
+    prefs.setBool('manualUpdateCheckOnly', value);
+    notifyListeners();
+  }
+
   bool get enableJsForEpub {
     return prefs.getBool('enableJsForEpub') ?? false;
   }

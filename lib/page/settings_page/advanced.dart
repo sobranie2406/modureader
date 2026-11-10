@@ -222,6 +222,21 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
           ],
         ),
         SettingsSection(
+          title: Text(ModuStrings.text(context, '版本检查与更新', 'App updates')),
+          tiles: [
+            SettingsTile.switchTile(
+              title: Text(ModuStrings.text(
+                  context, '仅手动检查更新', 'Only check for updates manually')),
+              description: Text(ModuStrings.text(context, '开启后，请在「关于默读」中检查更新。',
+                  'Check for updates from About Modu when this is on.')),
+              leading: const Icon(Icons.system_update_outlined),
+              initialValue: Prefs().manualUpdateCheckOnly,
+              onToggle: (value) =>
+                  setState(() => Prefs().manualUpdateCheckOnly = value),
+            ),
+          ],
+        ),
+        SettingsSection(
           title: Text(L10n.of(context).hints),
           tiles: [
             SettingsTile.navigation(
