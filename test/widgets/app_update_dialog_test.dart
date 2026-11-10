@@ -319,7 +319,7 @@ void main() {
     expect(find.text('Install update'), findsNothing);
   });
 
-  testWidgets('manual-only preference gates startup checks and their dialogs',
+  testWidgets('automatic checks default on and honor the saved preference',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = Prefs();
@@ -334,8 +334,9 @@ void main() {
         MaterialApp(navigatorKey: navigatorKey, home: const Scaffold()));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
 
-    expect(prefs.manualUpdateCheckOnly, isFalse);
-    prefs.manualUpdateCheckOnly = true;
+    expect(prefs.autoCheckUpdates, isTrue);
+    await prefs.prefs.setBool('manualUpdateCheckOnly', true);
+    expect(prefs.autoCheckUpdates, isFalse);
     await checkUpdate(false, controller: controller);
     expect(transport.checkRequests, isEmpty);
     expect(find.byType(AppUpdateDialog), findsNothing);
@@ -348,12 +349,12 @@ void main() {
     await tester.pumpAndSettle();
     await manual;
 
-    prefs.manualUpdateCheckOnly = false;
+    prefs.autoCheckUpdates = true;
     transport.gate = Completer<UpdateRelease>();
     final startup = checkUpdate(false, controller: controller);
     await tester.pump();
     expect(transport.checkRequests, hasLength(2));
-    prefs.manualUpdateCheckOnly = true;
+    prefs.autoCheckUpdates = false;
     transport.gate!.complete(transport.value);
     await tester.pumpAndSettle();
     expect(find.byType(AppUpdateDialog), findsNothing);

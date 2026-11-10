@@ -9,7 +9,7 @@ bool _dialogOpen = false;
 
 Future<void> checkUpdate(bool manualCheck,
     {AppUpdateController? controller}) async {
-  if (!manualCheck && (_startupChecked || Prefs().manualUpdateCheckOnly)) {
+  if (!manualCheck && (_startupChecked || !Prefs().autoCheckUpdates)) {
     return;
   }
   final updater = controller ?? AppUpdateController.instance;
@@ -18,7 +18,7 @@ Future<void> checkUpdate(bool manualCheck,
     await updater.check();
     // Startup network failures must not interrupt reading or masquerade as
     // "up to date". The About page keeps the status and offers a manual retry.
-    if (Prefs().manualUpdateCheckOnly ||
+    if (!Prefs().autoCheckUpdates ||
         !updater.newer ||
         updater.phase == UpdatePhase.error ||
         WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {

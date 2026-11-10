@@ -2669,11 +2669,12 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get manualUpdateCheckOnly =>
-      prefs.getBool('manualUpdateCheckOnly') ?? false;
+  // Keep the stored preference compatible with the previous manual-only switch.
+  bool get autoCheckUpdates =>
+      !(prefs.getBool('manualUpdateCheckOnly') ?? false);
 
-  set manualUpdateCheckOnly(bool value) {
-    prefs.setBool('manualUpdateCheckOnly', value);
+  set autoCheckUpdates(bool value) {
+    prefs.setBool('manualUpdateCheckOnly', !value);
     notifyListeners();
   }
 

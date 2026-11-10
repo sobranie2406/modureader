@@ -226,13 +226,15 @@ class _AdvancedSettingState extends State<AdvancedSetting> {
           tiles: [
             SettingsTile.switchTile(
               title: Text(ModuStrings.text(
-                  context, '仅手动检查更新', 'Only check for updates manually')),
-              description: Text(ModuStrings.text(context, '开启后，请在「关于默读」中检查更新。',
-                  'Check for updates from About Modu when this is on.')),
+                  context, '自动检查更新', 'Automatically check for updates')),
+              description: Text(ModuStrings.text(
+                  context,
+                  '关闭后，可在「关于默读」中手动检查更新。',
+                  'When off, check for updates manually from About Modu.')),
               leading: const Icon(Icons.system_update_outlined),
-              initialValue: Prefs().manualUpdateCheckOnly,
+              initialValue: Prefs().autoCheckUpdates,
               onToggle: (value) =>
-                  setState(() => Prefs().manualUpdateCheckOnly = value),
+                  setState(() => Prefs().autoCheckUpdates = value),
             ),
           ],
         ),
