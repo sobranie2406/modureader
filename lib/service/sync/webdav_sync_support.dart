@@ -1,6 +1,46 @@
 part of 'webdav_client.dart';
 
 extension _WebdavSyncSupport on WebdavClient {
+  void _normalizeAuthenticationChallenges(Headers headers) {
+    final values = headers['www-authenticate'];
+    if (values == null) return;
+    final scheme = RegExp(r'^\s*(Basic|Digest)\s+', caseSensitive: false);
+    final challenges = <String>[];
+    for (final value in values) {
+      var start = 0;
+      var quoted = false;
+      var escaped = false;
+      for (var i = 0; i < value.length; i++) {
+        final character = value[i];
+        if (escaped) {
+          escaped = false;
+        } else if (quoted && character == r'\') {
+          escaped = true;
+        } else if (character == '"') {
+          quoted = !quoted;
+        } else if (!quoted &&
+            character == ',' &&
+            scheme.hasMatch(value.substring(i + 1))) {
+          challenges.add(value.substring(start, i).trim());
+          start = i + 1;
+        }
+      }
+      challenges.add(value.substring(start).trim());
+    }
+    if (challenges.length < 2) return;
+    // The dependency expects one challenge. Keep its Digest-before-Basic order
+    // without joining realms/parameters from different authentication schemes.
+    final digest = challenges
+        .where((value) =>
+            scheme.firstMatch(value)?.group(1)?.toLowerCase() == 'digest')
+        .firstOrNull;
+    final basic = challenges
+        .where((value) =>
+            scheme.firstMatch(value)?.group(1)?.toLowerCase() == 'basic')
+        .firstOrNull;
+    headers.set('www-authenticate', digest ?? basic ?? challenges.first);
+  }
+
   bool _isSyncDirectory(String path) {
     final clean = path.replaceFirst(RegExp(r'/$'), '');
     return path.endsWith('/') ||

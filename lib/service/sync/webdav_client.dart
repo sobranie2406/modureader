@@ -111,6 +111,9 @@ class WebdavClient extends SyncClientBase {
       }
       handler.next(error);
     }, onResponse: (response, handler) async {
+      if (response.statusCode == 401) {
+        _normalizeAuthenticationChallenges(response.headers);
+      }
       policy.observe(response);
       final status = response.statusCode;
       if ([429, 503].contains(status)) {
