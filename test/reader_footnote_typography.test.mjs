@@ -51,3 +51,23 @@ test('each note captures the source before asynchronous cross-chapter lookup', a
   const book=await readFile(new URL('../assets/foliate-js/src/book.js',import.meta.url),'utf8');
   assert.ok(book.indexOf('applyFootnoteTypography(doc,')<book.indexOf('footnoteSizing = attachFootnoteSizing'));
 });
+
+test('resized notes repair zero and undersized fixed line boxes without changing readable spacing', () => {
+  const dom = new JSDOM('<body><p id="zero" style="line-height:0!important">wrapped note <span style="line-height:0px!important">text</span></p><p id="fixed" style="line-height:12px!important;font-family:serif"><i style="line-height:10px">italic</i><sup style="line-height:0">2</sup></p><p id="normal" style="line-height:1.8!important">reader spacing</p><p id="large" style="line-height:40px">larger fixed box</p><math style="line-height:0"><mi>x</mi></math></body>');
+  const doc = dom.window.document;
+  applyFootnoteTypography(doc, 30);
+  for (const selector of ['#zero', '#zero span', '#fixed', '#fixed i', '#fixed sup']) {
+    const node = doc.querySelector(selector);
+    assert.equal(node.style.lineHeight, '1.2');
+    assert.equal(node.style.getPropertyPriority('line-height'), 'important');
+  }
+  assert.equal(doc.querySelector('#normal').style.lineHeight, '1.8');
+  assert.equal(doc.querySelector('#large').style.lineHeight, '40px');
+  assert.equal(doc.querySelector('#fixed').style.fontFamily, 'serif');
+  assert.equal(doc.querySelector('#fixed sup').style.fontSize, '18px');
+  assert.equal(doc.querySelector('math').getAttribute('style'), 'line-height:0');
+  applyFootnoteTypography(doc, 30);
+  assert.equal(doc.querySelector('#zero').style.lineHeight, '1.2', 'repeated application does not enlarge line boxes');
+  assert.equal(sourceBodyFontSize(doc.querySelector('#normal')), 30, 'nested notes keep the reading baseline');
+  dom.window.close();
+});

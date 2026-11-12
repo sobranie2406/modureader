@@ -68,6 +68,9 @@ export function prepareReaderFontWeight(doc, styles) {
       el.toggleAttribute('data-modu-preserved-weight', el.matches(preserved));
       el.toggleAttribute('data-modu-reader-color', el.matches('h1,h2,h3,h4,h5,h6,span,b,strong,em,i,u,small,cite,q,sup,sub') && !el.closest('a,svg,pre,code'));
       el.toggleAttribute('data-modu-eink-color', !el.closest('svg,img,canvas,video'));
+      el.toggleAttribute('data-modu-reader-line-height',
+        el.matches('span,b,strong,em,i,u,small,cite,q,font') &&
+        !el.closest('table,pre,code,ruby,math,svg,sup,sub'));
     }
   }
   if (!String(styles).includes(marker)) {

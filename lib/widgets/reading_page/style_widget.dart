@@ -595,7 +595,9 @@ class StyleWidgetState extends State<StyleWidget> {
                   ? 'ocr-style-height'
                   : 'reading-line-height-slider'),
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              value: bookStyle.lineHeight,
+              value: _document
+                  ? bookStyle.lineHeight
+                  : bookStyle.lineHeight.clamp(1.0, 3.0),
               onChanged: enabled
                   ? (double value) {
                       setState(() {
@@ -605,12 +607,14 @@ class StyleWidgetState extends State<StyleWidget> {
                     }
                   : null,
               onChangeEnd: _document && enabled ? (_) => _saveStyle() : null,
-              min: _document ? 1.2 : 0,
+              min: _document ? 1.2 : 1,
               max: _document ? 2.4 : 3,
               divisions: _document ? 12 : 10,
               label: _document
                   ? bookStyle.lineHeight.toStringAsFixed(1)
-                  : (bookStyle.lineHeight / 3 * 10).round().toString()),
+                  : ((bookStyle.lineHeight.clamp(1.0, 3.0) - 1) / 2 * 10)
+                      .round()
+                      .toString()),
         ),
         IconAndText(
           flexibleHeight: true,

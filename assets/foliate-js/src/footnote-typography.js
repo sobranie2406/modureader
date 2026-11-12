@@ -56,10 +56,27 @@ export function applyFootnoteTypography(doc, sourceFontSize) {
   const size = sourceFontSize * .8;
   // Inline !important also beats author inline !important sizes. Normalize
   // each text container, so nested .8em / small / px rules cannot shrink again.
-  // Only font size changes: italics, bold, font family and links are preserved.
+  // Italics, bold, font family and links are preserved.
+  const containers = [];
   for (const node of [doc.documentElement, doc.body, ...doc.body.querySelectorAll('*')]) {
     if (node.closest('svg, math, img, canvas, video, script, style')) continue;
     const relative = node.closest('rt, rp') ? .6 : node.closest('sup, sub') ? .75 : 1;
     node.style.setProperty('font-size', `${size * relative}px`, 'important');
+    containers.push(node);
+  }
+  // Footnote views skip page line fitting. A publisher's fixed line box may
+  // become too small when its text grows to the normalized annotation size.
+  const repairs = [];
+  for (const node of containers) {
+    const css = doc.defaultView?.getComputedStyle(node);
+    const height = css?.lineHeight ?? '';
+    const font = parseFloat(css?.fontSize);
+    const pixels = height.endsWith('px') ? parseFloat(height)
+      : /^\d*\.?\d+$/.test(height) ? Number(height) * font : NaN;
+    if (Number.isFinite(pixels) && positive(font) && pixels < font * 1.2)
+      repairs.push(node);
+  }
+  for (const node of repairs) {
+    node.style.setProperty('line-height', '1.2', 'important');
   }
 }

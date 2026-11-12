@@ -7,6 +7,25 @@ const start = source.indexOf('  setStyles(styles,');
 const setStyles = source.slice(start, source.indexOf('  get writingMode()', start));
 const styleDocument = source.slice(source.indexOf('  #styleDocument(doc)'), source.indexOf('  #ensureContinuous()'));
 
+test('reader line-height has a safe minimum and controls nested publisher text', async () => {
+  const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
+  const getCSS = vm.runInNewContext(
+    book.slice(book.indexOf('const getCSS ='), book.indexOf('const fixHeadingColor =')) + '\ngetCSS',
+    {isPdf:false, readerFontCSS:()=>({faces:'',family:''}),
+      readerSelectionCSS:()=>'', readerFontWeightCSS:()=>'', reducedReaderMotionCSS:''},
+  );
+  for (const spacing of [0, .3, 1, 1.8, 3]) {
+    const css = getCSS({spacing, useBookStyles:false});
+    const paragraph = css.slice(css.indexOf('p, li, blockquote'), css.indexOf('.anx-text-center'));
+    assert.match(paragraph, new RegExp('line-height: ' + Math.max(1, spacing) + ' !important'));
+    assert.match(paragraph, /body :is\(span[^}]+line-height: inherit !important/s);
+    assert.match(paragraph, /table \*, pre \*, code \*, ruby \*, math \*, svg \*, sup \*, sub \*/);
+    assert.doesNotMatch(css, /line-height: 0(?:[ ;]|$)/);
+  }
+  const publisherCSS = getCSS({spacing:0, useBookStyles:true});
+  assert.doesNotMatch(publisherCSS.slice(0, publisherCSS.indexOf('.anx-text-center')), /line-height:/);
+});
+
 test('reader colors reach publisher spans and headings without changing typography', async () => {
   const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   const getCSS = vm.runInNewContext(

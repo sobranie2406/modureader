@@ -497,6 +497,9 @@ const getCSS = ({ fontSize,
   const { faces: fontFaces, family: fontFamily } = readerFontCSS({
     fontName, fontPath, englishFontName, englishFontPath,
   })
+  const requestedLineHeight = Number(spacing)
+  const lineHeight = Number.isFinite(requestedLineHeight)
+    ? Math.max(1, requestedLineHeight) : 1.8
 
   const writingModeCSS = writingMode === 'auto' ? '' : `writing-mode: ${writingMode} !important;`
 
@@ -520,6 +523,7 @@ const getCSS = ({ fontSize,
         background-color: transparent !important;
         ${useBookStyles ? '' : `letter-spacing: ${letterSpacing}px;`}
         ${useBookStyles ? '' : `font-size: ${fontSize}em;`}
+        ${useBookStyles ? '' : `line-height: ${lineHeight} !important;`}
         orphans: 1;  
         widows: 1;
     }
@@ -555,7 +559,6 @@ const getCSS = ({ fontSize,
     }
 
     * {
-        // line-height: ${spacing}em !important;
         ${fontFamily}
     }
 
@@ -571,33 +574,33 @@ const getCSS = ({ fontSize,
     ${useBookStyles ? '' : `
     h1 { 
         font-size: calc(2em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     h2 { 
         font-size: calc(1.5em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     h3 { 
         font-size: calc(1.17em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     h4 { 
         font-size: calc(1em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     h5 { 
         font-size: calc(0.83em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     h6 { 
         font-size: calc(0.67em * ${headingFontSize}) !important; 
-        line-height: ${spacing} !important;
+        line-height: ${lineHeight} !important;
     }
     `}
 
     p, li, blockquote, dd, ${(globalThis.CSS?.supports?.('selector(:has(*))') ?? true) ? 'div:not(:has(*:not(b, a, em, i, strong, u, span, modu-page-run)))' : 'div[data-modu-paragraph]'}, font {
         color: var(--modu-reader-font-color, ${fontColor}) !important;
-        ${useBookStyles ? '' : `line-height: ${spacing} !important;`}
+        ${useBookStyles ? '' : `line-height: ${lineHeight} !important;`}
         ${useBookStyles ? '' : `text-align: ${textAlign === 'auto' ? (justify ? 'justify' : 'start') : textAlign};`}
         ${useBookStyles || textIndent < 0 ? '' : 'text-indent: ' + textIndent + 'em !important;'}
         -webkit-hyphens: ${hyphenate ? 'auto' : 'manual'};
@@ -610,6 +613,12 @@ const getCSS = ({ fontSize,
         ${useBookStyles ? '' : `margin-block-start: ${paragraphSpacing / 2}em !important;`}
         ${useBookStyles ? '' : `margin-block-end: ${paragraphSpacing / 2}em !important;`}
     }
+
+    ${useBookStyles || isPdf ? '' : `
+    ${(globalThis.CSS?.supports?.('selector(:where(*))') ?? true) ? 'body :is(span, b, strong, em, i, u, small, cite, q, font):not(:where(table *, pre *, code *, ruby *, math *, svg *, sup *, sub *))' : 'body [data-modu-reader-line-height]'} {
+        line-height: inherit !important;
+    }
+    `}
 
     .anx-text-center,
     [align="center"],

@@ -141,3 +141,22 @@ test('ordinary, live, preloaded and footnote frames share the weight preparation
   assert.match(paginator, /prepareReaderFontWeight\(this\.#view.document, styles\)/);
   assert.match(book, /renderer\.setStyles\(css \+ footnoteLayoutCSS\)/);
 });
+
+test('reader line-height inheritance excludes structured content on modern and old WebViews', () => {
+  const css = getCSS({spacing:1, paragraphSpacing:0});
+  const selector = css.match(/body :is\(span[^{}]+(?=\{\s*line-height: inherit)/)?.[0].trim();
+  assert.ok(selector);
+  const dom = new JSDOM('<p><span id="prose">text</span><sup><span id="marker">8</span></sup></p>'
+    + '<table><tr><td><span id="cell">table</span></td></tr></table>'
+    + '<pre><span id="code">code</span></pre><ruby><span id="ruby">字</span><rt>zi</rt></ruby>');
+  const doc = dom.window.document;
+  prepareReaderFontWeight(doc, css);
+  assert.ok(doc.querySelector('#prose').matches(selector));
+  assert.ok(doc.querySelector('#prose').hasAttribute('data-modu-reader-line-height'));
+  for (const id of ['marker','cell','code','ruby']) {
+    const el = doc.getElementById(id);
+    assert.equal(el.matches(selector), false, id);
+    assert.equal(el.hasAttribute('data-modu-reader-line-height'), false, id);
+  }
+  dom.window.close();
+});

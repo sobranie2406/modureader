@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:anx_reader/models/book_style.dart';
 import 'package:anx_reader/service/ocr/document_reflow_store.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:file_picker/file_picker.dart';
@@ -114,6 +115,22 @@ class _Picker extends FilePicker {
       path;
 }
 
+class _LineHeightWidget extends StyleWidget {
+  _LineHeightWidget()
+      : super(
+          themes: const [],
+          setCurrentPage: (_) {},
+          hideAppBarAndBottomBar: (_) {},
+        );
+  @override
+  StyleWidgetState createState() => _LineHeightState();
+}
+
+class _LineHeightState extends StyleWidgetState {
+  @override
+  Widget build(BuildContext context) => lineHeightAndParagraphSpacingSlider();
+}
+
 void main() {
   setUpAll(() async {
     FilePicker.platform = _Picker('');
@@ -124,6 +141,26 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
   });
+  testWidgets('legacy zero line-height opens at the compact slider minimum',
+      (tester) async {
+    Prefs().saveBookStyleToPrefs(BookStyle(lineHeight: 0));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: L10n.localizationsDelegates,
+      supportedLocales: L10n.supportedLocales,
+      home: Scaffold(body: _LineHeightWidget()),
+    ));
+    await tester.pumpAndSettle();
+    final slider = tester.widget<Slider>(
+        find.byKey(const ValueKey('reading-line-height-slider')));
+    expect(slider.min, 1);
+    expect(slider.value, 1);
+    expect(slider.label, '0');
+    slider.onChanged!(1.2);
+    await tester.pumpAndSettle();
+    expect(Prefs().bookStyle.lineHeight, 1.2);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mode in [DocumentReadingMode.pdf, DocumentReadingMode.imageEpub]) {
     testWidgets('original Text menu exposes comparison switch: $mode',
         (tester) async {
