@@ -43,14 +43,14 @@ class IosLinkedBooks {
 
   static Future<void> forget(String key) async {
     if (!isLinked(key)) return;
-    if (!(Platform.isIOS ||
-        Platform.isAndroid ||
-        Platform.isMacOS ||
-        Platform.operatingSystem == 'ohos')) {
-      _paths.remove(key);
-      return;
+    // Ask the host to drop its bookmark/permission whenever the platform may
+    // hold one. Desktop builds have no bookmark host, so a missing channel is
+    // expected and must not prevent the in-memory path from being forgotten.
+    try {
+      await channel.invokeMethod<void>('forgetLink', {'key': key});
+    } on MissingPluginException {
+      // No native link host on this platform (Windows/Linux).
     }
-    await channel.invokeMethod<void>('forgetLink', {'key': key});
     _paths.remove(key);
   }
 }

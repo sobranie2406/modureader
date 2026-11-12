@@ -71,7 +71,10 @@ void main() {
     expect(book.fileFullPath, moved.path);
     bookmarks.clear();
     await IosLinkedBooks.restore();
-    expect(book.fileFullPath, contains('/.unlinked/'));
+    expect(
+        book.fileFullPath,
+        contains('${Platform.pathSeparator}.unlinked'
+            '${Platform.pathSeparator}'));
     await File(getBasePath(key)).writeAsString('stale copy');
     expect(await File(book.fileFullPath).exists(), false);
     expect(await moved.readAsString(), 'book');
