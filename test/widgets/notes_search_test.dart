@@ -13,11 +13,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SearchFixture extends SearchRepository {
   final queries = <String>[];
   final scopes = <int?>[];
+  final booksIncluded = <bool>[];
+  final notesIncluded = <bool>[];
   @override
   Future<SearchResultData> search(String keyword,
-      {int? bookId, DateTime? from, DateTime? to, int? limit}) async {
+      {int? bookId,
+      DateTime? from,
+      DateTime? to,
+      int? limit,
+      bool includeBooks = true,
+      bool includeNotes = true}) async {
     queries.add(keyword);
     scopes.add(bookId);
+    booksIncluded.add(includeBooks);
+    notesIncluded.add(includeNotes);
     return SearchResultData.empty;
   }
 }

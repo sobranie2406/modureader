@@ -1,4 +1,3 @@
-import 'package:anx_reader/page/search/search_page.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
@@ -33,17 +32,6 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     return SafeArea(
       bottom: false,
       child: Column(children: [
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: TextButton.icon(
-            icon: const Icon(Icons.search),
-            label: Text(Localizations.localeOf(context).languageCode == 'zh'
-                ? '搜索笔记'
-                : 'Search notes'),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const SearchPage(notesOnly: true))),
-          ),
-        ),
         Expanded(child: LayoutBuilder(
           builder: (context, constraints) {
             if (Prefs().appLayoutMode.usesWideLayout(constraints.maxWidth)) {

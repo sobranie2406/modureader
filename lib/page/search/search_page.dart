@@ -1,5 +1,6 @@
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:anx_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
@@ -41,6 +42,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(searchQueryProvider.notifier).state = '';
+      // Each opening starts with both sources on; the chips are local to this
+      // page rather than a stored setting.
+      ref.read(searchScopeProvider.notifier).state = const SearchScope();
       FocusScope.of(context).requestFocus(_focusNode);
     });
   }
@@ -70,6 +74,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
     final asyncResult = ref.watch(searchResultProvider(widget.bookId));
+    final scope = ref.watch(searchScopeProvider);
+    // In-book search is always notes-only, so the shelf scope bar is hidden.
+    final showScopeBar = !widget.notesOnly && widget.bookId == null;
+    final hintText = _searchHint(context, scope, showScopeBar);
 
     var appBar = AppBar(
       forceMaterialTransparency: true,
@@ -80,11 +88,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           controller: _controller,
           focusNode: _focusNode,
           decoration: InputDecoration(
-            hintText: widget.notesOnly
-                ? (Localizations.localeOf(context).languageCode == 'zh'
-                    ? '搜索笔记：摘录、批注、章节'
-                    : 'Search notes: excerpts, comments, chapters')
-                : L10n.of(context).searchBooksOrNotes,
+            hintText: hintText,
             prefixIcon: const Icon(Icons.search),
             suffixIcon: _controller.text.isEmpty
                 ? null
@@ -103,12 +107,32 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           },
         ),
       ),
+      bottom: showScopeBar
+          ? PreferredSize(
+              preferredSize: const Size.fromHeight(52),
+              child: _SearchScopeBar(
+                scope: scope,
+                onChanged: (next) =>
+                    ref.read(searchScopeProvider.notifier).state = next,
+              ),
+            )
+          : null,
     );
 
     return Scaffold(
       appBar: appBar,
       body: asyncResult.when(
         data: (result) {
+          if (showScopeBar && scope.isEmpty) {
+            return Center(
+              child: Text(
+                ModuStrings.text(
+                    context, '请至少选择「书籍」或「笔记」', 'Select Books, Notes, or both'),
+                key: const ValueKey('search-scope-empty'),
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
           if (query.trim().isEmpty) {
             return Center(
               child: Text(
@@ -122,15 +146,18 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               child: Column(
                 spacing: 24,
                 children: [
-                  if (!widget.notesOnly)
+                  if (!widget.notesOnly && scope.books)
                     _SearchResult(
+                        id: 'books',
                         title: L10n.of(context).books,
                         empty: result.books.isEmpty,
                         child: _SearchBookResult(books: result.books)),
-                  _SearchResult(
-                      title: L10n.of(context).notes,
-                      empty: result.noteGroups.isEmpty,
-                      child: _SearchNoteResult(group: result.noteGroups)),
+                  if (widget.notesOnly || scope.notes)
+                    _SearchResult(
+                        id: 'notes',
+                        title: L10n.of(context).notes,
+                        empty: result.noteGroups.isEmpty,
+                        child: _SearchNoteResult(group: result.noteGroups)),
                 ],
               ),
             ),
@@ -148,11 +175,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
 class _SearchResult extends ConsumerWidget {
   const _SearchResult({
+    required this.id,
     required this.title,
     required this.child,
     required this.empty,
   });
 
+  /// Stable section id for tests and semantics; the label is localized.
+  final String id;
   final String title;
   final Widget child;
   final bool empty;
@@ -164,6 +194,7 @@ class _SearchResult extends ConsumerWidget {
       children: [
         Text(
           title,
+          key: ValueKey('search-section-$id'),
           style: Theme.of(context)
               .textTheme
               .titleLarge!
@@ -274,4 +305,53 @@ class _SearchNoteResult extends ConsumerWidget {
           ))
     ]);
   }
+}
+
+class _SearchScopeBar extends StatelessWidget {
+  const _SearchScopeBar({required this.scope, required this.onChanged});
+
+  final SearchScope scope;
+  final ValueChanged<SearchScope> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Row(
+          children: [
+            FilterChip(
+              key: const ValueKey('search-scope-books'),
+              selected: scope.books,
+              label: Text(l10n.books),
+              onSelected: (value) => onChanged(scope.copyWith(books: value)),
+            ),
+            const SizedBox(width: 8),
+            FilterChip(
+              key: const ValueKey('search-scope-notes'),
+              selected: scope.notes,
+              label: Text(l10n.notes),
+              onSelected: (value) => onChanged(scope.copyWith(notes: value)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hint follows the selected sources so the field never promises books while
+/// only notes are being searched.
+String _searchHint(BuildContext context, SearchScope scope, bool showScopeBar) {
+  if (!showScopeBar || !scope.books) {
+    return ModuStrings.text(
+        context, '搜索笔记：摘录、批注、章节', 'Search notes: excerpts, comments, chapters');
+  }
+  if (!scope.notes) {
+    return ModuStrings.text(context, '搜索书名、作者', 'Search titles and authors');
+  }
+  return L10n.of(context).searchBooksOrNotes;
 }
