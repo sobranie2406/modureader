@@ -884,7 +884,12 @@ Future<void> showWebdavDialog(BuildContext context) async {
             )
           : TextField(
               autocorrect: false,
-              enableSuggestions: false,
+              // Disabling suggestions adds a password input type on Android.
+              enableSuggestions: true,
+              enableIMEPersonalizedLearning: false,
+              keyboardType: labelText == L10n.of(context).settingsSyncWebdavUrl
+                  ? TextInputType.url
+                  : TextInputType.text,
               controller: controller,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(),
