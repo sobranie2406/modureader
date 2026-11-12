@@ -267,6 +267,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       key: _reflowKey,
       onReaderKeyEvent: _handleReaderKeyEvent,
       onKeyboardEligibilityChanged: _updatePageKeys,
+      onPdfWheelZoom: isComparingDocument && player.isPdfDocument
+          ? player.zoomPdfFromWheel
+          : null,
+      wheelZoomAllowed: () => _canUsePageKeys,
       onNarrationInvalidated: (source) {
         if (identical(TtsHandler().tts.pageSource, source)) {
           unawaited(audioHandler.stop().catchError((Object error) {
@@ -555,6 +559,8 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     return !readerFocusBlocksPageKeys(
         FocusManager.instance.primaryFocus?.context);
   }
+
+  bool get canUseReaderWheelZoom => _canUsePageKeys;
 
   bool get _canUseNarrationKeys =>
       mounted &&

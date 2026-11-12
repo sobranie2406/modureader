@@ -12,6 +12,7 @@ import 'package:anx_reader/service/ocr/local_ocr_service.dart';
 import 'package:anx_reader/service/ocr/ocr_model_store.dart';
 import 'package:anx_reader/service/ocr/ocr_models.dart';
 import 'package:anx_reader/utils/app_motion.dart';
+import 'package:flutter/services.dart';
 import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
 import 'package:anx_reader/service/book_player/document_type_store.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -269,6 +270,29 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   Timer? _scrollDebounceTimer;
   double _accumulatedScrollDelta = 0;
   static const double _scrollThreshold = 50.0;
+  int _wheelInputGeneration = 0;
+  Future<void> _wheelZoomQueue = Future.value();
+
+  void zoomPdfFromWheel(int direction) {
+    if (direction != 1 && direction != -1) return;
+    _wheelInputGeneration++;
+    _scrollDebounceTimer?.cancel();
+    _accumulatedScrollDelta = 0;
+    _wheelZoomQueue = _wheelZoomQueue.then((_) async {
+      if (!mounted ||
+          !_readerReady ||
+          !AnxPlatform.isDesktop ||
+          !isPdfDocument ||
+          !_isTopOfNavigationStack ||
+          readingPageKey.currentState?.canUseReaderWheelZoom != true) {
+        return;
+      }
+      final zoom = (pdfZoom.value + direction * .25).clamp(1.0, 8.0);
+      if (zoom != pdfZoom.value) await zoomPdfReadingView(zoom, false);
+    }).catchError((Object error) {
+      AnxLog.warning('Reader wheel zoom failed: ${error.runtimeType}');
+    });
+  }
 
   // to know anytime if we are on top of navigation stack
   bool get _isTopOfNavigationStack =>
@@ -858,6 +882,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         mobileImageFit: ${AnxPlatform.isMobile},
         mobileTouchPaging: ${AnxPlatform.isMobile},
         desktopPageInput: ${AnxPlatform.isDesktop},
+        desktopZoomModifier: '${AnxPlatform.isMacOS ? 'meta' : 'ctrl'}',
         keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
         readerShortcuts: ${jsonEncode(Prefs().readerShortcuts.actions(ctrlBrackets: Prefs().keyboardShortcutTurnPage))},
         tapOnlyPageTurn: ${Prefs().tapOnlyPageTurn},
@@ -1884,6 +1909,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           await controller.setSettings(settings: settings);
         });
     controller.addJavaScriptHandler(
+        handlerName: 'onReaderWheelZoom',
+        callback: (args) {
+          if (args.length == 1 && (args.first == 1 || args.first == -1)) {
+            zoomPdfFromWheel((args.first as num).toInt());
+          }
+        });
+    controller.addJavaScriptHandler(
         handlerName: 'onReaderShortcut',
         callback: (args) {
           if (mounted && args.isNotEmpty && args.first is String) {
@@ -2553,7 +2585,21 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }
 
   Future<void> _handlePointerEvents(PointerEvent event) async {
-    if (await isFootNoteOpen() || Prefs().pageTurnStyle == PageTurn.scroll) {
+    final generation = _wheelInputGeneration;
+    if (AnxPlatform.isDesktop &&
+        isPdfDocument &&
+        event is PointerScrollEvent &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed)) {
+      _wheelInputGeneration++;
+      _scrollDebounceTimer?.cancel();
+      _accumulatedScrollDelta = 0;
+      return;
+    }
+    // A zoom may cancel paging while the footnote query is still in flight.
+    if (await isFootNoteOpen() ||
+        generation != _wheelInputGeneration ||
+        Prefs().pageTurnStyle == PageTurn.scroll) {
       return;
     }
     // Disable scroll wheel page turning when keyboard shortcuts are enabled

@@ -38,23 +38,59 @@ export function desktopDragDirection(dx, dy) {
   return (Math.abs(dx) > Math.abs(dy) ? dx : dy) < 0 ? 1 : -1;
 }
 
+export function desktopWheelZoomDirection(event, modifier = 'ctrl') {
+  if (event.defaultPrevented || event.altKey || event.shiftKey || interactive(event) ||
+      !Number.isFinite(event.deltaY) || event.deltaY === 0 ||
+      Math.abs(event.deltaX || 0) > Math.abs(event.deltaY)) return 0;
+  const pressed = modifier === 'meta'
+    ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  return pressed ? (event.deltaY < 0 ? 1 : -1) : 0;
+}
+
 export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   dragEnabled = enabled, nativeKeysEnabled = enabled,
+  zoomEnabled = enabled, zoomModifier = () => 'ctrl', onZoom = () => {},
   focusOnPointerDown = () => false, ctrlBrackets = () => false,
   shortcuts = () => null, onAction = () => {}, panArrow = () => false }) {
   let pointer = null;
   let turning = false;
   let suppressClickUntil = 0;
+  let zoomTimer = null, pendingZoom = 0;
   const listeners = [];
   const selected = () => hasSelection?.() || !!doc.getSelection()?.toString();
   const on = (target, type, listener) => {
     if (!target) return;
-    const options = { capture: true };
+    const options = { capture: true, passive: false };
     target.addEventListener(type, listener, options);
     listeners.push(() => target.removeEventListener(type, listener, options));
   };
   const consume = e => { e.preventDefault(); e.stopImmediatePropagation(); };
   const cancel = () => { pointer = null; };
+  const cancelZoom = () => {
+    clearTimeout(zoomTimer);
+    zoomTimer = null;
+    pendingZoom = 0;
+  };
+  const flushZoom = () => {
+    zoomTimer = null;
+    const direction = pendingZoom;
+    pendingZoom = 0;
+    if (direction && zoomEnabled() && !selected()) {
+      onZoom(direction);
+      zoomTimer = setTimeout(flushZoom, 80);
+    }
+  };
+  on(doc, 'wheel', e => {
+    if (!zoomEnabled() || selected()) return;
+    const direction = desktopWheelZoomDirection(e, zoomModifier());
+    if (!direction) return;
+    consume(e);
+    cancel();
+    if (zoomTimer == null) {
+      onZoom(direction);
+      zoomTimer = setTimeout(flushZoom, 80);
+    } else pendingZoom = direction;
+  });
   const turn = direction => {
     if (turning) return;
     turning = true;
@@ -119,6 +155,7 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
   on(doc, 'pointercancel', cancel);
   on(doc, 'mouseleave', cancel);
   on(doc.defaultView, 'blur', cancel);
+  on(doc.defaultView, 'blur', cancelZoom);
   return { cancel,
     panFromKeyboard(key) {
       return nativeKeysEnabled() && !selected() && !interactive({target: doc.activeElement}) && panArrow(key);
@@ -137,5 +174,5 @@ export function installDesktopPageInput(doc, { enabled, turnPage, hasSelection,
       turn(direction);
       return true;
     },
-    destroy() { cancel(); listeners.forEach(remove => remove()); } };
+    destroy() { cancel(); cancelZoom(); listeners.forEach(remove => remove()); } };
 }

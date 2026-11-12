@@ -41,6 +41,7 @@ Future<void> webviewInitialVariable(
       let initialCfi = '${replaceSingleQuote(cfi)}'
       let style = {
           desktopPageInput: ${AnxPlatform.isDesktop},
+          desktopZoomModifier: '${AnxPlatform.isMacOS ? 'meta' : 'ctrl'}',
           keyboardShortcutTurnPage: ${Prefs().keyboardShortcutTurnPage},
           readerShortcuts: ${jsonEncode(Prefs().readerShortcuts.actions(ctrlBrackets: Prefs().keyboardShortcutTurnPage))},
           mobileTouchPaging: ${AnxPlatform.isMobile},

@@ -137,6 +137,8 @@ void main() {
       VoidCallback? closeReaderMenu,
       FocusOnKeyEventCallback? readerKeyEvent,
       VoidCallback? keyboardEligibilityChanged,
+      ValueChanged<int>? pdfWheelZoom,
+      bool Function()? wheelZoomAllowed,
       void Function(TtsPageSource)? narrationInvalidated,
       bool comparison = false,
       ValueChanged<bool>? onComparisonChanged,
@@ -160,6 +162,8 @@ void main() {
           onTranslatedSelection: translatedSelection,
           onReaderKeyEvent: readerKeyEvent,
           onKeyboardEligibilityChanged: keyboardEligibilityChanged,
+          onPdfWheelZoom: pdfWheelZoom,
+          wheelZoomAllowed: wheelZoomAllowed,
           onNarrationInvalidated: narrationInvalidated,
           comparison: comparison,
           onComparisonChanged: onComparisonChanged,
@@ -1302,6 +1306,116 @@ void main() {
         .controller!;
     expect(controller.selection.textInside(controller.text), '下一段');
     expect(pages, [0, 2]);
+  });
+
+  for (final comparison in [false, true]) {
+    testWidgets(
+        'comparison=$comparison relays PDF wheel without resizing reflow',
+        (tester) async {
+      final zooms = <int>[];
+      var allowed = true;
+      await open(tester,
+          comparison: comparison,
+          pdfWheelZoom: zooms.add,
+          wheelZoomAllowed: () => allowed,
+          extract: (_) async =>
+              List.generate(80, (i) => 'Paragraph $i.').join('\n\n'));
+      final field = find.byKey(const ValueKey('reflow-text'));
+      final viewport = find
+          .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+          .first;
+      final scroll = tester.widget<SingleChildScrollView>(viewport).controller!;
+      scroll.jumpTo(200);
+      await tester.pumpAndSettle();
+      final before = scroll.offset;
+      final textField = tester.widget<TextField>(field);
+      final modifier = Platform.isMacOS
+          ? LogicalKeyboardKey.metaLeft
+          : LogicalKeyboardKey.controlLeft;
+      Future<void> wheel(double delta) async {
+        await tester.sendEventToBinding(PointerScrollEvent(
+            position: tester.getCenter(viewport),
+            scrollDelta: Offset(0, delta)));
+        await tester.pumpAndSettle();
+      }
+
+      await tester.sendKeyDownEvent(modifier);
+      try {
+        await wheel(-100);
+        await wheel(100);
+        expect(zooms, comparison ? [1, -1] : isEmpty);
+        if (comparison) expect(scroll.offset, before);
+        allowed = false;
+        await wheel(100);
+        expect(zooms, comparison ? [1, -1] : isEmpty);
+      } finally {
+        await tester.sendKeyUpEvent(modifier);
+      }
+      expect(tester.widget<TextField>(field).style!.fontSize,
+          textField.style!.fontSize);
+      expect(tester.widget<TextField>(field).controller,
+          same(textField.controller));
+      expect(pages, [0]);
+    });
+  }
+
+  testWidgets('comparison PDF wheel burst keeps one trailing zoom',
+      (tester) async {
+    final zooms = <int>[];
+    var allowed = true;
+    await open(tester,
+        comparison: true,
+        pdfWheelZoom: zooms.add,
+        wheelZoomAllowed: () => allowed,
+        extract: (_) async =>
+            List.generate(80, (i) => 'Paragraph $i.').join('\n\n'));
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final viewport = find
+        .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+        .first;
+    final scroll = tester.widget<SingleChildScrollView>(viewport).controller!;
+    scroll.jumpTo(200);
+    await tester.pumpAndSettle();
+    final before = scroll.offset;
+    final fontSize = tester.widget<TextField>(field).style!.fontSize;
+    final modifier = Platform.isMacOS
+        ? LogicalKeyboardKey.metaLeft
+        : LogicalKeyboardKey.controlLeft;
+    Future<void> wheel(double delta) =>
+        tester.sendEventToBinding(PointerScrollEvent(
+            position: tester.getCenter(viewport),
+            scrollDelta: Offset(0, delta)));
+
+    await tester.sendKeyDownEvent(modifier);
+    try {
+      await wheel(-100);
+      for (var i = 0; i < 10; i++) {
+        await wheel(100);
+      }
+      expect(zooms, [1]);
+      await tester.pump(const Duration(milliseconds: 79));
+      expect(zooms, [1]);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(zooms, [1, -1]);
+      expect(scroll.offset, before);
+      expect(tester.widget<TextField>(field).style!.fontSize, fontSize);
+      expect(pages, [0]);
+
+      await wheel(-100);
+      allowed = false;
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(zooms, [1, -1]);
+
+      allowed = true;
+      await wheel(-100);
+      await wheel(-100);
+      expect(zooms, [1, -1, 1]);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(zooms, [1, -1, 1]);
+    } finally {
+      await tester.sendKeyUpEvent(modifier);
+    }
   });
 
   testWidgets(

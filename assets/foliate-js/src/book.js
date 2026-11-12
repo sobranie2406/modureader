@@ -1225,6 +1225,10 @@ class Reader {
     const enabled = () => style.desktopPageInput === true && this.keyboardActive !== false && !window.isFootNoteOpen();
     desktopInputDocuments.set(doc, installDesktopPageInput(doc, {
       enabled,
+      zoomEnabled: () => isPdf && style.desktopPageInput === true &&
+        this.view.renderer.readerActive !== false && !window.isFootNoteOpen(),
+      zoomModifier: () => style.desktopZoomModifier,
+      onZoom: direction => callFlutter('onReaderWheelZoom', direction),
       ctrlBrackets: () => style.keyboardShortcutTurnPage === true,
       shortcuts: () => style.readerShortcuts,
       onAction: action => callFlutter('onReaderShortcut', action),

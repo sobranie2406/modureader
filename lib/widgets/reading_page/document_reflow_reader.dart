@@ -3,6 +3,7 @@ import 'package:anx_reader/service/reading/reflow_css.dart';
 import 'package:anx_reader/service/reading/text_filter.dart';
 import 'package:anx_reader/page/reading_page.dart' show epubPlayerKey;
 import 'package:anx_reader/utils/coordinates_to_part.dart';
+import 'package:anx_reader/utils/desktop_wheel_zoom.dart';
 import 'more_settings/page_turning/types_and_icons.dart';
 import 'more_settings/page_turning/diagram.dart';
 import 'reader_menu_appearance.dart';
@@ -92,6 +93,8 @@ class DocumentReflowReader extends StatefulWidget {
       this.onCloseReaderMenu,
       this.onReaderKeyEvent,
       this.onKeyboardEligibilityChanged,
+      this.onPdfWheelZoom,
+      this.wheelZoomAllowed,
       this.onNarrationInvalidated,
       this.readerMenuVisible = false,
       this.comparison = false,
@@ -100,6 +103,8 @@ class DocumentReflowReader extends StatefulWidget {
   final bool comparison;
   final FocusOnKeyEventCallback? onReaderKeyEvent;
   final VoidCallback? onKeyboardEligibilityChanged;
+  final ValueChanged<int>? onPdfWheelZoom;
+  final bool Function()? wheelZoomAllowed;
   final void Function(TtsPageSource)? onNarrationInvalidated;
   final ValueChanged<bool>? onComparisonChanged;
   final VoidCallback? onOpenReaderMenu, onCloseReaderMenu;
@@ -434,6 +439,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   Timer? _selectionTimer;
   Timer? _mouseLongPressTimer;
   Timer? _menuTapTimer;
+  Timer? _pdfWheelZoomTimer;
+  int _pendingPdfWheelZoom = 0;
   Duration? _pointerDownTime;
   int _selectionEpoch = 0;
   int? _expandingEpoch;
@@ -484,6 +491,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     _selectionTimer?.cancel();
     _mouseLongPressTimer?.cancel();
     _menuTapTimer?.cancel();
+    _pdfWheelZoomTimer?.cancel();
     cancelLoading();
     _controller.dispose();
     _search.dispose();
@@ -1044,6 +1052,49 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         }
       });
 
+  bool get _canRelayPdfWheelZoom =>
+      mounted &&
+      widget.onPdfWheelZoom != null &&
+      widget.comparison &&
+      !_busy &&
+      _page != null &&
+      !widget.readerMenuVisible &&
+      _surfaceKey.currentState?.menuIsOpen != true &&
+      ModalRoute.of(context)?.isCurrent != false &&
+      (widget.wheelZoomAllowed?.call() ?? true) &&
+      _readingController.selection.isCollapsed;
+
+  void _flushPdfWheelZoom() {
+    _pdfWheelZoomTimer = null;
+    final direction = _pendingPdfWheelZoom;
+    _pendingPdfWheelZoom = 0;
+    if (direction != 0 && _canRelayPdfWheelZoom) {
+      widget.onPdfWheelZoom!(direction);
+      _pdfWheelZoomTimer =
+          Timer(const Duration(milliseconds: 80), _flushPdfWheelZoom);
+    }
+  }
+
+  void _handlePdfWheelZoom(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        !event.scrollDelta.dy.isFinite ||
+        event.scrollDelta.dy == 0 ||
+        !desktopWheelZoomModifierPressed() ||
+        !_canRelayPdfWheelZoom) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final direction = event.scrollDelta.dy < 0 ? 1 : -1;
+      if (_pdfWheelZoomTimer == null) {
+        widget.onPdfWheelZoom!(direction);
+        _pdfWheelZoomTimer =
+            Timer(const Duration(milliseconds: 80), _flushPdfWheelZoom);
+      } else {
+        _pendingPdfWheelZoom = direction;
+      }
+    });
+  }
+
   void _resetSelectionGesture() {
     _menuTapTimer?.cancel();
     _selectionTimer?.cancel();
@@ -1423,6 +1474,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                               controller: _scroll,
                               padding: _style.padding,
                               child: Listener(
+                                  onPointerSignal: _handlePdfWheelZoom,
                                   onPointerDown: _selectionPointerDown,
                                   onPointerMove: _selectionPointerMove,
                                   onPointerUp: _selectionPointerUp,
