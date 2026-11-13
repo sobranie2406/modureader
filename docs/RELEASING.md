@@ -1,12 +1,12 @@
 # Building, releasing and installing Modu
 
-Single-edition guide in English. Prepared for stable **1.3.6+10168**, 2026-11-01.
+Single-edition guide in English. Prepared for stable **1.3.9+10177**, 2026-11-13.
 
 Modu is an independently modified derivative of Anx Reader (MIT) and ReadAny (GPL-3.0-or-later). Packages retain licenses; each release links its corresponding source, NOTICE and attribution. No separate notices ZIP is distributed.
 
 ## Build toolchain
 
-Use the SDK pinned in [.github/flutter-version](../.github/flutter-version): Flutter 3.47.2 for 1.3.6. Run flutter pub get, flutter gen-l10n and build_runner before building. CI uses native platform runners. Windows ARM64 applies scripts/release/windows-arm64-sdk.mjs to accommodate host identification in the CI SDK, then verifies output PE architecture.
+Use the SDK pinned in [.github/flutter-version](../.github/flutter-version): Flutter 3.47.2 for 1.3.9. Run flutter pub get, flutter gen-l10n and build_runner before building. CI uses native platform runners. Windows ARM64 applies scripts/release/windows-arm64-sdk.mjs to accommodate host identification in the CI SDK, then verifies output PE architecture.
 
 Current Android builds use Gradle 9.2.1 (checksum-pinned), AGP 9.0.1 and Kotlin 2.3.20 with `android.builtInKotlin=true`. Gradle 9.2.x's embedded Kotlin 2.2.20 matches the pinned Flutter 3.47.2 build plugin; see the [Gradle compatibility matrix](https://docs.gradle.org/current/userguide/compatibility.html). Keep `android.newDsl=false` while Flutter still uses legacy Android extension APIs ([AGP opt-out](https://developer.android.com/build/releases/agp-9-0-0-release-notes)). The minimum Android version remains API 26.
 
