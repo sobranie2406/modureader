@@ -43,14 +43,12 @@ class IosLinkedBooks {
 
   static Future<void> forget(String key) async {
     if (!isLinked(key)) return;
-    if (!(Platform.isIOS ||
-        Platform.isAndroid ||
-        Platform.isMacOS ||
-        Platform.operatingSystem == 'ohos')) {
-      _paths.remove(key);
-      return;
+    // Release native access when a host is available.
+    try {
+      await channel.invokeMethod<void>('forgetLink', {'key': key});
+    } on MissingPluginException {
+      // No native link host on this platform (Windows/Linux).
     }
-    await channel.invokeMethod<void>('forgetLink', {'key': key});
     _paths.remove(key);
   }
 }

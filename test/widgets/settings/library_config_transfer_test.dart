@@ -26,7 +26,9 @@ void main() {
     await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: RemoteLibrarySettings())));
     await tester.pumpAndSettle();
-    expect(find.text('Library connection'), findsOneWidget);
+    expect(find.byKey(const ValueKey('remote-library-settings-frame')),
+        findsOneWidget);
+    expect(find.text('WebDAV'), findsOneWidget);
     expect(find.text('Remote library settings'), findsNothing);
     expect(find.text('Library WebDAV'), findsNothing);
   }

@@ -1,5 +1,6 @@
 import 'package:anx_reader/dao/book.dart';
 import 'package:anx_reader/dao/book_note.dart';
+import 'package:anx_reader/models/book.dart';
 import 'package:anx_reader/models/book_note.dart';
 import 'package:anx_reader/models/search_note_group.dart';
 import 'package:anx_reader/models/search_result_data.dart';
@@ -7,19 +8,28 @@ import 'package:anx_reader/models/search_result_data.dart';
 class SearchRepository {
   const SearchRepository();
 
+  /// [includeBooks] and [includeNotes] let the search page skip a whole source
+  /// instead of querying it and discarding the result.
   Future<SearchResultData> search(
     String keyword, {
     int? bookId,
     DateTime? from,
     DateTime? to,
     int? limit,
+    bool includeBooks = true,
+    bool includeNotes = true,
   }) async {
     final query = keyword.trim();
-    if (query.isEmpty) {
+    if (query.isEmpty || (!includeBooks && !includeNotes)) {
       return SearchResultData.empty;
     }
 
-    final books = await bookDao.searchBooks(query);
+    final books =
+        includeBooks ? await bookDao.searchBooks(query) : const <Book>[];
+    if (!includeNotes) {
+      return SearchResultData(
+          books: books, noteGroups: const <SearchNoteGroup>[]);
+    }
     final notes = await bookNoteDao.searchBookNotesAdvanced(
       keyword: query,
       bookId: bookId,

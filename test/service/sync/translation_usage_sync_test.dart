@@ -56,5 +56,8 @@ void main() {
     expect(
         await sa.prepareLocalDatabase(enabled: true, password: 'test-password'),
         false);
-  });
+  },
+      // Six PBKDF2-hardened encrypt/decrypt rounds take ~30s on CI, which is
+      // the package default; keep the assertion but give it realistic headroom.
+      timeout: const Timeout(Duration(minutes: 2)));
 }

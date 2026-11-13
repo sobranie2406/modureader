@@ -49,65 +49,78 @@ class _StatisticDashboardTitleState
 
     return SizedBox(
       width: double.infinity,
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TotalReadTime(),
-          if (!tilesState.isEditing)
-            IconButton(
-              key: const ValueKey('history-edit'),
-              onPressed: notifier.startEditing,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: l10n.commonEdit,
-            ),
+          // The pencil sits right after the date so it never claims a row of
+          // its own: the date row is short and the button is compact.
+          TotalReadTime(
+            trailing: tilesState.isEditing
+                ? null
+                : IconButton(
+                    key: const ValueKey('history-edit'),
+                    onPressed: notifier.startEditing,
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: l10n.commonEdit,
+                    iconSize: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    visualDensity: VisualDensity.compact,
+                    constraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+          ),
           if (tilesState.isEditing)
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ModuStrings.text(
-                        context, '点击书籍时', 'When tapping a book')),
-                    const SizedBox(height: 6),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: AnxSegmentedButton<bool>(
-                        key: const ValueKey('history-book-tap-action'),
-                        segments: [
-                          SegmentButtonItem(
-                              value: false, label: l10n.readingPageBookDetails),
-                          SegmentButtonItem(
-                              value: true,
-                              label: ModuStrings.text(
-                                  context, '直接阅读', 'Read directly')),
-                        ],
-                        selected: {tilesState.openBookDirectly},
-                        onSelectionChanged: (values) =>
-                            notifier.setOpenBookDirectly(values.single),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ModuStrings.text(
+                          context, '点击书籍时', 'When tapping a book')),
+                      const SizedBox(height: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: AnxSegmentedButton<bool>(
+                          key: const ValueKey('history-book-tap-action'),
+                          segments: [
+                            SegmentButtonItem(
+                                value: false,
+                                label: l10n.readingPageBookDetails),
+                            SegmentButtonItem(
+                                value: true,
+                                label: ModuStrings.text(
+                                    context, '直接阅读', 'Read directly')),
+                          ],
+                          selected: {tilesState.openBookDirectly},
+                          onSelectionChanged: (values) =>
+                              notifier.setOpenBookDirectly(values.single),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                TextButton.icon(
-                  onPressed: notifier.restoreDefaults,
-                  icon: const Icon(Icons.restore),
-                  label: Text(
-                      ModuStrings.text(context, '恢复默认', 'Restore defaults')),
-                ),
-                IconButton(
-                  onPressed: availableTiles.isEmpty ? null : showAddTileSheet,
-                  icon: const Icon(Icons.add),
-                  tooltip: l10n.statisticsDashboardAddCard,
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: notifier.saveLayout,
-                  icon: const Icon(Icons.save),
-                  tooltip: l10n.commonSave,
-                ),
-              ],
+                    ],
+                  ),
+                  TextButton.icon(
+                    onPressed: notifier.restoreDefaults,
+                    icon: const Icon(Icons.restore),
+                    label: Text(
+                        ModuStrings.text(context, '恢复默认', 'Restore defaults')),
+                  ),
+                  IconButton(
+                    onPressed: availableTiles.isEmpty ? null : showAddTileSheet,
+                    icon: const Icon(Icons.add),
+                    tooltip: l10n.statisticsDashboardAddCard,
+                  ),
+                  IconButton(
+                    onPressed: notifier.saveLayout,
+                    icon: const Icon(Icons.save),
+                    tooltip: l10n.commonSave,
+                  ),
+                ],
+              ),
             ),
         ],
       ),
@@ -261,7 +274,10 @@ class _AddTileSheetContentState extends ConsumerState<AddTileSheetContent> {
 }
 
 class TotalReadTime extends ConsumerWidget {
-  const TotalReadTime({super.key});
+  const TotalReadTime({super.key, this.trailing});
+
+  /// Rendered on the same line as the "since date" caption.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -285,6 +301,9 @@ class TotalReadTime extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                // Intrinsic width: a full-width headline row used to push the
+                // edit button onto its own line in the old space-between Wrap.
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   highlightDigit(
                     context,
@@ -300,12 +319,22 @@ class TotalReadTime extends ConsumerWidget {
                   ),
                 ],
               ),
-              Text(
-                '${Prefs().beginDate.toString().substring(0, 10)} ${L10n.of(context).statisticToPresent}',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${Prefs().beginDate.toString().substring(0, 10)} ${L10n.of(context).statisticToPresent}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                  if (trailing != null) trailing!,
+                ],
               )
             ],
           );
