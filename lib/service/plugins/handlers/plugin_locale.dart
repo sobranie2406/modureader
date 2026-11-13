@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/app_language.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/app_language.dart';
 import 'package:flutter/widgets.dart';
 
 /// Locale key used when a contribution has to be materialised once, outside a

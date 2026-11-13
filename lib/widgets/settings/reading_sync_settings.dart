@@ -1,8 +1,8 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/sync/reading_sync_scheduler.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/sync/reading_sync_scheduler.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 
 class ReadingSyncSettings extends AbstractSettingsTile {

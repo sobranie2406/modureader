@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/system_tts.dart';
-import 'package:anx_reader/service/tts/tts_factory.dart';
-import 'package:anx_reader/service/tts/tts_handler.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/system_tts.dart';
+import 'package:modu_reader/service/tts/tts_factory.dart';
+import 'package:modu_reader/service/tts/tts_handler.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

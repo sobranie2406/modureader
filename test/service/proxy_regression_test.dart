@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/service/network/http_proxy_overrides.dart';
+import 'package:modu_reader/service/network/http_proxy_overrides.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

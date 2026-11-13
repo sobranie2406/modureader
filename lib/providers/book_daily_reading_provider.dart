@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:anx_reader/dao/reading_time.dart';
+import 'package:modu_reader/dao/reading_time.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'book_daily_reading_provider.g.dart';

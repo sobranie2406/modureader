@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/book_note.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/book_note.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'search_note_group.freezed.dart';

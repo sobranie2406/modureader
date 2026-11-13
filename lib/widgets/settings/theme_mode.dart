@@ -1,7 +1,7 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/theme_mode_to_string.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/theme_mode_to_string.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/common/anx_segmented_button.dart';
 import 'package:flutter/material.dart';
 
 class ChangeThemeMode extends StatefulWidget {

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:anx_reader/service/feedback/crash_journal.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/feedback/crash_journal.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart';
 
 enum BookKnowledgeQueueStatus {

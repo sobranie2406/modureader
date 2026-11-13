@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:anx_reader/models/narration_position.dart';
-import 'package:anx_reader/utils/reading_progress.dart';
+import 'package:modu_reader/models/narration_position.dart';
+import 'package:modu_reader/utils/reading_progress.dart';
 
 part 'book_sync_identity.dart';
 

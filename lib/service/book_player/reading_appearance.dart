@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/bgimg_type.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/models/bgimg.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/bgimg_type.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/models/bgimg.dart';
 
 ReadTheme readingThemeForDisplay(Prefs prefs,
     {List<ReadTheme> themes = const [], bool isDarkMode = false}) {

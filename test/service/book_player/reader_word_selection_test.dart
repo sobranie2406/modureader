@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/book_player/reader_word_selection.dart';
+import 'package:modu_reader/service/book_player/reader_word_selection.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

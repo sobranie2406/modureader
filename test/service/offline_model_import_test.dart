@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:anx_reader/service/offline_model_import.dart';
-import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/offline_model_import.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/ocr_models.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';

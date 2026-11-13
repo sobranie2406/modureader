@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
-import 'package:anx_reader/service/book_player/reader_background_response.dart';
+import 'package:modu_reader/service/book_player/reader_background_response.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';

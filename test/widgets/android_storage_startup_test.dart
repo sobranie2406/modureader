@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:anx_reader/page/android_storage_startup.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/android_storage_startup.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

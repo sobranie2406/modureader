@@ -1,9 +1,9 @@
 import 'dart:ui' as ui;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/app_brightness.dart';
-import 'package:anx_reader/widgets/reading_page/reader_content_brightness.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/app_brightness.dart';
+import 'package:modu_reader/widgets/reading_page/reader_content_brightness.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

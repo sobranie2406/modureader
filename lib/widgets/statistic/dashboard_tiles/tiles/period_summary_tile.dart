@@ -1,14 +1,14 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/enums/chart_mode.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/statistic_data_model.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
-import 'package:anx_reader/providers/statistic_data.dart';
-import 'package:anx_reader/providers/total_reading_time.dart';
-import 'package:anx_reader/utils/date/convert_seconds.dart';
-import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/enums/chart_mode.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/statistic_data_model.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
+import 'package:modu_reader/providers/statistic_data.dart';
+import 'package:modu_reader/providers/total_reading_time.dart';
+import 'package:modu_reader/utils/date/convert_seconds.dart';
+import 'package:modu_reader/widgets/common/async_skeleton_wrapper.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

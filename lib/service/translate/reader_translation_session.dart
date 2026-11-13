@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
 
 class TranslationCancelled implements Exception {}
 

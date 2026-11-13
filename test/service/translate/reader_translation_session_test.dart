@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/service/translate/reader_translation_session.dart';
-import 'package:anx_reader/service/translate/translation_answer.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/translate/reader_translation_session.dart';
+import 'package:modu_reader/service/translate/translation_answer.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anx_reader/service/translate/microsoft_free.dart';
-import 'package:anx_reader/enums/lang_list.dart';
+import 'package:modu_reader/service/translate/microsoft_free.dart';
+import 'package:modu_reader/enums/lang_list.dart';
 
 void main() {
   test('native bridge accepts integral doubles, never coerces invalid IDs', () {

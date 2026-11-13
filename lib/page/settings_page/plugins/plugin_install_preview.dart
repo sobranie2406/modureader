@@ -1,9 +1,9 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugin_labels.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugin_labels.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 
 /// Confirmation shown before a package writes anything.

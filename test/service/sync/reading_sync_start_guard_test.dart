@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/service/sync/sync_client_factory.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/service/sync/sync_client_factory.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

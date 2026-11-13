@@ -1,8 +1,8 @@
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/widgets/book_notes/book_note_tile.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/widgets/book_notes/book_note_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:anx_reader/models/document_enhancement.dart';
-import 'package:anx_reader/models/pdf_reading_view.dart';
-import 'package:anx_reader/widgets/reading_page/document_enhancement_panel.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/models/document_enhancement.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/widgets/reading_page/document_enhancement_panel.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'pdf_region_preview_test.dart' as fixture;

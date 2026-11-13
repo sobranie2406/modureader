@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/edge_tts_backend.dart';
-import 'package:anx_reader/service/tts/openai_tts_backend.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/edge_tts_backend.dart';
+import 'package:modu_reader/service/tts/openai_tts_backend.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

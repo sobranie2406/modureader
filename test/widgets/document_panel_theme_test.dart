@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/pdf_reading_view.dart';
-import 'package:anx_reader/utils/color_scheme.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
-import 'package:anx_reader/widgets/reading_page/pdf_reading_controls.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/utils/color_scheme.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/widgets/reading_page/pdf_reading_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

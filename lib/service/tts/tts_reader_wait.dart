@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/widgets.dart';
 
 /// Observe slow reader calls from Dart, whose timer does not depend on the

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
-import 'package:anx_reader/service/ai/mindmap_export.dart';
+import 'package:modu_reader/service/ai/mindmap_export.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xml/xml.dart';
 

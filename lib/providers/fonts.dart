@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/providers/font_list.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
+import 'package:modu_reader/providers/font_list.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';

@@ -4,11 +4,11 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/sync/immutable_sync_log.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/sync/immutable_sync_log.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
 import 'row_sync_test.dart' show MemorySyncClient, fixture, noteRow;
 
 class CompactClient extends MemorySyncClient {

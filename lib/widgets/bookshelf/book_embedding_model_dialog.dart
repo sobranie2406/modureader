@@ -1,11 +1,11 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter/material.dart';
 
 Future<void> showBookEmbeddingModelDialog(BuildContext context, Book book) =>

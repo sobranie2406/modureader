@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import 'package:dio/dio.dart';
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 
 /// Content-addressed batches are never replaced with different bytes. Two
 /// concurrent publishers either write different names or identical content.

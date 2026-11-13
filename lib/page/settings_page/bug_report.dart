@@ -1,15 +1,15 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'dart:convert';
 
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
-import 'package:anx_reader/service/feedback/bug_report.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
-import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/service/feedback/bug_report.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/feedback/crash_diagnostics.dart';
+import 'package:modu_reader/service/feedback/runtime_diagnostics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:flutter/services.dart';
 import 'package:pubspec_parse/pubspec_parse.dart';
 import 'package:url_launcher/url_launcher.dart';

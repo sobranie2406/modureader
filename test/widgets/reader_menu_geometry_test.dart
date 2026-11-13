@@ -1,11 +1,11 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
-import 'package:anx_reader/widgets/reading_page/reader_settings_scroll_view.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/reading_page/reader_settings_scroll_view.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/reading_page/reader_menu_group.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_group.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

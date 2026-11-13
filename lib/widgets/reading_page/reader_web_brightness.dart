@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:anx_reader/service/app_brightness.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/service/app_brightness.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/widgets.dart';
 import 'reader_content_brightness.dart';
 

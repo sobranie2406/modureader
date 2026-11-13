@@ -1,14 +1,14 @@
 import 'brightness_widget.dart';
-import 'package:anx_reader/service/app_brightness.dart';
+import 'package:modu_reader/service/app_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import 'package:anx_reader/enums/bgimg_fit.dart';
+import 'package:modu_reader/enums/bgimg_fit.dart';
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/book_player/reading_appearance.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/book_player/reading_appearance.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'reader_popup.dart';
 import 'reader_settings_scroll_view.dart';
 

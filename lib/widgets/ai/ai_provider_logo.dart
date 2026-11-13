@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/provider_brand.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/provider_brand.dart';
 import 'package:flutter/material.dart';
 
 /// One presentation for settings, model switching and chat history.

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
-import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:modu_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

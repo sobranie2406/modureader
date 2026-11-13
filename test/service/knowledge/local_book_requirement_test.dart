@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
-import 'package:anx_reader/service/knowledge/index_build_marker.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:modu_reader/service/knowledge/index_build_marker.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/local_book_requirement.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _ModelPaths extends PathProviderPlatform {

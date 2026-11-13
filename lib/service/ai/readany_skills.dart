@@ -1,6 +1,6 @@
-import 'package:anx_reader/enums/ai_prompts.dart';
+import 'package:modu_reader/enums/ai_prompts.dart';
 import 'dart:ui';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
 /// A built-in AI reading skill exposed in Settings and the reader AI panel.
 class ReadAnySkill {

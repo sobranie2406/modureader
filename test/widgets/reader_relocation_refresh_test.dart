@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/reading_info.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart' show navigatorKey;
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/reading_info.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/reading_info.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart' show navigatorKey;
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/reading_info.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

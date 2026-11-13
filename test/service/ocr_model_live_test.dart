@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/ocr_models.dart';
 import 'package:dio/dio.dart';
-import 'package:anx_reader/service/ocr/ocr_model_metadata.dart';
+import 'package:modu_reader/service/ocr/ocr_model_metadata.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Explicit network opt-in. Model weights never enter the app assets or backup.

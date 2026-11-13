@@ -2,9 +2,9 @@ import 'reader_menu_appearance.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
 
 Future<bool> confirmDocumentRecognition(BuildContext context) async =>
     await showReaderDialog<bool>(

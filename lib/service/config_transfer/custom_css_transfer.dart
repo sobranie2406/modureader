@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
 
 /// Portable CSS only. Never exports book IDs or reads referenced fonts/images.
 class CustomCssTransfer {

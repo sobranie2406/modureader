@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/reader_shortcuts.dart';
-import 'package:anx_reader/page/settings_page/reader_shortcuts.dart';
-import 'package:anx_reader/page/settings_page/reading.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/scroll_page_percent_tile.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/reader_shortcuts.dart';
+import 'package:modu_reader/page/settings_page/reader_shortcuts.dart';
+import 'package:modu_reader/page/settings_page/reading.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/scroll_page_percent_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';

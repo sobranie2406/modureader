@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/book_import_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

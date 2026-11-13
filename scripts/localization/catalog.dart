@@ -266,8 +266,8 @@ void main(List<String> args) {
         end = start;
       }
       if (!code
-          .contains("import 'package:anx_reader/l10n/modu_strings.dart';")) {
-        code = "import 'package:anx_reader/l10n/modu_strings.dart';\n$code";
+          .contains("import 'package:modu_reader/l10n/modu_strings.dart';")) {
+        code = "import 'package:modu_reader/l10n/modu_strings.dart';\n$code";
       }
       file.writeAsStringSync(code);
       stdout.writeln('${file.path}: ${visitor.edits.length}');

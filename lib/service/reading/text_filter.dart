@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
 
 List<TextRange> filteredTextRanges(String text, List<CustomCssProfile> rules) {
   final ranges = <TextRange>[];

@@ -1,6 +1,6 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';

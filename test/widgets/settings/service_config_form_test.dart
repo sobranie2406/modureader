@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/config/config_item.dart';
-import 'package:anx_reader/widgets/settings/service_config_form.dart';
+import 'package:modu_reader/service/config/config_item.dart';
+import 'package:modu_reader/widgets/settings/service_config_form.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -6,6 +6,16 @@ Latest stable: **1.3.9+10177**. Updated 2026-11-13.
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
+## Unreleased
+
+### English
+
+- Fix(sync): Recognize WeRead and OCR metadata directories when a WebDAV server redirects to their trailing-slash URLs.
+
+### 简体中文
+
+- Fix(sync): 修复 WebDAV 为微信读书和 OCR 资料目录补全末尾斜杠时导致的同步失败。
+
 ## 1.3.9
 
 ### English

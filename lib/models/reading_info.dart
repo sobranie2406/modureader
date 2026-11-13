@@ -1,6 +1,6 @@
 import 'package:flutter/painting.dart';
-import 'package:anx_reader/models/text_color.dart';
-import 'package:anx_reader/enums/reading_info.dart';
+import 'package:modu_reader/models/text_color.dart';
+import 'package:modu_reader/enums/reading_info.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reading_info.freezed.dart';

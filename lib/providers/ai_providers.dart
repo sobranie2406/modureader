@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
-import 'package:anx_reader/service/ai/ai_services.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/service/ai/ai_services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 

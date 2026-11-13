@@ -1,11 +1,11 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/bookmark.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
-import 'package:anx_reader/providers/bookmark.dart';
-import 'package:anx_reader/utils/error_handler.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/delete_confirm.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/bookmark.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/providers/bookmark.dart';
+import 'package:modu_reader/utils/error_handler.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/delete_confirm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/l10n/generated/L10n_en.dart';
-import 'package:anx_reader/l10n/generated/L10n_zh.dart';
+import 'package:modu_reader/l10n/generated/L10n_en.dart';
+import 'package:modu_reader/l10n/generated/L10n_zh.dart';
 
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/service/sync/sync_feedback.dart';
-import 'package:anx_reader/service/sync/sync_preflight.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/sync/sync_feedback.dart';
+import 'package:modu_reader/service/sync/sync_preflight.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common/src/exception.dart';

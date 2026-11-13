@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/version_check_type.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/utils/app_version.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/version_check_type.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/utils/app_version.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:anx_reader/page/changelog_screen.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/page/changelog_screen.dart';
+import 'package:modu_reader/utils/log/common.dart';
 
 class InitializationCheck {
   static String? _lastVersion;

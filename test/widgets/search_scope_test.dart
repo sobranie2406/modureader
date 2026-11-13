@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/search_repository.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/search_result_data.dart';
-import 'package:anx_reader/page/search/search_page.dart';
-import 'package:anx_reader/providers/search.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/search_repository.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/search_result_data.dart';
+import 'package:modu_reader/page/search/search_page.dart';
+import 'package:modu_reader/providers/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

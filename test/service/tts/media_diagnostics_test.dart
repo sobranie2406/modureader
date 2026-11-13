@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/tts_media_state.dart';
-import 'package:anx_reader/service/tts/media_diagnostics.dart';
-import 'package:anx_reader/service/tts/media_diagnostic_fields.dart';
-import 'package:anx_reader/service/feedback/detailed_runtime_log.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/tts_media_state.dart';
+import 'package:modu_reader/service/tts/media_diagnostics.dart';
+import 'package:modu_reader/service/tts/media_diagnostic_fields.dart';
+import 'package:modu_reader/service/feedback/detailed_runtime_log.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';

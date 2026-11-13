@@ -1,23 +1,23 @@
 import 'dart:convert';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
-import 'package:anx_reader/service/plugins/plugin_contributions.dart';
-import 'package:anx_reader/models/book_style.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/models/selection_search.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/local_data/backup_safety.dart';
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_contributions.dart';
+import 'package:modu_reader/models/book_style.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/models/selection_search.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/local_data/backup_safety.dart';
+import 'package:modu_reader/service/config_transfer/config_transfer_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
-import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
-import 'package:anx_reader/service/config_transfer/library_config_transfer.dart';
-import 'package:anx_reader/service/config_transfer/settings_modules.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
-import 'package:anx_reader/enums/ai_prompts.dart';
-import 'package:anx_reader/service/ai/reading_prompt_overrides.dart';
+import 'package:modu_reader/service/config_transfer/settings_config_transfer.dart';
+import 'package:modu_reader/service/config_transfer/tts_config_transfer.dart';
+import 'package:modu_reader/service/config_transfer/library_config_transfer.dart';
+import 'package:modu_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/enums/ai_prompts.dart';
+import 'package:modu_reader/service/ai/reading_prompt_overrides.dart';
 
 /// Portable preferences only. Never restore databases, per-book IDs, migration
 /// flags, storage paths, permissions, window geometry or device-local assets.

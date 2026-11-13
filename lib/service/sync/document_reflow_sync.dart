@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 

@@ -1,19 +1,19 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/index.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/service/ai/prompt_generate.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/index.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/ai/prompt_generate.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:skeletonizer/skeletonizer.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/widgets/ai/tool_step_tile.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/mindmap_step_tile.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/organize_bookshelf_step_tile.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/apply_book_tags_step_tile.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/widgets/ai/tool_step_tile.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/mindmap_step_tile.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/organize_bookshelf_step_tile.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/apply_book_tags_step_tile.dart';
 
 class AiStream extends ConsumerStatefulWidget {
   const AiStream({

@@ -1,4 +1,4 @@
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'ai_provider.freezed.dart';

@@ -1,8 +1,8 @@
-import 'package:anx_reader/dao/base_dao.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ThemeDao extends BaseDao {

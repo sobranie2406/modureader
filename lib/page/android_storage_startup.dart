@@ -1,13 +1,13 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
-import 'package:anx_reader/service/feedback/crash_journal.dart';
+import 'package:modu_reader/service/feedback/crash_journal.dart';
 
 /// Do not expose the library or start sync until storage is ready.
 class AndroidStorageStartup extends StatefulWidget {

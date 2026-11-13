@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/page/settings_page/vector_model.dart';
-import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/page/settings_page/vector_model.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anx_reader/enums/translation_mode.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/service/translate/document_page_translation.dart';
-import 'package:anx_reader/service/translate/reader_translation_session.dart';
+import 'package:modu_reader/enums/translation_mode.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/translate/document_page_translation.dart';
+import 'package:modu_reader/service/translate/reader_translation_session.dart';
 
 void main() {
   late DocumentPageTranslation translation;

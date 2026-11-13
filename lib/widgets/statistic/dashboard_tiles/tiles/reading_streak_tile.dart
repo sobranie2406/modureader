@@ -1,9 +1,9 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/providers/reading_streak_provider.dart';
-import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/providers/reading_streak_provider.dart';
+import 'package:modu_reader/widgets/common/async_skeleton_wrapper.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

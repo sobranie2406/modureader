@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'package:anx_reader/models/tts_role_config.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
 import 'tts_page_source.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
 import 'package:flutter/material.dart';
 
 enum TtsStateEnum { playing, stopped, paused, continued }

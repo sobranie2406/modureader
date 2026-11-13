@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:flutter/material.dart';
 
 /// Localised capability description shared by the install preview and the

@@ -1,10 +1,10 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/settings_page/ocr_model.dart';
-import 'package:anx_reader/page/settings_page/settings_page.dart';
-import 'package:anx_reader/page/settings_page/vector_model.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/settings_page/ocr_model.dart';
+import 'package:modu_reader/page/settings_page/settings_page.dart';
+import 'package:modu_reader/page/settings_page/vector_model.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
 
 class ModelSettings extends StatelessWidget {

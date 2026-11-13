@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pubspec_parse/pubspec_parse.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 
 String installedAppVersion(String version, String build,
     {String harmonyReleaseVersion = ''}) {

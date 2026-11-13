@@ -1,19 +1,19 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
-import 'package:anx_reader/widgets/bookshelf/stop_vectorization_button.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/common/anx_button.dart';
-import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
-import 'package:anx_reader/widgets/settings/offline_model_picker.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:modu_reader/widgets/bookshelf/stop_vectorization_button.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/common/anx_button.dart';
+import 'package:modu_reader/widgets/common/anx_segmented_button.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/widgets/settings/offline_model_picker.dart';
 import 'package:flutter/material.dart';
 
 class VectorModelSettings extends StatefulWidget {

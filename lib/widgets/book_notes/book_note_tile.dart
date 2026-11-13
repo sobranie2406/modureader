@@ -1,10 +1,10 @@
-import 'package:anx_reader/constants/note_annotations.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/utils/time_to_human.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/constants/note_annotations.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/utils/time_to_human.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
 class BookNoteTile extends StatelessWidget {
   const BookNoteTile({

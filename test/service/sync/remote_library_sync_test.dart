@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/remote_file.dart';
+import 'package:modu_reader/models/remote_file.dart';
 import 'package:dio/dio.dart';
 
 /// Raised before any upload when the current revision cannot be protected.

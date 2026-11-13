@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/service/tts/models/tts_segment.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
-import 'package:anx_reader/service/tts/edge_tts_backend.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
-import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/service/tts/models/tts_segment.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/edge_tts_backend.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/service/tts/tts_service_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

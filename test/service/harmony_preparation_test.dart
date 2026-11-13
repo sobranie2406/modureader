@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/utils/get_path/get_download_path.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/get_path/get_download_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:pubspec_parse/pubspec_parse.dart';

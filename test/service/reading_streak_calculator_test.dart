@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/reading_streak_calculator.dart';
+import 'package:modu_reader/service/reading_streak_calculator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 打卡判定单元测试。

@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/book_review_editor_page.dart';
-import 'package:anx_reader/providers/book_list.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/providers/sync_database_revision.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_trigger.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/book_review_editor_page.dart';
+import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/providers/sync_database_revision.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

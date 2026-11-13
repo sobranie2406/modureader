@@ -1,8 +1,8 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:ui';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

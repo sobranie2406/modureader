@@ -1,8 +1,8 @@
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
-import 'package:anx_reader/models/sync_state_model.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/widgets/bookshelf/sync_button.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_trigger.dart';
+import 'package:modu_reader/models/sync_state_model.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/widgets/bookshelf/sync_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

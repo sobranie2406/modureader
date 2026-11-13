@@ -1,9 +1,9 @@
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/ai/tools/book_content_search_tool.dart';
-import 'package:anx_reader/service/ai/tools/input/book_content_search_input.dart';
-import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
-import 'package:anx_reader/service/ai/tools/repository/books_repository.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_retriever.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/ai/tools/book_content_search_tool.dart';
+import 'package:modu_reader/service/ai/tools/input/book_content_search_input.dart';
+import 'package:modu_reader/service/ai/tools/repository/book_content_search_repository.dart';
+import 'package:modu_reader/service/ai/tools/repository/books_repository.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_retriever.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../knowledge/book_knowledge_retriever_test.dart'

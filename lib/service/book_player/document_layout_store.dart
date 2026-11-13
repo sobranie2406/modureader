@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:anx_reader/models/document_page_layout.dart';
+import 'package:modu_reader/models/document_page_layout.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Per-document local layouts, never a transferable global preference.

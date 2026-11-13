@@ -1,5 +1,5 @@
-import 'package:anx_reader/enums/chart_mode.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/enums/chart_mode.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'statistic_data_model.freezed.dart';

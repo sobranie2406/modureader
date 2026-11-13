@@ -1,6 +1,6 @@
-import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/widgets/dictionary/dictionary_sources.dart';
+import 'package:modu_reader/service/dictionary/dictionary_preferences.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/widgets/dictionary/dictionary_sources.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

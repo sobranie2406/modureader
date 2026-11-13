@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/service/translate/classical_translation.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';

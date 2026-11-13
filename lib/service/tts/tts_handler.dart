@@ -1,20 +1,20 @@
 import 'dart:async';
-import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
+import 'package:modu_reader/service/feedback/runtime_diagnostics.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/tts_page_source.dart';
-import 'package:anx_reader/service/tts/tts_factory.dart';
-import 'package:anx_reader/service/tts/tts_media_state.dart';
-import 'package:anx_reader/service/tts/notification_permission.dart';
-import 'package:anx_reader/service/tts/tts_reader_wait.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/tts_page_source.dart';
+import 'package:modu_reader/service/tts/tts_factory.dart';
+import 'package:modu_reader/service/tts/tts_media_state.dart';
+import 'package:modu_reader/service/tts/notification_permission.dart';
+import 'package:modu_reader/service/tts/tts_reader_wait.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 
 class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {

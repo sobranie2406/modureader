@@ -1,8 +1,8 @@
-import 'package:anx_reader/service/ai/ai_provider.dart';
-import 'package:anx_reader/service/sync/sync_merge.dart';
-import 'package:anx_reader/service/local_data/local_data_store.dart';
-import 'package:anx_reader/service/tts/tts_pipeline.dart';
-import 'package:anx_reader/service/tts/tts_provider.dart';
+import 'package:modu_reader/service/ai/ai_provider.dart';
+import 'package:modu_reader/service/sync/sync_merge.dart';
+import 'package:modu_reader/service/local_data/local_data_store.dart';
+import 'package:modu_reader/service/tts/tts_pipeline.dart';
+import 'package:modu_reader/service/tts/tts_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

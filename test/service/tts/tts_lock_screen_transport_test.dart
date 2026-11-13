@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'package:anx_reader/service/tts/tts_page_source.dart';
+import 'package:modu_reader/service/tts/tts_page_source.dart';
 import 'dart:typed_data';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
-import 'package:anx_reader/service/tts/tts_factory.dart';
-import 'package:anx_reader/service/tts/tts_handler.dart';
-import 'package:anx_reader/service/tts/tts_media_state.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/tts_factory.dart';
+import 'package:modu_reader/service/tts/tts_handler.dart';
+import 'package:modu_reader/service/tts/tts_media_state.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:audioplayers/audioplayers.dart';

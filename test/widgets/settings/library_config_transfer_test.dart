@@ -1,7 +1,7 @@
-import 'package:anx_reader/page/settings_page/remote_library.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
+import 'package:modu_reader/page/settings_page/remote_library.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

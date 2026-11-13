@@ -1,7 +1,7 @@
 // Opt-in network smoke test: public sample words only; no book or account data.
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/service/dictionary/online_dictionary.dart';
+import 'package:modu_reader/service/dictionary/online_dictionary.dart';
 
 Future<void> main() async {
   final service = OnlineDictionaryService();

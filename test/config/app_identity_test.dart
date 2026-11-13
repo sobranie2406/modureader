@@ -1,4 +1,4 @@
-import 'package:anx_reader/config/app_identity.dart';
+import 'package:modu_reader/config/app_identity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

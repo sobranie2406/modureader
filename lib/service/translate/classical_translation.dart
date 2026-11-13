@@ -1,10 +1,10 @@
 import 'translation_api_client.dart';
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/index.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/service/translate/translation_answer.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ai/index.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/translate/translation_answer.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:langchain_core/chat_models.dart';

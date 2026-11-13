@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/service/reading/text_filter.dart';
-import 'package:anx_reader/service/reading/reflow_css.dart';
-import 'package:anx_reader/service/tts/tts_page_source.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/reading/text_filter.dart';
+import 'package:modu_reader/service/reading/reflow_css.dart';
+import 'package:modu_reader/service/tts/tts_page_source.dart';
 
 void main() {
   for (final mode in ['text', 'paragraph']) {

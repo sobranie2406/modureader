@@ -1,6 +1,6 @@
 import 'dart:typed_data';
-import 'package:anx_reader/service/knowledge/android_embedding_bridge.dart';
-import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/android_embedding_bridge.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

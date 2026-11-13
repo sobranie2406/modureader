@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book_style.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/service/book_player/reading_appearance.dart';
-import 'package:anx_reader/utils/js/convert_dart_color_to_js.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book_style.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/service/book_player/reading_appearance.dart';
+import 'package:modu_reader/utils/js/convert_dart_color_to_js.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 
 String generateUrl(
   String url,

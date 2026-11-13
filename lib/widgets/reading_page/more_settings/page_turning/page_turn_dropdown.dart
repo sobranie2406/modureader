@@ -1,6 +1,6 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/widgets/common/anx_dropdown_button.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/widgets/common/anx_dropdown_button.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:flutter/material.dart';
 
 class PageTurnDropdown extends StatelessWidget {

@@ -1,13 +1,13 @@
-import 'package:anx_reader/service/registry/host_registry.dart';
-import 'package:anx_reader/service/translate/ai.dart';
-import 'package:anx_reader/service/translate/deepl.dart';
-import 'package:anx_reader/service/translate/google_api.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/service/translate/microsoft_api.dart';
-import 'package:anx_reader/service/translate/microsoft_free.dart';
-import 'package:anx_reader/service/translate/official_api.dart';
-import 'package:anx_reader/service/translate/web_view.dart';
-import 'package:anx_reader/utils/env_var.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/translate/ai.dart';
+import 'package:modu_reader/service/translate/deepl.dart';
+import 'package:modu_reader/service/translate/google_api.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/service/translate/microsoft_api.dart';
+import 'package:modu_reader/service/translate/microsoft_free.dart';
+import 'package:modu_reader/service/translate/official_api.dart';
+import 'package:modu_reader/service/translate/web_view.dart';
+import 'package:modu_reader/utils/env_var.dart';
 
 /// One translation provider.
 ///

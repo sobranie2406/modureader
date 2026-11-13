@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/ai_quick_prompt_chip.dart';
-import 'package:anx_reader/service/ai/reading_skill_layout.dart';
-import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
-import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/ai_quick_prompt_chip.dart';
+import 'package:modu_reader/service/ai/reading_skill_layout.dart';
+import 'package:modu_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:modu_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:flutter/material.dart';
 
 IconData readingSkillIcon(String id) => switch (id) {

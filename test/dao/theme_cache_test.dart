@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/dao/theme.dart';
+import 'package:modu_reader/dao/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 

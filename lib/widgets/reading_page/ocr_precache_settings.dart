@@ -1,9 +1,9 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
-import 'package:anx_reader/service/ocr/document_reflow_loader.dart';
+import 'package:modu_reader/service/ocr/document_ocr_precache.dart';
+import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
 
 class OcrPrecacheSettings extends StatefulWidget {
   const OcrPrecacheSettings({super.key, this.cache});

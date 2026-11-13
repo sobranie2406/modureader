@@ -1,4 +1,4 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 
 /// Only the explicit retry button receives input; the status is not a modal.

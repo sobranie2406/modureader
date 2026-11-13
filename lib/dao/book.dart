@@ -1,12 +1,12 @@
-import 'package:anx_reader/dao/base_dao.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/narration_position.dart';
-import 'package:anx_reader/models/reading_position_snapshot.dart';
+import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/narration_position.dart';
+import 'package:modu_reader/models/reading_position_snapshot.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/replaced_book_files.dart';
-import 'package:anx_reader/service/sync/converted_book_checksum.dart';
-import 'package:anx_reader/utils/reading_progress.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/replaced_book_files.dart';
+import 'package:modu_reader/service/sync/converted_book_checksum.dart';
+import 'package:modu_reader/utils/reading_progress.dart';
 
 class BookDao extends BaseDao {
   BookDao();

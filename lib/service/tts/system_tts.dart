@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/system_voice_identity.dart';
-import 'package:anx_reader/service/tts/system_tts_support.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/system_voice_identity.dart';
+import 'package:modu_reader/service/tts/system_tts_support.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

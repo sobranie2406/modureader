@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/config_transfer/settings_modules.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/sync_preview.dart';
-import 'package:anx_reader/widgets/sync/sync_preview_dialog.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/sync_preview.dart';
+import 'package:modu_reader/widgets/sync/sync_preview_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

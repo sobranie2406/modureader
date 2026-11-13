@@ -1,18 +1,18 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
-import 'package:anx_reader/service/knowledge/book_index_lock.dart';
-import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
-import 'package:anx_reader/service/knowledge/index_build_marker.dart';
-import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
-import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
+import 'package:modu_reader/service/knowledge/book_index_lock.dart';
+import 'package:modu_reader/service/feedback/crash_diagnostics.dart';
+import 'package:modu_reader/service/knowledge/index_build_marker.dart';
+import 'package:modu_reader/service/knowledge/book_source_fingerprint.dart';
+import 'package:modu_reader/service/knowledge/local_book_requirement.dart';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/ai/tools/repository/book_content_search_repository.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/knowledge_index_stream.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 
 class BookKnowledgeIndexStatus {
   const BookKnowledgeIndexStatus({

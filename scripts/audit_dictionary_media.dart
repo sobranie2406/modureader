@@ -5,8 +5,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:anx_reader/service/dictionary/dictionary_document.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/dictionary_document.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 
 class MediaFixtureStore extends LocalDictionaryStore {
   MediaFixtureStore() : super('unused');

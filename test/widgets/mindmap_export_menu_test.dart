@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/mindmap_step_tile.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/mindmap_step_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';

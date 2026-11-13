@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
+import 'package:modu_reader/service/knowledge/knowledge_index_stream.dart';
 
 /// Rewrite and validate one record at a time. Retain only chunk identities and
 /// a vector-seen bitmap, not book text or vectors. Temporary output must never

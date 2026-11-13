@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/base_dao.dart';
-import 'package:anx_reader/models/reading_round.dart';
+import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/models/reading_round.dart';
 
 class ReadingRoundDao extends BaseDao {
   ReadingRoundDao();

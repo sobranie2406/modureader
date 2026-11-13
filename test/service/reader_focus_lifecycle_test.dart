@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/reader_keyboard.dart';
-import 'package:anx_reader/service/reader_page_keys.dart';
+import 'package:modu_reader/service/reader_keyboard.dart';
+import 'package:modu_reader/service/reader_page_keys.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

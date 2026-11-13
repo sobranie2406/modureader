@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

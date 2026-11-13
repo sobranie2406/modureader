@@ -1,10 +1,10 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
-import 'package:anx_reader/widgets/reading_page/ocr_precache_settings.dart';
-import 'package:anx_reader/widgets/reading_page/reader_settings_scroll_view.dart';
-import 'package:anx_reader/widgets/reading_page/widget_title.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ocr/document_ocr_precache.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/widgets/reading_page/ocr_precache_settings.dart';
+import 'package:modu_reader/widgets/reading_page/reader_settings_scroll_view.dart';
+import 'package:modu_reader/widgets/reading_page/widget_title.dart';
 import 'package:flutter/material.dart';
 import 'reader_menu_group.dart';
 

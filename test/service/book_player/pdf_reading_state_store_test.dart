@@ -1,6 +1,6 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/book_player/pdf_reading_state_store.dart';
-import 'package:anx_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/book_player/pdf_reading_state_store.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

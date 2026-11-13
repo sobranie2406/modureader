@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/book_formats.dart';
-import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:modu_reader/service/book_formats.dart';
+import 'package:modu_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

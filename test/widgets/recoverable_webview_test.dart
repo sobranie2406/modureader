@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/webview/recoverable_webview.dart';
+import 'package:modu_reader/widgets/webview/recoverable_webview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,20 +1,20 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/settings_page/css_settings.dart';
-import 'package:anx_reader/page/settings_page/settings_page.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/other_settings.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/reading_settings.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/style_settings.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/settings_page/css_settings.dart';
+import 'package:modu_reader/page/settings_page/settings_page.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/other_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/reading_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/style_settings.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/settings/reader_popup_height_tile.dart';
-import 'package:anx_reader/widgets/settings/reader_menu_opacity_tile.dart';
-import 'package:anx_reader/widgets/reading_page/reader_top_actions.dart';
+import 'package:modu_reader/widgets/settings/reader_popup_height_tile.dart';
+import 'package:modu_reader/widgets/settings/reader_menu_opacity_tile.dart';
+import 'package:modu_reader/widgets/reading_page/reader_top_actions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ReadingSettings extends ConsumerStatefulWidget {

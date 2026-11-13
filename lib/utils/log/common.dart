@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/utils/log/environment.dart';
-import 'package:anx_reader/service/feedback/detailed_runtime_log.dart';
+import 'package:modu_reader/utils/log/environment.dart';
+import 'package:modu_reader/service/feedback/detailed_runtime_log.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/utils/log/string_to_level.dart';
-import 'package:anx_reader/utils/get_path/log_file.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/utils/log/string_to_level.dart';
+import 'package:modu_reader/utils/get_path/log_file.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';

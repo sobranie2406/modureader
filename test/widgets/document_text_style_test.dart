@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
-import 'package:anx_reader/service/book_player/pdf_reading_state_store.dart';
-import 'package:anx_reader/widgets/reading_page/document_text_style_dialog.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/service/book_player/pdf_reading_state_store.dart';
+import 'package:modu_reader/widgets/reading_page/document_text_style_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

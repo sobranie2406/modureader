@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/font_model.dart';
-import 'package:anx_reader/service/font.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/font_model.dart';
+import 'package:modu_reader/service/font.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

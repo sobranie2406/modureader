@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/database.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';

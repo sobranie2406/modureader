@@ -1,7 +1,7 @@
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/tts_handler.dart';
-import 'package:anx_reader/widgets/reading_page/tts_fab.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/tts_handler.dart';
+import 'package:modu_reader/widgets/reading_page/tts_fab.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:icons_plus/icons_plus.dart';

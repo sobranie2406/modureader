@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/app_brightness.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/widgets/reading_page/reader_content_brightness.dart';
-import 'package:anx_reader/widgets/reading_page/reader_web_brightness.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/app_brightness.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/widgets/reading_page/reader_content_brightness.dart';
+import 'package:modu_reader/widgets/reading_page/reader_web_brightness.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/book_style.dart';
+import 'package:modu_reader/models/book_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

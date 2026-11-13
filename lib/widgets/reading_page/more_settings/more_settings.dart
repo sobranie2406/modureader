@@ -1,14 +1,14 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/other_settings.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/reading_settings.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/style_settings.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/custom_css_editor.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/other_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/reading_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/style_settings.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/custom_css_editor.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
 import '../reader_settings_scroll_view.dart';
 import '../reader_menu_group.dart';
 

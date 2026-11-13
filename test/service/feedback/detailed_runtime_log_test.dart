@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/feedback/detailed_runtime_log.dart';
-import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
+import 'package:modu_reader/service/feedback/detailed_runtime_log.dart';
+import 'package:modu_reader/service/feedback/runtime_diagnostics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
 
@@ -19,14 +19,14 @@ void main() {
         'Modu',
         null,
         StackTrace.fromString(
-            '#0 RowSyncArchive.read (package:anx_reader/service/sync/row_sync_engine.dart:90:10)\n'
+            '#0 RowSyncArchive.read (package:modu_reader/service/sync/row_sync_engine.dart:90:10)\n'
             '#1 native (file:///Users/private/book.dart:1:2)')));
     final data = jsonDecode(entry) as Map;
     expect(data['reasons'], ['missing_table']);
     expect(data['errorCode'], 1);
     expect(data['databaseOperation'], 'SELECT');
     expect(data['frames'],
-        ['package:anx_reader/service/sync/row_sync_engine.dart:90:10']);
+        ['package:modu_reader/service/sync/row_sync_engine.dart:90:10']);
     for (final value in ['私密', 'PRIVATE', 'SECRET', 'private', 'user:pass']) {
       expect(entry, isNot(contains(value)));
     }
@@ -84,7 +84,7 @@ void main() {
 
   test('large stacks stay within aggregate budget and clear works', () {
     final frames = List.generate(16,
-            (i) => '#$i action (package:anx_reader/${'a' * 150}.dart:123:456)')
+            (i) => '#$i action (package:modu_reader/${'a' * 150}.dart:123:456)')
         .join('\n');
     for (var i = 0; i < 300; i++) {
       DetailedRuntimeLog.record(LogRecord(Level.SEVERE, 'FormatException',

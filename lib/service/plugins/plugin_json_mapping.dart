@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/plugin_network.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/models/plugin_network.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 
 /// Evaluates a [JsonPath] against decoded JSON and maps the result into
 /// dictionary entries.

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 
 abstract class BaseRoundedContainer extends StatelessWidget {
   const BaseRoundedContainer({

@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
-import 'package:anx_reader/service/convert_to_epub/section.dart';
-import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
+import 'package:modu_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:modu_reader/service/convert_to_epub/section.dart';
+import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;

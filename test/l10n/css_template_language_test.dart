@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:analyzer/dart/analysis/utilities.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

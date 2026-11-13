@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/widgets/home_navigation_metrics.dart';
+import 'package:modu_reader/widgets/home_navigation_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';
 import 'package:flutter_test/flutter_test.dart';

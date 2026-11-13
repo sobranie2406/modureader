@@ -1,7 +1,7 @@
-import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/providers/book_list.dart';
-import 'package:anx_reader/providers/current_reading.dart';
-import 'package:anx_reader/service/statistic/reading_insights.dart';
+import 'package:modu_reader/dao/database.dart';
+import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/providers/current_reading.dart';
+import 'package:modu_reader/service/statistic/reading_insights.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// All four optional cards share one result. Page turns do not reload it;

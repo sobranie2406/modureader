@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/config/config_item.dart';
+import 'package:modu_reader/service/config/config_item.dart';
 import 'package:flutter/material.dart';
 
 /// Base class for all service providers (Translate, TTS, etc.).

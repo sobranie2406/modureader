@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/service/book_player/reader_font_response.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/service/book_player/reader_font_response.dart';
 
 class FontModel {
   final String label;

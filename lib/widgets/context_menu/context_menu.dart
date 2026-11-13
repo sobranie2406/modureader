@@ -1,17 +1,17 @@
-import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'dart:math' as math;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/widgets/common/axis_flex.dart';
-import 'package:anx_reader/widgets/context_menu/excerpt_menu.dart';
-import 'package:anx_reader/widgets/context_menu/reader_note_menu.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/widgets/common/axis_flex.dart';
+import 'package:modu_reader/widgets/context_menu/excerpt_menu.dart';
+import 'package:modu_reader/widgets/context_menu/reader_note_menu.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/models/book_note.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/models/book_note.dart';
 
 Future<void> showContextMenu(
     BuildContext context,

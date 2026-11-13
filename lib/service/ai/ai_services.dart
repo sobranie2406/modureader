@@ -1,4 +1,4 @@
-import 'package:anx_reader/utils/env_var.dart';
+import 'package:modu_reader/utils/env_var.dart';
 
 class AiServiceOption {
   const AiServiceOption({

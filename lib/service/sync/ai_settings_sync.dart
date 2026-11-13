@@ -1,9 +1,9 @@
 import 'dart:collection';
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/database.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';

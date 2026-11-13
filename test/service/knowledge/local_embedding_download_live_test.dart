@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RealHttpOverrides extends HttpOverrides {}

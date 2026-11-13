@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/statistic/reading_insights.dart';
+import 'package:modu_reader/service/statistic/reading_insights.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'sync/row_sync_test.dart' show fixture, bookRow, noteRow;

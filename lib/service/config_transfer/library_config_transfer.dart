@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
 
 /// Separate from sync WebDAV: importing never enables sync or contacts a host.
 class LibraryConfigTransfer {

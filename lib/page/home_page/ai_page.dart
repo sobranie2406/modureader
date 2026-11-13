@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
+import 'package:modu_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:flutter/material.dart';
 
 class AiPage extends StatelessWidget {

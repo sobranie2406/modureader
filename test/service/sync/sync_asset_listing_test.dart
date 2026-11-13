@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/sync/sync_asset_listing.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/sync/sync_asset_listing.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'row_sync_test.dart' show MemorySyncClient;
 

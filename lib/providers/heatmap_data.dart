@@ -1,6 +1,6 @@
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/providers/reading_data_revision.dart';
-import 'package:anx_reader/providers/sync_database_revision.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/providers/reading_data_revision.dart';
+import 'package:modu_reader/providers/sync_database_revision.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'heatmap_data.g.dart';

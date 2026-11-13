@@ -1,6 +1,6 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/tts/openai_voice_presets.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/tts/openai_voice_presets.dart';
 import 'package:flutter/material.dart';
 
 /// Shares the connection form's draft; only Save settings persists it.

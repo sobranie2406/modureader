@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/convert_chinese_mode.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/reading_rules.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/convert_chinese_mode.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/reading_rules.dart';
 import 'package:flutter/material.dart';
 
 /// Quick access to the same conversion preference used by advanced settings.

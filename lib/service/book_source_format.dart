@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/sync/converted_book_checksum.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/sync/converted_book_checksum.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;

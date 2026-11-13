@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/ai/ai_cache.dart';
+import 'package:modu_reader/service/ai/ai_cache.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'ai_cache_count.g.dart';

@@ -1,6 +1,6 @@
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/models/reading_round.dart';
-import 'package:anx_reader/providers/sync_database_revision.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/models/reading_round.dart';
+import 'package:modu_reader/providers/sync_database_revision.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'reading_round_provider.g.dart';

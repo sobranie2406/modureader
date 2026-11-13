@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/sync/book_cloud_deletions.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/sync/book_cloud_deletions.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 import 'replaced_book_files_test.dart' show CleanupClient;
 
 void main() {

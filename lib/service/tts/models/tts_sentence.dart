@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/tts_role_config.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
 
 class TtsSentence {
   const TtsSentence({

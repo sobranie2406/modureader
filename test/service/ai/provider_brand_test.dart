@@ -1,8 +1,8 @@
 import 'dart:ui' as ui;
 
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/ai_services.dart';
-import 'package:anx_reader/service/ai/provider_brand.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/ai_services.dart';
+import 'package:modu_reader/service/ai/provider_brand.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

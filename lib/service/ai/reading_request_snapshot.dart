@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/ai/reading_skill_execution.dart';
+import 'package:modu_reader/service/ai/reading_skill_execution.dart';
 import 'package:langchain_core/chat_models.dart';
 
 /// The actual source and tool policy sent for the last reader request.

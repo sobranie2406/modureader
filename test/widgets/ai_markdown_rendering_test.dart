@@ -1,5 +1,5 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';

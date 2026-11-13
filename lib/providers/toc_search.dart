@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/search_result_model.dart';
+import 'package:modu_reader/models/search_result_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 

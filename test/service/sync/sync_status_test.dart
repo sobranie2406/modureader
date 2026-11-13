@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/sync_status.dart';
-import 'package:anx_reader/providers/sync_status.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/sync_status.dart';
+import 'package:modu_reader/providers/sync_status.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

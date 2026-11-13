@@ -1,6 +1,6 @@
 import 'dart:collection';
 
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 
 /// In-memory quota bookkeeping for plugin network requests.
 ///

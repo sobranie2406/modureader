@@ -1,4 +1,4 @@
-import 'package:anx_reader/enums/chart_mode.dart';
+import 'package:modu_reader/enums/chart_mode.dart';
 
 // Capture the selected interval when deleting, not when leaving statistics.
 typedef ReadingTimeDeletion = ({int bookId, String? start, String? end});

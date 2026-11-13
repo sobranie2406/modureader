@@ -1,6 +1,6 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
 import 'package:flutter/material.dart';
 
 const selectionToolbarIcons = <String, IconData>{

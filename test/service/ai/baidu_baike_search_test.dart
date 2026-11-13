@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:anx_reader/service/ai/dictionary_lookup.dart';
-import 'package:anx_reader/service/ai/dictionary_web_search.dart';
+import 'package:modu_reader/service/ai/dictionary_lookup.dart';
+import 'package:modu_reader/service/ai/dictionary_web_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

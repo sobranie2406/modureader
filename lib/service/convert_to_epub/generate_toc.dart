@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:anx_reader/service/convert_to_epub/section.dart';
+import 'package:modu_reader/service/convert_to_epub/section.dart';
 
 String _escapeXml(String value) {
   return value

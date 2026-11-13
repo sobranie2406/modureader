@@ -1,15 +1,15 @@
 import 'dart:convert';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/widgets/settings/translation_preview_text.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/widgets/settings/translation_preview_text.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/translation_text_style.dart';
-import 'package:anx_reader/service/config_transfer/settings_modules.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
-import 'package:anx_reader/widgets/settings/translation_text_style_settings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/translation_text_style.dart';
+import 'package:modu_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/widgets/settings/translation_text_style_settings.dart';
 
 void main() {
   setUp(() async {

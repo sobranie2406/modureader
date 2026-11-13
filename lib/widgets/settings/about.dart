@@ -1,22 +1,22 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/config/app_identity.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/settings_page/developer/developer_options_page.dart';
-import 'package:anx_reader/page/settings_page/bug_report.dart';
-import 'package:anx_reader/page/settings_page/settings_page.dart';
-import 'package:anx_reader/utils/env_var.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/utils/check_update.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/app_identity.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/settings_page/developer/developer_options_page.dart';
+import 'package:modu_reader/page/settings_page/bug_report.dart';
+import 'package:modu_reader/page/settings_page/settings_page.dart';
+import 'package:modu_reader/utils/env_var.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/utils/check_update.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:anx_reader/utils/app_version.dart';
-import 'package:anx_reader/widgets/settings/community_links.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/utils/app_version.dart';
+import 'package:modu_reader/widgets/settings/community_links.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class About extends StatelessWidget {

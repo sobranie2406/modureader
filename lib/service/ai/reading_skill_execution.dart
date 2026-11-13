@@ -1,6 +1,6 @@
 import 'package:langchain_core/chat_models.dart';
 import 'dart:convert';
-import 'package:anx_reader/service/ai/answer_presentation.dart';
+import 'package:modu_reader/service/ai/answer_presentation.dart';
 
 const String smartSummarySkillId = 'smart_summary';
 const String bookSummarySkillId = 'book_summary';

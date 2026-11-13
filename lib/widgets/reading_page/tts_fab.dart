@@ -1,11 +1,11 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
-import 'package:anx_reader/service/tts/tts_handler.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/service/tts/tts_handler.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 

@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/reading_info.dart';
-import 'package:anx_reader/models/reader_progress.dart';
-import 'package:anx_reader/models/reading_info.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/reading_info.dart';
+import 'package:modu_reader/models/reader_progress.dart';
+import 'package:modu_reader/models/reading_info.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

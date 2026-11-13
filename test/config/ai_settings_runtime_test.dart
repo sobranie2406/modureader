@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,6 +1,6 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 

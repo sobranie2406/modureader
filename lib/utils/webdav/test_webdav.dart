@@ -1,14 +1,14 @@
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
-import 'package:anx_reader/service/sync/sync_client_factory.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/enums/sync_protocol.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/service/sync/sync_connection_tester.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_trigger.dart';
+import 'package:modu_reader/service/sync/sync_client_factory.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/enums/sync_protocol.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/service/sync/sync_connection_tester.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<bool> testEnableWebdav() async {

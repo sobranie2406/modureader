@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/models/reading_round.dart';
-import 'package:anx_reader/service/sync/reading_round_sync.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/models/reading_round.dart';
+import 'package:modu_reader/service/sync/reading_round_sync.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

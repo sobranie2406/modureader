@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 

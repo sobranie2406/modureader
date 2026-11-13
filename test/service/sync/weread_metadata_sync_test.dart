@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/service/sync/weread_metadata_sync.dart';
-import 'package:anx_reader/service/weread/weread_store.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/sync/weread_metadata_sync.dart';
+import 'package:modu_reader/service/weread/weread_store.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'document_reflow_sync_test.dart' show OcrClient;

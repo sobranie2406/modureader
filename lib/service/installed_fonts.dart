@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
 const bundledFontFilename = 'SourceHanSerifSC-Regular.otf';
 final _removedFonts = StreamController<String>.broadcast(sync: true);

@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/ai_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
 
 /// Official website artwork bundled locally; never request icons with API keys.
 enum ProviderBrand {

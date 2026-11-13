@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/service/feedback/native_stack_diagnostics.dart';
+import 'package:modu_reader/service/feedback/native_stack_diagnostics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

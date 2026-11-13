@@ -1,14 +1,14 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/document_enhancement.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/document_enhancement.dart';
 import 'widget_title.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
 
 /// Preview only until Confirm succeeds. The book file is never modified.
 class DocumentEnhancementPanel extends StatefulWidget {

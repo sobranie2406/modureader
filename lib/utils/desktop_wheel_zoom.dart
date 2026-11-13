@@ -1,4 +1,4 @@
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/services.dart';
 
 bool desktopWheelZoomModifierPressed() {

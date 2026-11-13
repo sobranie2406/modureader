@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/models/book.dart';
 
 /// A synchronized bookshelf record does not imply a downloaded book file.
 class LocalBookRequiredException implements Exception {

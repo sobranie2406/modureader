@@ -1,18 +1,18 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/service/ai/prompt_generate.dart';
-import 'package:anx_reader/service/ai/index.dart';
-import 'package:anx_reader/service/config/config_item.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
-import 'package:anx_reader/providers/ai_chat.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/service/ai/prompt_generate.dart';
+import 'package:modu_reader/service/ai/index.dart';
+import 'package:modu_reader/service/config/config_item.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/widgets/ai/ai_chat_stream.dart';
+import 'package:modu_reader/providers/ai_chat.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/service/translate/translation_answer.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/service/translate/translation_answer.dart';
 
 class AiTranslateProvider extends TranslateServiceProvider {
   @override

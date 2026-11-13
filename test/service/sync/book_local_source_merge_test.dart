@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book_local_sources.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'row_sync_test.dart' show fixture;

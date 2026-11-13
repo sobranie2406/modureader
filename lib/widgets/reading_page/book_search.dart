@@ -1,11 +1,11 @@
 import 'reader_content_brightness.dart';
-import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_appearance.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:math' as math;
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/search_result_model.dart';
-import 'package:anx_reader/providers/toc_search.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/search_result_model.dart';
+import 'package:modu_reader/providers/toc_search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

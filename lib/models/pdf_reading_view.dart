@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/document_enhancement.dart';
-import 'package:anx_reader/models/document_display_options.dart';
+import 'package:modu_reader/models/document_enhancement.dart';
+import 'package:modu_reader/models/document_display_options.dart';
 
 class PdfReadingView {
   const PdfReadingView(

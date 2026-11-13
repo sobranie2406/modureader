@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/service/offline_model_import.dart';
-import 'package:anx_reader/service/knowledge/bundled_embedding_assets.dart';
-import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/offline_model_import.dart';
+import 'package:modu_reader/service/knowledge/bundled_embedding_assets.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:crypto/crypto.dart';
 
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 

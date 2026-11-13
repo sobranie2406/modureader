@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/sort_field.dart';
-import 'package:anx_reader/enums/sort_order.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/providers/book_list.dart';
-import 'package:anx_reader/providers/bookshelf_pins.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/sort_field.dart';
+import 'package:modu_reader/enums/sort_order.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/providers/bookshelf_pins.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

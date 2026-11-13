@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/ai_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
 import 'package:http/http.dart' as http;
 
 /// Explicit opt-out for SDKs which cannot serialize provider thinking fields.

@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/sync/book_file_sync.dart';
-import 'package:anx_reader/service/sync/replaced_book_files.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/sync/book_file_sync.dart';
+import 'package:modu_reader/service/sync/replaced_book_files.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

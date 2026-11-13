@@ -1,4 +1,4 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'package:flutter/material.dart';
 
 enum AnxButtonType { filled, outlined, text }

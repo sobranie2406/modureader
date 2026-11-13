@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
 
 /// A dictionary the lookup UI can offer.
 ///

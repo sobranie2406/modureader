@@ -1,9 +1,9 @@
-import 'package:anx_reader/widgets/settings/font_name_preview.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/providers/font_list.dart';
-import 'package:anx_reader/service/font.dart';
+import 'package:modu_reader/widgets/settings/font_name_preview.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/providers/font_list.dart';
+import 'package:modu_reader/service/font.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

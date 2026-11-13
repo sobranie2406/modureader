@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/remote_library/library_view_options.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/remote_library/library_view_options.dart';
 import 'package:flutter/material.dart';
 
 class RemoteLibraryControls extends StatelessWidget {

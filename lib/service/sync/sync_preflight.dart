@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:anx_reader/service/sync/webdav_request_policy.dart';
+import 'package:modu_reader/service/sync/webdav_request_policy.dart';
 
 typedef SyncDelay = Future<void> Function(Duration);
 

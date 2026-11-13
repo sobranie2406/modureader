@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/service/ocr/document_text_geometry.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/ocr/document_text_geometry.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

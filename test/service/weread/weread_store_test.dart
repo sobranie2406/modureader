@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:anx_reader/service/weread/weread_store.dart';
+import 'package:modu_reader/service/weread/weread_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

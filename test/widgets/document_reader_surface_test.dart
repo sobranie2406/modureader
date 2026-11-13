@@ -1,7 +1,7 @@
-import 'package:anx_reader/service/app_brightness.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/widgets/reading_page/document_reader_surface.dart';
+import 'package:modu_reader/service/app_brightness.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/widgets/reading_page/document_reader_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:flutter_test/flutter_test.dart';

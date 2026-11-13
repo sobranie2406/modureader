@@ -1,9 +1,9 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

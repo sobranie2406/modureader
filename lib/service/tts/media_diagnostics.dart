@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'media_diagnostic_fields.dart';
 
 /// Opt-in test builds only. Observes; never sends transport commands.

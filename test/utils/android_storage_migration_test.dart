@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/utils/get_path/android_storage.dart';
-import 'package:anx_reader/utils/get_path/android_storage_migration.dart';
+import 'package:modu_reader/utils/get_path/android_storage.dart';
+import 'package:modu_reader/utils/get_path/android_storage_migration.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:sqlite3/sqlite3.dart';

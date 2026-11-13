@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/document_reader_rotation.dart';
+import 'package:modu_reader/service/document_reader_rotation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

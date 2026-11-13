@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'document_reflow_loader.dart';
 import 'local_ocr_service.dart';
 

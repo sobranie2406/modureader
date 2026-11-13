@@ -1,15 +1,15 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:convert';
 
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/providers/tb_groups.dart';
-import 'package:anx_reader/service/ai/tools/models/bookshelf_organize_plan.dart';
-import 'package:anx_reader/service/ai/tools/models/bookshelf_organize_plan_group.dart';
-import 'package:anx_reader/service/bookshelf/bookshelf_organize_service.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/providers/tb_groups.dart';
+import 'package:modu_reader/service/ai/tools/models/bookshelf_organize_plan.dart';
+import 'package:modu_reader/service/ai/tools/models/bookshelf_organize_plan_group.dart';
+import 'package:modu_reader/service/bookshelf/bookshelf_organize_service.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';

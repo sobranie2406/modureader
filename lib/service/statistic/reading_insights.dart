@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ReadingInsightBook {

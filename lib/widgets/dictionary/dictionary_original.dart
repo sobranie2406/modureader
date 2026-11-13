@@ -1,10 +1,10 @@
-import 'package:anx_reader/widgets/reading_page/reader_web_brightness.dart';
+import 'package:modu_reader/widgets/reading_page/reader_web_brightness.dart';
 import 'dart:async';
-import 'package:anx_reader/utils/webView/web_scrollbar.dart';
+import 'package:modu_reader/utils/webView/web_scrollbar.dart';
 
-import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
-import 'package:anx_reader/service/dictionary/dictionary_document.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/page/home_page.dart' show webViewEnvironment;
+import 'package:modu_reader/service/dictionary/dictionary_document.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';

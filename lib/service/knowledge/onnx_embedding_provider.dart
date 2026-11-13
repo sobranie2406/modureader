@@ -4,13 +4,13 @@ import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/knowledge/android_embedding_bridge.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/android_embedding_bridge.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:hf_tokenizers/hf_tokenizers.dart';
 import 'package:flutter/services.dart';
-import 'package:anx_reader/service/knowledge/isolate_worker.dart';
+import 'package:modu_reader/service/knowledge/isolate_worker.dart';
 
 class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   LocalOnnxEmbeddingProvider({

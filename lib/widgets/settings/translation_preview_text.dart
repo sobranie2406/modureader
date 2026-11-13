@@ -1,4 +1,4 @@
-import 'package:anx_reader/enums/lang_list.dart';
+import 'package:modu_reader/enums/lang_list.dart';
 
 // Fixed translations of “学而时习之，不亦乐乎？” keep appearance previews offline.
 String translationPreviewText(LangListEnum language) => switch (language) {

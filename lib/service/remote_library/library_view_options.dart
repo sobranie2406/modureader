@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum LibrarySortField { name, createdAt, modifiedAt, size }

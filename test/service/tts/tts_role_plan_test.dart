@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
-import 'package:anx_reader/service/tts/tts_role_plan.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/tts_role_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

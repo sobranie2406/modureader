@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
+import 'package:modu_reader/service/tts/mimo_voice_presets.dart';
 
 /// Editable Modu instructions, not provider voice IDs or voice-cloning presets.
 class OpenAiVoicePresets {

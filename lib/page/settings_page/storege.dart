@@ -1,21 +1,21 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/providers/storage_info.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/providers/storage_info.dart';
 
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/get_path/storage_migration.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/widgets/common/anx_button.dart';
-import 'package:anx_reader/widgets/delete_confirm.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/storage_migration.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/widgets/common/anx_button.dart';
+import 'package:modu_reader/widgets/delete_confirm.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

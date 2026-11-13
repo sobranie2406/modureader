@@ -1,21 +1,21 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/css_visual_style.dart';
-import 'package:anx_reader/widgets/settings/css_visual_controls.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/css_profile_application.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/service/config_transfer/custom_css_transfer.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/css_visual_style.dart';
+import 'package:modu_reader/widgets/settings/css_visual_controls.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/css_profile_application.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/service/config_transfer/custom_css_transfer.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 
 class CustomCSSEditor extends StatefulWidget {
   const CustomCSSEditor(

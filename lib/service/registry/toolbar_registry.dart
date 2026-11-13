@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/toolbar_action_definition.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/models/toolbar_action_definition.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
 
 /// One toolbar action known to the app.
 ///

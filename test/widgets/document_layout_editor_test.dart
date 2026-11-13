@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:anx_reader/models/document_page_layout.dart';
-import 'package:anx_reader/widgets/reading_page/document_layout_editor.dart';
+import 'package:modu_reader/models/document_page_layout.dart';
+import 'package:modu_reader/widgets/reading_page/document_layout_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'pdf_region_preview_test.dart' as fixture;

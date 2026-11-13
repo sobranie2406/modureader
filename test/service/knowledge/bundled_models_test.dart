@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/knowledge/bundled_model_defaults.dart';
+import 'package:modu_reader/service/knowledge/bundled_model_defaults.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/service/sync/webdav_client.dart';
+import 'package:modu_reader/service/sync/document_reflow_sync.dart';
+import 'package:modu_reader/service/sync/webdav_client.dart';
+import 'package:modu_reader/service/sync/weread_metadata_sync.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +18,15 @@ void main() {
   var resourceMissing = false;
   var stripSlash = false;
   String? location;
+  const bookId = '0123456789abcdef0123456789abcdef';
+  final directoryProperties = [
+    'modu/record-log-v1',
+    'modu/record-log-v1/a',
+    WereadMetadataSync.root,
+    '${WereadMetadataSync.root}/$bookId',
+    DocumentReflowSync.root,
+    '${DocumentReflowSync.root}/$bookId',
+  ];
   String props(String path) => '<d:response><d:href>$path</d:href>'
       '${resourceMissing ? '<d:status>HTTP/1.1 404 Not Found</d:status>' : '<d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype>'
           '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>'}'
@@ -66,7 +77,7 @@ void main() {
   tearDown(() => server.close(force: true));
 
   for (final code in [301, 302, 307, 308]) {
-    for (final path in ['modu/record-log-v1', 'modu/record-log-v1/a']) {
+    for (final path in directoryProperties) {
       test(
           'HTTP $code normalizes directory $path with PROPFIND body and Depth intact',
           () async {
@@ -85,12 +96,12 @@ void main() {
     'modu',
     'modu/data/file',
     'modu/data/cover',
-    'modu/record-log-v1'
+    ...directoryProperties,
   ]) {
     test('Depth-one listing tolerates the reverse slash redirect: $path',
         () async {
       stripSlash = true;
-      final files = path.contains('record-log')
+      final files = path.contains('-v1')
           ? await client.readSyncDirectory(path)
           : await client.safeReadDir(path);
       expect(files.single.name, 'a');
@@ -160,11 +171,21 @@ void main() {
         client.readProps('modu/record-log-v1'), throwsA(isA<DioException>()));
     expect(calls, hasLength(1));
   });
-  test('a database file must never be retried as a directory', () async {
-    await expectLater(
-        client.readProps('modu/database8.db'), throwsA(isA<DioException>()));
-    expect(calls, ['PROPFIND /dav/library/modu/database8.db']);
-  });
+  for (final path in [
+    'modu/database8.db',
+    '${WereadMetadataSync.root}/$bookId/snapshot.json',
+    '${DocumentReflowSync.root}/$bookId/snapshot.json',
+    '${WereadMetadataSync.root}/${bookId.substring(1)}',
+    '${DocumentReflowSync.root}/${bookId}0',
+    '${WereadMetadataSync.root}/$bookId.json',
+    '${DocumentReflowSync.root}-other',
+  ]) {
+    test('files and unrecognized paths must not redirect as directories: $path',
+        () async {
+      await expectLater(client.readProps(path), throwsA(isA<DioException>()));
+      expect(calls, ['PROPFIND /dav/library/$path']);
+    });
+  }
   for (final missingInXml in [false, true]) {
     test(
         'redirected ${missingInXml ? '207/404' : '404'} is not empty cloud metadata',

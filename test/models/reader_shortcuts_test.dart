@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:anx_reader/models/reader_shortcuts.dart';
+import 'package:modu_reader/models/reader_shortcuts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 

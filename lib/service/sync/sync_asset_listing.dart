@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 
 /// A hint for one synchronization only. Never cache database/log listings.
 /// Re-read a directory if local/merged asset references change during the run.

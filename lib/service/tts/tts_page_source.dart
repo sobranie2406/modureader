@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:anx_reader/service/reading/text_filter.dart';
+import 'package:modu_reader/service/reading/text_filter.dart';
 import 'dart:ui' show TextRange;
 
 import 'models/tts_sentence.dart';

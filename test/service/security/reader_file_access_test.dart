@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/service/book_player/reader_file_access.dart';
+import 'package:modu_reader/service/book_player/reader_file_access.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,9 +1,9 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
-import 'package:anx_reader/service/tts/edge_tts_backend.dart';
-import 'package:anx_reader/service/tts/openai_tts_backend.dart';
-import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
-import 'package:anx_reader/service/tts/tts_service_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/tts/edge_tts_backend.dart';
+import 'package:modu_reader/service/tts/openai_tts_backend.dart';
+import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:modu_reader/service/tts/tts_service_provider.dart';
 import 'package:flutter/material.dart';
 
 /// TTS service enumeration.

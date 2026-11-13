@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html;
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 
 enum OnlineDictionary {
   wiktionaryZh('维基词典 · 中文', 'Wiktionary · Chinese'),

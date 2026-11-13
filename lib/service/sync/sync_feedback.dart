@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
 
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/service/sync/sync_preflight.dart';
-import 'package:anx_reader/service/sync/webdav_request_policy.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/sync/sync_preflight.dart';
+import 'package:modu_reader/service/sync/webdav_request_policy.dart';
 
 String bookDownloadSummary(L10n l10n,
         {required int success, required int failed}) =>

@@ -1,6 +1,6 @@
-import 'package:anx_reader/dao/search_repository.dart';
-import 'package:anx_reader/models/search_note_group.dart';
-import 'package:anx_reader/models/search_result_data.dart';
+import 'package:modu_reader/dao/search_repository.dart';
+import 'package:modu_reader/models/search_note_group.dart';
+import 'package:modu_reader/models/search_result_data.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final searchRepositoryProvider = Provider<SearchRepository>((ref) {

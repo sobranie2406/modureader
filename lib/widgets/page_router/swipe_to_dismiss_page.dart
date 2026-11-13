@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/page_router/page_dismiss_controller.dart';
+import 'package:modu_reader/widgets/page_router/page_dismiss_controller.dart';
 import 'package:flutter/material.dart';
 
 class ControlledDismissiblePage extends StatefulWidget {

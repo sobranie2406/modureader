@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/enums/convert_chinese_mode.dart';
+import 'package:modu_reader/enums/convert_chinese_mode.dart';
 
 class ReadingRules {
   late ConvertChineseMode convertChineseMode;

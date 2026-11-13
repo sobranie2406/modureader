@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 

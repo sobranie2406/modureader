@@ -121,6 +121,12 @@ Example of the change-list format (not a published release):
 - Fix(tts): 修复共享缓存请求超时后无法重新发起语音合成的问题。
 ```
 
+## Development branches
+
+After a stable release, keep `main` at the released source and put subsequent changes on `release/<next-version>` (for example, `release/1.3.10` after 1.3.9). Create that branch from the published commit, or continue its existing history. Push completed, checked changes there. Merge into `main` only when the user requests the next stable release. Never force-overwrite either branch.
+
+Internal Dart package renames are maintenance details and must not appear in public release notes or changelogs.
+
 ## Release procedure
 
 A stable-release request includes **GitHub and Gitee publication by default**. Gitee is not an optional follow-up and must not be silently skipped. If access, permissions, capacity or verification prevent completion, report the remaining mirror work explicitly; GitHub publication alone is not full release completion.

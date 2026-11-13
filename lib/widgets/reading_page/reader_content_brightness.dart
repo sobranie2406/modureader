@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/app_brightness.dart';
+import 'package:modu_reader/service/app_brightness.dart';
 import 'package:flutter/material.dart';
 
 /// An opt-in surface for reading content; never inherited by menus or routes.

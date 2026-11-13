@@ -1,9 +1,9 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/ai_model_service.dart';
-import 'package:anx_reader/widgets/common/anx_button.dart';
-import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/ai_model_service.dart';
+import 'package:modu_reader/widgets/common/anx_button.dart';
+import 'package:modu_reader/widgets/ai/ai_provider_logo.dart';
 import 'package:flutter/material.dart';
 
 /// A dialog that lets the user either type a model name manually or pick one

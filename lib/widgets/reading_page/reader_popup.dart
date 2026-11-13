@@ -1,13 +1,13 @@
 import 'reader_content_brightness.dart';
 import 'reader_menu_appearance.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/reading_page/adjustable_reader_popup.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/reading_page/adjustable_reader_popup.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 
 /// Shared geometry for reader query and settings panels.
 class ReaderPopup extends StatelessWidget {

@@ -1,8 +1,8 @@
-import 'package:anx_reader/models/toc_item.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
-import 'package:anx_reader/providers/book_toc.dart';
+import 'package:modu_reader/models/toc_item.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/providers/book_toc.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 

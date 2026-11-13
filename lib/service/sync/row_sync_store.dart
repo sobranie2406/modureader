@@ -1,12 +1,12 @@
-import 'package:anx_reader/service/book_local_sources.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'dart:convert';
-import 'package:anx_reader/models/narration_position.dart';
+import 'package:modu_reader/models/narration_position.dart';
 import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
-import 'package:anx_reader/service/sync/replaced_book_files.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/service/sync/replaced_book_files.dart';
 
 const syncRecordsTable = 'modu_sync_records';
 const _control = 'modu_sync_control';

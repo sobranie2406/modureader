@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
-import 'package:anx_reader/service/knowledge/isolate_worker.dart';
+import 'package:modu_reader/service/knowledge/isolate_worker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void _testWorker(List<Object?> args) async {

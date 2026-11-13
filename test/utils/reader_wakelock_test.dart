@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/utils/reader_wakelock.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/reader_wakelock.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

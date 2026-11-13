@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book_source_format.dart';
-import 'package:anx_reader/service/convert_to_epub/create_epub.dart';
-import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
-import 'package:anx_reader/service/convert_to_epub/section.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book_source_format.dart';
+import 'package:modu_reader/service/convert_to_epub/create_epub.dart';
+import 'package:modu_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:modu_reader/service/convert_to_epub/section.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

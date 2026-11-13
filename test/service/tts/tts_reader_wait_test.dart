@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/service/tts/tts_reader_wait.dart';
+import 'package:modu_reader/service/tts/tts_reader_wait.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

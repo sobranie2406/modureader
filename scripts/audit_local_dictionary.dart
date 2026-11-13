@@ -2,7 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:dict_reader/dict_reader.dart';
 import 'package:sqlite3/sqlite3.dart';
 

@@ -1,13 +1,13 @@
 import 'dart:io';
-import 'package:anx_reader/service/ai/answer_presentation.dart';
+import 'package:modu_reader/service/ai/answer_presentation.dart';
 
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
-import 'package:anx_reader/service/ai/reasoning_control_client.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/service/ai/reasoning_control_client.dart';
 import 'package:http/http.dart' as http;
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/providers/current_reading.dart';
-import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/providers/current_reading.dart';
+import 'package:modu_reader/service/ai/tools/ai_tool_registry.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:langchain_anthropic/langchain_anthropic.dart';
 import 'package:langchain_core/chat_models.dart';

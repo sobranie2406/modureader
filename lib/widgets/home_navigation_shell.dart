@@ -1,14 +1,14 @@
 import 'dart:ui';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/home_page/ai_page.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/utils/env_var.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/home_navigation_metrics.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/home_page/ai_page.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/env_var.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/home_navigation_metrics.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_floating_bottom_bar/flutter_floating_bottom_bar.dart';

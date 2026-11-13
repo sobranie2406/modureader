@@ -1,18 +1,18 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/enums/app_layout_mode.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/env_var.dart';
-import 'package:anx_reader/widgets/common/anx_segmented_button.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/enums/app_layout_mode.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/env_var.dart';
+import 'package:modu_reader/widgets/common/anx_segmented_button.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/enums/bookshelf_folder_style.dart';
-import 'package:anx_reader/page/settings_page/theme_colors.dart';
-import 'package:anx_reader/page/settings_page/weread_settings.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/enums/bookshelf_folder_style.dart';
+import 'package:modu_reader/page/settings_page/theme_colors.dart';
+import 'package:modu_reader/page/settings_page/weread_settings.dart';
 
 const List<Map<String, String>> languageOptions = [
   {'system': 'System'},

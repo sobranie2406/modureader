@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/css_visual_style.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/css_visual_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

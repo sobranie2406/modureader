@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:anx_reader/models/text_color.dart';
+import 'package:modu_reader/models/text_color.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
-import 'package:anx_reader/service/book_player/reader_font_response.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/service/book_player/reader_font_response.dart';
 
 /// Presentation of translated output only, independent of API/cache identity.
 class TranslationTextStyle {

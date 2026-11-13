@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book_style.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book_style.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/service/config_transfer/config_qr_bridge.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/config_transfer/settings_modules.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,7 +1,7 @@
-import 'package:anx_reader/service/registry/host_registry.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/service/translate/microsoft_free.dart';
-import 'package:anx_reader/service/translate/translate_registry.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/service/translate/microsoft_free.dart';
+import 'package:modu_reader/service/translate/translate_registry.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/page/settings_page/weread_settings.dart';
-import 'package:anx_reader/service/weread/weread_api.dart';
-import 'package:anx_reader/service/weread/weread_store.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/page/settings_page/weread_settings.dart';
+import 'package:modu_reader/service/weread/weread_api.dart';
+import 'package:modu_reader/service/weread/weread_store.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'weread_common.dart';

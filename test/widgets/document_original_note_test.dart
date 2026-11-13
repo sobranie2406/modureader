@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/service/ocr/document_text_geometry.dart';
-import 'package:anx_reader/widgets/reading_page/document_original_note.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/ocr/document_text_geometry.dart';
+import 'package:modu_reader/widgets/reading_page/document_original_note.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

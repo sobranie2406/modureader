@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/document_reading_mode.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/document_reading_mode.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Import-time evidence. Opening only reads this local cache; no file I/O,

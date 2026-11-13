@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
+import 'package:modu_reader/service/ai/tools/ai_tool_registry.dart';
 import 'package:langchain_core/chat_models.dart';
 
 class ReasoningEnvelope {

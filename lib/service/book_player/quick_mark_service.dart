@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/models/book_note.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/models/book_note.dart';
 
 class QuickMarkResult {
   const QuickMarkResult(this.note, [this.replacedCfis = const []]);

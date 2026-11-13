@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/coalesced_stream.dart';
-import 'package:anx_reader/service/ai/index.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/coalesced_stream.dart';
+import 'package:modu_reader/service/ai/index.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

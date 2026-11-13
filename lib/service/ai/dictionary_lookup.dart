@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/ai/dictionary_web_search.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/service/ai/dictionary_web_search.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
 import 'package:langchain_core/chat_models.dart';
 
 // Older customized prompts may still return this internal protocol marker.

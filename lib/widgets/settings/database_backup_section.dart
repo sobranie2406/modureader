@@ -1,8 +1,8 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 
 /// ZIP library backup is separate from the JSON global-settings transfer.

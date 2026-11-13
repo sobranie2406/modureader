@@ -1,6 +1,6 @@
 import 'reader_menu_appearance.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 
 /// Inherit the app theme, including its monochrome e-ink palette. Fixed-page
 /// menus must not force black/white when the application uses a colored theme.

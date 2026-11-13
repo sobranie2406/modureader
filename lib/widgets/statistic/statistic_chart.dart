@@ -1,8 +1,8 @@
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/providers/statistic_data.dart';
-import 'package:anx_reader/utils/date/convert_seconds.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/providers/statistic_data.dart';
+import 'package:modu_reader/utils/date/convert_seconds.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

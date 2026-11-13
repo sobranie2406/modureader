@@ -1,11 +1,11 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:convert';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 import 'dart:math' as math;
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/document_page_layout.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/document_page_layout.dart';
 import 'widget_title.dart';
 import 'package:flutter/material.dart';
 

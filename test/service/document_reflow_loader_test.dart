@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/ocr/document_reflow_loader.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
-import 'package:anx_reader/service/ocr/document_text_geometry.dart';
-import 'package:anx_reader/service/ocr/local_ocr_service.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/ocr/document_text_geometry.dart';
+import 'package:modu_reader/service/ocr/local_ocr_service.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class ReadyModel extends OcrModelStore {

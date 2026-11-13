@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/service/reading_round_service.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/reading_round_sync.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/database.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/service/reading_round_service.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/reading_round_sync.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';

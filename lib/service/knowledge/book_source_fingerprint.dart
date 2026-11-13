@@ -1,8 +1,8 @@
-import 'package:anx_reader/service/read_only_book_file.dart';
+import 'package:modu_reader/service/read_only_book_file.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:crypto/crypto.dart';
 
 class _DigestValue implements Sink<Digest> {

@@ -1,16 +1,16 @@
 import 'dart:io';
-import 'package:anx_reader/service/book_import_source.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/models/font_model.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/service/book_player/reader_font_response.dart';
-import 'package:anx_reader/utils/font_parser.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/models/font_model.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/service/book_player/reader_font_response.dart';
+import 'package:modu_reader/utils/font_parser.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:crypto/crypto.dart';
 

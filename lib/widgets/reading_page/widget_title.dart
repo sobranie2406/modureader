@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/reading_page/more_settings/more_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/more_settings.dart';
 import 'package:flutter/material.dart';
 
 const readerMenuTitleStyle = TextStyle(

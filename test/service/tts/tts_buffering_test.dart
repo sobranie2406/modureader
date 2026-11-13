@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class BufferingBackend extends BaseTts {

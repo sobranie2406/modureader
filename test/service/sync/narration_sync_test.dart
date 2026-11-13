@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:anx_reader/models/narration_position.dart';
-import 'package:anx_reader/models/reading_position_snapshot.dart';
-import 'package:anx_reader/service/book_player/reader_progress_session.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/models/narration_position.dart';
+import 'package:modu_reader/models/reading_position_snapshot.dart';
+import 'package:modu_reader/service/book_player/reader_progress_session.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
 import 'row_sync_test.dart' show fixture, bookRow, MemorySyncClient;
 import 'suspended_reader_sync_diagnostic_test.dart' show IsolatedBookDao;
 

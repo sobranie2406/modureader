@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/reader_focus.dart';
+import 'package:modu_reader/service/reader_focus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';

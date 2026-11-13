@@ -1,4 +1,4 @@
-import 'package:anx_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'sync_state_model.freezed.dart';

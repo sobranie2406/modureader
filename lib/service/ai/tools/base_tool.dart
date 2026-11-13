@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:langchain_core/tools.dart';
 
 typedef JsonMap = Map<String, dynamic>;

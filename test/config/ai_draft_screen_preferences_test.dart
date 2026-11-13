@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/widgets/ai/skill_template_draft_tile.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/widgets/ai/skill_template_draft_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

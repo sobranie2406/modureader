@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/update/app_update.dart';
+import 'package:modu_reader/service/update/app_update.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 

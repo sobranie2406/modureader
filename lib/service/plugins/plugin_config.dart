@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 
 /// Validation and encoding for the per-plugin `pluginConfig_<id>` preference.
 ///

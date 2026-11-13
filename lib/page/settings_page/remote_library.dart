@@ -1,8 +1,8 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:flutter/material.dart';
 
 class RemoteLibrarySettings extends StatefulWidget {

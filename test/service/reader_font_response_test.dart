@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/font_model.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/service/book_player/reader_file_access.dart';
-import 'package:anx_reader/service/book_player/reader_font_response.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/font_model.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/service/book_player/reader_file_access.dart';
+import 'package:modu_reader/service/book_player/reader_font_response.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;

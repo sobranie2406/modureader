@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/sync_protocol.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
-import 'package:anx_reader/service/local_data/backup_safety.dart';
-import 'package:anx_reader/service/sync/sync_client_factory.dart';
-import 'package:anx_reader/service/sync/s3_client.dart';
-import 'package:anx_reader/service/sync/webdav_client.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/sync_protocol.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/service/local_data/backup_safety.dart';
+import 'package:modu_reader/service/sync/sync_client_factory.dart';
+import 'package:modu_reader/service/sync/s3_client.dart';
+import 'package:modu_reader/service/sync/webdav_client.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
 
 const info = {
   'endpoint': 'https://s3.example.test',

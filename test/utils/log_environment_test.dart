@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
-import 'package:anx_reader/utils/log/environment.dart';
-import 'package:anx_reader/utils/webView/webview_console_message.dart';
+import 'package:modu_reader/service/feedback/crash_diagnostics.dart';
+import 'package:modu_reader/utils/log/environment.dart';
+import 'package:modu_reader/utils/webView/webview_console_message.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 

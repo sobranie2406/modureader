@@ -1,10 +1,10 @@
-import 'package:anx_reader/service/read_only_book_file.dart';
+import 'package:modu_reader/service/read_only_book_file.dart';
 import 'dart:io';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book_local_sources.dart';
-import 'package:anx_reader/service/ios_linked_books.dart';
-import 'package:anx_reader/service/md5_service.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
+import 'package:modu_reader/service/ios_linked_books.dart';
+import 'package:modu_reader/service/md5_service.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 
 /// Create/verify the owned copy before changing the source or releasing access.
 Future<void> copyLinkedBookToLibrary(Book book) async {

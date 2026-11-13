@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/audio_mime_type.dart';
-import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
-import 'package:anx_reader/service/tts/stable_narration.dart';
-import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
-import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/audio_mime_type.dart';
+import 'package:modu_reader/service/tts/mimo_voice_presets.dart';
+import 'package:modu_reader/service/tts/stable_narration.dart';
+import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:modu_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

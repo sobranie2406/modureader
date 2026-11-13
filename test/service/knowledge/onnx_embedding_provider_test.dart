@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

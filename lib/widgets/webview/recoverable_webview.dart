@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 

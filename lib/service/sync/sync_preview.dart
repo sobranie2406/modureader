@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
 
 /// Read-only view of both libraries handed to the confirmation UI BEFORE the
 /// library merge or cloud write. The engine never applies these records by itself.

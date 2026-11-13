@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

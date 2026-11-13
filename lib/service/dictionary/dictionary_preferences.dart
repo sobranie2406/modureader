@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/service/dictionary/online_dictionary.dart';
-import 'package:anx_reader/service/dictionary/dictionary_source_registry.dart';
+import 'package:modu_reader/service/dictionary/online_dictionary.dart';
+import 'package:modu_reader/service/dictionary/dictionary_source_registry.dart';
 
 // Device-local IDs and explicit network opt-in must not travel in sync backups.
 const dictionaryPreferencesKey = 'dictionaryLookupSources';

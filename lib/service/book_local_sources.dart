@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:anx_reader/service/ios_linked_books.dart';
+import 'package:modu_reader/service/ios_linked_books.dart';
 
 /// Device-only locators. Kept outside the backup/sync directory allowlist.
 /// The synchronized book path remains a remote asset key, never a local locator.

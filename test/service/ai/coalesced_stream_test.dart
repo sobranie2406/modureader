@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:anx_reader/service/ai/coalesced_stream.dart';
+import 'package:modu_reader/service/ai/coalesced_stream.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 

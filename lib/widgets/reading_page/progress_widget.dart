@@ -1,6 +1,6 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/reader_progress.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/reader_progress.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
 import 'package:flutter/material.dart';
 import 'reader_menu_group.dart';
 

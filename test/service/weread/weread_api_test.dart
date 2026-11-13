@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:anx_reader/service/weread/weread_api.dart';
+import 'package:modu_reader/service/weread/weread_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

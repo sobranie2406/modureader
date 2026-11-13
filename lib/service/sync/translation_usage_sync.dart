@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/service/translate/translation_usage.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/translate/translation_usage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/dao/database.dart';
+import 'package:modu_reader/dao/database.dart';
 
 /// Separate encrypted record per device: concurrent devices cannot replace
 /// each other's increments through the settings snapshot's last-writer rule.

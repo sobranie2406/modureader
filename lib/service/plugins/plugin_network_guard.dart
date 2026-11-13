@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/plugin_network.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/models/plugin_network.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 
 /// Result of validating a plugin request before anything is sent.
 class PluginGuardResult {

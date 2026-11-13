@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:archive/archive_io.dart';
-import 'package:anx_reader/service/local_data/backup_safety.dart';
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/local_data/backup_safety.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/local_data/local_data_store.dart';
+import 'package:modu_reader/service/local_data/local_data_store.dart';
 
 class TtsPipeline {
   TtsPipeline(String text)

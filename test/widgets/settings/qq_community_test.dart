@@ -1,7 +1,7 @@
-import 'package:anx_reader/widgets/settings/qq_community.dart';
-import 'package:anx_reader/widgets/settings/community_links.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/settings/qq_community.dart';
+import 'package:modu_reader/widgets/settings/community_links.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';

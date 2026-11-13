@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/reading_info.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/reading_page/vertical_page_chrome.dart';
+import 'package:modu_reader/models/reading_info.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/reading_page/vertical_page_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';

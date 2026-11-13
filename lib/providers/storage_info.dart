@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/storege_info_model.dart';
-import 'package:anx_reader/service/ai/ai_history.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/providers/font_list.dart';
-import 'package:anx_reader/utils/get_path/databases_path.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
-import 'package:anx_reader/utils/get_path/log_file.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/models/storege_info_model.dart';
+import 'package:modu_reader/service/ai/ai_history.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/providers/font_list.dart';
+import 'package:modu_reader/utils/get_path/databases_path.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/get_cache_dir.dart';
+import 'package:modu_reader/utils/get_path/log_file.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'storage_info.g.dart';

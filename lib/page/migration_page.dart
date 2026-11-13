@@ -1,6 +1,6 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/get_path/macos_migration.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/get_path/macos_migration.dart';
 import 'package:flutter/material.dart';
 
 class MigrationPage extends StatefulWidget {

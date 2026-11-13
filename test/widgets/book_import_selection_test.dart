@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:anx_reader/service/receive_file/external_book_inbox.dart';
+import 'package:modu_reader/service/receive_file/external_book_inbox.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:anx_reader/service/book_import_source.dart';
-import 'package:anx_reader/widgets/bookshelf/book_import_picker.dart';
+import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

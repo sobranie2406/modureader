@@ -1,5 +1,5 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/user_prompt.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/user_prompt.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'user_prompts.g.dart';

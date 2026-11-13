@@ -1,11 +1,11 @@
 import 'dart:ui' as ui;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/settings_page/settings_page.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/utils/color_scheme.dart';
-import 'package:anx_reader/widgets/app_route_surface.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/settings_page/settings_page.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/color_scheme.dart';
+import 'package:modu_reader/widgets/app_route_surface.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';

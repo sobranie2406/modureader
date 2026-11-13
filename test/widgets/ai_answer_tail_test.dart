@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/ai/coalesced_stream.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/service/ai/coalesced_stream.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

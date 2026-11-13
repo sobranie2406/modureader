@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/user_prompt.dart';
-import 'package:anx_reader/service/plugins/plugin_config.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/user_prompt.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:flutter/foundation.dart';
 
 /// Instantiation of plugin prompts.

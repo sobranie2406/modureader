@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:path/path.dart' as p;
 
 /// Filesystem layout for installed plugin packages.

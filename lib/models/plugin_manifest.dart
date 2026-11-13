@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/plugin_network.dart';
+import 'package:modu_reader/models/plugin_network.dart';
 
 import 'package:pub_semver/pub_semver.dart';
 

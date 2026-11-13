@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/service/translate/translation_api_client.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/service/translate/translation_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 

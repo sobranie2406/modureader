@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/ai/reading_skill_registry.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
-import 'package:anx_reader/service/ai/reading_skill_execution.dart';
-import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/service/ai/reading_skill_registry.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ai/reading_request_snapshot.dart';
+import 'package:modu_reader/service/ai/reading_skill_execution.dart';
+import 'package:modu_reader/utils/get_path/get_cache_dir.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:path/path.dart' as p;
 import 'package:langchain_core/chat_models.dart';
 

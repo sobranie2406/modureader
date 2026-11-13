@@ -1,6 +1,6 @@
-import 'package:anx_reader/enums/translation_mode.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/widgets/reading_page/translation_toolbar_action.dart';
+import 'package:modu_reader/enums/translation_mode.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/widgets/reading_page/translation_toolbar_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

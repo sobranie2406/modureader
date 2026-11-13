@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/weread/weread_store.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/weread/weread_store.dart';
 import 'package:crypto/crypto.dart';
 
 /// Optional sidecars, keyed by the original book checksum, never database IDs.

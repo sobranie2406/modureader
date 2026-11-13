@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/providers/toc_search.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/providers/toc_search.dart';
 import 'package:flutter/material.dart';
 
 class SearchNavigationBar extends StatelessWidget {

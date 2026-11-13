@@ -8,7 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:anx_reader/utils/app_version.dart';
+import 'package:modu_reader/utils/app_version.dart';
 
 const moduReleasePage = 'https://github.com/sobranie2406/modureader/releases';
 const moduReleaseApi =

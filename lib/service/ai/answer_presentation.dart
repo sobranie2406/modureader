@@ -1,4 +1,4 @@
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
 
 const conciseAnswerGuidance = '''
 直接回答用户的问题，不输出准备过程或工具调用旁白，例如“我先确认一下你当前的阅读上下文”。

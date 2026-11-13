@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:ui';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/config_transfer/config_qr_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';

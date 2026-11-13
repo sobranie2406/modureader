@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/ai/reading_skill_execution.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:modu_reader/service/ai/reading_skill_execution.dart';
+import 'package:modu_reader/service/ai/readany_skills.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:langchain_core/chat_models.dart';
 

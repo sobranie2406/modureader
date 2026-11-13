@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:anx_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Device-local region positions supplement (never replace) the original CFI.

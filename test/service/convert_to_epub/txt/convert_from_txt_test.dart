@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/chapter_split_presets.dart';
+import 'package:modu_reader/models/chapter_split_presets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

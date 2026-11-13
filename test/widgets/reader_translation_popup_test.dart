@@ -1,16 +1,16 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/translate/ai.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/translate/ai.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:anx_reader/widgets/context_menu/translation_menu.dart';
-import 'package:anx_reader/widgets/context_menu/translation_result.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/context_menu/translation_menu.dart';
+import 'package:modu_reader/widgets/context_menu/translation_result.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';

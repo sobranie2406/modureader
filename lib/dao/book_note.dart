@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/base_dao.dart';
-import 'package:anx_reader/models/book_note.dart';
+import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/models/book_note.dart';
 
 class NoteConflictException implements Exception {
   const NoteConflictException();

@@ -50,7 +50,7 @@ class CrashJournal {
     RuntimeDiagnostics.record(RuntimeEvent.error);
     final type = error.runtimeType.toString();
     final locations = RegExp(
-            r'(?:package:(?:anx_reader|flutter)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z0-9_/]+)(?::\d+){1,2}')
+            r'(?:package:(?:modu_reader|anx_reader|flutter)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z0-9_/]+)(?::\d+){1,2}')
         .allMatches(stack?.toString() ?? '')
         .where((m) => m.group(0)!.length <= 200)
         .take(12)
@@ -161,7 +161,7 @@ class CrashJournal {
       if (event['frames'] is List) {
         for (final frame in (event['frames'] as List).take(12)) {
           if (frame is String &&
-              RegExp(r'^(?:package:(?:anx_reader|flutter)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z0-9_/]+)(?::\d+){1,2}$')
+              RegExp(r'^(?:package:(?:modu_reader|anx_reader|flutter)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z0-9_/]+)(?::\d+){1,2}$')
                   .hasMatch(frame)) {
             out.writeln(frame);
           }

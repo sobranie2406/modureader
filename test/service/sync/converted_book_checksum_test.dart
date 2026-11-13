@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/service/convert_to_epub/create_epub.dart';
-import 'package:anx_reader/service/convert_to_epub/section.dart';
-import 'package:anx_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
-import 'package:anx_reader/service/sync/converted_book_checksum.dart';
-import 'package:anx_reader/service/sync/local_book_download.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/service/convert_to_epub/create_epub.dart';
+import 'package:modu_reader/service/convert_to_epub/section.dart';
+import 'package:modu_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
+import 'package:modu_reader/service/sync/converted_book_checksum.dart';
+import 'package:modu_reader/service/sync/local_book_download.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';

@@ -9,7 +9,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 

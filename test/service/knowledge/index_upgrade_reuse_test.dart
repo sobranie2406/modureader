@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
-import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/ai/tools/repository/book_content_search_repository.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:modu_reader/service/knowledge/book_source_fingerprint.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 

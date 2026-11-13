@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:anx_reader/service/sync/sync_preflight.dart';
-import 'package:anx_reader/service/sync/sync_preview.dart';
+import 'package:modu_reader/service/sync/sync_preflight.dart';
+import 'package:modu_reader/service/sync/sync_preview.dart';
 
 bool syncNetworkAllowed(List<ConnectivityResult> connections,
         {required bool onlyWifi}) =>

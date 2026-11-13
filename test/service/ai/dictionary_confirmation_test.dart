@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
-import 'package:anx_reader/service/ai/dictionary_confirmation.dart';
-import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
-import 'package:anx_reader/service/ai/reading_skill_execution.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/service/ai/dictionary_confirmation.dart';
+import 'package:modu_reader/service/ai/reading_request_snapshot.dart';
+import 'package:modu_reader/service/ai/reading_skill_execution.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:langchain_core/chat_models.dart';
 

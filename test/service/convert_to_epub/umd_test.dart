@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/book_formats.dart';
-import 'package:anx_reader/service/convert_to_epub/umd/convert_from_umd.dart';
-import 'package:anx_reader/service/sync/converted_book_checksum.dart';
+import 'package:modu_reader/service/book_formats.dart';
+import 'package:modu_reader/service/convert_to_epub/umd/convert_from_umd.dart';
+import 'package:modu_reader/service/sync/converted_book_checksum.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/sync/knowledge_index_sync.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/sync/knowledge_index_sync.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';

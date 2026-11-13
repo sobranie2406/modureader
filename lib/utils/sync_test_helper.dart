@@ -1,8 +1,8 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/enums/sync_protocol.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/service/sync/sync_connection_tester.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/enums/sync_protocol.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/service/sync/sync_connection_tester.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:flutter/material.dart';
 
 class SyncTestHelper {

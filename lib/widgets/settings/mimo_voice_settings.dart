@@ -1,7 +1,7 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
-import 'package:anx_reader/service/tts/readany_compatible_tts_backend.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/tts/mimo_voice_presets.dart';
+import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
 import 'package:flutter/material.dart';
 
 /// Edits the same draft as the connection form. Never saves or starts synthesis.

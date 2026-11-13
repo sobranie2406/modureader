@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/ai/tools/input/bookshelf_organize_group_spec.dart';
+import 'package:modu_reader/service/ai/tools/input/bookshelf_organize_group_spec.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'bookshelf_organize_input.g.dart';

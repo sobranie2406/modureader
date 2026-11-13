@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:http/http.dart' as http;
 
 class VectorModelConfig {

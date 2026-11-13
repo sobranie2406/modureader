@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
-import 'package:anx_reader/utils/app_version.dart';
+import 'package:modu_reader/service/feedback/crash_diagnostics.dart';
+import 'package:modu_reader/utils/app_version.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 

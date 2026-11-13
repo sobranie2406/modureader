@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/ai/ai_services.dart';
+import 'package:modu_reader/service/ai/ai_services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

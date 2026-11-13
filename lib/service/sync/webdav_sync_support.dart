@@ -44,9 +44,17 @@ extension _WebdavSyncSupport on WebdavClient {
   bool _isSyncDirectory(String path) {
     final clean = path.replaceFirst(RegExp(r'/$'), '');
     return path.endsWith('/') ||
-        {SyncPaths.root, SyncPaths.books, SyncPaths.covers, SyncPaths.recordLog}
-            .contains(clean) ||
-        RegExp('^${SyncPaths.recordLog}/[0-9a-f]\$').hasMatch(clean);
+        {
+          SyncPaths.root,
+          SyncPaths.books,
+          SyncPaths.covers,
+          SyncPaths.recordLog,
+          'modu/weread-metadata-v1',
+          'modu/document-reflow-v1',
+        }.contains(clean) ||
+        RegExp(r'^modu/record-log-v1/[0-9a-f]$').hasMatch(clean) ||
+        RegExp(r'^modu/(weread-metadata-v1|document-reflow-v1)/[0-9a-f]{32}$')
+            .hasMatch(clean);
   }
 
   // Do not enable Dio's automatic redirects: WebDAV needs to retain PROPFIND,

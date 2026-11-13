@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/book_player/tts_text_result.dart';
+import 'package:modu_reader/service/book_player/tts_text_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

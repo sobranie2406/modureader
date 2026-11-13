@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
-import 'package:anx_reader/widgets/reading_page/reader_popup.dart';
-import 'package:anx_reader/widgets/reading_page/reader_settings_scroll_view.dart';
-import 'package:anx_reader/widgets/reading_page/tts_widget.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/reading_page/reader_settings_scroll_view.dart';
+import 'package:modu_reader/widgets/reading_page/tts_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

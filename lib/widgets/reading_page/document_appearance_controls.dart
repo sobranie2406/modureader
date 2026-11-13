@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/theme.dart';
-import 'package:anx_reader/models/read_theme.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/book_player/reading_appearance.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/theme.dart';
+import 'package:modu_reader/models/read_theme.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/book_player/reading_appearance.dart';
 import 'reader_popup.dart';
 import 'style_widget.dart';
 import 'widgets/bgimg_selector.dart';

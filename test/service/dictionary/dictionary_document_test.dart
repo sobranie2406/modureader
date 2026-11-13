@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/service/dictionary/dictionary_document.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/dictionary_document.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;

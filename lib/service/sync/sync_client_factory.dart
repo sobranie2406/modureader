@@ -1,8 +1,8 @@
-import 'package:anx_reader/enums/sync_protocol.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/webdav_client.dart';
-import 'package:anx_reader/service/sync/s3_client.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/sync_protocol.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/webdav_client.dart';
+import 'package:modu_reader/service/sync/s3_client.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:path_provider/path_provider.dart';
 
 class SyncClientFactory {

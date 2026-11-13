@@ -1,13 +1,13 @@
 import 'reader_content_brightness.dart';
-import 'package:anx_reader/service/app_brightness.dart';
+import 'package:modu_reader/service/app_brightness.dart';
 import 'reader_menu_appearance.dart';
 import 'dart:math' as math;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 

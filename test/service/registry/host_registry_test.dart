@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Entry implements RegistryEntry {

@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/user_prompt.dart';
-import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
-import 'package:anx_reader/widgets/ai/reading_skill_chips.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/user_prompt.dart';
+import 'package:modu_reader/page/settings_page/ai_reading_skills.dart';
+import 'package:modu_reader/widgets/ai/reading_skill_chips.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

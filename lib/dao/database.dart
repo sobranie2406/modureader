@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/utils/get_path/get_cache_dir.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/harmony_database_snapshot.dart';
+import 'package:modu_reader/utils/get_path/get_cache_dir.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/harmony_database_snapshot.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/service/book.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/get_path/databases_path.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/service/book.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/get_path/databases_path.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

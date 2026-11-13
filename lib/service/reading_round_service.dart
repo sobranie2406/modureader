@@ -1,10 +1,10 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/reading_round.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/utils/reading_progress.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/reading_round.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/utils/reading_progress.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// 多刷阅读统计：轮次管理服务

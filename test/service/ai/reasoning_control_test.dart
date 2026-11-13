@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/langchain_ai_config.dart';
-import 'package:anx_reader/service/ai/langchain_registry.dart';
-import 'package:anx_reader/service/ai/reasoning_control_client.dart';
-import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
-import 'package:anx_reader/service/translate/ai.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/langchain_ai_config.dart';
+import 'package:modu_reader/service/ai/langchain_registry.dart';
+import 'package:modu_reader/service/ai/reasoning_control_client.dart';
+import 'package:modu_reader/service/config_transfer/settings_config_transfer.dart';
+import 'package:modu_reader/service/translate/ai.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

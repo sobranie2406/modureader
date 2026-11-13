@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:crypto/crypto.dart';
 
 /// Book-local model references only. Credentials remain in vector settings.

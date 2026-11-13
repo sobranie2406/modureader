@@ -1,20 +1,20 @@
 import 'dart:convert';
-import 'package:anx_reader/models/text_color.dart';
-import 'package:anx_reader/models/translation_text_style.dart';
-import 'package:anx_reader/models/tts_buffer_settings.dart';
-import 'package:anx_reader/service/sync/s3_config.dart';
-import 'package:anx_reader/service/ai/reading_skill_layout.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/models/chapter_split_rule.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/models/reading_info.dart';
-import 'package:anx_reader/models/reading_rules.dart';
-import 'package:anx_reader/models/user_prompt.dart';
-import 'package:anx_reader/service/config_transfer/custom_css_transfer.dart';
-import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
-import 'package:anx_reader/service/plugins/plugin_config.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/models/text_color.dart';
+import 'package:modu_reader/models/translation_text_style.dart';
+import 'package:modu_reader/models/tts_buffer_settings.dart';
+import 'package:modu_reader/service/sync/s3_config.dart';
+import 'package:modu_reader/service/ai/reading_skill_layout.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/models/chapter_split_rule.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/models/reading_info.dart';
+import 'package:modu_reader/models/reading_rules.dart';
+import 'package:modu_reader/models/user_prompt.dart';
+import 'package:modu_reader/service/config_transfer/custom_css_transfer.dart';
+import 'package:modu_reader/service/config_transfer/tts_config_transfer.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
 
 /// Parse with the same models that consume these preferences, before writing
 /// anything. Free-form prompts/CSS are not inferred to be JSON from their text.

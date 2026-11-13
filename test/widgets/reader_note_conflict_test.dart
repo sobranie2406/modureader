@@ -1,7 +1,7 @@
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/widgets/context_menu/reader_note_menu.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/widgets/context_menu/reader_note_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';

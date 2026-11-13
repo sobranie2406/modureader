@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/constants/note_annotations.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/constants/note_annotations.dart';
 import 'package:flutter/material.dart';
 
 /// Two rows (two columns in vertical reading) keep every colour accessible

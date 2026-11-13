@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/utils/changelog.dart';
+import 'package:modu_reader/utils/changelog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

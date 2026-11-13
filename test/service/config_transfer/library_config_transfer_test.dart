@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
-import 'package:anx_reader/service/config_transfer/library_config_transfer.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/service/config_transfer/config_qr_bridge.dart';
+import 'package:modu_reader/service/config_transfer/config_transfer_codec.dart';
+import 'package:modu_reader/service/config_transfer/library_config_transfer.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 

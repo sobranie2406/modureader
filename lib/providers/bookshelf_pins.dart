@@ -1,5 +1,5 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Device-local shelf layout, not transferable settings (database IDs are local).

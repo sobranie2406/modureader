@@ -1,11 +1,11 @@
 import 'dart:math';
 
-import 'package:anx_reader/enums/hint_key.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/providers/dashboard_tiles_provider.dart';
-import 'package:anx_reader/widgets/hint/hint_banner.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
+import 'package:modu_reader/enums/hint_key.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/providers/dashboard_tiles_provider.dart';
+import 'package:modu_reader/widgets/hint/hint_banner.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:staggered_reorderable/staggered_reorderable.dart';

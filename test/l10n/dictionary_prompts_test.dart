@@ -1,8 +1,8 @@
 import 'dart:ui';
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/service/ai/readany_skills.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

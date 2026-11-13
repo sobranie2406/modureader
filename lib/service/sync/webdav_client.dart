@@ -1,16 +1,16 @@
 import 'dart:io' as io;
 import 'package:uuid/uuid.dart';
 
-import 'package:anx_reader/models/remote_file.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
-import 'package:anx_reader/utils/get_path/get_temp_dir.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/models/remote_file.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:webdav_client/webdav_client.dart';
 import 'package:xml/xml.dart';
-import 'package:anx_reader/service/sync/webdav_request_policy.dart';
+import 'package:modu_reader/service/sync/webdav_request_policy.dart';
 
 part 'webdav_sync_support.dart';
 

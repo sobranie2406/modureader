@@ -4,7 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xml/xml.dart';
-import 'package:anx_reader/models/remote_file.dart';
+import 'package:modu_reader/models/remote_file.dart';
 import 'sync_client_base.dart';
 import 's3_config.dart';
 import 's3_signer.dart';

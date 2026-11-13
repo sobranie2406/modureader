@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'package:anx_reader/service/sync/reading_sync_retry.dart';
-import 'package:anx_reader/service/sync/sync_feedback.dart';
-import 'package:anx_reader/service/sync/sync_preview.dart';
+import 'package:modu_reader/service/sync/reading_sync_retry.dart';
+import 'package:modu_reader/service/sync/sync_feedback.dart';
+import 'package:modu_reader/service/sync/sync_preview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';

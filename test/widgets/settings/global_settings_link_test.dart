@@ -1,15 +1,15 @@
 import 'dart:convert';
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/settings_page/global_settings.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/settings_page/global_settings.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

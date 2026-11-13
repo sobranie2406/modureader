@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
+import 'package:modu_reader/service/config_transfer/config_transfer_codec.dart';
+import 'package:modu_reader/widgets/settings/config_transfer_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

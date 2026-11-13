@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 
 import 'package:path_provider/path_provider.dart' as path;
 

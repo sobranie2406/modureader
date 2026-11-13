@@ -1,17 +1,17 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:anx_reader/service/sync/immutable_sync_log.dart';
+import 'package:modu_reader/service/sync/immutable_sync_log.dart';
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
-import 'package:anx_reader/service/sync/sync_preview.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/service/sync/sync_preview.dart';
+import 'package:modu_reader/utils/log/common.dart';
 
 /// A clean SQLite transport: only portable records and opaque encrypted AI
 /// settings. Never ships local paths, fonts, indexes, or the entire app DB.

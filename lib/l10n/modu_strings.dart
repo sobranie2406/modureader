@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:anx_reader/l10n/legacy_dictionary_prompts.dart';
+import 'package:modu_reader/l10n/legacy_dictionary_prompts.dart';
 import 'package:flutter/widgets.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
 
 /// Localized newer UI and bundled prompts. Defaults are never saved as edits.
 abstract final class ModuStrings {

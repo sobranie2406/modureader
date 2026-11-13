@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:anx_reader/page/settings_page/sync.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/utils/get_path/get_download_path.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/page/settings_page/sync.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/get_path/get_download_path.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

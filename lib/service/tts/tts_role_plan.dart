@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
 
 /// One speech run with a single voice: either narration or quoted dialogue.
 class TtsRoleRun {

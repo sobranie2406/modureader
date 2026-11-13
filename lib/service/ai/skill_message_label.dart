@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/reading_skill_registry.dart';
-import 'package:anx_reader/service/ai/reading_skill_prompt_store.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ai/reading_skill_registry.dart';
+import 'package:modu_reader/service/ai/reading_skill_prompt_store.dart';
 import 'dart:ui';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
 /// Presentation only: never replaces the prompt sent to the model.
 /// Exact matching also recognizes older conversations without saved labels.

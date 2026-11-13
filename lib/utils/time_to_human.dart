@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
 
 String timeToHuman(DateTime? date) {
   final context = navigatorKey.currentContext!;

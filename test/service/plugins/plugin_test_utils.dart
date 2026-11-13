@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:anx_reader/service/plugins/plugin_trust.dart';
+import 'package:modu_reader/service/plugins/plugin_trust.dart';
 import 'package:path/path.dart' as p;
 
 // Host lifecycle fixtures are intentionally not production-approved packages.

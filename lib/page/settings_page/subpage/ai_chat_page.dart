@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/widgets/ai/ai_chat_stream.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/widgets/ai/ai_chat_stream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

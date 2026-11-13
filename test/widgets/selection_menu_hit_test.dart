@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/widgets/context_menu/context_menu.dart';
-import 'package:anx_reader/widgets/context_menu/excerpt_menu.dart';
-import 'package:anx_reader/widgets/context_menu/selection_action_toolbar.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/widgets/context_menu/context_menu.dart';
+import 'package:modu_reader/widgets/context_menu/excerpt_menu.dart';
+import 'package:modu_reader/widgets/context_menu/selection_action_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/settings_page/ai_provider_detail_page.dart';
-import 'package:anx_reader/providers/ai_providers.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/settings_page/ai_provider_detail_page.dart';
+import 'package:modu_reader/providers/ai_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

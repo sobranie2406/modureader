@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugins_page.dart';
-import 'package:anx_reader/page/settings_page/experimental.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
-import 'package:anx_reader/service/plugins/plugin_paths.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugins_page.dart';
+import 'package:modu_reader/page/settings_page/experimental.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;

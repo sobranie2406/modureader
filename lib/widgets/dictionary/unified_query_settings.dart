@@ -1,14 +1,14 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/widgets/reading_page/reader_menu_appearance.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/unified_query.dart';
-import 'package:anx_reader/widgets/ai/skill_template_draft_tile.dart';
-import 'package:anx_reader/page/settings_page/dictionaries.dart';
-import 'package:anx_reader/page/settings_page/translate.dart';
-import 'package:anx_reader/page/settings_page/selection_search.dart';
-import 'package:anx_reader/page/settings_page/selection_toolbar.dart';
-import 'package:anx_reader/page/settings_page/ai_reading_skills.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_appearance.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/unified_query.dart';
+import 'package:modu_reader/widgets/ai/skill_template_draft_tile.dart';
+import 'package:modu_reader/page/settings_page/dictionaries.dart';
+import 'package:modu_reader/page/settings_page/translate.dart';
+import 'package:modu_reader/page/settings_page/selection_search.dart';
+import 'package:modu_reader/page/settings_page/selection_toolbar.dart';
+import 'package:modu_reader/page/settings_page/ai_reading_skills.dart';
 import 'package:flutter/material.dart';
 
 class UnifiedQuerySettings extends StatefulWidget {

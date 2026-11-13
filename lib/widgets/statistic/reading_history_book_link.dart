@@ -1,11 +1,11 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/page/book_detail.dart';
-import 'package:anx_reader/providers/dashboard_tiles_provider.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/page/book_detail.dart';
+import 'package:modu_reader/providers/dashboard_tiles_provider.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

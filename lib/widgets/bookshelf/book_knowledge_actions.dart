@@ -1,19 +1,19 @@
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:io';
-import 'package:anx_reader/service/book_local_sources.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/providers/book_list.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
-import 'package:anx_reader/service/knowledge/local_book_requirement.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:modu_reader/service/knowledge/local_book_requirement.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

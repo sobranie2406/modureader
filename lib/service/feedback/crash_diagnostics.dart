@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'runtime_diagnostics.dart';
 import 'dart:io';
 import 'dart:ffi';
-import 'package:anx_reader/service/feedback/crash_journal.dart';
-import 'package:anx_reader/service/feedback/native_stack_diagnostics.dart';
+import 'package:modu_reader/service/feedback/crash_journal.dart';
+import 'package:modu_reader/service/feedback/native_stack_diagnostics.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 

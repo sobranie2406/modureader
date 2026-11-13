@@ -1,17 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/main.dart' show navigatorKey;
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/page/home_page.dart' show webViewEnvironment;
-import 'package:anx_reader/service/ai/tools/repository/book_content_search_repository.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
-import 'package:anx_reader/service/feedback/crash_journal.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/webView/anx_headless_webview.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/main.dart' show navigatorKey;
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/page/home_page.dart' show webViewEnvironment;
+import 'package:modu_reader/service/ai/tools/repository/book_content_search_repository.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/service/convert_to_epub/txt/convert_from_txt.dart';
+import 'package:modu_reader/service/feedback/crash_journal.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';

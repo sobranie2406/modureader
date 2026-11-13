@@ -1,6 +1,6 @@
-import 'package:anx_reader/service/sync/ai_settings_sync.dart';
-import 'package:anx_reader/service/sync/translation_usage_sync.dart';
-import 'package:anx_reader/service/translate/translation_usage.dart';
+import 'package:modu_reader/service/sync/ai_settings_sync.dart';
+import 'package:modu_reader/service/sync/translation_usage_sync.dart';
+import 'package:modu_reader/service/translate/translation_usage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

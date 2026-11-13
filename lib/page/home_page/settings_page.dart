@@ -1,6 +1,6 @@
-import 'package:anx_reader/page/settings_page/more_settings_page.dart';
+import 'package:modu_reader/page/settings_page/more_settings_page.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/home_navigation_metrics.dart';
+import 'package:modu_reader/widgets/home_navigation_metrics.dart';
 
 /// The home navigation's Settings tab opens the complete settings interface
 /// directly. The optional controller is kept for compatibility with the home

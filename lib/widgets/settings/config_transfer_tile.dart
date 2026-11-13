@@ -1,10 +1,10 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:async';
 
-import 'package:anx_reader/service/config_transfer/config_qr_bridge.dart';
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/service/config_transfer/config_qr_bridge.dart';
+import 'package:modu_reader/service/config_transfer/config_transfer_codec.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

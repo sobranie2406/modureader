@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:anx_reader/service/ai/dictionary_lookup.dart';
-import 'package:anx_reader/service/ai/dictionary_web_search.dart';
-import 'package:anx_reader/service/ai/reading_skill_execution.dart';
-import 'package:anx_reader/service/ai/reading_request_snapshot.dart';
+import 'package:modu_reader/service/ai/dictionary_lookup.dart';
+import 'package:modu_reader/service/ai/dictionary_web_search.dart';
+import 'package:modu_reader/service/ai/reading_skill_execution.dart';
+import 'package:modu_reader/service/ai/reading_request_snapshot.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

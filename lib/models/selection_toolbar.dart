@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:ui';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
-import 'package:anx_reader/constants/note_annotations.dart';
-import 'package:anx_reader/models/toolbar_action_definition.dart';
+import 'package:modu_reader/constants/note_annotations.dart';
+import 'package:modu_reader/models/toolbar_action_definition.dart';
 
 /// Stable action IDs, rather than translated labels or platform icon codes.
 enum SelectionAiScope { selection, context }

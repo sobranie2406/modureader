@@ -1,18 +1,18 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/widgets/settings/font_name_preview.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/settings/font_name_preview.dart';
 import 'widget_title.dart';
 import 'reader_menu_group.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
 import 'document_panel_widgets.dart';
 import 'reader_popup.dart';
 import 'reader_settings_scroll_view.dart';
 import 'document_appearance_controls.dart';
-import 'package:anx_reader/dao/theme.dart';
-import 'package:anx_reader/models/read_theme.dart';
+import 'package:modu_reader/dao/theme.dart';
+import 'package:modu_reader/models/read_theme.dart';
 import 'style_widget.dart';
 import 'more_settings/more_settings.dart';
 

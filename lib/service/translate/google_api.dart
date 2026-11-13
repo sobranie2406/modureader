@@ -1,11 +1,11 @@
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/config/config_item.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/config/config_item.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
 const _urlGoogleApi =
     'https://translation.googleapis.com/language/translate/v2';

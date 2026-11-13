@@ -1,10 +1,10 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/constants/note_annotations.dart';
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/models/book_notes_state.dart';
-import 'package:anx_reader/providers/bookmark.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/constants/note_annotations.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/models/book_notes_state.dart';
+import 'package:modu_reader/providers/bookmark.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 

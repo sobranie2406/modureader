@@ -1,7 +1,7 @@
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/css_visual_style.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/css_visual_style.dart';
 import 'dart:ui';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
 const customCssProfileCount = 32;
 

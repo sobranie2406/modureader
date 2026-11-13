@@ -1,10 +1,10 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:math' as math;
 
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/widgets/common/axis_flex.dart';
-import 'package:anx_reader/widgets/context_menu/selection_toolbar_labels.dart';
-import 'package:anx_reader/widgets/icon_and_text.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/widgets/common/axis_flex.dart';
+import 'package:modu_reader/widgets/context_menu/selection_toolbar_labels.dart';
+import 'package:modu_reader/widgets/icon_and_text.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 

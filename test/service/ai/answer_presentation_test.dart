@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/ai/answer_presentation.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/service/ai/answer_presentation.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ParsedReasoningEntry tool(String name, String status, {String? error}) =>

@@ -1,13 +1,13 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_catalogs.g.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/widgets/settings/database_backup_section.dart';
-import 'package:anx_reader/widgets/settings/settings_export_dialog.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_catalogs.g.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/widgets/settings/database_backup_section.dart';
+import 'package:modu_reader/widgets/settings/settings_export_dialog.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

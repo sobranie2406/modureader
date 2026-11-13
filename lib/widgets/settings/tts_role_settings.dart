@@ -1,13 +1,13 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/providers/tts_providers.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/tts_handler.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/providers/tts_providers.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/tts_handler.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:anx_reader/service/ocr/ocr_processing.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/service/ocr/ocr_model_metadata.dart';
-import 'package:anx_reader/service/ocr/document_text_reflow.dart';
+import 'package:modu_reader/service/ocr/ocr_processing.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/ocr_model_metadata.dart';
+import 'package:modu_reader/service/ocr/document_text_reflow.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;

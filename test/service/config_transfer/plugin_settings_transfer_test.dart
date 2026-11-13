@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/models/user_prompt.dart';
-import 'package:anx_reader/service/plugins/handlers/ai_prompt_handler.dart';
-import 'package:anx_reader/service/config_transfer/global_settings_transfer.dart';
-import 'package:anx_reader/service/config_transfer/settings_modules.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
-import 'package:anx_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/models/user_prompt.dart';
+import 'package:modu_reader/service/plugins/handlers/ai_prompt_handler.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

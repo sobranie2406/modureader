@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/settings_page/narrate.dart';
-import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
-import 'package:anx_reader/widgets/settings/config_transfer_tile.dart';
-import 'package:anx_reader/service/tts/mimo_voice_presets.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/settings_page/narrate.dart';
+import 'package:modu_reader/service/config_transfer/tts_config_transfer.dart';
+import 'package:modu_reader/widgets/settings/config_transfer_tile.dart';
+import 'package:modu_reader/service/tts/mimo_voice_presets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

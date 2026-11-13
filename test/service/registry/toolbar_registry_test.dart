@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
-import 'package:anx_reader/service/registry/toolbar_registry.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/registry/toolbar_registry.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

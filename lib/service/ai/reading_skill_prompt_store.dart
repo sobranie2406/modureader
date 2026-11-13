@@ -1,5 +1,5 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ai/readany_skills.dart';
 import 'dart:ui';
 
 /// Keeps built-in reading skills and the existing AI prompt settings backed by

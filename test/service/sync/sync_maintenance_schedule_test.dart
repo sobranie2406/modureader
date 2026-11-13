@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/service/sync/sync_maintenance_schedule.dart';
+import 'package:modu_reader/service/sync/sync_maintenance_schedule.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'sync_asset_listing_test.dart' show ListingClient;
 

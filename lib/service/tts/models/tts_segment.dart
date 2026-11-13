@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
 
 class TtsSegment {
   TtsSegment({required this.sentence, this.roleRate = 1});

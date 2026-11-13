@@ -1,12 +1,12 @@
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/page/settings_page/ai_provider_detail_page.dart';
-import 'package:anx_reader/providers/ai_providers.dart';
-import 'package:anx_reader/widgets/ai/ai_provider_logo.dart';
-import 'package:anx_reader/widgets/ai/ai_provider_actions.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/page/settings_page/ai_provider_detail_page.dart';
+import 'package:modu_reader/providers/ai_providers.dart';
+import 'package:modu_reader/widgets/ai/ai_provider_logo.dart';
+import 'package:modu_reader/widgets/ai/ai_provider_actions.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AiProviderListPage extends ConsumerWidget {

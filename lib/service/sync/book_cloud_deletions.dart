@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 
 /// Explicit deletion intents, scoped to one backend. Never infer from absence.
 class BookCloudDeletions {

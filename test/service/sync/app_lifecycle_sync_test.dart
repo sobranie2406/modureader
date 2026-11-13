@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/service/sync/app_lifecycle_sync.dart';
+import 'package:modu_reader/service/sync/app_lifecycle_sync.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,15 +1,15 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'package:anx_reader/service/ai/mindmap_export.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/service/ai/mindmap_export.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
 
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:graphview/GraphView.dart';

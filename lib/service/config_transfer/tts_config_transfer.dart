@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:anx_reader/models/tts_buffer_settings.dart';
+import 'package:modu_reader/models/tts_buffer_settings.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
 
 /// A complete, versioned snapshot. Parsing never changes preferences or starts TTS.
 class TtsConfigTransfer {

@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/reading_page/reader_menu_group.dart';
-import 'package:anx_reader/models/pdf_reading_view.dart';
-import 'package:anx_reader/models/document_display_options.dart';
-import 'package:anx_reader/widgets/reading_page/pdf_reading_controls.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_group.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/models/document_display_options.dart';
+import 'package:modu_reader/widgets/reading_page/pdf_reading_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

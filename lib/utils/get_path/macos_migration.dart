@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Callback for migration progress updates

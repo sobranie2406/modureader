@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_retriever.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_retriever.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class TestEmbedding extends EmbeddingProvider {

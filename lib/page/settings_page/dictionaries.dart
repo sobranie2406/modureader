@@ -1,13 +1,13 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/widgets/dictionary/dictionary_common.dart';
-import 'package:anx_reader/widgets/dictionary/dictionary_sources.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/widgets/dictionary/dictionary_common.dart';
+import 'package:modu_reader/widgets/dictionary/dictionary_sources.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:path/path.dart' as p;
 
 // Android's MIME allowlist cannot represent MDX/IFO/IDX/DICT/SYN reliably.

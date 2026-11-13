@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:anx_reader/enums/reading_info.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/reader_progress.dart';
-import 'package:anx_reader/widgets/reading_page/progress_widget.dart';
+import 'package:modu_reader/enums/reading_info.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/reader_progress.dart';
+import 'package:modu_reader/widgets/reading_page/progress_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';

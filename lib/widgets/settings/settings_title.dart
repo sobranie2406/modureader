@@ -1,8 +1,8 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 
 Widget settingsTitle({
   required Icon icon,

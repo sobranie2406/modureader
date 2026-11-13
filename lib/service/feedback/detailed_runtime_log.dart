@@ -2,7 +2,7 @@ import 'dart:collection';
 import 'dart:convert';
 
 import 'package:logging/logging.dart';
-import 'package:anx_reader/service/tts/media_diagnostic_fields.dart';
+import 'package:modu_reader/service/tts/media_diagnostic_fields.dart';
 
 /// A current-session, shareable projection of Settings > Advanced > Logs.
 /// Free-form messages can include whole books, SQL arguments and credentials:
@@ -163,7 +163,7 @@ class DetailedRuntimeLog {
     }
     final stack = record.stackTrace ?? (error is StackTrace ? error : null);
     final frames = RegExp(
-            r'(?:^|[\s(])((?:package:(?:anx_reader|flutter|sqflite|sqflite_common|sqflite_common_ffi|dio)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z_][a-zA-Z0-9_/]*)(?::\d+){1,2})(?=[\s)]|$)')
+            r'(?:^|[\s(])((?:package:(?:modu_reader|anx_reader|flutter|sqflite|sqflite_common|sqflite_common_ffi|dio)/[a-zA-Z0-9_/]+\.dart|dart:[a-zA-Z_][a-zA-Z0-9_/]*)(?::\d+){1,2})(?=[\s)]|$)')
         .allMatches(bounded(stack?.toString() ?? ''))
         .where((match) => match.group(1)!.length <= 200)
         .take(16)

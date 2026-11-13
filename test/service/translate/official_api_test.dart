@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/service/translate/index.dart';
-import 'package:anx_reader/service/translate/official_api.dart';
-import 'package:anx_reader/service/translate/translation_usage.dart';
-import 'package:anx_reader/service/translate/translation_api_client.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/service/translate/index.dart';
+import 'package:modu_reader/service/translate/official_api.dart';
+import 'package:modu_reader/service/translate/translation_usage.dart';
+import 'package:modu_reader/service/translate/translation_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

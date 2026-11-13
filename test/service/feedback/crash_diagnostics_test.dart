@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:anx_reader/service/feedback/crash_diagnostics.dart';
+import 'package:modu_reader/service/feedback/crash_diagnostics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<int> vint(int value) {

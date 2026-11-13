@@ -1,6 +1,6 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
-import 'package:anx_reader/utils/toast/common.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/utils/toast/common.dart';
 import 'package:flutter/material.dart';
 
 /// Shared entry point in vector settings and the bookshelf's live queue.

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

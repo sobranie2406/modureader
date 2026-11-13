@@ -1,11 +1,11 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/sync/s3_client.dart';
-import 'package:anx_reader/service/sync/s3_config.dart';
-import 'package:anx_reader/service/sync/sync_feedback.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/widgets/settings/sync_secret_field.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/sync/s3_client.dart';
+import 'package:modu_reader/service/sync/s3_config.dart';
+import 'package:modu_reader/service/sync/sync_feedback.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/sync_secret_field.dart';
 
 class S3SettingsDialog extends StatefulWidget {
   const S3SettingsDialog({super.key, required this.initial});

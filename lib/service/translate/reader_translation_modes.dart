@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:anx_reader/enums/translation_mode.dart';
+import 'package:modu_reader/enums/translation_mode.dart';
 
 /// Two independent controls for one text surface. Starting another translation
 /// replaces the displayed translation; merely opening its menu changes nothing.

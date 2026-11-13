@@ -1,10 +1,10 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/translate/classical_translation.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:flutter/material.dart';
 import 'translation_api_settings.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 
 class ClassicalTranslationSettings extends StatefulWidget {
   const ClassicalTranslationSettings(

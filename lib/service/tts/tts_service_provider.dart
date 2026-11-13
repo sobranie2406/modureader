@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/config/service_provider.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/config/service_provider.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/widgets.dart';
 
 // Re-export ConfigItem for convenience
-export 'package:anx_reader/service/config/config_item.dart';
+export 'package:modu_reader/service/config/config_item.dart';
 
 // Forward declaration to avoid circular dependency
 // The actual TtsService enum is defined in tts_service.dart

@@ -1,16 +1,16 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:convert';
 
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/tag.dart';
-import 'package:anx_reader/service/ai/tools/repository/tag_repository.dart';
-import 'package:anx_reader/utils/ai_reasoning_parser.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/utils/color/hash_color.dart';
-import 'package:anx_reader/utils/color/rgb.dart';
-import 'package:anx_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
-import 'package:anx_reader/widgets/common/tag_chip.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/tag.dart';
+import 'package:modu_reader/service/ai/tools/repository/tag_repository.dart';
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/utils/color/hash_color.dart';
+import 'package:modu_reader/utils/color/rgb.dart';
+import 'package:modu_reader/widgets/ai/tool_tiles/tool_tile_base.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/widgets/common/tag_chip.dart';
 import 'package:flutter/material.dart';
 
 class ApplyBookTagsStepTile extends StatefulWidget {

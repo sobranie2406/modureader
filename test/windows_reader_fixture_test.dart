@@ -1,15 +1,15 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart' show navigatorKey;
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/utils/webView/gererate_url.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart' show navigatorKey;
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/utils/webView/gererate_url.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
-import 'package:anx_reader/service/convert_to_epub/txt/convert_from_txt.dart';
+import 'package:modu_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import '../integration_test/fixtures/windows_reader_fixtures.dart';
 

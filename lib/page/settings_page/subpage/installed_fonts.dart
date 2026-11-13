@@ -1,14 +1,14 @@
-import 'package:anx_reader/widgets/settings/font_name_preview.dart';
+import 'package:modu_reader/widgets/settings/font_name_preview.dart';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/providers/font_list.dart';
-import 'package:anx_reader/providers/fonts.dart';
-import 'package:anx_reader/service/installed_fonts.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/providers/font_list.dart';
+import 'package:modu_reader/providers/fonts.dart';
+import 'package:modu_reader/service/installed_fonts.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

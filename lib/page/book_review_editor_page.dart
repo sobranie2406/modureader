@@ -1,8 +1,8 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 
 /// 书籍备注/书评编辑页

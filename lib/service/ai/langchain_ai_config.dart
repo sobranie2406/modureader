@@ -1,4 +1,4 @@
-import 'package:anx_reader/enums/ai_reasoning_effort.dart';
+import 'package:modu_reader/enums/ai_reasoning_effort.dart';
 import 'dart:convert';
 
 import 'package:langchain_anthropic/langchain_anthropic.dart';

@@ -1,6 +1,6 @@
-import 'package:anx_reader/widgets/reading_page/reader_menu_group.dart';
-import 'package:anx_reader/widgets/reading_page/reader_settings_scroll_view.dart';
-import 'package:anx_reader/widgets/reading_page/widget_title.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_group.dart';
+import 'package:modu_reader/widgets/reading_page/reader_settings_scroll_view.dart';
+import 'package:modu_reader/widgets/reading_page/widget_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/app_identity.dart';
+import 'package:modu_reader/config/app_identity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -86,7 +86,7 @@ void main() {
         .map(
           (source) => source.replaceAll(
             RegExp(
-              r"^import 'package:anx_reader/.*$",
+              r"^import 'package:modu_reader/.*$",
               multiLine: true,
             ),
             '',

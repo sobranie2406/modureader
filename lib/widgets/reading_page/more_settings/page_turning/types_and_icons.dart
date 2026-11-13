@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 
 List<PageTurningType> type1 = [
   PageTurningType.prev,

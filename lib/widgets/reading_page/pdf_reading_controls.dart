@@ -1,13 +1,13 @@
 import 'reader_menu_appearance.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'reader_menu_group.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/pdf_reading_view.dart';
-import 'package:anx_reader/widgets/reading_page/document_enhancement_panel.dart';
-import 'package:anx_reader/models/document_enhancement.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/pdf_reading_view.dart';
+import 'package:modu_reader/widgets/reading_page/document_enhancement_panel.dart';
+import 'package:modu_reader/models/document_enhancement.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/widgets/reading_page/document_panel_widgets.dart';
+import 'package:modu_reader/widgets/reading_page/document_panel_widgets.dart';
 
 /// Formal reader controls, separate from the temporary crop preview.
 class PdfReadingControls extends StatefulWidget {

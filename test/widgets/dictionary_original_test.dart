@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/widgets/dictionary/dictionary_original.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/widgets/dictionary/dictionary_original.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';

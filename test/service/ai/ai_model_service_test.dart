@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/ai/langchain_ai_config.dart';
-import 'package:anx_reader/service/ai/ai_model_service.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/ai/langchain_ai_config.dart';
+import 'package:modu_reader/service/ai/ai_model_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

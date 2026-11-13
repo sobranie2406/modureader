@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/ai/readany_skills.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/ai/readany_skills.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
 import 'package:flutter/foundation.dart';
 
 /// A reading skill registered with the app.

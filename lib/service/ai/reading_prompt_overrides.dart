@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/enums/ai_prompts.dart';
-import 'package:anx_reader/service/ai/reading_skill_registry.dart';
+import 'package:modu_reader/enums/ai_prompts.dart';
+import 'package:modu_reader/service/ai/reading_skill_registry.dart';
 
 /// Strip bundled prompt text from a portable snapshot, not from live settings.
 /// Null means use the receiving application's built-in default. Unknown IDs

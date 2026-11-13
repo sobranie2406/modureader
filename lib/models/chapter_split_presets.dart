@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/chapter_split_rule.dart';
+import 'package:modu_reader/models/chapter_split_rule.dart';
 
 const String kDefaultChapterSplitRuleId = 'default_chapter_rule';
 

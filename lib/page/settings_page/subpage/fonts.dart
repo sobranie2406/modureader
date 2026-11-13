@@ -1,11 +1,11 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:anx_reader/providers/fonts.dart';
+import 'package:modu_reader/providers/fonts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
 
 class FontsSettingPage extends ConsumerWidget {
   const FontsSettingPage({super.key});

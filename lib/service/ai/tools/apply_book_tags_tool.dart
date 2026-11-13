@@ -1,13 +1,13 @@
-import 'package:anx_reader/dao/tag.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/tag.dart';
-import 'package:anx_reader/service/ai/tools/base_tool.dart';
-import 'package:anx_reader/service/ai/tools/input/apply_book_tags_input.dart';
-import 'package:anx_reader/service/ai/tools/repository/books_repository.dart';
-import 'package:anx_reader/service/ai/tools/repository/tag_repository.dart';
-import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
-import 'package:anx_reader/utils/color/hash_color.dart';
-import 'package:anx_reader/utils/color/rgb.dart';
+import 'package:modu_reader/dao/tag.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/tag.dart';
+import 'package:modu_reader/service/ai/tools/base_tool.dart';
+import 'package:modu_reader/service/ai/tools/input/apply_book_tags_input.dart';
+import 'package:modu_reader/service/ai/tools/repository/books_repository.dart';
+import 'package:modu_reader/service/ai/tools/repository/tag_repository.dart';
+import 'package:modu_reader/service/ai/tools/ai_tool_registry.dart';
+import 'package:modu_reader/utils/color/hash_color.dart';
+import 'package:modu_reader/utils/color/rgb.dart';
 
 const _applyBookTagsToolId = 'apply_book_tags';
 

@@ -1,7 +1,7 @@
-import 'package:anx_reader/widgets/reading_page/tts_value_control.dart';
+import 'package:modu_reader/widgets/reading_page/tts_value_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const input = ValueKey('tts-rate-input');

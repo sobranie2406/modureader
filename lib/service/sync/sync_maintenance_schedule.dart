@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
 
 /// Device-local, endpoint-specific scheduling; not part of the sync archive.
 /// Delaying recoverable GC is safe; it never delays publication of user data.

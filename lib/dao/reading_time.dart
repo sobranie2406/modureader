@@ -1,13 +1,13 @@
-import 'package:anx_reader/dao/base_dao.dart';
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/reading_time.dart';
-import 'package:anx_reader/models/reading_time_deletion.dart';
-import 'package:anx_reader/providers/reading_data_revision.dart';
-import 'package:anx_reader/providers/sync.dart';
+import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_trigger.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/reading_time.dart';
+import 'package:modu_reader/models/reading_time_deletion.dart';
+import 'package:modu_reader/providers/reading_data_revision.dart';
+import 'package:modu_reader/providers/sync.dart';
 
 class ReadingTimeDao extends BaseDao {
   ReadingTimeDao();

@@ -1,5 +1,5 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 
 /// Platform-gated here as well as in the native-to-reader bridge.

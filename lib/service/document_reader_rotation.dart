@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 
 /// Rotate the reader viewport, not just its bitmap. Dialogs and fit-width then
 /// receive the same real window metrics as the page.

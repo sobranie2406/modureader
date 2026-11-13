@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/common/container/base_rounded_container.dart';
+import 'package:modu_reader/widgets/common/container/base_rounded_container.dart';
 import 'package:flutter/material.dart';
 
 class OutlinedContainer extends BaseRoundedContainer {

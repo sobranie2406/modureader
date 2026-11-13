@@ -1,15 +1,15 @@
 import 'dart:io';
-import 'package:anx_reader/enums/lang_list.dart';
-import 'package:anx_reader/widgets/icon_and_text.dart';
-import 'package:anx_reader/widgets/settings/translation_preview_text.dart';
+import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/widgets/icon_and_text.dart';
+import 'package:modu_reader/widgets/settings/translation_preview_text.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/translation_text_style.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/text_color_setting.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/translation_text_style.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/text_color_setting.dart';
 
 class TranslationTextStyleSettings extends StatefulWidget {
   const TranslationTextStyleSettings({super.key, this.classical = true});

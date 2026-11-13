@@ -1,4 +1,4 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:flutter/material.dart';
 
 /// A captured menu theme also reaches dialogs and popup menus opened below it.

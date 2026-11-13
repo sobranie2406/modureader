@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../service/plugins/plugin_test_utils.dart';

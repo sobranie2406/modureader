@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_embedding_preferences.dart';
-import 'package:anx_reader/service/knowledge/embedding_provider.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_queue.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
+import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

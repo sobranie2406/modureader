@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/feedback/bug_report.dart';
+import 'package:modu_reader/service/feedback/bug_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

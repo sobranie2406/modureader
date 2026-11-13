@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/models/book.dart';
 
 class BookSearchResult {
   BookSearchResult(this.book);

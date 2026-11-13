@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/service/plugins/plugin_http_budget.dart';
-import 'package:anx_reader/service/plugins/plugin_network_guard.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
+import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
 
 /// Performs the single GET a plugin source is allowed per lookup.
 ///

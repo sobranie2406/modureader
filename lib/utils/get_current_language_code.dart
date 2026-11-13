@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 
 String getCurrentLanguageCode() {
   String? locale = Prefs().locale?.toLanguageTag();

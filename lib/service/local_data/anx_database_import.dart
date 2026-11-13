@@ -7,10 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'package:anx_reader/service/local_data/backup_safety.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/utils/reading_progress.dart';
+import 'package:modu_reader/service/local_data/backup_safety.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/utils/reading_progress.dart';
 
 String _hash(Object value) =>
     sha256.convert(utf8.encode(jsonEncode(value))).toString();

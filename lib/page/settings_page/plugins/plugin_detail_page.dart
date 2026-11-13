@@ -1,19 +1,19 @@
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugin_labels.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugins_page.dart';
-import 'package:anx_reader/service/config/config_item.dart';
-import 'package:anx_reader/service/plugins/handlers/selection_action_handler.dart';
-import 'package:anx_reader/service/plugins/plugin_config.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
-import 'package:anx_reader/widgets/settings/service_config_form.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugin_labels.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugins_page.dart';
+import 'package:modu_reader/service/config/config_item.dart';
+import 'package:modu_reader/service/plugins/handlers/selection_action_handler.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/widgets/settings/service_config_form.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:flutter/material.dart';
 
 class PluginDetailPage extends StatelessWidget {

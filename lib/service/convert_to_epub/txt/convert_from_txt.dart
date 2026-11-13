@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/chapter_split_presets.dart';
-import 'package:anx_reader/service/convert_to_epub/create_epub.dart';
-import 'package:anx_reader/service/convert_to_epub/section.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/chapter_split_presets.dart';
+import 'package:modu_reader/service/convert_to_epub/create_epub.dart';
+import 'package:modu_reader/service/convert_to_epub/section.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:charset/charset.dart';
 import 'package:path/path.dart' as path;
 

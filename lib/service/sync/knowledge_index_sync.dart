@@ -2,15 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/knowledge/book_index_lock.dart';
-import 'package:anx_reader/service/knowledge/book_knowledge_index_service.dart';
-import 'package:anx_reader/service/knowledge/book_source_fingerprint.dart';
-import 'package:anx_reader/service/knowledge/index_build_marker.dart';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
-import 'package:anx_reader/service/sync/knowledge_index_transfer.dart';
-import 'package:anx_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/knowledge/book_index_lock.dart';
+import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
+import 'package:modu_reader/service/knowledge/book_source_fingerprint.dart';
+import 'package:modu_reader/service/knowledge/index_build_marker.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/knowledge_index_stream.dart';
+import 'package:modu_reader/service/sync/knowledge_index_transfer.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
 import 'package:crypto/crypto.dart';
 
 const knowledgeSyncRoot = 'modu/knowledge-v1';

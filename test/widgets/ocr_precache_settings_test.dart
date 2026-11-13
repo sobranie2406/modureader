@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ocr/document_ocr_precache.dart';
-import 'package:anx_reader/service/ocr/document_reflow_loader.dart';
-import 'package:anx_reader/widgets/reading_page/ocr_precache_settings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ocr/document_ocr_precache.dart';
+import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
+import 'package:modu_reader/widgets/reading_page/ocr_precache_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

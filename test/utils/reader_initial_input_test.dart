@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/font_model.dart';
-import 'package:anx_reader/service/book_player/book_player_server.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
-import 'package:anx_reader/utils/webView/gererate_url.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/font_model.dart';
+import 'package:modu_reader/service/book_player/book_player_server.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/utils/webView/gererate_url.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

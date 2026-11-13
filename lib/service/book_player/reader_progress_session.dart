@@ -1,6 +1,6 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/models/reading_position_snapshot.dart';
-import 'package:anx_reader/models/narration_position.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/models/reading_position_snapshot.dart';
+import 'package:modu_reader/models/narration_position.dart';
 
 /// Serializes real reading actions and database refreshes for one open reader.
 /// Lifecycle saves merely drain work; they never invent a new reading action.

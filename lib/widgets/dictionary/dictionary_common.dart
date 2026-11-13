@@ -1,7 +1,7 @@
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 
 LocalDictionaryStore? _store;
 LocalDictionaryStore defaultDictionaryStore() {

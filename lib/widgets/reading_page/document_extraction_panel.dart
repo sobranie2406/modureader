@@ -1,24 +1,24 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'reader_menu_group.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ocr/local_ocr_service.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/service/ocr/ocr_models.dart';
-import 'package:anx_reader/service/ocr/document_page_range.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ocr/local_ocr_service.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/ocr/document_page_range.dart';
 import 'package:dio/dio.dart';
 import 'widget_title.dart';
 import 'package:flutter/material.dart';
 import 'document_reader_surface.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
-import 'package:anx_reader/service/ocr/document_text_geometry.dart';
-import 'package:anx_reader/service/ocr/document_text_reflow.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/service/ocr/document_text_geometry.dart';
+import 'package:modu_reader/service/ocr/document_text_reflow.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 import 'document_saved_text_actions.dart';
 import '../common/app_scroll_behavior.dart';
 

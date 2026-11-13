@@ -1,7 +1,7 @@
-import 'package:anx_reader/service/config_transfer/tts_config_transfer.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
-import 'package:anx_reader/service/tts/edge_tts_backend.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/service/config_transfer/tts_config_transfer.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/tts/edge_tts_backend.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

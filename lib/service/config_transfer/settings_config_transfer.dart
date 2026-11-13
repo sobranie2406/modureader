@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/ai_provider.dart';
+import 'package:modu_reader/models/ai_provider.dart';
 
 class WebdavTransferResult {
   const WebdavTransferResult({

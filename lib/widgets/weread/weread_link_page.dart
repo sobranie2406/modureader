@@ -1,6 +1,6 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/weread/weread_api.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/weread/weread_api.dart';
 import 'package:flutter/material.dart';
 import 'weread_common.dart';
 

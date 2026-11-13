@@ -1,20 +1,20 @@
 import 'dart:io';
-import 'package:anx_reader/widgets/reading_page/reader_menu_group.dart';
+import 'package:modu_reader/widgets/reading_page/reader_menu_group.dart';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/page/book_player/epub_player.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/widgets/reading_page/more_settings/style_settings.dart';
-import 'package:anx_reader/widgets/reading_page/style_widget.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/page/book_player/epub_player.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/style_settings.dart';
+import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
-import 'package:anx_reader/models/font_model.dart';
-import 'package:anx_reader/widgets/reading_page/widgets/bgimg_selector.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/models/font_model.dart';
+import 'package:modu_reader/widgets/reading_page/widgets/bgimg_selector.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

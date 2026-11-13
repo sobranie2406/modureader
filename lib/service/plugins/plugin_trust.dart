@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 

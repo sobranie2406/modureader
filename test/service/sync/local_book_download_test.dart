@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/service/sync/local_book_download.dart';
+import 'package:modu_reader/service/sync/local_book_download.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 

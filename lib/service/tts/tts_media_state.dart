@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
 import 'package:audio_service/audio_service.dart';
 
 /// One policy for the expanded notification, lock screen and compact controls.

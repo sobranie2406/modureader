@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/service/notes/export_notes.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/service/notes/export_notes.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:csv/csv.dart';
 

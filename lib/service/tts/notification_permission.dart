@@ -1,7 +1,7 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 

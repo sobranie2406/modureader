@@ -1,5 +1,5 @@
-import 'package:anx_reader/enums/chart_mode.dart';
-import 'package:anx_reader/models/reading_time_deletion.dart';
+import 'package:modu_reader/enums/chart_mode.dart';
+import 'package:modu_reader/models/reading_time_deletion.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

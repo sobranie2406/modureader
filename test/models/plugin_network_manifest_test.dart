@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_network.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_network.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> _base({

@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show StandardMessageCodec;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/tts_buffer_settings.dart';
-import 'package:anx_reader/service/tts/models/tts_sentence.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/tts_buffer_settings.dart';
+import 'package:modu_reader/service/tts/models/tts_sentence.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

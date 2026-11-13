@@ -1,6 +1,6 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/common/container/base_rounded_container.dart';
-import 'package:anx_reader/widgets/common/container/outlined_container.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/common/container/base_rounded_container.dart';
+import 'package:modu_reader/widgets/common/container/outlined_container.dart';
 import 'package:flutter/material.dart';
 
 class FilledContainer extends BaseRoundedContainer {

@@ -1,12 +1,12 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/theme_preset.dart';
-import 'package:anx_reader/widgets/common/color_picker_sheet.dart';
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
-import 'package:anx_reader/widgets/settings/theme_mode.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/theme_preset.dart';
+import 'package:modu_reader/widgets/common/color_picker_sheet.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/widgets/settings/theme_mode.dart';
 import 'package:flutter/material.dart';
 
 Widget _canvasColourLegend(BuildContext context) {

@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/ai/tools/models/bookshelf_organize_plan_book.dart';
-import 'package:anx_reader/service/ai/tools/models/bookshelf_organize_plan_group.dart';
+import 'package:modu_reader/service/ai/tools/models/bookshelf_organize_plan_book.dart';
+import 'package:modu_reader/service/ai/tools/models/bookshelf_organize_plan_group.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'bookshelf_organize_plan.freezed.dart';

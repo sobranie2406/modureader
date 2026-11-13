@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
-import 'package:anx_reader/service/knowledge/onnx_embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;

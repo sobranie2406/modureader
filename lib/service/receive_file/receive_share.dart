@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:anx_reader/service/book.dart';
-import 'package:anx_reader/service/receive_file/external_book_inbox.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/service/book.dart';
+import 'package:modu_reader/service/receive_file/external_book_inbox.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_handler/share_handler.dart';

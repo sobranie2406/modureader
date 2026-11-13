@@ -1,9 +1,9 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/models/search_note_group.dart';
-import 'package:anx_reader/models/search_result_data.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/models/search_note_group.dart';
+import 'package:modu_reader/models/search_result_data.dart';
 
 class SearchRepository {
   const SearchRepository();

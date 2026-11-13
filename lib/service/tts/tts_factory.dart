@@ -1,9 +1,9 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/tts/base_tts.dart';
-import 'package:anx_reader/service/tts/online_tts.dart';
-import 'package:anx_reader/service/tts/system_tts.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/online_tts.dart';
+import 'package:modu_reader/service/tts/system_tts.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 
 class TtsFactory {

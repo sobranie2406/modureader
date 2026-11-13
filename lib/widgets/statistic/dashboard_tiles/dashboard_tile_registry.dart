@@ -1,17 +1,17 @@
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/books_total_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/completion_progress_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/library_totals_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/notes_total_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/period_summary_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/random_highlight_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_days_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_duration_trend_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_streak_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/continue_reading_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/top_book_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/total_time_tile.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/tiles/reading_insight_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/books_total_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/completion_progress_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/library_totals_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/notes_total_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/period_summary_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/random_highlight_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/reading_days_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/reading_duration_trend_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/reading_streak_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/continue_reading_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/top_book_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/total_time_tile.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/tiles/reading_insight_tile.dart';
 
 /// Types of dashboard tiles that can appear in the statistics dashboard.
 enum StatisticsDashboardTileType {

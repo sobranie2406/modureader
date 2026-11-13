@@ -1,8 +1,8 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/widgets/bookshelf/book_folder_dialog.dart';
-import 'package:anx_reader/widgets/bookshelf/book_knowledge_actions.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/bookshelf/book_folder_dialog.dart';
+import 'package:modu_reader/widgets/bookshelf/book_knowledge_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

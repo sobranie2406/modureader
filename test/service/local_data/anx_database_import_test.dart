@@ -4,9 +4,9 @@ import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:anx_reader/service/local_data/anx_database_import.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/local_data/anx_database_import.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
 import '../sync/row_sync_test.dart' show fixture, noteRow;
 
 void main() {

@@ -1,8 +1,8 @@
-import 'package:anx_reader/providers/tts_providers.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/tts_role_config.dart';
-import 'package:anx_reader/widgets/settings/tts_role_settings.dart';
+import 'package:modu_reader/providers/tts_providers.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/tts_role_config.dart';
+import 'package:modu_reader/widgets/settings/tts_role_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

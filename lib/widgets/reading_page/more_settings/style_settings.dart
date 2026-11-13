@@ -1,15 +1,15 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import '../reader_menu_group.dart';
-import 'package:anx_reader/enums/text_alignment.dart';
-import 'package:anx_reader/enums/writing_mode.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book_style.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/widgets/icon_and_text.dart';
+import 'package:modu_reader/enums/text_alignment.dart';
+import 'package:modu_reader/enums/writing_mode.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book_style.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/widgets/icon_and_text.dart';
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:anx_reader/service/ocr/document_text_style.dart';
+import 'package:modu_reader/service/ocr/document_text_style.dart';
 import 'reader_setting_availability.dart';
 
 // Reusable style slider widget that can be disabled

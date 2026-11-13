@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/knowledge/knowledge_chapter_source.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/knowledge_chapter_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

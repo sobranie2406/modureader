@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
 
 /// Native reflow has paragraphs, but no publication HTML elements/selectors.
 class ReflowCss {

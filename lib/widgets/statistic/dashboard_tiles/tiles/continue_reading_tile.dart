@@ -1,15 +1,15 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/providers/last_read_book_provider.dart';
-import 'package:anx_reader/widgets/statistic/reading_history_book_link.dart';
-import 'package:anx_reader/utils/date/relative_time_formatter.dart';
-import 'package:anx_reader/widgets/bookshelf/book_cover.dart';
-import 'package:anx_reader/widgets/page_router/reader_cover_hero.dart';
-import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
-import 'package:anx_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/providers/last_read_book_provider.dart';
+import 'package:modu_reader/widgets/statistic/reading_history_book_link.dart';
+import 'package:modu_reader/utils/date/relative_time_formatter.dart';
+import 'package:modu_reader/widgets/bookshelf/book_cover.dart';
+import 'package:modu_reader/widgets/page_router/reader_cover_hero.dart';
+import 'package:modu_reader/widgets/common/async_skeleton_wrapper.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_base.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_metadata.dart';
+import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

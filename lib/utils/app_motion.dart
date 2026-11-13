@@ -1,4 +1,4 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:heroine/heroine.dart';
 

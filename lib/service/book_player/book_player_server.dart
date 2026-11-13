@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'package:anx_reader/service/book_player/reader_background_response.dart';
-import 'package:anx_reader/service/book_player/reader_font_response.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/book_player/reader_file_access.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/service/book_player/reader_background_response.dart';
+import 'package:modu_reader/service/book_player/reader_font_response.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/book_player/reader_file_access.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:shelf/shelf.dart' as shelf;

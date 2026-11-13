@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/settings/font_name_preview.dart';
+import 'package:modu_reader/widgets/settings/font_name_preview.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 

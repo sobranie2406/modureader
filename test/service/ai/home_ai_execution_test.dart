@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/ai/home_ai_execution.dart';
+import 'package:modu_reader/service/ai/home_ai_execution.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:langchain_core/chat_models.dart';
 

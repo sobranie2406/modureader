@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/providers/heatmap_data.dart';
-import 'package:anx_reader/providers/reading_streak_provider.dart';
-import 'package:anx_reader/providers/sync_database_revision.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/dao/database.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/providers/heatmap_data.dart';
+import 'package:modu_reader/providers/reading_streak_provider.dart';
+import 'package:modu_reader/providers/sync_database_revision.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';

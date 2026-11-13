@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/models/ai_provider.dart';
-import 'package:anx_reader/service/config_transfer/config_transfer_codec.dart';
-import 'package:anx_reader/service/config_transfer/settings_config_transfer.dart';
+import 'package:modu_reader/models/ai_provider.dart';
+import 'package:modu_reader/service/config_transfer/config_transfer_codec.dart';
+import 'package:modu_reader/service/config_transfer/settings_config_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

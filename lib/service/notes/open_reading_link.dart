@@ -1,15 +1,15 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:io';
 
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/main.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/page/reading_page.dart';
-import 'package:anx_reader/providers/current_reading.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/service/book.dart';
-import 'package:anx_reader/service/notes/reading_link.dart';
-import 'package:anx_reader/utils/platform_utils.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/main.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/providers/current_reading.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/service/book.dart';
+import 'package:modu_reader/service/notes/reading_link.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';

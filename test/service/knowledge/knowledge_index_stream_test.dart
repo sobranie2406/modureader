@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
-import 'package:anx_reader/service/knowledge/knowledge_index_stream.dart';
-import 'package:anx_reader/service/sync/knowledge_index_transfer.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/knowledge_index_stream.dart';
+import 'package:modu_reader/service/sync/knowledge_index_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

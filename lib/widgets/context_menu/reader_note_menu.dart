@@ -1,8 +1,8 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/dao/book_note.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book_note.dart';
-import 'package:anx_reader/widgets/common/axis_flex.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/dao/book_note.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/widgets/common/axis_flex.dart';
 import 'package:flutter/material.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';

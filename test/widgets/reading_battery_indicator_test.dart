@@ -1,4 +1,4 @@
-import 'package:anx_reader/widgets/reading_page/reading_battery_indicator.dart';
+import 'package:modu_reader/widgets/reading_page/reading_battery_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

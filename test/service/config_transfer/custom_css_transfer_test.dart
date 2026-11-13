@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/service/config_transfer/custom_css_transfer.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/config_transfer/custom_css_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

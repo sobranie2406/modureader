@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/providers/ai_providers.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/providers/ai_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

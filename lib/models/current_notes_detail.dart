@@ -1,4 +1,4 @@
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'current_notes_detail.freezed.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:ui' show TextRange;
-import 'package:anx_reader/enums/translation_mode.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/enums/translation_mode.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 import 'reader_translation_session.dart';
 
 /// Ephemeral translation of one saved source page, never an OCR cache revision.

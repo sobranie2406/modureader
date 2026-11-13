@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/security/credential_vault.dart';
+import 'package:modu_reader/service/security/credential_vault.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/models/plugin_network.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/service/plugins/plugin_http_budget.dart';
-import 'package:anx_reader/service/plugins/plugin_http_client.dart';
-import 'package:anx_reader/service/plugins/plugin_json_mapping.dart';
-import 'package:anx_reader/service/plugins/plugin_network_guard.dart';
+import 'package:modu_reader/models/plugin_network.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
+import 'package:modu_reader/service/plugins/plugin_http_client.dart';
+import 'package:modu_reader/service/plugins/plugin_json_mapping.dart';
+import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 JsonPath _path(String raw) => JsonPath.parse(raw, 'test');

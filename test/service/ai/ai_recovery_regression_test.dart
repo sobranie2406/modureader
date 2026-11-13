@@ -3,9 +3,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/ai/ai_history.dart';
-import 'package:anx_reader/service/ai/langchain_runner.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/ai/ai_history.dart';
+import 'package:modu_reader/service/ai/langchain_runner.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:langchain/langchain.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';

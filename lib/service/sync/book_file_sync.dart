@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/sync/sync_client_base.dart';
-import 'package:anx_reader/service/sync/sync_paths.dart';
+import 'package:modu_reader/service/sync/sync_client_base.dart';
+import 'package:modu_reader/service/sync/sync_paths.dart';
 
 /// The directory listing is a hint, not proof that a recently uploaded book
 /// is absent. Some DAV servers return delayed or paginated listings.

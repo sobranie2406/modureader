@@ -1,11 +1,11 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
-import 'package:anx_reader/service/dictionary/local_dictionary.dart';
-import 'package:anx_reader/service/dictionary/online_dictionary.dart';
-import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
-import 'package:anx_reader/widgets/dictionary/dictionary_common.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
+import 'package:modu_reader/service/dictionary/online_dictionary.dart';
+import 'package:modu_reader/service/dictionary/dictionary_preferences.dart';
+import 'package:modu_reader/widgets/dictionary/dictionary_common.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 
 Future<bool> showDictionarySources(
     BuildContext context, List<LocalDictionary> dictionaries) async {

@@ -1,15 +1,15 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/widgets/reading_page/ocr_precache_settings.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/service/ocr/ocr_model_store.dart';
-import 'package:anx_reader/service/ocr/ocr_models.dart';
-import 'package:anx_reader/widgets/common/anx_button.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
-import 'package:anx_reader/widgets/settings/offline_model_picker.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/widgets/reading_page/ocr_precache_settings.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/ocr/ocr_model_store.dart';
+import 'package:modu_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/widgets/common/anx_button.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/widgets/settings/offline_model_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 

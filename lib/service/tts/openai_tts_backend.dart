@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/tts/models/tts_voice.dart';
-import 'package:anx_reader/service/tts/openai_voice_presets.dart';
-import 'package:anx_reader/service/tts/stable_narration.dart';
-import 'package:anx_reader/service/tts/tts_service.dart';
-import 'package:anx_reader/service/tts/tts_service_provider.dart';
-import 'package:anx_reader/service/tts/tts_synthesis_error.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/tts/models/tts_voice.dart';
+import 'package:modu_reader/service/tts/openai_voice_presets.dart';
+import 'package:modu_reader/service/tts/stable_narration.dart';
+import 'package:modu_reader/service/tts/tts_service.dart';
+import 'package:modu_reader/service/tts/tts_service_provider.dart';
+import 'package:modu_reader/service/tts/tts_synthesis_error.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 

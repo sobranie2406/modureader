@@ -1,6 +1,6 @@
-import 'package:anx_reader/dao/reading_round.dart';
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/models/reading_round.dart';
+import 'package:modu_reader/dao/reading_round.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/models/reading_round.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Post-merge reconciliation for synced reading rounds.

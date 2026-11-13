@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/providers/storage_info.dart';
-import 'package:anx_reader/service/ai/ai_history.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/providers/storage_info.dart';
+import 'package:modu_reader/service/ai/ai_history.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';

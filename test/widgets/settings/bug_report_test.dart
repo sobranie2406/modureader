@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:anx_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:anx_reader/page/settings_page/bug_report.dart';
-import 'package:anx_reader/page/settings_page/settings_page.dart';
-import 'package:anx_reader/service/feedback/bug_report.dart';
-import 'package:anx_reader/l10n/app_language.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/page/settings_page/bug_report.dart';
+import 'package:modu_reader/page/settings_page/settings_page.dart';
+import 'package:modu_reader/service/feedback/bug_report.dart';
+import 'package:modu_reader/l10n/app_language.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';

@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/models/selection_toolbar.dart';
-import 'package:anx_reader/service/plugins/handlers/plugin_locale.dart';
-import 'package:anx_reader/service/plugins/plugin_contribution_handler.dart';
-import 'package:anx_reader/service/plugins/plugin_prompt_template.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/service/plugins/handlers/plugin_locale.dart';
+import 'package:modu_reader/service/plugins/plugin_contribution_handler.dart';
+import 'package:modu_reader/service/plugins/plugin_prompt_template.dart';
 import 'package:crypto/crypto.dart';
 
 /// Materialises `selectionAction` contributions as ordinary custom AI

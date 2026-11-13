@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:anx_reader/service/remote_library/library_view_options.dart';
-import 'package:anx_reader/service/remote_library/webdav_library.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/service/remote_library/library_view_options.dart';
+import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -4,12 +4,12 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:anx_reader/service/sync/s3_client.dart';
-import 'package:anx_reader/service/sync/s3_config.dart';
-import 'package:anx_reader/service/sync/s3_signer.dart';
-import 'package:anx_reader/service/sync/row_sync_engine.dart';
-import 'package:anx_reader/service/sync/row_sync_store.dart';
-import 'package:anx_reader/service/sync/immutable_sync_log.dart';
+import 'package:modu_reader/service/sync/s3_client.dart';
+import 'package:modu_reader/service/sync/s3_config.dart';
+import 'package:modu_reader/service/sync/s3_signer.dart';
+import 'package:modu_reader/service/sync/row_sync_engine.dart';
+import 'package:modu_reader/service/sync/row_sync_store.dart';
+import 'package:modu_reader/service/sync/immutable_sync_log.dart';
 import 'row_sync_test.dart' show fixture, noteRow;
 
 Map<String, dynamic> configuration([Map<String, dynamic> extra = const {}]) => {

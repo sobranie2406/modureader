@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/page/settings_page/subpage/log_page.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/service/tts/media_diagnostics.dart';
-import 'package:anx_reader/service/feedback/detailed_runtime_log.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/page/settings_page/subpage/log_page.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/service/tts/media_diagnostics.dart';
+import 'package:modu_reader/service/feedback/detailed_runtime_log.dart';
 import 'package:logging/logging.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/common/app_scroll_behavior.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/common/app_scroll_behavior.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

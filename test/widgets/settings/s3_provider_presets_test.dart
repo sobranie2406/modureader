@@ -1,6 +1,6 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/sync/s3_config.dart';
-import 'package:anx_reader/widgets/settings/s3_settings_dialog.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/sync/s3_config.dart';
+import 'package:modu_reader/widgets/settings/s3_settings_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

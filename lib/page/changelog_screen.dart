@@ -1,11 +1,11 @@
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/utils/changelog.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/utils/get_current_language_code.dart';
-import 'package:anx_reader/widgets/markdown/styled_markdown.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/changelog.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/utils/get_current_language_code.dart';
+import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
 
 /// Changelog screen for showing app updates
 /// Displays version history and new features

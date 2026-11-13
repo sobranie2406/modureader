@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:anx_reader/service/tts/notification_permission.dart';
+import 'package:modu_reader/service/tts/notification_permission.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler/permission_handler.dart';
 

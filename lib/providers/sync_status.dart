@@ -1,13 +1,13 @@
 import 'dart:io';
 
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/sync_status.dart';
-import 'package:anx_reader/providers/sync.dart';
-import 'package:anx_reader/service/sync/webdav_request_policy.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/sync_status.dart';
+import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/service/sync/webdav_request_policy.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'sync_status.g.dart';

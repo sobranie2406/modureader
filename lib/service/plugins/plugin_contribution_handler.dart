@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
 
 /// One contribution type. The host never switches on kind; it looks the
 /// handler up in [PluginContributionRegistry] (decision D9), so new types are

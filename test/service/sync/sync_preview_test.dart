@@ -1,5 +1,5 @@
-import 'package:anx_reader/service/sync/row_sync_record.dart';
-import 'package:anx_reader/service/sync/sync_preview.dart';
+import 'package:modu_reader/service/sync/row_sync_record.dart';
+import 'package:modu_reader/service/sync/sync_preview.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 RowSyncRecord book(String md5,

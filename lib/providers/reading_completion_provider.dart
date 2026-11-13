@@ -1,5 +1,5 @@
-import 'package:anx_reader/dao/book.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'reading_completion_provider.g.dart';

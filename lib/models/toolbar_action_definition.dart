@@ -10,7 +10,7 @@
 /// never be renamed; only added.
 library;
 
-import 'package:anx_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/models/selection_toolbar.dart';
 
 /// Which list an action belongs to; the settings page renders one group each.
 enum ToolbarActionGroup { primary, annotation, template }

@@ -34,7 +34,7 @@ The original audit covered tracked files on the GitHub main branch from `8021c97
 ### Deliberately retained
 
 - `LICENSE`, `NOTICE`, `LICENSES/`, `UPSTREAM.md` and dependencies' own READMEs, copyright and provenance.
-- Internal Dart package name `anx_reader`, old-data migration paths and sanitized stack rules; string matches alone do not justify global replacement.
+- Internal Dart package name `modu_reader`, old-data migration paths and sanitized stack rules; string matches alone do not justify global replacement.
 - The user-requested `fonts.anxcye.com` font service.
 - Real repositories for pinned third-party dependencies, which are not Modu download/feedback destinations.
 - Upstream-scoped maintenance-task protections, without changing existing issue policy.

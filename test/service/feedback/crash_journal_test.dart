@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:anx_reader/service/feedback/crash_journal.dart';
+import 'package:modu_reader/service/feedback/crash_journal.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -25,7 +25,7 @@ void main() {
     CrashJournal.recordError(
         StateError('sk-SECRET private book'),
         StackTrace.fromString(
-            '#0 Reader.open (package:anx_reader/page/reader.dart:10:2)\n'
+            '#0 Reader.open (package:modu_reader/page/reader.dart:10:2)\n'
             '#1 open (/Users/private/SECRET.dart:12)'));
     final stored = File('${root.path}/session.json').readAsStringSync();
     expect(stored, contains('reader.dart:10:2'));

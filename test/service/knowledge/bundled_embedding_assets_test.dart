@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/knowledge/bundled_embedding_assets.dart';
-import 'package:anx_reader/service/knowledge/embedding_model_manifest.dart';
-import 'package:anx_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/bundled_embedding_assets.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';

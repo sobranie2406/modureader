@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/widgets/reading_page/reader_top_actions.dart';
-import 'package:anx_reader/widgets/reading_page/classical_translation_icon.dart';
-import 'package:anx_reader/widgets/settings/classical_translation_settings.dart';
-import 'package:anx_reader/service/translate/classical_translation.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/widgets/reading_page/reader_top_actions.dart';
+import 'package:modu_reader/widgets/reading_page/classical_translation_icon.dart';
+import 'package:modu_reader/widgets/settings/classical_translation_settings.dart';
+import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';

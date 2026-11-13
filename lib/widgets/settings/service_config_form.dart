@@ -1,7 +1,7 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/config/config_item.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/config/config_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';

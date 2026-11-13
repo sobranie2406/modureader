@@ -1,5 +1,5 @@
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
-import 'package:anx_reader/service/book_local_sources.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
 
 class Book {
   int id;

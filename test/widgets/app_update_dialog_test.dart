@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/main.dart' show navigatorKey;
-import 'package:anx_reader/service/update/app_update.dart';
-import 'package:anx_reader/utils/check_update.dart';
-import 'package:anx_reader/widgets/settings/app_update_dialog.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/main.dart' show navigatorKey;
+import 'package:modu_reader/service/update/app_update.dart';
+import 'package:modu_reader/utils/check_update.dart';
+import 'package:modu_reader/widgets/settings/app_update_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

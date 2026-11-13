@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/models/book.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:flutter/material.dart';
 
 class BookCover extends StatelessWidget {

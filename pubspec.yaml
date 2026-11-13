@@ -1,4 +1,4 @@
-name: anx_reader
+name: modu_reader
 description: "Modu: an open-source AI reader derived from Anx Reader and ReadAny."
 publish_to: 'none'
 

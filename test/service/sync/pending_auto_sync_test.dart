@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:anx_reader/service/sync/pending_auto_sync.dart';
+import 'package:modu_reader/service/sync/pending_auto_sync.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

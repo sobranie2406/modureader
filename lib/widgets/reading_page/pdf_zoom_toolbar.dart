@@ -1,4 +1,4 @@
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:pointer_interceptor/pointer_interceptor.dart';

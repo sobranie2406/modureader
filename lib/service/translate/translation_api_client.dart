@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/translate/translation_usage.dart';
-import 'package:anx_reader/utils/log/common.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/translate/translation_usage.dart';
+import 'package:modu_reader/utils/log/common.dart';
 
 enum TranslationApiEngine { baidu, microsoft }
 

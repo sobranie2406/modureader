@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/service/ai/tools/ai_tool_registry.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/service/ai/tools/ai_tool_registry.dart';
 
 import 'base_tool.dart';
 import 'input/book_content_search_input.dart';

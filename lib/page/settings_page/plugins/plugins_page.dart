@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/plugin_manifest.dart';
-import 'package:anx_reader/models/plugin_state.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugin_detail_page.dart';
-import 'package:anx_reader/page/settings_page/plugins/plugin_install_preview.dart';
-import 'package:anx_reader/service/plugins/plugin_host.dart';
-import 'package:anx_reader/widgets/settings/settings_section.dart';
-import 'package:anx_reader/widgets/settings/settings_tile.dart';
-import 'package:anx_reader/widgets/settings/settings_title.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugin_detail_page.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugin_install_preview.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/widgets/settings/settings_section.dart';
+import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/settings/settings_title.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 

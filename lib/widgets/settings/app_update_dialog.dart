@@ -1,13 +1,13 @@
-import 'package:anx_reader/widgets/settings/setting_help_title.dart';
-import 'package:anx_reader/utils/app_motion.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:anx_reader/service/update/app_update.dart';
-import 'package:anx_reader/utils/env_var.dart';
+import 'package:modu_reader/service/update/app_update.dart';
+import 'package:modu_reader/utils/env_var.dart';
 
 Future<void> showAppUpdateDialog(BuildContext context,
         {AppUpdateController? controller}) =>

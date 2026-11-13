@@ -1,12 +1,12 @@
 import 'dart:io';
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/custom_css_profile.dart';
-import 'package:anx_reader/models/document_reading_mode.dart';
-import 'package:anx_reader/service/book_player/document_reading_mode_store.dart';
-import 'package:anx_reader/service/book_player/document_type_store.dart';
-import 'package:anx_reader/service/book_source_format.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/document_reading_mode.dart';
+import 'package:modu_reader/service/book_player/document_reading_mode_store.dart';
+import 'package:modu_reader/service/book_player/document_type_store.dart';
+import 'package:modu_reader/service/book_source_format.dart';
 import 'package:flutter/material.dart';
 
 /// Painting uses cached metadata; legacy conversion detection runs off-isolate.

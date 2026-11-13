@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
 
-import 'package:anx_reader/service/sync/webdav_client.dart';
-import 'package:anx_reader/service/sync/webdav_request_policy.dart';
-import 'package:anx_reader/service/sync/sync_feedback.dart';
+import 'package:modu_reader/service/sync/webdav_client.dart';
+import 'package:modu_reader/service/sync/webdav_request_policy.dart';
+import 'package:modu_reader/service/sync/sync_feedback.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 

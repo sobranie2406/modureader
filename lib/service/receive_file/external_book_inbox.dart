@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:anx_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/book_import_source.dart';
 import 'package:path/path.dart' as p;
 
 /// Accept local documents only; reading links and network URLs are not imports.

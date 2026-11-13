@@ -1,13 +1,13 @@
-import 'package:anx_reader/dao/reading_time.dart';
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/models/reading_round.dart';
-import 'package:anx_reader/providers/reading_round_provider.dart';
-import 'package:anx_reader/service/reading_round_service.dart';
-import 'package:anx_reader/utils/date/convert_seconds.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/widgets/common/async_skeleton_wrapper.dart';
-import 'package:anx_reader/widgets/common/container/filled_container.dart';
+import 'package:modu_reader/dao/reading_time.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/reading_round.dart';
+import 'package:modu_reader/providers/reading_round_provider.dart';
+import 'package:modu_reader/service/reading_round_service.dart';
+import 'package:modu_reader/utils/date/convert_seconds.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/widgets/common/async_skeleton_wrapper.dart';
+import 'package:modu_reader/widgets/common/container/filled_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

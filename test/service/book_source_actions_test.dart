@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book_local_sources.dart';
-import 'package:anx_reader/service/book_source_actions.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book_local_sources.dart';
+import 'package:modu_reader/service/book_source_actions.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 
 void main() {
   late Directory dir;

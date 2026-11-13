@@ -1,6 +1,6 @@
-import 'package:anx_reader/models/user_prompt.dart';
-import 'package:anx_reader/service/ai/readany_skills.dart';
-import 'package:anx_reader/service/ai/reading_skill_registry.dart';
+import 'package:modu_reader/models/user_prompt.dart';
+import 'package:modu_reader/service/ai/readany_skills.dart';
+import 'package:modu_reader/service/ai/reading_skill_registry.dart';
 
 /// Stable, namespaced IDs allow custom and built-in skills to share one order.
 class ReadingSkillEntry {

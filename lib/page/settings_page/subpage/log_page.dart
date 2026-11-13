@@ -1,16 +1,16 @@
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'package:anx_reader/service/feedback/runtime_diagnostics.dart';
-import 'package:anx_reader/service/tts/media_diagnostics.dart';
+import 'package:modu_reader/service/feedback/runtime_diagnostics.dart';
+import 'package:modu_reader/service/tts/media_diagnostics.dart';
 
-import 'package:anx_reader/l10n/generated/L10n.dart';
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/utils/save_file_to_download.dart';
-import 'package:anx_reader/utils/get_path/log_file.dart';
-import 'package:anx_reader/utils/toast/common.dart';
-import 'package:anx_reader/utils/log/common.dart';
-import 'package:anx_reader/utils/log/environment.dart';
+import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/utils/save_file_to_download.dart';
+import 'package:modu_reader/utils/get_path/log_file.dart';
+import 'package:modu_reader/utils/toast/common.dart';
+import 'package:modu_reader/utils/log/common.dart';
+import 'package:modu_reader/utils/log/environment.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

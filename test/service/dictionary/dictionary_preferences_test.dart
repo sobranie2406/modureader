@@ -1,8 +1,8 @@
-import 'package:anx_reader/config/shared_preference_provider.dart';
-import 'package:anx_reader/service/dictionary/dictionary_preferences.dart';
-import 'package:anx_reader/service/dictionary/online_dictionary.dart';
-import 'package:anx_reader/service/dictionary/dictionary_source_registry.dart';
-import 'package:anx_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/dictionary/dictionary_preferences.dart';
+import 'package:modu_reader/service/dictionary/online_dictionary.dart';
+import 'package:modu_reader/service/dictionary/dictionary_source_registry.dart';
+import 'package:modu_reader/service/registry/host_registry.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 

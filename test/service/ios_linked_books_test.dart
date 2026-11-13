@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/book_import_source.dart';
-import 'package:anx_reader/service/ios_linked_books.dart';
-import 'package:anx_reader/utils/get_path/get_base_path.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/ios_linked_books.dart';
+import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

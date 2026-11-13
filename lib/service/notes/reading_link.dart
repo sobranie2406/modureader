@@ -1,5 +1,5 @@
-import 'package:anx_reader/models/book.dart';
-import 'package:anx_reader/service/ocr/document_reflow_store.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 
 /// A versioned, data-only reference. Never includes credentials or file paths.
 class ReadingLink {

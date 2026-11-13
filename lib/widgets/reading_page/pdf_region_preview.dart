@@ -1,15 +1,15 @@
 import 'reader_menu_appearance.dart';
-import 'package:anx_reader/utils/app_motion.dart';
+import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:anx_reader/l10n/modu_strings.dart';
-import 'package:anx_reader/models/document_page_layout.dart';
-import 'package:anx_reader/widgets/reading_page/document_layout_editor.dart';
-import 'package:anx_reader/models/document_enhancement.dart';
-import 'package:anx_reader/widgets/reading_page/document_enhancement_panel.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/models/document_page_layout.dart';
+import 'package:modu_reader/widgets/reading_page/document_layout_editor.dart';
+import 'package:modu_reader/models/document_enhancement.dart';
+import 'package:modu_reader/widgets/reading_page/document_enhancement_panel.dart';
 import 'widget_title.dart';
 import 'package:flutter/material.dart';
 

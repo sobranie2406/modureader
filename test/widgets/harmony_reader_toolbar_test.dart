@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:anx_reader/widgets/reading_page/harmony_reader_toolbar.dart';
+import 'package:modu_reader/widgets/reading_page/harmony_reader_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

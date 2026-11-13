@@ -1,4 +1,4 @@
-import 'package:anx_reader/service/read_only_book_file.dart';
+import 'package:modu_reader/service/read_only_book_file.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:path/path.dart' as p;

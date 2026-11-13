@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:anx_reader/service/eink_refresh.dart';
-import 'package:anx_reader/service/config_transfer/settings_value_validation.dart';
+import 'package:modu_reader/service/eink_refresh.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

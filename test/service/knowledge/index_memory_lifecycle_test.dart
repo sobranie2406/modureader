@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:anx_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,6 +1,6 @@
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
-import 'package:anx_reader/providers/sync.dart';
+import 'package:modu_reader/enums/sync_direction.dart';
+import 'package:modu_reader/enums/sync_trigger.dart';
+import 'package:modu_reader/providers/sync.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
