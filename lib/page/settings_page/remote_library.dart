@@ -1,4 +1,3 @@
-import 'package:anx_reader/widgets/baidu_library_settings.dart';
 import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -96,7 +95,6 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
           child: EinkStaticIndicator(child: CircularProgressIndicator()));
     }
     return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
-      const BaiduLibrarySettings(),
       SettingsSection.content(
         key: const ValueKey('remote-library-settings-frame'),
         title: const Text('WebDAV'),

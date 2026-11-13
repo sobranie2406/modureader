@@ -1,5 +1,3 @@
-import 'package:anx_reader/service/remote_library/baidu_auth.dart';
-import 'package:anx_reader/service/remote_library/baidu_library.dart';
 import 'package:anx_reader/widgets/settings/setting_help_title.dart';
 import 'package:anx_reader/utils/app_motion.dart';
 import 'package:anx_reader/l10n/modu_strings.dart';
@@ -31,9 +29,7 @@ class RemoteLibraryPage extends ConsumerStatefulWidget {
 }
 
 class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
-  RemoteLibrary? _client;
-  BaiduAuth? _baiduAuth;
-  bool _baidu = false;
+  WebdavLibrary? _client;
   Uri? _directory;
   List<LibraryEntry> _entries = [];
   (List<LibraryEntry>, LibraryViewOptions, String)? _visibleKey;
@@ -83,18 +79,11 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       _error = null;
     });
     try {
-      if (_baidu) {
-        final auth = _baiduAuth ??= BaiduAuth();
-        final connected = await auth.restore();
-        if (!mounted) return;
-        if (connected) _client = BaiduLibrary(auth);
-      } else {
-        final connection = await LibraryConnectionStore.load();
-        if (!mounted) return;
-        if (connection != null) {
-          _client = widget.clientFactory?.call(connection) ??
-              WebdavLibrary(connection);
-        }
+      final connection = await LibraryConnectionStore.load();
+      if (!mounted) return;
+      if (connection != null) {
+        _client =
+            widget.clientFactory?.call(connection) ?? WebdavLibrary(connection);
       }
       if (_client == null) {
         setState(() => _loading = false);
@@ -192,7 +181,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   }
 
   Future<bool> _importEntry(
-      LibraryEntry entry, RemoteLibrary client, CancelToken token) async {
+      LibraryEntry entry, WebdavLibrary client, CancelToken token) async {
     final container = ProviderScope.containerOf(context, listen: false);
     Directory? temporary;
     try {
@@ -320,7 +309,6 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
     _listing?.cancel();
     _download?.cancel();
     _client?.close();
-    _baiduAuth?.close();
     super.dispose();
   }
 
@@ -389,31 +377,6 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                   icon: const Icon(Icons.settings_outlined)),
             ]),
         body: Column(children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SegmentedButton<bool>(
-              segments: [
-                const ButtonSegment(
-                    value: false,
-                    label: Text('WebDAV'),
-                    icon: Icon(Icons.folder_outlined)),
-                ButtonSegment(
-                    value: true,
-                    label: Text(t('百度网盘', 'Baidu Netdisk')),
-                    icon: const Icon(Icons.cloud_outlined)),
-              ],
-              selected: {_baidu},
-              onSelectionChanged: _loading || _activeName != null
-                  ? null
-                  : (values) {
-                      setState(() {
-                        _baidu = values.single;
-                        _filter = '';
-                      });
-                      _connect();
-                    },
-            ),
-          ),
           if (root != null)
             Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -506,22 +469,16 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                   Text(
                                       ModuStrings.text(
                                           context,
-                                          _baidu
-                                              ? '连接百度网盘，浏览并下载书籍。'
-                                              : '连接 WebDAV，浏览远程目录并将书籍下载到本地书架。',
-                                          _baidu
-                                              ? 'Connect Baidu Netdisk to browse and download books.'
-                                              : 'Connect WebDAV to browse and import books into your local bookshelf.'),
+                                          '连接 WebDAV，浏览远程目录并将书籍下载到本地书架。',
+                                          'Connect WebDAV to browse and import books into your local bookshelf.'),
                                       textAlign: TextAlign.center),
                                   const SizedBox(height: 16),
                                   FilledButton(
                                       onPressed: _settings,
                                       child: Text(ModuStrings.text(
                                           context,
-                                          _baidu ? '连接百度网盘' : '配置书库 WebDAV',
-                                          _baidu
-                                              ? 'Connect Baidu Netdisk'
-                                              : 'Configure library WebDAV')))
+                                          '配置书库 WebDAV',
+                                          'Configure library WebDAV')))
                                 ]))
                           : visible.isEmpty
                               ? Center(

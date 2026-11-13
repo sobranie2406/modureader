@@ -2,7 +2,7 @@
 
 English · [简体中文](PRIVACY_zh.md) · [Home](README_EN.md) · [Settings guide](docs/SETTINGS.md)
 
-Updated 2026-11-08. This document explains storage and network behavior. Third-party services have their own privacy policies.
+Updated 2026-11-13. This document explains storage and network behavior. Third-party services have their own privacy policies.
 
 ## Local data and scanned books
 
@@ -61,8 +61,6 @@ WebDAV sync runs only after configuration and enablement. Your server receives s
 **Sync API keys** is separate from the WebDAV master switch and off by default. It requires an independent password and encrypts sensitive service settings with AES-256-GCM. The password is not stored in sync data. This does not encrypt all books, notes or the whole database. Disabling the switch does not automatically destroy old cloud data, backups or copies on other devices. Lost passwords cannot recover protected keys.
 
 **Remote library** offers a separate WebDAV connection for browsing/downloading and does not modify that server's library files. Its URL, username and password are kept in local preferences without additional encryption; protect access to your device. With key sync enabled, library configuration can be encrypted using the same independent sync password. Clearing a connection can propagate configuration removal, not book deletion; an unconfigured new device does not proactively clear cloud configuration.
-
-Baidu Netdisk is connected only at the user's request through Baidu's official authorization page; Modu does not receive the Baidu password. The client requests selected directories, file information and book downloads directly from Baidu, without uploading, deleting or modifying Netdisk files. Authorization requests pass through Cloudflare to an AWS Singapore service for code exchange and token refresh; book files do not pass through this service. The service encrypts tokens with AES-GCM and stores hashed device-session identifiers. The client keeps its device session in secure storage and access tokens in memory, outside library sync and settings backups. Authorization tickets expire after five minutes; device sessions expire after 30 days and renew on successful token refresh. Expired records are cleaned during subsequent requests. Disconnecting deletes that device's server session and tokens but keeps downloaded books. The service does not log authorization codes, tokens, request bodies or query strings; Cloudflare and AWS process connection metadata under their own service policies.
 
 Use HTTPS. Basic authentication is not transport encryption; explicitly choosing HTTP risks interception of credentials and content.
 

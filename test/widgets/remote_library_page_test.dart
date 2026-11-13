@@ -1,4 +1,3 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:anx_reader/utils/toast/common.dart';
@@ -371,25 +370,6 @@ void main() {
     expect(find.text('Descending'), findsOneWidget);
     expect(find.text('Date added'), findsOneWidget);
     expect(await names(), ['folder', 'B.pdf']);
-    expect(tester.takeException(), isNull);
-  });
-  testWidgets(
-      'Baidu and WebDAV share Remote while retaining WebDAV configuration',
-      (tester) async {
-    FlutterSecureStorage.setMockInitialValues({});
-    await LibraryConnectionStore.save(const LibraryConnection(
-        url: 'https://example.com/books/', password: 'test-password'));
-    await tester.pumpWidget(ProviderScope(
-        child: MaterialApp(
-            home: RemoteLibraryPage(clientFactory: (_) => _Library()))));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Baidu Netdisk'));
-    await tester.pumpAndSettle();
-    expect(find.text('Connect Baidu Netdisk'), findsOneWidget);
-    expect((await LibraryConnectionStore.load())!.password, 'test-password');
-    await tester.tap(find.text('WebDAV', skipOffstage: false));
-    await tester.pumpAndSettle();
-    expect(find.text('A.epub'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
