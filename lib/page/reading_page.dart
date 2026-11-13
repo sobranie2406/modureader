@@ -933,26 +933,53 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
   }
 
-  Future<void>? _readerWakeSync;
+  Future<void>? _backgroundReadingSave;
+  int _foregroundSyncGeneration = 0;
 
-  /// App-level and reader-level resume notifications share one request.
-  Future<void> syncAndRefreshReading() => _readerWakeSync ??=
-      _syncAndRefreshReading().whenComplete(() => _readerWakeSync = null);
+  Future<void> prepareBackgroundSync() {
+    final saved = _backgroundReadingSave;
+    if (saved != null) return saved;
+    // A cancelled foreground sync cannot refresh the next foreground session.
+    _foregroundSyncGeneration++;
+    return _backgroundReadingSave = _saveBackgroundReading();
+  }
 
-  Future<void> _syncAndRefreshReading() async {
+  Future<void> _saveBackgroundReading() async {
+    _readTimeWatch.stop();
+    final elapsedSeconds = _readTimeWatch.elapsed.inSeconds;
+    final startedAt = _sessionStart;
+    _readTimeWatch.reset();
+    _sessionStart = null;
+    await Future.wait<void>([
+      if (epubPlayerKey.currentState case final reader?)
+        reader.saveReadingProgress(captureVisiblePage: true),
+      if (elapsedSeconds > 5)
+        readingTimeDao.insertReadingTime(
+          ReadingTime(
+            bookId: _book.id,
+            readingTime: elapsedSeconds,
+            round: _book.currentRound,
+          ),
+          startedAt: startedAt,
+        ),
+    ]);
+  }
+
+  Future<void> syncAndRefreshReading() async {
     if (!mounted) return;
+    final generation = _foregroundSyncGeneration;
     final reader = epubPlayerKey.currentState;
     try {
       if (Prefs().webdavStatus && Prefs().autoSync) {
-        await ref.read(syncProvider.notifier).syncData(
-              SyncDirection.both,
-              ref,
-              trigger: SyncTrigger.auto,
-              immediate: true,
+        await ref.read(syncProvider.notifier).syncForLifecycle(
+              background: false,
               savedReading: reader?.saveReadingProgress(),
             );
       }
-      if (mounted && identical(reader, epubPlayerKey.currentState)) {
+      if (mounted &&
+          generation == _foregroundSyncGeneration &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+          identical(reader, epubPlayerKey.currentState)) {
         await reader?.refreshReadingAfterSync(retryOnResume: true);
       }
     } catch (error) {
@@ -968,8 +995,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       unawaited(reader.setTtsBackground(state != AppLifecycleState.resumed));
       if (state == AppLifecycleState.resumed) {
         reader.resumeDocumentOcrCache();
-        // Pull first; only then restore the retained reader and speech cursor.
-        unawaited(syncAndRefreshReading());
       } else {
         unawaited(reader.pauseDocumentOcrCache());
       }
@@ -977,6 +1002,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _updateReadingSync();
     switch (state) {
       case AppLifecycleState.resumed:
+        _backgroundReadingSave = null;
         _refreshReaderHostState();
         if (!_readTimeWatch.isRunning) {
           _readTimeWatch.start();
@@ -993,20 +1019,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         if (state == AppLifecycleState.paused ||
             state == AppLifecycleState.hidden ||
             state == AppLifecycleState.detached) {
-          final elapsedSeconds = _readTimeWatch.elapsed.inSeconds;
-          if (elapsedSeconds > 5) {
-            epubPlayerKey.currentState?.saveReadingProgress();
-            readingTimeDao.insertReadingTime(
-              ReadingTime(
-                bookId: _book.id,
-                readingTime: elapsedSeconds,
-                round: _book.currentRound,
-              ),
-              startedAt: _sessionStart,
-            );
-          }
-          _readTimeWatch.reset();
-          _sessionStart = null;
+          unawaited(prepareBackgroundSync().catchError((Object error) {
+            AnxLog.warning(
+                'Background reading save failed: ${error.runtimeType}');
+          }));
         }
         break;
     }

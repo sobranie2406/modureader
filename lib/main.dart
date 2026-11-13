@@ -1,3 +1,4 @@
+import 'package:anx_reader/service/sync/app_lifecycle_sync.dart';
 import 'package:anx_reader/service/book_local_sources.dart';
 import 'package:anx_reader/utils/toast/common.dart';
 import 'package:anx_reader/service/receive_file/external_book_inbox.dart';
@@ -23,8 +24,6 @@ import 'package:anx_reader/utils/platform_utils.dart';
 
 import 'package:anx_reader/config/shared_preference_provider.dart';
 import 'package:anx_reader/dao/database.dart';
-import 'package:anx_reader/enums/sync_direction.dart';
-import 'package:anx_reader/enums/sync_trigger.dart';
 import 'package:anx_reader/l10n/generated/L10n.dart';
 import 'package:anx_reader/l10n/app_language.dart';
 import 'package:anx_reader/models/window_info.dart';
@@ -284,20 +283,53 @@ class _MyAppState extends ConsumerState<MyApp>
 
   StreamSubscription<List<ConnectivityResult>>? _syncConnectivity;
 
-  void _resumeAutomaticSync() {
-    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+  Future<void>? _foregroundSync;
+
+  Future<void> _resumeAutomaticSync() {
+    final active = _foregroundSync;
+    if (active != null) return active;
+    late final Future<void> request;
+    request = _syncForeground().whenComplete(() {
+      if (identical(_foregroundSync, request)) _foregroundSync = null;
+    });
+    return _foregroundSync = request;
+  }
+
+  Future<void> _syncForeground() async {
+    if (!mounted ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
         !Prefs().webdavStatus ||
-        !Prefs().autoSync) {
+        !Prefs().autoSync ||
+        Prefs().syncPreviewBeforeSync) {
       return;
     }
     final reader = readingPageKey.currentState;
     if (reader != null) {
-      unawaited(reader.syncAndRefreshReading());
+      await reader.syncAndRefreshReading();
       return;
     }
-    unawaited(ref.read(syncProvider.notifier).syncData(SyncDirection.both, null,
-        trigger: SyncTrigger.auto, immediate: true));
+    await ref.read(syncProvider.notifier).syncForLifecycle(background: false);
   }
+
+  late final _lifecycleSync = AppLifecycleSync(
+    pauseAutomatic: () => Sync().pauseAutomaticSync(),
+    synchronize: (background) async {
+      if (!mounted) return;
+      if (background) {
+        // An interrupted foreground request must not swallow the next return.
+        _foregroundSync = null;
+        await ref.read(syncProvider.notifier).syncForLifecycle(
+              background: true,
+              savedReading:
+                  readingPageKey.currentState?.prepareBackgroundSync(),
+            );
+      } else {
+        await _resumeAutomaticSync();
+      }
+    },
+    onError: (error, _) =>
+        AnxLog.warning('Lifecycle sync failed: ${error.runtimeType}'),
+  );
 
   @override
   void initState() {
@@ -311,7 +343,7 @@ class _MyAppState extends ConsumerState<MyApp>
       if (connections.any((value) => value != ConnectivityResult.none) &&
           (!Prefs().onlySyncWhenWifi ||
               connections.contains(ConnectivityResult.wifi))) {
-        _resumeAutomaticSync();
+        unawaited(_resumeAutomaticSync());
       }
     }, onError: (Object error) {
       AnxLog.warning('Sync connectivity monitor failed: ${error.runtimeType}');
@@ -422,15 +454,14 @@ class _MyAppState extends ConsumerState<MyApp>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _themeScheduleTimer?.cancel();
-      Sync().pauseAutomaticSync();
     } else if (state == AppLifecycleState.resumed) {
       _checkThemeSchedule();
       Prefs().refreshLinkedReadTheme();
       if (AnxPlatform.isIOS) {
         Server().start();
       }
-      _resumeAutomaticSync();
     }
+    _lifecycleSync.update(state);
   }
 
   @override

@@ -74,6 +74,8 @@ class Sync extends _$Sync {
   Sync._internal();
 
   bool _syncRunning = false;
+  Completer<void>? _syncIdle;
+  Future<void> _lifecycleSync = Future.value();
   final _localDownloads = LocalBookDownload();
   int _activeDownloads = 0;
   bool get hasActiveTransfers => _syncRunning || _activeDownloads > 0;
@@ -175,7 +177,9 @@ class Sync extends _$Sync {
         Localizations.maybeLocaleOf(context)?.languageCode == 'zh';
   }
 
-  bool get _autoSyncAllowed {
+  bool get _autoSyncAllowed => _automaticSyncAllowed();
+
+  bool _automaticSyncAllowed({bool background = false}) {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     return Prefs().webdavStatus &&
         Prefs().autoSync &&
@@ -183,7 +187,12 @@ class Sync extends _$Sync {
         // preview is enabled every merge has to be started and confirmed by the
         // user, so automatic starts stay paused instead of merging silently.
         !Prefs().syncPreviewBeforeSync &&
-        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+        (background
+            ? lifecycle == AppLifecycleState.hidden ||
+                lifecycle == AppLifecycleState.paused ||
+                lifecycle == AppLifecycleState.inactive ||
+                lifecycle == AppLifecycleState.resumed
+            : lifecycle == null || lifecycle == AppLifecycleState.resumed);
   }
 
   void pauseAutomaticSync() {
@@ -283,12 +292,12 @@ class Sync extends _$Sync {
 
   bool get _isReading => ref.read(currentReadingProvider).isReading;
 
-  Future<bool> _networkReady() async {
+  Future<bool> _networkReady({bool silent = false}) async {
     try {
       return syncNetworkAllowed(await Connectivity().checkConnectivity(),
           onlyWifi: Prefs().onlySyncWhenWifi);
     } catch (error) {
-      if (!_isReading) rethrow;
+      if (!_isReading && !silent) rethrow;
       AnxLog.warning('Sync network check unavailable: ${error.runtimeType}');
       return false;
     }
@@ -301,11 +310,49 @@ class Sync extends _$Sync {
     bool Function()? shouldStart,
     bool immediate = false,
     Future<void>? savedReading,
+  }) =>
+      _runSyncData(direction, ref,
+          trigger: trigger,
+          shouldStart: shouldStart,
+          immediate: immediate,
+          savedReading: savedReading);
+
+  Future<void> syncForLifecycle(
+      {required bool background, Future<void>? savedReading}) {
+    var savedSuccessfully = true;
+    final saved = _pendingSync.request(
+        savedReading: savedReading?.catchError((Object error) {
+      savedSuccessfully = false;
+      AnxLog.warning('Lifecycle progress save failed: ${error.runtimeType}');
+    }));
+    return _lifecycleSync = _lifecycleSync.then((_) async {
+      await saved;
+      if (!savedSuccessfully) return;
+      await _runSyncData(SyncDirection.both, null,
+          immediate: true,
+          recordPending: false,
+          background: background,
+          lifecycleRequest: true);
+    }).catchError((Object error) {
+      AnxLog.warning('Lifecycle sync failed: ${error.runtimeType}');
+    });
+  }
+
+  Future<void> _runSyncData(
+    SyncDirection direction,
+    WidgetRef? ref, {
+    SyncTrigger trigger = SyncTrigger.auto,
+    bool Function()? shouldStart,
+    bool immediate = false,
+    Future<void>? savedReading,
+    bool recordPending = true,
+    bool background = false,
+    bool lifecycleRequest = false,
   }) async {
     if (shouldStart != null && (!shouldStart() || _syncRunning)) return;
     final automatic = trigger == SyncTrigger.auto;
     try {
-      if (automatic && immediate) {
+      if (automatic && immediate && recordPending) {
         await _pendingSync.request(savedReading: savedReading);
       }
       await _pendingSync.ready;
@@ -313,11 +360,18 @@ class Sync extends _$Sync {
       AnxLog.warning('Sync progress save failed: ${error.runtimeType}');
       return;
     }
+    if (lifecycleRequest) {
+      while (_syncRunning) {
+        await _syncIdle!.future;
+      }
+    }
+    bool automaticAllowed() => _automaticSyncAllowed(background: background);
+    Future<bool> networkReady() => _networkReady(silent: lifecycleRequest);
     final scheduledClient = _syncClient;
     final policy =
         scheduledClient is WebdavClient ? scheduledClient.requestPolicy : null;
-    if (automatic && !_autoSyncAllowed) return;
-    if (_isReading && !await _networkReady()) {
+    if (automatic && !automaticAllowed()) return;
+    if ((_isReading || lifecycleRequest) && !await networkReady()) {
       _retryPendingSyncLater();
       return;
     }
@@ -326,7 +380,9 @@ class Sync extends _$Sync {
       await policy?.prepare();
     } catch (error, stack) {
       if (!_isReading) {
-        AnxToast.show(syncFailureMessage(error, chinese: _chineseFeedback));
+        if (!background) {
+          AnxToast.show(syncFailureMessage(error, chinese: _chineseFeedback));
+        }
         _retryPendingSyncLater();
         return;
       }
@@ -343,8 +399,16 @@ class Sync extends _$Sync {
       _readingFeedback.reset();
     }
     if (automatic) {
-      if (!_autoSyncAllowed) return;
+      if (!automaticAllowed()) return;
       if (_syncRunning) {
+        if (lifecycleRequest) {
+          await _syncIdle!.future;
+          return _runSyncData(direction, ref,
+              immediate: immediate,
+              recordPending: false,
+              background: background,
+              lifecycleRequest: true);
+        }
         _pendingAutomatic = true;
         return;
       }
@@ -352,7 +416,7 @@ class Sync extends _$Sync {
       if (immediate) _autoStart.invalidate();
       if (!await _autoStart.wait(
           () =>
-              _autoSyncAllowed &&
+              automaticAllowed() &&
               identical(scheduledClient, _syncClient) &&
               (scheduledClient is! WebdavClient ||
                   identical(policy, scheduledClient.requestPolicy)) &&
@@ -370,10 +434,19 @@ class Sync extends _$Sync {
     }
     // Covers preflight and direction selection as well as byte transfer.
     if (_syncRunning) {
+      if (lifecycleRequest) {
+        await _syncIdle!.future;
+        return _runSyncData(direction, ref,
+            immediate: immediate,
+            recordPending: false,
+            background: background,
+            lifecycleRequest: true);
+      }
       if (!automatic) _pendingManualDirection = direction;
       return;
     }
     _syncRunning = true;
+    _syncIdle = Completer<void>();
     final diagnosticTimer = Stopwatch()..start();
     RuntimeDiagnostics.record(RuntimeEvent.syncStart);
     _retryAutomatic?.cancel();
@@ -389,11 +462,11 @@ class Sync extends _$Sync {
           identical(scheduledClient, _syncClient) &&
           listEquals(identity, scheduledClient?.syncIdentity ?? []) &&
           (!automatic ||
-              (_autoSyncAllowed && generation == _autoStart.generation));
+              (automaticAllowed() && generation == _autoStart.generation));
       final completed = await _readingRetry.run(
         enabled: stillAllowed,
         reading: () => _isReading,
-        networkReady: _networkReady,
+        networkReady: networkReady,
         policyDelay: () =>
             policy?.automaticStartDelay(immediate: true) ?? Duration.zero,
         synchronize: () async {
@@ -406,7 +479,9 @@ class Sync extends _$Sync {
           await policy?.prepare();
           if (!stillAllowed()) return false;
           return _syncData(direction, ref,
-              trigger: trigger, shouldStart: stillAllowed);
+              trigger: trigger,
+              shouldStart: stillAllowed,
+              background: background);
         },
       );
       if (completed) await _pendingSync.acknowledge(pendingRevision);
@@ -431,15 +506,20 @@ class Sync extends _$Sync {
           stack);
       // Intentional pause/cancellation is not a failed synchronization.
       // Reader failures reach here only after the bounded reconciliation retries.
-      if (automatic && (!_autoSyncAllowed || !(shouldStart?.call() ?? true))) {
+      if (automatic &&
+          (!automaticAllowed() || !(shouldStart?.call() ?? true))) {
         return;
       }
-      if ((!_isReading || await _networkReady()) &&
+      if (!background &&
+          (!_isReading || await networkReady()) &&
           _readingFeedback.failure(reading: _isReading)) {
         AnxToast.show(syncFailureMessage(e, chinese: _chineseFeedback));
       }
     } finally {
       _syncRunning = false;
+      final idle = _syncIdle;
+      _syncIdle = null;
+      idle?.complete();
       changeState(state.copyWith(isSyncing: false));
       final pending = _pendingManualDirection;
       final pendingAutomatic = _pendingAutomatic;
@@ -461,6 +541,7 @@ class Sync extends _$Sync {
     WidgetRef? ref, {
     SyncTrigger trigger = SyncTrigger.auto,
     bool Function()? shouldStart,
+    bool background = false,
   }) async {
     if (trigger == SyncTrigger.auto && !Prefs().autoSync) {
       return false;
@@ -489,8 +570,9 @@ class Sync extends _$Sync {
           (shouldStart?.call() ?? true) &&
           Prefs().webdavStatus &&
           (trigger != SyncTrigger.auto ||
-              (_autoSyncAllowed && generation == _autoStart.generation)),
-      networkReady: _networkReady,
+              (_automaticSyncAllowed(background: background) &&
+                  generation == _autoStart.generation)),
+      networkReady: () => _networkReady(silent: background),
       probe: client.ping,
     )) {
       return false;
@@ -594,7 +676,8 @@ class Sync extends _$Sync {
         AnxToast.show(_previewSummary(_lastPreview!));
       } else if (!hasPendingChanges &&
           _readingFeedback.success(
-              reading: _isReading, enabled: Prefs().syncCompletedToast)) {
+              reading: _isReading,
+              enabled: Prefs().syncCompletedToast && !background)) {
         AnxToast.show(syncSuccessMessage(chinese: _chineseFeedback));
       }
       return !hasPendingChanges;

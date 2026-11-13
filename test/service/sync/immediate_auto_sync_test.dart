@@ -37,6 +37,8 @@ void main() {
   var responseStatus = 503;
   var disconnectOnRequest = false;
   var network = ['wifi'];
+  final responseGates = <int, Completer<void>>{};
+  var activeRequests = 0, maximumActiveRequests = 0;
   const connectivity = MethodChannel('dev.fluttercommunity.plus/connectivity');
 
   setUpAll(() => container = ProviderContainer());
@@ -47,6 +49,8 @@ void main() {
     requests = 0;
     responseStatus = 503;
     disconnectOnRequest = false;
+    responseGates.clear();
+    activeRequests = maximumActiveRequests = 0;
     container.read(currentReadingProvider.notifier).finish();
     network = ['wifi'];
     directory = await Directory.systemTemp.createTemp('modu-auto-sync-');
@@ -55,10 +59,16 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       requests++;
+      activeRequests++;
+      if (activeRequests > maximumActiveRequests) {
+        maximumActiveRequests = activeRequests;
+      }
+      await responseGates[requests]?.future;
       // Exercise the real provider and transport without creating a cloud library.
       request.response.statusCode = responseStatus;
       if (disconnectOnRequest) network = ['none'];
       await request.response.close();
+      activeRequests--;
     });
     SharedPreferences.setMockInitialValues({
       'webdavStatus': true,
@@ -165,5 +175,120 @@ void main() {
     await result;
     expect(requests, 0);
     expect(PendingAutoSync(() => Prefs().prefs).pending, true);
+  });
+
+  test('background lifecycle waits for saved progress and probes while paused',
+      () async {
+    responseStatus = 405;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    final saved = Completer<void>();
+    final result =
+        sync.syncForLifecycle(background: true, savedReading: saved.future);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(requests, 0);
+    saved.complete();
+    await result.timeout(const Duration(seconds: 1));
+    expect(requests, 1);
+    expect(container.read(syncProvider).isSyncing, false);
+    expect(PendingAutoSync(() => Prefs().prefs).pending, true);
+  });
+
+  for (final background in [false, true]) {
+    for (final disabled in ['webdavStatus', 'autoSync', 'preview']) {
+      test('lifecycle background=$background obeys $disabled', () async {
+        binding.handleAppLifecycleStateChanged(
+            background ? AppLifecycleState.paused : AppLifecycleState.resumed);
+        if (disabled == 'webdavStatus') {
+          await Prefs().prefs.setBool('webdavStatus', false);
+        }
+        if (disabled == 'autoSync') Prefs().autoSync = false;
+        if (disabled == 'preview') Prefs().syncPreviewBeforeSync = true;
+        final saved = Completer<void>();
+        var finished = false;
+        final result = sync
+            .syncForLifecycle(
+                background: background, savedReading: saved.future)
+            .then((_) => finished = true);
+        await Future<void>.delayed(Duration.zero);
+        expect(finished, false);
+        saved.complete();
+        await result;
+        expect(requests, 0);
+      });
+    }
+    for (final connection in ['none', 'mobile']) {
+      test('lifecycle background=$background silently defers $connection',
+          () async {
+        binding.handleAppLifecycleStateChanged(
+            background ? AppLifecycleState.paused : AppLifecycleState.resumed);
+        Prefs().onlySyncWhenWifi = true;
+        network = [connection];
+        await sync.syncForLifecycle(background: background);
+        expect(requests, 0);
+        expect(PendingAutoSync(() => Prefs().prefs).pending, true);
+      });
+    }
+  }
+
+  test('disabled lifecycle still waits for failed reading writes safely',
+      () async {
+    Prefs().autoSync = false;
+    final saved = Completer<void>();
+    var finished = false;
+    final result = sync
+        .syncForLifecycle(background: true, savedReading: saved.future)
+        .then((_) => finished = true);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(finished, false);
+    saved.completeError(StateError('fixture write failure'));
+    await result;
+    expect(finished, true);
+    expect(requests, 0);
+  });
+
+  test('lifecycle requests wait for active sync and their own queued execution',
+      () async {
+    responseStatus = 405;
+    for (var i = 1; i <= 3; i++) {
+      responseGates[i] = Completer<void>();
+    }
+    Future<void> waitForRequest(int count) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 2));
+      while (requests < count && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+      }
+      expect(requests, count);
+    }
+
+    final existing = sync.syncData(SyncDirection.both, null, immediate: true);
+    await waitForRequest(1);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    sync.pauseAutomaticSync();
+    var backgroundFinished = false, foregroundFinished = false;
+    final background = sync
+        .syncForLifecycle(background: true)
+        .then((_) => backgroundFinished = true);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(requests, 1);
+    expect(backgroundFinished, false);
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final foreground = sync
+        .syncForLifecycle(background: false)
+        .then((_) => foregroundFinished = true);
+    responseGates[1]!.complete();
+    await existing;
+    await waitForRequest(2);
+    expect(backgroundFinished, false);
+    expect(foregroundFinished, false);
+    responseGates[2]!.complete();
+    await background;
+    await waitForRequest(3);
+    expect(backgroundFinished, true);
+    expect(foregroundFinished, false);
+    responseGates[3]!.complete();
+    await foreground;
+    expect(foregroundFinished, true);
+    expect(maximumActiveRequests, 1);
   });
 }

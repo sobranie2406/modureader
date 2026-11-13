@@ -217,33 +217,39 @@ void main() {
     expect(isTemporarySyncError(responseError(503)), isTrue);
   });
 
-  test('lifecycle sync wiring starts on resume rather than on pause', () {
+  test('lifecycle sync is global and waits for reader writes before refresh',
+      () {
     final source = File('lib/main.dart').readAsStringSync();
-    final lifecycle = source.substring(
-        source.indexOf('Future<void> didChangeAppLifecycleState'),
-        source.indexOf('Widget build(BuildContext context)',
-            source.indexOf('Future<void> didChangeAppLifecycleState')));
-    final split = lifecycle.split('state == AppLifecycleState.resumed');
-    expect(split.first, contains('pauseAutomaticSync()'));
-    expect(split.first, isNot(contains('.syncData(')));
-    expect(split.last, contains('_resumeAutomaticSync()'));
+    expect(source, contains('_lifecycleSync.update(state)'));
+    expect(
+        source, contains('pauseAutomatic: () => Sync().pauseAutomaticSync()'));
+    expect(
+        source,
+        matches(RegExp(
+            r'savedReading:\s*readingPageKey\.currentState\?\.prepareBackgroundSync\(\)')));
     final resume = source.substring(
-        source.indexOf('void _resumeAutomaticSync()'),
-        source.indexOf(
-            '@override', source.indexOf('void _resumeAutomaticSync()')));
+        source.indexOf('Future<void> _resumeAutomaticSync()'),
+        source.indexOf('late final _lifecycleSync'));
     expect(resume, contains('AppLifecycleState.resumed'));
-    expect(resume, contains('immediate: true'));
+    expect(resume, contains('Prefs().syncPreviewBeforeSync'));
     expect(resume, contains('Prefs().autoSync'));
     expect(resume, contains('reader.syncAndRefreshReading()'));
     final reader = File('lib/page/reading_page.dart').readAsStringSync();
     final wake = reader.substring(
-        reader.indexOf('Future<void> _syncAndRefreshReading()'),
+        reader.indexOf('Future<void> syncAndRefreshReading()'),
         reader.indexOf('@override',
-            reader.indexOf('Future<void> _syncAndRefreshReading()')));
-    expect(wake.indexOf('await ref.read(syncProvider.notifier).syncData('),
+            reader.indexOf('Future<void> syncAndRefreshReading()')));
+    expect(
+        wake.indexOf('await ref.read(syncProvider.notifier).syncForLifecycle('),
         lessThan(wake.indexOf('await reader?.refreshReadingAfterSync(')));
     expect(wake, contains('savedReading: reader?.saveReadingProgress()'));
-    expect(reader, contains('unawaited(syncAndRefreshReading())'));
+    expect(reader, isNot(contains('unawaited(syncAndRefreshReading())')));
+    final save = reader.substring(
+        reader.indexOf('Future<void> _saveBackgroundReading()'),
+        reader.indexOf('Future<void> syncAndRefreshReading()'));
+    expect(save, contains('await Future.wait<void>'));
+    expect(save, contains('saveReadingProgress(captureVisiblePage: true)'));
+    expect(save, contains('readingTimeDao.insertReadingTime('));
     final network = source.substring(source.indexOf('_syncConnectivity ='),
         source.indexOf('@override', source.indexOf('_syncConnectivity =')));
     expect(network, contains('_resumeAutomaticSync()'));
