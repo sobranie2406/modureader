@@ -479,10 +479,38 @@ void main() {
     expect(source, isNot(contains('determineSyncDirection(')));
     expect(
         source, isNot(contains('await client.remove(SyncPaths.data(file))')));
-    expect(
-        source,
-        contains(RegExp(
-            r'if \(_syncRunning\) \{\s*if \(!automatic\) _pendingManualDirection = direction;\s*return;')));
+    final runnerStart = source.indexOf('  Future<void> _runSyncData(');
+    final runnerEnd = source.indexOf('  Future<bool> _syncData(', runnerStart);
+    expect(runnerStart, greaterThan(0));
+    expect(runnerEnd, greaterThan(runnerStart));
+    final runner = source.substring(runnerStart, runnerEnd);
+    String compact(String text) => text.replaceAll(RegExp(r'\s+'), '');
+    expect(compact(runner), contains(compact('''
+      if (_syncRunning) {
+        if (lifecycleRequest) {
+          await _syncIdle!.future;
+          return _runSyncData(direction, ref,
+              immediate: immediate,
+              recordPending: false,
+              background: background,
+              lifecycleRequest: true);
+        }
+        if (!automatic) _pendingManualDirection = direction;
+        return;
+      }
+    ''')));
+    expect(compact(runner), contains(compact('''
+      if (pending != null) {
+        unawaited(syncData(pending, null, trigger: SyncTrigger.manual));
+      }
+    ''')));
+    expect(runner, contains('_syncIdle = Completer<void>();'));
+    expect(runner, contains('idle?.complete();'));
+    final entries = source.substring(
+        source.indexOf('  Future<void> syncData('), runnerStart);
+    expect(entries, contains('_runSyncData(direction, ref,'));
+    expect(entries, contains('_runSyncData(SyncDirection.both, null,'));
+    expect(entries, contains('lifecycleRequest: true'));
   });
 
   test(
@@ -707,8 +735,8 @@ void main() {
         contains('if (hasPendingChanges) await _pendingSync.request();'));
     expect(
         source,
-        matches(RegExp(
-            r'!hasPendingChanges &&\s+_readingFeedback\.success\(')));
+        matches(
+            RegExp(r'!hasPendingChanges &&\s+_readingFeedback\.success\(')));
     expect(source, contains('return !hasPendingChanges;'));
     expect(
         source,
