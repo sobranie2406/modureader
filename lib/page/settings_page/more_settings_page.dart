@@ -268,9 +268,25 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
                       },
                     ),
                   ),
-                const FilledContainer(
-                  margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: About(leadingColor: true),
+                FilledContainer(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: About(
+                    leadingColor: true,
+                    selected: !isMobile && selectedIndex == settings.length,
+                    onTap: isMobile
+                        ? null
+                        : () => setDetail(
+                              SettingsPageBody(
+                                title: L10n.of(context).appAbout,
+                                titleBuilder: (context) =>
+                                    L10n.of(context).appAbout,
+                                isMobile: false,
+                                sections: const AboutSettings(),
+                              ),
+                              settings.length,
+                            ),
+                  ),
                 ),
               ];
 

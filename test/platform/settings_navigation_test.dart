@@ -95,7 +95,7 @@ void main() {
     expect(sync, contains('webdavSwitch(context, setState, ref)'));
     expect(settings, isNot(contains('IAPPage')));
 
-    final aboutIndex = settings.indexOf('About(leadingColor: true)');
+    final aboutIndex = RegExp(r'child:\s*About\(').firstMatch(settings)!.start;
     final developerIndex = settings.indexOf("const Text('Developer Options')");
     expect(aboutIndex, greaterThan(developerIndex));
   });
