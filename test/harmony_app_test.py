@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
@@ -16,7 +17,7 @@ class AppCompatibilityTest(unittest.TestCase):
         for relative in ('lib/service/initialization_check.dart',
                          'lib/page/settings_page/advanced.dart'):
             source = (ROOT / relative).read_text()
-            self.assertEqual(source.count('showCupertinoSheet('), 1)
+            self.assertEqual(len(re.findall(r'\bshowCupertinoSheet(?:<[^>]+>)?\(', source)), 1)
             self.assertEqual(ANCHOR_COUNTS[relative], 1)
             self.assertNotIn('OnboardingScreen', source)
 
@@ -61,6 +62,61 @@ class AppCompatibilityTest(unittest.TestCase):
             if 'onReorderItem:' in path.read_text():
                 self.assertIn(str(path.relative_to(ROOT)), PATCHES)
                 self.assertNotIn('onReorderItem:', edits[path])
+
+    def test_all_current_sheet_callbacks_have_an_adapter(self):
+        edits = plan(ROOT)
+        for path in (ROOT / 'lib').rglob('*.dart'):
+            if 'scrollableBuilder:' in path.read_text():
+                self.assertIn(str(path.relative_to(ROOT)), PATCHES)
+                self.assertNotIn('scrollableBuilder:', edits[path])
+
+    def test_changelog_sheet_retains_versions_and_one_time_dismissal(self):
+        path = ROOT / 'lib/service/initialization_check.dart'
+        adapted = plan(ROOT)[path]
+        self.assertIn('showCupertinoSheet<void>(', adapted)
+        self.assertIn('builder: (sheetContext) => ChangelogScreen(', adapted)
+        self.assertIn('lastVersion: previous,', adapted)
+        self.assertIn('currentVersion: current,', adapted)
+        self.assertIn('onComplete: () => Navigator.pop(sheetContext),', adapted)
+        self.assertIn('await Prefs().saveLastAppVersion(current);', adapted)
+        self.assertIn('await dismissed;', adapted)
+
+    def test_real_source_install_is_confined_to_disposable_checkout(self):
+        originals = {name: (ROOT / name).read_bytes() for name in PATCHES}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            for relative, data in originals.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            env = {'GITHUB_ACTIONS': 'true', 'GITHUB_WORKSPACE': str(root)}
+            with patch.dict(os.environ, env), patch('sys.platform', 'linux'):
+                install(root)
+                for relative, (before, after) in PATCHES.items():
+                    self.assertEqual((root / relative).read_text(),
+                                     originals[relative].decode().replace(before, after))
+                with self.assertRaises(ValueError):
+                    install(root)
+        for relative, data in originals.items():
+            self.assertEqual((ROOT / relative).read_bytes(), data)
+
+    def test_changed_changelog_callback_still_fails_before_any_writes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            for relative, (before, _) in PATCHES.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(before * ANCHOR_COUNTS.get(relative, 1))
+            path = root / 'lib/service/initialization_check.dart'
+            path.write_text(path.read_text().replace('currentVersion: current,',
+                                                    'currentVersion: changed,'))
+            originals = {p: p.read_bytes() for p in root.rglob('*.dart')}
+            env = {'GITHUB_ACTIONS': 'true', 'GITHUB_WORKSPACE': str(root)}
+            with patch.dict(os.environ, env), patch('sys.platform', 'linux'):
+                with self.assertRaisesRegex(ValueError, 'reviewed API anchors'):
+                    install(root)
+            for path, data in originals.items():
+                self.assertEqual(path.read_bytes(), data)
 
     def test_old_to_new_index_normalization_for_all_moves(self):
         for count in range(1, 12):

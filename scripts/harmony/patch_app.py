@@ -20,8 +20,16 @@ PATCHES = {
         'scrollableBuilder: (BuildContext context, ScrollController controller) {',
         'builder: (BuildContext context) {'),
     'lib/service/initialization_check.dart': (
-        'scrollableBuilder: (BuildContext context, ScrollController controller) {',
-        'builder: (BuildContext context) {'),
+        'scrollableBuilder: (sheetContext, controller) => ChangelogScreen(\n'
+        '          lastVersion: previous,\n'
+        '          currentVersion: current,\n'
+        '          onComplete: () => Navigator.pop(sheetContext),\n'
+        '        ),',
+        'builder: (sheetContext) => ChangelogScreen(\n'
+        '          lastVersion: previous,\n'
+        '          currentVersion: current,\n'
+        '          onComplete: () => Navigator.pop(sheetContext),\n'
+        '        ),'),
     'lib/page/settings_page/advanced.dart': (
         'scrollableBuilder: (BuildContext context, ScrollController controller) {',
         'builder: (BuildContext context) {'),
