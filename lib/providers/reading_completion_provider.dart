@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -8,11 +9,12 @@ part 'reading_completion_provider.g.dart';
 class ReadingCompletion extends _$ReadingCompletion {
   @override
   Future<List<Book>> build() async {
+    ref.watch(privateLibraryRevisionProvider);
     return _fetch();
   }
 
   Future<List<Book>> _fetch() async {
-    final books = await bookDao.selectNotDeleteBooks();
+    final books = await bookDao.selectNotDeleteBooks(visibleOnly: true);
     final filtered = books
         .where(
           (book) =>

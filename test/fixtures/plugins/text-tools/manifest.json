@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.text-tools",
+  "version": "1.0.0",
+  "name": {"zh-CN": "文字整理", "en": "Text cleanup"},
+  "description": {"zh-CN": "整理所选文字的空格和换行。", "en": "Tidy spaces and line breaks in selected text."},
+  "author": {"name": "Modu"},
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": ["script:run", "ui:selection-action"],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "clean-text",
+      "name": {"zh-CN": "整理文字", "en": "Clean up text"},
+      "entry": "main.js",
+      "surface": "selection",
+      "scope": "selection"
+    }
+  ],
+  "settings": [
+    {"key": "trim_lines", "type": "toggle", "label": {"zh-CN": "去除行首尾空格", "en": "Trim each line"}, "defaultValue": true}
+  ]
+}

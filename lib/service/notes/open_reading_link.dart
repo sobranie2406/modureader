@@ -43,7 +43,7 @@ Future<void> openReadingLink(
       await windowManager.focus();
     }
     final link = ReadingLink.parse(raw);
-    final books = await bookDao.selectBooks(includeDeleted: false);
+    final books = await bookDao.selectBooks(includeDeleted: false, visibleOnly: true);
     final matches = link.matches(books);
     if (!context.mounted) return;
     if (matches.isEmpty) {

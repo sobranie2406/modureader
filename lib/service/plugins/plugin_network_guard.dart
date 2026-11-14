@@ -47,8 +47,7 @@ class PluginNetworkGuard {
   }) async {
     _validateShape(uri, network);
     final addresses = await _resolve(uri.host);
-    return PluginGuardResult(
-        uri: uri, addresses: addresses, headers: headers);
+    return PluginGuardResult(uri: uri, addresses: addresses, headers: headers);
   }
 
   void _validateShape(Uri uri, PluginNetwork network) {
@@ -126,25 +125,29 @@ class PluginNetworkGuard {
   }
 
   static bool _isPublicV6(List<int> bytes) {
-    // ::/128 unspecified and ::1/128 loopback
-    if (bytes.take(15).every((byte) => byte == 0)) return false;
     // IPv4-mapped ::ffff:a.b.c.d — re-check the embedded address, so
     // ::ffff:127.0.0.1 is rejected.
-    final isMapped =
-        bytes.take(10).every((byte) => byte == 0) &&
-            bytes[10] == 0xff &&
-            bytes[11] == 0xff;
+    final isMapped = bytes.take(10).every((byte) => byte == 0) &&
+        bytes[10] == 0xff &&
+        bytes[11] == 0xff;
     if (isMapped) return _isPublicV4(bytes.sublist(12));
-    if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80) return false; // fe80::/10
-    if ((bytes[0] & 0xfe) == 0xfc) return false; // fc00::/7 unique local
-    if (bytes[0] == 0xff) return false; // multicast
-    // 64:ff9b::/96 NAT64 and 2001:db8::/32 documentation are not useful here.
-    if (bytes[0] == 0x00 && bytes[1] == 0x64 && bytes[2] == 0xff &&
-        bytes[3] == 0x9b) {
+    // Only native global unicast (2000::/3), never local/translation space.
+    if ((bytes[0] & 0xe0) != 0x20) return false;
+    if (bytes[0] == 0x20 && bytes[1] == 0x02) return false; // 6to4
+    if (bytes[0] == 0x20 &&
+        bytes[1] == 0x01 &&
+        bytes[2] == 0 &&
+        bytes[3] == 0) {
+      return false; // Teredo can embed an otherwise forbidden IPv4 target.
+    }
+    if (bytes[0] == 0x20 &&
+        bytes[1] == 0x01 &&
+        bytes[2] == 0x0d &&
+        bytes[3] == 0xb8) {
       return false;
     }
-    if (bytes[0] == 0x20 && bytes[1] == 0x01 &&
-        bytes[2] == 0x0d && bytes[3] == 0xb8) {
+    // Documentation allocations: 2001:db8::/32 above and 3fff::/20.
+    if (bytes[0] == 0x3f && bytes[1] == 0xff && (bytes[2] & 0xf0) == 0) {
       return false;
     }
     return true;

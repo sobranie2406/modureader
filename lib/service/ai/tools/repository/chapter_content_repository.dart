@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/providers/chapter_content_bridge.dart';
 import 'package:modu_reader/providers/current_reading.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +24,9 @@ class ChapterContentRepository {
     int? maxCharacters,
   }) async {
     final readingState = ref.read(currentReadingProvider);
-    if (!readingState.isReading) {
+    if (!readingState.isReading ||
+        readingState.book == null ||
+        !PrivateLibrary.instance.canRead(readingState.book!)) {
       throw StateError('No active reading session.');
     }
 
@@ -34,6 +37,9 @@ class ChapterContentRepository {
 
     final limit = _resolveLimit(maxCharacters);
     final content = await handlers.fetchCurrentChapter(maxCharacters: limit);
+    if (!PrivateLibrary.instance.canRead(readingState.book!)) {
+      throw StateError('Book unavailable');
+    }
     return _sanitizeContent(content, limit);
   }
 
@@ -48,7 +54,9 @@ class ChapterContentRepository {
     }
 
     final readingState = ref.read(currentReadingProvider);
-    if (!readingState.isReading) {
+    if (!readingState.isReading ||
+        readingState.book == null ||
+        !PrivateLibrary.instance.canRead(readingState.book!)) {
       throw StateError('No active reading session.');
     }
 
@@ -62,6 +70,9 @@ class ChapterContentRepository {
       normalizedHref,
       maxCharacters: limit,
     );
+    if (!PrivateLibrary.instance.canRead(readingState.book!)) {
+      throw StateError('Book unavailable');
+    }
     return _sanitizeContent(content, limit);
   }
 

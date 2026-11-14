@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 // Host lifecycle fixtures are intentionally not production-approved packages.
 // Production trust enforcement is tested separately, including the real sample.
 class FixturePluginTrust extends PluginTrust {
-  const FixturePluginTrust();
+  FixturePluginTrust();
 
   @override
   Future<void> verify(Directory directory, String id, String version) async {}

@@ -20,7 +20,7 @@ void main() {
   late PluginHost host;
 
   PluginHost createHost() => PluginHost(
-        trust: const FixturePluginTrust(),
+        trust: FixturePluginTrust(),
         paths: paths,
         appVersionResolver: () async => '1.3.1+10152',
       );

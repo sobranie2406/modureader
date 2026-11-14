@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.dictionary-transform",
+  "version": "1.0.0",
+  "name": {
+    "zh-CN": "查词预处理",
+    "en": "Dictionary word forms"
+  },
+  "description": {
+    "zh-CN": "原词未命中时，尝试英语词形、法语前缀和自定义正则生成的候选词。",
+    "en": "Try English word forms, French prefixes and custom regex candidates after an exact miss."
+  },
+  "author": {
+    "name": "Modu"
+  },
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": [
+    "script:run",
+    "dictionary:transform"
+  ],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "word-forms",
+      "name": {
+        "zh-CN": "查词预处理",
+        "en": "Lookup word forms"
+      },
+      "entry": "main.js",
+      "surface": "dictionary",
+      "scope": "selection"
+    }
+  ],
+  "settings": [
+    {
+      "key": "english",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "英语常见词形",
+        "en": "Common English forms"
+      },
+      "defaultValue": true
+    },
+    {
+      "key": "french",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "去除法语省音前缀",
+        "en": "Strip French elision prefixes"
+      },
+      "defaultValue": true
+    },
+    {
+      "key": "rules",
+      "type": "text",
+      "label": {
+        "zh-CN": "自定义正则规则（JSON）",
+        "en": "Custom regex rules (JSON)"
+      },
+      "defaultValue": "[]"
+    }
+  ]
+}

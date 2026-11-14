@@ -1,3 +1,5 @@
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/models/book.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -42,6 +44,9 @@ enum AiChatScope {
 
 @Riverpod(keepAlive: true)
 class AiChat extends _$AiChat {
+  Book? _privateSourceBook;
+  bool _privateConversation = false;
+  bool _restoredHistory = false;
   String? _currentSessionId;
   ReadingRequestSnapshot? _lastReadingRequest;
   String? _historyKey;
@@ -51,6 +56,34 @@ class AiChat extends _$AiChat {
   FutureOr<List<ChatMessage>> build(AiChatScope scope) async {
     _scope = scope;
     _currentSessionId = null;
+    void privacyChanged() {
+      final source = _privateSourceBook;
+      if (!_privateConversation &&
+          ((source != null && PrivateLibrary.instance.isPrivate(source)) ||
+              (_scope == AiChatScope.library &&
+                  PrivateLibrary.instance.enabled &&
+                  PrivateLibrary.instance.hasPrivateBooks))) {
+        _privateConversation = true;
+        final id = _currentSessionId;
+        if (id != null) {
+          unawaited(
+              PrivateLibrary.instance.protectHistory(id).catchError((_) {}));
+        }
+      }
+      if ((source != null && !PrivateLibrary.instance.canRead(source)) ||
+          (_currentSessionId != null &&
+              !PrivateLibrary.instance.canReadHistory(_currentSessionId!)) ||
+          (_privateConversation && !PrivateLibrary.instance.unlocked) ||
+          (_restoredHistory &&
+              PrivateLibrary.instance.hasPrivateBooks &&
+              PrivateLibrary.instance.enabled &&
+              !PrivateLibrary.instance.unlocked)) {
+        clear();
+      }
+    }
+
+    PrivateLibrary.instance.addListener(privacyChanged);
+    ref.onDispose(() => PrivateLibrary.instance.removeListener(privacyChanged));
     return List<ChatMessage>.empty();
   }
 
@@ -83,6 +116,25 @@ class AiChat extends _$AiChat {
     String Function(String)? responseFilter,
     CancelableLangchainRunner? requestRunner,
   }) async* {
+    final accessBook = widgetRef.read(currentReadingProvider).book;
+    // Library tools can include private sources without one current book.
+    _privateConversation = _privateConversation ||
+        (_scope == AiChatScope.library
+            ? PrivateLibrary.instance.enabled &&
+                PrivateLibrary.instance.hasPrivateBooks
+            : accessBook != null &&
+                PrivateLibrary.instance.isPrivate(accessBook));
+    _privateSourceBook = _scope != AiChatScope.library ? accessBook : null;
+    _restoredHistory = false;
+    void checkAccess() {
+      if (_scope != AiChatScope.library &&
+          accessBook != null &&
+          !PrivateLibrary.instance.canRead(accessBook)) {
+        throw StateError('Book unavailable');
+      }
+    }
+
+    checkAccess();
     final sessionId = _ensureSessionId();
     final providers = widgetRef.read(aiProvidersProvider.notifier);
     final selectedProvider = serviceIdentifier == null
@@ -241,6 +293,7 @@ class AiChat extends _$AiChat {
           : [ChatMessage.system(knowledgeContext), ...messages];
     }
 
+    checkAccess();
     if (requestRunner?.isCancelled == true || _currentSessionId != sessionId) {
       return;
     }
@@ -288,7 +341,8 @@ class AiChat extends _$AiChat {
       historyKey: key,
     );
 
-    await historyNotifier.upsert(draftEntry);
+    if (!_privateConversation) await historyNotifier.upsert(draftEntry);
+    checkAccess();
     if (requestRunner?.isCancelled == true || _currentSessionId != sessionId) {
       return;
     }
@@ -297,6 +351,7 @@ class AiChat extends _$AiChat {
     state = AsyncData(updatedMessages);
 
     yield updatedMessages;
+    checkAccess();
     if (requestRunner?.isCancelled == true || _currentSessionId != sessionId) {
       return;
     }
@@ -389,7 +444,7 @@ class AiChat extends _$AiChat {
         completed: true,
         model: model,
       );
-      await historyNotifier.upsert(completedEntry);
+      if (!_privateConversation) await historyNotifier.upsert(completedEntry);
     } catch (_) {
       if (_currentSessionId != sessionId) return;
       final failedEntry = draftEntry.copyWith(
@@ -398,7 +453,7 @@ class AiChat extends _$AiChat {
         completed: false,
         model: model,
       );
-      await historyNotifier.upsert(failedEntry);
+      if (!_privateConversation) await historyNotifier.upsert(failedEntry);
       rethrow;
     }
   }
@@ -695,9 +750,15 @@ class AiChat extends _$AiChat {
     _currentSessionId = null;
     _lastReadingRequest = null;
     _historyKey = null;
+    _privateConversation = false;
+    _privateSourceBook = null;
+    _restoredHistory = false;
   }
 
   void loadHistoryEntry(AiChatHistoryEntry entry) {
+    _privateConversation = false;
+    _privateSourceBook = null;
+    _restoredHistory = true;
     _currentSessionId = entry.id;
     _lastReadingRequest = entry.readingRequest;
     _historyKey = entry.effectiveHistoryKey;

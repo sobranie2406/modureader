@@ -1,3 +1,5 @@
+import 'package:modu_reader/providers/private_library.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/enums/book_sync_status.dart';
@@ -60,6 +62,10 @@ class _BookItemState extends ConsumerState<BookItem> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(privateLibraryRevisionProvider);
+    if (!PrivateLibrary.instance.isVisible(book)) {
+      return const SizedBox.shrink();
+    }
     final pinned = ref.watch(bookshelfPinsProvider).contains(bookPinKey(book));
     void toggleSelection() {
       onSelectionChanged?.call(book, !selected);

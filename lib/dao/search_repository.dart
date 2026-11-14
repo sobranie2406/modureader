@@ -49,7 +49,8 @@ class SearchRepository {
     }
 
     final relatedBookIds = notesByBookId.keys.toList(growable: false);
-    final relatedBooks = await bookDao.selectBooksByIds(relatedBookIds);
+    final relatedBooks =
+        await bookDao.selectBooksByIds(relatedBookIds, visibleOnly: true);
     final relatedBookMap = {
       for (final book in relatedBooks) book.id: book,
     };

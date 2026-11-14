@@ -1,3 +1,4 @@
+import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
@@ -409,7 +410,10 @@ class _BookNotesPageState extends ConsumerState<BookNotesPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      PrivateBookGate(book: widget.book, builder: _buildNotes);
+
+  Widget _buildNotes(BuildContext context) {
     return Scaffold(
       appBar: widget.isMobile
           ? AppBar(

@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/models/book.dart';
@@ -13,6 +14,9 @@ class NoteSearchResult {
   final BookNote note;
 
   Map<String, dynamic> toMap() {
+    if (!PrivateLibrary.instance.canRead(book)) {
+      throw StateError('Book unavailable');
+    }
     final snippet = _buildSnippet();
     return {
       'bookId': book.id,
@@ -66,7 +70,7 @@ class NotesRepository {
     }
 
     final bookIds = notes.map((note) => note.bookId).toSet().toList();
-    final books = await bookDao.selectBooksByIds(bookIds);
+    final books = await bookDao.selectBooksByIds(bookIds, visibleOnly: true);
     final bookMap = {for (final book in books) book.id: book};
 
     final results = <NoteSearchResult>[];

@@ -1,4 +1,5 @@
 import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/models/book_note.dart';
 
 class NoteConflictException implements Exception {
@@ -67,7 +68,8 @@ class BookNoteDao extends BaseDao {
     return queryList(
       table,
       mapper: BookNote.fromDb,
-      where: 'book_id = ? AND $_typeFilter',
+      where:
+          'book_id = ? AND $_typeFilter AND ${PrivateLibrary.instance.bookIdPredicate()}',
       whereArgs: [bookId],
       orderBy: 'update_time DESC',
     );
@@ -170,7 +172,7 @@ class BookNoteDao extends BaseDao {
 
   Future<List<Map<String, int>>> selectAllBookIdAndNotes() async {
     return rawQueryList(
-      'SELECT book_id, COUNT(id) AS number_of_notes FROM $table WHERE $_typeFilter GROUP BY book_id ORDER BY number_of_notes DESC',
+      'SELECT book_id, COUNT(id) AS number_of_notes FROM $table WHERE $_typeFilter AND ${PrivateLibrary.instance.bookIdPredicate()} GROUP BY book_id ORDER BY number_of_notes DESC',
       mapper: (row) => <String, int>{
         'bookId': row['book_id'] as int? ?? 0,
         'numberOfNotes': row['number_of_notes'] as int? ?? 0,
@@ -180,7 +182,7 @@ class BookNoteDao extends BaseDao {
 
   Future<Map<String, int>> selectNumberOfNotesAndBooks() async {
     final result = await rawQuerySingle(
-      'SELECT COUNT(id) AS number_of_notes, COUNT(DISTINCT book_id) AS number_of_books FROM $table WHERE $_typeFilter',
+      'SELECT COUNT(id) AS number_of_notes, COUNT(DISTINCT book_id) AS number_of_books FROM $table WHERE $_typeFilter AND ${PrivateLibrary.instance.bookIdPredicate()}',
       mapper: (row) => <String, int>{
         'numberOfNotes': row['number_of_notes'] as int? ?? 0,
         'numberOfBooks': row['number_of_books'] as int? ?? 0,
@@ -214,7 +216,7 @@ class BookNoteDao extends BaseDao {
     int? limit,
     List<String>? types,
   }) async {
-    final where = <String>[];
+    final where = <String>[PrivateLibrary.instance.bookIdPredicate()];
     final whereArgs = <Object?>[];
     final query = keyword?.trim();
 
@@ -257,7 +259,7 @@ class BookNoteDao extends BaseDao {
 
   Future<BookNote?> selectRandomNote() async {
     return rawQuerySingle(
-      'SELECT * FROM $table WHERE $_typeFilter ORDER BY RANDOM() LIMIT 1',
+      'SELECT * FROM $table WHERE $_typeFilter AND ${PrivateLibrary.instance.bookIdPredicate()} ORDER BY RANDOM() LIMIT 1',
       mapper: BookNote.fromDb,
     );
   }

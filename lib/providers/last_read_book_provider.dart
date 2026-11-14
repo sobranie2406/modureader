@@ -1,3 +1,5 @@
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/reading_time.dart';
 import 'package:modu_reader/models/book.dart';
@@ -19,6 +21,7 @@ class LastReadBookData {
 class LastReadBook extends _$LastReadBook {
   @override
   Future<LastReadBookData?> build() async {
+    ref.watch(privateLibraryRevisionProvider);
     return _load();
   }
 
@@ -36,7 +39,8 @@ class LastReadBook extends _$LastReadBook {
       if (bookId != null) {
         try {
           final candidate = await bookDao.selectBookById(bookId);
-          if (!candidate.isDeleted) {
+          if (!candidate.isDeleted &&
+              PrivateLibrary.instance.isVisible(candidate)) {
             book = candidate;
           }
         } catch (_) {
@@ -46,7 +50,7 @@ class LastReadBook extends _$LastReadBook {
     }
 
     if (book == null) {
-      final books = await bookDao.selectNotDeleteBooks();
+      final books = await bookDao.selectNotDeleteBooks(visibleOnly: true);
       if (books.isNotEmpty) {
         book = books.first;
       }

@@ -17,6 +17,9 @@ Older sections retain their original version scope; they are not current accepta
 - Fix(reader): Improve low-speed auto scrolling on compatible WebViews and keep reflow text in place after font, rotation or split-size changes.
 - Fix(reader): Improve cross-chapter scrolling and retain a line of context during aligned scroll paging.
 - Feat(reader): Use timed scroll steps in e-ink mode at the selected reading speed.
+- Feat(plugins): Enable reviewed JavaScript actions and add an optional private-books plugin with local locking, book visibility and a six-digit passcode. The plugin page offers GitHub/Gitee sources and independent compatible plugin updates.
+- Feat(dictionary): Add optional lookup preprocessing for English word forms, French elisions and custom regex candidates, keeping exact matches first. ([#83](https://github.com/sobranie2406/modureader/issues/83)) Thanks [@zhuhui-in](https://github.com/zhuhui-in).
+- Feat(plugins): Add a web read-later plugin to extract article text, preview Markdown, then export it or add it to the bookshelf.
 
 - Fix(sync): Recognize WeRead and OCR metadata directories when a WebDAV server redirects to their trailing-slash URLs.
 
@@ -29,6 +32,9 @@ Older sections retain their original version scope; they are not current accepta
 - Fix(reader): 改善低速自动滚动的平滑度，重排页调整字体、旋转或改变分屏比例后保持阅读位置。
 - Fix(reader): 改善跨章滚动衔接，开启自动对齐时翻屏保留一行上下文。
 - Feat(reader): 电纸书模式按当前阅读速度间隔滚动，减少连续刷新。
+- Feat(plugins): 支持审核通过的脚本动作，新增可选私密书籍插件，提供本机锁定、书架显示范围和六位密码；插件页面可选 GitHub／Gitee 来源，兼容的插件可独立更新。
+- Feat(dictionary): 新增可选「查词预处理」插件，原词未命中后尝试英语常见词形、法语省音前缀和自定义正则候选。 ([#83](https://github.com/sobranie2406/modureader/issues/83)) 感谢 [@zhuhui-in](https://github.com/zhuhui-in)。
+- Feat(plugins): 新增「网页稍后阅读」插件，提取网页正文并预览 Markdown，可导出或加入书架。
 
 - Fix(sync): 修复 WebDAV 为微信读书和 OCR 资料目录补全末尾斜杠时导致的同步失败。
 

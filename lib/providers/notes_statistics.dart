@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/dao/reading_time.dart';
@@ -10,6 +11,7 @@ part 'notes_statistics.g.dart';
 class NotesStatistics extends _$NotesStatistics {
   @override
   Future<Map<String, int>> build() async {
+    ref.watch(privateLibraryRevisionProvider);
     return _getNotesStatistics();
   }
 
@@ -27,6 +29,7 @@ class NotesStatistics extends _$NotesStatistics {
 class BookIdAndNotes extends _$BookIdAndNotes {
   @override
   Future<List<Map<String, dynamic>>> build() async {
+    ref.watch(privateLibraryRevisionProvider);
     final bookDataList = await _getBookIdAndNotes();
     final result = <Map<String, dynamic>>[];
 
@@ -59,6 +62,7 @@ class BookIdAndNotes extends _$BookIdAndNotes {
 class BookReadingTime extends _$BookReadingTime {
   @override
   Future<int> build(int bookId) async {
+    ref.watch(privateLibraryRevisionProvider);
     return _getBookReadingTime(bookId);
   }
 

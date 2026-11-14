@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'dart:async';
 import 'dart:isolate';
 
@@ -30,8 +31,12 @@ class BookKnowledgeRetriever {
   Future<List<SearchResult>> search(Book book, String query,
       {int limit = 5, Duration? timeBudget, bool Function()? isCancelled}) {
     var expired = false;
-    bool cancelled() => expired || (isCancelled?.call() ?? false);
-    final result = _search(book, query, limit, cancelled);
+    bool cancelled() =>
+        expired ||
+        !PrivateLibrary.instance.canRead(book) ||
+        (isCancelled?.call() ?? false);
+    final result = _search(book, query, limit, cancelled)
+        .then((value) => cancelled() ? <SearchResult>[] : value);
     if (timeBudget == null) return result;
     return result.timeout(timeBudget, onTimeout: () {
       expired = true;

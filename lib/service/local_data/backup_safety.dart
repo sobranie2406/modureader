@@ -199,6 +199,7 @@ Map<String, dynamic> withoutBackupCredentials(Map<String, dynamic> backup) => {
 bool isCredentialPreference(String key) =>
     {
       'aiProviders',
+      'privateLibrary_v1',
       'vectorModelConfig',
       'webdavInfo',
       's3Info',

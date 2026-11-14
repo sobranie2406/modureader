@@ -196,12 +196,8 @@ void main() {
   });
 
   group('address classification', () {
-    Future<bool> public(
-            String address) async =>
-        PluginNetworkGuard.isPublicAddress(
-            (await InternetAddress.lookup(address)).isEmpty
-                ? InternetAddress(address)
-                : InternetAddress(address));
+    bool public(String address) =>
+        PluginNetworkGuard.isPublicAddress(InternetAddress(address));
 
     for (final address in [
       '127.0.0.1',
@@ -213,18 +209,42 @@ void main() {
       '100.64.0.1',
       '224.0.0.1',
       '::1',
+      '::',
+      '::7f00:1',
       'fe80::1',
       'fc00::1',
+      'fec0::1',
+      'ff02::1',
+      '100::1',
+      '100:0:0:1::1',
+      '64:ff9b::a9fe:a9fe',
+      '64:ff9b:1::a9fe:a9fe',
+      '2002:a9fe:a9fe::1',
+      '2001::1',
+      '2001:0:4136:e378:8000:63bf:3fff:fdd2',
+      '2001:db8::1',
+      '3fff::1',
+      '3fff:fff:ffff::1',
+      '4000::1',
+      '5f00::1',
       '::ffff:127.0.0.1',
+      '::ffff:169.254.169.254',
     ]) {
-      test('rejects $address', () async {
-        expect(await public(address), isFalse);
+      test('rejects $address', () {
+        expect(public(address), isFalse);
       });
     }
 
-    for (final address in ['8.8.8.8', '1.1.1.1', '2606:4700::1111']) {
-      test('accepts $address', () async {
-        expect(await public(address), isTrue);
+    for (final address in [
+      '8.8.8.8',
+      '1.1.1.1',
+      '2606:4700::1111',
+      '2001:4860:4860::8888',
+      '::ffff:8.8.8.8',
+      '3fff:1000::1'
+    ]) {
+      test('accepts $address', () {
+        expect(public(address), isTrue);
       });
     }
   });
@@ -247,6 +267,36 @@ void main() {
       );
       expect(result.addresses.single.address, '8.8.8.8');
     });
+
+    test('accepts an allowlisted host resolving to native public IPv6',
+        () async {
+      final result = await guardReturning(['2001:4860:4860::8888']).validate(
+        network: network,
+        uri: Uri.parse('https://api.example.com/x'),
+        headers: const {},
+      );
+      expect(result.addresses.single.address, '2001:4860:4860::8888');
+    });
+
+    for (final address in [
+      'fec0::1',
+      '100::1',
+      '2002:a9fe:a9fe::1',
+      '2001::1',
+      '2001:db8::1',
+      '3fff::1'
+    ]) {
+      test('rejects a mixed DNS answer containing $address', () async {
+        await expectLater(
+          guardReturning(['2001:4860:4860::8888', address]).validate(
+            network: network,
+            uri: Uri.parse('https://api.example.com/x'),
+            headers: const {},
+          ),
+          _fails('configuration'),
+        );
+      });
+    }
 
     test('rejects a host outside the allowlist', () async {
       expect(
@@ -418,9 +468,21 @@ void main() {
   group('http client against a local server', () {
     late HttpServer server;
     late PluginHttpClient client;
+    late List<InternetAddress> localhost;
+
+    setUpAll(() {
+      SecurityContext.defaultContext.setTrustedCertificatesBytes(
+          File('test/fixtures/plugins/tls/localhost-ca.pem').readAsBytesSync());
+    });
 
     setUp(() async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final tls = SecurityContext()
+        ..useCertificateChain('test/fixtures/plugins/tls/localhost-cert.pem')
+        ..usePrivateKey('test/fixtures/plugins/tls/localhost-key.pem');
+      server =
+          await HttpServer.bindSecure(InternetAddress.loopbackIPv4, 0, tls);
+      localhost = await InternetAddress.lookup('localhost',
+          type: InternetAddressType.IPv4);
       client = PluginHttpClient(httpClientFactory: HttpClient.new);
     });
 
@@ -433,10 +495,34 @@ void main() {
     /// address policy, which the guard group already covers.
     PluginGuardResult target(String path, {Map<String, String>? headers}) =>
         PluginGuardResult(
-          uri: Uri.parse('http://127.0.0.1:${server.port}$path'),
-          addresses: [InternetAddress.loopbackIPv4],
+          uri: Uri.parse('https://localhost:${server.port}$path'),
+          addresses: localhost,
           headers: headers ?? const {},
         );
+
+    test('establishes a trusted TLS socket for the pinned hostname', () async {
+      server.listen((request) => request.response.close());
+      final task = await connectPluginTls(
+          target: target('/tls'),
+          timeout: const Duration(seconds: 2),
+          isCancelled: () => false);
+      final socket = await task.socket;
+      expect(socket, isA<SecureSocket>());
+      socket.destroy();
+    });
+
+    test('rejects a trusted certificate issued for a different hostname',
+        () async {
+      server.listen((request) => request.response.close());
+      final task = await connectPluginTls(
+          target: PluginGuardResult(
+              uri: Uri.parse('https://127.0.0.1:${server.port}/'),
+              addresses: [InternetAddress.loopbackIPv4],
+              headers: const {}),
+          timeout: const Duration(seconds: 2),
+          isCancelled: () => false);
+      await expectLater(task.socket, throwsA(isA<HandshakeException>()));
+    });
 
     test('client creation failure releases its concurrency slot', () async {
       final budget = PluginHttpBudget();

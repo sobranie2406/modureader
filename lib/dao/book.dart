@@ -1,4 +1,5 @@
 import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/narration_position.dart';
 import 'package:modu_reader/models/reading_position_snapshot.dart';
@@ -102,11 +103,15 @@ class BookDao extends BaseDao {
   Future<void> updateExternalMetadata(int bookId,
       {String? coverPath, String? description}) async {
     if (coverPath == null && description == null) return;
-    final changed = await update(table, {
-      if (coverPath != null) 'cover_path': coverPath,
-      if (description != null) 'description': description,
-      'update_time': DateTime.now().toIso8601String(),
-    }, where: 'id = ? AND is_deleted = 0', whereArgs: [bookId]);
+    final changed = await update(
+        table,
+        {
+          if (coverPath != null) 'cover_path': coverPath,
+          if (description != null) 'description': description,
+          'update_time': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ? AND is_deleted = 0',
+        whereArgs: [bookId]);
     if (changed != 1) throw StateError('Book no longer available');
   }
 
@@ -192,20 +197,24 @@ class BookDao extends BaseDao {
         whereArgs: [bookId]);
   }
 
-  Future<List<Book>> selectBooks({bool includeDeleted = true}) {
+  Future<List<Book>> selectBooks(
+      {bool includeDeleted = true, bool visibleOnly = false}) {
     return queryList(
       table,
       mapper: Book.fromDb,
-      where: includeDeleted ? null : 'is_deleted = 0',
+      where: !visibleOnly
+          ? (includeDeleted ? null : 'is_deleted = 0')
+          : '${includeDeleted ? '1' : 'is_deleted = 0'} AND (${PrivateLibrary.instance.bookPredicate()})',
       orderBy: 'update_time DESC',
     );
   }
 
-  Future<List<Book>> selectNotDeleteBooks() {
+  Future<List<Book>> selectNotDeleteBooks({bool visibleOnly = false}) {
     return rawQueryList('''SELECT b.*, p.clock AS reading_position_clock
       FROM tb_books b LEFT JOIN $syncRecordsTable p
       ON p.kind='position' AND p.local_id=b.id AND p.deleted=0
-      WHERE b.is_deleted=0 ORDER BY b.update_time DESC''', mapper: Book.fromDb);
+      WHERE b.is_deleted=0 ${visibleOnly ? 'AND ${PrivateLibrary.instance.bookPredicate('b')}' : ''} ORDER BY b.update_time DESC''',
+        mapper: Book.fromDb);
   }
 
   Future<Book> selectBookById(int id) async {
@@ -256,21 +265,22 @@ class BookDao extends BaseDao {
     return queryList(
       table,
       mapper: Book.fromDb,
-      where: 'is_deleted = 0 AND (title LIKE ? OR author LIKE ?)',
+      where:
+          'is_deleted = 0 AND (${PrivateLibrary.instance.bookPredicate()}) AND (title LIKE ? OR author LIKE ?)',
       whereArgs: ['%$query%', '%$query%'],
       orderBy: 'update_time DESC',
     );
   }
 
   Future<List<Book>> selectBooksByIds(List<int> ids,
-      {bool includeDeleted = false}) async {
+      {bool includeDeleted = false, bool visibleOnly = false}) async {
     if (ids.isEmpty) {
       return const [];
     }
 
     final placeholders = List.filled(ids.length, '?').join(',');
     return rawQueryList(
-      'SELECT * FROM $table WHERE ${includeDeleted ? '' : 'is_deleted = 0 AND '}id IN ($placeholders)',
+      'SELECT * FROM $table WHERE ${includeDeleted ? '' : 'is_deleted = 0 AND '}${visibleOnly ? '(${PrivateLibrary.instance.bookPredicate()}) AND ' : ''}id IN ($placeholders)',
       arguments: ids,
       mapper: Book.fromDb,
     );

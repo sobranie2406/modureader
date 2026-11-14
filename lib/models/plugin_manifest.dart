@@ -23,6 +23,7 @@ class PluginLimits {
   static const int maxSelectionActionNameLength = 30;
   static const int maxSelectionActionsPerPlugin = 24;
   static const int maxDictionarySourcesPerPlugin = 8;
+  static const int maxScriptBytes = 128 * 1024;
   static const int maxDescriptionLength = 2000;
   static const int maxSettingLabelLength = 80;
   static const int maxIdLength = 64;
@@ -30,8 +31,7 @@ class PluginLimits {
 
 /// Capability tokens understood by the manifest parser.
 ///
-/// `net:http` is parsed for validation tests, but PluginHost rejects installation
-/// until consent, secret storage and dictionary integration are complete.
+/// Availability and consent are checked by PluginHost after parsing.
 /// `storage:plugin` is implicit (plugins always own their private directory)
 /// but declared packages are accepted for forward compatibility.
 const Set<String> kP1SupportedCapabilities = {
@@ -39,17 +39,25 @@ const Set<String> kP1SupportedCapabilities = {
   'ui:selection-action',
   'net:http',
   'storage:plugin',
+  'script:run',
+  'library:read',
+  'note:write',
+  'library:private',
+  'dictionary:transform',
+  'article:capture',
 };
 
-/// Capabilities reserved for later phases. A package declaring one of these is
-/// rejected with a "requires a newer version" error rather than silently
-/// accepted, which is the fail-closed side of decision D2.
+/// Known tokens are checked separately from the adapter's allowed capabilities.
 const Set<String> kKnownCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
   'net:http',
   'script:run',
   'library:read',
+  'note:write',
+  'library:private',
+  'dictionary:transform',
+  'article:capture',
   'storage:plugin',
 };
 
@@ -58,6 +66,13 @@ const String kSelectionActionCapability = 'ui:selection-action';
 const String kAiSkillContributionKind = 'aiSkill';
 const String kSelectionActionContributionKind = 'selectionAction';
 const String kDictionarySourceContributionKind = 'dictionarySource';
+const String kScriptActionContributionKind = 'scriptAction';
+const String kScriptRunCapability = 'script:run';
+const String kLibraryReadCapability = 'library:read';
+const String kNoteWriteCapability = 'note:write';
+const String kLibraryPrivateCapability = 'library:private';
+const String kDictionaryTransformCapability = 'dictionary:transform';
+const String kArticleCaptureCapability = 'article:capture';
 
 enum PluginErrorCode {
   untrustedPackage,
@@ -363,6 +378,14 @@ sealed class PluginContribution {
           raw: json,
           network: network);
     }
+    if (kind == kScriptActionContributionKind) {
+      if (!_skillIdPattern.hasMatch(id)) {
+        throw PluginInstallError(PluginErrorCode.invalidContribution,
+            'contributes[$index].id is invalid.');
+      }
+      return ScriptActionContribution.parse(
+          kind: kind, schema: schema, id: id, index: index, raw: json);
+    }
     // Forward compatibility: an unknown kind is skipped even if new fields or
     // a missing id would fail the known-kind schema (decision D1).
     warnings.add(
@@ -447,6 +470,77 @@ class AiSkillContribution extends PluginContribution {
 }
 
 enum PluginSelectionScope { selection, context }
+
+enum PluginScriptSurface { selection, library, dictionary }
+
+class ScriptActionContribution extends PluginContribution {
+  const ScriptActionContribution({
+    required super.kind,
+    required super.schema,
+    required super.id,
+    required super.index,
+    required super.raw,
+    required this.name,
+    required this.entry,
+    this.surface = PluginScriptSurface.selection,
+    this.scope = PluginSelectionScope.selection,
+  });
+
+  final PluginText name;
+  final String entry;
+  final PluginScriptSurface surface;
+  final PluginSelectionScope scope;
+
+  factory ScriptActionContribution.parse({
+    required String kind,
+    required int schema,
+    required String id,
+    required int index,
+    required Map<String, dynamic> raw,
+  }) {
+    if (schema != 1) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].schema is not supported.');
+    }
+    final entry = raw['entry'];
+    if (entry is! String ||
+        entry.length > 256 ||
+        !RegExp(r'^[A-Za-z0-9_./-]+\.js$').hasMatch(entry) ||
+        entry.startsWith('/') ||
+        entry
+            .split('/')
+            .any((part) => part.isEmpty || part == '.' || part == '..')) {
+      throw PluginInstallError(PluginErrorCode.invalidPath,
+          'contributes[$index].entry must be a relative JavaScript file.');
+    }
+    final surface = PluginScriptSurface.values
+        .where((value) => value.name == (raw['surface'] ?? 'selection'))
+        .firstOrNull;
+    final scope = PluginSelectionScope.values
+        .where((value) => value.name == (raw['scope'] ?? 'selection'))
+        .firstOrNull;
+    if (surface == null ||
+        scope == null ||
+        (surface == PluginScriptSurface.dictionary &&
+            scope != PluginSelectionScope.selection)) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index] has an invalid surface or scope.');
+    }
+    return ScriptActionContribution(
+      kind: kind,
+      schema: schema,
+      id: id,
+      index: index,
+      raw: raw,
+      name: PluginText.parse(raw['name'],
+          field: 'contributes[$index].name',
+          maxLength: PluginLimits.maxSelectionActionNameLength),
+      entry: entry,
+      surface: surface,
+      scope: scope,
+    );
+  }
+}
 
 /// A declarative selection-toolbar action. It materialises as a custom AI
 /// command (`SelectionToolbarItem(action: 'aiCommand')`), so the existing
@@ -846,6 +940,16 @@ class PluginManifest {
       contributions.add(contribution);
     }
     _validateContributionCounts(contributions);
+    for (final action in contributions.whereType<ScriptActionContribution>()) {
+      if (!capabilities.contains(kScriptRunCapability) ||
+          (action.surface == PluginScriptSurface.selection &&
+              !capabilities.contains(kSelectionActionCapability)) ||
+          (action.surface == PluginScriptSurface.dictionary &&
+              !capabilities.contains(kDictionaryTransformCapability))) {
+        throw PluginInstallError(PluginErrorCode.capabilityUnavailable,
+            'Script actions must declare their execution and surface capabilities.');
+      }
+    }
 
     final rawSettings = json['settings'] ?? const <dynamic>[];
     if (rawSettings is! List) {
@@ -881,11 +985,11 @@ class PluginManifest {
       _validateTemplateReferences(source, settingByKey);
     }
 
-    final dictionarySources = contributions
-        .whereType<DictionarySourceContribution>()
-        .length;
+    final dictionarySources =
+        contributions.whereType<DictionarySourceContribution>().length;
     if (dictionarySources > PluginLimits.maxDictionarySourcesPerPlugin) {
-      throw PluginInstallError(PluginErrorCode.tooManyContributions,
+      throw PluginInstallError(
+          PluginErrorCode.tooManyContributions,
           'A package may declare at most '
           '${PluginLimits.maxDictionarySourcesPerPlugin} dictionary sources.');
     }
@@ -928,8 +1032,7 @@ class PluginManifest {
               "$field references an undeclared setting '$key'.");
         }
         if (setting.isSecret) {
-          throw PluginInstallError(
-              PluginErrorCode.invalidContribution,
+          throw PluginInstallError(PluginErrorCode.invalidContribution,
               "$field references '$key', which is a secret; secrets may only be used in the Authorization header.");
         }
       }
@@ -1055,7 +1158,8 @@ class DictionarySourceContribution extends PluginContribution {
 
     final license = raw['license'];
     if (license is! String || license.trim().isEmpty) {
-      throw PluginInstallError(PluginErrorCode.invalidContribution,
+      throw PluginInstallError(
+          PluginErrorCode.invalidContribution,
           'contributes[$index].license is required: a dictionary source must state '
           'the terms of the content it serves.');
     }

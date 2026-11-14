@@ -5,6 +5,9 @@ import 'dart:io';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_state.dart';
+import 'package:modu_reader/main.dart' show navigatorKey;
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/plugins/plugin_contributions.dart';
 import 'package:modu_reader/service/plugins/plugin_package.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
@@ -68,11 +71,14 @@ class PluginHost extends ChangeNotifier {
     PluginPaths? paths,
     PluginPackageReader? reader,
     PluginContributions? contributions,
-    this.trust = const PluginTrust(),
+    PluginTrust? trust,
     Future<String> Function()? appVersionResolver,
-  })  : _paths = paths ?? PluginPaths(),
+  })  : trust = trust ?? PluginTrust(),
+        _paths = paths ?? PluginPaths(),
         _appVersionResolver = appVersionResolver ?? getAppVersion {
     _reader = reader ?? PluginPackageReader(paths: _paths);
+    this.trust.bindCatalogDirectory(
+        Directory(p.join(_paths.root.path, '.catalog-proofs')));
     _contributions = contributions ?? PluginContributions.standard();
   }
 
@@ -81,7 +87,6 @@ class PluginHost extends ChangeNotifier {
   static PluginHost get instance => _instance ??= PluginHost();
 
   final PluginPaths _paths;
-  @visibleForTesting
   final PluginTrust trust;
   late final PluginPackageReader _reader;
   late final PluginContributions _contributions;
@@ -100,13 +105,42 @@ class PluginHost extends ChangeNotifier {
   bool _initialized = false;
   bool _disposed = false;
   Future<void> _pending = Future.value();
+  bool _scriptsMutating = false;
+
+  bool isScriptRunnable(String id) =>
+      !_disposed &&
+      !_scriptsMutating &&
+      _compiledIn &&
+      Prefs().experimentalPluginsEnabled &&
+      byId(id)?.status == PluginStatus.enabled;
+
+  @override
+  void notifyListeners() {
+    if (identical(this, _instance)) {
+      PrivateLibrary.instance.setPluginActive(_plugins.any((record) =>
+          record.status == PluginStatus.enabled &&
+          (_manifests[record.id]
+                  ?.capabilities
+                  .contains(kLibraryPrivateCapability) ??
+              false)));
+    }
+    super.notifyListeners();
+  }
 
   // Serialize package/state transactions, including disabling during an import.
   Future<T> _exclusive<T>(Future<T> Function() action) {
     final previous = _pending;
     final done = Completer<void>();
     _pending = done.future;
-    return previous.then((_) => action()).whenComplete(done.complete);
+    return previous.then((_) async {
+      _scriptsMutating = true;
+      if (identical(this, _instance)) PluginScriptRuntime.cancelExisting();
+      try {
+        return await action();
+      } finally {
+        _scriptsMutating = false;
+      }
+    }).whenComplete(done.complete);
   }
 
   List<PluginRecord> get plugins => List.unmodifiable(_plugins);
@@ -248,16 +282,32 @@ class PluginHost extends ChangeNotifier {
       // gone" rule, so one prompt the user deleted is not resurrected.
       final hasRuntimeOnly = record.applied.any((entry) =>
           _contributions.registry.forKind(entry.kind)?.runtimeOnly ?? false);
-      final lost = hasRuntimeOnly ||
-          record.applied.isEmpty ||
-          record.applied.every((entry) {
-            final handler = _contributions.registry.forKind(entry.kind);
-            // A kind this build does not know cannot be judged; leave it alone.
-            return handler != null && !handler.isApplied(entry);
-          });
-      if (lost) {
+      final persistent = record.applied
+          .where((entry) =>
+              !(_contributions.registry.forKind(entry.kind)?.runtimeOnly ??
+                  false))
+          .toList();
+      final lost = record.applied.isEmpty ||
+          (persistent.isNotEmpty &&
+              persistent.every((entry) {
+                final handler = _contributions.registry.forKind(entry.kind);
+                // A kind this build does not know cannot be judged; leave it alone.
+                return handler != null && !handler.isApplied(entry);
+              }));
+      if (lost || hasRuntimeOnly) {
         try {
-          final applied = await _contributions.apply(manifest);
+          final applied = lost
+              ? await _contributions.apply(manifest)
+              : [
+                  ...persistent,
+                  for (final kind in _contributions.registry.kinds)
+                    if (_contributions.registry.forKind(kind)!.runtimeOnly)
+                      ...await _contributions.registry.forKind(kind)!.apply(
+                          manifest,
+                          manifest.contributions
+                              .where((entry) => entry.kind == kind)
+                              .toList()),
+                ];
           return _Reconciled(
               record: record.copyWith(applied: applied), changed: true);
         } catch (error) {
@@ -368,8 +418,12 @@ class PluginHost extends ChangeNotifier {
           allowSameVersion: allowSameVersion, expectedSha256: expectedSha256));
 
   void _ensureSupportedCapabilities(PluginManifest manifest) {
-    // Transport helpers are not wired to consent, secrets or lookup UI yet.
-    if (manifest.capabilities.contains('net:http')) {
+    // Script networking uses the bounded host proxy; dictionary contributions
+    // still need their separate lookup integration.
+    if (manifest.capabilities.contains('net:http') &&
+        (!manifest.contributions.any((c) => c is ScriptActionContribution) ||
+            manifest.contributions
+                .any((c) => c is DictionarySourceContribution))) {
       throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
           'Network plugins are not available in this version.');
     }
@@ -499,6 +553,7 @@ class PluginHost extends ChangeNotifier {
           'This plugin is ${record.status.name}; uninstall it instead.');
     }
     if (record.status == PluginStatus.disabled) return;
+    await _authorizePrivateRemoval(id);
     final prompts = Prefs().userPrompts;
     final toolbar = Prefs().selectionToolbar;
     try {
@@ -520,6 +575,7 @@ class PluginHost extends ChangeNotifier {
   Future<void> _uninstall(String id) async {
     _ensureUsable();
     final record = _require(id);
+    await _authorizePrivateRemoval(id);
     final prompts = Prefs().userPrompts;
     final toolbar = Prefs().selectionToolbar;
     try {
@@ -586,10 +642,37 @@ class PluginHost extends ChangeNotifier {
         rethrow;
       }
     } else {
+      await _authorizePrivateRemoval(null);
       await _suspendPlugins();
       await Prefs().saveExperimentalPluginsEnabled(false);
     }
     notifyListeners();
+  }
+
+  Future<void> _authorizePrivateRemoval(String? id) async {
+    if (!identical(this, _instance) || !PrivateLibrary.instance.active) return;
+    if (id != null) {
+      if (!(_manifests[id]?.capabilities.contains(kLibraryPrivateCapability) ??
+          false)) {
+        return;
+      }
+      if (_plugins.any((record) =>
+          record.id != id &&
+          record.status == PluginStatus.enabled &&
+          (_manifests[record.id]
+                  ?.capabilities
+                  .contains(kLibraryPrivateCapability) ??
+              false))) {
+        return;
+      }
+    }
+    final context = navigatorKey.currentContext;
+    if (context == null ||
+        !await PrivateLibrary.instance.authorizeDeactivate(context)) {
+      throw const PluginInstallError(
+          PluginErrorCode.pluginUnavailable, 'Plugin deactivation cancelled.');
+    }
+    await PrivateLibrary.instance.clearProtection();
   }
 
   Future<void> _suspendPlugins() async {
@@ -716,6 +799,10 @@ class PluginHost extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    if (identical(this, _instance)) {
+      PluginScriptRuntime.cancelExisting();
+      PrivateLibrary.instance.setPluginActive(false);
+    }
     super.dispose();
   }
 }

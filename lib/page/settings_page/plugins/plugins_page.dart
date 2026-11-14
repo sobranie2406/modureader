@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_detail_page.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_install_preview.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_catalog.dart';
 import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:modu_reader/widgets/settings/settings_title.dart';
@@ -13,11 +16,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 class PluginSettings extends StatefulWidget {
-  const PluginSettings({super.key, this.host, this.pickPackage});
+  const PluginSettings({super.key, this.host, this.pickPackage, this.catalog});
 
   /// Injectable for tests; defaults to the app-wide singleton.
   final PluginHost? host;
   final Future<File?> Function()? pickPackage;
+  final PluginCatalog? catalog;
 
   @override
   State<PluginSettings> createState() => _PluginSettingsState();
@@ -25,8 +29,75 @@ class PluginSettings extends StatefulWidget {
 
 class _PluginSettingsState extends State<PluginSettings> {
   bool _busy = false;
+  bool _loadingCatalog = false;
+  Object? _catalogError;
+  String? _downloadingId;
+  List<PluginCatalogEntry> _entries = const [];
+  late final PluginCatalog _catalog;
+  late String _catalogSource;
+  int _catalogRequest = 0;
 
   PluginHost get _host => widget.host ?? PluginHost.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _catalogSource = Prefs().pluginCatalogSource;
+    _catalog = widget.catalog ?? PluginCatalog(sourceId: _catalogSource);
+    unawaited(_catalog.changeSource(_catalogSource).then<void>((_) async {
+      if (mounted) await _loadCatalog();
+    }));
+  }
+
+  @override
+  void dispose() {
+    unawaited(_catalog.dispose());
+    super.dispose();
+  }
+
+  Future<void> _loadCatalog() async {
+    if (_loadingCatalog) return;
+    final request = ++_catalogRequest;
+    setState(() {
+      _loadingCatalog = true;
+      _catalogError = null;
+    });
+    try {
+      final entries = await _catalog.load();
+      if (mounted && request == _catalogRequest) {
+        setState(() => _entries = entries);
+      }
+    } catch (error) {
+      if (mounted && request == _catalogRequest) {
+        setState(() => _catalogError = error);
+      }
+    } finally {
+      if (mounted && request == _catalogRequest) {
+        setState(() => _loadingCatalog = false);
+      }
+    }
+  }
+
+  Future<void> _changeCatalogSource(String? value) async {
+    if (value == null || value == _catalogSource || _busy) return;
+    final request = ++_catalogRequest;
+    setState(() {
+      _catalogSource = value;
+      _entries = const [];
+      _catalogError = null;
+      _loadingCatalog = false;
+    });
+    try {
+      await _catalog.changeSource(value);
+      if (!mounted || request != _catalogRequest) return;
+      await Prefs().savePluginCatalogSource(value);
+      if (mounted && request == _catalogRequest) await _loadCatalog();
+    } catch (error) {
+      if (mounted && request == _catalogRequest) {
+        setState(() => _catalogError = error);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,8 +118,8 @@ class _PluginSettingsState extends State<PluginSettings> {
                 leading: const Icon(Icons.add_box_outlined),
                 title:
                     Text(ModuStrings.text(context, '安装插件…', 'Install plugin…')),
-                description: Text(ModuStrings.text(context, "安装项目提供的提示词包和划词动作。",
-                    "Install prompt packs and selection actions provided by the project.")),
+                description: Text(ModuStrings.text(context, "安装项目提供的插件包。",
+                    "Install plugin packages provided by the project.")),
                 enabled: !_busy,
                 onPressed: _busy ? null : (_) => _install(),
               ),
@@ -75,6 +146,7 @@ class _PluginSettingsState extends State<PluginSettings> {
                 ),
             ],
           ),
+          _catalogSection(context),
           if (plugins.isNotEmpty)
             SettingsSection(
               title: Text(ModuStrings.text(context, '插件摘要', 'Plugin summary')),
@@ -111,6 +183,128 @@ class _PluginSettingsState extends State<PluginSettings> {
         ]);
       },
     );
+  }
+
+  SettingsSection _catalogSection(BuildContext context) => SettingsSection(
+        title: Row(children: [
+          Expanded(
+              child: Text(ModuStrings.text(context, '插件仓库', 'Plugin catalog'))),
+          IconButton(
+              key: const ValueKey('plugin-catalog-refresh'),
+              tooltip: ModuStrings.text(context, '刷新', 'Refresh'),
+              onPressed: _busy || _loadingCatalog ? null : _loadCatalog,
+              icon: const Icon(Icons.refresh)),
+        ]),
+        tiles: [
+          CustomSettingsTile(
+              child: ListTile(
+            title: Text(ModuStrings.text(context, '下载来源', 'Download source')),
+            trailing: DropdownButton<String>(
+              key: const ValueKey('plugin-catalog-source'),
+              value: _catalogSource,
+              items: const [
+                DropdownMenuItem(value: 'github', child: Text('GitHub')),
+                DropdownMenuItem(value: 'gitee', child: Text('Gitee')),
+              ],
+              onChanged: _busy ? null : _changeCatalogSource,
+            ),
+          )),
+          if (_loadingCatalog)
+            const CustomSettingsTile(
+                child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()))),
+          if (_catalogError != null)
+            CustomSettingsTile(
+                child: ListTile(
+                    title: Text(ModuStrings.text(
+                        context, '无法读取插件列表', 'Could not load plugins')),
+                    trailing: TextButton(
+                        key: const ValueKey('plugin-catalog-retry'),
+                        onPressed:
+                            _loadingCatalog || _busy ? null : _loadCatalog,
+                        child:
+                            Text(ModuStrings.text(context, '重试', 'Retry'))))),
+          if (!_loadingCatalog && _catalogError == null && _entries.isEmpty)
+            CustomSettingsTile(
+                child: ListTile(
+                    title: Text(ModuStrings.text(
+                        context, '暂无已上架插件', 'No listed plugins')))),
+          for (final entry in _entries)
+            CustomSettingsTile(
+                child: ListTile(
+              key: ValueKey('plugin-catalog-${entry.id}-${entry.version}'),
+              leading: const Icon(Icons.extension_outlined),
+              title: Text(entry.name
+                  .resolve(Localizations.localeOf(context).toLanguageTag())),
+              subtitle: Text('v${entry.version}'),
+              trailing: _downloadingId == entry.id
+                  ? TextButton(
+                      onPressed: () => unawaited(_catalog.cancel()),
+                      child: Text(ModuStrings.text(context, '取消', 'Cancel')))
+                  : TextButton(
+                      key: ValueKey('plugin-catalog-install-${entry.id}'),
+                      onPressed: _busy ||
+                              _loadingCatalog ||
+                              entry.requiresAppUpdate(_host.appVersion) ||
+                              _host.byId(entry.id)?.version == entry.version &&
+                                  _host.byId(entry.id)?.isUsable == true
+                          ? null
+                          : () => _installFromCatalog(entry),
+                      child: Text(entry.requiresAppUpdate(_host.appVersion)
+                          ? ModuStrings.text(
+                              context, '更新默读后可用', 'Update Modu to use')
+                          : _host.byId(entry.id)?.version == entry.version &&
+                                  _host.byId(entry.id)?.isUsable == true
+                              ? ModuStrings.text(context, '已安装', 'Installed')
+                              : ModuStrings.text(
+                                  context, '下载安装', 'Download and install'))),
+            )),
+        ],
+      );
+
+  Future<void> _installFromCatalog(PluginCatalogEntry entry) async {
+    if (_busy || entry.requiresAppUpdate(_host.appVersion)) return;
+    setState(() {
+      _busy = true;
+      _downloadingId = entry.id;
+    });
+    PluginCatalogDownload? download;
+    try {
+      await _host.trust.acceptCatalog(_catalog.signedCatalog);
+      download = await _catalog.download(entry);
+      if (!mounted) return;
+      setState(() => _downloadingId = null);
+      final replacing = _host.byId(entry.id) != null;
+      final preview =
+          await _host.preview(download.file, allowSameVersion: replacing);
+      if (preview.manifest.id != entry.id ||
+          preview.manifest.version != entry.version ||
+          preview.sha256 != entry.sha256) {
+        throw const PluginCatalogFailure('checksum');
+      }
+      if (!mounted) return;
+      final confirmed = await PluginInstallPreviewPage.show(context, preview);
+      if (!confirmed || !mounted) return;
+      final installed = await _host.install(download.file,
+          allowSameVersion: replacing, expectedSha256: entry.sha256);
+      if (mounted && installed.warnings.isNotEmpty) {
+        await _showWarnings(installed.warnings);
+      }
+    } catch (error) {
+      if (mounted &&
+          !(error is PluginCatalogFailure && error.code == 'cancelled')) {
+        await _showError(error);
+      }
+    } finally {
+      await download?.dispose();
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _downloadingId = null;
+        });
+      }
+    }
   }
 
   Future<void> _toggle(PluginRecord plugin, bool value) async {
@@ -330,6 +524,20 @@ String pluginStatusLabel(BuildContext context, PluginStatus status) {
 /// Localised, actionable text for install failures. Unknown errors fall back
 /// to the underlying message so diagnostics stay visible.
 String pluginErrorText(BuildContext context, Object error) {
+  if (error is PluginCatalogFailure) {
+    return switch (error.code) {
+      'checksum' => ModuStrings.text(
+          context, '插件文件校验失败，请重试。', 'Plugin verification failed. Try again.'),
+      'size' => ModuStrings.text(
+          context, '插件文件超过大小限制。', 'The plugin file is too large.'),
+      'unapproved' => ModuStrings.text(context, '请更新默读后再安装此插件。',
+          'Update Modu before installing this plugin.'),
+      'catalog' => ModuStrings.text(context, '插件目录校验失败，请稍后重试。',
+          'The plugin catalog could not be verified. Try again later.'),
+      _ => ModuStrings.text(context, '无法连接插件仓库，请重试。',
+          'Could not connect to the plugin catalog. Try again.'),
+    };
+  }
   if (error is! PluginInstallError) return error.toString();
   final zh = Localizations.localeOf(context).languageCode == 'zh';
   final reason = switch (error.code) {

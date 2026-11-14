@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/constants/note_annotations.dart';
 import 'package:modu_reader/dao/book_note.dart';
@@ -42,6 +43,7 @@ class BookNotesController extends _$BookNotesController {
 
   @override
   Future<BookNotesState> build(Book book) async {
+    ref.watch(privateLibraryRevisionProvider);
     final notes = await bookNoteDao.selectBookNotesByBookId(book.id);
     return _createState(
       book: book,

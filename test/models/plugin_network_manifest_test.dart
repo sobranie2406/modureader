@@ -103,12 +103,10 @@ void main() {
       );
     });
 
-    test('script:run is still refused', () {
-      expect(
-        () => _parse(_base(capabilities: const ['net:http', 'script:run'],
-            network: _network())),
-        throwsA(isA<PluginInstallError>()),
-      );
+    test('script capability can coexist with a declared network block', () {
+      final manifest = _parse(_base(
+          capabilities: const ['net:http', 'script:run'], network: _network()));
+      expect(manifest.capabilities, contains('script:run'));
     });
   });
 

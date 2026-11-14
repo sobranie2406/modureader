@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.private-books",
+  "version": "1.0.0",
+  "name": {"zh-CN": "私密书籍", "en": "Private books"},
+  "description": {"zh-CN": "管理与锁定私密书籍。", "en": "Manage and lock private books."},
+  "author": {"name": "Modu"},
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": ["script:run", "library:private"],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "open",
+      "name": {"zh-CN": "私密书籍", "en": "Private books"},
+      "entry": "main.js",
+      "surface": "library"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "lock",
+      "name": {"zh-CN": "锁定私密书籍", "en": "Lock private books"},
+      "entry": "main.js",
+      "surface": "library"
+    }
+  ]
+}

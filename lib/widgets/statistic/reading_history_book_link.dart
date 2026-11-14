@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/page/book_detail.dart';
@@ -86,7 +87,13 @@ class _ReadingHistoryBookLinkState
   }
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => ListenableBuilder(
+      listenable: PrivateLibrary.instance,
+      builder: (context, _) => PrivateLibrary.instance.isVisible(widget.book)
+          ? _buildLink(context)
+          : const SizedBox.shrink());
+
+  Widget _buildLink(BuildContext context) => InkWell(
         onTap: widget.enabled && !ref.watch(dashboardTilesProvider).isEditing
             ? _open
             : null,

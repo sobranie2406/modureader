@@ -8,6 +8,7 @@ import 'package:modu_reader/widgets/dictionary/dictionary_original.dart';
 import 'package:modu_reader/service/dictionary/dictionary_preferences.dart';
 import 'package:modu_reader/service/dictionary/online_dictionary.dart';
 import 'package:modu_reader/service/dictionary/dictionary_source_registry.dart';
+import 'package:modu_reader/service/plugins/plugin_dictionary_transform.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,11 +21,13 @@ class DictionaryLookup extends StatefulWidget {
       required this.word,
       this.store,
       this.onlineService,
+      this.transforms,
       this.embedded = false});
   final bool embedded;
   final String word;
   final LocalDictionaryStore? store;
   final OnlineDictionaryService? onlineService;
+  final PluginDictionaryTransform? transforms;
   @override
   State<DictionaryLookup> createState() => _DictionaryLookupState();
 }
@@ -33,6 +36,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
   late final store = widget.store ?? defaultDictionaryStore();
   late final input = TextEditingController(text: widget.word.trim());
   late final online = widget.onlineService ?? OnlineDictionaryService();
+  late final transforms = widget.transforms ?? PluginDictionaryTransform();
   final _requests = <CancelToken>[];
   final _onlineEntries = <OnlineDictionary, List<DictionaryEntry>>{};
   final _pending = <OnlineDictionary>{};
@@ -62,6 +66,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
   @override
   void dispose() {
     _generation++;
+    transforms.cancel();
     for (final request in _requests) {
       request.cancel();
     }
@@ -72,6 +77,7 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
 
   Future<void> _search() async {
     final generation = ++_generation;
+    transforms.cancel();
     for (final request in _requests) {
       request.cancel();
     }
@@ -103,15 +109,39 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
         }
       });
       if (word.isEmpty || word.length > 256) return;
+      Future<List<String>>? variants;
+      Future<List<String>> candidates() =>
+          variants ??= transforms.candidates(word,
+              isContextValid: () => mounted && generation == _generation);
       _pending.addAll(preferences.online);
       // Start independently so a slow/unavailable online source never hides local results.
       for (final source in preferences.online) {
-        _searchOnline(source, word, generation);
+        _searchOnline(source, word, generation, candidates);
       }
       final entries =
           await store.lookup(word, dictionaryIds: preferences.localIds);
       if (!mounted || generation != _generation) return;
       setState(() => _entries = entries);
+      final missing = dictionaries
+          .where((d) =>
+              d.enabled &&
+              (preferences.localIds == null ||
+                  preferences.localIds!.contains(d.id)) &&
+              !entries.any((e) => e.dictionaryId == d.id))
+          .map((d) => d.id)
+          .toSet();
+      if (missing.isNotEmpty) {
+        for (final candidate in await candidates()) {
+          if (!mounted || generation != _generation) return;
+          final matches = await store.lookup(candidate, dictionaryIds: missing);
+          if (!mounted || generation != _generation) return;
+          final accepted =
+              matches.where((e) => missing.contains(e.dictionaryId)).toList();
+          missing.removeAll(accepted.map((e) => e.dictionaryId));
+          setState(() => _entries = [..._entries, ...accepted]);
+          if (missing.isEmpty) break;
+        }
+      }
     } catch (e) {
       if (mounted && generation == _generation) {
         setState(() => _error = dictionaryError(context, e));
@@ -121,12 +151,20 @@ class _DictionaryLookupState extends State<DictionaryLookup> {
     }
   }
 
-  Future<void> _searchOnline(
-      OnlineDictionary source, String word, int generation) async {
+  Future<void> _searchOnline(OnlineDictionary source, String word,
+      int generation, Future<List<String>> Function() candidates) async {
     final token = CancelToken();
     _requests.add(token);
     try {
-      final entries = await online.lookup(source, word, cancelToken: token);
+      var entries = await online.lookup(source, word, cancelToken: token);
+      if (!mounted || generation != _generation) return;
+      if (entries.isEmpty) {
+        for (final candidate in await candidates()) {
+          if (!mounted || generation != _generation) return;
+          entries = await online.lookup(source, candidate, cancelToken: token);
+          if (entries.isNotEmpty) break;
+        }
+      }
       if (mounted && generation == _generation) {
         setState(() => _onlineEntries[source] = entries);
       }

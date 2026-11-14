@@ -1,3 +1,4 @@
+import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'dart:io';
@@ -123,7 +124,10 @@ class _BookDetailState extends ConsumerState<BookDetail> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      PrivateBookGate(book: widget.book, builder: _buildDetails);
+
+  Widget _buildDetails(BuildContext context) {
     Widget buildBackground() {
       var bg = ShaderMask(
         shaderCallback: (rect) {

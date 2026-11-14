@@ -6,6 +6,7 @@ import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugins_page.dart';
 import 'package:modu_reader/page/settings_page/experimental.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_catalog.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,11 @@ class _WidgetPluginPaths extends PluginPaths {
   Future<void> cleanStale() async {}
 }
 
+class _EmptyCatalog extends PluginCatalog {
+  @override
+  Future<List<PluginCatalogEntry>> load() async => const [];
+}
+
 void main() {
   late Directory temp;
   late PluginHost host;
@@ -37,7 +43,7 @@ void main() {
     await Prefs().saveLocaleToPrefs('en');
     temp = await Directory.systemTemp.createTemp('modu_plugin_ui_');
     host = PluginHost(
-      trust: const FixturePluginTrust(),
+      trust: FixturePluginTrust(),
       paths: _WidgetPluginPaths(rootPath: p.join(temp.path, 'plugins')),
       appVersionResolver: () async => '1.3.1+10152',
     );
@@ -78,6 +84,7 @@ void main() {
       home: Scaffold(
         body: PluginSettings(
           host: hostOverride ?? host,
+          catalog: _EmptyCatalog(),
           pickPackage: () async {
             onPick?.call();
             return pickNothing ? null : nextPackage;
@@ -129,7 +136,7 @@ void main() {
     expect(find.text('Manage plugins'), findsNothing);
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
-    expect(find.text('Enable experimental plugins?'), findsOneWidget);
+    expect(find.text('Enable plugins?'), findsOneWidget);
     expect(Prefs().experimentalPluginsEnabled, isFalse);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -151,7 +158,7 @@ void main() {
     expect(find.text('Manage plugins'), findsNothing);
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
-    expect(find.text('Enable experimental plugins?'), findsOneWidget);
+    expect(find.text('Enable plugins?'), findsOneWidget);
     expect(Prefs().experimentalPluginsEnabled, isFalse);
   });
 
@@ -310,7 +317,7 @@ void main() {
 /// can assert navigation without waiting on real zip unpacking.
 class _PreviewHost extends PluginHost {
   _PreviewHost({required this.packageFile, required this.previewResult})
-      : super(trust: const FixturePluginTrust());
+      : super(trust: FixturePluginTrust());
 
   final File packageFile;
   final PluginPreview previewResult;

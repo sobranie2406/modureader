@@ -24,7 +24,7 @@ void main() {
   late PluginHost host;
 
   PluginHost createHost() => PluginHost(
-        trust: const FixturePluginTrust(),
+        trust: FixturePluginTrust(),
         paths: paths,
         appVersionResolver: () async => '1.3.1+10152',
       );
@@ -64,9 +64,16 @@ void main() {
     expect(Prefs().userPrompts, isEmpty);
   });
 
-  test('consent defaults off and blocks installation', () async {
+  test('plugins default on and can install reviewed packages', () async {
     await Prefs().prefs.remove('experimentalPluginsEnabled');
-    expect(Prefs().experimentalPluginsEnabled, isFalse);
+    expect(Prefs().experimentalPluginsEnabled, isTrue);
+    final installed = await host.install(await package());
+    expect(installed.record.status, PluginStatus.enabled);
+    expect(host.plugins, hasLength(1));
+  });
+
+  test('an explicit disabled preference still blocks installation', () async {
+    await Prefs().saveExperimentalPluginsEnabled(false);
     await expectLater(
         host.install(await package()), throwsA(isA<PluginInstallError>()));
     expect(host.plugins, isEmpty);
@@ -279,13 +286,14 @@ void main() {
   test('a runtime-only kind is rebuilt on every start', () async {
     // P3 dictionary sources live only in an in-memory registry, so a restart
     // must re-materialise them even though nothing in prefs looks missing.
-    final runtimeContributions = PluginContributions(PluginContributionRegistry([
+    final runtimeContributions =
+        PluginContributions(PluginContributionRegistry([
       AiPromptContributionHandler(),
       SelectionActionContributionHandler(),
       const _RuntimeOnlyHandler(),
     ]));
     final runtimeHost = PluginHost(
-      trust: const FixturePluginTrust(),
+      trust: FixturePluginTrust(),
       paths: paths,
       contributions: runtimeContributions,
       appVersionResolver: () async => '1.3.1+10152',
@@ -308,7 +316,7 @@ void main() {
     await runtimeHost.install(runtimePackage);
 
     final restarted = PluginHost(
-      trust: const FixturePluginTrust(),
+      trust: FixturePluginTrust(),
       paths: paths,
       contributions: PluginContributions(PluginContributionRegistry([
         AiPromptContributionHandler(),

@@ -2,6 +2,7 @@ import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/service/plugins/handlers/ai_prompt_handler.dart';
 import 'package:modu_reader/service/plugins/handlers/selection_action_handler.dart';
+import 'package:modu_reader/service/plugins/handlers/script_action_handler.dart';
 import 'package:modu_reader/service/plugins/plugin_contribution_handler.dart';
 
 /// Orchestrates contribution handlers: validates all kinds first, then applies
@@ -13,6 +14,7 @@ class PluginContributions {
         PluginContributionRegistry([
           AiPromptContributionHandler(),
           SelectionActionContributionHandler(),
+          ScriptActionContributionHandler(),
         ]),
       );
 

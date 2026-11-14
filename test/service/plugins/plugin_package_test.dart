@@ -191,7 +191,8 @@ void main() {
         samplePackageFiles(
             manifest: manifestJson(capabilities: ['script:run'])));
     expect(
-      () => reader().read(file),
+      () => PluginPackageReader(paths: paths, allowedCapabilities: const {})
+          .read(file),
       throwsA(isA<PluginInstallError>().having((error) => error.code, 'code',
           PluginErrorCode.capabilityUnavailable)),
     );

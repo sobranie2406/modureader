@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -26,7 +27,13 @@ class BookCover extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+      listenable: PrivateLibrary.instance,
+      builder: (context, _) => PrivateLibrary.instance.canRead(book)
+          ? _buildCover(context)
+          : SizedBox(width: width, height: height));
+
+  Widget _buildCover(BuildContext context) {
     final double effectiveRadius = radius ?? 8;
     final BorderRadius borderRadius = BorderRadius.circular(effectiveRadius);
     final File file = File(book.coverFullPath);

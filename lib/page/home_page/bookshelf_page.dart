@@ -1,3 +1,5 @@
+import 'package:modu_reader/providers/private_library.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:async';
 import 'dart:io';
@@ -98,6 +100,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    ref.watch(privateLibraryRevisionProvider);
     final statusFilter = ref.watch(readingStatusFilterNotifierProvider);
     final selectedTags = ref.watch(tagSelectionProvider);
     final tagsAsync = ref.watch(tagListProvider);
@@ -105,6 +108,7 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     final listMode = Prefs().bookshelfListMode;
     final visibleBooks = booksAsync.valueOrNull
             ?.expand((group) => group)
+            .where(PrivateLibrary.instance.isVisible)
             .toList(growable: false) ??
         const <Book>[];
     final selectedBooks = visibleBooks
@@ -390,7 +394,12 @@ class BookshelfPageState extends ConsumerState<BookshelfPage>
     }
 
     Widget buildBookshelfBody = booksAsync.when(
-      data: (books) {
+      data: (loadedBooks) {
+        final books = loadedBooks
+            .map((group) =>
+                group.where(PrivateLibrary.instance.isVisible).toList())
+            .where((group) => group.isNotEmpty)
+            .toList();
         return books.isEmpty
             ? const Center(child: BookshelfTips())
             : LayoutBuilder(builder: (context, constraints) {

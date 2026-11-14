@@ -28,12 +28,9 @@ class _ExperimentalSettingsState extends State<ExperimentalSettings> {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: Text(ModuStrings.text(
-                context, '开启实验性插件？', 'Enable experimental plugins?')),
-            content: Text(ModuStrings.text(
-                context,
-                "开启后可安装项目提供的提示词包和划词动作。使用 AI 动作时，会把所选内容发送给你配置的 AI 服务。",
-                "Install prompt packs and selection actions provided by the project. AI actions send selected text to your configured AI service.")),
+            title: Text(ModuStrings.text(context, '开启插件？', 'Enable plugins?')),
+            content: Text(ModuStrings.text(context, "安装项目提供的插件，按插件声明的权限使用。",
+                "Install project plugins and use their declared permissions.")),
             scrollable: true,
             actions: [
               TextButton(
@@ -42,8 +39,7 @@ class _ExperimentalSettingsState extends State<ExperimentalSettings> {
               FilledButton(
                   key: const ValueKey('confirm-experimental-plugins'),
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: Text(ModuStrings.text(
-                      context, '了解风险，确认开启', 'Understand risks and enable'))),
+                  child: Text(ModuStrings.text(context, '开启', 'Enable'))),
             ],
           ),
         );

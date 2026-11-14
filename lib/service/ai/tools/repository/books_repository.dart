@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/models/book.dart';
 
@@ -7,6 +8,9 @@ class BookSearchResult {
   final Book book;
 
   Map<String, dynamic> toMap() {
+    if (!PrivateLibrary.instance.canRead(book)) {
+      throw StateError('Book unavailable');
+    }
     return {
       'bookId': book.id,
       'title': book.title,
@@ -30,7 +34,7 @@ class BooksRepository {
       return const <int, Book>{};
     }
 
-    final books = await bookDao.selectBooksByIds(uniqueIds);
+    final books = await bookDao.selectBooksByIds(uniqueIds, visibleOnly: true);
     return {for (final book in books) book.id: book};
   }
 
@@ -44,7 +48,7 @@ class BooksRepository {
 
     List<Book> books;
     if (query.isEmpty) {
-      books = await bookDao.selectBooks();
+      books = await bookDao.selectBooks(visibleOnly: true);
     } else {
       books = await bookDao.searchBooks(query);
     }

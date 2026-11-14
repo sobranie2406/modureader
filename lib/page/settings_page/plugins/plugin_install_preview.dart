@@ -52,11 +52,15 @@ class PluginInstallPreviewPage extends StatelessWidget {
               if (manifest.author != null)
                 _valueTile(context, ModuStrings.text(context, '作者', 'Author'),
                     manifest.author!.name),
-              _valueTile(context, ModuStrings.text(context, '包大小', 'Package size'),
+              _valueTile(
+                  context,
+                  ModuStrings.text(context, '包大小', 'Package size'),
                   _formatBytes(preview.compressedBytes)),
               _valueTile(context, 'SHA-256', preview.sha256),
               if (preview.installedVersion != null)
-                _valueTile(context, ModuStrings.text(context, '将替换', 'Replaces'),
+                _valueTile(
+                    context,
+                    ModuStrings.text(context, '将替换', 'Replaces'),
                     'v${preview.installedVersion}'),
             ],
           ),
@@ -66,11 +70,16 @@ class PluginInstallPreviewPage extends StatelessWidget {
               if (manifest.capabilities.isEmpty)
                 _notice(
                     context,
-                    ModuStrings.text(
-                        context, '没有声明额外权限。', 'No extra permissions declared.')),
+                    ModuStrings.text(context, '没有声明额外权限。',
+                        'No extra permissions declared.')),
               for (final capability in manifest.capabilities)
+                _valueTile(context, pluginCapabilityLabel(context, capability),
+                    capability),
+              if (manifest.network != null)
                 _valueTile(
-                    context, pluginCapabilityLabel(context, capability), capability),
+                    context,
+                    ModuStrings.text(context, '访问网站', 'Websites'),
+                    manifest.network!.domains.join('\n')),
             ],
           ),
           SettingsSection(
@@ -82,7 +91,8 @@ class PluginInstallPreviewPage extends StatelessWidget {
             SettingsSection(
               title: Text(ModuStrings.text(context, '将被跳过', 'Skipped items')),
               tiles: [
-                for (final warning in preview.warnings) _notice(context, warning),
+                for (final warning in preview.warnings)
+                  _notice(context, warning),
               ],
             ),
           if (preview.readme != null)
@@ -138,6 +148,8 @@ class PluginInstallPreviewPage extends StatelessWidget {
         manifest.contributions.whereType<SelectionActionContribution>().length;
     final skipped =
         manifest.contributions.whereType<UnknownContribution>().length;
+    final scripts =
+        manifest.contributions.whereType<ScriptActionContribution>().toList();
     return [
       if (prompts > 0)
         _valueTile(context, ModuStrings.text(context, 'AI 提示词', 'AI prompts'),
@@ -147,6 +159,20 @@ class PluginInstallPreviewPage extends StatelessWidget {
             context,
             ModuStrings.text(context, '划词工具栏动作', 'Selection toolbar actions'),
             '$actions'),
+      for (final action in scripts)
+        _valueTile(
+            context,
+            action.name
+                .resolve(Localizations.localeOf(context).toLanguageTag()),
+            action.surface == PluginScriptSurface.library
+                ? ModuStrings.text(context, '插件功能', 'Plugin action')
+                : action.surface == PluginScriptSurface.dictionary
+                    ? ModuStrings.text(context, '查词文字', 'Dictionary query')
+                    : action.scope == PluginSelectionScope.context
+                        ? ModuStrings.text(
+                            context, '划词与上下文', 'Selection and context')
+                        : ModuStrings.text(
+                            context, '仅划词文字', 'Selected text only')),
       if (manifest.settings.isNotEmpty)
         _valueTile(
             context,
@@ -157,9 +183,11 @@ class PluginInstallPreviewPage extends StatelessWidget {
             context,
             ModuStrings.text(context, '未知的贡献类型会被跳过，不影响其余内容。',
                 'Unknown contribution kinds are skipped; the rest still installs.')),
-      if (prompts == 0 && actions == 0 && skipped == 0)
-        _notice(context,
-            ModuStrings.text(context, '这个包不添加任何内容。', 'This package adds nothing.')),
+      if (prompts == 0 && actions == 0 && scripts.isEmpty && skipped == 0)
+        _notice(
+            context,
+            ModuStrings.text(
+                context, '这个包不添加任何内容。', 'This package adds nothing.')),
     ];
   }
 

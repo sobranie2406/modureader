@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/dao/search_repository.dart';
 import 'package:modu_reader/models/search_note_group.dart';
 import 'package:modu_reader/models/search_result_data.dart';
@@ -31,6 +32,7 @@ final searchScopeProvider =
 
 final searchResultProvider = FutureProvider.autoDispose
     .family<SearchResultData, int?>((ref, bookId) async {
+  ref.watch(privateLibraryRevisionProvider);
   final query = ref.watch(searchQueryProvider);
   final repository = ref.watch(searchRepositoryProvider);
   final trimmed = query.trim();

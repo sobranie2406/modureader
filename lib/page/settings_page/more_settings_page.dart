@@ -1,4 +1,6 @@
 import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
@@ -75,7 +77,8 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([Prefs(), PluginHost.instance]),
+      animation: Listenable.merge(
+          [Prefs(), PluginHost.instance, PrivateLibrary.instance]),
       builder: (context, _) {
         final showDeveloperEntry = Prefs().developerOptionsEnabled;
         return Scaffold(
@@ -97,6 +100,17 @@ class _SubMoreSettingsState extends State<SubMoreSettings> {
           ),
           body: LayoutBuilder(builder: (context, constraints) {
             List<Map<String, dynamic>> settings = [
+              if (PrivateLibrary.instance.showEntry)
+                {
+                  'title': ModuStrings.text(context, '私密书库', 'Private library'),
+                  'icon': Icons.lock_outline,
+                  'sections':
+                      PrivateLibrarySettings(library: PrivateLibrary.instance),
+                  'subtitles': [
+                    ModuStrings.text(
+                        context, '显示范围 · 私密书籍', 'Visibility · Private books')
+                  ],
+                },
               {
                 "title": L10n.of(context).settingsAppearance,
                 "titleBuilder": (BuildContext context) =>

@@ -73,10 +73,12 @@ void main() {
     slider.onChanged!(100);
     slider.onChangeEnd!(100);
     await tester.pump();
-    expect(find.textContaining('0% overlap'), findsNothing);
+    final description = find.textContaining('Move 100% of a screen per turn.');
+    expect(description, findsNothing);
     await tester.tap(find.byIcon(Icons.help_outline));
     await tester.pumpAndSettle();
-    expect(find.textContaining('0% overlap'), findsOneWidget);
+    expect(description, findsOneWidget);
+    expect(find.textContaining('one line stays visible'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

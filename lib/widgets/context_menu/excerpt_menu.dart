@@ -6,11 +6,13 @@ import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/main.dart';
 import 'package:modu_reader/models/book_note.dart';
 import 'package:modu_reader/models/selection_toolbar.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/page/settings_page/selection_toolbar.dart';
 import 'package:modu_reader/page/reading_page.dart';
 import 'package:modu_reader/service/tts/tts_handler.dart';
 import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 import 'package:modu_reader/service/plugins/plugin_prompt_template.dart';
+import 'package:modu_reader/service/plugins/handlers/script_action_handler.dart';
 import 'package:modu_reader/utils/env_var.dart';
 import 'package:modu_reader/utils/toast/common.dart';
 import 'package:modu_reader/widgets/book_share/excerpt_share_service.dart';
@@ -21,6 +23,7 @@ import 'package:modu_reader/widgets/context_menu/selection_toolbar_labels.dart';
 import 'package:modu_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:modu_reader/widgets/dictionary/unified_query.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/plugins/plugin_script_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -395,6 +398,30 @@ class ExcerptMenuState extends State<ExcerptMenu> {
     final reader = readingPageKey.currentState;
     final text = widget.annoContent;
     switch (item.action) {
+      case 'pluginScript':
+        final registered = PluginScriptActionRegistry.instance.byId(item.id);
+        if (registered == null) return;
+        final bookId = _bookId;
+        final cfi = widget.allowAnnotations ? widget.annoCfi : '';
+        final sourceContext =
+            registered.action.scope == PluginSelectionScope.context
+                ? widget.contextText ?? ''
+                : '';
+        final chapter = epubPlayerKey.currentState?.selectionChapterTitle ?? '';
+        final onNoteCreated =
+            widget.allowAnnotations ? widget.onNoteCreated : null;
+        widget.onClose();
+        if (!popupContext.mounted) return;
+        await runPluginAction(popupContext,
+            pluginId: registered.pluginId,
+            action: registered.action,
+            selection: text,
+            contextText: sourceContext,
+            bookId: bookId,
+            cfi: cfi,
+            chapter: chapter,
+            onNoteCreated: onNoteCreated);
+        break;
       case 'query':
         final sourceContext = widget.contextText;
         widget.onClose();
@@ -493,10 +520,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             : PluginPromptTemplate.renderForId(item.id, item.prompt);
         final prompt = template.isEmpty
             ? text
-            : item
-                .copyWith(prompt: template)
-                .promptForSelection(text,
-                    locale: Localizations.localeOf(context));
+            : item.copyWith(prompt: template).promptForSelection(text,
+                locale: Localizations.localeOf(context));
         widget.onClose();
         await reader?.showAiChat(
           draftScreen: 'selection.${item.id}',
@@ -581,7 +606,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
   @override
   Widget build(BuildContext context) => Expanded(
         child: AnimatedBuilder(
-            animation: Prefs(),
+            animation: Listenable.merge(
+                [Prefs(), PluginScriptActionRegistry.instance]),
             builder: (context, _) {
               final config = Prefs().selectionToolbar;
               if (!config.enabled) return const SizedBox.shrink();
@@ -594,14 +620,22 @@ class ExcerptMenuState extends State<ExcerptMenu> {
                     ? constraints.maxWidth
                     : constraints.maxHeight;
                 final menu = SelectionActionToolbar(
-                  items: config
-                      .availableItems(
-                          footnote: widget.footnote,
-                          aiEnabled: EnvVar.enableAIFeature)
-                      .where((item) => item.action != 'narrate' || _canNarrate)
-                      .where((item) =>
-                          item.action != 'note' || widget.allowAnnotations)
-                      .toList(),
+                  items: [
+                    ...config
+                        .availableItems(
+                            footnote: widget.footnote,
+                            aiEnabled: EnvVar.enableAIFeature)
+                        .where(
+                            (item) => item.action != 'narrate' || _canNarrate)
+                        .where((item) =>
+                            item.action != 'note' || widget.allowAnnotations),
+                    for (final registered in PluginScriptActionRegistry.instance
+                        .forSurface(PluginScriptSurface.selection))
+                      SelectionToolbarItem(registered.id, 'pluginScript',
+                          name: registered.action.name.resolve(
+                              Localizations.localeOf(context).toLanguageTag()),
+                          icon: 'star'),
+                  ],
                   visibleCount: config.visibleCount,
                   axis: widget.axis,
                   maxExtent: extent,

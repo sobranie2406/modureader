@@ -106,6 +106,7 @@ void main() {
     test(
         'restore ${reset ? 'reset' : 'full backup'} cannot leave active plugin prompts while off',
         () async {
+      await Prefs().saveExperimentalPluginsEnabled(false);
       const content = 'Reviewed prompt';
       await Prefs().savePluginState(PluginState(plugins: [
         record.copyWith(applied: [
@@ -147,6 +148,7 @@ void main() {
     final data = await GlobalSettingsTransfer.decode(
         await GlobalSettingsTransfer.export(Prefs(), scope: 'plugins'));
     await initialize();
+    await Prefs().saveExperimentalPluginsEnabled(false);
     await GlobalSettingsTransfer.apply(Prefs(), data);
     final restored = Prefs().pluginState.byId('com.example.prompt-pack');
     expect(restored, isNotNull);

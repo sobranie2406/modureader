@@ -227,6 +227,7 @@ flutter:
     - assets/images/bgimg/
     - assets/icon/
     - assets/CHANGELOG.md
+    - assets/plugin-runtime/
     - assets/models/embeddings/manifest.json
 
   fonts:

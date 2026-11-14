@@ -22,7 +22,8 @@ class AnxHeadlessWebView {
   HeadlessInAppWebView? _headlessWebView;
   OverlayEntry? _overlayEntry;
 
-  final URLRequest initialUrlRequest;
+  final URLRequest? initialUrlRequest;
+  final InAppWebViewInitialData? initialData;
   final InAppWebViewSettings? initialSettings;
   final void Function(InAppWebViewController controller)? onWebViewCreated;
   final void Function(InAppWebViewController controller, Uri? url)? onLoadStop;
@@ -33,16 +34,32 @@ class AnxHeadlessWebView {
       String message)? onLoadError;
   final void Function(InAppWebViewController controller, Uri? url,
       int statusCode, String description)? onLoadHttpError;
+  final FutureOr<NavigationActionPolicy?> Function(
+          InAppWebViewController controller, NavigationAction navigationAction)?
+      shouldOverrideUrlLoading;
+  final FutureOr<WebResourceResponse?> Function(
+          InAppWebViewController controller, WebResourceRequest request)?
+      shouldInterceptRequest;
+  final FutureOr<bool?> Function(InAppWebViewController controller,
+      CreateWindowAction createWindowAction)? onCreateWindow;
+  final FutureOr<PermissionResponse?> Function(
+          InAppWebViewController controller, PermissionRequest request)?
+      onPermissionRequest;
   final WebViewEnvironment? webViewEnvironment;
 
   AnxHeadlessWebView({
-    required this.initialUrlRequest,
+    this.initialUrlRequest,
+    this.initialData,
     this.initialSettings,
     this.onWebViewCreated,
     this.onLoadStop,
     this.onConsoleMessage,
     this.onLoadError,
     this.onLoadHttpError,
+    this.shouldOverrideUrlLoading,
+    this.shouldInterceptRequest,
+    this.onCreateWindow,
+    this.onPermissionRequest,
     this.webViewEnvironment,
   });
 
@@ -80,6 +97,7 @@ class AnxHeadlessWebView {
       _headlessWebView = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
         initialUrlRequest: initialUrlRequest,
+        initialData: initialData,
         initialSettings: initialSettings,
         onWebViewCreated: onWebViewCreated,
         onLoadStop: onLoadStop,
@@ -87,6 +105,10 @@ class AnxHeadlessWebView {
         onReceivedError: _onReceivedError,
         onReceivedHttpError: _onReceivedHttpError,
         onRenderProcessGone: _onRenderProcessGone,
+        shouldOverrideUrlLoading: shouldOverrideUrlLoading,
+        shouldInterceptRequest: shouldInterceptRequest,
+        onCreateWindow: onCreateWindow,
+        onPermissionRequest: onPermissionRequest,
       );
       try {
         await _headlessWebView?.run();
@@ -129,8 +151,8 @@ class AnxHeadlessWebView {
   }
 
   void _runOverlay() {
-    final context = navigatorKey.currentContext;
-    if (context == null) {
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) {
       AnxLog.severe("No context available for AnxHeadlessWebView overlay");
       return;
     }
@@ -142,13 +164,19 @@ class AnxHeadlessWebView {
           width: 1,
           height: 1,
           child: InAppWebView(
+            webViewEnvironment: webViewEnvironment,
             initialUrlRequest: initialUrlRequest,
+            initialData: initialData,
             initialSettings: initialSettings,
             onLoadStop: onLoadStop,
             onConsoleMessage: onConsoleMessage,
             onReceivedError: _onReceivedError,
             onReceivedHttpError: _onReceivedHttpError,
             onRenderProcessGone: _onRenderProcessGone,
+            shouldOverrideUrlLoading: shouldOverrideUrlLoading,
+            shouldInterceptRequest: shouldInterceptRequest,
+            onCreateWindow: onCreateWindow,
+            onPermissionRequest: onPermissionRequest,
             onWebViewCreated: (controller) {
               onWebViewCreated?.call(controller);
             },
@@ -157,7 +185,7 @@ class AnxHeadlessWebView {
       ),
     );
 
-    Overlay.of(context).insert(_overlayEntry!);
+    overlay.insert(_overlayEntry!);
   }
 
   Future<void> dispose() {

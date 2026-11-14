@@ -29,7 +29,7 @@ void main() {
     temp = await Directory.systemTemp.createTemp('modu_plugin_preview_');
     paths = PluginPaths(rootPath: p.join(temp.path, 'plugins'));
     host = PluginHost(
-      trust: const FixturePluginTrust(),
+      trust: FixturePluginTrust(),
       paths: paths,
       appVersionResolver: () async => '1.3.1+10152',
     );

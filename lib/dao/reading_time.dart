@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/base_dao.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/reading_round.dart';
@@ -104,12 +105,13 @@ class ReadingTimeDao extends BaseDao {
       table,
       mapper: ReadingTime.fromDb,
       orderBy: 'datetime(date) DESC, id DESC',
+      where: PrivateLibrary.instance.bookIdPredicate(),
     );
   }
 
   Future<int> selectTotalReadingTime() async {
     final result = await rawQuerySingle(
-      'SELECT SUM(reading_time) AS total_sum FROM $table',
+      'SELECT SUM(reading_time) AS total_sum FROM $table WHERE ${PrivateLibrary.instance.bookIdPredicate()}',
       mapper: (row) => row['total_sum'] as int? ?? 0,
     );
     return result ?? 0;
@@ -117,7 +119,7 @@ class ReadingTimeDao extends BaseDao {
 
   Future<int> selectTotalNumberOfBook() async {
     final result = await rawQuerySingle(
-      'SELECT COUNT(DISTINCT book_id) AS total_count FROM $table',
+      'SELECT COUNT(DISTINCT book_id) AS total_count FROM $table WHERE ${PrivateLibrary.instance.bookIdPredicate()}',
       mapper: (row) => row['total_count'] as int? ?? 0,
     );
     return result ?? 0;
@@ -125,7 +127,7 @@ class ReadingTimeDao extends BaseDao {
 
   Future<int> selectTotalNumberOfDate() async {
     final result = await rawQuerySingle(
-      'SELECT COUNT(DISTINCT DATE(date)) AS total_count FROM $table',
+      'SELECT COUNT(DISTINCT DATE(date)) AS total_count FROM $table WHERE ${PrivateLibrary.instance.bookIdPredicate()}',
       mapper: (row) => row['total_count'] as int? ?? 0,
     );
     return result ?? 0;
@@ -133,7 +135,7 @@ class ReadingTimeDao extends BaseDao {
 
   Future<int> selectTotalNumberOfNotes() async {
     final result = await rawQuerySingle(
-      'SELECT COUNT(*) AS total_count FROM tb_notes',
+      'SELECT COUNT(*) AS total_count FROM tb_notes WHERE ${PrivateLibrary.instance.bookIdPredicate()}',
       mapper: (row) => row['total_count'] as int? ?? 0,
     );
     return result ?? 0;
@@ -144,9 +146,9 @@ class ReadingTimeDao extends BaseDao {
     final end = start.add(const Duration(days: 6));
     final rows = await rawQueryList(
       '''
-      SELECT DATE(date) AS day, SUM(reading_time) AS total_sum 
-      FROM $table 
-      WHERE DATE(date) BETWEEN DATE(?) AND DATE(?) 
+      SELECT DATE(date) AS day, SUM(reading_time) AS total_sum
+      FROM $table
+      WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND DATE(date) BETWEEN DATE(?) AND DATE(?)
       GROUP BY day
       ''',
       arguments: [
@@ -174,9 +176,9 @@ class ReadingTimeDao extends BaseDao {
 
     final rows = await rawQueryList(
       '''
-      SELECT DATE(date) AS day, SUM(reading_time) AS total_sum 
-      FROM $table 
-      WHERE DATE(date) BETWEEN DATE(?) AND DATE(?) 
+      SELECT DATE(date) AS day, SUM(reading_time) AS total_sum
+      FROM $table
+      WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND DATE(date) BETWEEN DATE(?) AND DATE(?)
       GROUP BY day
       ''',
       arguments: [
@@ -205,9 +207,9 @@ class ReadingTimeDao extends BaseDao {
 
     final rows = await rawQueryList(
       '''
-      SELECT strftime('%Y-%m', date) AS month, SUM(reading_time) AS total_sum 
-      FROM $table 
-      WHERE DATE(date) BETWEEN DATE(?) AND DATE(?) 
+      SELECT strftime('%Y-%m', date) AS month, SUM(reading_time) AS total_sum
+      FROM $table
+      WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND DATE(date) BETWEEN DATE(?) AND DATE(?)
       GROUP BY month
       ''',
       arguments: [
@@ -246,7 +248,7 @@ class ReadingTimeDao extends BaseDao {
     DateTime? to,
     int? limit,
   }) async {
-    final where = <String>[];
+    final where = <String>[PrivateLibrary.instance.bookIdPredicate()];
     final whereArgs = <Object?>[];
 
     if (bookId != null) {
@@ -291,10 +293,10 @@ class ReadingTimeDao extends BaseDao {
         DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
     final rows = await rawQueryList(
       '''
-      SELECT book_id, SUM(reading_time) AS total_sum 
-      FROM $table 
-      WHERE DATE(date) >= DATE(?) 
-      GROUP BY book_id 
+      SELECT book_id, SUM(reading_time) AS total_sum
+      FROM $table
+      WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND DATE(date) >= DATE(?)
+      GROUP BY book_id
       ORDER BY total_sum DESC
       ''',
       arguments: [monday.toIso8601String().substring(0, 10)],
@@ -379,9 +381,9 @@ class ReadingTimeDao extends BaseDao {
   Future<Map<DateTime, int>> selectAllReadingTimeGroupByDay() async {
     final rows = await rawQueryList(
       '''
-      SELECT DATE(date) AS day, SUM(reading_time) AS total_time 
-      FROM $table 
-      GROUP BY day 
+      SELECT DATE(date) AS day, SUM(reading_time) AS total_time
+      FROM $table WHERE ${PrivateLibrary.instance.bookIdPredicate()}
+      GROUP BY day
       ORDER BY day ASC
       ''',
       mapper: (row) => row,
@@ -403,9 +405,9 @@ class ReadingTimeDao extends BaseDao {
   Future<Map<String, dynamic>?> selectLatestReadingRecord() async {
     return await rawQuerySingle(
       '''
-      SELECT book_id, date, reading_time 
-      FROM $table 
-      ORDER BY datetime(date) DESC, id DESC 
+      SELECT book_id, date, reading_time
+      FROM $table WHERE ${PrivateLibrary.instance.bookIdPredicate()}
+      ORDER BY datetime(date) DESC, id DESC
       LIMIT 1
       ''',
       mapper: (row) => row,
@@ -436,10 +438,10 @@ class ReadingTimeDao extends BaseDao {
     final db = await database;
     return db.rawQuery(
       '''
-      SELECT book_id, SUM(reading_time) AS total_time 
-      FROM $table 
-      ${where != null ? 'WHERE $where' : ''} 
-      GROUP BY book_id 
+      SELECT book_id, SUM(reading_time) AS total_time
+      FROM $table
+      ${where != null ? 'WHERE $where' : ''}
+      GROUP BY book_id
       ORDER BY total_time DESC
       ''',
       whereArgs,
@@ -459,7 +461,8 @@ class ReadingTimeDao extends BaseDao {
 
     // Deleting a book does not delete its reading history. Keep its metadata
     // visible here; ordinary bookshelf queries still exclude deleted books.
-    final books = await bookDao.selectBooksByIds(ids, includeDeleted: true);
+    final books = await bookDao.selectBooksByIds(ids,
+        includeDeleted: true, visibleOnly: true);
     final bookMap = {for (final book in books) book.id: book};
 
     final result = <Map<Book, int>>[];
@@ -504,7 +507,7 @@ class ReadingTimeDao extends BaseDao {
       '''
       SELECT DATE(date) as day, SUM(reading_time) as total_time
       FROM $table
-      WHERE DATE(date) >= DATE(?)
+      WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND DATE(date) >= DATE(?)
       GROUP BY day
       ORDER BY day ASC
       ''',

@@ -66,6 +66,7 @@ const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
 const Set<String> _prefsImportSkipKeys = {
+  'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
   'translationUsageCounters',
@@ -107,6 +108,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
   'translationUsageCounters',
@@ -222,6 +224,8 @@ class Prefs extends ChangeNotifier {
   late SharedPreferences prefs;
   bool _initialized = false;
   bool get isInitialized => _initialized;
+  static bool _readyForReads = false;
+  static bool get isReady => _readyForReads;
   static final Prefs _instance = Prefs._internal();
 
   /// Notifies settings consumers after a validated external restore.
@@ -249,6 +253,7 @@ class Prefs extends ChangeNotifier {
 
   Future<void> initPrefs() async {
     prefs = await SharedPreferences.getInstance();
+    _readyForReads = true;
     _initialized = true;
     // Remove only the retired toggle, never local indexes or remote files.
     if (prefs.containsKey('syncKnowledgeIndexes')) {
@@ -1894,11 +1899,24 @@ class Prefs extends ChangeNotifier {
   }
 
   bool get experimentalPluginsEnabled =>
-      prefs.getBool('experimentalPluginsEnabled') ?? false;
+      prefs.getBool('experimentalPluginsEnabled') ?? true;
 
   Future<void> saveExperimentalPluginsEnabled(bool value) async {
     if (!await prefs.setBool('experimentalPluginsEnabled', value)) {
       throw StateError('Could not save experimental plugin consent');
+    }
+    notifyListeners();
+  }
+
+  String get pluginCatalogSource =>
+      prefs.getString('pluginCatalogSource') == 'gitee' ? 'gitee' : 'github';
+
+  Future<void> savePluginCatalogSource(String value) async {
+    if (value != 'github' && value != 'gitee') {
+      throw ArgumentError.value(value, 'value');
+    }
+    if (!await prefs.setString('pluginCatalogSource', value)) {
+      throw StateError('Could not save plugin source');
     }
     notifyListeners();
   }

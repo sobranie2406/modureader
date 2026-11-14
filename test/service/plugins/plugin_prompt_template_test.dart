@@ -69,7 +69,7 @@ void main() {
       await Prefs().saveLocaleToPrefs('en');
       temp = await Directory.systemTemp.createTemp('modu_plugin_template_');
       host = PluginHost(
-        trust: const FixturePluginTrust(),
+        trust: FixturePluginTrust(),
         paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
         appVersionResolver: () async => '1.3.1+10152',
       );

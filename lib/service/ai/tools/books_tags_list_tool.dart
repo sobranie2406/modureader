@@ -49,8 +49,8 @@ class BooksTagsListTool
         const [];
     final tagMap = await _tagRepository.fetchTagsForBooks(ids);
     final books = ids.isEmpty
-        ? await bookDao.selectNotDeleteBooks()
-        : await bookDao.selectBooksByIds(ids);
+        ? await bookDao.selectNotDeleteBooks(visibleOnly: true)
+        : await bookDao.selectBooksByIds(ids, visibleOnly: true);
     final byId = {for (final b in books) b.id: b};
     return tagMap.entries
         .map((entry) {

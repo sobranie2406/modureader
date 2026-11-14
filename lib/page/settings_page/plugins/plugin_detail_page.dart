@@ -14,6 +14,7 @@ import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/widgets/settings/service_config_form.dart';
 import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'package:modu_reader/widgets/plugins/plugin_script_action.dart';
 import 'package:flutter/material.dart';
 
 class PluginDetailPage extends StatelessWidget {
@@ -21,10 +22,13 @@ class PluginDetailPage extends StatelessWidget {
     super.key,
     required this.pluginId,
     required this.host,
+    this.onRunScriptAction,
   });
 
   final String pluginId;
   final PluginHost host;
+  final Future<void> Function(String pluginId, ScriptActionContribution action)?
+      onRunScriptAction;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +113,12 @@ class PluginDetailPage extends StatelessWidget {
   }
 
   Widget _contributionSection(BuildContext context, PluginRecord record) {
+    final scripts = host
+            .manifestFor(pluginId)
+            ?.contributions
+            .whereType<ScriptActionContribution>()
+            .toList() ??
+        const <ScriptActionContribution>[];
     final toolbarItems = Prefs().selectionToolbar.items;
     final usedSlots = toolbarItems
         .where((item) =>
@@ -121,7 +131,7 @@ class PluginDetailPage extends StatelessWidget {
     return SettingsSection(
       title: Text(ModuStrings.text(context, '贡献内容', 'Contributions')),
       tiles: [
-        if (record.applied.isEmpty)
+        if (record.applied.isEmpty && scripts.isEmpty)
           CustomSettingsTile(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -130,7 +140,8 @@ class PluginDetailPage extends StatelessWidget {
             ),
           )
         else
-          for (final applied in record.applied)
+          for (final applied in record.applied
+              .where((entry) => entry.kind != kScriptActionContributionKind))
             CustomSettingsTile(
               child: ListTile(
                 leading: Icon(applied.kind == kSelectionActionContributionKind
@@ -140,6 +151,38 @@ class PluginDetailPage extends StatelessWidget {
                 subtitle: Text('${applied.kind} · ${applied.id}'),
               ),
             ),
+        for (final action in scripts)
+          CustomSettingsTile(
+            child: ListTile(
+              key: ValueKey('plugin-script-action-${action.id}'),
+              leading: const Icon(Icons.extension_outlined),
+              title: Text(action.name
+                  .resolve(Localizations.localeOf(context).toLanguageTag())),
+              subtitle: switch (action.surface) {
+                PluginScriptSurface.selection => Text(ModuStrings.text(context,
+                    '在阅读界面划词后使用', 'Use after selecting text in a book')),
+                PluginScriptSurface.dictionary => Text(ModuStrings.text(context,
+                    '查词未命中时自动尝试', 'Used when an exact lookup has no match')),
+                PluginScriptSurface.library => null,
+              },
+              trailing: action.surface == PluginScriptSurface.library
+                  ? const Icon(Icons.chevron_right)
+                  : null,
+              enabled: record.status == PluginStatus.enabled,
+              onTap: record.status == PluginStatus.enabled &&
+                      action.surface == PluginScriptSurface.library
+                  ? () async {
+                      final run = onRunScriptAction;
+                      if (run != null) {
+                        await run(pluginId, action);
+                      } else {
+                        await runPluginAction(context,
+                            pluginId: pluginId, action: action);
+                      }
+                    }
+                  : null,
+            ),
+          ),
         if (hasActions)
           CustomSettingsTile(
             child: ListTile(

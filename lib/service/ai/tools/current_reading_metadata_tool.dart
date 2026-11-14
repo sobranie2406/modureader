@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'dart:async';
 
 import 'package:modu_reader/l10n/generated/L10n.dart';
@@ -33,7 +34,9 @@ class CurrentReadingMetadataTool
     final state = _ref.read(currentReadingProvider);
     final book = state.book;
 
-    if (!state.isReading || book == null) {
+    if (!state.isReading ||
+        book == null ||
+        !PrivateLibrary.instance.canRead(book)) {
       return {
         'isReading': false,
         'message':

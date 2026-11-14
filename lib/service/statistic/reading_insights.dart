@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:sqflite/sqflite.dart';
@@ -36,7 +37,8 @@ class ReadingInsights {
     final monday = DateTime(
         today.year, today.month, today.day - (today.weekday - DateTime.monday));
     String day(DateTime value) => value.toIso8601String().substring(0, 10);
-    const valid = 'reading_time > 0 AND DATE(date) <= DATE(?)';
+    final valid =
+        'reading_time > 0 AND DATE(date) <= DATE(?) AND ${PrivateLibrary.instance.bookIdPredicate()}';
     final daily = (await db.rawQuery('''
       SELECT COALESCE(SUM(seconds), 0) AS seconds, COUNT(*) AS days,
              COALESCE(MAX(seconds), 0) AS best
@@ -60,7 +62,7 @@ class ReadingInsights {
     final notes = await db.rawQuery('''
       SELECT b.*, n.note_count FROM tb_books b
       JOIN (SELECT book_id, COUNT(*) AS note_count FROM tb_notes
-            WHERE type IN (${List.filled(types.length, '?').join(',')})
+            WHERE (${PrivateLibrary.instance.bookIdPredicate()}) AND type IN (${List.filled(types.length, '?').join(',')})
             GROUP BY book_id) n ON n.book_id = b.id
       ORDER BY n.note_count DESC, b.id DESC LIMIT 3
     ''', types);

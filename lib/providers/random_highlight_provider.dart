@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/models/book.dart';
@@ -20,6 +21,7 @@ class RandomHighlightData {
 class RandomHighlight extends _$RandomHighlight {
   @override
   Future<RandomHighlightData?> build() async {
+    ref.watch(privateLibraryRevisionProvider);
     return _load();
   }
 

@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'dart:async';
 
 import 'package:modu_reader/l10n/generated/L10n.dart';
@@ -34,7 +35,9 @@ class CurrentBookTocTool extends RepositoryTool<JsonMap, Map<String, dynamic>> {
     final readingState = _ref.read(currentReadingProvider);
     final tocItems = _ref.read(bookTocProvider);
 
-    if (!readingState.isReading || readingState.book == null) {
+    if (!readingState.isReading ||
+        readingState.book == null ||
+        !PrivateLibrary.instance.canRead(readingState.book!)) {
       return {
         'isReading': false,
         'message':

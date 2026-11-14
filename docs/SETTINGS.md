@@ -44,7 +44,7 @@ Open **Settings** from the home navigation. The app language can follow the syst
 | Sync and backup | WebDAV / S3, automatic and encrypted credential sync, database backup and global settings files/links |
 | Remote library settings | Separate WebDAV browsing and book downloads |
 | Translation | Engine, target language, AI and DeepL / DeepLX |
-| Experimental features | Plugins are off by default; warning and confirmation required; only project-reviewed packages accepted |
+| Experimental features | Plugins, enabled by default; install packages from the signed project catalog |
 | Advanced | Storage, cache, TXT chapter splitting, logs and network |
 | About Modu | Bug reports and feature requests, project links, community, licenses and app updates |
 
@@ -178,15 +178,19 @@ Text-filter profiles live alongside CSS profiles and can hide matching text or i
 
 ## Plugins
 
-Unreleased: **Settings → Experimental features → Plugins** is off by default. Enabling requires reading the warning and confirming; cancelling leaves it off. Consent is local to this device and is never exported or restored from settings backups. Once enabled, **Manage plugins** installs a local `.moduplugin` package (a zip under 5 MB). At this stage a package is declarative data only and contains no executable code. Supported contributions are AI prompt templates and selection-toolbar actions; each package must declare an SPDX license, its capabilities and a semantic version. Selecting a package opens a confirmation page first: name, version, author, license, package size, SHA-256, declared permissions, what will be added, skipped items and the README. Nothing is written until you confirm. The details page shows the same facts for an installed package, its active contributions and its README.
+Open **Settings → Experimental features → Manage plugins**. The plugin switch defaults to on; an existing disabled choice is preserved. Choose GitHub or Gitee to load the reviewed catalog, then select **Download and install**. Review the permissions and confirm installation. Local `.moduplugin` packages use the same verification.
 
-Only releases reviewed by the [Modu project](https://github.com/sobranie2406/modureader) and pinned in the app's built-in catalog are accepted. Package ID, version, complete file list and every file's SHA-256 must match; forged author URLs, modified packages and extra files do not qualify. Verification runs during installation, startup reconciliation and re-enabling. There is no custom source, trust override or script execution switch. New catalog entries require source review and an app update. See [plugin trust policy](development/plugin-trust.md). This reduces risk; it does not guarantee that AI responses are safe or accurate.
+Only versions reviewed and listed in the [official plugin repository](https://github.com/sobranie2406/modu-plugin) are available. Modu verifies the catalog signature, package hash and complete file inventory. Compatible plugins can be installed or updated independently; new host APIs or permissions require a Modu update. See [plugin trust policy](development/plugin-trust.md).
 
-Turning the experimental switch off disables plugins and removes their unedited contributions, but keeps package files, configuration and edited ordinary entries. Turning it back on requires confirmation again and does not automatically re-enable individual plugins. AI actions only send reading context when you invoke them, through your configured AI service.
+Optional plugins include:
 
-Disabling a plugin removes the prompts and toolbar actions it added. Uninstalling also deletes its package files. Entries whose prompt content you edited are kept as ordinary prompts or custom toolbar commands, including during same-ID upgrades. Plugin settings accept text, numbers, toggles, choices and help text; they cannot store passwords or API keys. A prompt or toolbar action may reference a setting as `{setting.<key>}`, resolved each time you run it, so editing a setting changes the next request without rewriting the stored prompt; unknown keys stay literal. Partially deleted prompt packs are not automatically filled back in on restart, preserving intentional user deletions.
+- **Dictionary preprocessing**: after an exact lookup misses, try common English word forms, French elision prefixes and custom regex candidates. Configure the English/French switches and JSON rules in the plugin's settings. Each rule uses `pattern`, `replacement` and optional `flags`; rules apply to the original word independently, in order. Lookup continues through your selected dictionaries.
+- **Web read later**: open the action in the plugin details, enter a webpage URL and choose **Capture**. Preview the Markdown, then **Export Markdown** or **Add to bookshelf**. Extraction runs locally without AI; images remain links.
+- **Private books**: install and enable the plugin to show its protection controls. Mark books as private, choose their shelf visibility and optionally set a six-digit PIN. Protection settings stay on this device; books, progress and notes retain their existing sync behavior.
 
-Global settings backup includes installed-plugin records and plugin settings, but not package files. On another device these records stay disabled while the experimental switch is off. After local confirmation, absent packages show as **Missing** and require an approved package to be installed; saved configuration is retained. Plugin toolbar actions use the same 24 custom-action slots as your own commands.
+Disabling a plugin removes its actions and stops running scripts. Uninstalling also removes its package files. Edited prompts and toolbar commands are retained as ordinary entries. Turning the global switch off keeps package files and settings; turning it back on does not re-enable individual plugins automatically.
+
+Settings backups retain plugin records and ordinary settings, including lookup rules. Package files and signed review proofs must be obtained again on another device. Missing packages show as **Missing** until reinstalled. A locally disabled plugin switch stays disabled during restore. Imported web articles use the existing bookshelf, sync and backup paths.
 
 ## AI configuration, skills and conversations
 
@@ -315,3 +319,5 @@ Advanced contains logs, network and JavaScript options. Enable book scripts and 
 ### 1.3.5 additions
 
 Settings → Reading: popup height limit 40–80% (default 80%); reading popup opacity 20–100% (default 100%). Both stay on this device and are excluded from sync. Opacity is disabled in E-Ink mode; narration and zoom floating bars retain their original appearance.
+
+Plugins are enabled by default on new installations; an existing disabled choice is preserved. Choose GitHub or the Gitee mirror on the plugin page. It loads the signed, reviewed catalog automatically and offers download, permission preview and installation. Compatible new plugins and versions work without updating Modu. Install reviewed packages from the [modu-plugin repository](https://github.com/sobranie2406/modu-plugin). Script selection actions appear after selecting text. Private books is an optional plugin: without it there is no private-books entry or change to the bookshelf. After enabling it, open Private books to mark books, choose the locked/unlocked shelf display, set new imports as private, and optionally set a six-digit PIN. The session locks when the app leaves the foreground. Credentials and protection settings remain local; book files, reading progress and notes retain their existing sync behavior. Private books controls in-app access; it does not encrypt book files.

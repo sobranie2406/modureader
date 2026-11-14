@@ -6,6 +6,57 @@ import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
 import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
 
+/// Uses the validated address bytes while preserving the DNS name for TLS/SNI.
+Future<ConnectionTask<Socket>> connectPluginTls({
+  required PluginGuardResult target,
+  required Duration timeout,
+  required bool Function() isCancelled,
+}) async {
+  final pinned = target.addresses.first;
+  if (pinned.host != target.uri.host) {
+    throw const DictionaryFailure('configuration');
+  }
+  if (isCancelled()) throw const DictionaryFailure('cancelled');
+  // HttpClient does not add TLS around a custom connectionFactory's socket.
+  final task = await SecureSocket.startConnect(pinned, target.uri.port);
+  final result = Completer<Socket>();
+  SecureSocket? connected;
+  var cancelled = false;
+  Timer? timer;
+  void abort(String code) {
+    cancelled = true;
+    task.cancel();
+    connected?.destroy();
+    timer?.cancel();
+    if (!result.isCompleted) {
+      result.completeError(DictionaryFailure(code));
+    }
+  }
+
+  timer = Timer(timeout, () => abort('timeout'));
+  task.socket.then<void>((secure) {
+    connected = secure;
+    if (cancelled || isCancelled()) {
+      abort('cancelled');
+      return;
+    }
+    final remote = secure.remoteAddress;
+    final approved = target.addresses.any((address) =>
+        address.address == remote.address && address.type == remote.type);
+    if (!approved) {
+      abort('configuration');
+      return;
+    }
+    timer?.cancel();
+    result.complete(secure);
+  }, onError: (Object error, StackTrace stack) {
+    timer?.cancel();
+    if (!result.isCompleted) result.completeError(error, stack);
+  });
+  if (isCancelled()) abort('cancelled');
+  return ConnectionTask.fromSocket(result.future, () => abort('cancelled'));
+}
+
 /// Performs the single GET a plugin source is allowed per lookup.
 ///
 /// Everything is bounded: the response is streamed and cancelled as soon as it
@@ -76,23 +127,11 @@ class PluginHttpClient {
     // Pinning the connection to a validated address is what closes the
     // rebinding window: the name is resolved once, by the guard, and never
     // again by the HTTP stack.
-    final pinned = target.addresses.first;
-    client.connectionFactory = (uri, proxyHost, proxyPort) async {
-      final socket = await Socket.connect(pinned, uri.port, timeout: timeout);
-      // Independent second check after connect: whatever answered must be one
-      // of the addresses the guard approved. A proxy or a hijacked route that
-      // landed somewhere else is refused here rather than trusted.
-      final remote = socket.remoteAddress;
-      final approved = target.addresses.any((address) =>
-          address.address == remote.address && address.type == remote.type);
-      if (finished || !approved) {
-        socket.destroy();
-        throw const DictionaryFailure('configuration');
-      }
-      return ConnectionTask.fromSocket(Future.value(socket), () {
-        socket.destroy();
-      });
-    };
+    client.findProxy = (_) => 'DIRECT';
+    client.connectionFactory = (uri, proxyHost, proxyPort) => connectPluginTls(
+        target: target,
+        timeout: timeout,
+        isCancelled: () => finished || (cancel?.isCancelled ?? false));
 
     timer = Timer(timeout, () {
       fail(const DictionaryFailure('timeout'));

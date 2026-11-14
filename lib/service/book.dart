@@ -36,6 +36,8 @@ import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:modu_reader/page/reading_page.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/utils/import_book.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/toast/common.dart';
@@ -517,6 +519,14 @@ Future<void> pushToReadingPage(
     return;
   }
 
+  if (!PrivateLibrary.instance.canRead(book)) {
+    if (!await PrivateLibrary.instance.requestUnlock(context) ||
+        !context.mounted ||
+        !PrivateLibrary.instance.canRead(book)) {
+      return;
+    }
+  }
+
   if (!File(book.fileFullPath).existsSync()) {
     if (book.isLinked) {
       final relink = await showDialog<bool>(
@@ -573,13 +583,16 @@ Future<void> pushToReadingPage(
     navigatorKey.currentContext!,
     readingRoute<void>(
       animate: Prefs().openBookAnimation,
-      builder: (c) => ReadingPage(
-        key: readingPageKey,
-        book: book,
-        cfi: cfi,
-        initialThemes: initialThemes,
-        heroTag: heroTag,
-      ),
+      builder: (c) => PrivateBookGate(
+          book: book,
+          reader: true,
+          builder: (c) => ReadingPage(
+                key: readingPageKey,
+                book: book,
+                cfi: cfi,
+                initialThemes: initialThemes,
+                heroTag: heroTag,
+              )),
     ),
   ).then((_) {
     AnxLog.info('ReadingPage: poped: ${book.title}');
@@ -665,6 +678,7 @@ Future<void> saveBook(
       updateTime: DateTime.now());
 
   try {
+    await PrivateLibrary.instance.onImported(book, isNew: provideBook == null);
     book.id = await bookDao.insertBook(book, sourceMd5: sourceMd5);
   } catch (_) {
     // Only remove newly created staging artifacts; never the imported source.

@@ -1,3 +1,4 @@
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/reading_time.dart';
 import 'package:modu_reader/models/book.dart';
@@ -14,6 +15,9 @@ class ReadingHistoryRecord {
   final ReadingTime entry;
 
   Map<String, dynamic> toMap() {
+    if (!PrivateLibrary.instance.canRead(book)) {
+      throw StateError('Book unavailable');
+    }
     return {
       'bookId': book.id,
       'bookTitle': book.title,
@@ -46,7 +50,7 @@ class ReadingHistoryRepository {
     }
 
     final bookIds = entries.map((entry) => entry.bookId).toSet().toList();
-    final books = await bookDao.selectBooksByIds(bookIds);
+    final books = await bookDao.selectBooksByIds(bookIds, visibleOnly: true);
     final bookMap = {for (final book in books) book.id: book};
 
     final records = <ReadingHistoryRecord>[];

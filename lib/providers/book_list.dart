@@ -1,3 +1,4 @@
+import 'package:modu_reader/providers/private_library.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/tag.dart';
@@ -105,12 +106,13 @@ class BookList extends _$BookList {
   }
 
   Future<List<List<Book>>> _buildWithFilters({String? query}) async {
+    ref.watch(privateLibraryRevisionProvider);
     ref.watch(syncDatabaseRevisionProvider);
     ref.watch(bookshelfPinsProvider);
     final status = ref.watch(readingStatusFilterNotifierProvider);
     final selectedTags = ref.watch(tagSelectionProvider);
 
-    final books = await bookDao.selectNotDeleteBooks();
+    final books = await bookDao.selectNotDeleteBooks(visibleOnly: true);
     final filteredByQuery = query == null || query.isEmpty
         ? books
         : books
