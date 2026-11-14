@@ -443,7 +443,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final style = TranslationTextStyle.decode(value);
     _translatedController.translationStyle = style.textStyle;
     unawaited(style.loadFont().then((_) {
-      if (mounted) setState(() {});
+      if (mounted) setState(() => _fontLayoutRevision++);
     }).catchError((_) {}));
     if (mounted && _showTranslation) setState(() {});
   }
@@ -556,6 +556,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   String? _searchStatus;
   final _scroll = ScrollController();
   Ticker? _autoScrollTicker;
+  Timer? _autoScrollTimer;
   VoidCallback? _autoScrollStopped;
   Duration? _autoScrollElapsed;
   double _autoScrollSpeed = 1;
@@ -563,6 +564,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   double _autoScrollViewport = -1;
   String? _autoScrollText;
   Offset? _autoScrollPointerOrigin;
+  (bool, int, bool)? _autoScrollSettings;
+  bool get _autoScrollRunning => _autoScrollStopped != null;
 
   bool get _autoScrollReady =>
       mounted &&
@@ -574,9 +577,12 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _readingController.selection.isCollapsed;
 
   bool startAutoScroll(double speed, VoidCallback onStopped) {
-    if (_autoScrollTicker != null && _autoScrollReady) {
-      _autoScrollSpeed = speed.isFinite ? speed.clamp(.1, 4).toDouble() : 1;
+    final multiplier = speed.isFinite ? speed.clamp(.1, 4).toDouble() : 1.0;
+    if (_autoScrollRunning && _autoScrollReady) {
+      final changed = multiplier != _autoScrollSpeed;
+      _autoScrollSpeed = multiplier;
       _autoScrollStopped = onStopped;
+      if (changed && Prefs().eInkMode) _restartAutoScrollDriver();
       return true;
     }
     if (!_autoScrollReady ||
@@ -584,33 +590,112 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         _scroll.offset >= _scroll.position.maxScrollExtent - .5) {
       return false;
     }
-    _autoScrollSpeed = speed.isFinite ? speed.clamp(.1, 4).toDouble() : 1;
+    _autoScrollSpeed = multiplier;
     _autoScrollStopped = onStopped;
     _autoScrollText = null;
     _autoScrollElapsed = null;
     _autoScrollPointerOrigin = null;
-    _autoScrollTicker = Ticker(_tickAutoScroll)..start();
+    _restartAutoScrollDriver();
     return true;
   }
 
+  void _autoScrollPreferencesChanged() {
+    final prefs = Prefs();
+    final settings =
+        (prefs.eInkMode, prefs.scrollPagePercent, prefs.scrollAutoAlign);
+    if (_autoScrollSettings == settings) return;
+    final previous = _autoScrollSettings;
+    _autoScrollSettings = settings;
+    if (_autoScrollRunning && previous != null && previous.$1 != settings.$1) {
+      stopAutoScroll();
+    } else if (_autoScrollRunning && settings.$1) {
+      _restartAutoScrollDriver();
+    }
+  }
+
+  void _restartAutoScrollDriver() {
+    _autoScrollTicker?.dispose();
+    _autoScrollTicker = null;
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+    _autoScrollElapsed = null;
+    final prefs = Prefs();
+    _autoScrollSettings =
+        (prefs.eInkMode, prefs.scrollPagePercent, prefs.scrollAutoAlign);
+    if (prefs.eInkMode) {
+      _scheduleEinkAutoScroll();
+    } else {
+      _autoScrollTicker = Ticker(_tickAutoScroll)..start();
+    }
+  }
+
+  bool get _autoScrollAvailable {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return _autoScrollReady &&
+        !widget.readerMenuVisible &&
+        _surfaceKey.currentState?.menuIsOpen != true &&
+        ModalRoute.of(context)?.isCurrent != false &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+  }
+
+  void _scheduleEinkAutoScroll() {
+    if (!_autoScrollAvailable) {
+      stopAutoScroll();
+      return;
+    }
+    _estimateAutoScrollRate();
+    final remaining = _scroll.position.maxScrollExtent - _scroll.offset;
+    if (remaining <= .5) {
+      stopAutoScroll();
+      return;
+    }
+    final distance = _scrollPageDistance(1).clamp(0.0, remaining);
+    final milliseconds =
+        (distance / (_autoScrollPixelsPerSecond * _autoScrollSpeed) * 1000)
+            .round()
+            .clamp(1, 2147483647);
+    _autoScrollTimer =
+        Timer(Duration(milliseconds: milliseconds), _stepEinkAutoScroll);
+  }
+
+  void _stepEinkAutoScroll() {
+    _autoScrollTimer = null;
+    if (!_autoScrollRunning) return;
+    if (!_autoScrollAvailable) {
+      stopAutoScroll();
+      return;
+    }
+    if (_translation.busy ||
+        _autoScrollPointerOrigin != null ||
+        _pendingViewportRestore != null) {
+      _autoScrollTimer =
+          Timer(const Duration(milliseconds: 180), _stepEinkAutoScroll);
+      return;
+    }
+    final end = _scroll.position.maxScrollExtent;
+    _scroll.jumpTo((_scroll.offset + _scrollPageDistance(1))
+        .clamp(_scroll.position.minScrollExtent, end)
+        .toDouble());
+    if (_scroll.offset >= end - .5) {
+      stopAutoScroll();
+    } else {
+      _scheduleEinkAutoScroll();
+    }
+  }
+
   void stopAutoScroll() {
-    final ticker = _autoScrollTicker;
-    if (ticker == null) return;
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+    _autoScrollTicker?.dispose();
     _autoScrollTicker = null;
     _autoScrollElapsed = null;
-    ticker.dispose();
     final stopped = _autoScrollStopped;
     _autoScrollStopped = null;
     stopped?.call();
   }
 
   void _tickAutoScroll(Duration elapsed) {
-    final lifecycle = WidgetsBinding.instance.lifecycleState;
-    if (!_autoScrollReady ||
-        widget.readerMenuVisible ||
-        _surfaceKey.currentState?.menuIsOpen == true ||
-        ModalRoute.of(context)?.isCurrent == false ||
-        (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+    if (!_autoScrollAvailable) {
       stopAutoScroll();
       return;
     }
@@ -619,7 +704,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     // Visible translation can extend the text; wait for its existing request.
     if (previous == null ||
         _translation.busy ||
-        _autoScrollPointerOrigin != null) {
+        _autoScrollPointerOrigin != null ||
+        _pendingViewportRestore != null) {
       return;
     }
     _estimateAutoScrollRate();
@@ -663,6 +749,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _autoScrollPointerDown(PointerDownEvent event) {
+    _cancelViewportRestore();
     if (_autoScrollPointerOrigin != null) stopAutoScroll();
     _autoScrollPointerOrigin = event.position;
   }
@@ -674,6 +761,147 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
             (event.kind == PointerDeviceKind.mouse ? 2 : kTouchSlop)) {
       stopAutoScroll();
     }
+  }
+
+  Object? _readerLayout;
+  EditableTextState? _layoutEditable;
+  DocumentReflowPage? _layoutPage;
+  String? _layoutText;
+  int? _layoutGeneration;
+  int _viewportRestoreEpoch = 0, _fontLayoutRevision = 0;
+  int? _pendingViewportRestore;
+  _ReflowViewportAnchor? _pendingViewportAnchor;
+
+  void _cancelViewportRestore() {
+    _viewportRestoreEpoch++;
+    _pendingViewportRestore = null;
+    _pendingViewportAnchor = null;
+  }
+
+  _ReflowViewportAnchor? _captureViewportAnchor() {
+    final page = _page;
+    final render = _layoutEditable?.mounted == true
+        ? _layoutEditable!.renderEditable
+        : null;
+    final viewport = _translationViewportKey.currentContext?.findRenderObject();
+    if (_busy ||
+        page == null ||
+        !identical(page, _layoutPage) ||
+        _generation != _layoutGeneration ||
+        _readingController.text != _layoutText ||
+        render == null ||
+        !render.hasSize ||
+        viewport is! RenderBox ||
+        !viewport.hasSize ||
+        !_scroll.hasClients ||
+        _scroll.offset <= _scroll.position.minScrollExtent + .5 ||
+        _autoScrollPointerOrigin != null) {
+      return null;
+    }
+    final controller = _readingController;
+    final top = viewport.localToGlobal(Offset.zero).dy;
+    final offset = render
+        .getPositionForPoint(
+            Offset(render.localToGlobal(Offset.zero).dx + 1, top + 1))
+        .offset
+        .clamp(0, controller.text.length);
+    final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
+    return _ReflowViewportAnchor(page, controller, controller.text, offset,
+        render.localToGlobal(caret.topLeft).dy - top);
+  }
+
+  void _trackReaderLayout(Object layout) {
+    if (_readerLayout == layout) return;
+    final anchor = _pendingViewportAnchor ?? _captureViewportAnchor();
+    _readerLayout = layout;
+    final epoch = ++_viewportRestoreEpoch;
+    _pendingViewportRestore = anchor == null ? null : epoch;
+    _pendingViewportAnchor = anchor;
+    final generation = _generation;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _layoutEditable = _textState;
+      _layoutPage = _page;
+      _layoutText = _readingController.text;
+      _layoutGeneration = _generation;
+      if (epoch != _viewportRestoreEpoch) return;
+      _pendingViewportRestore = null;
+      _pendingViewportAnchor = null;
+      if (anchor != null &&
+          !_busy &&
+          generation == _generation &&
+          identical(anchor.page, _page) &&
+          identical(anchor.controller, _readingController) &&
+          anchor.text == _readingController.text &&
+          _scroll.hasClients) {
+        final render = _textState?.renderEditable;
+        final viewport =
+            _translationViewportKey.currentContext?.findRenderObject();
+        if (render != null && viewport is RenderBox && viewport.hasSize) {
+          final caret =
+              render.getLocalRectForCaret(TextPosition(offset: anchor.offset));
+          final currentTop = render.localToGlobal(caret.topLeft).dy -
+              viewport.localToGlobal(Offset.zero).dy;
+          final position = _scroll.position;
+          final target = (_scroll.offset + currentTop - anchor.top)
+              .clamp(position.minScrollExtent, position.maxScrollExtent)
+              .toDouble();
+          if ((target - _scroll.offset).abs() > .01) _scroll.jumpTo(target);
+        }
+      }
+      if (_autoScrollRunning && Prefs().eInkMode) {
+        _restartAutoScrollDriver();
+      }
+    });
+  }
+
+  Rect? _textLineAt(double globalY, {required bool previous}) {
+    final render = _textState?.renderEditable;
+    final text = _readingController.text;
+    if (render == null || text.trim().isEmpty) return null;
+    var offset = render.getPositionForPoint(
+        Offset(render.localToGlobal(Offset.zero).dx + 1, globalY));
+    var line = render.getLineAtOffset(offset);
+    while (text.substring(line.start, line.end).trim().isEmpty) {
+      final next = previous ? line.start - 1 : line.end;
+      if (next < 0 || next >= text.length || next == offset.offset) return null;
+      offset = TextPosition(offset: next);
+      final adjacent = render.getLineAtOffset(offset);
+      if (adjacent == line) return null;
+      line = adjacent;
+    }
+    final boxes = render.getBoxesForSelection(
+        TextSelection(baseOffset: line.start, extentOffset: line.end));
+    if (boxes.isEmpty) return null;
+    final rect =
+        boxes.map((box) => box.toRect()).reduce((a, b) => a.expandToInclude(b));
+    return Rect.fromPoints(render.localToGlobal(rect.topLeft),
+        render.localToGlobal(rect.bottomRight));
+  }
+
+  double _scrollPageDistance(int direction) {
+    final extent = _scroll.position.viewportDimension;
+    final prefs = Prefs();
+    final requested = extent * prefs.scrollPagePercent / 100;
+    if (!prefs.scrollAutoAlign) return requested;
+    final viewport = _translationViewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return requested;
+    final top = viewport.localToGlobal(Offset.zero).dy;
+    final bottom = top + extent;
+    final context = _textLineAt(direction > 0 ? bottom - 1 : top + 1,
+        previous: direction > 0);
+    final aligned = _textLineAt(
+        direction > 0 ? top + requested : bottom - requested,
+        previous: direction > 0);
+    if (context == null || aligned == null) return requested;
+    final contextLimit =
+        direction > 0 ? context.top - top : bottom - context.bottom;
+    if (contextLimit <= .5) return requested;
+    final distance =
+        (direction > 0 ? aligned.top - top : bottom - aligned.bottom)
+            .clamp(0.0, contextLimit);
+    // Very large glyphs and blank lines still need a useful paging step.
+    return distance > .5 ? distance.clamp(0.0, requested) : requested;
   }
 
   final _translationViewportKey = GlobalKey();
@@ -695,8 +923,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _queueVisibleTranslation() {
-    if (_autoScrollTicker != null &&
-        _translationScrollTimer?.isActive == true) {
+    if (_autoScrollRunning && _translationScrollTimer?.isActive == true) {
       return;
     }
     _translationScrollTimer?.cancel();
@@ -775,6 +1002,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                   !_readingController.selection.isCollapsed) {
             return;
           }
+          _cancelViewportRestore();
           _textState?.bringIntoView(TextPosition(offset: offset));
         });
   }
@@ -851,10 +1079,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       }
     });
     Prefs().addListener(_configureTranslationStyle);
+    Prefs().addListener(_autoScrollPreferencesChanged);
     _configureTranslationStyle();
     _scroll.addListener(_queueVisibleTranslation);
     unawaited(_style.loadFont().then((_) {
-      if (mounted) setState(() {});
+      if (mounted) setState(() => _fontLayoutRevision++);
     }).catchError((_) {}));
     unawaited(_load(widget.anchor?.page, anchor: widget.anchor));
   }
@@ -868,6 +1097,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     _generation++;
     _translation.removeListener(_translationChanged);
     Prefs().removeListener(_configureTranslationStyle);
+    Prefs().removeListener(_autoScrollPreferencesChanged);
     _translation.dispose();
     _translationModes.dispose();
     _translationScrollTimer?.cancel();
@@ -902,6 +1132,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final selection = controller.selection;
     if (!selection.isCollapsed) stopAutoScroll();
     if (selection == _observedSelection) return;
+    _cancelViewportRestore();
     _observedSelection = selection;
     widget.onKeyboardEligibilityChanged?.call();
     _selectionEpoch++;
@@ -963,6 +1194,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> turn(int direction) async {
+    _cancelViewportRestore();
     stopAutoScroll();
     if (_busy) return;
     if (_page == null || _navigationPage != _page!.page) {
@@ -972,8 +1204,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     clearSelection();
     widget.clearMenu();
     if (_scroll.hasClients) {
-      final next =
-          _scroll.offset + direction * _scroll.position.viewportDimension * .9;
+      final next = _scroll.offset + direction * _scrollPageDistance(direction);
       if ((direction > 0 &&
               _scroll.offset < _scroll.position.maxScrollExtent - 1) ||
           (direction < 0 && _scroll.offset > 1)) {
@@ -993,6 +1224,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void cancelLoading({bool queued = true}) {
+    _cancelViewportRestore();
     _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     if (queued) _loadRequest++;
@@ -1149,6 +1381,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       bool refresh = false,
       bool followOriginal = false,
       bool Function()? narrationCurrent}) async {
+    _cancelViewportRestore();
     _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     if (narrationCurrent == null) {
@@ -1861,7 +2094,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         onPointerMove: _autoScrollPointerMove,
         onPointerUp: (_) => _autoScrollPointerOrigin = null,
         onPointerCancel: (_) => _autoScrollPointerOrigin = null,
-        onPointerSignal: (_) => stopAutoScroll(),
+        onPointerSignal: (_) {
+          _cancelViewportRestore();
+          stopAutoScroll();
+        },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: (details) => _tapPage(details.globalPosition),
@@ -1878,51 +2114,69 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                                 child: CircularProgressIndicator())
                             : Text(t('等待本页文字', 'Waiting for page text'),
                                 style: TextStyle(color: foreground)))
-                    : ScrollConfiguration(
-                        // EditableText re-enables scrollbars; do not inherit app gutters.
-                        behavior: const MaterialScrollBehavior()
-                            .copyWith(scrollbars: false),
-                        child: AppScrollbar(
-                            controller: _scroll,
-                            child: SingleChildScrollView(
-                                key: _translationViewportKey,
+                    : LayoutBuilder(builder: (context, constraints) {
+                        _trackReaderLayout((
+                          constraints.biggest,
+                          css.textStyle,
+                          css.alignment ?? _style.alignment,
+                          _style.padding,
+                          _controller.paragraphSpacing,
+                          _translatedController.translationStyle,
+                          MediaQuery.textScalerOf(context),
+                          _fontLayoutRevision,
+                          _filterSignature,
+                          _generation,
+                          _readingController
+                        ));
+                        return ScrollConfiguration(
+                            // EditableText re-enables scrollbars; do not inherit app gutters.
+                            behavior: const MaterialScrollBehavior()
+                                .copyWith(scrollbars: false),
+                            child: AppScrollbar(
                                 controller: _scroll,
-                                padding: _style.padding,
-                                child: Listener(
-                                    onPointerSignal: _handlePdfWheelZoom,
-                                    onPointerDown: _selectionPointerDown,
-                                    onPointerMove: _selectionPointerMove,
-                                    onPointerUp: _selectionPointerUp,
-                                    onPointerCancel: (_) =>
-                                        _resetSelectionGesture(),
-                                    child: KeyedSubtree(
-                                        key: _textFieldKey,
-                                        child: Stack(children: [
-                                          TextField(
-                                            key: ValueKey(_showTranslation
-                                                ? 'reflow-translated-text'
-                                                : 'reflow-text'),
-                                            controller: _readingController,
-                                            focusNode: _focus,
-                                            readOnly: true,
-                                            maxLines: null,
-                                            showCursor: false,
-                                            enableSuggestions: false,
-                                            style: css.textStyle,
-                                            textAlign: css.alignment ??
-                                                _style.alignment,
-                                            decoration: const InputDecoration(
-                                                border: InputBorder.none,
-                                                isCollapsed: true,
-                                                contentPadding:
-                                                    EdgeInsets.zero),
-                                            contextMenuBuilder: _selectionMenu,
-                                            onTapOutside: (_) {},
-                                          ),
-                                          if (_quickMarkTouchMode)
-                                            Positioned.fill(
-                                                child: _quickMarkOverlay()),
-                                        ]))))))),
+                                child: SingleChildScrollView(
+                                    key: _translationViewportKey,
+                                    controller: _scroll,
+                                    padding: _style.padding,
+                                    child: Listener(
+                                        onPointerSignal: _handlePdfWheelZoom,
+                                        onPointerDown: _selectionPointerDown,
+                                        onPointerMove: _selectionPointerMove,
+                                        onPointerUp: _selectionPointerUp,
+                                        onPointerCancel: (_) =>
+                                            _resetSelectionGesture(),
+                                        child: KeyedSubtree(
+                                            key: _textFieldKey,
+                                            child: Stack(children: [
+                                              TextField(
+                                                key: ValueKey(_showTranslation
+                                                    ? 'reflow-translated-text'
+                                                    : 'reflow-text'),
+                                                controller: _readingController,
+                                                focusNode: _focus,
+                                                readOnly: true,
+                                                maxLines: null,
+                                                showCursor: false,
+                                                enableSuggestions: false,
+                                                style: css.textStyle,
+                                                textAlign: css.alignment ??
+                                                    _style.alignment,
+                                                decoration:
+                                                    const InputDecoration(
+                                                        border:
+                                                            InputBorder.none,
+                                                        isCollapsed: true,
+                                                        contentPadding:
+                                                            EdgeInsets.zero),
+                                                contextMenuBuilder:
+                                                    _selectionMenu,
+                                                onTapOutside: (_) {},
+                                              ),
+                                              if (_quickMarkTouchMode)
+                                                Positioned.fill(
+                                                    child: _quickMarkOverlay()),
+                                            ]))))));
+                      })),
             if (_needsModel || _error != null)
               Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1985,6 +2239,16 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
           ]),
     );
   }
+}
+
+class _ReflowViewportAnchor {
+  const _ReflowViewportAnchor(
+      this.page, this.controller, this.text, this.offset, this.top);
+  final DocumentReflowPage page;
+  final TextEditingController controller;
+  final String text;
+  final int offset;
+  final double top;
 }
 
 class _ReflowQuickMarkStroke {

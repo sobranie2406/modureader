@@ -60,16 +60,31 @@ export class ReaderAutoScroll {
       this.host.document.visibilityState !== 'hidden' &&
       !(renderer.getContents?.() ?? []).some(({ doc }) => doc.getSelection()?.toString())
   }
-  refresh() { this.lastEstimate = null }
-  set({ enabled, speed = 1, session } = {}) {
+  refresh() {
+    this.lastEstimate = null
+    if (this.running && this.eInkMode && !this.advancing) this.scheduleEink?.()
+  }
+  cancelScheduled() {
+    if (this.frame != null) this.host.cancelAnimationFrame(this.frame)
+    if (this.timer != null) this.host.clearTimeout(this.timer)
+    this.frame = this.timer = null
+    this.scheduleEink = null
+  }
+  set({ enabled, speed = 1, session, eInkMode = false } = {}) {
     if (enabled !== true) { this.stop('manual'); return false }
     const renderer = this.renderer()
     if (!this.available(renderer)) { this.stop('unsupported'); return false }
     this.speed = Math.max(.1, Math.min(4, Number.isFinite(speed) ? speed : 1))
-    if (this.running && this.currentRenderer === renderer) return true
-    this.stop('renderer')
+    if (this.running && this.currentRenderer === renderer && this.eInkMode === eInkMode) {
+      if (eInkMode && !this.advancing) this.scheduleEink?.()
+      return true
+    }
+    if (this.running && this.currentRenderer === renderer) this.cancelScheduled()
+    else this.stop('renderer')
     this.running = true
-    this.session = session
+    this.session = session ?? this.session
+    this.eInkMode = eInkMode
+    this.advancing = false
     this.currentRenderer = renderer
     this.lastTime = null
     this.distance = 0
@@ -81,13 +96,7 @@ export class ReaderAutoScroll {
     const generation = ++this.generation
     const active = () => this.running && this.generation === generation &&
       this.renderer() === renderer && this.available(renderer)
-    const schedule = () => { this.frame = this.host.requestAnimationFrame(tick) }
-    const tick = async time => {
-      this.frame = null
-      if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
-      const elapsed = this.lastTime == null ? 0 : Math.min(100, Math.max(0, time - this.lastTime))
-      this.lastTime = time
-      this.lastFlush ??= time
+    const pace = time => {
       if (this.lastEstimate == null || time - this.lastEstimate >= 1000) {
         try {
           const estimate = renderer.getAutoScrollSpeed?.(this.pixelsPerSecond)
@@ -95,35 +104,66 @@ export class ReaderAutoScroll {
         } catch { /* Keep the last pace while fonts or images change layout. */ }
         this.lastEstimate = time
       }
-      // Accumulate whole pixels: older WebViews round a fractional scrollTop.
-      this.distance += this.speed * this.pixelsPerSecond * elapsed / 1000
-      const distance = Math.floor(this.distance)
-      if (distance) {
-        this.distance -= distance
-        try {
-          const result = await renderer.autoScrollBy(distance, active)
-          if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
-          if (result !== 'moved') { this.stop(result === 'end' ? 'end' : 'inactive'); return }
-          if (time - this.lastFlush >= 500) {
-            renderer.flushAutoScrollPosition?.()
-            this.lastFlush = time
-          }
-        } catch {
-          if (this.generation === generation) this.stop('error')
-          return
+      return this.speed * this.pixelsPerSecond
+    }
+    const advance = async (distance, time) => {
+      this.advancing = true
+      try {
+        const result = await renderer.autoScrollBy(distance, active)
+        if (!active()) { if (this.generation === generation) this.stop('inactive'); return false }
+        if (typeof result === 'number' && Number.isFinite(result) && result >= 0) {
+          // Subpixel scrollTop may still quantize to physical pixels. Keep both
+          // undershoot and overshoot instead of losing or multiplying distance.
+          this.distance -= result
+        } else if (result === 'moved') this.distance -= distance
+        else { this.stop(result === 'end' ? 'end' : 'inactive'); return false }
+        if (this.eInkMode || time - this.lastFlush >= 500) {
+          renderer.flushAutoScrollPosition?.()
+          this.lastFlush = time
         }
+        return true
+      } catch {
+        if (this.generation === generation) this.stop('error')
+        return false
+      } finally {
+        if (this.generation === generation) this.advancing = false
       }
+    }
+    const schedule = () => { this.frame = this.host.requestAnimationFrame(tick) }
+    const tick = async time => {
+      if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
+      this.frame = null
+      const elapsed = this.lastTime == null ? 0 : Math.min(100, Math.max(0, time - this.lastTime))
+      this.lastTime = time
+      this.lastFlush ??= time
+      this.distance += pace(time) * elapsed / 1000
+      const distance = renderer.supportsFractionalAutoScroll?.() ? this.distance : Math.floor(this.distance)
+      if (distance > 0 && !await advance(distance, time)) return
       if (active()) schedule()
     }
-    schedule()
+    if (eInkMode) {
+      const now = () => this.host.performance?.now?.() ?? Date.now()
+      this.scheduleEink = () => {
+        if (this.timer != null) this.host.clearTimeout(this.timer)
+        if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
+        const step = this.distance > .001 ? this.distance : renderer.getAutoScrollStep?.() ?? 600
+        const delay = Math.max(100, Math.min(2147483647, step / pace(now()) * 1000))
+        this.timer = this.host.setTimeout(async () => {
+          if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
+          this.timer = null
+          if (this.distance <= .001) this.distance += step
+          if (await advance(this.distance, now()) && active()) this.scheduleEink()
+        }, delay)
+      }
+      this.scheduleEink()
+    } else schedule()
     return true
   }
   stop(reason = 'manual') {
     if (!this.running) return
     this.running = false
     this.generation++
-    if (this.frame != null) this.host.cancelAnimationFrame(this.frame)
-    this.frame = null
+    this.cancelScheduled()
     const renderer = this.currentRenderer
     this.currentRenderer = null
     try { renderer.flushAutoScrollPosition?.() }

@@ -13,6 +13,8 @@ export class ContinuousSectionWindow {
   loadQueue = []
   loading = false
   anchor = null
+  textAnchor = null
+  scrolling = 0
   constructor({ container, sections, create, activate, changed, alignScroll,
     maxViews = 9, maxBytes = 8 * 1024 * 1024 }) {
     Object.assign(this, { container, sections, create, activate, changed, alignScroll, maxViews, maxBytes })
@@ -54,15 +56,17 @@ export class ContinuousSectionWindow {
     while (this.entries.size >= this.maxViews || (this.entries.size > 0 &&
       bytes() + (this.sections[index].size || 0) > this.maxBytes)) {
       const list = this.ordered
-      const candidates = [...this.entries.values()].filter(e => e !== this.current && e.index !== this.pinned &&
+      const candidates = [...this.entries.values()].filter(e => e !== this.current && e !== this.scrollOrigin && e.index !== this.pinned &&
         (e.detached || e === list[0] || e === list.at(-1)) &&
         (foreground || e.detached || (index > list.at(-1)?.index ? e === list[0] : e === list.at(-1))) &&
         (foreground || e.detached || Math.abs(e.index - this.current.index) > Math.abs(index - this.current.index)) &&
-        !e.view.document.getSelection()?.toString() && (foreground ||
+        !e.view.document.getSelection()?.toString() && ((foreground && !this.scrolling) ||
           this.top(e) + e.view.element.getBoundingClientRect().height < this.container.scrollTop ||
           this.top(e) > this.container.scrollTop + this.height))
       candidates.sort((a, b) => Math.abs(b.index - index) - Math.abs(a.index - index))
-      if (!candidates.length) return foreground
+      // Extremely short chapters can fill one viewport with more than nine
+      // frames. Retain that visible window, with a fixed pathological-case cap.
+      if (!candidates.length) return foreground && (!this.scrolling || this.entries.size < this.maxViews * 4)
       this.remember()
       this.drop(candidates[0])
       this.compensate()
@@ -176,14 +180,14 @@ export class ContinuousSectionWindow {
     entry.activated = true
     this.remember()
   }
-  track() {
+  track(list = this.ordered) {
     if (this.closed || this.busy) return
     const position = this.container.scrollTop + 1
-    const entry = this.ordered.find(e => this.top(e) + e.view.element.getBoundingClientRect().height > position)
+    const entry = list.find(e => this.top(e) + e.view.element.getBoundingClientRect().height > position) ?? list.at(-1)
     this.select(entry)
     // Initialize only documents actually visible, not speculative neighbors.
     // Restore the primary chapter after wiring a visible trailing document.
-    for (const e of this.ordered) if (!e.activated && this.top(e) < position + this.height &&
+    for (const e of list) if (!e.activated && this.top(e) < position + this.height &&
       this.top(e) + e.view.element.getBoundingClientRect().height > position) {
       this.activate(e)
       e.activated = true
@@ -237,10 +241,22 @@ export class ContinuousSectionWindow {
     if (this.closed || this.busy) return
     if (this.anchor && Math.abs(this.container.scrollTop - this.anchor.scroll) > 1) {
       this.track()
-      return
+    } else this.compensate()
+    const anchor = this.textAnchor
+    if (anchor?.entry === this.current && this.entries.has(anchor.entry.index)) {
+      const top = anchor.range.getBoundingClientRect?.().top
+      if (Number.isFinite(top)) {
+        this.container.scrollTop += top - anchor.top
+        anchor.top = top
+        this.remember()
+      }
     }
-    this.compensate()
     this.warm()
+  }
+  rememberText(range) {
+    const top = range?.getBoundingClientRect?.().top
+    this.textAnchor = Number.isFinite(top) && range.startContainer?.ownerDocument === this.current?.view.document
+      ? { entry: this.current, range, top } : null
   }
   updateTail() {
     const last = this.ordered.at(-1)
@@ -249,13 +265,17 @@ export class ContinuousSectionWindow {
     const end = last ? this.top(last) + last.view.element.getBoundingClientRect().height : 0
     const needed = !last || this.adjacent(last.index, 1) != null
       ? Math.max(0, this.container.scrollTop + this.height * 1.5 - end) : 0
-    this.tailSpace.style.height = `${Math.min(this.height, needed)}px`
+    const height = `${Math.min(this.height, needed)}px`
+    if (this.tailSpace.style.height !== height) this.tailSpace.style.height = height
   }
   async autoScrollBy(distance, active = () => true) {
     if (this.closed || this.busy || !this.current || !active()) return 'inactive'
+    this.scrolling++
     const origin = this.current
+    this.scrollOrigin = origin
     const offset = this.top(origin) - this.container.scrollTop
     const start = () => this.top(origin) - offset
+    try {
     for (let n = 0; n < this.maxViews && !this.closed && active(); n++) {
       const last = this.ordered.at(-1)
       if (this.top(last) + last.view.element.getBoundingClientRect().height >= start() + distance + this.height) break
@@ -267,14 +287,20 @@ export class ContinuousSectionWindow {
     const end = this.top(last) + last.view.element.getBoundingClientRect().height
     const before = start()
     this.container.scrollTop = Math.max(0, Math.min(before + distance, end - this.height))
-    const moved = this.container.scrollTop > before
-    this.track()
+    const moved = this.container.scrollTop - before
+    this.track(this.ordered)
     this.updateTail()
-    return moved ? 'moved' : 'end'
+    return moved > 0 ? moved : this.adjacent(last.index, 1) == null ? 'end'
+      : this.entries.size >= this.maxViews * 4 ? 'inactive' : 0
+    } finally {
+      this.scrolling--
+      if (this.scrollOrigin === origin) this.scrollOrigin = null
+    }
   }
   async scrollBy(distance) {
     if (this.closed || !this.current || !Number.isFinite(distance) || !distance) return
     this.busy = true
+    this.scrolling++
     // Keep the origin relative to a retained document: prepending a previous
     // chapter changes scrollTop, but must not change the requested page step.
     const origin = this.current
@@ -301,6 +327,7 @@ export class ContinuousSectionWindow {
       this.container.scrollTop = Math.max(0, Math.min(aligned, end - this.height))
     } finally {
       this.busy = false
+      this.scrolling--
       this.track()
       if (!this.closed) this.updateTail()
     }

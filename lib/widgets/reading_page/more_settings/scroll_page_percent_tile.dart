@@ -27,8 +27,8 @@ class _ScrollPagePercentTileState extends State<ScrollPagePercentTile> {
           title: SettingHelpTitle(
               title: ModuStrings.text(context, '滚动翻页幅度', 'Scroll page step'),
               description: zh
-                  ? '滚动模式下，每次翻页移动一屏的 $_percent%，保留 ${100 - _percent}% 重叠内容。不影响手指自由滚动。'
-                  : 'Move $_percent% of a screen per page turn, with ${100 - _percent}% overlap. Free scrolling is unchanged.'),
+                  ? '每次翻页移动一屏的 $_percent%；开启行对齐时，以此为上限并保留一行。不影响手指滚动。'
+                  : 'Move $_percent% of a screen per turn. With line alignment, this is the maximum step and one line stays visible. Free scrolling is unchanged.'),
           trailing: Text('$_percent%'),
         ),
         Slider(

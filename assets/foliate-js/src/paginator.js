@@ -593,6 +593,9 @@ export class Paginator extends HTMLElement {
   #coalesceScrollProgress = /Android|OpenHarmony|HarmonyOS/i.test(navigator.userAgent)
   #lineSettleTimer = null
   #autoScrolling = false
+  #fractionalAutoScroll = null
+  #fractionalAutoScrollDpr = null
+  #anchorTop = null
   #scrollPointerDown = false
   #lastScrollTop = 0
   #scrollDirection = 1
@@ -882,7 +885,7 @@ export class Paginator extends HTMLElement {
     this.#view = new View({
       container: this,
       onExpand: () => {
-        if (!this.#preparingView && !this.#destroyed) this.scrollToAnchor(this.#anchor)
+        if (!this.#preparingView && !this.#destroyed) this.#restoreExpandedAnchor()
       },
     })
     // Keep the old iframe attached: moving/cloning it would reload its document
@@ -1031,14 +1034,15 @@ export class Paginator extends HTMLElement {
         this.#continuous = null
         this.#view = entry.view
         this.#view.onExpand = () => {
-          if (!this.#preparingView && !this.#destroyed) this.scrollToAnchor(this.#anchor)
+          if (!this.#preparingView && !this.#destroyed) this.#restoreExpandedAnchor()
         }
         this.#view.render(this.#beforeRender(this.#view.refreshDirection()))
         return
       }
       for (const entry of this.#continuous.ordered)
         entry.view.render(this.#beforeRender({ vertical: false, rtl: false }))
-      this.scrollToAnchor(this.#anchor)
+      if (this.#continuous.textAnchor?.entry === this.#continuous.current) this.#afterScroll('layout')
+      else this.scrollToAnchor(this.#anchor)
       return
     }
     if (!this.#view || this.#preparingView || this.#destroyed) return
@@ -1095,9 +1099,56 @@ export class Paginator extends HTMLElement {
     if (horizontal) element.scrollBy({ left: delta, top: 0, behavior: 'auto' })
     else element.scrollBy({ left: 0, top: delta, behavior: 'auto' })
   }
+  #restoreExpandedAnchor() {
+    const doc = this.#anchor?.startContainer?.ownerDocument
+    const top = this.#anchor?.getBoundingClientRect?.().top
+    if (this.scrolled && !this.#vertical && doc === this.#view?.document &&
+        Number.isFinite(top) && Number.isFinite(this.#anchorTop)) {
+      this.#container.scrollTop += top - this.#anchorTop
+      this.#anchorTop = top
+      this.#afterScroll('layout')
+    } else this.scrollToAnchor(this.#anchor)
+  }
   get autoScrollSupported() {
     return this.scrolled && !this.#vertical && !this.#destroyed && !!this.#view
   }
+  supportsFractionalAutoScroll() {
+    const dpr = globalThis.devicePixelRatio ?? 1
+    if (this.#fractionalAutoScroll != null && this.#fractionalAutoScrollDpr === dpr) return this.#fractionalAutoScroll
+    const element = this.#container, before = element.scrollTop
+    const max = element.scrollHeight - element.clientHeight
+    if (max < 1) return false
+    element.scrollTop = before + (before + .5 <= max ? .5 : -.5)
+    const delta = Math.abs(element.scrollTop - before)
+    element.scrollTop = before
+    this.#fractionalAutoScrollDpr = dpr
+    return this.#fractionalAutoScroll = delta > .001 && delta < .999
+  }
+  scrollPageTarget(target, current) {
+    if (!this.scrolled || this.#vertical || this.getAttribute('scroll-auto-align') === 'false') return target
+    const documents = this.#continuous
+      ? this.#continuous.ordered.map(entry => ({ doc: entry.view.document,
+        offset: this.#continuous.top(entry) + this.#margin }))
+      : [{ doc: this.#view?.document, offset: this.#margin }]
+    const forward = target > current
+    let boundary = null
+    for (const { doc, offset } of documents) {
+      const lines = prepareScrollLines(doc)
+      let lo = 0, hi = lines.length
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1
+        if (lines[mid].top + offset < current - .5) lo = mid + 1
+        else hi = mid
+      }
+      for (let i = lo; i < lines.length && lines[i].bottom + offset <= current + this.size + .5; i++) {
+        const value = forward ? lines[i].top + offset : lines[i].bottom + offset - this.size
+        boundary = boundary == null ? value : forward ? Math.max(boundary, value) : Math.min(boundary, value)
+      }
+    }
+    if (boundary == null || Math.abs(boundary - current) < 1) return target
+    return forward ? Math.min(target, boundary) : Math.max(target, boundary)
+  }
+  getAutoScrollStep() { return Math.max(1, this.scrollPageTarget(this.start + this.scrollPageStep, this.start) - this.start) }
   getAutoScrollSpeed(fallback = 10) {
     if (!this.autoScrollSupported || this.#preparingView) return fallback
     if (!this.#continuous) return autoScrollPixelsPerSecond([
@@ -1125,10 +1176,17 @@ export class Paginator extends HTMLElement {
   }
   async autoScrollBy(distance, active = () => true) {
     if (!this.autoScrollSupported || this.#locked || this.#preparingView || !active()) return 'inactive'
-    if (this.#continuous) return this.#continuous.autoScrollBy(distance, active)
+    if (this.#continuous) {
+      const window = this.#continuous
+      const moved = await window.autoScrollBy(distance, active)
+      if (this.#continuous === window && active() && typeof moved === 'number' && moved > 0 &&
+          window.textAnchor?.entry !== window.current) this.#afterScroll('auto-scroll', true)
+      return moved
+    }
     const before = this.#container.scrollTop
     this.#container.scrollTop = Math.max(0, Math.min(before + distance, this.viewSize - this.size))
-    return this.#container.scrollTop > before ? 'moved' : 'end'
+    const moved = this.#container.scrollTop - before
+    return moved > 0 ? moved : before >= this.viewSize - this.size - .001 ? 'end' : 0
   }
   flushAutoScrollPosition() { this.#afterScroll('auto-scroll', true) }
   snap(vx, vy, touchState) {
@@ -1561,6 +1619,7 @@ export class Paginator extends HTMLElement {
       return
     }
     this.#anchor = anchor
+    this.#anchorTop = null
     const rects = uncollapse(anchor)?.getClientRects?.()
     // if anchor is an element or a range
     if (rects) {
@@ -1631,6 +1690,7 @@ export class Paginator extends HTMLElement {
         Math.min(height, start + this.size - this.#margin),
         ({ top, bottom }) => ({ left: top, right: bottom }))
       this.#anchor = range
+      this.#continuous.rememberText(range)
       this.dispatchEvent(new CustomEvent('relocate', { detail: { reason, range,
         index: entry.index, fraction: Math.max(0, Math.min(1, start / Math.max(1, height))),
         size: this.size / Math.max(1, height),
@@ -1639,7 +1699,10 @@ export class Paginator extends HTMLElement {
     }
     const range = this.#getVisibleRange()
     // don't set new anchor if relocation was to scroll to anchor
-    if (reason !== 'anchor' && reason !== 'navigation') this.#anchor = range
+    if (reason !== 'anchor' && reason !== 'navigation') {
+      this.#anchor = range
+      this.#anchorTop = range?.getBoundingClientRect?.().top ?? null
+    }
     else this.#justAnchored = true
 
     const index = this.#index
@@ -2000,6 +2063,7 @@ export class Paginator extends HTMLElement {
   }
   #alignScrollTarget(target, current, settled = false) {
     if (this.getAttribute('scroll-auto-align') === 'false') return target
+    if (!settled) target = this.scrollPageTarget(target, current)
     const documents = this.#continuous
       ? this.#continuous.ordered.map(entry => ({ doc: entry.view.document,
         offset: this.#continuous.top(entry) + this.#margin }))

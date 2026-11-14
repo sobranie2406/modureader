@@ -28,6 +28,7 @@ function harness() {
     getContents() { return [{doc: {getSelection: () => this.selected}}] }
     #scrollTo(...args) { this.scrolls.push(args) }
     align(...args) { return this.#alignScrollTarget(...args) }
+    scrollPageTarget(target) {return target}
     schedule(direction = 1) { this.#needsLineSettle = true; this.#scrollDirection = direction; this.#scheduleLineSettle() }
     ${methods}
   })`, context)

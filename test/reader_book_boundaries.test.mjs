@@ -34,6 +34,7 @@ const Renderer = runInNewContext(`class Renderer {
   set animationElement(value) {this.#view.element = value}
   percent = null;
   getAttribute() {return this.percent}
+  scrollPageTarget(target) {return target}
   #afterScroll() {this.relocations++}
   setStyles() {} dispatchEvent() {}
   async #display(target) {

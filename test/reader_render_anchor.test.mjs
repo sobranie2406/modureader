@@ -18,6 +18,8 @@ const Renderer = vm.runInNewContext(`class Renderer {
     }
   }
   #beforeRender(direction) {return direction}
+  #afterScroll() {}
+  #restoreExpandedAnchor() {this.scrollToAnchor(this.#anchor)}
   scrollToAnchor(anchor) {this.restores.push(anchor)}
   ${method}
 }; Renderer`);
@@ -26,4 +28,19 @@ for (const continuous of [false,true]) test(`a layout restores its saved anchor 
   renderer.render();
   assert.equal(renderer.layouts,1);
   assert.deepEqual([...renderer.restores],['saved-position']);
+});
+
+test('single-chapter expansion compensates a live word range rather than rewinding to an old scroll position',()=>{
+  const method=source.slice(source.indexOf('  #restoreExpandedAnchor() {'),source.indexOf('  get autoScrollSupported()'));
+  const Reader=vm.runInNewContext(`class Reader {
+    #view={document:{}};#vertical=false;#anchor;#anchorTop=100;#container={scrollTop:125};
+    scrolled=true;top=100;fallback=0;
+    constructor(){this.#anchor={startContainer:{ownerDocument:this.#view.document},getBoundingClientRect:()=>({top:this.top})}}
+    #afterScroll(){}scrollToAnchor(){this.fallback++}
+    expand(){this.#restoreExpandedAnchor()}get scroll(){return this.#container.scrollTop}
+    ${method}
+  };Reader`);
+  const reader=new Reader();reader.top=300;reader.expand();
+  assert.equal(reader.scroll,325);assert.equal(reader.fallback,0);
+  reader.top=150;reader.expand();assert.equal(reader.scroll,175);
 });

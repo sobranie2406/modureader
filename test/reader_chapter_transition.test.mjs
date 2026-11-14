@@ -39,6 +39,7 @@ function fixture(cache) {
     get view() {return this.#view} get index() {return this.#index}
     get preparing() {return this.#preparingView}
     #beforeRender() {return {}}
+    #restoreExpandedAnchor() {this.scrollToAnchor(this.#anchor)}
     render() {this.anchors.push('restore')}
     scrollToAnchor(anchor) {this.#anchor = anchor; this.anchors.push(anchor)}
     dispatchEvent(e) {this.events.push(e.type)}

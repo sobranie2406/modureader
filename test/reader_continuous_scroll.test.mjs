@@ -7,12 +7,13 @@ const pause = () => new Promise(r => setTimeout(r, 160));
 
 function fixture(chapterHeight = 120) {
   const nodes = [], loaded = [], unloaded = [], activated = [];
+  const heights = new Map();
   let scroll = 0, fail = -1, releases;
   const container = {style:{}, clientHeight:600, getBoundingClientRect:()=>({top:0}),
     ownerDocument:{createElement:()=>element(null)}, append:e=>nodes.push(e),
     get scrollHeight(){return ordered().reduce((h,e)=>h+height(e),0)},
     get scrollTop(){return scroll},set scrollTop(v){scroll=Math.max(0,Math.min(v,this.scrollHeight-this.clientHeight))}};
-  const height = e => e.style.display === 'none' || e.style.position === 'absolute' ? 0 : e.index == null ? parseFloat(e.style.height)||0 : chapterHeight;
+  const height = e => e.style.display === 'none' || e.style.position === 'absolute' ? 0 : e.index == null ? parseFloat(e.style.height)||0 : heights.get(e.index)??chapterHeight;
   const ordered = () => nodes.filter(e=>!e.removed).sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0));
   function element(index) {return {index,style:{},removed:false,remove(){this.removed=true},
     getBoundingClientRect(){let y=0;for(const e of ordered()){if(e===this)break;y+=height(e)}return {top:y-scroll,height:height(this)}}};}
@@ -26,6 +27,7 @@ function fixture(chapterHeight = 120) {
     activate:e=>activated.push(e.index)});
   const go=index=>window.goTo(index,0,false,()=>{container.scrollTop=window.top(window.current)});
   return {window,container,loaded,unloaded,activated,go,setFail:i=>fail=i,
+    setHeight:(index,value)=>heights.set(index,value),
     block:promise=>releases=promise};
 }
 
@@ -50,6 +52,38 @@ test('automatic scrolling crosses chapters without line snapping and stops at th
     assert.equal(f.container.scrollTop,f.window.top(last)+1000-600);
     assert.ok(!f.loaded.includes(4),'non-linear sections remain skipped');
   } finally {f.window.destroy()}
+});
+
+test('short chapters fill a viewport without skipping visible chapters or discarding pending distance',async()=>{
+  const f=fixture(50);let ended=false;
+  try{
+    await f.go(0);
+    for(let n=0;n<60;n++){
+      const result=await f.window.autoScrollBy(100);
+      const ordered=f.window.ordered;
+      for(let i=1;i<ordered.length;i++)assert.equal(ordered[i].index,f.window.adjacent(ordered[i-1].index,1));
+      assert.ok(ordered.length<=f.window.maxViews*4);
+      if(result==='end'){ended=true;break}
+    }
+    assert.equal(ended,true);
+    const last=f.window.ordered.at(-1);assert.equal(last.index,39);
+    assert.equal(f.container.scrollTop,f.window.top(last)+50-600);
+  }finally{f.window.destroy()}
+});
+
+test('late image/font height changes preserve the live text anchor plus intervening scrolling',async()=>{
+  const f=fixture(3000);let lineTop=1000;
+  try{
+    await f.go(0);await f.window.autoScrollBy(100);
+    const doc=f.window.current.view.document;
+    f.window.rememberText({startContainer:{ownerDocument:doc},getBoundingClientRect:()=>({top:lineTop})});
+    await f.window.autoScrollBy(25);
+    const visibleY=lineTop-f.container.scrollTop;
+    lineTop+=200;f.setHeight(0,3200);f.window.resize();
+    assert.equal(lineTop-f.container.scrollTop,visibleY);
+    lineTop-=150;f.setHeight(0,3050);f.window.resize();
+    assert.equal(lineTop-f.container.scrollTop,visibleY);
+  }finally{f.window.destroy()}
 });
 
 test('automatic scrolling cancelled during chapter preparation does not move after loading', async () => {

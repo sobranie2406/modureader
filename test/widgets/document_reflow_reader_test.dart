@@ -1,4 +1,5 @@
 import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/models/css_visual_style.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:modu_reader/service/installed_fonts.dart';
@@ -17,6 +18,7 @@ import 'package:modu_reader/service/ocr/document_text_geometry.dart';
 import 'package:modu_reader/service/ocr/document_text_style.dart';
 import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:modu_reader/widgets/reading_page/document_reflow_reader.dart';
+import 'package:modu_reader/widgets/reading_page/document_text_style_dialog.dart';
 import 'package:modu_reader/widgets/reading_page/document_reader_surface.dart';
 import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/more_settings.dart';
@@ -223,6 +225,324 @@ void main() {
       .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
       .controller!
       .text;
+
+  Finder reflowViewport() => find
+      .ancestor(
+          of: find.byKey(const ValueKey('reflow-text')),
+          matching: find.byType(SingleChildScrollView))
+      .first;
+
+  ScrollController reflowScroll(WidgetTester tester) =>
+      tester.widget<SingleChildScrollView>(reflowViewport()).controller!;
+
+  (int, double) visibleAnchor(WidgetTester tester) {
+    final render = tester
+        .state<EditableTextState>(find.byType(EditableText).first)
+        .renderEditable;
+    final top = tester.getTopLeft(reflowViewport()).dy;
+    final offset = render
+        .getPositionForPoint(
+            Offset(render.localToGlobal(Offset.zero).dx + 1, top + 1))
+        .offset;
+    final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
+    return (offset, render.localToGlobal(caret.topLeft).dy - top);
+  }
+
+  double anchorTop(WidgetTester tester, int offset) {
+    final render = tester
+        .state<EditableTextState>(find.byType(EditableText).first)
+        .renderEditable;
+    final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
+    return render.localToGlobal(caret.topLeft).dy -
+        tester.getTopLeft(reflowViewport()).dy;
+  }
+
+  testWidgets('reflow style changes retain the visible source line and anchors',
+      (tester) async {
+    var reads = 0;
+    await open(tester, extract: (_) async {
+      reads++;
+      return List.generate(100, (i) => 'Paragraph $i. More words for reflow.')
+          .join('\n\n');
+    });
+    final scroll = reflowScroll(tester);
+    scroll.jumpTo(900);
+    await tester.pumpAndSettle();
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final controller = tester.widget<TextField>(field).controller!;
+    final source = key.currentState!.narrationSource!;
+    final originalText = controller.text;
+    final page = key.currentState!.quickMarkPage;
+    for (final style in [
+      const DocumentTextStyle(size: 30),
+      const DocumentTextStyle(size: 30, height: 2.2, spacing: 1),
+      const DocumentTextStyle(size: 30, height: 2.2, serif: true),
+    ]) {
+      final before = visibleAnchor(tester);
+      final selection = controller.selection;
+      await (key.currentState!.stylePanel() as DocumentTextStyleDialog)
+          .save!(style);
+      await tester.pumpAndSettle();
+      expect(anchorTop(tester, before.$1), closeTo(before.$2, .1));
+      expect(controller.selection, selection);
+      expect(controller.text, originalText);
+      expect(key.currentState!.narrationSource, same(source));
+      expect(source.valid, isTrue);
+      expect(key.currentState!.quickMarkPage, same(page));
+    }
+    expect(reads, 1);
+    expect(pages, [0]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rotation and comparison resizing retain a source line position',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 700);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await open(tester,
+        comparison: true,
+        extract: (_) async =>
+            List.generate(150, (i) => '第$i段。源文字位置在重新排版后应当继续保持。').join('\n\n'));
+    reflowScroll(tester).jumpTo(900);
+    await tester.pumpAndSettle();
+    for (final size in [
+      const Size(350, 700),
+      const Size(700, 350),
+      const Size(600, 600),
+    ]) {
+      final before = visibleAnchor(tester);
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(anchorTop(tester, before.$1), closeTo(before.$2, .1));
+    }
+    expect(pages, [0]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('navigation wins over an already queued layout restoration',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(700, 700);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await open(tester,
+        extract: (page) async =>
+            List.filled(100, 'Source page $page. More words.').join('\n\n'));
+    reflowScroll(tester).jumpTo(900);
+    await tester.pumpAndSettle();
+    Future<void>? navigation;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigation = key.currentState!.goToPage(1);
+    });
+    tester.view.physicalSize = const Size(350, 700);
+    await tester.pumpAndSettle();
+    await navigation;
+    expect(text(tester), startsWith('Source page 1.'));
+    expect(reflowScroll(tester).offset, 0);
+    expect(pages, [0, 1]);
+  });
+
+  for (final operation in ['wheel', 'speech']) {
+    testWidgets('$operation wins over a pending reflow layout restoration',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(700, 700);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await open(tester,
+          extract: (_) async => List.generate(
+                  150, (i) => 'Paragraph $i. A long sentence for layout tests.')
+              .join('\n\n'));
+      final scroll = reflowScroll(tester);
+      scroll.jumpTo(900);
+      await tester.pumpAndSettle();
+      final old = visibleAnchor(tester);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (operation == 'wheel') {
+          GestureBinding.instance.handlePointerEvent(PointerScrollEvent(
+              position: tester.getCenter(reflowViewport()),
+              scrollDelta: const Offset(0, 80)));
+        } else {
+          final controller = tester
+              .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
+              .controller!;
+          key.currentState!.narrationSource!
+              .onPosition!(controller.text.indexOf('Paragraph 100.'));
+        }
+      });
+      tester.view.physicalSize = const Size(350, 700);
+      await tester.pumpAndSettle();
+      expect(anchorTop(tester, old.$1), isNot(closeTo(old.$2, 1)));
+      expect(scroll.offset,
+          operation == 'wheel' ? closeTo(980, .1) : greaterThan(3000));
+      expect(pages, [0]);
+    });
+  }
+
+  testWidgets('effective CSS size and paragraph gap preserve the source line',
+      (tester) async {
+    await open(tester,
+        extract: (_) async =>
+            List.filled(150, 'A source paragraph with several words.')
+                .join('\n\n'));
+    reflowScroll(tester).jumpTo(900);
+    await tester.pumpAndSettle();
+    final before = visibleAnchor(tester);
+    await Prefs().saveCustomCssProfile(
+        0,
+        const CustomCssProfile(
+            css: 'p {font-size:32px;line-height:2.1;font-family:monospace;}',
+            visual: CssVisualStyle({'paragraphGap': 2.5})));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 0, enabled: true, indices: [0]));
+    await tester.pumpAndSettle();
+    expect(anchorTop(tester, before.$1), closeTo(before.$2, .1));
+    expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
+            .style!
+            .fontSize,
+        32);
+    expect(pages, [0]);
+  });
+
+  for (final percent in [80, 90, 100]) {
+    testWidgets('reflow manual scroll respects $percent percent without align',
+        (tester) async {
+      Prefs().scrollPagePercent = percent;
+      Prefs().scrollAutoAlign = false;
+      await open(tester,
+          extract: (_) async =>
+              List.filled(100, 'A line of readable source text.').join('\n\n'));
+      final scroll = reflowScroll(tester);
+      final distance = scroll.position.viewportDimension * percent / 100;
+      final forward = key.currentState!.turn(1);
+      await tester.pumpAndSettle();
+      await forward;
+      expect(scroll.offset, closeTo(distance, .01));
+      final backward = key.currentState!.turn(-1);
+      await tester.pumpAndSettle();
+      await backward;
+      expect(scroll.offset, closeTo(0, .01));
+      expect(pages, [0]);
+    });
+  }
+
+  testWidgets('aligned manual scroll retains a real visible text line',
+      (tester) async {
+    Prefs().scrollPagePercent = 100;
+    Prefs().scrollAutoAlign = true;
+    await open(tester,
+        extract: (_) async =>
+            List.filled(100, 'A line of readable source text.').join('\n'));
+    final scroll = reflowScroll(tester);
+    final render = tester
+        .state<EditableTextState>(find.byType(EditableText))
+        .renderEditable;
+    final lastVisible = render.getPositionForPoint(
+        tester.getBottomLeft(reflowViewport()) + const Offset(2, -1));
+    final forward = key.currentState!.turn(1);
+    await tester.pumpAndSettle();
+    await forward;
+    expect(scroll.offset, greaterThan(0));
+    expect(scroll.offset, lessThan(scroll.position.viewportDimension));
+    expect(visibleAnchor(tester).$1, lessThanOrEqualTo(lastVisible.offset));
+    expect(pages, [0]);
+  });
+
+  testWidgets(
+      'eink auto scroll waits then steps without scheduling frame ticks',
+      (tester) async {
+    Prefs().eInkMode = true;
+    Prefs().scrollAutoAlign = false;
+    Prefs().scrollPagePercent = 80;
+    var stopped = 0;
+    await open(tester,
+        extract: (_) async => List.filled(100, '甲乙丙').join('\n\n'));
+    final scroll = reflowScroll(tester);
+    final distance = scroll.position.viewportDimension * .8;
+    final rate =
+        (scroll.position.maxScrollExtent + scroll.position.viewportDimension) /
+            60;
+    final interval = (distance / rate * 1000).round();
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    expect(tester.binding.transientCallbackCount, 0);
+    await tester.pump(Duration(milliseconds: interval - 1));
+    expect(scroll.offset, 0);
+    await tester.pump(const Duration(milliseconds: 2));
+    expect(scroll.offset, closeTo(distance, .01));
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(stopped, 0);
+    expect(pages, [0]);
+    key.currentState!.stopAutoScroll();
+    final offset = scroll.offset;
+    await tester.pump(Duration(milliseconds: interval * 2));
+    expect(scroll.offset, offset);
+    expect(stopped, 1);
+  });
+
+  testWidgets('eink speed updates reschedule the step and page end stops once',
+      (tester) async {
+    Prefs().eInkMode = true;
+    Prefs().scrollAutoAlign = false;
+    var reads = 0, stopped = 0;
+    await open(tester, extract: (_) async {
+      reads++;
+      return List.filled(100, '甲乙丙').join('\n\n');
+    });
+    final scroll = reflowScroll(tester);
+    final distance = scroll.position.viewportDimension * .8;
+    final rate =
+        (scroll.position.maxScrollExtent + scroll.position.viewportDimension) /
+            60;
+    final interval = (distance / rate * 1000).round();
+    final reader = key.currentState!;
+    expect(reader.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump(Duration(milliseconds: interval ~/ 2));
+    expect(scroll.offset, 0);
+    expect(reader.startAutoScroll(2, () => stopped++), isTrue);
+    await tester.pump(Duration(milliseconds: interval ~/ 2 - 1));
+    expect(scroll.offset, 0);
+    await tester.pump(const Duration(milliseconds: 3));
+    expect(scroll.offset, closeTo(distance, .01));
+    expect(stopped, 0);
+    scroll.jumpTo(scroll.position.maxScrollExtent - 2);
+    expect(reader.startAutoScroll(4, () => stopped++), isTrue);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset, scroll.position.maxScrollExtent);
+    expect(stopped, 1);
+    expect(reads, 1);
+    expect(pages, [0]);
+    reader.stopAutoScroll();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(minutes: 1));
+    expect(stopped, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final initialEink in [false, true]) {
+    testWidgets('eink mode change stops an active session ($initialEink)',
+        (tester) async {
+      Prefs().eInkMode = initialEink;
+      await open(tester,
+          extract: (_) async =>
+              List.filled(100, 'A line of readable source text.').join('\n\n'));
+      var stopped = 0;
+      expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+      await tester.pump();
+      Prefs().eInkMode = !initialEink;
+      await tester.pumpAndSettle();
+      expect(stopped, 1);
+      final offset = reflowScroll(tester).offset;
+      await tester.pump(const Duration(seconds: 30));
+      expect(reflowScroll(tester).offset, offset);
+      expect(stopped, 1);
+      expect(tester.binding.transientCallbackCount, 0);
+    });
+  }
 
   testWidgets(
       'continuous narration uses edited cache then extracts the next page',

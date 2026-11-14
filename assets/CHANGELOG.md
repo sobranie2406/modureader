@@ -14,6 +14,9 @@ Older sections retain their original version scope; they are not current accepta
 - Feat(tts): Hide floating narration and auto-scroll controls after five idle seconds; tap the page to reveal them.
 - Feat(reader): Keep the screen awake during auto scroll and add a timer button with a 0–120 minute stop timer.
 - Feat(reader): Add quick marking to mobile PDF/OCR reflow: swipe to highlight, merge connected marks, and use the existing menu-after-marking setting.
+- Fix(reader): Improve low-speed auto scrolling on compatible WebViews and keep reflow text in place after font, rotation or split-size changes.
+- Fix(reader): Improve cross-chapter scrolling and retain a line of context during aligned scroll paging.
+- Feat(reader): Use timed scroll steps in e-ink mode at the selected reading speed.
 
 - Fix(sync): Recognize WeRead and OCR metadata directories when a WebDAV server redirects to their trailing-slash URLs.
 
@@ -23,6 +26,9 @@ Older sections retain their original version scope; they are not current accepta
 - Feat(tts): 朗读与自动滚动浮动条闲置 5 秒后隐藏，轻点页面重新显示。
 - Feat(reader): 自动滚动期间保持屏幕常亮，浮动条新增计时按钮，可设置 0～120 分钟定时停止。
 - Feat(reader): 移动端重排页支持快速标记，划过文字即可高亮，连续划线自动合并，并沿用标记后弹出菜单的设置。
+- Fix(reader): 改善低速自动滚动的平滑度，重排页调整字体、旋转或改变分屏比例后保持阅读位置。
+- Fix(reader): 改善跨章滚动衔接，开启自动对齐时翻屏保留一行上下文。
+- Feat(reader): 电纸书模式按当前阅读速度间隔滚动，减少连续刷新。
 
 - Fix(sync): 修复 WebDAV 为微信读书和 OCR 资料目录补全末尾斜杠时导致的同步失败。
 

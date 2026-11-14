@@ -11,13 +11,17 @@ const {ReadingActionGate} = await import(`data:text/javascript;base64,${Buffer.f
 function fixture() {
   const doc = Object.assign(new EventTarget(), {visibilityState:'visible', getSelection:()=>''});
   const host = Object.assign(new EventTarget(), {document:doc});
-  const pending = new Map(), stopped = [], stoppedSessions = [], moves = [], flushed = [], enabled = [];
+  const pending = new Map(), timers = new Map(), stopped = [], stoppedSessions = [], moves = [], flushed = [], enabled = [];
   let sequence = 0, now = 0, allowed = true;
   host.requestAnimationFrame = fn => { pending.set(++sequence, fn); return sequence };
   host.cancelAnimationFrame = id => pending.delete(id);
+  host.performance = {now:()=>now};
+  host.setTimeout = (fn,delay) => {timers.set(++sequence,{fn,at:now+delay,delay});return sequence};
+  host.clearTimeout = id => timers.delete(id);
   let renderer = {autoScrollSupported:true, readerActive:true, isNavigating:false,
     getContents:()=>[{doc}], setAutoScrolling:value=>enabled.push(value),
     getAutoScrollSpeed:()=>30,
+    getAutoScrollStep:()=>60,
     async autoScrollBy(distance, active) { if (!active()) return 'inactive'; moves.push(distance); return 'moved' },
     flushAutoScrollPosition:()=>flushed.push(moves.reduce((a,b)=>a+b,0))};
   const scroll = new ReaderAutoScroll({host, renderer:()=>renderer, canRun:()=>allowed,
@@ -26,9 +30,10 @@ function fixture() {
     now += ms;
     const callbacks = [...pending.values()]; pending.clear();
     callbacks.forEach(fn=>fn(now));
+    for(const [id,timer] of [...timers])if(timer.at<=now){timers.delete(id);await timer.fn()}
     await new Promise(resolve=>setImmediate(resolve));
   };
-  return {doc, host, scroll, pending, stopped, stoppedSessions, moves, flushed, enabled, step,
+  return {doc, host, scroll, pending, timers, stopped, stoppedSessions, moves, flushed, enabled, step,
     get renderer(){return renderer}, set renderer(value){renderer=value},
     set allowed(value){allowed=value}};
 }
@@ -209,29 +214,36 @@ test('stopping while a chapter loads cannot move later or interfere with a resta
   await f.step();assert.deepEqual(f.moves,[6]);assert.deepEqual(f.stopped,['navigation']);f.scroll.stop();
 });
 
-function paginatorFixture() {
+function paginatorFixture(quantum = 1, lines = []) {
   const methods=paginator.slice(paginator.indexOf('  get autoScrollSupported() {'),paginator.indexOf('  snap(vx, vy, touchState) {'));
-  return runInNewContext(`new (class {
+  const reader = runInNewContext(`new (class {
     #vertical=false; #destroyed=false; #view={}; #locked=false; #preparingView=false;
-    #continuous=null; #container={scrollTop:0}; #autoScrolling=false;
+    #continuous=null; #container; #autoScrolling=false; #fractionalAutoScroll=null; #fractionalAutoScrollDpr=null;
     #needsLineSettle=true; #lineSettleTimer; #scrollRelocateTimer;
     #justAnchored=false;
     #margin=0;#getVisibleRange(){return {toString:()=> '字'.repeat(300)}}
     scrolled=true;viewSize=2000;size=600;reported=[];
+    quantum=1;position=0;writes=0;scrollPageStep=480;
+    constructor(){const self=this;this.#container={clientHeight:600,scrollHeight:2000,
+      get scrollTop(){return self.position},set scrollTop(v){self.writes++;self.position=Math.round(Math.max(0,Math.min(1400,v))/self.quantum)*self.quantum}}}
+    get start(){return this.#container.scrollTop}
+    align=true;getAttribute(name){return name==='scroll-auto-align'?String(this.align):null}
     #afterScroll(...args){this.reported.push(args)}
     get top(){return this.#container.scrollTop}
     set vertical(value){this.#vertical=value}
     set continuous(value){this.#continuous=value}
     ${methods}
-  })`,{clearTimeout(){},autoScrollPixelsPerSecond});
+  })`,{clearTimeout(){},autoScrollPixelsPerSecond,prepareScrollLines:doc=>doc?.lines??lines});
+  reader.quantum = quantum;
+  return reader;
 }
 
 test('ordinary scrolling advances exact pixels, stops at this chapter and has explicit reading actions', async () => {
   const reader=paginatorFixture();assert.equal(reader.autoScrollSupported,true);
   assert.equal(reader.getAutoScrollSpeed(),10);
   reader.setAutoScrolling(true);
-  assert.equal(await reader.autoScrollBy(7),'moved');assert.equal(reader.top,7);
-  assert.equal(await reader.autoScrollBy(9000),'moved');assert.equal(reader.top,1400);
+  assert.equal(await reader.autoScrollBy(7),7);assert.equal(reader.top,7);
+  assert.equal(await reader.autoScrollBy(9000),1393);assert.equal(reader.top,1400);
   assert.equal(await reader.autoScrollBy(3),'end');assert.equal(reader.top,1400);
   reader.flushAutoScrollPosition();assert.deepEqual([...reader.reported[0]],['auto-scroll',true]);
   assert.equal(new ReadingActionGate(()=>100000).isAction('auto-scroll'),true);
@@ -245,6 +257,86 @@ test('continuous chapters use their bounded scrolling window and preserve cancel
   assert.equal(await reader.autoScrollBy(8,active),'moved');
   assert.equal(calls[0][0],8);assert.equal(calls[0][1],active);
   assert.equal(await reader.autoScrollBy(8,()=>false),'inactive');assert.equal(calls.length,1);
+});
+
+for(const quantum of [.5,1/3])test(`fractional ${quantum}-pixel quantization retains the intended average speed`,async()=>{
+  const f=fixture();let position=0,zero=0;
+  f.renderer.getAutoScrollSpeed=()=>10;
+  f.renderer.supportsFractionalAutoScroll=()=>true;
+  f.renderer.autoScrollBy=async(distance)=>{const before=position;position=Math.round((position+distance)/quantum)*quantum;
+    if(position===before)zero++;return position-before};
+  f.scroll.set({enabled:true,speed:.1});await f.step(0);
+  for(let i=0;i<600;i++)await f.step(1000/60);
+  assert.ok(Math.abs(position-10)<=quantum/2+1e-8,`${position} instead of 10`);
+  assert.ok(zero>0);assert.equal(f.scroll.running,true,'unmoved fractional requests are not book ends');
+  f.scroll.stop();
+});
+
+test('fractional capability is probed once, restores scrollTop and keeps integer WebViews safe',async()=>{
+  for(const [quantum,expected] of [[1,false],[.5,true],[1/3,true]]){
+    const reader=paginatorFixture(quantum);
+    assert.equal(reader.supportsFractionalAutoScroll(),expected);
+    assert.equal(reader.top,0);
+    const writes=reader.writes;
+    assert.equal(reader.supportsFractionalAutoScroll(),expected);assert.equal(reader.writes,writes);
+    assert.equal(await reader.autoScrollBy(.01),0,'rounding to zero does not mean end');
+  }
+});
+
+test('partially consumed motion remains available on the next frame',async()=>{
+  const f=fixture(),requested=[];let first=true,total=0;
+  f.renderer.autoScrollBy=async(distance)=>{requested.push(distance);const actual=first?2:distance;first=false;total+=actual;return actual};
+  f.scroll.set({enabled:true});await f.step(0);await f.step();await f.step();
+  assert.deepEqual(requested,[3,4]);assert.equal(total,6);f.scroll.stop();
+});
+
+test('e-ink waits between whole-screen steps without scheduling animation frames',async()=>{
+  const f=fixture();f.scroll.set({enabled:true,eInkMode:true,session:7});
+  assert.equal(f.pending.size,0);assert.equal(f.timers.size,1);
+  assert.equal([...f.timers.values()][0].delay,2000);
+  await f.step(1999);assert.deepEqual(f.moves,[]);
+  await f.step(1);assert.deepEqual(f.moves,[60]);assert.deepEqual(f.flushed,[60]);
+  f.scroll.set({enabled:true,eInkMode:true,speed:2,session:7});
+  assert.equal([...f.timers.values()][0].delay,1000);assert.equal(f.timers.size,1);
+  const late=[...f.timers.values()][0].fn;
+  send(f.doc,'wheel');assert.equal(f.timers.size,0);
+  await late();assert.deepEqual(f.moves,[60]);assert.deepEqual(f.stoppedSessions,[{reason:'input',session:7}]);
+});
+
+test('e-ink mode updates cannot overlap a pending chapter load',async()=>{
+  const f=fixture();let release;const gate=new Promise(resolve=>release=resolve),advance=f.renderer.autoScrollBy;
+  f.renderer.autoScrollBy=async(distance,active)=>{await gate;return advance(distance,active)};
+  f.scroll.set({enabled:true,eInkMode:true});
+  const timer=[...f.timers.values()][0];f.timers.clear();const moving=timer.fn();
+  await Promise.resolve();f.scroll.set({enabled:true,eInkMode:true,speed:4});
+  assert.equal(f.timers.size,0);
+  f.scroll.stop();release();await moving;
+  assert.deepEqual(f.moves,[]);assert.equal(f.timers.size,0);assert.equal(f.pending.size,0);
+});
+
+test('late e-ink and animation callbacks cannot orphan a replacement session scheduler',async()=>{
+  for(const eInkMode of [true,false]){
+    const f=fixture();f.scroll.set({enabled:true,eInkMode,session:1});
+    const late=eInkMode?[...f.timers.values()][0].fn:[...f.pending.values()][0];
+    f.scroll.stop();f.scroll.set({enabled:true,eInkMode,session:2});
+    await late(0);f.scroll.stop();
+    assert.equal(f.timers.size,0);assert.equal(f.pending.size,0);assert.deepEqual(f.moves,[]);
+  }
+});
+
+test('screen steps preserve a real complete line only while automatic alignment is enabled',()=>{
+  const lines=Array.from({length:60},(_,i)=>({top:i*20,bottom:i*20+20}));
+  const reader=paginatorFixture(1,lines);
+  reader.scrollPageStep=600;assert.equal(reader.getAutoScrollStep(),580);
+  assert.equal(reader.scrollPageTarget(0,600),20,'backward step retains the first complete old line');
+  for(const percent of [80,93]){
+    reader.scrollPageStep=600*percent/100;assert.equal(reader.getAutoScrollStep(),600*percent/100);
+  }
+  reader.align=false;reader.scrollPageStep=600;assert.equal(reader.getAutoScrollStep(),600);
+  reader.align=true;
+  reader.continuous={ordered:[{top:0,view:{document:{lines:lines.slice(0,30)}}},
+    {top:600,view:{document:{lines:lines.slice(0,30)}}}],top:entry=>entry.top};
+  assert.equal(reader.scrollPageTarget(1150,550),1120,'one-line overlap uses the neighboring chapter');
 });
 
 test('host tap consumption keeps the original reading action only when not handled',async()=>{

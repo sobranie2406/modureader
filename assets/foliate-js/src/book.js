@@ -1711,7 +1711,9 @@ const autoScroll = new ReaderAutoScroll({
     !window.readerApplyingSync && !window.isFootNoteOpen(),
   onStop: (reason, session) => { void callFlutter('onAutoScrollStopped', { reason, session }).catch(() => {}) },
 })
-window.setReaderAutoScroll = options => autoScroll.set(options)
+window.setReaderAutoScroll = options => autoScroll.set({
+  ...options, eInkMode: style?.eInkMode === true,
+})
 window.stopReaderAutoScroll = reason => {
   autoScroll.stop(reason)
   return onRelocated.pending ?? Promise.resolve()
@@ -2059,6 +2061,7 @@ window.changeStyle = (newStyle) => {
   const oldStyle = style
   style = { ...style, ...newStyle }
   console.log('changeStyle', JSON.stringify(style))
+  if ((oldStyle?.eInkMode === true) !== (style.eInkMode === true)) autoScroll.stop('mode')
   setStyle(oldStyle)
   autoScroll.refresh()
   

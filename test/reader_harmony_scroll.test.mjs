@@ -13,7 +13,7 @@ function fixture(userAgent = 'Mozilla/5.0 (Phone; OpenHarmony 5.0) ArkWeb/114') 
     #scrollRelocateTimer = null; #lastScrollRelocate = -Infinity;
     ${platform}
     #preparingView = false; #destroyed = false; #view = {}; #ignoreNativeScroll = false; #autoScrolling = false;
-    #continuous; #container = {scrollTop: 0}; #margin = 0; #anchor;
+    #continuous; #container = {scrollTop: 0}; #margin = 0; #anchor; #anchorTop;
     #justAnchored; #index = 0; #touchState; #touchScrolled; #pendingRelocate;
     #readingActions = {isAction: reason => reason === 'scroll' || reason === 'auto-scroll'};
     scrolled = true; size = 600; viewSize = 10000; page = 1; pages = 20;
@@ -27,7 +27,7 @@ function fixture(userAgent = 'Mozilla/5.0 (Phone; OpenHarmony 5.0) ArkWeb/114') 
     continuous() {
       const entry = index => ({index, view: {document: {}, element: {
         getBoundingClientRect: () => ({height: 1000})}}});
-      this.#continuous = {current: entry(0), top: e => e.index * 1000,
+      this.#continuous = {current: entry(0), top: e => e.index * 1000, rememberText(){},
         track: () => {this.tracks++; this.#continuous.current = entry(Math.floor(this.start / 1000))}};
     }
     preparing(value) {this.#preparingView = value}
