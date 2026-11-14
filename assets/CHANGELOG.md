@@ -12,6 +12,7 @@ Older sections retain their original version scope; they are not current accepta
 
 - Feat(reader): Add adjustable auto scroll for standard text and reflow reading in scroll mode, with draggable controls and device-local speed settings. ([#84](https://github.com/sobranie2406/modureader/issues/84)) Thanks [@zhangxiaochang](https://github.com/zhangxiaochang).
 - Feat(tts): Hide floating narration and auto-scroll controls after five idle seconds; tap the page to reveal them.
+- Feat(reader): Keep the screen awake during auto scroll and add a timer button with a 0–120 minute stop timer.
 
 - Fix(sync): Recognize WeRead and OCR metadata directories when a WebDAV server redirects to their trailing-slash URLs.
 
@@ -19,6 +20,7 @@ Older sections retain their original version scope; they are not current accepta
 
 - Feat(reader): 普通阅读和重排页在滚动翻页模式下支持自动滚动，提供可拖动浮动条与倍速调节，速度仅本机保存。 ([#84](https://github.com/sobranie2406/modureader/issues/84)) 感谢 [@zhangxiaochang](https://github.com/zhangxiaochang)。
 - Feat(tts): 朗读与自动滚动浮动条闲置 5 秒后隐藏，轻点页面重新显示。
+- Feat(reader): 自动滚动期间保持屏幕常亮，浮动条新增计时按钮，可设置 0～120 分钟定时停止。
 
 - Fix(sync): 修复 WebDAV 为微信读书和 OCR 资料目录补全末尾斜杠时导致的同步失败。
 

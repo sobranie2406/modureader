@@ -113,6 +113,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     with WidgetsBindingObserver, TickerProviderStateMixin, RouteAware {
   final _autoScrollVisibility = ReaderToolbarVisibility();
   final _ttsVisibility = ReaderToolbarVisibility();
+  final _screenAwake = ReaderAwakeSession();
+  void _syncAutoScrollAwake() =>
+      _screenAwake.setAutoScrolling(_autoScroll.running);
   late final ReaderAutoScroll _autoScroll = ReaderAutoScroll(
       speed: Prefs().autoScrollSpeed,
       startReader: _startReaderAutoScroll,
@@ -160,12 +163,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   bool _resumeScrollAfterEditing = false;
-  int _speedEditForeground = 0;
-  void _speedEditingChanged(bool editing) {
+  int _toolbarEditForeground = 0;
+  void _scrollEditingChanged(bool editing) {
     if (!mounted) return;
     if (editing) {
       _resumeScrollAfterEditing = _autoScroll.running;
-      _speedEditForeground = _foregroundSyncGeneration;
+      _toolbarEditForeground = _foregroundSyncGeneration;
+      stopAutoScroll();
     } else if (_resumeScrollAfterEditing) {
       _resumeScrollAfterEditing = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -173,7 +177,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
             _autoScrollEligible &&
             _autoScrollVisibility.enabled &&
             _canUsePageKeys &&
-            _speedEditForeground == _foregroundSyncGeneration &&
+            _toolbarEditForeground == _foregroundSyncGeneration &&
             !_autoScroll.active) {
           unawaited(_playAutoScroll());
         }
@@ -229,7 +233,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       controller: _autoScroll,
       visibility: _autoScrollVisibility,
       onStart: () => unawaited(_playAutoScroll()),
-      onEditingChanged: _speedEditingChanged,
+      onEditingChanged: _scrollEditingChanged,
       onClose: () {
         stopAutoScroll();
         Prefs().autoScrollEnabled = false;
@@ -515,7 +519,6 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   late Widget _currentPage = empty;
   final Stopwatch _readTimeWatch = Stopwatch();
   DateTime? _sessionStart;
-  Timer? _awakeTimer;
   PageRoute<dynamic>? _observedRoute;
   bool _readingRouteVisible = true;
   late final _readingSync = ReadingSyncScheduler(
@@ -808,6 +811,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         });
     FocusManager.instance.addListener(_updatePageKeys);
     _bindNarrationState();
+    _autoScroll.addListener(_syncAutoScrollAwake);
 
     // Initialize AI panel sizes from persistent storage
     _aiChatWidth = Prefs().aiPanelWidth;
@@ -853,6 +857,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   void dispose() {
+    _autoScroll.removeListener(_syncAutoScrollAwake);
     _autoScroll.dispose();
     _autoScrollVisibility.dispose();
     _ttsVisibility.dispose();
@@ -872,8 +877,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _readingSync.dispose();
     if (AnxPlatform.isDesktop) unawaited(_fullscreen.close());
     _readTimeWatch.stop();
-    _awakeTimer?.cancel();
-    unawaited(ReaderWakelock.setEnabled(false));
+    _screenAwake.dispose();
     showStatusBar();
     WidgetsBinding.instance.removeObserver(this);
     readingTimeDao.insertReadingTime(
@@ -1135,6 +1139,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    _screenAwake.setForeground(state == AppLifecycleState.resumed);
     final reader = epubPlayerKey.currentState;
     if (reader != null) {
       unawaited(reader.setTtsBackground(state != AppLifecycleState.resumed));
@@ -1174,17 +1179,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> setAwakeTimer(int minutes) async {
-    _awakeTimer?.cancel();
-    _awakeTimer = null;
-    unawaited(ReaderWakelock.setEnabled(true));
-    _awakeTimer = Timer.periodic(Duration(minutes: minutes), (timer) {
-      unawaited(ReaderWakelock.setEnabled(false));
-      _awakeTimer?.cancel();
-      _awakeTimer = null;
-    });
+    final state = WidgetsBinding.instance.lifecycleState;
+    _screenAwake
+        .setForeground(state == null || state == AppLifecycleState.resumed);
+    _screenAwake.reset(minutes);
   }
 
-  void resetAwakeTimer() {
+  void resetAwakeTimer({bool autoScrollStopping = false}) {
+    if (_autoScroll.active || autoScrollStopping) return;
     setAwakeTimer(Prefs().awakeTime);
   }
 

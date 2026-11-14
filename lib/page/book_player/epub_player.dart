@@ -2172,7 +2172,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             unawaited(_recordReadingAction(cfi, percentage,
                 pdfRegion: location['pdfRegion']));
           }
-          readingPageKey.currentState?.resetAwakeTimer();
+          readingPageKey.currentState
+              ?.resetAwakeTimer(autoScrollStopping: _autoScrollStop != null);
         });
     controller.addJavaScriptHandler(
         handlerName: 'onTtsChapter',

@@ -1,9 +1,124 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modu_reader/service/reader_auto_scroll.dart';
 
 void main() {
+  test('countdown runs only while scrolling and pauses at the selected limit',
+      () {
+    fakeAsync((time) {
+      var stops = 0;
+      final controller = ReaderAutoScroll(
+          startReader: (_) async => true, stopReader: () => stops++);
+      controller.setTimeLimit(const Duration(minutes: 1));
+      time.elapse(const Duration(minutes: 2));
+      expect(controller.remaining, const Duration(minutes: 1));
+      controller.start();
+      time.flushMicrotasks();
+      time.elapse(const Duration(seconds: 25));
+      expect(controller.remaining, const Duration(seconds: 35));
+      controller.stop();
+      time.elapse(const Duration(minutes: 2));
+      expect(controller.remaining, const Duration(seconds: 35));
+      controller.start();
+      time.flushMicrotasks();
+      time.elapse(const Duration(seconds: 34));
+      expect(controller.running, isTrue);
+      expect(controller.remaining, const Duration(seconds: 1));
+      time.elapse(const Duration(seconds: 1));
+      expect(controller.running, isFalse);
+      expect(controller.remaining, Duration.zero);
+      expect(stops, 2);
+      expect(time.pendingTimers, isEmpty);
+      controller.start();
+      time.flushMicrotasks();
+      expect(controller.remaining, const Duration(minutes: 1));
+      controller.dispose();
+      expect(time.pendingTimers, isEmpty);
+    });
+  });
+
+  test('changing or disabling the limit does not restart the reader', () {
+    fakeAsync((time) {
+      var starts = 0, stops = 0;
+      final controller = ReaderAutoScroll(
+          startReader: (_) async {
+            starts++;
+            return true;
+          },
+          stopReader: () => stops++);
+      controller.start();
+      time.flushMicrotasks();
+      time.elapse(const Duration(hours: 3));
+      expect(controller.remaining, isNull);
+      expect(controller.running, isTrue);
+      expect(time.pendingTimers, isEmpty);
+      controller.setTimeLimit(const Duration(minutes: 30));
+      time.elapse(const Duration(minutes: 3));
+      expect(controller.remaining, const Duration(minutes: 27));
+      controller.setTimeLimit(const Duration(minutes: 5));
+      expect(controller.remaining, const Duration(minutes: 5));
+      time.elapse(const Duration(minutes: 1));
+      controller.setTimeLimit(Duration.zero);
+      expect(controller.remaining, isNull);
+      expect(controller.timeLimit, isNull);
+      expect(time.pendingTimers, isEmpty);
+      time.elapse(const Duration(hours: 3));
+      expect(controller.running, isTrue);
+      expect(starts, 1);
+      expect(stops, 0);
+      controller.dispose();
+    });
+  });
+
+  test('limit is bounded at 120 minutes and does not count a pending start',
+      () {
+    fakeAsync((time) {
+      final pending = Completer<bool>();
+      final controller = ReaderAutoScroll(
+          startReader: (_) => pending.future, stopReader: () {});
+      controller.setTimeLimit(const Duration(hours: 3));
+      expect(controller.timeLimit, const Duration(minutes: 120));
+      controller.start();
+      time.elapse(const Duration(minutes: 5));
+      expect(controller.remaining, const Duration(minutes: 120));
+      expect(time.pendingTimers, isEmpty);
+      pending.complete(true);
+      time.flushMicrotasks();
+      time.elapse(const Duration(seconds: 1));
+      expect(controller.remaining,
+          const Duration(minutes: 120) - const Duration(seconds: 1));
+      controller.dispose();
+      expect(time.pendingTimers, isEmpty);
+      controller.setTimeLimit(const Duration(minutes: 1));
+      expect(controller.timeLimit, const Duration(minutes: 120));
+    });
+  });
+
+  test('a delayed tick still stops on time and disposing cancels the timer',
+      () {
+    fakeAsync((time) {
+      var stops = 0;
+      final controller = ReaderAutoScroll(
+          startReader: (_) async => true, stopReader: () => stops++);
+      controller.setTimeLimit(const Duration(minutes: 1));
+      controller.start();
+      time.flushMicrotasks();
+      time.elapseBlocking(const Duration(seconds: 70));
+      time.elapse(Duration.zero);
+      expect(controller.running, isFalse);
+      expect(controller.remaining, Duration.zero);
+      expect(stops, 1);
+      controller.start();
+      time.flushMicrotasks();
+      controller.dispose();
+      time.elapse(const Duration(minutes: 2));
+      expect(stops, 2);
+      expect(time.pendingTimers, isEmpty);
+    });
+  });
+
   test('starts at the selected speed and stops only once', () async {
     final speeds = <double>[];
     var stops = 0;

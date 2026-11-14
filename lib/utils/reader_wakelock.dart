@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:flutter/services.dart';
@@ -22,5 +24,53 @@ class ReaderWakelock {
         AnxLog.warning('Reader wakelock failed: ${error.runtimeType}');
       }
     });
+  }
+}
+
+/// Reading inactivity and auto scroll share one native screen-lock request.
+class ReaderAwakeSession {
+  Timer? _timer;
+  bool _reading = false, _scrolling = false, _foreground = true;
+  bool _enabled = false, _disposed = false;
+
+  void reset(int minutes) {
+    if (_disposed) return;
+    _timer?.cancel();
+    _timer = null;
+    _reading = minutes > 0;
+    if (_reading) {
+      _timer = Timer(Duration(minutes: minutes), () {
+        _timer = null;
+        _reading = false;
+        _update();
+      });
+    }
+    _update();
+  }
+
+  void setAutoScrolling(bool value) {
+    if (_disposed || value == _scrolling) return;
+    _scrolling = value;
+    _update();
+  }
+
+  void setForeground(bool value) {
+    if (_disposed || value == _foreground) return;
+    _foreground = value;
+    _update();
+  }
+
+  void _update() {
+    final enabled = !_disposed && _foreground && (_reading || _scrolling);
+    if (_enabled == enabled) return;
+    _enabled = enabled;
+    unawaited(ReaderWakelock.setEnabled(enabled));
+  }
+
+  void dispose() {
+    _disposed = true;
+    _timer?.cancel();
+    _timer = null;
+    _update();
   }
 }

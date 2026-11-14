@@ -35,6 +35,14 @@ void main() {
     messenger.setMockDecodedMessageHandler<Object?>(pluginChannel, null);
   });
 
+  Future<void> advance(WidgetTester tester,
+      [Duration duration = Duration.zero]) async {
+    await tester.pump(duration);
+    // The shared platform queue can come from an earlier real-async test zone.
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+  }
+
   test('OHOS uses its native channel; other platforms retain wakelock_plus',
       () async {
     final calls = <bool>[];
@@ -92,5 +100,100 @@ void main() {
     await ReaderWakelock.setEnabled(true, platform: AnxPlatformEnum.ohos);
     await ReaderWakelock.setEnabled(false, platform: AnxPlatformEnum.ohos);
     expect(calls, [true, false]);
+  });
+
+  testWidgets('foreground reading and auto scroll share the screen lock',
+      (tester) async {
+    // auto scroll holds the screen after the ordinary timeout expires.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(1);
+      await advance(tester);
+      session.setAutoScrolling(true);
+      await advance(tester, const Duration(minutes: 2));
+      expect(pluginValues, [true]);
+      session.setAutoScrolling(false);
+      await advance(tester);
+      expect(pluginValues, [true, false]);
+      session.dispose();
+      await advance(tester);
+    }
+    // zero timeout still allows auto scroll to hold the screen.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(0);
+      session.setAutoScrolling(true);
+      await advance(tester, const Duration(minutes: 10));
+      expect(pluginValues, [true]);
+      session.setAutoScrolling(false);
+      await advance(tester);
+      expect(pluginValues, [true, false]);
+      session.dispose();
+      await advance(tester);
+    }
+    // pausing retains an unexpired ordinary reading timeout.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(5);
+      session.setAutoScrolling(true);
+      await advance(tester, const Duration(minutes: 1));
+      session.setAutoScrolling(false);
+      await advance(tester);
+      expect(pluginValues, [true]);
+      await advance(tester, const Duration(minutes: 4));
+      expect(pluginValues, [true, false]);
+      session.dispose();
+      await advance(tester);
+    }
+    // background releases the screen and does not renew an expired timeout.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(1);
+      session.setAutoScrolling(true);
+      await advance(tester);
+      session.setForeground(false);
+      session.setAutoScrolling(false);
+      await advance(tester, const Duration(minutes: 2));
+      session.setForeground(true);
+      await advance(tester);
+      expect(pluginValues, [true, false]);
+      session.dispose();
+      await advance(tester);
+    }
+    // returning to the reader preserves the original unexpired timeout.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(5);
+      await advance(tester);
+      session.setForeground(false);
+      await advance(tester, const Duration(minutes: 1));
+      session.setForeground(true);
+      await advance(tester);
+      expect(pluginValues, [true, false, true]);
+      await advance(tester, const Duration(minutes: 4));
+      expect(pluginValues, [true, false, true, false]);
+      session.dispose();
+      await advance(tester);
+    }
+    // disposing releases the lock and rejects later resets and ticks.
+    {
+      pluginValues.clear();
+      final session = ReaderAwakeSession();
+      session.reset(5);
+      session.setAutoScrolling(true);
+      await advance(tester);
+      session.dispose();
+      await advance(tester);
+      session.reset(5);
+      session.setAutoScrolling(true);
+      session.setForeground(true);
+      await advance(tester, const Duration(minutes: 10));
+      expect(pluginValues, [true, false]);
+    }
   });
 }

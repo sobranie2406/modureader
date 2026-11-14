@@ -60,6 +60,8 @@ Text/OCR reflow provides page-local narration and current-page translation (corr
 
 Auto scroll: choose **Scroll** under page turning, then enable **Auto scroll**. Standard text and reflow pages show draggable play/pause and 0.1–4.0× controls, initially paused at 1.0×. Tap the number to enter a speed. The initial pace estimates 300 Chinese characters or 200 English words per minute from the current layout. The switch and speed stay on this device. Original PDF/image pages do not use auto scroll. Text scrolling follows the existing cross-chapter setting; reflow stops at the end of its current source page. Floating auto-scroll and narration bars hide after five idle seconds; tap the page to reveal them without interrupting reading. Dragging the book, selecting text, opening menus or leaving the reader pauses auto scroll.
 
+Auto scroll keeps the screen awake while running. Tap its timer button to choose 0–120 minutes with the slider; 0 means no limit. The remaining time appears on the button and pauses with scrolling. At zero, scrolling stops; starting again uses the selected duration. The timer applies to the current reading session. Pausing or leaving the reader restores the normal screen timeout.
+
 ### First-use defaults
 
 These come from [preferences](../lib/config/shared_preference_provider.dart) when the setting has never been saved. Upgrades, imports and independent provider configurations can change them.

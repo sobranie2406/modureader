@@ -70,6 +70,7 @@ void main() {
 
   Future<void> unmount(WidgetTester tester) async {
     visibility.setEnabled(false);
+    controller.stop();
     await tester.pumpWidget(const SizedBox());
   }
 
@@ -86,7 +87,13 @@ void main() {
         expect(tester.getSize(key(name)), const Size(44, 44));
         expect(key(name).hitTestable(), findsOneWidget);
       }
+      await tester.tap(key('timer'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 (No limit)'), findsOneWidget);
+      expect(find.text('120 min'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
       await unmount(tester);
     });
   }
@@ -134,6 +141,170 @@ void main() {
     expect(tester.widget<IconButton>(key('decrease')).onPressed, isNotNull);
     await unmount(tester);
   });
+
+  testWidgets('timer opens a zero to 120 minute slider and applies either end',
+      (tester) async {
+    await mount(tester);
+    expect(controller.timeLimit, isNull);
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
+    await tester.tap(key('timer'));
+    await tester.pumpAndSettle();
+    final slider = key('timer-slider');
+    final control = tester.widget<Slider>(slider);
+    expect(control.min, 0);
+    expect(control.max, 120);
+    expect(control.divisions, 120);
+    expect(control.value, 0);
+    expect(find.text('No limit'), findsOneWidget);
+    expect(find.text('0 (No limit)'), findsOneWidget);
+    expect(find.text('120 min'), findsOneWidget);
+    await tester.drag(slider, const Offset(2000, 0));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 120);
+    expect(find.text('120 min'), findsNWidgets(2));
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(controller.timeLimit, const Duration(minutes: 120));
+    expect(find.text('120:00'), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
+
+    await tester.tap(key('timer'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 120);
+    await tester.drag(slider, const Offset(-2000, 0));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, 0);
+    expect(find.text('No limit'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(controller.timeLimit, isNull);
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('canceling timer edits preserves the previous limit',
+      (tester) async {
+    controller.setTimeLimit(const Duration(minutes: 15));
+    await mount(tester);
+    expect(find.text('15:00'), findsOneWidget);
+    await tester.tap(key('timer'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(key('timer-slider')).value, 15);
+    await tester.drag(key('timer-slider'), const Offset(2000, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(controller.timeLimit, const Duration(minutes: 15));
+    expect(find.text('15:00'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('timer button follows countdown, pause and automatic stopping',
+      (tester) async {
+    controller.setTimeLimit(const Duration(seconds: 3));
+    await mount(tester);
+    expect(find.text('00:03'), findsOneWidget);
+    await controller.start();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('00:02'), findsOneWidget);
+    controller.stop();
+    await tester.pump(const Duration(seconds: 10));
+    visibility.reveal();
+    await tester.pump();
+    expect(find.text('00:02'), findsOneWidget);
+    await controller.start();
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('00:00'), findsOneWidget);
+    expect(controller.active, isFalse);
+    expect(stops, 2);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    await controller.start();
+    await tester.pump();
+    expect(find.text('00:03'), findsOneWidget);
+    controller.setTimeLimit(null);
+    await tester.pump();
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+    expect(controller.running, isTrue);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  for (final width in [200.0, 280.0]) {
+    testWidgets('timer fits a $width pixel comparison pane with large text',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      controller.setTimeLimit(const Duration(minutes: 120));
+      await mount(tester, scale: 2.5);
+      final bar = tester.getRect(key('toolbar'));
+      expect(bar.height, 44);
+      expect(bar.left, greaterThanOrEqualTo(0));
+      expect(bar.right, lessThanOrEqualTo(width));
+      expect(key('increase'), findsNothing);
+      expect(key('decrease'), findsNothing);
+      for (final name in ['play-pause', 'speed', 'timer', 'close']) {
+        expect(key(name).hitTestable(), findsOneWidget);
+        final rect = tester.getRect(key(name));
+        expect(rect.width, greaterThanOrEqualTo(44));
+        expect(rect.left, greaterThanOrEqualTo(bar.left));
+        expect(rect.right, lessThanOrEqualTo(bar.right));
+      }
+      expect(find.text('120:00'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await unmount(tester);
+    });
+  }
+
+  for (final confirm in [false, true]) {
+    testWidgets(
+        '${confirm ? 'confirming' : 'canceling'} timer edits waits for the route before resuming',
+        (tester) async {
+      final changes = <bool>[];
+      final limitsAfterEditing = <Duration?>[];
+      var resume = false;
+      controller.setTimeLimit(const Duration(minutes: 15));
+      await controller.start();
+      await mount(tester, onEditingChanged: (editing) {
+        changes.add(editing);
+        if (editing) {
+          resume = controller.running;
+          controller.stop();
+        } else {
+          expect(key('timer-slider'), findsNothing);
+          limitsAfterEditing.add(controller.timeLimit);
+          if (resume) unawaited(controller.start());
+        }
+      });
+      await tester.tap(key('timer'));
+      await tester.pumpAndSettle();
+      expect(changes, [true]);
+      expect(controller.active, isFalse);
+      await tester.pump(const Duration(seconds: 10));
+      expect(visibility.visible, isTrue);
+      tester.widget<Slider>(key('timer-slider')).onChanged!(30);
+      await tester.pump();
+      await tester.tap(find.text(confirm ? 'OK' : 'Cancel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(changes, [true]);
+      expect(controller.active, isFalse);
+      expect(key('timer-slider'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(changes, [true, false]);
+      expect(controller.running, isTrue);
+      expect(limitsAfterEditing, [Duration(minutes: confirm ? 30 : 15)]);
+      await tester.pump(const Duration(seconds: 1));
+      expect(changes, [true, false]);
+      expect(starts, 2);
+      expect(stops, 1);
+      expect(tester.takeException(), isNull);
+      await unmount(tester);
+    });
+  }
 
   testWidgets('manual speed validates input and holds visibility while editing',
       (tester) async {
