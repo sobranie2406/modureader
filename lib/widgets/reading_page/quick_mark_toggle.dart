@@ -29,31 +29,46 @@ class QuickMarkToggle extends StatelessWidget {
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     if (showExit) {
       if (!enabled) return const SizedBox.shrink();
-      return Material(
-        elevation: 2,
-        borderRadius: BorderRadius.circular(24),
-        color: Theme.of(context).colorScheme.secondaryContainer,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (onToggleMenu != null)
-            IconButton(
-              key: const ValueKey('quick-mark-menu-toggle'),
-              tooltip: zh
-                  ? (showMenu ? '标记后弹出菜单：开' : '标记后弹出菜单：关')
-                  : (showMenu
-                      ? 'Menu after marking: on'
-                      : 'Menu after marking: off'),
-              isSelected: showMenu,
-              icon: const Icon(Icons.speaker_notes_off_outlined, size: 20),
-              selectedIcon: const Icon(Icons.speaker_notes, size: 20),
-              onPressed: onToggleMenu,
-            ),
-          TextButton.icon(
-              onPressed: onPressed,
-              icon: const Icon(Icons.close, size: 18),
-              label: Text(ModuStrings.text(
-                  context, '快速标记中 · 退出', 'Quick mark · Exit'))),
-        ]),
-      );
+      return LayoutBuilder(builder: (context, constraints) {
+        final compact = constraints.maxWidth <
+            240 * MediaQuery.textScalerOf(context).scale(14) / 14;
+        final menu = IconButton(
+          key: const ValueKey('quick-mark-menu-toggle'),
+          tooltip: zh
+              ? (showMenu ? '标记后弹出菜单：开' : '标记后弹出菜单：关')
+              : (showMenu
+                  ? 'Menu after marking: on'
+                  : 'Menu after marking: off'),
+          isSelected: showMenu,
+          icon: const Icon(Icons.speaker_notes_off_outlined, size: 20),
+          selectedIcon: const Icon(Icons.speaker_notes, size: 20),
+          onPressed: onToggleMenu,
+        );
+        return Material(
+          elevation: 2,
+          borderRadius: BorderRadius.circular(24),
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (onToggleMenu != null)
+              compact ? SizedBox.square(dimension: 44, child: menu) : menu,
+            if (compact)
+              SizedBox.square(
+                  dimension: 44,
+                  child: IconButton(
+                      key: const ValueKey('quick-mark-exit'),
+                      tooltip: zh ? '关闭快速标记' : 'Turn off quick mark',
+                      onPressed: onPressed,
+                      icon: const Icon(Icons.close, size: 20)))
+            else
+              TextButton.icon(
+                  key: const ValueKey('quick-mark-exit'),
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.close, size: 18),
+                  label: Text(ModuStrings.text(
+                      context, '快速标记中 · 退出', 'Quick mark · Exit'))),
+          ]),
+        );
+      });
     }
     return IconButton(
       tooltip: zh

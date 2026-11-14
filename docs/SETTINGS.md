@@ -62,6 +62,8 @@ Auto scroll: choose **Scroll** under page turning, then enable **Auto scroll**. 
 
 Auto scroll keeps the screen awake while running. Tap its timer button to choose 0–120 minutes with the slider; 0 means no limit. The remaining time appears on the button and pauses with scrolling. At zero, scrolling stops; starting again uses the selected duration. The timer applies to the current reading session. Pausing or leaving the reader restores the normal screen timeout.
 
+On mobile, **Quick mark** is available in ordinary text and original-text reflow. Swipe across text and release to save a highlight in the current color; tap the page to open the reading menu. The floating control exits quick marking or toggles the menu after marking. Connected highlights in the same color merge while existing comments remain. Reflow marks appear in Notes and use the existing note sync. Switching to translated text or leaving reflow ends quick marking.
+
 ### First-use defaults
 
 These come from [preferences](../lib/config/shared_preference_provider.dart) when the setting has never been saved. Upgrades, imports and independent provider configurations can change them.

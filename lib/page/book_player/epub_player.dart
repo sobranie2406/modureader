@@ -276,6 +276,16 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   bool get classicalTranslation => _classicalTranslator != null;
   bool quickMarkEnabled = false;
   final _quickMarks = QuickMarkService(bookNoteDao);
+  Future<QuickMarkResult> saveReflowQuickMark(
+          {required DocumentReflowAnchor anchor,
+          required DocumentReflowPage page,
+          required String chapter}) =>
+      _quickMarks.saveReflowStroke(
+          bookId: book.id,
+          anchor: anchor,
+          page: page,
+          chapter: chapter,
+          color: Prefs().annotationColor);
   late final ReaderProgressSession _progress;
   Future<void>? _syncRefresh;
   bool _refreshRequested = false;
@@ -2775,6 +2785,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       }
     }
     await _progress.flush();
+    await _quickMarks.flush();
   }
 
   void _showReaderLoadFailure() {

@@ -141,6 +141,9 @@ void main() {
       ValueChanged<int>? pdfWheelZoom,
       bool Function()? wheelZoomAllowed,
       void Function(TtsPageSource)? narrationInvalidated,
+      bool quickMarkEnabled = false,
+      ReflowQuickMark? quickMark,
+      VoidCallback? quickMarkUnavailable,
       bool comparison = false,
       ValueChanged<bool>? onComparisonChanged,
       Future<void> Function(String, String, bool)? query,
@@ -167,6 +170,9 @@ void main() {
           onPdfWheelZoom: pdfWheelZoom,
           wheelZoomAllowed: wheelZoomAllowed,
           onNarrationInvalidated: narrationInvalidated,
+          quickMarkEnabled: quickMarkEnabled,
+          onQuickMark: quickMark,
+          onQuickMarkUnavailable: quickMarkUnavailable,
           comparison: comparison,
           onComparisonChanged: onComparisonChanged,
           store: store,
@@ -1785,6 +1791,327 @@ void main() {
     final caret = render.getLocalRectForCaret(TextPosition(offset: offset));
     return render.localToGlobal(caret.center + const Offset(2, 0));
   }
+
+  bool quickMarkPreview(WidgetTester tester) {
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final controller = tester.widget<TextField>(field).controller!;
+    return controller
+        .buildTextSpan(context: tester.element(field), withComposing: false)
+        .children!
+        .cast<TextSpan>()
+        .any((span) => span.style?.backgroundColor != null);
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+        'quick mark previews a touch drag and submits on release ($platform)',
+        (tester) async {
+      var selected = 0, submitted = 0;
+      DocumentReflowAnchor? saved;
+      String? content;
+      final pending = Completer<void>();
+      await open(tester,
+          quickMarkEnabled: true,
+          extract: (_) async =>
+              List.generate(80, (i) => '第$i段，快速标记测试文字。').join('\n\n'),
+          selection: (a, t, c, r, ids) async => selected++,
+          quickMark: (anchor, text, context, rect) async {
+            submitted++;
+            saved = anchor;
+            content = text;
+            expect(context, contains(text));
+            expect(rect.width, greaterThan(0));
+            expect(rect.height, greaterThan(0));
+            await pending.future;
+          });
+      final field = find.byKey(const ValueKey('reflow-text'));
+      final controller = tester.widget<TextField>(field).controller!;
+      final viewport = find
+          .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+          .first;
+      final scroll = tester.widget<SingleChildScrollView>(viewport).controller!;
+      final page = key.currentState!.quickMarkPage!;
+      final end = controller.text.indexOf('第2段') + 3;
+      final source = key.currentState!.narrationSource!;
+      expect(key.currentState!.canQuickMark, isTrue);
+      final drag = await tester.startGesture(textPoint(tester, 2));
+      await drag.moveTo(textPoint(tester, end));
+      await tester.pump();
+      expect(quickMarkPreview(tester), isTrue);
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(scroll.offset, 0);
+      expect(submitted, 0);
+      await drag.up();
+      await tester.pump();
+      expect(submitted, 1);
+      expect(saved!.matches(page), isTrue);
+      expect(saved!.start, 2);
+      expect(saved!.end, end);
+      expect(content, controller.text.substring(2, end));
+      expect(selected, 0);
+      expect(pages, [0]);
+      expect(source.valid, isTrue);
+      expect(quickMarkPreview(tester), isTrue);
+      pending.complete();
+      await tester.pump();
+      expect(quickMarkPreview(tester), isFalse);
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant({platform}));
+  }
+
+  testWidgets(
+      'quick mark taps open the menu without notes, selection or paging',
+      (tester) async {
+    var submitted = 0, selected = 0, menus = 0;
+    await open(tester,
+        quickMarkEnabled: true,
+        openReaderMenu: () => menus++,
+        quickMark: (a, t, c, r) async => submitted++,
+        selection: (a, t, c, r, ids) async => selected++);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.longPressAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.byKey(const ValueKey('reflow-mode')));
+    await tester.pump();
+    expect(submitted, 0);
+    expect(selected, 0);
+    expect(menus, 2);
+    expect(pages, [0]);
+    final field =
+        tester.widget<TextField>(find.byKey(const ValueKey('reflow-text')));
+    expect(field.controller!.selection.isCollapsed, isTrue);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  for (final interruption in [
+    'cancel',
+    'disable',
+    'navigate',
+    'translation',
+    'dispose'
+  ]) {
+    testWidgets('quick mark discards a stroke after $interruption',
+        (tester) async {
+      var submitted = 0, unavailable = 0;
+      Future<void> submit(
+          DocumentReflowAnchor a, String t, String c, Rect r) async {
+        submitted++;
+      }
+
+      await open(tester,
+          quickMarkEnabled: true,
+          quickMark: submit,
+          quickMarkUnavailable: () => unavailable++,
+          extract: (_) async => '快速标记测试文字，下一段继续。');
+      final drag = await tester.startGesture(textPoint(tester, 1));
+      await drag.moveTo(textPoint(tester, 8));
+      await tester.pump();
+      expect(quickMarkPreview(tester), isTrue);
+      switch (interruption) {
+        case 'cancel':
+          await drag.cancel();
+        case 'disable':
+          await drag.up();
+          await open(tester, quickMarkEnabled: false, quickMark: submit);
+        case 'navigate':
+          await key.currentState!.goToPage(1);
+          await drag.up();
+        case 'translation':
+          await key.currentState!.translateCurrentPage(
+              TranslationModeEnum.translationOnly,
+              provider: PageTranslator());
+          await drag.up();
+        case 'dispose':
+          await tester.pumpWidget(const SizedBox());
+          await drag.up();
+      }
+      await tester.pumpAndSettle();
+      expect(submitted, 0);
+      expect(tester.takeException(), isNull);
+      if (interruption == 'translation') {
+        expect(unavailable, 1);
+        expect(key.currentState!.canQuickMark, isFalse);
+        expect(key.currentState!.quickMarkPage, isNull);
+        expect(find.byKey(const ValueKey('reflow-quick-mark')), findsNothing);
+      } else if (interruption != 'dispose') {
+        expect(quickMarkPreview(tester), isFalse);
+      }
+      if (interruption == 'navigate') {
+        expect(
+            tester
+                .widget<DocumentReflowReader>(find.byType(DocumentReflowReader))
+                .quickMarkEnabled,
+            isTrue);
+        final next = await tester.startGesture(textPoint(tester, 1));
+        await next.moveTo(textPoint(tester, 8));
+        await next.up();
+        await tester.pumpAndSettle();
+        expect(submitted, 1);
+        expect(pages, [0, 1]);
+      }
+    }, variant: TargetPlatformVariant({TargetPlatform.android}));
+  }
+
+  testWidgets('quick mark preserves source offsets when text is filtered',
+      (tester) async {
+    await Prefs().saveCustomCssProfile(
+        0, const CustomCssProfile(pattern: '广告', filterMode: 'text'));
+    await Prefs().saveCustomCssSelection(
+        const CustomCssSelection(index: 0, enabled: true, indices: [0]));
+    DocumentReflowAnchor? saved;
+    await open(tester,
+        quickMarkEnabled: true,
+        extract: (_) async => '广告正文快速标记测试文字。',
+        quickMark: (a, t, c, r) async => saved = a);
+    final drag = await tester.startGesture(textPoint(tester, 2));
+    await drag.moveTo(textPoint(tester, 8));
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(saved!.start, 2);
+    expect(saved!.end, 8);
+    expect(saved!.matches(key.currentState!.quickMarkPage!), isTrue);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets('speech follows its cursor after releasing a quick mark stroke',
+      (tester) async {
+    var submitted = 0;
+    await open(tester,
+        quickMarkEnabled: true,
+        extract: (_) async =>
+            List.generate(80, (i) => '第$i段，朗读和快速标记测试。').join('\n\n'),
+        quickMark: (a, t, c, r) async => submitted++);
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final controller = tester.widget<TextField>(field).controller!;
+    final scroll = tester
+        .widget<SingleChildScrollView>(find
+            .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+            .first)
+        .controller!;
+    final source = key.currentState!.narrationSource!;
+    final drag = await tester.startGesture(textPoint(tester, 1));
+    await drag.moveTo(textPoint(tester, 8));
+    source.seekToOffset(controller.text.indexOf('第60段'));
+    final speaking = source.currentText();
+    await tester.pumpAndSettle();
+    expect(speaking, contains('第60段'));
+    expect(source.valid, isTrue);
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(scroll.offset, 0);
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(submitted, 1);
+    source.showCurrent();
+    await tester.pumpAndSettle();
+    expect(scroll.offset, greaterThan(0));
+    expect(source.currentText(), speaking);
+    expect(pages, [0]);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets(
+      'multi-touch cannot restart quick marking until every finger lifts',
+      (tester) async {
+    var submitted = 0;
+    await open(tester,
+        quickMarkEnabled: true,
+        extract: (_) async => '快速标记手指测试文字，禁止多指产生标记。',
+        quickMark: (a, t, c, r) async => submitted++);
+    final first = await tester.startGesture(textPoint(tester, 1), pointer: 41);
+    await first.moveTo(textPoint(tester, 7));
+    await tester.pump();
+    expect(quickMarkPreview(tester), isTrue);
+    final second = await tester.startGesture(textPoint(tester, 3), pointer: 42);
+    final third = await tester.startGesture(textPoint(tester, 5), pointer: 43);
+    await third.moveTo(textPoint(tester, 12));
+    await third.up();
+    await second.moveTo(textPoint(tester, 10));
+    await second.up();
+    await first.up();
+    await tester.pumpAndSettle();
+    expect(submitted, 0);
+    expect(quickMarkPreview(tester), isFalse);
+    final single = await tester.startGesture(textPoint(tester, 1));
+    await single.moveTo(textPoint(tester, 8));
+    await single.up();
+    await tester.pumpAndSettle();
+    expect(submitted, 1);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets('consecutive quick strokes both commit before the next frame',
+      (tester) async {
+    final saved = <DocumentReflowAnchor>[];
+    await open(tester,
+        quickMarkEnabled: true,
+        extract: (_) async => '连续快速标记测试文字，两笔都应该保存。',
+        quickMark: (a, t, c, r) async => saved.add(a));
+    final first = await tester.startGesture(textPoint(tester, 1));
+    await first.moveTo(textPoint(tester, 6));
+    await first.up();
+    final second = await tester.startGesture(textPoint(tester, 9));
+    await second.moveTo(textPoint(tester, 15));
+    await second.up();
+    expect(saved, isEmpty);
+    await tester.pumpAndSettle();
+    expect(saved.map((a) => (a.start, a.end)), [(1, 6), (9, 15)]);
+    expect(quickMarkPreview(tester), isFalse);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets(
+      'returning a quick stroke to its start does not save or open menus',
+      (tester) async {
+    var submitted = 0, menus = 0;
+    await open(tester,
+        quickMarkEnabled: true,
+        quickMark: (a, t, c, r) async => submitted++,
+        openReaderMenu: () => menus++);
+    final drag = await tester.startGesture(textPoint(tester, 1));
+    await drag.moveTo(textPoint(tester, 6));
+    await drag.moveTo(textPoint(tester, 1));
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(submitted, 0);
+    expect(menus, 0);
+    expect(quickMarkPreview(tester), isFalse);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets(
+      'quick mark failure clears its preview without an unhandled error',
+      (tester) async {
+    await open(tester,
+        quickMarkEnabled: true,
+        quickMark: (a, t, c, r) async =>
+            throw StateError('host reported failure'));
+    final drag = await tester.startGesture(textPoint(tester, 0));
+    await drag.moveTo(textPoint(tester, 7));
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(quickMarkPreview(tester), isFalse);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets('disabling quick mark restores ordinary text tapping',
+      (tester) async {
+    var submitted = 0;
+    await open(tester,
+        quickMarkEnabled: true, quickMark: (a, t, c, r) async => submitted++);
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig = List.filled(9, 1);
+    await open(tester,
+        quickMarkEnabled: false, quickMark: (a, t, c, r) async => submitted++);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(submitted, 0);
+    expect(pages, [0, 1]);
+  }, variant: TargetPlatformVariant({TargetPlatform.android}));
+
+  testWidgets('desktop reflow does not activate the touch quick mark overlay',
+      (tester) async {
+    await open(tester,
+        quickMarkEnabled: true, quickMark: (a, t, c, r) async {});
+    expect(key.currentState!.canQuickMark, isFalse);
+    expect(find.byKey(const ValueKey('reflow-quick-mark')), findsNothing);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 
   testWidgets(
       'reflow templates apply CSS and skip filtered speech without changing stored text',

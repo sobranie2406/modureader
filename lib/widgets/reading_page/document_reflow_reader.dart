@@ -4,6 +4,7 @@ import 'package:modu_reader/service/reading/text_filter.dart';
 import 'package:modu_reader/page/reading_page.dart' show epubPlayerKey;
 import 'package:modu_reader/utils/coordinates_to_part.dart';
 import 'package:modu_reader/utils/desktop_wheel_zoom.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'more_settings/page_turning/types_and_icons.dart';
 import 'more_settings/page_turning/diagram.dart';
 import 'reader_menu_appearance.dart';
@@ -40,6 +41,8 @@ import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:modu_reader/service/ocr/ocr_models.dart';
 import 'widget_title.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -55,6 +58,8 @@ typedef ReflowSelection = Future<void> Function(DocumentReflowAnchor anchor,
     String text, String contextText, Rect globalRect, List<int> annotationIds);
 typedef ReflowTranslatedSelection = Future<void> Function(
     String text, String contextText, Rect globalRect, int start);
+typedef ReflowQuickMark = Future<void> Function(DocumentReflowAnchor anchor,
+    String text, String contextText, Rect globalRect);
 
 /// A reading surface in the reader's body, not a dialog or another book.
 /// The source WebView stays mounted underneath to retain original-page state.
@@ -98,6 +103,9 @@ class DocumentReflowReader extends StatefulWidget {
       this.onPdfWheelZoom,
       this.wheelZoomAllowed,
       this.onNarrationInvalidated,
+      this.quickMarkEnabled = false,
+      this.onQuickMark,
+      this.onQuickMarkUnavailable,
       this.readerMenuVisible = false,
       this.comparison = false,
       this.onComparisonChanged,
@@ -109,6 +117,9 @@ class DocumentReflowReader extends StatefulWidget {
   final ValueChanged<int>? onPdfWheelZoom;
   final bool Function()? wheelZoomAllowed;
   final void Function(TtsPageSource)? onNarrationInvalidated;
+  final bool quickMarkEnabled;
+  final ReflowQuickMark? onQuickMark;
+  final VoidCallback? onQuickMarkUnavailable;
   final ValueChanged<bool>? onComparisonChanged;
   final VoidCallback? onOpenReaderMenu, onCloseReaderMenu;
   final VoidCallback? onOpenTranslationSettings;
@@ -150,6 +161,230 @@ class DocumentReflowReader extends StatefulWidget {
 class DocumentReflowReaderState extends State<DocumentReflowReader> {
   final _surfaceKey = GlobalKey<DocumentReaderSurfaceState>();
   final _panels = ValueNotifier<int>(0);
+  int _quickMarkEpoch = 0, _quickMarkSequence = 0;
+  int? _quickMarkPreviewOwner;
+  _ReflowQuickMarkStroke? _quickMarkStroke;
+  final _quickMarkPointers = <int>{};
+  bool _quickMarkTranslationPending = false;
+  bool _quickMarkUnavailableNotified = false;
+
+  bool get _quickMarkMobile =>
+      AnxPlatform.isMobile ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+  bool get canQuickMark =>
+      mounted &&
+      _quickMarkMobile &&
+      !_busy &&
+      !_translation.busy &&
+      !_quickMarkTranslationPending &&
+      !_showTranslation &&
+      _page != null &&
+      _page!.page == _navigationPage &&
+      _controller.text == _page!.text;
+  DocumentReflowPage? get quickMarkPage => canQuickMark ? _page : null;
+  bool get _quickMarkTouchMode =>
+      widget.quickMarkEnabled &&
+      widget.onQuickMark != null &&
+      _quickMarkMobile &&
+      !_showTranslation;
+
+  void _cancelQuickMark({bool clearPointers = false}) {
+    if (clearPointers) _quickMarkPointers.clear();
+    _quickMarkEpoch++;
+    _quickMarkStroke = null;
+    _quickMarkPreviewOwner = null;
+    _controller.setQuickMarkRange(null);
+  }
+
+  void _notifyQuickMarkUnavailable() {
+    if (!widget.quickMarkEnabled || _quickMarkUnavailableNotified) return;
+    _quickMarkUnavailableNotified = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.quickMarkEnabled && _showTranslation) {
+        widget.onQuickMarkUnavailable?.call();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  bool _quickMarkCurrent(_ReflowQuickMarkStroke stroke) =>
+      _quickMarkTouchMode &&
+      canQuickMark &&
+      !widget.readerMenuVisible &&
+      _surfaceKey.currentState?.menuIsOpen != true &&
+      ModalRoute.of(context)?.isCurrent != false &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState ==
+              AppLifecycleState.resumed) &&
+      stroke.epoch == _quickMarkEpoch &&
+      stroke.generation == _generation &&
+      stroke.translation == _translationRequest &&
+      identical(stroke.page, _page);
+
+  int? _quickMarkOffset(Offset global, {bool hit = false}) {
+    final render = _textState?.renderEditable;
+    if (render == null) return null;
+    final text = _controller.text;
+    final offset =
+        render.getPositionForPoint(global).offset.clamp(0, text.length);
+    if (!hit) return offset;
+    final point = render.globalToLocal(global);
+    for (final index in [offset, offset - 1]) {
+      if (index < 0 ||
+          index >= text.length ||
+          text[index].trim().isEmpty ||
+          _controller.filteredRanges
+              .any((range) => index >= range.start && index < range.end)) {
+        continue;
+      }
+      final boxes = render.getBoxesForSelection(
+          TextSelection(baseOffset: index, extentOffset: index + 1));
+      if (boxes.any((box) => box.toRect().inflate(2).contains(point))) {
+        return offset;
+      }
+    }
+    return null;
+  }
+
+  void _quickMarkDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _quickMarkPointers.add(event.pointer);
+    if (_quickMarkPointers.length != 1) {
+      _cancelQuickMark();
+      return;
+    }
+    if (!canQuickMark) return;
+    final offset = _quickMarkOffset(event.position, hit: true);
+    stopAutoScroll();
+    _clearTextSelection();
+    _quickMarkStroke = _ReflowQuickMarkStroke(
+        pointer: event.pointer,
+        page: _page!,
+        generation: _generation,
+        translation: _translationRequest,
+        epoch: _quickMarkEpoch,
+        sequence: ++_quickMarkSequence,
+        base: offset ?? -1,
+        origin: event.position);
+  }
+
+  void _quickMarkMove(PointerMoveEvent event) {
+    final stroke = _quickMarkStroke;
+    if (stroke == null || event.pointer != stroke.pointer) return;
+    if (!_quickMarkCurrent(stroke)) {
+      _cancelQuickMark();
+      return;
+    }
+    if (!stroke.moved && (event.position - stroke.origin).distance < 6) return;
+    stroke.moved = true;
+    if (stroke.base < 0) return;
+    final offset = _quickMarkOffset(event.position);
+    if (offset == null) return;
+    var start = offset < stroke.base ? offset : stroke.base;
+    var end = offset > stroke.base ? offset : stroke.base;
+    bool hidden(int index) =>
+        stroke.page.text[index].trim().isEmpty ||
+        _controller.filteredRanges
+            .any((range) => index >= range.start && index < range.end);
+    while (start < end && hidden(start)) {
+      start++;
+    }
+    while (end > start && hidden(end - 1)) {
+      end--;
+    }
+    stroke.range = start < end ? TextRange(start: start, end: end) : null;
+    _quickMarkPreviewOwner = stroke.sequence;
+    _controller.setQuickMarkRange(stroke.range);
+  }
+
+  void _quickMarkUp(PointerUpEvent event) {
+    _quickMarkPointers.remove(event.pointer);
+    final stroke = _quickMarkStroke;
+    if (stroke == null || event.pointer != stroke.pointer) return;
+    _quickMarkStroke = null;
+    final range = stroke.range;
+    if (range == null || !_quickMarkCurrent(stroke)) {
+      final tap = !stroke.moved && _quickMarkCurrent(stroke);
+      _cancelQuickMark();
+      if (tap && widget.onReaderTap?.call() != true) {
+        widget.onOpenReaderMenu?.call();
+      }
+      return;
+    }
+    final render = _textState?.renderEditable;
+    final boxes = render?.getBoxesForSelection(
+        TextSelection(baseOffset: range.start, extentOffset: range.end));
+    if (render == null || boxes == null || boxes.isEmpty) {
+      _cancelQuickMark();
+      return;
+    }
+    final local =
+        boxes.map((box) => box.toRect()).reduce((a, b) => a.expandToInclude(b));
+    final rect = Rect.fromPoints(render.localToGlobal(local.topLeft),
+        render.localToGlobal(local.bottomRight));
+    final text = stroke.page.text;
+    final anchor = stroke.page.anchor(range.start, range.end);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!_quickMarkCurrent(stroke)) return;
+        await widget.onQuickMark!(
+            anchor,
+            text.substring(range.start, range.end),
+            text.substring((range.start - 800).clamp(0, text.length),
+                (range.end + 800).clamp(0, text.length)),
+            rect);
+      } catch (_) {
+        // The host reports persistence failures; only discard this preview.
+      } finally {
+        if (mounted && _quickMarkPreviewOwner == stroke.sequence) {
+          _quickMarkPreviewOwner = null;
+          _controller.setQuickMarkRange(null);
+        }
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Widget _quickMarkOverlay() => RawGestureDetector(
+      key: const ValueKey('reflow-quick-mark'),
+      behavior: HitTestBehavior.translucent,
+      gestures: {
+        EagerGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+                () => EagerGestureRecognizer(
+                    supportedDevices: const {PointerDeviceKind.touch}),
+                (_) {}),
+      },
+      child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: _quickMarkDown,
+          onPointerMove: _quickMarkMove,
+          onPointerUp: _quickMarkUp,
+          onPointerCancel: (event) {
+            _quickMarkPointers.remove(event.pointer);
+            _cancelQuickMark();
+          },
+          child: const SizedBox.expand()));
+
+  @override
+  void didUpdateWidget(covariant DocumentReflowReader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.quickMarkEnabled != widget.quickMarkEnabled) {
+      _cancelQuickMark(clearPointers: true);
+      _resetSelectionGesture();
+      if (widget.quickMarkEnabled) {
+        clearSelection();
+        if (_showTranslation) _notifyQuickMarkUnavailable();
+      } else {
+        _quickMarkUnavailableNotified = false;
+      }
+    }
+    if (widget.readerMenuVisible && !oldWidget.readerMenuVisible) {
+      _cancelQuickMark();
+    }
+  }
+
   void closeMenu() {
     if (widget.onCloseReaderMenu != null) {
       widget.onCloseReaderMenu!();
@@ -225,12 +460,20 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _showTranslation ? _translatedController : _controller;
 
   void stopTranslation() {
+    _cancelQuickMark(clearPointers: true);
+    _quickMarkTranslationPending = false;
     stopAutoScroll();
     _translationRequest++;
     _translation.stop();
   }
 
   void _translationChanged() {
+    _cancelQuickMark(clearPointers: true);
+    if (_showTranslation) {
+      _notifyQuickMarkUnavailable();
+    } else {
+      _quickMarkUnavailableNotified = false;
+    }
     _configureTranslationStyle();
     _translationModes.update(_translation.mode.value,
         isClassical: classicalTranslation);
@@ -247,6 +490,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       {bool force = false,
       TranslateServiceProvider? provider,
       bool classical = false}) async {
+    _cancelQuickMark();
     stopAutoScroll();
     final page = _page;
     if (!mounted || _busy || page == null || page.page != _navigationPage) {
@@ -254,7 +498,13 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     }
     final request = ++_translationRequest;
     final generation = _generation;
-    final saved = await widget.store.read(page.page, '');
+    _quickMarkTranslationPending = true;
+    DocumentReflowPage? saved;
+    try {
+      saved = await widget.store.read(page.page, '');
+    } finally {
+      if (request == _translationRequest) _quickMarkTranslationPending = false;
+    }
     if (!mounted ||
         _busy ||
         request != _translationRequest ||
@@ -520,6 +770,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         },
         onPosition: (offset) {
           if (!mounted ||
+              _quickMarkStroke != null ||
               _readingController.selection.isValid &&
                   !_readingController.selection.isCollapsed) {
             return;
@@ -610,6 +861,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
 
   @override
   void dispose() {
+    _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     _removedFontSubscription?.cancel();
     _invalidateNarration();
@@ -674,6 +926,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void clearSelection() {
+    _cancelQuickMark();
+    _clearTextSelection();
+  }
+
+  void _clearTextSelection() {
     _resetSelectionGesture();
     _editable?.hideToolbar();
     _shownSelection = null;
@@ -736,6 +993,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void cancelLoading({bool queued = true}) {
+    _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     if (queued) _loadRequest++;
     _cancel?.cancel();
@@ -891,6 +1149,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       bool refresh = false,
       bool followOriginal = false,
       bool Function()? narrationCurrent}) async {
+    _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     if (narrationCurrent == null) {
       stopTranslation();
@@ -1244,6 +1503,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _selectionPointerDown(PointerDownEvent event) {
+    if (_quickMarkTouchMode && event.kind == PointerDeviceKind.touch) return;
     _menuTapTimer?.cancel();
     _pointerDownTime = event.timeStamp;
     _selectionTimer?.cancel();
@@ -1277,6 +1537,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _selectionPointerMove(PointerMoveEvent event) {
+    if (_quickMarkTouchMode && event.kind == PointerDeviceKind.touch) return;
     // A deliberate drag owns its exact range. Handle overlays live outside
     // this Listener, so dragging a handle never arms expansion again.
     if (_pointerOrigin != null &&
@@ -1288,6 +1549,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _selectionPointerUp(PointerUpEvent event) {
+    if (_quickMarkTouchMode && event.kind == PointerDeviceKind.touch) return;
     _mouseLongPressTimer?.cancel();
     final shortTap = _expandInitialSelection &&
         _pointerOrigin != null &&
@@ -1307,6 +1569,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
 
   void _tapPage(Offset global) {
     if (_busy || !_readingController.selection.isCollapsed) return;
+    if (_quickMarkTouchMode) {
+      if (widget.onReaderTap?.call() != true) widget.onOpenReaderMenu?.call();
+      return;
+    }
     if (widget.onReaderTap?.call() == true) return;
     final box = _translationViewportKey.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return;
@@ -1341,6 +1607,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> _settleSelection() async {
+    if (_quickMarkTouchMode) return;
     final controller = _readingController;
     final selection = controller.selection, page = _page;
     final state = _textState;
@@ -1417,6 +1684,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Widget _selectionMenu(BuildContext context, EditableTextState state) {
+    if (_quickMarkTouchMode) return const SizedBox.shrink();
     if (_expandingEpoch == _selectionEpoch) return const SizedBox.shrink();
     if (_expandInitialSelection) {
       _queueSelection();
@@ -1427,6 +1695,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _publishSelection(EditableTextState state) {
+    if (_quickMarkTouchMode) return;
     _editable = state;
     final translated = _showTranslation;
     final controller = _readingController;
@@ -1628,26 +1897,32 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                                         _resetSelectionGesture(),
                                     child: KeyedSubtree(
                                         key: _textFieldKey,
-                                        child: TextField(
-                                          key: ValueKey(_showTranslation
-                                              ? 'reflow-translated-text'
-                                              : 'reflow-text'),
-                                          controller: _readingController,
-                                          focusNode: _focus,
-                                          readOnly: true,
-                                          maxLines: null,
-                                          showCursor: false,
-                                          enableSuggestions: false,
-                                          style: css.textStyle,
-                                          textAlign:
-                                              css.alignment ?? _style.alignment,
-                                          decoration: const InputDecoration(
-                                              border: InputBorder.none,
-                                              isCollapsed: true,
-                                              contentPadding: EdgeInsets.zero),
-                                          contextMenuBuilder: _selectionMenu,
-                                          onTapOutside: (_) {},
-                                        ))))))),
+                                        child: Stack(children: [
+                                          TextField(
+                                            key: ValueKey(_showTranslation
+                                                ? 'reflow-translated-text'
+                                                : 'reflow-text'),
+                                            controller: _readingController,
+                                            focusNode: _focus,
+                                            readOnly: true,
+                                            maxLines: null,
+                                            showCursor: false,
+                                            enableSuggestions: false,
+                                            style: css.textStyle,
+                                            textAlign: css.alignment ??
+                                                _style.alignment,
+                                            decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                isCollapsed: true,
+                                                contentPadding:
+                                                    EdgeInsets.zero),
+                                            contextMenuBuilder: _selectionMenu,
+                                            onTapOutside: (_) {},
+                                          ),
+                                          if (_quickMarkTouchMode)
+                                            Positioned.fill(
+                                                child: _quickMarkOverlay()),
+                                        ]))))))),
             if (_needsModel || _error != null)
               Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1712,7 +1987,31 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 }
 
+class _ReflowQuickMarkStroke {
+  _ReflowQuickMarkStroke(
+      {required this.pointer,
+      required this.page,
+      required this.generation,
+      required this.translation,
+      required this.epoch,
+      required this.sequence,
+      required this.base,
+      required this.origin});
+  final int pointer, generation, translation, epoch, sequence, base;
+  final DocumentReflowPage page;
+  final Offset origin;
+  TextRange? range;
+  bool moved = false;
+}
+
 class _ReflowTextController extends TextEditingController {
+  TextRange? _quickMarkRange;
+  void setQuickMarkRange(TextRange? range) {
+    if (range == _quickMarkRange) return;
+    _quickMarkRange = range;
+    notifyListeners();
+  }
+
   List<TextRange> translatedRanges = [];
   TextStyle? translationStyle;
   TextRange? _narrationRange;
@@ -1754,6 +2053,11 @@ class _ReflowTextController extends TextEditingController {
       for (final range in filteredRanges) ...[range.start, range.end],
       for (final range in translatedRanges) ...[range.start, range.end],
       if (_narrationRange case final range?
+          when range.isValid && range.end <= text.length) ...[
+        range.start,
+        range.end
+      ],
+      if (_quickMarkRange case final range?
           when range.isValid && range.end <= text.length) ...[
         range.start,
         range.end
@@ -1811,6 +2115,14 @@ class _ReflowTextController extends TextEditingController {
     if (range != null && offset >= range.start && offset < range.end) {
       // Match the ordinary ebook speech overlay without changing selection/notes.
       background = const Color(0x8339c5bc);
+    }
+    final quick = _quickMarkRange;
+    if (quick != null && offset >= quick.start && offset < quick.end) {
+      background = Color(int.tryParse(
+                  'ff${Prefs().annotationColor.replaceFirst('#', '')}',
+                  radix: 16) ??
+              0xffffff00)
+          .withValues(alpha: .35);
     }
     return TextStyle(
         backgroundColor: background,

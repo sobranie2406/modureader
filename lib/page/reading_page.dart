@@ -4,6 +4,8 @@ import 'package:modu_reader/widgets/reading_page/reader_top_actions.dart';
 import 'package:modu_reader/widgets/reading_page/auto_scroll_toolbar.dart';
 import 'package:modu_reader/service/reader_toolbar_visibility.dart';
 import 'package:modu_reader/service/reader_auto_scroll.dart';
+import 'package:modu_reader/providers/book_notes.dart';
+import 'package:modu_reader/providers/notes_statistics.dart';
 import 'package:modu_reader/widgets/reading_page/harmony_reader_toolbar.dart';
 import 'package:modu_reader/service/document_reader_rotation.dart';
 import 'package:modu_reader/widgets/reading_page/document_style_widget.dart';
@@ -136,6 +138,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   bool get _autoScrollEligible =>
       Prefs().autoScrollEnabled &&
+      !_quickMarkActive &&
       (isReflowActive ||
           (Prefs().pageTurnStyle == PageTurn.scroll &&
               !isReflowReading &&
@@ -260,6 +263,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     if (!reflow) reflowReader?.clearSelection();
     setState(() {
       _reflowFocused = reflow;
+      if (!reflow) _reflowQuickMarkEnabled = false;
       _currentPage = empty;
       bottomBarOffstage = true;
     });
@@ -291,6 +295,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> openReflowAnchor(DocumentReflowAnchor anchor) async {
+    _disableReflowQuickMark();
     if (anchor.original) {
       final player = epubPlayerKey.currentState;
       if (player == null || !mounted || _viewingOriginalNote) return;
@@ -337,6 +342,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     if (!mounted) return;
     setState(() {
       _reflowOcr = null;
+      _reflowQuickMarkEnabled = false;
       _reflowAnchor = null;
       _compareOriginal = false;
       _reflowFocused = true;
@@ -399,6 +405,57 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
     return DocumentReflowReader(
       key: _reflowKey,
+      quickMarkEnabled: _reflowQuickMarkEnabled &&
+          isReflowActive &&
+          bottomBarOffstage &&
+          _aiChat == null,
+      onQuickMarkUnavailable: _disableReflowQuickMark,
+      onQuickMark: (anchor, text, contextText, rect) async {
+        final reader = reflowReader;
+        final page = reader?.quickMarkPage;
+        if (!mounted ||
+            !isReflowActive ||
+            !_reflowQuickMarkEnabled ||
+            reader == null ||
+            page == null ||
+            !anchor.matches(page) ||
+            anchor.ocr != page.ocr) {
+          return;
+        }
+        try {
+          final result = await player.saveReflowQuickMark(
+              anchor: anchor, page: page, chapter: reader.chapter);
+          if (!mounted) return;
+          ref.invalidate(bookNotesControllerProvider(player.book));
+          ref.invalidate(notesStatisticsProvider);
+          ref.invalidate(bookIdAndNotesProvider);
+          await reader.refreshNotes();
+          if (!mounted ||
+              reader != reflowReader ||
+              !isReflowActive ||
+              !_reflowQuickMarkEnabled ||
+              reader.quickMarkPage != page ||
+              !Prefs().quickMarkShowMenu) {
+            return;
+          }
+          final saved = DocumentReflowAnchor.parse(result.note.cfi);
+          if (saved == null || result.note.id == null) return;
+          await showReflowSelection(
+              result.note.content,
+              page.text.substring(
+                  (saved.start - 800).clamp(0, page.text.length),
+                  (saved.end + 800).clamp(0, page.text.length)),
+              rect,
+              anchor: saved,
+              ids: [result.note.id!]);
+        } catch (_) {
+          if (mounted) {
+            AnxToast.show(ModuStrings.text(context, '快速标记保存失败，请重试。',
+                'Could not save the highlight. Please retry.'));
+          }
+          rethrow;
+        }
+      },
       onReaderKeyEvent: _handleReaderKeyEvent,
       onReaderTap: consumeReaderToolbarTap,
       onKeyboardEligibilityChanged: _updatePageKeys,
@@ -617,7 +674,32 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   bool _searchDialogOpen = false;
   bool _readerDrawerOpen = false;
   bool _quickMarkEnabled = false;
+  bool _reflowQuickMarkEnabled = false;
+  bool get _quickMarkActive => _quickMarkEnabled || _reflowQuickMarkEnabled;
   bool _changingQuickMark = false;
+
+  void _disableReflowQuickMark() {
+    if (!mounted || !_reflowQuickMarkEnabled) return;
+    setState(() => _reflowQuickMarkEnabled = false);
+    reflowReader?.clearSelection();
+    _updatePageKeys();
+  }
+
+  Widget _quickMarkExitToolbar() => Positioned(
+      top: 8,
+      left: 12,
+      right: 12,
+      child: Align(
+          alignment: Alignment.topRight,
+          child: PointerInterceptor(
+              child: SafeArea(
+                  child: QuickMarkToggle(
+                      enabled: true,
+                      showExit: true,
+                      showMenu: Prefs().quickMarkShowMenu,
+                      onToggleMenu: _toggleQuickMarkMenu,
+                      onPressed:
+                          _changingQuickMark ? null : _toggleQuickMark)))));
 
   Future<void> _toggleQuickMarkMenu() async {
     if (_changingQuickMark) return;
@@ -627,9 +709,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
       Prefs().quickMarkShowMenu = !previous;
     });
     try {
-      final applied = await epubPlayerKey.currentState
-          ?.setQuickMarkEnabled(_quickMarkEnabled);
-      if (applied != true) throw StateError('Reader not ready');
+      if (!_reflowQuickMarkEnabled) {
+        final applied = await epubPlayerKey.currentState
+            ?.setQuickMarkEnabled(_quickMarkEnabled);
+        if (applied != true) throw StateError('Reader not ready');
+      }
     } catch (_) {
       Prefs().quickMarkShowMenu = previous;
       if (mounted) {
@@ -644,16 +728,33 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> _toggleQuickMark() async {
     if (!AnxPlatform.isMobile || _changingQuickMark) return;
     setState(() => _changingQuickMark = true);
-    final requested = !_quickMarkEnabled;
+    final reflow =
+        _reflowQuickMarkEnabled || (isReflowActive && !_quickMarkEnabled);
+    final requested = !(reflow ? _reflowQuickMarkEnabled : _quickMarkEnabled);
     try {
-      final enabled =
-          await epubPlayerKey.currentState?.setQuickMarkEnabled(requested) ??
+      if (requested) {
+        stopAutoScroll();
+        reflowReader?.clearSelection();
+        epubPlayerKey.currentState?.removeOverlay();
+      }
+      final enabled = reflow
+          ? requested && reflowReader?.canQuickMark == true
+          : await epubPlayerKey.currentState?.setQuickMarkEnabled(requested) ??
               false;
       if (!mounted) return;
-      setState(() => _quickMarkEnabled = enabled);
+      setState(() {
+        if (reflow) {
+          _reflowQuickMarkEnabled = enabled;
+        } else {
+          _quickMarkEnabled = enabled;
+        }
+      });
       if (requested && !enabled) {
-        AnxToast.show(ModuStrings.text(context, '请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。',
-            'Wait for the book to load. PDF and fixed-layout books are not supported.'));
+        AnxToast.show(reflow
+            ? ModuStrings.text(context, '请在重排原文载入后开启快速标记。',
+                'Open the loaded reflow source text to use quick mark.')
+            : ModuStrings.text(context, '请等待正文载入。快速标记暂不支持 PDF 和固定版式书籍。',
+                'Wait for the book to load. PDF and fixed-layout books are not supported.'));
       } else if (enabled) {
         showOrHideAppBarAndBottomBar(false);
         AnxToast.show(ModuStrings.text(context, '直接划过文字，松手即高亮；退出后恢复滑动翻页。',
@@ -664,6 +765,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
           'Could not switch quick mark. Please retry.'));
     } finally {
       if (mounted) setState(() => _changingQuickMark = false);
+      _updatePageKeys();
     }
   }
 
@@ -1629,6 +1731,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   Future<void> setDocumentForceOcr(bool enabled) async {
     final player = epubPlayerKey.currentState;
     if (player == null) return;
+    _disableReflowQuickMark();
     await reflowReader?.stopLoading();
     await player.setDocumentForceOcr(enabled);
     if (!mounted || epubPlayerKey.currentState != player) return;
@@ -1644,6 +1747,9 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     if (player == null || !player.supportsDocumentImages) return;
     final bookKey = player.cssBookKey;
     if (reflow) forceOcr = forceOcr || player.documentForceOcr;
+    if (isReflowReading && _reflowOcr != forceOcr) {
+      _disableReflowQuickMark();
+    }
     hideBottomBar();
     if (!reflow) {
       await player.pauseDocumentOcrCache();
@@ -1967,10 +2073,14 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                     },
                                     buttons: {
                                       if (AnxPlatform.isMobile &&
-                                          !isReflowReading)
+                                          (isReflowActive ||
+                                              (!isReflowReading &&
+                                                  documentPlayer
+                                                          ?.supportsDocumentImages !=
+                                                      true)))
                                         ReaderTopAction.quickMark:
                                             QuickMarkToggle(
-                                                enabled: _quickMarkEnabled,
+                                                enabled: _quickMarkActive,
                                                 onPressed: _changingQuickMark
                                                     ? null
                                                     : _toggleQuickMark),
@@ -2282,21 +2392,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                       ),
                                     if (AnxPlatform.isMobile &&
                                         _quickMarkEnabled)
-                                      Positioned(
-                                          top: 8,
-                                          right: 12,
-                                          child: PointerInterceptor(
-                                              child: SafeArea(
-                                                  child: QuickMarkToggle(
-                                                      enabled: true,
-                                                      showExit: true,
-                                                      showMenu: Prefs()
-                                                          .quickMarkShowMenu,
-                                                      onToggleMenu:
-                                                          _toggleQuickMarkMenu,
-                                                      onPressed: _changingQuickMark
-                                                          ? null
-                                                          : _toggleQuickMark)))),
+                                      _quickMarkExitToolbar(),
                                   ]),
                                   reflow: isReflowReading &&
                                           documentPlayer != null
@@ -2304,6 +2400,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                           child: Stack(children: [
                                           Positioned.fill(
                                               child: _buildDocumentReflow()),
+                                          if (AnxPlatform.isMobile &&
+                                              _reflowQuickMarkEnabled &&
+                                              isReflowActive)
+                                            _quickMarkExitToolbar(),
                                           if (bottomBarOffstage &&
                                               _aiChat == null)
                                             Positioned.fill(
