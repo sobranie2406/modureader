@@ -136,6 +136,7 @@ void main() {
       ValueChanged<Widget>? openReaderPanel,
       VoidCallback? closeReaderMenu,
       FocusOnKeyEventCallback? readerKeyEvent,
+      bool Function()? readerTap,
       VoidCallback? keyboardEligibilityChanged,
       ValueChanged<int>? pdfWheelZoom,
       bool Function()? wheelZoomAllowed,
@@ -161,6 +162,7 @@ void main() {
           key: key,
           onTranslatedSelection: translatedSelection,
           onReaderKeyEvent: readerKeyEvent,
+          onReaderTap: readerTap,
           onKeyboardEligibilityChanged: keyboardEligibilityChanged,
           onPdfWheelZoom: pdfWheelZoom,
           wheelZoomAllowed: wheelZoomAllowed,
@@ -1306,6 +1308,250 @@ void main() {
         .controller!;
     expect(controller.selection.textInside(controller.text), '下一段');
     expect(pages, [0, 2]);
+  });
+
+  for (final chinese in [false, true]) {
+    testWidgets(
+        'auto scroll uses reading-rate multipliers without reflow (Chinese=$chinese)',
+        (tester) async {
+      var reads = 0, stopped = 0;
+      await open(tester, extract: (_) async {
+        reads++;
+        return List.generate(100, (i) => chinese ? '甲乙丙' : 'Paragraph $i.')
+            .join('\n\n');
+      });
+      final field = find.byKey(const ValueKey('reflow-text'));
+      final initial = tester.widget<TextField>(field);
+      final scroll = tester
+          .widget<SingleChildScrollView>(find
+              .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+              .first)
+          .controller!;
+      final reader = key.currentState!;
+      Prefs().pageTurnStyle = PageTurn.slide;
+      expect(reader.startAutoScroll(2, () => stopped++), isTrue);
+      await tester.pump();
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final base = (scroll.position.maxScrollExtent +
+              scroll.position.viewportDimension) /
+          60;
+      expect(scroll.offset, closeTo(base, .01));
+      final fasterOffset = scroll.offset;
+      expect(reader.startAutoScroll(1, () => stopped++), isTrue);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(scroll.offset - fasterOffset, closeTo(base * .1, .01));
+      expect(
+          tester.widget<TextField>(field).controller, same(initial.controller));
+      expect(tester.widget<TextField>(field).style, initial.style);
+      expect(reads, 1);
+      expect(pages, [0]);
+      expect(Prefs().pageTurnStyle, PageTurn.slide);
+      reader.stopAutoScroll();
+      reader.stopAutoScroll();
+      expect(stopped, 1);
+      final offset = scroll.offset;
+      await tester.pump(const Duration(seconds: 1));
+      expect(scroll.offset, offset);
+    });
+  }
+
+  testWidgets('a reader tap reveals controls while reflow keeps scrolling',
+      (tester) async {
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    var stopped = 0, taps = 0, menus = 0;
+    await open(tester,
+        readerTap: () {
+          taps++;
+          return true;
+        },
+        openReaderMenu: () => menus++,
+        extract: (_) async =>
+            List.generate(100, (i) => 'Paragraph $i.').join('\n\n'));
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final viewport = find
+        .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+        .first;
+    final scroll = tester.widget<SingleChildScrollView>(viewport).controller!;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    await tester.tapAt(tester.getCenter(viewport));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(taps, 1);
+    expect(menus, 0);
+    expect(stopped, 0);
+    final offset = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset, greaterThan(offset));
+    key.currentState!.stopAutoScroll();
+    expect(stopped, 1);
+  });
+
+  testWidgets('auto scroll reestimates the reading rate after width changes',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    var reads = 0, stopped = 0;
+    await open(tester, extract: (_) async {
+      reads++;
+      return List.filled(600, 'word').join(' ');
+    });
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final original = tester.widget<TextField>(field);
+    final scroll = tester
+        .widget<SingleChildScrollView>(find
+            .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+            .first)
+        .controller!;
+    final wideRate =
+        (scroll.position.maxScrollExtent + scroll.position.viewportDimension) /
+            180;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset, closeTo(wideRate * .1, .01));
+    tester.view.physicalSize = const Size(400, 600);
+    await tester.pump();
+    final narrowRate =
+        (scroll.position.maxScrollExtent + scroll.position.viewportDimension) /
+            180;
+    expect(narrowRate, greaterThan(wideRate));
+    final offset = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset - offset, closeTo(narrowRate * .1, .01));
+    expect(
+        tester.widget<TextField>(field).controller, same(original.controller));
+    expect(reads, 1);
+    expect(pages, [0]);
+    expect(stopped, 0);
+    key.currentState!.stopAutoScroll();
+  });
+
+  testWidgets('auto scroll loads newly visible translations without repeats',
+      (tester) async {
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    var stopped = 0, reads = 0;
+    await open(tester, extract: (_) async {
+      reads++;
+      return List.generate(
+              30,
+              (i) =>
+                  'Paragraph $i. ${List.filled(15, 'Source text for testing.').join(' ')}')
+          .join('\n\n');
+    });
+    final provider = PageTranslator();
+    final task = key.currentState!.translateCurrentPage(
+        TranslationModeEnum.translationOnly,
+        provider: provider);
+    await tester.pumpAndSettle();
+    await task;
+    final requests = provider.requests.length;
+    expect(key.currentState!.startAutoScroll(4, () => stopped++), isTrue);
+    await tester.pump();
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(provider.requests.length, greaterThan(requests));
+    expect(provider.requests.toSet().length, provider.requests.length);
+    expect(stopped, 0);
+    expect(reads, 1);
+    expect(pages, [0]);
+    key.currentState!.stopAutoScroll();
+    key.currentState!.stopTranslation();
+    await tester.pumpAndSettle();
+  });
+
+  for (final operation in ['drag', 'wheel', 'selection', 'menu', 'navigate']) {
+    testWidgets('manual $operation stops reflow auto scroll once',
+        (tester) async {
+      Prefs().pageTurnStyle = PageTurn.scroll;
+      await open(tester,
+          extract: (_) async =>
+              List.generate(100, (i) => 'Paragraph $i.').join('\n\n'));
+      final field = find.byKey(const ValueKey('reflow-text'));
+      final viewport = find
+          .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+          .first;
+      final scroll = tester.widget<SingleChildScrollView>(viewport).controller!;
+      var stopped = 0;
+      expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      switch (operation) {
+        case 'drag':
+          final gesture = await tester.startGesture(tester.getCenter(viewport));
+          await gesture.moveBy(const Offset(0, -40));
+          await gesture.cancel();
+        case 'wheel':
+          await tester.sendEventToBinding(PointerScrollEvent(
+              position: tester.getCenter(viewport),
+              scrollDelta: const Offset(0, 20)));
+        case 'selection':
+          tester.widget<TextField>(field).controller!.selection =
+              const TextSelection(baseOffset: 0, extentOffset: 4);
+        case 'menu':
+          key.currentState!.openStyleMenu();
+        case 'navigate':
+          await key.currentState!.goToPage(1);
+      }
+      await tester.pumpAndSettle();
+      expect(stopped, 1);
+      final offset = scroll.offset;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(scroll.offset, offset);
+      key.currentState!.stopAutoScroll();
+      expect(stopped, 1);
+    });
+  }
+
+  testWidgets(
+      'auto scroll stops at reflow page end without loading another page',
+      (tester) async {
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    var reads = 0, stopped = 0;
+    await open(tester, extract: (_) async {
+      reads++;
+      return List.generate(100, (i) => 'Paragraph $i.').join('\n\n');
+    });
+    final field = find.byKey(const ValueKey('reflow-text'));
+    final scroll = tester
+        .widget<SingleChildScrollView>(find
+            .ancestor(of: field, matching: find.byType(SingleChildScrollView))
+            .first)
+        .controller!;
+    scroll.jumpTo(scroll.position.maxScrollExtent - 2);
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(stopped, 1);
+    expect(scroll.offset, scroll.position.maxScrollExtent);
+    expect(pages, [0]);
+    expect(reads, 1);
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isFalse);
+    expect(stopped, 1);
+  });
+
+  testWidgets('ebook mode changes preserve reflow scrolling until disposal',
+      (tester) async {
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    await open(tester,
+        extract: (_) async =>
+            List.generate(100, (i) => 'Paragraph $i.').join('\n\n'));
+    var stopped = 0;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    Prefs().pageTurnStyle = PageTurn.noAnimation;
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(stopped, 0);
+    expect(Prefs().pageTurnStyle, PageTurn.noAnimation);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+    expect(stopped, 1);
+    expect(tester.takeException(), isNull);
   });
 
   for (final comparison in [false, true]) {

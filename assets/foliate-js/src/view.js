@@ -287,12 +287,12 @@ export class View extends HTMLElement {
     const section = progress.section ?? { current: index, total: this.book.sections.length }
     this.lastLocation = { ...progress, section, tocItem, pageItem, cfi, range, chapterLocation, reason, pdfRegion,
       readingAction: readingAction ?? (reason === 'page' || reason === 'navigation') }
-    if (reason === 'snap' || reason === 'page' || reason === 'scroll')
+    if (reason === 'snap' || reason === 'page' || reason === 'scroll' || reason === 'auto-scroll')
       this.history.replaceState(cfi)
 
     if (cfi && (!this.#lastCfi || cfi !== this.#lastCfi ||
       chapterLocation.current !== this.#lastChapterLocation?.current ||
-      chapterLocation.total !== this.#lastChapterLocation?.total || reason === 'layout' || reason === 'viewport')) {
+      chapterLocation.total !== this.#lastChapterLocation?.total || reason === 'layout' || reason === 'viewport' || reason === 'auto-scroll')) {
       this.#lastCfi = cfi
       this.#lastChapterLocation = chapterLocation
       this.#emit('relocate', this.lastLocation)
@@ -589,6 +589,7 @@ export class View extends HTMLElement {
     this.history.clear(this.lastLocation?.cfi)
   }
   async goTo(target, { recordHistory = true } = {}) {
+    this.#emit('before-navigation')
     const resolved = this.resolveNavigation(target)
     if (!resolved) return
     const previous = this.lastLocation?.cfi
@@ -602,12 +603,14 @@ export class View extends HTMLElement {
     }
   }
   async goToFraction(frac) {
+    this.#emit('before-navigation')
     const previous = this.lastLocation?.cfi
     const [index, anchor] = this.#sectionProgress.getSection(frac)
     await this.renderer.goTo({ index, anchor })
     this.#recordNavigation({ fraction: frac }, previous)
   }
   async select(target) {
+    this.#emit('before-navigation')
     const previous = this.lastLocation?.cfi
     try {
       const obj = await this.resolveNavigation(target)
@@ -663,9 +666,11 @@ export class View extends HTMLElement {
     }
   }
   async prev(distance) {
+    this.#emit('before-navigation')
     await this.renderer.prev(distance)
   }
   async next(distance) {
+    this.#emit('before-navigation')
     await this.renderer.next(distance)
   }
   goLeft() {

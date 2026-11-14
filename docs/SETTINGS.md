@@ -58,6 +58,8 @@ The default light theme uses paper white and jade green; format and indexing bad
 
 Text/OCR reflow provides page-local narration and current-page translation (corrected text first), translation-only/bilingual views and the shared selection toolbar. Original PDF/scanned pages do not narrate. Text → Export saved book text offers TXT or Markdown in original page order.
 
+Auto scroll: choose **Scroll** under page turning, then enable **Auto scroll**. Standard text and reflow pages show draggable play/pause and 0.1–4.0× controls, initially paused at 1.0×. Tap the number to enter a speed. The initial pace estimates 300 Chinese characters or 200 English words per minute from the current layout. The switch and speed stay on this device. Original PDF/image pages do not use auto scroll. Text scrolling follows the existing cross-chapter setting; reflow stops at the end of its current source page. Floating auto-scroll and narration bars hide after five idle seconds; tap the page to reveal them without interrupting reading. Dragging the book, selecting text, opening menus or leaving the reader pauses auto scroll.
+
 ### First-use defaults
 
 These come from [preferences](../lib/config/shared_preference_provider.dart) when the setting has never been saved. Upgrades, imports and independent provider configurations can change them.

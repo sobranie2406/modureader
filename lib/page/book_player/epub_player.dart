@@ -225,6 +225,41 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   bool _selectionClearLocked = false;
   bool _selectionClearPending = false;
   bool _readerReady = false;
+  Future<bool> startAutoScroll(double speed, int session) async {
+    if (!mounted ||
+        !_readerReady ||
+        supportsDocumentImages ||
+        _chapterLoading ||
+        Prefs().pageTurnStyle != PageTurn.scroll) {
+      return false;
+    }
+    return await webViewController.evaluateJavascript(
+            source:
+                'window.setReaderAutoScroll?.({enabled: true, speed: ${speed.clamp(.1, 4)}, session: $session})') ==
+        true;
+  }
+
+  Future<void>? _autoScrollStop;
+  Future<void> stopAutoScroll() {
+    if (!mounted || !_readerReady) return Future.value();
+    // A new session can start while an earlier stop awaits its position receipt.
+    late final Future<void> stopping;
+    stopping = _stopAutoScroll().whenComplete(() {
+      if (identical(_autoScrollStop, stopping)) _autoScrollStop = null;
+    });
+    return _autoScrollStop = stopping;
+  }
+
+  Future<void> _stopAutoScroll() async {
+    try {
+      await webViewController.callAsyncJavaScript(
+          functionBody:
+              'await window.stopReaderAutoScroll?.("host"); return true;');
+    } catch (_) {
+      // The renderer may already have been destroyed during navigation.
+    }
+  }
+
   String? _rendererRecoveryCfi;
   bool _readerLoadFailed = false;
   bool _chapterLoading = false;
@@ -968,6 +1003,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }
 
   void changePageTurnStyle(PageTurn pageTurnStyle) {
+    readingPageKey.currentState?.stopAutoScroll();
     webViewController.evaluateJavascript(source: '''
       changeStyle({
         pageTurnStyle: '${pageTurnStyle.name}',
@@ -1675,6 +1711,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
                 previous?.position != latest.position ||
                 previous?.narration?.encode() != latest.narration?.encode() ||
                 !_readerPositionInitialized)) {
+          readingPageKey.currentState?.stopAutoScroll();
           _remotePositionPending = true;
           // Stop the old audio before moving the page. Its stop/progress callbacks
           // are suppressed until both remote cursors have been restored.
@@ -1991,6 +2028,21 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             _chapterFontFailed = _chapterLoadFailed && data['reason'] == 'font';
             if (data['state'] == 'ready') _readerLoadFailed = false;
           });
+        });
+    controller.addJavaScriptHandler(
+        handlerName: 'onReaderTap',
+        callback: (_) =>
+            readingPageKey.currentState?.consumeReaderToolbarTap() ?? false);
+    controller.addJavaScriptHandler(
+        handlerName: 'onAutoScrollStopped',
+        callback: (args) {
+          final data = args.isEmpty ? null : args.first;
+          if (data is Map &&
+              data['session'] is int &&
+              readingPageKey.currentState?.isReflowActive != true) {
+            readingPageKey.currentState
+                ?.readerAutoScrollStopped(data['session'] as int);
+          }
         });
     controller.addJavaScriptHandler(
         handlerName: 'onReaderLoadError',
@@ -2690,7 +2742,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   Future<void> saveReadingProgress({bool captureVisiblePage = false}) async {
     // On exit, commit the last displayed page even if its relocation was a
     // passive reflow. Wake/timed sync must only drain writes, never stamp stale UI.
-    if (captureVisiblePage &&
+    final position = cfi;
+    final generation = _progress.generation;
+    final stopping = _autoScrollStop;
+    final capture = captureVisiblePage &&
         _readerReady &&
         _readerPositionInitialized &&
         !_remotePositionPending &&
@@ -2699,10 +2754,24 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         !supportsDocumentImages &&
         readingPageKey.currentState?.isReflowReading != true &&
         widget.cfi == null &&
-        cfi.isNotEmpty &&
-        !_hasNarrationSession) {
-      await _progress.checkpointPage(cfi, percentage,
-          generation: _progress.generation);
+        position.isNotEmpty &&
+        !_hasNarrationSession;
+    if (capture) {
+      await _progress.checkpointPage(position, percentage,
+          generation: generation);
+    }
+    // Queue the exit checkpoint before detach; then drain the final scroll write.
+    if (stopping != null) {
+      await stopping;
+      if (capture &&
+          mounted &&
+          !_narrationDetached &&
+          !_remotePositionPending &&
+          !_restoringNarration &&
+          !_hasNarrationSession &&
+          cfi != position) {
+        await _progress.checkpointPage(cfi, percentage, generation: generation);
+      }
     }
     await _progress.flush();
   }
@@ -3016,6 +3085,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       BuildContext context, String url, String initialCfi) {
     final webView = RecoverableWebView(
       onGone: () {
+        readingPageKey.currentState?.stopAutoScroll();
         _brightnessWebViewReady = false;
         _rendererRecoveryCfi = _progress.current?.position;
         _readerReady = false;

@@ -118,6 +118,7 @@ class TtsHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     tts.bufferingNotifier.addListener(_syncPlaybackState);
     // Rebind on every backend switch: the factory may have created a new TTS.
     if (tts is OnlineTts) tts.roleConfigResolver = _resolveRoleConfig;
+    readingPageKey.currentState?.refreshDocumentReaderActivity();
   }
 
   /// Narration/dialogue voices for the book currently playing. Read on every

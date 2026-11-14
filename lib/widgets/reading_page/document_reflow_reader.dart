@@ -42,6 +42,7 @@ import 'widget_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'document_text_style_dialog.dart';
 import 'document_saved_text_actions.dart';
 import '../common/app_scroll_behavior.dart';
@@ -92,6 +93,7 @@ class DocumentReflowReader extends StatefulWidget {
       this.onOpenReaderPanel,
       this.onCloseReaderMenu,
       this.onReaderKeyEvent,
+      this.onReaderTap,
       this.onKeyboardEligibilityChanged,
       this.onPdfWheelZoom,
       this.wheelZoomAllowed,
@@ -102,6 +104,7 @@ class DocumentReflowReader extends StatefulWidget {
       this.readerActions = const []});
   final bool comparison;
   final FocusOnKeyEventCallback? onReaderKeyEvent;
+  final bool Function()? onReaderTap;
   final VoidCallback? onKeyboardEligibilityChanged;
   final ValueChanged<int>? onPdfWheelZoom;
   final bool Function()? wheelZoomAllowed;
@@ -156,6 +159,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _openMenu(String menu) {
+    stopAutoScroll();
     if (widget.onOpenReaderPanel != null) {
       widget.clearMenu();
       clearSelection();
@@ -221,6 +225,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _showTranslation ? _translatedController : _controller;
 
   void stopTranslation() {
+    stopAutoScroll();
     _translationRequest++;
     _translation.stop();
   }
@@ -242,6 +247,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       {bool force = false,
       TranslateServiceProvider? provider,
       bool classical = false}) async {
+    stopAutoScroll();
     final page = _page;
     if (!mounted || _busy || page == null || page.page != _navigationPage) {
       return;
@@ -299,6 +305,127 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   bool classicalTranslation = false;
   String? _searchStatus;
   final _scroll = ScrollController();
+  Ticker? _autoScrollTicker;
+  VoidCallback? _autoScrollStopped;
+  Duration? _autoScrollElapsed;
+  double _autoScrollSpeed = 1;
+  double _autoScrollPixelsPerSecond = 0, _autoScrollExtent = -1;
+  double _autoScrollViewport = -1;
+  String? _autoScrollText;
+  Offset? _autoScrollPointerOrigin;
+
+  bool get _autoScrollReady =>
+      mounted &&
+      !_busy &&
+      _page != null &&
+      _page!.page == _navigationPage &&
+      _scroll.hasClients &&
+      _scroll.position.hasContentDimensions &&
+      _readingController.selection.isCollapsed;
+
+  bool startAutoScroll(double speed, VoidCallback onStopped) {
+    if (_autoScrollTicker != null && _autoScrollReady) {
+      _autoScrollSpeed = speed.isFinite ? speed.clamp(.1, 4).toDouble() : 1;
+      _autoScrollStopped = onStopped;
+      return true;
+    }
+    if (!_autoScrollReady ||
+        _translation.busy ||
+        _scroll.offset >= _scroll.position.maxScrollExtent - .5) {
+      return false;
+    }
+    _autoScrollSpeed = speed.isFinite ? speed.clamp(.1, 4).toDouble() : 1;
+    _autoScrollStopped = onStopped;
+    _autoScrollText = null;
+    _autoScrollElapsed = null;
+    _autoScrollPointerOrigin = null;
+    _autoScrollTicker = Ticker(_tickAutoScroll)..start();
+    return true;
+  }
+
+  void stopAutoScroll() {
+    final ticker = _autoScrollTicker;
+    if (ticker == null) return;
+    _autoScrollTicker = null;
+    _autoScrollElapsed = null;
+    ticker.dispose();
+    final stopped = _autoScrollStopped;
+    _autoScrollStopped = null;
+    stopped?.call();
+  }
+
+  void _tickAutoScroll(Duration elapsed) {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (!_autoScrollReady ||
+        widget.readerMenuVisible ||
+        _surfaceKey.currentState?.menuIsOpen == true ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+      stopAutoScroll();
+      return;
+    }
+    final previous = _autoScrollElapsed;
+    _autoScrollElapsed = elapsed;
+    // Visible translation can extend the text; wait for its existing request.
+    if (previous == null ||
+        _translation.busy ||
+        _autoScrollPointerOrigin != null) {
+      return;
+    }
+    _estimateAutoScrollRate();
+    final seconds =
+        ((elapsed - previous).inMicroseconds / 1000000).clamp(0.0, .1);
+    final end = _scroll.position.maxScrollExtent;
+    final target = (_scroll.offset +
+            _autoScrollPixelsPerSecond * _autoScrollSpeed * seconds)
+        .clamp(_scroll.position.minScrollExtent, end)
+        .toDouble();
+    if (target != _scroll.offset) _scroll.jumpTo(target);
+    if (target >= end - .5) stopAutoScroll();
+  }
+
+  void _estimateAutoScrollRate() {
+    final text = _readingController.text;
+    final position = _scroll.position;
+    final extent = position.maxScrollExtent - position.minScrollExtent;
+    final viewport = position.viewportDimension;
+    if (_autoScrollText == text &&
+        _autoScrollExtent == extent &&
+        _autoScrollViewport == viewport) {
+      return;
+    }
+    _autoScrollText = text;
+    _autoScrollExtent = extent;
+    _autoScrollViewport = viewport;
+    final chinese = RegExp(r'[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]')
+        .allMatches(text)
+        .length;
+    final words =
+        RegExp(r"[A-Za-z\u00c0-\u024f0-9]+(?:['’-][A-Za-z\u00c0-\u024f0-9]+)*")
+            .allMatches(text)
+            .length;
+    final minutes = chinese / 300 + words / 200;
+    final seconds = minutes > 0
+        ? minutes * 60
+        : text.replaceAll(RegExp(r'\s'), '').length / 5;
+    _autoScrollPixelsPerSecond =
+        (extent + viewport) / (seconds < 1 ? 1 : seconds);
+  }
+
+  void _autoScrollPointerDown(PointerDownEvent event) {
+    if (_autoScrollPointerOrigin != null) stopAutoScroll();
+    _autoScrollPointerOrigin = event.position;
+  }
+
+  void _autoScrollPointerMove(PointerMoveEvent event) {
+    final origin = _autoScrollPointerOrigin;
+    if (origin != null &&
+        (event.position - origin).distance >
+            (event.kind == PointerDeviceKind.mouse ? 2 : kTouchSlop)) {
+      stopAutoScroll();
+    }
+  }
+
   final _translationViewportKey = GlobalKey();
   Timer? _translationScrollTimer;
   (int, int) _visibleTranslationRange() {
@@ -318,6 +445,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _queueVisibleTranslation() {
+    if (_autoScrollTicker != null &&
+        _translationScrollTimer?.isActive == true) {
+      return;
+    }
     _translationScrollTimer?.cancel();
     if (!_showTranslation) return;
     _translationScrollTimer =
@@ -479,6 +610,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
 
   @override
   void dispose() {
+    stopAutoScroll();
     _removedFontSubscription?.cancel();
     _invalidateNarration();
     _generation++;
@@ -516,6 +648,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   void _readingSelectionChanged() {
     final controller = _readingController;
     final selection = controller.selection;
+    if (!selection.isCollapsed) stopAutoScroll();
     if (selection == _observedSelection) return;
     _observedSelection = selection;
     widget.onKeyboardEligibilityChanged?.call();
@@ -573,6 +706,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> turn(int direction) async {
+    stopAutoScroll();
     if (_busy) return;
     if (_page == null || _navigationPage != _page!.page) {
       await turnOriginalPage(direction);
@@ -602,6 +736,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void cancelLoading({bool queued = true}) {
+    stopAutoScroll();
     if (queued) _loadRequest++;
     _cancel?.cancel();
     if (_ownsRenderer) widget.cancelRender();
@@ -706,6 +841,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> _action(String action) async {
+    stopAutoScroll();
     if (action == 'translate' && widget.onOpenTranslationSettings != null) {
       widget.onOpenTranslationSettings!();
       return;
@@ -755,6 +891,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       bool refresh = false,
       bool followOriginal = false,
       bool Function()? narrationCurrent}) async {
+    stopAutoScroll();
     if (narrationCurrent == null) {
       stopTranslation();
       _invalidateNarration();
@@ -1170,6 +1307,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
 
   void _tapPage(Offset global) {
     if (_busy || !_readingController.selection.isCollapsed) return;
+    if (widget.onReaderTap?.call() == true) return;
     final box = _translationViewportKey.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return;
     final point = box.globalToLocal(global);
@@ -1398,6 +1536,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       actions: widget.readerActions,
       extraMenus: {'search': _readerPanel('search')},
       onMenuOpened: () {
+        stopAutoScroll();
         widget.clearMenu();
         clearSelection();
       },
@@ -1447,72 +1586,80 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
             ],
           ),
       ]),
-      body: GestureDetector(
+      body: Listener(
         behavior: HitTestBehavior.opaque,
-        onTapUp: (details) => _tapPage(details.globalPosition),
-        child: Column(children: [
-          if (_busy || _translation.busy)
-            EinkStaticIndicator(
-                child:
-                    LinearProgressIndicator(value: _busy ? _progress : null)),
-          Expanded(
-              child: _page == null
-                  ? Center(
-                      child: _busy
-                          ? const EinkStaticIndicator(
-                              child: CircularProgressIndicator())
-                          : Text(t('等待本页文字', 'Waiting for page text'),
-                              style: TextStyle(color: foreground)))
-                  : ScrollConfiguration(
-                      // EditableText re-enables scrollbars; do not inherit app gutters.
-                      behavior: const MaterialScrollBehavior()
-                          .copyWith(scrollbars: false),
-                      child: AppScrollbar(
-                          controller: _scroll,
-                          child: SingleChildScrollView(
-                              key: _translationViewportKey,
-                              controller: _scroll,
-                              padding: _style.padding,
-                              child: Listener(
-                                  onPointerSignal: _handlePdfWheelZoom,
-                                  onPointerDown: _selectionPointerDown,
-                                  onPointerMove: _selectionPointerMove,
-                                  onPointerUp: _selectionPointerUp,
-                                  onPointerCancel: (_) =>
-                                      _resetSelectionGesture(),
-                                  child: KeyedSubtree(
-                                      key: _textFieldKey,
-                                      child: TextField(
-                                        key: ValueKey(_showTranslation
-                                            ? 'reflow-translated-text'
-                                            : 'reflow-text'),
-                                        controller: _readingController,
-                                        focusNode: _focus,
-                                        readOnly: true,
-                                        maxLines: null,
-                                        showCursor: false,
-                                        enableSuggestions: false,
-                                        style: css.textStyle,
-                                        textAlign:
-                                            css.alignment ?? _style.alignment,
-                                        decoration: const InputDecoration(
-                                            border: InputBorder.none,
-                                            isCollapsed: true,
-                                            contentPadding: EdgeInsets.zero),
-                                        contextMenuBuilder: _selectionMenu,
-                                        onTapOutside: (_) {},
-                                      ))))))),
-          if (_needsModel || _error != null)
-            Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                    _error ??
-                        t("请先在“离线本地模型”中下载 OCR 模型。",
-                            "Download an OCR model in Offline models first."),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: foreground))),
-        ]),
+        onPointerDown: _autoScrollPointerDown,
+        onPointerMove: _autoScrollPointerMove,
+        onPointerUp: (_) => _autoScrollPointerOrigin = null,
+        onPointerCancel: (_) => _autoScrollPointerOrigin = null,
+        onPointerSignal: (_) => stopAutoScroll(),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (details) => _tapPage(details.globalPosition),
+          child: Column(children: [
+            if (_busy || _translation.busy)
+              EinkStaticIndicator(
+                  child:
+                      LinearProgressIndicator(value: _busy ? _progress : null)),
+            Expanded(
+                child: _page == null
+                    ? Center(
+                        child: _busy
+                            ? const EinkStaticIndicator(
+                                child: CircularProgressIndicator())
+                            : Text(t('等待本页文字', 'Waiting for page text'),
+                                style: TextStyle(color: foreground)))
+                    : ScrollConfiguration(
+                        // EditableText re-enables scrollbars; do not inherit app gutters.
+                        behavior: const MaterialScrollBehavior()
+                            .copyWith(scrollbars: false),
+                        child: AppScrollbar(
+                            controller: _scroll,
+                            child: SingleChildScrollView(
+                                key: _translationViewportKey,
+                                controller: _scroll,
+                                padding: _style.padding,
+                                child: Listener(
+                                    onPointerSignal: _handlePdfWheelZoom,
+                                    onPointerDown: _selectionPointerDown,
+                                    onPointerMove: _selectionPointerMove,
+                                    onPointerUp: _selectionPointerUp,
+                                    onPointerCancel: (_) =>
+                                        _resetSelectionGesture(),
+                                    child: KeyedSubtree(
+                                        key: _textFieldKey,
+                                        child: TextField(
+                                          key: ValueKey(_showTranslation
+                                              ? 'reflow-translated-text'
+                                              : 'reflow-text'),
+                                          controller: _readingController,
+                                          focusNode: _focus,
+                                          readOnly: true,
+                                          maxLines: null,
+                                          showCursor: false,
+                                          enableSuggestions: false,
+                                          style: css.textStyle,
+                                          textAlign:
+                                              css.alignment ?? _style.alignment,
+                                          decoration: const InputDecoration(
+                                              border: InputBorder.none,
+                                              isCollapsed: true,
+                                              contentPadding: EdgeInsets.zero),
+                                          contextMenuBuilder: _selectionMenu,
+                                          onTapOutside: (_) {},
+                                        ))))))),
+            if (_needsModel || _error != null)
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                      _error ??
+                          t("请先在“离线本地模型”中下载 OCR 模型。",
+                              "Download an OCR model in Offline models first."),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: foreground))),
+          ]),
+        ),
       ),
       tools: _readerPanel('tools'),
       navigation: Wrap(

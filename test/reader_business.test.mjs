@@ -121,6 +121,7 @@ test('reflow source-page bridge uses View navigation rather than renderer-only t
     bookSource.indexOf('// Search has its own origin/previous/next controls'))
   const View = runInNewContext(`(class {
     #sectionProgress; history = {replaceState() {}, pushState() {}, clear() {}};
+    #emit() {}
     ${methods}
   })`, {CFI: {isCFI: /^epubcfi\(/}, console: {error() {}}})
   globalThis.document = new JSDOM('').window.document

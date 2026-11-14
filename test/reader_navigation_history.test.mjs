@@ -10,6 +10,7 @@ const methods=source.slice(source.indexOf('  #recordNavigation('),source.indexOf
 const init=source.slice(source.indexOf('  async init('),source.indexOf('\n  #emit('));
 const View=runInNewContext(`(class {
   history=new History(); lastLocation; fail=false;
+  #emit() {}
   #sectionProgress={getSection:f=>[0,f]};
   renderer={goTo:async target=>{if(this.fail)throw Error('fixture');
     this.lastLocation={cfi:target.cfi??'fraction-'+target.anchor};}};

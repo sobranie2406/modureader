@@ -1,3 +1,4 @@
+import 'package:modu_reader/widgets/reading_page/more_settings/auto_scroll_tile.dart';
 import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:modu_reader/utils/platform_utils.dart';
 import '../reader_menu_group.dart';
@@ -377,6 +378,7 @@ class _OtherSettingsState extends State<OtherSettings> {
               ),
           ]),
           group([
+            if (!widget.documentMode) const AutoScrollTile(),
             ebookOnly(ContinuousScrollTile(onChanged: (value) {
               epubPlayerKey.currentState?.changeContinuousScroll(value);
             })),

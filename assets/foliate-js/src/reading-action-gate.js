@@ -8,7 +8,7 @@ export class ReadingActionGate {
   }
   reset() { this.#until = -1 }
   isAction(reason) {
-    if (reason === 'page' || reason === 'navigation') return true
+    if (reason === 'page' || reason === 'navigation' || reason === 'auto-scroll') return true
     if ((reason === 'scroll' || reason === 'snap') && this.now() <= this.#until) {
       // Keep uninterrupted inertia alive, but never restart it after sleep.
       this.#until = this.now() + 3000

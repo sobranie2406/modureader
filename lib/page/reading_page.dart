@@ -1,6 +1,9 @@
 import 'package:modu_reader/widgets/reading_page/reader_menu_appearance.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/widgets/reading_page/reader_top_actions.dart';
+import 'package:modu_reader/widgets/reading_page/auto_scroll_toolbar.dart';
+import 'package:modu_reader/service/reader_toolbar_visibility.dart';
+import 'package:modu_reader/service/reader_auto_scroll.dart';
 import 'package:modu_reader/widgets/reading_page/harmony_reader_toolbar.dart';
 import 'package:modu_reader/service/document_reader_rotation.dart';
 import 'package:modu_reader/widgets/reading_page/document_style_widget.dart';
@@ -108,6 +111,130 @@ final epubPlayerKey = GlobalKey<EpubPlayerState>();
 
 class ReadingPageState extends ConsumerState<ReadingPage>
     with WidgetsBindingObserver, TickerProviderStateMixin, RouteAware {
+  final _autoScrollVisibility = ReaderToolbarVisibility();
+  final _ttsVisibility = ReaderToolbarVisibility();
+  late final ReaderAutoScroll _autoScroll = ReaderAutoScroll(
+      speed: Prefs().autoScrollSpeed,
+      startReader: _startReaderAutoScroll,
+      stopReader: _stopReaderAutoScroll,
+      onSpeedChanged: (value) {
+        Prefs().autoScrollSpeed = value;
+        if (_autoScroll.running) {
+          final generation = _autoScroll.generation;
+          unawaited(_startReaderAutoScroll(value).then((started) {
+            if (!started && generation == _autoScroll.generation) {
+              stopAutoScroll();
+            }
+          }).catchError((Object _) {
+            if (generation == _autoScroll.generation) stopAutoScroll();
+          }));
+        }
+      });
+
+  bool get _autoScrollEligible =>
+      Prefs().autoScrollEnabled &&
+      (isReflowActive ||
+          (Prefs().pageTurnStyle == PageTurn.scroll &&
+              !isReflowReading &&
+              epubPlayerKey.currentState?.supportsDocumentImages == false));
+
+  bool consumeReaderToolbarTap() {
+    if (!_canUsePageKeys) return false;
+    if (_autoScrollVisibility.enabled &&
+        (_autoScroll.running || !_autoScrollVisibility.visible)) {
+      _autoScrollVisibility.reveal();
+      return true;
+    }
+    if (_ttsVisibility.enabled && !_ttsVisibility.visible) {
+      _ttsVisibility.reveal();
+      return true;
+    }
+    return false;
+  }
+
+  void stopAutoScroll() => _autoScroll.stop();
+  void readerAutoScrollStopped(int generation) {
+    if (generation == _autoScroll.generation) {
+      _autoScroll.stop(fromReader: true);
+    }
+  }
+
+  bool _resumeScrollAfterEditing = false;
+  int _speedEditForeground = 0;
+  void _speedEditingChanged(bool editing) {
+    if (!mounted) return;
+    if (editing) {
+      _resumeScrollAfterEditing = _autoScroll.running;
+      _speedEditForeground = _foregroundSyncGeneration;
+    } else if (_resumeScrollAfterEditing) {
+      _resumeScrollAfterEditing = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _autoScrollEligible &&
+            _autoScrollVisibility.enabled &&
+            _canUsePageKeys &&
+            _speedEditForeground == _foregroundSyncGeneration &&
+            !_autoScroll.active) {
+          unawaited(_playAutoScroll());
+        }
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+  }
+
+  ValueNotifier<TtsStateEnum>? _observedNarrationState;
+  void _bindNarrationState() {
+    final notifier = TtsHandler().ttsStateNotifier;
+    if (identical(_observedNarrationState, notifier)) return;
+    _observedNarrationState?.removeListener(_updatePageKeys);
+    _observedNarrationState = notifier;
+    notifier.addListener(_updatePageKeys);
+  }
+
+  void _stopReaderAutoScroll() {
+    reflowReader?.stopAutoScroll();
+    unawaited(epubPlayerKey.currentState?.stopAutoScroll());
+  }
+
+  Future<bool> _startReaderAutoScroll(double speed) async {
+    final state = TtsHandler().ttsStateNotifier.value;
+    if (state == TtsStateEnum.playing || state == TtsStateEnum.continued) {
+      await audioHandler.pause();
+    }
+    if (!mounted ||
+        !_autoScroll.active ||
+        !_canUsePageKeys ||
+        !_autoScrollEligible) {
+      return false;
+    }
+    if (isReflowActive) {
+      final generation = _autoScroll.generation;
+      return reflowReader?.startAutoScroll(
+              speed, () => readerAutoScrollStopped(generation)) ??
+          false;
+    }
+    return await epubPlayerKey.currentState
+            ?.startAutoScroll(speed, _autoScroll.generation) ??
+        false;
+  }
+
+  Future<void> _playAutoScroll() async {
+    if (!await _autoScroll.start() && mounted && _autoScrollEligible) {
+      AnxToast.show(ModuStrings.text(context, '请等待正文载入后再开始滚动。',
+          'Wait for the text to load before starting auto scroll.'));
+    }
+  }
+
+  Widget _autoScrollToolbar() => AutoScrollToolbar(
+      controller: _autoScroll,
+      visibility: _autoScrollVisibility,
+      onStart: () => unawaited(_playAutoScroll()),
+      onEditingChanged: _speedEditingChanged,
+      onClose: () {
+        stopAutoScroll();
+        Prefs().autoScrollEnabled = false;
+      });
+
   final _reflowKey = GlobalKey<DocumentReflowReaderState>();
   final _documentRotation = DocumentReaderRotation();
   Future<void> setDocumentRotation(int angle) => _documentRotation.set(angle);
@@ -124,6 +251,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void _activateDocumentPane(bool reflow) {
     if (!isComparingDocument || _reflowFocused == reflow) return;
+    stopAutoScroll();
     epubPlayerKey.currentState?.removeOverlay();
     if (!reflow) reflowReader?.clearSelection();
     setState(() {
@@ -136,6 +264,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
   }
 
   Future<void> setDocumentComparison(bool enabled) async {
+    stopAutoScroll();
     hideBottomBar();
     setState(() {
       _compareOriginal = enabled;
@@ -196,6 +325,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   Future<void> closeDocumentReflow() async {
     if (!isReflowReading) return;
+    stopAutoScroll();
     hideBottomBar();
     reflowReader?.cancelLoading();
     epubPlayerKey.currentState?.removeOverlay();
@@ -266,6 +396,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     return DocumentReflowReader(
       key: _reflowKey,
       onReaderKeyEvent: _handleReaderKeyEvent,
+      onReaderTap: consumeReaderToolbarTap,
       onKeyboardEligibilityChanged: _updatePageKeys,
       onPdfWheelZoom: isComparingDocument && player.isPdfDocument
           ? player.zoomPdfFromWheel
@@ -589,6 +720,15 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void _updatePageKeys({bool force = false}) {
     if (!mounted) return;
+    _bindNarrationState();
+    final narration = _observedNarrationState!.value;
+    final narrationSession = narration == TtsStateEnum.playing ||
+        narration == TtsStateEnum.continued ||
+        narration == TtsStateEnum.paused;
+    final autoAvailable =
+        _autoScrollEligible && _canUsePageKeys && !narrationSession;
+    _autoScrollVisibility.setEnabled(autoAvailable);
+    if (!autoAvailable) stopAutoScroll();
     epubPlayerKey.currentState?.setDocumentReaderActive(_canUsePageKeys);
     _pageKeys.update(
         active: _canUsePageKeys || _canUseNarrationKeys,
@@ -667,6 +807,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
           }
         });
     FocusManager.instance.addListener(_updatePageKeys);
+    _bindNarrationState();
 
     // Initialize AI panel sizes from persistent storage
     _aiChatWidth = Prefs().aiPanelWidth;
@@ -712,6 +853,10 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   @override
   void dispose() {
+    _autoScroll.dispose();
+    _autoScrollVisibility.dispose();
+    _ttsVisibility.dispose();
+    _observedNarrationState?.removeListener(_updatePageKeys);
     unawaited(_documentRotation.close().catchError((Object error) {
       AnxLog.warning('Reader rotation restore failed: ${error.runtimeType}');
     }));
@@ -1594,6 +1739,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     bool newConversation = false,
     bool forcePopup = false,
   }) async {
+    stopAutoScroll();
     _aiDraftScreen = draftScreen;
     List<AiQuickPromptChip> quickPrompts = _getAiQuickPromptChips();
 
@@ -2161,6 +2307,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                             Positioned.fill(
                                                 child: TtsQuickToolbar(
                                               floating: true,
+                                              visibility: _ttsVisibility,
                                               stateListenable:
                                                   TtsHandler().ttsStateNotifier,
                                               onReturnToPosition:
@@ -2284,6 +2431,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     ],
                   ),
                   ReaderMenuAppearance.wrap(context, controller),
+                  if ((!isReflowReading || isReflowActive) &&
+                      !documentMenu &&
+                      bottomBarOffstage &&
+                      _aiChat == null)
+                    Positioned.fill(child: _autoScrollToolbar()),
                   // Paint controls above the book without changing WebView
                   // dimensions, pagination or reader margins.
                   if (!documentMenu &&
@@ -2293,6 +2445,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                     Positioned.fill(
                       child: TtsQuickToolbar(
                         floating: true,
+                        visibility: _ttsVisibility,
                         stateListenable: TtsHandler().ttsStateNotifier,
                         onReturnToPosition: _returnToNarration,
                         onReadHere: _readAloudFromHere,

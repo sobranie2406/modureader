@@ -251,6 +251,27 @@ export class ContinuousSectionWindow {
       ? Math.max(0, this.container.scrollTop + this.height * 1.5 - end) : 0
     this.tailSpace.style.height = `${Math.min(this.height, needed)}px`
   }
+  async autoScrollBy(distance, active = () => true) {
+    if (this.closed || this.busy || !this.current || !active()) return 'inactive'
+    const origin = this.current
+    const offset = this.top(origin) - this.container.scrollTop
+    const start = () => this.top(origin) - offset
+    for (let n = 0; n < this.maxViews && !this.closed && active(); n++) {
+      const last = this.ordered.at(-1)
+      if (this.top(last) + last.view.element.getBoundingClientRect().height >= start() + distance + this.height) break
+      const index = this.adjacent(last.index, 1)
+      if (index == null || !await this.ensure(index, true)) break
+    }
+    if (this.closed || !active() || !this.entries.has(origin.index)) return 'inactive'
+    const last = this.ordered.at(-1)
+    const end = this.top(last) + last.view.element.getBoundingClientRect().height
+    const before = start()
+    this.container.scrollTop = Math.max(0, Math.min(before + distance, end - this.height))
+    const moved = this.container.scrollTop > before
+    this.track()
+    this.updateTail()
+    return moved ? 'moved' : 'end'
+  }
   async scrollBy(distance) {
     if (this.closed || !this.current || !Number.isFinite(distance) || !distance) return
     this.busy = true

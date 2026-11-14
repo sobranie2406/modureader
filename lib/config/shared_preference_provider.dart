@@ -71,6 +71,8 @@ const Set<String> _prefsImportSkipKeys = {
   'translationUsageCounters',
   'experimentalPluginsEnabled',
   'inPlaceImportEnabled',
+  'autoScrollEnabled',
+  'autoScrollSpeed',
   'wereadEnabled',
   'pendingStorageMigration',
   'storageMigrationSucceeded',
@@ -110,6 +112,8 @@ const Set<String> _prefsExportSkipKeys = {
   'translationUsageCounters',
   'experimentalPluginsEnabled',
   'inPlaceImportEnabled',
+  'autoScrollEnabled',
+  'autoScrollSpeed',
   'wereadEnabled',
   'pendingStorageMigration',
   'storageMigrationSucceeded',
@@ -1051,6 +1055,25 @@ class Prefs extends ChangeNotifier {
 
   set pageTurnStyle(PageTurn style) {
     prefs.setString('pageTurnStyle', style.name);
+    notifyListeners();
+  }
+
+  bool get autoScrollEnabled => prefs.getBool('autoScrollEnabled') ?? false;
+  set autoScrollEnabled(bool value) {
+    prefs.setBool('autoScrollEnabled', value);
+    notifyListeners();
+  }
+
+  double get autoScrollSpeed {
+    final value = prefs.get('autoScrollSpeed');
+    return value is num && value.isFinite
+        ? (value.toDouble().clamp(.1, 4) * 10).round() / 10
+        : 1;
+  }
+
+  set autoScrollSpeed(double value) {
+    if (!value.isFinite) return;
+    prefs.setDouble('autoScrollSpeed', (value.clamp(.1, 4) * 10).round() / 10);
     notifyListeners();
   }
 

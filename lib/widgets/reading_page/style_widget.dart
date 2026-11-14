@@ -1,3 +1,4 @@
+import 'package:modu_reader/widgets/reading_page/more_settings/auto_scroll_tile.dart';
 import 'package:modu_reader/widgets/settings/font_name_preview.dart';
 import 'reader_menu_appearance.dart';
 import 'package:modu_reader/utils/app_motion.dart';
@@ -152,6 +153,7 @@ class StyleWidgetState extends State<StyleWidget> {
           padding: const EdgeInsets.all(12),
           child: Column(children: [
             fontAndPageTurn(),
+            AutoScrollTile(forceScroll: _document),
             if (!_document && Prefs().pageTurnStyle == PageTurn.scroll) ...[
               const SizedBox(height: 16),
               ContinuousScrollTile(onChanged: (value) {

@@ -15,6 +15,7 @@ import { installDesktopPageInput } from './desktop-page-input.js'
 import { readerSelectionCSS } from './selection-style.js'
 import { readerFontCSS } from './reader-fonts.js'
 import { readerFontWeightCSS } from './reader-font-weight.js'
+import { ReaderAutoScroll } from './reader-auto-scroll.js'
 import { applyCustomHighlights } from './custom-highlight.js'
 import { applyVerticalPageChrome } from './vertical-page-chrome.js'
 import { installSettledSelection } from './settled-selection.js'
@@ -945,6 +946,7 @@ class Reader {
     })
 
     this.installDesktopInput(document)
+    this.view.addEventListener('before-navigation', () => autoScroll.stop('navigation'))
 
     this.view.addEventListener('load', this.#onLoad.bind(this))
     this.view.addEventListener('activate', ({ detail: { doc, index } }) => {
@@ -1262,6 +1264,7 @@ class Reader {
     this.#doc = doc
     this.#index = index
     this.installDesktopInput(doc)
+    autoScroll.attach(doc)
     // Fixed-layout/PDF currently has no annotation overlayer. Do not claim
     // success by storing a note that cannot be shown in that renderer.
     if (!this.view.isFixedLayout && !isPdf) {
@@ -1702,6 +1705,18 @@ const callFlutter = (name, data) => {
   return window.flutter_inappwebview.callHandler(name, data)
 }
 
+const autoScroll = new ReaderAutoScroll({
+  renderer: () => globalThis.reader?.view?.renderer,
+  canRun: () => !isPdf && reader?.view?.isFixedLayout !== true && style?.pageTurnStyle === 'scroll' &&
+    !window.readerApplyingSync && !window.isFootNoteOpen(),
+  onStop: (reason, session) => { void callFlutter('onAutoScrollStopped', { reason, session }).catch(() => {}) },
+})
+window.setReaderAutoScroll = options => autoScroll.set(options)
+window.stopReaderAutoScroll = reason => {
+  autoScroll.stop(reason)
+  return onRelocated.pending ?? Promise.resolve()
+}
+
 const setStyle = (oldStyle) => {
   if (!oldStyle || JSON.stringify(style.customTextFilters ?? []) !== JSON.stringify(oldStyle.customTextFilters ?? [])) {
     for (const {doc} of reader.view.renderer?.getContents?.() ?? []) {
@@ -1843,7 +1858,7 @@ const onRelocated = (currentInfo) => {
   const cfi = currentInfo.cfi
   const percentage = currentInfo.fraction
 
-  callFlutter('onRelocated', {
+  onRelocated.pending = Promise.resolve(callFlutter('onRelocated', {
     pdfRegion: currentInfo.pdfRegion,
     readingAction: currentInfo.readingAction === true && !window.readerApplyingSync,
     chapterTitle,
@@ -1858,12 +1873,20 @@ const onRelocated = (currentInfo) => {
     percentage,
     bookmark: currentInfo.bookmark,
     writingMode: reader.view.renderer.writingMode,
-  })
+  }))
+  // Synchronous event callers ignore the promise; explicit stop can await it.
+  void onRelocated.pending.catch(() => {})
+  return onRelocated.pending
 }
 
 const onAnnotationClick = (annotation) => callFlutter('onAnnotationClick', annotation)
 
-const onClickView = (x, y) => callFlutter('onClick', { x, y })
+const onClickView = async (x, y) => {
+  try {
+    if (await callFlutter('onReaderTap', { x, y }) === true) return
+  } catch { /* Older hosts keep the existing tap action. */ }
+  return callFlutter('onClick', { x, y })
+}
 
 const onExternalLink = (link) => callFlutter('onExternalLink', link)
 
@@ -1902,6 +1925,7 @@ const getMetadata = async (book, inspectDocument = false) => {
 
 window.refreshToc = () => onSetToc()
 window.setDocumentReaderActive = (active, keyboardActive = active) => {
+  if (active !== true) autoScroll.stop('inactive')
   if (reader) reader.keyboardActive = active === true && keyboardActive === true;
   if (reader?.view?.renderer) reader.view.renderer.readerActive = active === true;
 }
@@ -2036,6 +2060,7 @@ window.changeStyle = (newStyle) => {
   style = { ...style, ...newStyle }
   console.log('changeStyle', JSON.stringify(style))
   setStyle(oldStyle)
+  autoScroll.refresh()
   
   // Update code highlighting theme if changed
   if (newStyle.codeHighlightTheme !== undefined) {

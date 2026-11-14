@@ -7,6 +7,7 @@ import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
 import { ContinuousSectionWindow } from './continuous-section-window.js'
+import { autoScrollPixelsPerSecond } from './reader-auto-scroll.js'
 import { VerticalColumnRules } from './vertical-column-rules.js'
 import './transient-scrollbar.js'
 import { alignPaginatedText, resetPageAlignment, fitTextLineSpacing, lineAlignedOffset, invalidateScrollLines, prepareScrollLines } from './text-page-layout.js'
@@ -591,6 +592,7 @@ export class Paginator extends HTMLElement {
   #lastScrollRelocate = -Infinity
   #coalesceScrollProgress = /Android|OpenHarmony|HarmonyOS/i.test(navigator.userAgent)
   #lineSettleTimer = null
+  #autoScrolling = false
   #scrollPointerDown = false
   #lastScrollTop = 0
   #scrollDirection = 1
@@ -740,7 +742,7 @@ export class Paginator extends HTMLElement {
       if (!this.#ignoreNativeScroll && Math.abs(top - this.#lastScrollTop) > .5)
         this.#scrollDirection = Math.sign(top - this.#lastScrollTop)
       this.#lastScrollTop = top
-      if (this.#ignoreNativeScroll) return
+      if (this.#ignoreNativeScroll || this.#autoScrolling) return
       if (this.#justAnchored) {
         this.#justAnchored = false
         return
@@ -1093,6 +1095,42 @@ export class Paginator extends HTMLElement {
     if (horizontal) element.scrollBy({ left: delta, top: 0, behavior: 'auto' })
     else element.scrollBy({ left: 0, top: delta, behavior: 'auto' })
   }
+  get autoScrollSupported() {
+    return this.scrolled && !this.#vertical && !this.#destroyed && !!this.#view
+  }
+  getAutoScrollSpeed(fallback = 10) {
+    if (!this.autoScrollSupported || this.#preparingView) return fallback
+    if (!this.#continuous) return autoScrollPixelsPerSecond([
+      { text: this.#getVisibleRange()?.toString(), height: Math.max(0, this.size - this.#margin * 2) },
+    ], fallback)
+    const samples = []
+    for (const entry of this.#continuous.ordered) {
+      const height = entry.view.element.getBoundingClientRect().height
+      const start = this.#container.scrollTop - this.#continuous.top(entry)
+      const from = Math.max(0, start - this.#margin)
+      const to = Math.min(height, start + this.size - this.#margin)
+      if (to <= from) continue
+      const range = getVisibleRange(entry.view.document, from, to, ({ top, bottom }) => ({ left: top, right: bottom }))
+      samples.push({ text: range?.toString(), height: to - from })
+    }
+    return autoScrollPixelsPerSecond(samples, fallback)
+  }
+  setAutoScrolling(enabled) {
+    this.#autoScrolling = enabled === true
+    if (this.#autoScrolling) this.#justAnchored = false
+    this.#needsLineSettle = false
+    clearTimeout(this.#lineSettleTimer)
+    clearTimeout(this.#scrollRelocateTimer)
+    this.#scrollRelocateTimer = null
+  }
+  async autoScrollBy(distance, active = () => true) {
+    if (!this.autoScrollSupported || this.#locked || this.#preparingView || !active()) return 'inactive'
+    if (this.#continuous) return this.#continuous.autoScrollBy(distance, active)
+    const before = this.#container.scrollTop
+    this.#container.scrollTop = Math.max(0, Math.min(before + distance, this.viewSize - this.size))
+    return this.#container.scrollTop > before ? 'moved' : 'end'
+  }
+  flushAutoScrollPosition() { this.#afterScroll('auto-scroll', true) }
   snap(vx, vy, touchState) {
     if (this.#isSnapping) return
     
@@ -1567,7 +1605,7 @@ export class Paginator extends HTMLElement {
       this.#scrollRelocateTimer = null
     }
     if (this.#preparingView || this.#destroyed || !this.#view) return
-    if (reason === 'scroll' && this.#ignoreNativeScroll) return
+    if (reason === 'scroll' && (this.#ignoreNativeScroll || this.#autoScrolling)) return
     if (reason === 'scroll') this.#continuous?.track()
     // Keep chapter warming responsive; avoid per-frame text/CFI scans and Flutter rebuilds on Android/ArkWeb.
     if (reason === 'scroll' && this.scrolled && this.#coalesceScrollProgress && !flush) {

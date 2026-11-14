@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/reader_toolbar_visibility.dart';
 import 'package:modu_reader/widgets/reading_page/tts_quick_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -34,6 +35,7 @@ void main() {
       {Locale locale = const Locale('zh'),
       double scale = 1,
       bool floating = false,
+      ReaderToolbarVisibility? visibility,
       Future<void> Function()? previous,
       Future<void> Function()? readHere}) async {
     await tester.pumpWidget(MaterialApp(
@@ -66,6 +68,7 @@ void main() {
                     BoxConstraints(maxWidth: floating ? double.infinity : 440),
                 child: TtsQuickToolbar(
                   floating: floating,
+                  visibility: visibility,
                   stateListenable: state,
                   onReturnToPosition: () async => actions.add('return'),
                   onReadHere: readHere ?? () async => actions.add('here'),
@@ -221,6 +224,114 @@ void main() {
     for (final name in ['return', 'read-here', 'stop', 'play-pause']) {
       expect(tester.widget<IconButton>(key(name)).color!.a, 1);
     }
+  });
+
+  testWidgets('floating controls hide without stopping or blocking narration',
+      (tester) async {
+    final visibility = ReaderToolbarVisibility();
+    addTearDown(visibility.dispose);
+    await mount(tester, floating: true, visibility: visibility);
+    final viewport =
+        tester.getRect(find.byKey(const ValueKey('reader-viewport')));
+    final bar = tester.getRect(key('toolbar'));
+    await tester.pump(ReaderToolbarVisibility.hideDelay);
+    expect(key('toolbar'), findsNothing);
+    expect(state.value, TtsStateEnum.playing);
+    expect(actions, isEmpty);
+    expect(tester.getRect(find.byKey(const ValueKey('reader-viewport'))),
+        viewport);
+    await tester.tapAt(bar.center);
+    expect(actions, ['body']);
+
+    visibility.reveal();
+    await tester.pump();
+    expect(key('toolbar').hitTestable(), findsOneWidget);
+    expect(tester.getRect(key('toolbar')), bar);
+    await tester.tap(key('play-pause'));
+    await tester.pumpAndSettle();
+    expect(state.value, TtsStateEnum.paused);
+    await tester.pump(ReaderToolbarVisibility.hideDelay);
+    expect(key('toolbar'), findsNothing);
+    state.value = TtsStateEnum.stopped;
+    await tester.pump();
+    expect(visibility.enabled, isFalse);
+    visibility.reveal();
+    await tester.pump();
+    expect(key('toolbar'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final cancel in [false, true]) {
+    testWidgets('pointer ${cancel ? 'cancel' : 'release'} restarts the timeout',
+        (tester) async {
+      await mount(tester, floating: true);
+      final gesture = await tester.startGesture(
+          tester.getTopLeft(key('toolbar')) + const Offset(4, 22));
+      await tester.pump(const Duration(seconds: 10));
+      expect(key('toolbar'), findsOneWidget);
+      if (cancel) {
+        await gesture.cancel();
+      } else {
+        await gesture.up();
+      }
+      await tester.pump(const Duration(milliseconds: 4999));
+      expect(key('toolbar'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(key('toolbar'), findsNothing);
+      expect(actions, isEmpty);
+    });
+  }
+
+  testWidgets('pending actions hold the floating controls until completion',
+      (tester) async {
+    final pending = Completer<void>();
+    await mount(tester, floating: true, previous: () {
+      actions.add('previous');
+      return pending.future;
+    });
+    await tester.tap(key('previous'));
+    await tester.pump(const Duration(seconds: 10));
+    expect(key('toolbar'), findsOneWidget);
+    expect(tester.widget<IconButton>(key('previous')).onPressed, isNull);
+    pending.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 4999));
+    expect(key('toolbar'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(key('toolbar'), findsNothing);
+    expect(state.value, TtsStateEnum.playing);
+    expect(actions, ['previous']);
+  });
+
+  testWidgets('nonfloating controls do not enable or follow automatic hiding',
+      (tester) async {
+    final visibility = ReaderToolbarVisibility();
+    addTearDown(visibility.dispose);
+    await mount(tester, visibility: visibility);
+    await tester.pump(const Duration(seconds: 20));
+    expect(visibility.enabled, isFalse);
+    expect(key('toolbar').hitTestable(), findsOneWidget);
+    await tester.tap(key('play-pause'));
+    await tester.pump();
+    expect(state.value, TtsStateEnum.paused);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('unmount disables but does not dispose an external controller',
+      (tester) async {
+    final visibility = ReaderToolbarVisibility();
+    addTearDown(visibility.dispose);
+    await mount(tester, floating: true, visibility: visibility);
+    expect(visibility.enabled, isTrue);
+    await tester.pumpWidget(const SizedBox());
+    expect(visibility.enabled, isFalse);
+    expect(visibility.visible, isFalse);
+    await tester.pump(const Duration(seconds: 10));
+    visibility.setEnabled(true);
+    expect(visibility.visible, isTrue);
+    visibility.setEnabled(false);
+    expect(actions, isEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

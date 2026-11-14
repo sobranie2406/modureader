@@ -1,6 +1,7 @@
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/reader_toolbar_visibility.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -20,6 +21,7 @@ class TtsQuickToolbar extends StatefulWidget {
     required this.onStop,
     required this.onOpenSettings,
     this.floating = false,
+    this.visibility,
   });
 
   final ValueListenable<TtsStateEnum> stateListenable;
@@ -32,6 +34,7 @@ class TtsQuickToolbar extends StatefulWidget {
   final AsyncCallback onStop;
   final VoidCallback onOpenSettings;
   final bool floating;
+  final ReaderToolbarVisibility? visibility;
 
   @override
   State<TtsQuickToolbar> createState() => _TtsQuickToolbarState();
@@ -40,10 +43,59 @@ class TtsQuickToolbar extends StatefulWidget {
 class _TtsQuickToolbarState extends State<TtsQuickToolbar> {
   bool _busy = false;
   Offset? _position;
+  late ReaderToolbarVisibility _visibility;
+  final _pointers = <int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _visibility = widget.visibility ?? ReaderToolbarVisibility();
+    widget.stateListenable.addListener(_syncVisibility);
+    _syncVisibility();
+  }
+
+  void _syncVisibility() {
+    if (!widget.floating) return;
+    final state = widget.stateListenable.value;
+    _visibility.setEnabled(
+        state == TtsStateEnum.playing || state == TtsStateEnum.paused);
+    _updateHold();
+  }
+
+  void _updateHold() {
+    if (widget.floating) _visibility.hold(_busy || _pointers.isNotEmpty);
+  }
+
+  @override
+  void didUpdateWidget(covariant TtsQuickToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.stateListenable != widget.stateListenable) {
+      oldWidget.stateListenable.removeListener(_syncVisibility);
+      widget.stateListenable.addListener(_syncVisibility);
+    }
+    if (oldWidget.visibility != widget.visibility) {
+      if (oldWidget.floating) _visibility.setEnabled(false);
+      if (oldWidget.visibility == null) _visibility.dispose();
+      _visibility = widget.visibility ?? ReaderToolbarVisibility();
+    } else if (oldWidget.floating && !widget.floating) {
+      _visibility.setEnabled(false);
+      _pointers.clear();
+    }
+    _syncVisibility();
+  }
+
+  @override
+  void dispose() {
+    widget.stateListenable.removeListener(_syncVisibility);
+    if (widget.floating) _visibility.setEnabled(false);
+    if (widget.visibility == null) _visibility.dispose();
+    super.dispose();
+  }
 
   Future<void> _run(AsyncCallback action) async {
     if (_busy) return;
     setState(() => _busy = true);
+    _updateHold();
     try {
       await action();
     } catch (_) {
@@ -54,16 +106,23 @@ class _TtsQuickToolbarState extends State<TtsQuickToolbar> {
         ));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        _updateHold();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<TtsStateEnum>(
-      valueListenable: widget.stateListenable,
-      builder: (context, state, _) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.stateListenable, _visibility]),
+      builder: (context, _) {
+        final state = widget.stateListenable.value;
         if (state != TtsStateEnum.playing && state != TtsStateEnum.paused) {
+          return const SizedBox.shrink();
+        }
+        if (widget.floating && !_visibility.visible) {
           return const SizedBox.shrink();
         }
         final playing = state == TtsStateEnum.playing;
@@ -137,56 +196,81 @@ class _TtsQuickToolbarState extends State<TtsQuickToolbar> {
           final position = clampPosition(
               _position ?? Offset((constraints.maxWidth - width) / 2, maxY));
           final bar = PointerInterceptor(
-              child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: widget.floating
-                      ? (details) => setState(() => _position = clampPosition(
-                          clampPosition(_position ?? position) + details.delta))
+              child: Listener(
+                  onPointerDown: widget.floating
+                      ? (event) {
+                          _pointers.add(event.pointer);
+                          _updateHold();
+                        }
                       : null,
-                  child: SizedBox(
-                    key: const ValueKey('tts-quick-toolbar'),
-                    width: width,
-                    height: height,
-                    child: Material(
-                      color: colors.surfaceContainer.withValues(alpha: 0.2),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          side: BorderSide(
-                              color: colors.outlineVariant
-                                  .withValues(alpha: 0.5))),
-                      clipBehavior: Clip.antiAlias,
-                      child: compact
-                          ? Column(children: [
-                              Expanded(
-                                  child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [returnButton, hereButton])),
-                              Expanded(
-                                  child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
-                                      children: [
-                                    settings,
-                                    previous,
-                                    playPause,
-                                    next,
-                                    stop,
-                                  ])),
-                            ])
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                  settings,
-                                  returnButton,
-                                  previous,
-                                  playPause,
-                                  next,
-                                  hereButton,
-                                  stop,
-                                ]),
-                    ),
-                  )));
+                  onPointerUp: widget.floating
+                      ? (event) {
+                          _pointers.remove(event.pointer);
+                          _updateHold();
+                        }
+                      : null,
+                  onPointerCancel: widget.floating
+                      ? (event) {
+                          _pointers.remove(event.pointer);
+                          _updateHold();
+                        }
+                      : null,
+                  child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: widget.floating
+                          ? (details) => setState(() => _position =
+                              clampPosition(
+                                  clampPosition(_position ?? position) +
+                                      details.delta))
+                          : null,
+                      child: SizedBox(
+                        key: const ValueKey('tts-quick-toolbar'),
+                        width: width,
+                        height: height,
+                        child: Material(
+                          color: colors.surfaceContainer.withValues(alpha: 0.2),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              side: BorderSide(
+                                  color: colors.outlineVariant
+                                      .withValues(alpha: 0.5))),
+                          clipBehavior: Clip.antiAlias,
+                          child: compact
+                              ? Column(children: [
+                                  Expanded(
+                                      child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                        returnButton,
+                                        hereButton
+                                      ])),
+                                  Expanded(
+                                      child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceAround,
+                                          children: [
+                                        settings,
+                                        previous,
+                                        playPause,
+                                        next,
+                                        stop,
+                                      ])),
+                                ])
+                              : Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                      settings,
+                                      returnButton,
+                                      previous,
+                                      playPause,
+                                      next,
+                                      hereButton,
+                                      stop,
+                                    ]),
+                        ),
+                      ))));
           if (!widget.floating) return bar;
           return Stack(children: [
             Positioned(

@@ -35,6 +35,34 @@ const deferred = () => {
   return { promise, resolve };
 };
 
+test('automatic scrolling crosses chapters without line snapping and stops at the book end', async () => {
+  const f=fixture(1000);let aligned=0;f.window.alignScroll=()=>{aligned++;return 0};
+  try {
+    await f.go(0);
+    for(let n=0;n<500;n++) {
+      if(await f.window.autoScrollBy(100)==='end')break;
+      assert.ok(f.window.entries.size<=9);
+    }
+    assert.equal(aligned,0);
+    assert.equal(f.window.current.index,39);
+    assert.equal(await f.window.autoScrollBy(1),'end');
+    const last=f.window.ordered.at(-1);
+    assert.equal(f.container.scrollTop,f.window.top(last)+1000-600);
+    assert.ok(!f.loaded.includes(4),'non-linear sections remain skipped');
+  } finally {f.window.destroy()}
+});
+
+test('automatic scrolling cancelled during chapter preparation does not move after loading', async () => {
+  const f=fixture(1000),gate=deferred();let active=true;
+  try {
+    await f.go(0);clearTimeout(f.window.timer);f.window.timer=null;
+    f.block(gate.promise);
+    const before=f.container.scrollTop,pending=f.window.autoScrollBy(500,()=>active);
+    active=false;gate.resolve();
+    assert.equal(await pending,'inactive');assert.equal(f.container.scrollTop,before);
+  } finally {gate.resolve();f.window.destroy()}
+});
+
 test('line alignment runs after loading adjacent content and keeps document endpoints reachable', async () => {
   const f = fixture(1000), calls = [];
   f.window.alignScroll = (target, current) => {

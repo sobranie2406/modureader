@@ -12,10 +12,10 @@ function fixture(userAgent = 'Mozilla/5.0 (Phone; OpenHarmony 5.0) ArkWeb/114') 
   const Reader = runInNewContext(`(class {
     #scrollRelocateTimer = null; #lastScrollRelocate = -Infinity;
     ${platform}
-    #preparingView = false; #destroyed = false; #view = {}; #ignoreNativeScroll = false;
+    #preparingView = false; #destroyed = false; #view = {}; #ignoreNativeScroll = false; #autoScrolling = false;
     #continuous; #container = {scrollTop: 0}; #margin = 0; #anchor;
     #justAnchored; #index = 0; #touchState; #touchScrolled; #pendingRelocate;
-    #readingActions = {isAction: reason => reason === 'scroll'};
+    #readingActions = {isAction: reason => reason === 'scroll' || reason === 'auto-scroll'};
     scrolled = true; size = 600; viewSize = 10000; page = 1; pages = 20;
     scans = 0; tracks = 0; events = [];
     get start() {return this.#container.scrollTop}
@@ -32,6 +32,7 @@ function fixture(userAgent = 'Mozilla/5.0 (Phone; OpenHarmony 5.0) ArkWeb/114') 
     }
     preparing(value) {this.#preparingView = value}
     animating(value) {this.#ignoreNativeScroll = value}
+    automatic(value) {this.#autoScrolling = value}
     close() {
       ${source.slice(source.indexOf('    this.#destroyed = true', source.indexOf('  destroy() {', source.indexOf('  get isNavigating'))), source.indexOf('    clearTimeout(this.#lineSettleTimer)', source.indexOf('  get isNavigating')))}
     }
@@ -118,6 +119,18 @@ test('an animated page turn suppresses old scroll work until its final position 
   assert.equal(reader.events.at(-1).range.position, 600)
   assert.equal(reader.events.length, 2)
 })
+
+test('automatic scrolling suppresses native per-frame scans but explicitly saves its current position', () => {
+  const {reader,advance}=fixture();
+  reader.move(0);advance(10);reader.move(20);reader.automatic(true);
+  advance(100);assert.equal(reader.scans,1);
+  for(let i=0;i<30;i++)reader.move(i*3);
+  assert.equal(reader.scans,1);
+  reader.move(100,'auto-scroll',true);
+  assert.equal(reader.events.at(-1).range.position,100);
+  assert.equal(reader.events.at(-1).readingAction,true);
+  assert.equal(reader.events.length,2);
+});
 
 test('Apple and desktop scrolling, and Android/Harmony paginated mode keep existing cadence', () => {
   for (const ua of ['Android', 'iPhone', 'Macintosh', 'Windows', 'OpenHarmony']) {

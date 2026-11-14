@@ -9,7 +9,8 @@ test('comparison disables source keys without disabling source gestures', async 
   const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
   const bridge = book.slice(book.indexOf('window.setDocumentReaderActive ='), book.indexOf('window.setPdfReadingView ='));
   const reader = { view: { renderer: {} } }, window = {};
-  new Function('window', 'reader', bridge)(window, reader);
+  const stopped=[];
+  new Function('window', 'reader', 'autoScroll', bridge)(window, reader,{stop:reason=>stopped.push(reason)});
   const doc = new EventTarget(); doc.getSelection = () => '';
   const turns = [], pans = [];
   const input = installDesktopPageInput(doc, {
@@ -36,6 +37,7 @@ test('comparison disables source keys without disabling source gestures', async 
   window.setDocumentReaderActive(false, true);
   assert.equal(reader.keyboardActive, false);
   assert.equal(reader.view.renderer.readerActive, false);
+  assert.deepEqual(stopped,['inactive']);
   window.setDocumentReaderActive(true);
   assert.equal(reader.keyboardActive, true);
   input.destroy();
