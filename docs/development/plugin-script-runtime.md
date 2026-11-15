@@ -8,7 +8,7 @@ review admission, with separate temporary packages, state and trust; ordinary
 installation still requires the signed catalog.
 
 Packages remain schema 1 / host API 1. `scriptAction` declares `id`, localized
-`name`, relative `.js` `entry`, `surface` (`selection`, `library` or `dictionary`) and `scope`
+`name`, relative `.js` `entry`, `surface` (`selection`, `library`, `dictionary` or `article`) and `scope`
 (`selection` or `context`). It requires `script:run`; selection actions also
 require `ui:selection-action`. Existing prompt and AI toolbar formats are unchanged.
 The dictionary surface additionally requires `dictionary:transform` and uses
@@ -49,16 +49,42 @@ Rules independently process the original word, preserving candidate order.
 ## Web read later
 
 The plugin's library action calls `modu.articles.capture()`. The native page owns
-the URL, acquisition and save actions; page content does not return through the
-script bridge. It fetches a public HTTPS page with bounded redirects, revalidates
-DNS and pins the connection to the checked address. HTML is parsed offline in an
-isolate. Markdown retains headings, paragraphs, lists, quotes, code, tables and
-links; images become ordinary links without subresource downloads.
-Native acquisition has a 15-second deadline and a 2 MiB response limit; generated
-Markdown is capped at 512 KiB and stays in the native preview/save workflow.
+the URL, acquisition and save actions. Acquisition fetches public HTTPS content
+with bounded redirects, revalidates DNS and pins the connection to the checked
+address. It does not execute website scripts, send login credentials or fetch
+images. Downloads are limited to 2 MiB.
+
+The plugin declares one `scriptAction` with `surface: "article"`,
+`scope: "selection"` and the `article:extract` capability in addition to
+`script:run`. This action is a pure offline conversion. Its input contains only
+`html`, the validated final `url`, a `plainText` flag, declared non-secret
+`settings` and `actionId`. It receives no book, selection or application secrets;
+all host calls are denied, including HTTP calls declared elsewhere in the package.
+Return exactly `{title, markdown}`. The host retains the verified source URL
+rather than accepting one from the result.
+
+Content recognition, advertisement removal, metadata, image handling and Markdown
+conversion belong in the plugin package. Bundle offline parsers and dependencies
+with pinned versions and their licenses. Future extraction rules, website fixes
+and conversion features update through the plugin catalog without an app update.
+The host has no article extraction fallback. Older packages without an article
+entry prompt for a plugin update; apps without `article:extract` reject a package
+requiring it before installation.
+
+The article execution profile permits a 512 KiB bundled script, 2 MiB of decoded
+HTML, a 200-character title and 512 KiB of Markdown. Separate bounded JSON wire
+budgets allow escaping overhead: 16 MiB for startup and 4 MiB for result messages.
+These limits apply only to the article action, not every action in the same
+package. Acquisition and conversion share a cancellable 15-second deadline.
+The host preview suppresses automatic image requests; the reviewed plugin emits
+ordinary image links, so capturing and previewing do not fetch subresources.
 
 The user previews the result before exporting Markdown or adding it through the
-existing book-import path. Imported articles follow normal private-import rules,
+existing book-import path. Once the user submits a native save or import, that
+operation belongs to the file saver or book importer and may finish after the
+plugin is disabled; it does not run more plugin code or receive new plugin data.
+Disabling still cancels acquisition, conversion and pending plugin callbacks.
+Imported articles follow normal private-import rules,
 sync and local backup. Plugin settings can be backed up; plugin packages and
 signed proof files are obtained separately after restoring to another device.
 
@@ -80,8 +106,8 @@ windows and permissions. No global cookie clearing or incognito-profile mutation
 is used. OHOS uses the separate overlay adapter; Windows reuses the initialized
 WebView2 environment. Missing Worker support fails closed, without parent eval.
 
-Limits: 128 KiB source, 64 KiB input/result/bridge messages, 16 host calls,
-one call in flight, one execution per plugin, two globally, and a ten-second
+Ordinary-action limits: 128 KiB source, 64 KiB input/result/bridge messages, 16 host calls,
+one call in flight, one execution per plugin, two per runtime, and a ten-second
 total deadline. HTTP additionally uses the shared burst/daily budget. Disabling,
 upgrading, removing or globally disabling plugins cancels tasks before changing
 their files or contributions. Backgrounding also cancels tasks. Late DNS and

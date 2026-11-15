@@ -32,6 +32,9 @@ String pluginCapabilityLabel(BuildContext context, String capability) {
     case kArticleCaptureCapability:
       return ModuStrings.text(
           context, '提取指定网页并保存', 'Extract and save a chosen web page');
+    case kArticleExtractCapability:
+      return ModuStrings.text(
+          context, '离线处理网页正文', 'Process article HTML offline');
     default:
       return capability;
   }

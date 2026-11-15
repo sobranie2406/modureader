@@ -14,6 +14,7 @@ import 'package:modu_reader/service/plugins/plugin_developer_session.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
+import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:modu_reader/widgets/plugins/plugin_script_action.dart';
@@ -77,7 +78,8 @@ class _Runtime extends PluginScriptRuntime {
       required ScriptActionContribution action,
       Map<String, Object?> input = const {},
       PluginHostCall? hostCall,
-      bool Function()? isContextValid}) {
+      bool Function()? isContextValid,
+      PluginCancelToken? cancel}) {
     running = true;
     call = hostCall!;
     ready.complete();

@@ -82,8 +82,8 @@ function fixture({workerAvailable = true, bridgeReady = true, onCall = async () 
   new vm.Script(bootstrap).runInContext(host);
   return {
     host, messages, workers, blobs, result,
-    start(source, input = {}) {
-      host.moduPluginStart({source, input, handler: 'host-only-handler'});
+    start(source, input = {}, options = {}) {
+      host.moduPluginStart({source, input, handler: 'host-only-handler', ...options});
     },
     readyBridge({emitEvent = true} = {}) {
       host.flutter_inappwebview = nativeBridge;
@@ -159,6 +159,50 @@ for (const kind of ['result', 'request']) test(`oversized ${kind} is stopped bef
   assert.deepEqual(await within(f.result), {kind:'error'});
   assert.equal(f.messages.length, 1);
   assert.equal(f.workers[0].terminated, true);
+});
+
+test('normal messages are bounded by UTF8 bytes as well as character count', async t => {
+  const f = fixture(); t.after(() => f.dispose());
+  f.start(`return {text:'汉'.repeat(23000)};`);
+  assert.deepEqual(await within(f.result), {kind:'error'});
+  assert.equal(f.messages.length, 1);
+});
+
+test('native article profile carries escaped large Markdown across the same worker bridge', async t => {
+  const f = fixture(); t.after(() => f.dispose());
+  const html = '<'.repeat(2 * 1024 * 1024);
+  f.start(`if(input.html.length!==2097152)throw new Error();
+    return {title:'Article',markdown:'x\\n'.repeat(262144)};`, {html}, {maxMessageBytes:4194304});
+  const message = await within(f.result);
+  assert.equal(message.kind, 'result');
+  assert.equal(Buffer.byteLength(message.value.markdown), 512 * 1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(message)) > 512 * 1024);
+});
+
+test('article wire limit is bounded independently of raw field length', async t => {
+  const f = fixture(); t.after(() => f.dispose());
+  f.start(`return {title:'Article',markdown:'\\u0000'.repeat(750000)};`, {}, {maxMessageBytes:4194304});
+  assert.deepEqual(await within(f.result), {kind:'error'});
+  assert.equal(f.messages.length, 1);
+});
+
+test('article message budget survives delayed Android-style bridge readiness', async t => {
+  const f = fixture({bridgeReady:false}); t.after(() => f.dispose());
+  f.start(`return {title:'Article',markdown:'x'.repeat(70000)};`, {}, {maxMessageBytes:4194304});
+  f.readyBridge({emitEvent:false});
+  const message = await within(f.result);
+  assert.equal(message.kind, 'result');
+  assert.equal(message.value.markdown.length, 70000);
+  assert.equal(f.readyListeners, 0);
+});
+
+test('unknown native limits and forged worker limits cannot enlarge ordinary messages', async t => {
+  for (const trusted of [undefined, 8 * 1024 * 1024]) {
+    const f = fixture(); t.after(() => f.dispose());
+    f.start(`self.postMessage({kind:'result',value:{text:'x'.repeat(70000)},maxMessageBytes:4194304});
+      await new Promise(()=>{});`, {}, {maxMessageBytes:trusted});
+    assert.deepEqual(await within(f.result), {kind:'error'});
+  }
 });
 
 test('a forged worker message flood is bounded even when package code bypasses its API', async t => {

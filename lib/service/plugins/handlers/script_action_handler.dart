@@ -72,13 +72,24 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
       throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
           'Script actions require script:run.');
     }
+    if (contributions
+            .whereType<ScriptActionContribution>()
+            .where((action) => action.surface == PluginScriptSurface.article)
+            .length >
+        1) {
+      throw const PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package may declare only one article extractor.');
+    }
     for (final action in contributions) {
       if (action is! ScriptActionContribution ||
           (action.surface == PluginScriptSurface.selection &&
               !manifest.capabilities.contains(kSelectionActionCapability)) ||
           (action.surface == PluginScriptSurface.dictionary &&
               !manifest.capabilities
-                  .contains(kDictionaryTransformCapability))) {
+                  .contains(kDictionaryTransformCapability)) ||
+          (action.surface == PluginScriptSurface.article &&
+              (!manifest.capabilities.contains(kArticleExtractCapability) ||
+                  action.scope != PluginSelectionScope.selection))) {
         throw const PluginInstallError(PluginErrorCode.invalidContribution,
             'Script action or its declared permissions are invalid.');
       }

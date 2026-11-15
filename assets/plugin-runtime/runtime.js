@@ -9,22 +9,38 @@
   };
   const stop = () => { closed=true; clearReadiness(); if (worker) worker.terminate(); worker = null; if(workerUrl) URL.revokeObjectURL(workerUrl); workerUrl=null; };
   window.moduPluginStop = stop;
-  window.moduPluginStart = ({source, input, handler}) => {
+  window.moduPluginStart = ({source, input, handler, maxMessageBytes = 65536}) => {
     if (closed) return 'stopped';
     if (started) return 'running';
     const bridge = window.flutter_inappwebview;
     if (!bridge || typeof bridge.callHandler !== 'function') {
       if (!ready) {
-        ready=()=>window.moduPluginStart({source,input,handler});
+        ready=()=>window.moduPluginStart({source,input,handler,maxMessageBytes});
         window.addEventListener('flutterInAppWebViewPlatformReady',ready,{once:true});
       }
       // Native startup can emit its ready event before callHandler is injected.
       // The host deadline owns this retry and calls stop on timeout/cancellation.
-      if (retry === null) retry=setTimeout(()=>{retry=null;window.moduPluginStart({source,input,handler});},50);
+      if (retry === null) retry=setTimeout(()=>{retry=null;window.moduPluginStart({source,input,handler,maxMessageBytes});},50);
       return 'waiting_bridge';
     }
     clearReadiness();
     started = true;
+    const messageLimit = maxMessageBytes === 4194304 ? 4194304 : 65536;
+    const fitsMessage = text => {
+      if (typeof text !== 'string' || text.length > messageLimit) return false;
+      let bytes = 0;
+      for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code < 128) bytes++;
+        else if (code < 2048) bytes += 2;
+        else if (code >= 0xd800 && code <= 0xdbff &&
+            i + 1 < text.length && text.charCodeAt(i + 1) >= 0xdc00 &&
+            text.charCodeAt(i + 1) <= 0xdfff) { bytes += 4; i++; }
+        else bytes += 3;
+        if (bytes > messageLimit) return false;
+      }
+      return true;
+    };
     const send = value => bridge.callHandler(handler, JSON.stringify(value));
     if (typeof Worker !== 'function' || typeof Blob !== 'function') {
       void send({kind:'error'}); return 'unsupported_worker';
@@ -76,7 +92,7 @@
       if (worker !== current) return;
       let json;
       try { json = JSON.stringify(event.data); } catch (_) { stop();void send({kind:'error'});return; }
-      if (++count > 40 || typeof json !== 'string' || json.length > 65536) {
+      if (++count > 40 || !fitsMessage(json)) {
         stop();void send({kind:'error'});return;
       }
       const message = event.data;

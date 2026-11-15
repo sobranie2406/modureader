@@ -282,9 +282,11 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
                       builder: (_) =>
                           PluginDetailPage(pluginId: plugin.id, host: host))),
           trailing: const Icon(Icons.chevron_right)),
-      for (final action
-          in manifest?.contributions.whereType<ScriptActionContribution>() ??
-              const <ScriptActionContribution>[])
+      for (final action in manifest?.contributions
+              .whereType<ScriptActionContribution>()
+              .where(
+                  (action) => action.surface != PluginScriptSurface.article) ??
+          const <ScriptActionContribution>[])
         ListTile(
             key: ValueKey('plugin-developer-run-${plugin.id}-${action.id}'),
             leading: const Icon(Icons.play_arrow_outlined),
@@ -293,6 +295,14 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
             onTap: _working || plugin.status != PluginStatus.enabled
                 ? null
                 : () => _run(plugin.id, action)),
+      if (manifest?.contributions
+              .whereType<ScriptActionContribution>()
+              .any((action) => action.surface == PluginScriptSurface.article) ??
+          false)
+        ListTile(
+            leading: const Icon(Icons.article_outlined),
+            title: Text(t('网页正文提取', 'Article extraction')),
+            subtitle: Text(t('从网页稍后阅读入口测试', 'Test through Web clipper'))),
       for (final action
           in manifest?.contributions.whereType<BookActionContribution>() ??
               const <BookActionContribution>[])

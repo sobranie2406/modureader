@@ -40,6 +40,11 @@ class _Response extends Stream<List<int>> implements HttpClientResponse {
       : _data = [utf8.encode(body)],
         headers = _Headers(mime: mime, location: location),
         contentLength = length ?? utf8.encode(body).length;
+  _Response.bytes(List<int> bytes, {String mime = 'text/html'})
+      : _data = [bytes],
+        statusCode = 200,
+        headers = _Headers(mime: mime),
+        contentLength = bytes.length;
   _Response.stream(this._data)
       : statusCode = 200,
         headers = _Headers(),
@@ -99,126 +104,6 @@ class _Client extends Fake implements HttpClient {
 }
 
 void main() {
-  group('offline article extraction', () {
-    test(
-        'selects semantic article and removes page furniture and executable HTML',
-        () {
-      final article = extractArticle('''
-        <title>Site title</title><meta property="og:title" content="An article">
-        <nav><a href="/menu">Navigation</a></nav>
-        <article><header><h1>An article</h1></header><p>$_paragraph</p>
-        <script>alert('secret')</script><style>.x{}</style>
-        <div class="advertisement">ADVERTISEMENT</div><aside>SIDEBAR</aside>
-        <div id="comments">COMMENT</div><div class="related">RECOMMENDED</div>
-        <div hidden>HIDDEN</div><div style="display:none">INVISIBLE</div></article>
-        <footer>FOOTER</footer>''', _url);
-      expect(article.title, 'An article');
-      expect(article.markdown, contains(_paragraph));
-      expect(article.markdown, startsWith('# An article\n'));
-      for (final removed in [
-        'Navigation',
-        'secret',
-        'ADVERTISEMENT',
-        'SIDEBAR',
-        'COMMENT',
-        'RECOMMENDED',
-        'HIDDEN',
-        'INVISIBLE',
-        'FOOTER',
-        '<script',
-        '<style'
-      ]) {
-        expect(article.markdown, isNot(contains(removed)));
-      }
-    });
-
-    test('falls back to paragraph density without taking link-heavy menus', () {
-      final article = extractArticle(
-          '<title>Report</title><div>${List.generate(12, (i) => '<a href="/$i">Long navigation menu number $i</a>').join()}</div><section><p>$_paragraph</p><p>$_paragraph</p></section>',
-          _url);
-      expect(article.markdown, contains(_paragraph));
-      expect(article.markdown, isNot(contains('navigation menu')));
-    });
-
-    test('keeps headings, lists, quotes, code and tables', () {
-      final article = extractArticle(
-          '''<article><h1>Report</h1><p>$_paragraph</p>
-      <h2>Section</h2><p><strong>Bold</strong> and <em>emphasis</em> with <code>a`b</code>.</p>
-      <ol start="3"><li>First<ul><li>Nested</li></ul></li><li>Second</li></ol>
-      <blockquote><p>A quotation.</p></blockquote><pre><code>if (a &lt; b) {\n  print(```);\n}</code></pre>
-      <table><tr><th>Name</th><th>Value</th></tr><tr><td>A | B</td><td>2</td></tr></table></article>''',
-          _url);
-      expect(article.markdown, contains('## Section'));
-      expect(article.markdown, contains('**Bold** and *emphasis*'));
-      expect(article.markdown, contains('`` a`b ``'));
-      expect(article.markdown, contains('3. First\n   - Nested'));
-      expect(article.markdown, contains('4. Second'));
-      expect(article.markdown, contains('> A quotation.'));
-      expect(article.markdown, contains('````\nif (a < b)'));
-      expect(article.markdown,
-          contains('| Name | Value |\n| --- | --- |\n| A \\| B | 2 |'));
-    });
-
-    test(
-        'resolves ordinary links and image links without embedding images or HTML',
-        () {
-      final article = extractArticle('''<article><p>$_paragraph</p><p>
-      <a href="../guide?id=2&amp;page=3">Guide</a><a href="javascript:alert(1)">Unsafe</a>
-      <a href="https://user:pass@example.com">Credentials</a>
-      <img src="/photo.png" alt="A photo"><img src="data:image/png;base64,AAAA" alt="Inline">
-      <a href="http://[broken">Malformed</a> &lt;script&gt;plain&lt;/script&gt;
-      ![literal](https://example.com/extra.png)</p></article>''', _url);
-      expect(article.markdown,
-          contains('[Guide](<https://example.com/guide?id=2&page=3>)'));
-      expect(article.markdown,
-          contains('[A photo](<https://example.com/photo.png>)'));
-      expect(article.markdown, isNot(contains('![A photo]')));
-      expect(article.markdown, isNot(contains('javascript:')));
-      expect(article.markdown, isNot(contains('user:pass')));
-      expect(article.markdown, isNot(contains('data:image')));
-      expect(article.markdown, contains(r'\<script\>plain\</script\>'));
-      expect(article.markdown, contains(r'!\[literal\]'));
-    });
-
-    test('supports Chinese text and plain text without executing Markdown', () {
-      final article = extractArticle(
-          '<article><h1>中文标题</h1><p>${'这是一段用于稍后阅读的中文正文，保留文字内容。' * 4}</p></article>',
-          _url);
-      expect(article.title, '中文标题');
-      expect(article.markdown, contains('用于稍后阅读'));
-      final plain = extractArticle(
-          '$_paragraph\n<script>raw</script>\n![remote](https://x.invalid/image)',
-          _url,
-          plainText: true);
-      expect(plain.markdown, contains(r'\<script\>raw\</script\>'));
-      expect(plain.markdown, contains(r'!\[remote\]'));
-    });
-
-    test('rejects empty, link-only, huge and deeply nested documents', () {
-      expect(() => extractArticle('<p>Short</p>', _url), _failure('empty'));
-      expect(
-          () =>
-              extractArticle('<main><a href="/">$_paragraph</a></main>', _url),
-          _failure('empty'));
-      expect(
-          () => extractArticle(
-              'x' * (ArticleCaptureService.maxBytes * 2 + 1), _url),
-          _failure('size'));
-      expect(
-          () => extractArticle(
-              '${'<div>' * 140}$_paragraph${'</div>' * 140}', _url),
-          _failure('size'));
-      expect(
-          () => extractArticle(
-              '<article>${'<span>x</span>' * 20001}</article>', _url),
-          _failure('size'));
-      expect(
-          () => extractArticle(
-              '<article><p>${'x' * (600 * 1024)}</p></article>', _url),
-          _failure('size'));
-    });
-  });
-
   group('guarded manual acquisition', () {
     final clients = <_Client>[];
     final resolutions = <String>[];
@@ -242,14 +127,15 @@ void main() {
         return client;
       });
     });
-    Future<CapturedArticle> fetch(String url) =>
-        service.fetch(url, cancel: PluginCancelToken());
+    Future<ArticleCaptureDocument> fetch(String url) =>
+        service.fetchDocument(url, cancel: PluginCancelToken());
 
     test(
         'fetches text through public DNS, a pinned direct connection and no cookies',
         () async {
       final article = await fetch('https://example.com/news#section');
-      expect(article.title, 'Test');
+      expect(article.content, contains('<h1>Test</h1>'));
+      expect(article.plainText, false);
       expect(article.sourceUrl.toString(), 'https://example.com/news');
       expect(resolutions, ['example.com']);
       expect(clients.single.connectionFactory, isNotNull);
@@ -313,7 +199,7 @@ void main() {
         _Response(_paragraph, mime: 'text/plain')
       ];
       expect(
-          (await fetch('https://example.com')).markdown, contains(_paragraph));
+          (await fetch('https://example.com')).content, contains(_paragraph));
       clients.clear();
       responses = [
         for (var i = 0; i < 4; i++)
@@ -343,6 +229,42 @@ void main() {
       await expectLater(fetch('https://example.com'), _failure('size'));
     });
 
+    test('returns raw HTML without native extraction or executing page code',
+        () async {
+      const raw =
+          '<title>Raw page</title><header>Site header</header><script>throw new Error("PAGE_CODE")</script><article><p>$_paragraph</p></article>';
+      responses = [_Response(raw)];
+      final document = await fetch('https://example.com');
+      expect(document.content, raw);
+      expect(document.plainText, false);
+    });
+
+    test('plain text preserves literal markup for the plugin to process',
+        () async {
+      const raw =
+          '# original\n<script>literal</script>\n![literal](https://example.com/image)';
+      responses = [_Response(raw, mime: 'text/plain; charset=utf-8')];
+      final document = await fetch('https://example.com');
+      expect(document.content, raw);
+      expect(document.plainText, true);
+    });
+
+    test('decodes declared and meta charsets before enforcing UTF8 input size',
+        () async {
+      final raw = latin1.encode('<meta charset="iso-8859-1"><p>café</p>');
+      responses = [_Response.bytes(raw)];
+      expect((await fetch('https://example.com')).content, contains('café'));
+      responses = [
+        _Response.bytes(List.filled(ArticleCaptureService.maxBytes, 0xff),
+            mime: 'text/plain; charset=iso-8859-1')
+      ];
+      await expectLater(fetch('https://example.com'), _failure('size'));
+      responses = [
+        _Response.bytes([0xff, 0xff], mime: 'text/plain; charset=utf-8')
+      ];
+      await expectLater(fetch('https://example.com'), _failure('format'));
+    });
+
     test('cancels while DNS is pending and ignores the late answer', () async {
       final dns = Completer<List<InternetAddress>>();
       var created = false;
@@ -353,7 +275,8 @@ void main() {
             return HttpClient();
           });
       final token = PluginCancelToken();
-      final result = service.fetch('https://example.com', cancel: token);
+      final result =
+          service.fetchDocument('https://example.com', cancel: token);
       final check = expectLater(result, _failure('cancelled'));
       token.cancel();
       await check;
@@ -367,19 +290,21 @@ void main() {
       final waiting = ArticleCaptureService(
           timeout: const Duration(milliseconds: 40),
           guard: PluginNetworkGuard(resolver: (_) => dns.future));
-      final a =
-          waiting.fetch('https://example.com', cancel: PluginCancelToken());
-      final b =
-          waiting.fetch('https://example.com', cancel: PluginCancelToken());
+      final a = waiting.fetchDocument('https://example.com',
+          cancel: PluginCancelToken());
+      final b = waiting.fetchDocument('https://example.com',
+          cancel: PluginCancelToken());
       final aCheck = expectLater(a, _failure('timeout'));
       final bCheck = expectLater(b, _failure('timeout'));
       await expectLater(
-          waiting.fetch('https://example.com', cancel: PluginCancelToken()),
+          waiting.fetchDocument('https://example.com',
+              cancel: PluginCancelToken()),
           _failure('busy'));
       await Future.wait([aCheck, bCheck]);
       dns.complete([InternetAddress('8.8.8.8')]);
       await Future<void>.delayed(Duration.zero);
-      expect((await fetch('https://example.com')).title, 'Test');
+      expect((await fetch('https://example.com')).content,
+          contains('<h1>Test</h1>'));
     });
 
     test('failures never include an address or query in their message',

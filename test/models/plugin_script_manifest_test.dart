@@ -90,6 +90,49 @@ void main() {
         contains(kArticleCaptureCapability));
   });
 
+  test('article extraction is a separately granted offline surface', () {
+    final manifest = parse(scriptAction(surface: 'article'),
+        capabilities: ['script:run', 'article:extract']);
+    final action = manifest.contributions.single as ScriptActionContribution;
+    expect(action.surface, PluginScriptSurface.article);
+    expect(action.scope, PluginSelectionScope.selection);
+    for (final capabilities in [
+      <String>['script:run'],
+      <String>['article:extract']
+    ]) {
+      expect(
+          () => parse(scriptAction(surface: 'article'),
+              capabilities: capabilities),
+          throwsA(isA<PluginInstallError>()));
+    }
+    expect(
+        () => parse(scriptAction(surface: 'article', scope: 'context'),
+            capabilities: ['script:run', 'article:extract']),
+        throwsA(isA<PluginInstallError>()));
+  });
+
+  test('article packages require a new capability and one unique extractor',
+      () {
+    final raw = manifestJson(
+        capabilities: ['script:run', 'article:extract'],
+        contributes: [scriptAction(surface: 'article')]);
+    expect(
+        () => PluginManifest.parse(raw,
+            allowedCapabilities:
+                kP1SupportedCapabilities.difference({'article:extract'})),
+        throwsA(isA<PluginInstallError>()));
+    expect(
+        () => PluginManifest.parse(manifestJson(capabilities: [
+              'script:run',
+              'article:extract'
+            ], contributes: [
+              scriptAction(surface: 'article'),
+              {...scriptAction(surface: 'article'), 'id': 'second'}
+            ])),
+        throwsA(isA<PluginInstallError>().having(
+            (e) => e.code, 'code', PluginErrorCode.tooManyContributions)));
+  });
+
   test('only safe package-relative JavaScript entries are accepted', () {
     expect(
         (parse(scriptAction(entry: 'scripts/clean-text.js'))

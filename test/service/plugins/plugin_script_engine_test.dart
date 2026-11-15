@@ -93,10 +93,12 @@ void main() {
   });
 
   Future<_Headless> start(
-      {String action = 'open', PluginHostCall? onCall}) async {
+      {String action = 'open',
+      PluginHostCall? onCall,
+      Map<String, Object?>? input}) async {
     result = engine.execute(
         'await modu.privateLibrary.$action(); return {title:"私密书籍",text:""};',
-        {'actionId': action}, onCall: (method, arguments) async {
+        input ?? {'actionId': action}, onCall: (method, arguments) async {
       calls.add((method, arguments));
       if (onCall != null) return onCall(method, arguments);
       return {action == 'open' ? 'opened' : 'locked': true};
@@ -107,6 +109,65 @@ void main() {
 
   Future<void> failed() => expectLater(
       result.timeout(const Duration(seconds: 1)), throwsA(isA<StateError>()));
+
+  test('normal bridge refuses multibyte payloads above 64KiB', () async {
+    final view = await start();
+    view.loadStop();
+    final rejected = failed();
+    await view.native.message({
+      'kind': 'result',
+      'value': {'text': '汉' * 23000}
+    });
+    await rejected;
+    expect(engine.diagnosticStage, 'invalid_message');
+  });
+
+  test(
+      'article bridge accepts escaped large Markdown with trusted native budget',
+      () async {
+    await engine.dispose();
+    engine = WebViewPluginScriptEngine(
+        maxMessageBytes: 4 * 1024 * 1024, maxStartBytes: 16 * 1024 * 1024);
+    final view = await start(input: {'html': '\u0000' * (2 * 1024 * 1024)});
+    view.loadStop();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+        view.native.evaluations.single, contains('"maxMessageBytes":4194304'));
+    expect(engine.diagnosticStage, 'worker');
+    final markdown = 'x\n' * (256 * 1024);
+    await view.native.message({
+      'kind': 'result',
+      'value': {'title': 'Article', 'markdown': markdown}
+    });
+    expect((await result)['markdown'], markdown);
+  });
+
+  test('article bridge still refuses JSON output above 4MiB', () async {
+    await engine.dispose();
+    engine = WebViewPluginScriptEngine(
+        maxMessageBytes: 4 * 1024 * 1024, maxStartBytes: 16 * 1024 * 1024);
+    final view = await start();
+    view.loadStop();
+    final rejected = failed();
+    await view.native.message({
+      'kind': 'result',
+      'value': {'markdown': '\u0000' * 750000}
+    });
+    await rejected;
+    expect(engine.diagnosticStage, 'invalid_message');
+  });
+
+  test('article initial JSON above 16MiB fails before JavaScript evaluation',
+      () async {
+    await engine.dispose();
+    engine = WebViewPluginScriptEngine(
+        maxMessageBytes: 4 * 1024 * 1024, maxStartBytes: 16 * 1024 * 1024);
+    final view = await start(input: {'html': '\u0000' * (3 * 1024 * 1024)});
+    final rejected = failed();
+    view.loadStop();
+    await rejected;
+    expect(view.native.evaluations, isEmpty);
+  });
 
   for (final action in ['open', 'lock']) {
     test('real engine dispatches private $action and accepts its result',
@@ -391,14 +452,17 @@ void main() {
     InAppWebViewPlatform.instance = secondBrowser;
     final secondEngine = WebViewPluginScriptEngine();
     addTearDown(secondEngine.dispose);
-    secondEngine.execute('return {text:"ok"};', {},
-        onCall: (_, __) async => null).ignore();
+    secondEngine
+        .execute('return {text:"ok"};', {}, onCall: (_, __) async => null)
+        .ignore();
     final second = await secondBrowser.created.future;
     final firstUrl = first.params.initialData!.baseUrl!;
     final secondUrl = second.params.initialData!.baseUrl!;
     expect(firstUrl.host, isNot(secondUrl.host));
-    expect(firstUrl.host, matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
-    expect(secondUrl.host, matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
+    expect(firstUrl.host,
+        matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
+    expect(secondUrl.host,
+        matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
     InAppWebViewPlatform.instance = browser;
   });
 }

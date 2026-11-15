@@ -55,6 +55,20 @@ void main() {
         }
       ]));
 
+  PluginManifest articleManifest() => PluginManifest.parse(manifestJson(
+      capabilities: ['script:run', 'article:extract'],
+      minAppVersion: '1.3.10',
+      contributes: [
+        {
+          'kind': 'scriptAction',
+          'schema': 1,
+          'id': 'extract',
+          'name': 'Article extractor',
+          'entry': 'extract.js',
+          'surface': 'article',
+        }
+      ]));
+
   Future<void> pump(WidgetTester tester, Widget page) async {
     tester.view.physicalSize = const Size(1000, 2600);
     tester.view.devicePixelRatio = 1;
@@ -111,5 +125,36 @@ void main() {
     expect(tester.widget<ListTile>(entry).enabled, false);
     expect(tester.widget<ListTile>(entry).onTap, isNull);
     expect(runs, 0);
+  });
+
+  testWidgets('article preview explains offline access rather than selection',
+      (tester) async {
+    await pump(
+        tester,
+        PluginInstallPreviewPage(
+            preview: PluginPreview(
+                manifest: articleManifest(),
+                manifestText: '{}',
+                sha256: 'a' * 64,
+                compressedBytes: 100,
+                readme: null,
+                warnings: const [],
+                installedVersion: null)));
+    expect(find.text('Article extractor'), findsOneWidget);
+    expect(find.text('Process article HTML offline'), findsNWidgets(2));
+    expect(find.text('Selected text only'), findsNothing);
+  });
+
+  testWidgets('article details cannot execute an unbound extraction action',
+      (tester) async {
+    final host = _Host(articleManifest());
+    addTearDown(host.dispose);
+    await pump(
+        tester, PluginDetailPage(pluginId: host.manifest.id, host: host));
+    final entry = tester.widget<ListTile>(
+        find.byKey(const ValueKey('plugin-script-action-extract')));
+    expect(find.text('Used by Web clipper'), findsOneWidget);
+    expect(entry.onTap, isNull);
+    expect(entry.trailing, isNull);
   });
 }

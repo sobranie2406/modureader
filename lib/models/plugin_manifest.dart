@@ -25,6 +25,9 @@ class PluginLimits {
   static const int maxBookActionsPerPlugin = 24;
   static const int maxDictionarySourcesPerPlugin = 8;
   static const int maxScriptBytes = 128 * 1024;
+  static const int maxArticleScriptBytes = 512 * 1024;
+  static const int maxArticleHtmlBytes = 2 * 1024 * 1024;
+  static const int maxArticleMarkdownBytes = 512 * 1024;
   static const int maxDescriptionLength = 2000;
   static const int maxSettingLabelLength = 80;
   static const int maxIdLength = 64;
@@ -47,6 +50,7 @@ const Set<String> kP1SupportedCapabilities = {
   'library:private',
   'dictionary:transform',
   'article:capture',
+  'article:extract',
 };
 
 /// Known tokens are checked separately from the adapter's allowed capabilities.
@@ -61,6 +65,7 @@ const Set<String> kKnownCapabilities = {
   'library:private',
   'dictionary:transform',
   'article:capture',
+  'article:extract',
   'storage:plugin',
 };
 
@@ -78,6 +83,7 @@ const String kNoteWriteCapability = 'note:write';
 const String kLibraryPrivateCapability = 'library:private';
 const String kDictionaryTransformCapability = 'dictionary:transform';
 const String kArticleCaptureCapability = 'article:capture';
+const String kArticleExtractCapability = 'article:extract';
 
 enum PluginErrorCode {
   untrustedPackage,
@@ -523,7 +529,7 @@ class AiSkillContribution extends PluginContribution {
 
 enum PluginSelectionScope { selection, context }
 
-enum PluginScriptSurface { selection, library, dictionary }
+enum PluginScriptSurface { selection, library, dictionary, article }
 
 class ScriptActionContribution extends PluginContribution {
   const ScriptActionContribution({
@@ -573,7 +579,8 @@ class ScriptActionContribution extends PluginContribution {
         .firstOrNull;
     if (surface == null ||
         scope == null ||
-        (surface == PluginScriptSurface.dictionary &&
+        (const {PluginScriptSurface.dictionary, PluginScriptSurface.article}
+                .contains(surface) &&
             scope != PluginSelectionScope.selection)) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
           'contributes[$index] has an invalid surface or scope.');
@@ -1003,10 +1010,20 @@ class PluginManifest {
           (action.surface == PluginScriptSurface.selection &&
               !capabilities.contains(kSelectionActionCapability)) ||
           (action.surface == PluginScriptSurface.dictionary &&
-              !capabilities.contains(kDictionaryTransformCapability))) {
+              !capabilities.contains(kDictionaryTransformCapability)) ||
+          (action.surface == PluginScriptSurface.article &&
+              !capabilities.contains(kArticleExtractCapability))) {
         throw PluginInstallError(PluginErrorCode.capabilityUnavailable,
             'Script actions must declare their execution and surface capabilities.');
       }
+    }
+    if (contributions
+            .whereType<ScriptActionContribution>()
+            .where((action) => action.surface == PluginScriptSurface.article)
+            .length >
+        1) {
+      throw const PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package may declare only one article extractor.');
     }
 
     final rawSettings = json['settings'] ?? const <dynamic>[];

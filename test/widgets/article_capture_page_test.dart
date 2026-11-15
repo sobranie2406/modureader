@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,11 +11,13 @@ import 'package:modu_reader/service/plugins/article_capture.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
+import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Host extends PluginHost {
   _Host() : super(paths: PluginPaths(rootPath: '/tmp/modu_article_widget'));
-  bool enabled = true, hasCapability = true;
+  bool enabled = true, hasCapability = true, hasExtractor = true;
   PluginManifest? _manifest;
   void reload() {
     _manifest = null;
@@ -40,7 +43,11 @@ class _Host extends PluginHost {
           'name': {'en': 'Web clipper'},
           'license': 'MIT',
           'minAppVersion': '1.3.10',
-          'capabilities': ['script:run', 'article:capture'],
+          'capabilities': [
+            'script:run',
+            'article:capture',
+            if (hasExtractor) 'article:extract'
+          ],
           'contributes': [
             {
               'kind': 'scriptAction',
@@ -49,33 +56,68 @@ class _Host extends PluginHost {
               'name': {'en': 'Capture'},
               'entry': 'main.js',
               'surface': 'library'
-            }
+            },
+            if (hasExtractor)
+              {
+                'kind': 'scriptAction',
+                'schema': 1,
+                'id': 'extract',
+                'name': 'Extract',
+                'entry': 'extract.js',
+                'surface': 'article'
+              }
           ],
         })
       : null;
 }
 
+final _document = ArticleCaptureDocument(
+    '<article>Raw website text</article>', Uri.parse('https://example.com'),
+    plainText: false);
 final _article = CapturedArticle(
     'A captured article',
     Uri.parse('https://example.com'),
     '# A captured article\n\nUseful body text captured for offline reading, with its original source link.\n');
 
 class _Service extends ArticleCaptureService {
-  Future<CapturedArticle> Function()? next;
+  Future<ArticleCaptureDocument> Function()? next;
   PluginCancelToken? lastCancel;
   int calls = 0;
   @override
-  Future<CapturedArticle> fetch(String url,
+  Future<ArticleCaptureDocument> fetchDocument(String url,
       {required PluginCancelToken cancel}) {
     calls++;
     lastCancel = cancel;
-    return next?.call() ?? Future.value(_article);
+    return next?.call() ?? Future.value(_document);
+  }
+}
+
+class _Runtime extends PluginScriptRuntime {
+  _Runtime(PluginHost host) : super(host: host);
+  Future<Map<String, dynamic>> Function()? next;
+  PluginCancelToken? lastCancel;
+  Map<String, Object?>? lastInput;
+  int calls = 0;
+  @override
+  Future<Map<String, dynamic>> run(
+      {required String pluginId,
+      required ScriptActionContribution action,
+      Map<String, Object?> input = const {},
+      PluginHostCall? hostCall,
+      bool Function()? isContextValid,
+      PluginCancelToken? cancel}) {
+    calls++;
+    lastCancel = cancel;
+    lastInput = input;
+    return next?.call() ??
+        Future.value({'title': _article.title, 'markdown': _article.markdown});
   }
 }
 
 void main() {
   late _Host host;
   late _Service service;
+  late _Runtime runtime;
   var exports = 0, imports = 0;
   setUp(() async {
     SharedPreferences.setMockInitialValues(
@@ -83,11 +125,31 @@ void main() {
     await Prefs().initPrefs();
     host = _Host();
     service = _Service();
+    runtime = _Runtime(host);
     exports = 0;
     imports = 0;
   });
   tearDown(() {
+    runtime.dispose();
     host.dispose();
+  });
+
+  test('article filenames preserve Unicode without exceeding filesystem limits',
+      () {
+    const stamp = 1790000000000000;
+    for (final title in ['书' * 80, '😀' * 80, '${'A' * 79}😀']) {
+      final name = articleCaptureFileName(title, timestamp: stamp);
+      expect(utf8.encode(name).length, lessThanOrEqualTo(240));
+      expect(utf8.decode(utf8.encode(name)), name);
+      expect(name, endsWith('-$stamp.md'));
+      expect(name, isNot(contains('\uFFFD')));
+    }
+    expect(articleCaptureFileName('${'A' * 79}😀', timestamp: stamp),
+        '${'A' * 79}😀-$stamp.md');
+    expect(articleCaptureFileName('', timestamp: stamp), 'Article-$stamp.md');
+    final sanitized =
+        articleCaptureFileName('a/b\\c:*?"<>|\n', timestamp: stamp);
+    expect(sanitized, isNot(contains(RegExp(r'[\\/:*?"<>|\x00-\x1f]'))));
   });
 
   Future<void> show(WidgetTester tester,
@@ -111,6 +173,7 @@ void main() {
           pluginId: 'com.modu.web-clipper',
           host: host,
           service: service,
+          scriptRuntime: runtime,
           onExport: onExport ??
               (_) async {
                 exports++;
@@ -165,7 +228,7 @@ void main() {
 
   testWidgets('disabling the plugin cancels capture and discards a late result',
       (tester) async {
-    final pending = Completer<CapturedArticle>();
+    final pending = Completer<ArticleCaptureDocument>();
     service.next = () => pending.future;
     await show(tester);
     await tester.tap(find.byKey(const ValueKey('article-fetch')));
@@ -174,7 +237,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.lastCancel!.isCancelled, isTrue);
     expect(find.text('This plugin is disabled.'), findsOneWidget);
-    pending.complete(_article);
+    pending.complete(_document);
     await tester.pumpAndSettle();
     host.change(enabled: true);
     await tester.pumpAndSettle();
@@ -204,7 +267,7 @@ void main() {
 
   testWidgets('cancelled and replaced captures cannot replace a newer preview',
       (tester) async {
-    final first = Completer<CapturedArticle>();
+    final first = Completer<ArticleCaptureDocument>();
     service.next = () => first.future;
     await show(tester);
     await tester.tap(find.byKey(const ValueKey('article-fetch')));
@@ -212,10 +275,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('article-cancel')));
     await tester.pumpAndSettle();
     expect(service.lastCancel!.isCancelled, isTrue);
-    service.next = () async => _article;
+    service.next = () async => _document;
     await capture(tester);
-    first.complete(
-        CapturedArticle('Old result', _article.sourceUrl, '# Old result'));
+    first.complete(ArticleCaptureDocument('Old raw result', _article.sourceUrl,
+        plainText: false));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('article-preview')), findsOneWidget);
     expect(find.textContaining('Old result'), findsNothing);
@@ -223,7 +286,7 @@ void main() {
 
   testWidgets('backgrounding cancels acquisition and does not resume it',
       (tester) async {
-    final pending = Completer<CapturedArticle>();
+    final pending = Completer<ArticleCaptureDocument>();
     service.next = () => pending.future;
     await show(tester);
     await tester.tap(find.byKey(const ValueKey('article-fetch')));
@@ -232,7 +295,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.lastCancel!.isCancelled, isTrue);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    pending.complete(_article);
+    pending.complete(_document);
     await tester.pumpAndSettle();
     expect(service.calls, 1);
     expect(find.byKey(const ValueKey('article-preview')), findsNothing);
@@ -293,20 +356,20 @@ void main() {
   testWidgets(
       'disposing the page cancels a pending capture without late UI work',
       (tester) async {
-    final pending = Completer<CapturedArticle>();
+    final pending = Completer<ArticleCaptureDocument>();
     service.next = () => pending.future;
     await show(tester);
     await tester.tap(find.byKey(const ValueKey('article-fetch')));
     await tester.pump();
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     expect(service.lastCancel!.isCancelled, isTrue);
-    pending.complete(_article);
+    pending.complete(_document);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
   testWidgets('same-version reload revokes the original page and late capture',
       (tester) async {
-    final pending = Completer<CapturedArticle>();
+    final pending = Completer<ArticleCaptureDocument>();
     service.next = () => pending.future;
     await show(tester);
     await tester.tap(find.byKey(const ValueKey('article-fetch')));
@@ -314,10 +377,71 @@ void main() {
     host.reload();
     await tester.pumpAndSettle();
     expect(service.lastCancel!.isCancelled, true);
-    pending.complete(_article);
+    pending.complete(_document);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('article-preview')), findsNothing);
     expect(find.byKey(const ValueKey('article-import')), findsNothing);
     expect(find.byKey(const ValueKey('article-fetch')), findsNothing);
+  });
+  testWidgets('old capture-only plugins show an update prompt before fetching',
+      (tester) async {
+    host.hasExtractor = false;
+    await show(tester);
+    expect(find.byKey(const ValueKey('article-update-plugin')), findsOneWidget);
+    expect(find.byKey(const ValueKey('article-fetch')), findsNothing);
+    expect(service.calls, 0);
+    expect(runtime.calls, 0);
+  });
+
+  testWidgets(
+      'plugin extraction receives downloaded content and never auto-fetches preview images',
+      (tester) async {
+    runtime.next = () async => {
+          'title': 'Plugin title',
+          'markdown':
+              '# Plugin title\n\n![Remote](https://image.example/photo.png)\n\n[Unsafe](file:///private/secret)'
+        };
+    await show(tester);
+    await capture(tester);
+    expect(runtime.lastInput, {
+      'html': _document.content,
+      'url': _document.sourceUrl.toString(),
+      'plainText': false
+    });
+    expect(find.text('Image link'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cancelling during plugin parsing rejects its late result',
+      (tester) async {
+    final parsed = Completer<Map<String, dynamic>>();
+    runtime.next = () => parsed.future;
+    await show(tester);
+    await tester.tap(find.byKey(const ValueKey('article-fetch')));
+    await tester.pump();
+    expect(runtime.calls, 1);
+    await tester.tap(find.byKey(const ValueKey('article-cancel')));
+    await tester.pumpAndSettle();
+    expect(runtime.lastCancel!.isCancelled, true);
+    parsed.complete({'title': 'Late title', 'markdown': '# Late title'});
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('article-preview')), findsNothing);
+  });
+
+  testWidgets('one overall deadline cancels a pending plugin parser',
+      (tester) async {
+    final parsed = Completer<Map<String, dynamic>>();
+    runtime.next = () => parsed.future;
+    await show(tester);
+    await tester.tap(find.byKey(const ValueKey('article-fetch')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pumpAndSettle();
+    expect(runtime.lastCancel!.isCancelled, true);
+    expect(find.text('The request timed out. Try again.'), findsOneWidget);
+    parsed.complete({'title': 'Late title', 'markdown': '# Late title'});
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('article-preview')), findsNothing);
   });
 }

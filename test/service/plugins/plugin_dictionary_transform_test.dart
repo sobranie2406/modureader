@@ -6,6 +6,7 @@ import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/service/plugins/handlers/script_action_handler.dart';
 import 'package:modu_reader/service/plugins/plugin_dictionary_transform.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
+import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 
 class _Runtime extends PluginScriptRuntime {
@@ -25,7 +26,8 @@ class _Runtime extends PluginScriptRuntime {
       required ScriptActionContribution action,
       Map<String, Object?> input = const {},
       PluginHostCall? hostCall,
-      bool Function()? isContextValid}) {
+      bool Function()? isContextValid,
+      PluginCancelToken? cancel}) {
     inputs.add(input);
     running.add(pluginId);
     expect(hostCall, isNull);

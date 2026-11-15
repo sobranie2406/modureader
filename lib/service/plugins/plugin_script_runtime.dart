@@ -31,7 +31,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     this.timeout = const Duration(seconds: 10),
     this.onDiagnostic,
   })  : _host = host,
-        _engineFactory = engineFactory ?? WebViewPluginScriptEngine.new,
+        _engineFactory = engineFactory,
         _guard = networkGuard ?? PluginNetworkGuard(),
         _http = httpClient ?? PluginHttpClient(budget: PluginHttpBudget()) {
     WidgetsBinding.instance.addObserver(this);
@@ -53,7 +53,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
 
   final PluginHost? _host;
   PluginHost get host => _host ?? PluginHost.instance;
-  final PluginScriptEngine Function() _engineFactory;
+  final PluginScriptEngine Function()? _engineFactory;
   final PluginNetworkGuard _guard;
   final PluginHttpClient _http;
   final Duration timeout;
@@ -73,6 +73,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
 
   final _jobs = <String, _ScriptJob>{};
   static const maxInputBytes = 64 * 1024, maxResultBytes = 64 * 1024;
+  static const maxArticleInputBytes = 16 * 1024 * 1024;
+  static const maxArticleResultBytes = 4 * 1024 * 1024;
   bool isRunning(String id) => _jobs[id]?.result.isCompleted == false;
 
   bool _enabled(String id, String version) =>
@@ -87,6 +89,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     Map<String, Object?> input = const {},
     PluginHostCall? hostCall,
     bool Function()? isContextValid,
+    PluginCancelToken? cancel,
   }) {
     final manifest = host.manifestFor(pluginId);
     final record = host.byId(pluginId);
@@ -94,6 +97,9 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         record == null ||
         !_enabled(pluginId, record.version) ||
         !manifest.capabilities.contains(kScriptRunCapability) ||
+        (action.surface == PluginScriptSurface.article &&
+            (!manifest.capabilities.contains(kArticleExtractCapability) ||
+                action.scope != PluginSelectionScope.selection)) ||
         !manifest.contributions.any((c) => identical(c, action))) {
       _logFailure(pluginId, record?.version ?? 'unknown', action.id,
           'unavailable', 'validate', 0);
@@ -103,8 +109,20 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       _logFailure(pluginId, record.version, action.id, 'busy', 'queue', 0);
       return Future.error(const PluginScriptFailure('busy'));
     }
+    if (cancel?.isCancelled == true) {
+      return Future.error(const PluginScriptFailure('cancelled'));
+    }
+    final article = action.surface == PluginScriptSurface.article;
     final job = _ScriptJob(
-        _engineFactory(), pluginId, record.version, action.id, isContextValid);
+        _engineFactory?.call() ??
+            WebViewPluginScriptEngine(
+                maxMessageBytes:
+                    article ? maxArticleResultBytes : maxResultBytes,
+                maxStartBytes: article ? maxArticleInputBytes : null),
+        pluginId,
+        record.version,
+        action.id,
+        isContextValid);
     _jobs[pluginId] = job;
     _diagnostic(pluginId, action.id, 'validate', 'started', 0);
     final limit = action.surface == PluginScriptSurface.dictionary &&
@@ -112,6 +130,11 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         ? const Duration(seconds: 2)
         : timeout;
     job.timer = Timer(limit, () => _abort(job, 'timeout'));
+    cancel?.whenCancelled(() {
+      if (identical(_jobs[pluginId], job) && !job.result.isCompleted) {
+        _abort(job, 'cancelled');
+      }
+    });
     unawaited(_execute(pluginId, manifest, action, input, hostCall, job));
     return job.result.future;
   }
@@ -134,18 +157,23 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       PluginHostCall? hostCall,
       _ScriptJob job) async {
     try {
+      _check(id, job);
       final directory = host.paths.pluginDir(id);
       await host.trust.verify(directory, id, job.version);
       _check(id, job);
       job.stage = 'source';
       final file = File(p.join(directory.path, action.entry));
-      if (await file.length() > PluginLimits.maxScriptBytes) {
+      final article = action.surface == PluginScriptSurface.article;
+      final maxSourceBytes = article
+          ? PluginLimits.maxArticleScriptBytes
+          : PluginLimits.maxScriptBytes;
+      if (await file.length() > maxSourceBytes) {
         throw const PluginScriptFailure('size');
       }
       final bytes = await file.readAsBytes();
       final expected =
           (await host.trust.reviewedFiles(id, job.version))?[action.entry];
-      if (bytes.length > PluginLimits.maxScriptBytes ||
+      if (bytes.length > maxSourceBytes ||
           expected == null ||
           sha256.convert(bytes).toString() != expected) {
         throw const PluginScriptFailure('unavailable');
@@ -159,28 +187,33 @@ class PluginScriptRuntime with WidgetsBindingObserver {
             spec.key: config[spec.key] ?? spec.defaultValue,
       };
       // Only named fields from the trusted UI cross the process boundary.
-      final payload = <String, Object?>{
-        'selection': input['selection'] is String ? input['selection'] : '',
-        if (action.surface != PluginScriptSurface.dictionary &&
-            action.scope == PluginSelectionScope.context)
-          'context': input['context'] is String ? input['context'] : '',
-        'settings': settings,
-        'actionId': action.id,
-        if (action.surface != PluginScriptSurface.dictionary &&
-            input['book'] is Map)
-          'book': _bookSummary(input['book'] as Map),
-      };
-      _bounded(payload, maxInputBytes);
+      final payload = article
+          ? _articleInput(input, settings, action.id)
+          : <String, Object?>{
+              'selection':
+                  input['selection'] is String ? input['selection'] : '',
+              if (action.surface != PluginScriptSurface.dictionary &&
+                  action.scope == PluginSelectionScope.context)
+                'context': input['context'] is String ? input['context'] : '',
+              'settings': settings,
+              'actionId': action.id,
+              if (action.surface != PluginScriptSurface.dictionary &&
+                  input['book'] is Map)
+                'book': _bookSummary(input['book'] as Map),
+            };
+      _bounded(payload, article ? maxArticleInputBytes : maxInputBytes);
       job.stage = 'execute';
       final result = await job.engine.execute(utf8.decode(bytes), payload,
           onCall: (method, args) =>
-              action.surface == PluginScriptSurface.dictionary
+              article || action.surface == PluginScriptSurface.dictionary
                   ? Future.error(const PluginScriptFailure('permission'))
                   : _call(id, manifest, method, args, hostCall, job));
       _check(id, job);
       job.stage = 'result';
-      _bounded(result, maxResultBytes);
-      if (action.surface == PluginScriptSurface.dictionary) {
+      _bounded(result, article ? maxArticleResultBytes : maxResultBytes);
+      if (article) {
+        validateArticleResult(result);
+      } else if (action.surface == PluginScriptSurface.dictionary) {
         final candidates = result['candidates'];
         if (result.length != 1 ||
             candidates is! List ||
@@ -212,6 +245,54 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         await job.engine.dispose();
       } catch (_) {/* Keep failures private. */}
       if (identical(_jobs[id], job)) _jobs.remove(id);
+    }
+  }
+
+  static Map<String, Object?> _articleInput(Map<String, Object?> input,
+      Map<String, Object?> settings, String actionId) {
+    final html = input['html'], url = input['url'], plain = input['plainText'];
+    if (html is! String ||
+        url is! String ||
+        plain is! bool ||
+        url.length > 4096 ||
+        url.contains(RegExp(r'[\x00-\x20\x7f]'))) {
+      throw const PluginScriptFailure('result');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.port != 443 ||
+        uri.hasFragment) {
+      throw const PluginScriptFailure('result');
+    }
+    if (utf8.encode(html).length > PluginLimits.maxArticleHtmlBytes) {
+      throw const PluginScriptFailure('size');
+    }
+    return {
+      'html': html,
+      'url': url,
+      'plainText': plain,
+      'settings': settings,
+      'actionId': actionId
+    };
+  }
+
+  static void validateArticleResult(Map<String, dynamic> result) {
+    final title = result['title'], markdown = result['markdown'];
+    if (result.length != 2 ||
+        title is! String ||
+        markdown is! String ||
+        title.trim().isEmpty ||
+        title.runes.length > 200 ||
+        title.contains(RegExp(r'[\x00-\x1f\x7f]')) ||
+        markdown.trim().isEmpty ||
+        markdown.contains(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'))) {
+      throw const PluginScriptFailure('result');
+    }
+    if (utf8.encode(markdown).length > PluginLimits.maxArticleMarkdownBytes) {
+      throw const PluginScriptFailure('size');
     }
   }
 
@@ -316,6 +397,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
   }
 
   void _abort(_ScriptJob job, String code) {
+    if (job.result.isCompleted) return;
     job.cancel.cancel();
     job.timer?.cancel();
     _completeFailure(job, PluginScriptFailure(code));

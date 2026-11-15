@@ -13,12 +13,32 @@ import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
 import 'package:modu_reader/utils/save_file_to_download.dart';
-import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:url_launcher/url_launcher_string.dart';
+import 'package:modu_reader/widgets/markdown/selection_control.dart';
+import 'package:modu_reader/service/plugins/plugin_article_extractor.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 
 Future<void> showArticleCapturePage(BuildContext context,
         {required String pluginId, PluginHost? host}) =>
     Navigator.of(context).push<void>(MaterialPageRoute(
         builder: (_) => ArticleCapturePage(pluginId: pluginId, host: host)));
+
+String articleCaptureFileName(String title, {int? timestamp}) {
+  final suffix = '-${timestamp ?? DateTime.now().microsecondsSinceEpoch}.md';
+  final sanitized = title.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_');
+  final source = sanitized.isEmpty ? 'Article' : sanitized;
+  final budget = 240 - utf8.encode(suffix).length;
+  final kept = <int>[];
+  var bytes = 0;
+  for (final rune in source.runes.take(80)) {
+    final width = utf8.encode(String.fromCharCode(rune)).length;
+    if (bytes + width > budget) break;
+    kept.add(rune);
+    bytes += width;
+  }
+  return '${String.fromCharCodes(kept)}$suffix';
+}
 
 class ArticleCapturePage extends ConsumerStatefulWidget {
   const ArticleCapturePage(
@@ -26,11 +46,13 @@ class ArticleCapturePage extends ConsumerStatefulWidget {
       required this.pluginId,
       this.host,
       this.service,
+      this.scriptRuntime,
       this.onExport,
       this.onImport});
   final String pluginId;
   final PluginHost? host;
   final ArticleCaptureService? service;
+  final PluginScriptRuntime? scriptRuntime;
   final Future<void> Function(CapturedArticle)? onExport;
   final Future<void> Function(CapturedArticle)? onImport;
 
@@ -45,6 +67,8 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
       widget.host ?? PluginHost.executionHostFor(widget.pluginId);
   late final ArticleCaptureService _service =
       widget.service ?? ArticleCaptureService();
+  late final PluginArticleExtractor _extractor =
+      PluginArticleExtractor(host: _host, runtime: widget.scriptRuntime);
   late final PluginManifest? _openingManifest;
   bool _revoked = false;
   PluginCancelToken? _cancel;
@@ -114,7 +138,7 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
   }
 
   Future<void> _fetch() async {
-    if (!_available || _busy) return;
+    if (!_available || !_extractor.available(widget.pluginId) || _busy) return;
     final generation = ++_generation;
     _cancel?.cancel();
     final token = _cancel = PluginCancelToken();
@@ -125,7 +149,12 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
       _status = null;
     });
     try {
-      final article = await _service.fetch(_url.text.trim(), cancel: token);
+      final article = await _extractor.capture(_url.text.trim(),
+          pluginId: widget.pluginId,
+          service: _service,
+          cancel: token,
+          isContextValid: () =>
+              mounted && generation == _generation && _available);
       if (!mounted || generation != _generation || !_available) return;
       setState(() {
         _article = article;
@@ -139,6 +168,12 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
           'size' => _text('网页内容过大。', 'This page is too large.'),
           'timeout' => _text('获取超时，请重试。', 'The request timed out. Try again.'),
           'cancelled' => null,
+          'upgrade' => _text('请更新网页稍后阅读插件。', 'Update the Web clipper plugin.'),
+          'busy' => _text('正在处理其他网页，请稍后重试。',
+              'Another capture is running. Try again shortly.'),
+          'result' ||
+          'extract' =>
+            _text('未能提取正文，请重试。', 'Could not extract the article. Try again.'),
           _ => _text('无法获取网页，请检查地址后重试。',
               'Unable to capture this page. Check the address and try again.'),
         };
@@ -160,15 +195,6 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
     }
   }
 
-  String _fileName(CapturedArticle article) {
-    final title =
-        article.title.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_');
-    final safe = title.isEmpty
-        ? 'Article'
-        : title.substring(0, title.length.clamp(0, 80));
-    return '$safe-${DateTime.now().microsecondsSinceEpoch}.md';
-  }
-
   Future<void> _save({required bool export}) async {
     final article = _article;
     if (!_available || _busy || article == null) return;
@@ -185,12 +211,13 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
       } else if (export) {
         await saveFileToDownload(
             bytes: utf8.encode(article.markdown),
-            fileName: _fileName(article),
+            fileName: articleCaptureFileName(article.title),
             mimeType: 'text/markdown');
       } else {
         directory =
             await (await getAnxTempDir()).createTemp('article-capture-');
-        final file = File('${directory.path}/${_fileName(article)}');
+        final file =
+            File('${directory.path}/${articleCaptureFileName(article.title)}');
         await file.writeAsString(article.markdown, flush: true);
         if (!mounted || generation != _generation || !_available) return;
         await importBook(file, ref);
@@ -232,78 +259,132 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
               child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(_text('插件已停用。', 'This plugin is disabled.'))))
-          : ListView(
-              children: [
-                Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                            key: const ValueKey('article-url'),
-                            controller: _url,
-                            enabled: !_busy,
-                            keyboardType: TextInputType.url,
-                            textInputAction: TextInputAction.go,
-                            autocorrect: false,
-                            onSubmitted: (_) => unawaited(_fetch()),
-                            decoration: InputDecoration(
-                                labelText: _text('网页地址', 'Webpage address'),
-                                hintText: 'https://',
-                                border: const OutlineInputBorder())),
-                        const SizedBox(height: 12),
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          FilledButton.icon(
-                              key: const ValueKey('article-fetch'),
-                              onPressed: _busy ? null : _fetch,
-                              icon: const Icon(Icons.article_outlined),
-                              label: Text(_text('获取正文', 'Capture'))),
-                          if (_capturing)
-                            TextButton(
-                                key: const ValueKey('article-cancel'),
-                                onPressed: () {
-                                  _cancel?.cancel();
-                                  _generation++;
-                                  setState(() {
-                                    _busy = false;
-                                    _capturing = false;
-                                    _status = null;
-                                  });
-                                },
-                                child: Text(_text('取消', 'Cancel'))),
-                          if (_article != null) ...[
-                            OutlinedButton.icon(
-                                key: const ValueKey('article-export'),
-                                onPressed:
-                                    _busy ? null : () => _save(export: true),
-                                icon: const Icon(Icons.save_alt),
-                                label: Text(
-                                    _text('导出 Markdown', 'Export Markdown'))),
-                            OutlinedButton.icon(
-                                key: const ValueKey('article-import'),
-                                onPressed:
-                                    _busy ? null : () => _save(export: false),
-                                icon: const Icon(Icons.library_add_outlined),
-                                label: Text(_text('加入书架', 'Add to bookshelf'))),
+          : !_extractor.available(widget.pluginId)
+              ? Center(
+                  child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                          _text(
+                              '请更新网页稍后阅读插件。', 'Update the Web clipper plugin.'),
+                          key: const ValueKey('article-update-plugin'))))
+              : ListView(
+                  children: [
+                    Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                                key: const ValueKey('article-url'),
+                                controller: _url,
+                                enabled: !_busy,
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.go,
+                                autocorrect: false,
+                                onSubmitted: (_) => unawaited(_fetch()),
+                                decoration: InputDecoration(
+                                    labelText: _text('网页地址', 'Webpage address'),
+                                    hintText: 'https://',
+                                    border: const OutlineInputBorder())),
+                            const SizedBox(height: 12),
+                            Wrap(spacing: 8, runSpacing: 8, children: [
+                              FilledButton.icon(
+                                  key: const ValueKey('article-fetch'),
+                                  onPressed: _busy ? null : _fetch,
+                                  icon: const Icon(Icons.article_outlined),
+                                  label: Text(_text('获取正文', 'Capture'))),
+                              if (_capturing)
+                                TextButton(
+                                    key: const ValueKey('article-cancel'),
+                                    onPressed: () {
+                                      _cancel?.cancel();
+                                      _generation++;
+                                      setState(() {
+                                        _busy = false;
+                                        _capturing = false;
+                                        _status = null;
+                                      });
+                                    },
+                                    child: Text(_text('取消', 'Cancel'))),
+                              if (_article != null) ...[
+                                OutlinedButton.icon(
+                                    key: const ValueKey('article-export'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _save(export: true),
+                                    icon: const Icon(Icons.save_alt),
+                                    label: Text(_text(
+                                        '导出 Markdown', 'Export Markdown'))),
+                                OutlinedButton.icon(
+                                    key: const ValueKey('article-import'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _save(export: false),
+                                    icon:
+                                        const Icon(Icons.library_add_outlined),
+                                    label: Text(
+                                        _text('加入书架', 'Add to bookshelf'))),
+                              ],
+                            ]),
+                            if (_busy)
+                              const Padding(
+                                  padding: EdgeInsets.only(top: 12),
+                                  child: LinearProgressIndicator()),
+                            if (_status != null)
+                              Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Text(_status!)),
                           ],
-                        ]),
-                        if (_busy)
-                          const Padding(
-                              padding: EdgeInsets.only(top: 12),
-                              child: LinearProgressIndicator()),
-                        if (_status != null)
-                          Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Text(_status!)),
-                      ],
-                    )),
-                if (_article != null)
-                  Padding(
-                      key: const ValueKey('article-preview'),
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      child: StyledMarkdown(data: _article!.markdown)),
-              ],
-            ),
+                        )),
+                    if (_article != null)
+                      Padding(
+                          key: const ValueKey('article-preview'),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          child: _ArticlePreview(article: _article!)),
+                  ],
+                ),
     );
   }
+}
+
+class _ArticlePreview extends StatelessWidget {
+  const _ArticlePreview({required this.article});
+  final CapturedArticle article;
+  Uri? _link(String value) {
+    final url = Uri.tryParse(value);
+    if (url == null ||
+        !{'http', 'https'}.contains(url.scheme) ||
+        url.host.isEmpty ||
+        url.userInfo.isNotEmpty ||
+        value.contains(RegExp(r'[\x00-\x20\x7f]'))) {
+      return null;
+    }
+    return url;
+  }
+
+  @override
+  Widget build(BuildContext context) => SelectableRegion(
+      selectionControls: selectionControls(),
+      child: GptMarkdown(
+        article.markdown,
+        followLinkColor: true,
+        onLinkTap: (href, _) {
+          final link = _link(href);
+          if (link != null) {
+            unawaited(launchUrlString(link.toString(),
+                mode: LaunchMode.externalApplication));
+          }
+        },
+        imageBuilder: (context, href) => TextButton.icon(
+            icon: const Icon(Icons.image_outlined),
+            label: Text(ModuStrings.text(context, '图片链接', 'Image link')),
+            onPressed: _link(href) == null
+                ? null
+                : () => launchUrlString(_link(href)!.toString(),
+                    mode: LaunchMode.externalApplication)),
+        linkBuilder: (context, text, url, style) => Text.rich(text,
+            style: style.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                decoration: TextDecoration.underline)),
+      ));
 }

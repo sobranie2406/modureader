@@ -21,9 +21,15 @@ abstract class PluginScriptEngine {
 /// A fresh view hosts only our bootstrap. Package code runs in a terminable
 /// worker, with no DOM, native bridge or direct network access.
 class WebViewPluginScriptEngine implements PluginScriptEngine {
-  WebViewPluginScriptEngine() {
+  WebViewPluginScriptEngine(
+      {this.maxMessageBytes = 64 * 1024, this.maxStartBytes}) {
+    if (maxMessageBytes != 64 * 1024 && maxMessageBytes != 4 * 1024 * 1024) {
+      throw ArgumentError.value(maxMessageBytes, 'maxMessageBytes');
+    }
     _result.future.ignore();
   }
+  final int maxMessageBytes;
+  final int? maxStartBytes;
   Future<void>? _disposing;
   AnxHeadlessWebView? _view;
   InAppWebViewController? _controller;
@@ -122,8 +128,8 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
               if (++_messages > 40 ||
                   args.length != 1 ||
                   args.single is! String ||
-                  (args.single as String).length > 65536 ||
-                  utf8.encode(args.single as String).length > 65536) {
+                  (args.single as String).length > maxMessageBytes ||
+                  utf8.encode(args.single as String).length > maxMessageBytes) {
                 _fail('invalid_message');
                 return null;
               }
@@ -170,10 +176,17 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
         if (_disposed || _started) return;
         _started = true;
         _diagnosticStage = 'bootstrap_start';
-        final payload =
-            jsonEncode({'source': source, 'input': input, 'handler': handler})
-                .replaceAll('\u2028', r'\u2028')
-                .replaceAll('\u2029', r'\u2029');
+        final payload = jsonEncode({
+          'source': source,
+          'input': input,
+          'handler': handler,
+          'maxMessageBytes': maxMessageBytes
+        }).replaceAll('\u2028', r'\u2028').replaceAll('\u2029', r'\u2029');
+        if (maxStartBytes != null &&
+            utf8.encode(payload).length > maxStartBytes!) {
+          _fail('invalid_message');
+          return;
+        }
         unawaited(() async {
           try {
             final state = await controller.evaluateJavascript(source: '''

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
@@ -18,6 +19,13 @@ import 'package:modu_reader/utils/log/common.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'plugin_test_utils.dart';
+
+class _RuntimeFixtureTrust extends FixturePluginTrust {
+  Map<String, String> sealed = {};
+  @override
+  Future<Map<String, String>?> reviewedFiles(String id, String version) async =>
+      Map.unmodifiable(sealed);
+}
 
 class Engine implements PluginScriptEngine {
   Engine() {
@@ -90,6 +98,10 @@ void main() {
     if (capabilities != null) m['capabilities'] = capabilities;
     if (network != null) m['network'] = network;
     files['manifest.json'] = jsonEncode(m);
+    (host.trust as _RuntimeFixtureTrust).sealed = {
+      for (final entry in files.entries)
+        entry.key: sha256.convert(utf8.encode(entry.value)).toString()
+    };
     await host.install(await writePluginZip(temp, files),
         allowSameVersion: true);
     action = host
@@ -105,7 +117,7 @@ void main() {
     await Prefs().initPrefs();
     temp = await Directory.systemTemp.createTemp('plugin_script_test');
     host = PluginHost(
-        trust: FixturePluginTrust(),
+        trust: _RuntimeFixtureTrust(),
         paths: PluginPaths(rootPath: '${temp.path}/plugins'),
         appVersionResolver: () async => '1.3.10');
     await host.initialize();
@@ -182,6 +194,202 @@ void main() {
     expect(await result, {
       'candidates': ['apple']
     });
+  });
+
+  Future<void> installArticle({String? source, bool library = false}) async {
+    final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
+    final extract =
+        Map<String, dynamic>.from((m['contributes'] as List).first as Map)
+          ..['surface'] = 'article'
+          ..['scope'] = 'selection';
+    m['contributes'] = [
+      extract,
+      if (library) {...extract, 'id': 'open', 'surface': 'library'}
+    ];
+    files['manifest.json'] = jsonEncode(m);
+    if (source != null) files['main.js'] = source;
+    await install(capabilities: [
+      'script:run',
+      'article:extract',
+      'library:read',
+      'note:write',
+      'article:capture',
+      'net:http'
+    ], network: {
+      'domains': ['example.com'],
+      'timeoutMs': 1000,
+      'maxResponseBytes': 65536,
+      'requestsPerLookup': 1
+    });
+  }
+
+  Map<String, Object?> articleInput(String html) => {
+        'html': html,
+        'url': 'https://example.com/article?a=1',
+        'plainText': false,
+        'selection': 'do not disclose',
+        'context': 'do not disclose',
+        'book': {'id': 4, 'title': 'Private book'},
+        'token': 'secret'
+      };
+
+  test(
+      'article receives only fetched document fields and refuses every host API',
+      () async {
+    await installArticle();
+    var called = false;
+    final response = runtime.run(
+        pluginId: id,
+        action: action,
+        input: articleInput('<article>text</article>'),
+        hostCall: (_, __) async {
+          called = true;
+          return null;
+        });
+    await engine.ready.future;
+    expect(engine.input.keys.toSet(),
+        {'html', 'url', 'plainText', 'settings', 'actionId'});
+    expect(engine.input['html'], '<article>text</article>');
+    for (final method in [
+      'http.get',
+      'library.list',
+      'notes.save',
+      'articles.capture',
+      'privateLibrary.open',
+      'unknown'
+    ]) {
+      await expectLater(
+          engine.call(method, {}), throwsA(failure('permission')));
+    }
+    expect(called, false);
+    engine.result
+        .complete({'title': 'Article', 'markdown': '# Article\n\nText'});
+    expect((await response)['title'], 'Article');
+  });
+
+  test('article accepts its larger UTF8 document, source and Markdown budgets',
+      () async {
+    await installArticle(
+        source: '//${'s' * (PluginLimits.maxArticleScriptBytes - 2)}');
+    final html = 'h' * PluginLimits.maxArticleHtmlBytes;
+    final markdown = '汉' * (PluginLimits.maxArticleMarkdownBytes ~/ 3) +
+        'a' * (PluginLimits.maxArticleMarkdownBytes % 3);
+    final response = run(articleInput(html));
+    await engine.ready.future;
+    expect(engine.source!.length, PluginLimits.maxArticleScriptBytes);
+    expect(engine.input['html'], html);
+    engine.result.complete({'title': '标' * 200, 'markdown': markdown});
+    expect((await response)['markdown'], markdown);
+  });
+
+  test('article UTF8 HTML and source limits reject before execution', () async {
+    await installArticle();
+    await expectLater(
+        run(articleInput('汉' * (PluginLimits.maxArticleHtmlBytes ~/ 3 + 1))),
+        throwsA(failure('size')));
+    expect(engine.source, null);
+    await Future<void>.delayed(Duration.zero);
+    engine = Engine();
+    await installArticle(
+        source: '//${'s' * (PluginLimits.maxArticleScriptBytes - 1)}');
+    await expectLater(run(articleInput('text')), throwsA(failure('size')));
+    expect(engine.source, null);
+  });
+
+  test('article privilege does not enlarge the same package library source',
+      () async {
+    await installArticle(
+        source: '//${'s' * PluginLimits.maxScriptBytes}', library: true);
+    final library = host
+        .manifestFor(id)!
+        .contributions
+        .whereType<ScriptActionContribution>()
+        .singleWhere((c) => c.surface == PluginScriptSurface.library);
+    await expectLater(
+        runtime.run(pluginId: id, action: library), throwsA(failure('size')));
+    expect(engine.source, null);
+  });
+
+  test('article capability does not enlarge ordinary action results', () async {
+    await install(
+        capabilities: ['script:run', 'ui:selection-action', 'article:extract']);
+    final response = run();
+    await engine.ready.future;
+    engine.result.complete({'text': 'x' * (64 * 1024)});
+    await expectLater(response, throwsA(failure('size')));
+  });
+
+  for (final invalid in <Map<String, dynamic>>[
+    {
+      'title': 'Article',
+      'markdown': '汉' * (PluginLimits.maxArticleMarkdownBytes ~/ 3 + 1)
+    },
+    {'title': 'x' * 201, 'markdown': 'text'},
+    {'title': 'Article', 'markdown': 'text', 'html': '<script>'},
+    {
+      'title': 'Article',
+      'markdown': 'text',
+      'sourceUrl': 'https://forged.example'
+    },
+    {'title': 'Article', 'markdown': '\u0000text'},
+    {'title': 'Article', 'text': 'wrong shape'},
+  ].indexed) {
+    test('article rejects invalid or oversized result ${invalid.$1}', () async {
+      await installArticle();
+      final response = run(articleInput('text'));
+      await engine.ready.future;
+      engine.result.complete(invalid.$2);
+      await expectLater(
+          response, throwsA(failure(invalid.$1 == 0 ? 'size' : 'result')));
+    });
+  }
+
+  test(
+      'article rejects non-native-shaped document input without starting engine',
+      () async {
+    await installArticle();
+    await expectLater(
+        run({'html': 'text', 'url': 'http://example.com', 'plainText': false}),
+        throwsA(failure('result')));
+    expect(engine.source, null);
+  });
+
+  test(
+      'pre-cancelled and rejected busy-job tokens cannot cancel an accepted job',
+      () async {
+    final cancelled = PluginCancelToken()..cancel();
+    await expectLater(
+        runtime.run(pluginId: id, action: action, cancel: cancelled),
+        throwsA(failure('cancelled')));
+    expect(engine.source, null);
+    final accepted = PluginCancelToken(), rejected = PluginCancelToken();
+    final response =
+        runtime.run(pluginId: id, action: action, cancel: accepted);
+    await engine.ready.future;
+    await expectLater(
+        runtime.run(pluginId: id, action: action, cancel: rejected),
+        throwsA(failure('busy')));
+    rejected.cancel();
+    expect(engine.disposed, 0);
+    final stopped = expectLater(response, throwsA(failure('cancelled')));
+    accepted.cancel();
+    await stopped;
+  });
+
+  test('a completed job token never cancels its same-ID successor', () async {
+    final old = PluginCancelToken();
+    final first = runtime.run(pluginId: id, action: action, cancel: old);
+    await engine.ready.future;
+    engine.result.complete({'text': 'first'});
+    await first;
+    await Future<void>.delayed(Duration.zero);
+    engine = Engine();
+    final next = runtime.run(pluginId: id, action: action);
+    await engine.ready.future;
+    old.cancel();
+    expect(engine.disposed, 0);
+    engine.result.complete({'text': 'second'});
+    expect(await next, {'text': 'second'});
   });
 
   test(

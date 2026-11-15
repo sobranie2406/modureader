@@ -188,6 +188,8 @@ class PluginDetailPage extends StatelessWidget {
                     '在阅读界面划词后使用', 'Use after selecting text in a book')),
                 PluginScriptSurface.dictionary => Text(ModuStrings.text(context,
                     '查词未命中时自动尝试', 'Used when an exact lookup has no match')),
+                PluginScriptSurface.article => Text(ModuStrings.text(
+                    context, '在网页稍后阅读中使用', 'Used by Web clipper')),
                 PluginScriptSurface.library => null,
               },
               trailing: action.surface == PluginScriptSurface.library

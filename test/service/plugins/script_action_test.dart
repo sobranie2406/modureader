@@ -40,6 +40,41 @@ void main() {
     expect(registry.forPlugin(second.id).single.action.id, 'other');
   });
 
+  test(
+      'article registry isolates extractors and handler rechecks permission and uniqueness',
+      () async {
+    final registry = PluginScriptActionRegistry();
+    addTearDown(registry.dispose);
+    final handler = ScriptActionContributionHandler(registry: registry);
+    final article = PluginManifest.parse(manifestJson(capabilities: [
+      'script:run',
+      'article:extract'
+    ], contributes: [
+      {
+        'kind': 'scriptAction',
+        'schema': 1,
+        'id': 'extract',
+        'name': 'Extract',
+        'entry': 'extract.js',
+        'surface': 'article'
+      }
+    ]));
+    final applied = await handler.apply(article, article.contributions);
+    expect(registry.forSurface(PluginScriptSurface.library), isEmpty);
+    expect(registry.forSurface(PluginScriptSurface.article).single.action.id,
+        'extract');
+    expect(
+        () => handler.validate(
+            manifest('com.example.other', []), article.contributions),
+        throwsA(isA<PluginInstallError>()));
+    expect(
+        () => handler.validate(
+            article, [...article.contributions, ...article.contributions]),
+        throwsA(isA<PluginInstallError>()));
+    await handler.remove(applied);
+    expect(registry.forSurface(PluginScriptSurface.article), isEmpty);
+  });
+
   test('reconciliation replaces previous action list without duplicates',
       () async {
     final registry = PluginScriptActionRegistry();

@@ -9,6 +9,7 @@ import 'package:modu_reader/service/plugins/plugin_catalog.dart';
 import 'package:modu_reader/service/plugins/plugin_catalog_signature.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'plugin_test_utils.dart';
@@ -38,14 +39,17 @@ void main() {
       await host.trust.acceptCatalog(envelope);
       for (final name in [
         'dictionary-transform',
-        'web-clipper',
+        'web-clipper-1.1.0',
         'private-books-1.1.0'
       ]) {
         final sources = <String, String>{};
+        final directory = Directory('test/fixtures/plugins/$name');
         await for (final file
-            in Directory('test/fixtures/plugins/$name').list()) {
+            in directory.list(recursive: true, followLinks: false)) {
           if (file is File) {
-            sources[file.uri.pathSegments.last] = await file.readAsString();
+            sources[p
+                .relative(file.path, from: directory.path)
+                .replaceAll('\\', '/')] = await file.readAsString();
           }
         }
         final manifest = PluginManifest.parse(sources['manifest.json']!);
@@ -59,7 +63,7 @@ void main() {
             host.manifestFor(manifest.id)!.capabilities,
             contains(switch (name) {
               'dictionary-transform' => kDictionaryTransformCapability,
-              'web-clipper' => kArticleCaptureCapability,
+              'web-clipper-1.1.0' => kArticleExtractCapability,
               _ => kBookActionCapability
             }));
         expect(await host.trust.reviewedFiles(manifest.id, manifest.version),
