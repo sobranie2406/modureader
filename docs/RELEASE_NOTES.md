@@ -22,7 +22,7 @@ Android ARM64 APK and SHA-256 checksum. / 安卓 ARM64 安装包及 SHA-256 校�
 
 Private books 1.2.0 requires this host update. Plugins remain optional downloads from the plugin page. / 私密书籍 1.2.0 需要本次应用更新；插件仍在插件页面按需下载。
 
-[Source / 源码](https://github.com/sobranie2406/modureader/tree/android-1.3.10-beta.4) · [License](https://github.com/sobranie2406/modureader/blob/android-1.3.10-beta.4/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/android-1.3.10-beta.4/NOTICE)
+[Source / 源码](https://github.com/sobranie2406/modureader/tree/android-1.3.10-beta.4-build10181) · [License](https://github.com/sobranie2406/modureader/blob/android-1.3.10-beta.4-build10181/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/android-1.3.10-beta.4-build10181/NOTICE)
 
 ---
 
