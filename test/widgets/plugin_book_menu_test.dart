@@ -97,7 +97,7 @@ void main() {
     await close();
     await tester.runAsync(() async {
       final proof =
-          await File('test/fixtures/plugins/catalog-published.signed.json')
+          await File('test/fixtures/plugins/catalog-private-books-1.1.signed.json')
               .readAsString();
       await host.trust.acceptCatalog(proof);
       final files = {

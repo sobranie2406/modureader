@@ -48,6 +48,9 @@ const Set<String> kP1SupportedCapabilities = {
   'library:read',
   'note:write',
   'library:private',
+  'library:private-control',
+  'library:private-policy',
+  'settings:device',
   'dictionary:transform',
   'article:capture',
   'article:extract',
@@ -63,6 +66,9 @@ const Set<String> kKnownCapabilities = {
   'library:read',
   'note:write',
   'library:private',
+  'library:private-control',
+  'library:private-policy',
+  'settings:device',
   'dictionary:transform',
   'article:capture',
   'article:extract',
@@ -81,6 +87,9 @@ const String kScriptRunCapability = 'script:run';
 const String kLibraryReadCapability = 'library:read';
 const String kNoteWriteCapability = 'note:write';
 const String kLibraryPrivateCapability = 'library:private';
+const String kLibraryPrivateControlCapability = 'library:private-control';
+const String kLibraryPrivatePolicyCapability = 'library:private-policy';
+const String kPluginDeviceSettingsCapability = 'settings:device';
 const String kDictionaryTransformCapability = 'dictionary:transform';
 const String kArticleCaptureCapability = 'article:capture';
 const String kArticleExtractCapability = 'article:extract';
@@ -438,10 +447,18 @@ class BookActionContribution extends PluginContribution {
     required super.raw,
     required this.name,
     required this.command,
+    this.privateValue,
+    this.lockAfter = false,
+    this.lockAfterSetting,
+    this.when = 'any',
   });
 
   final PluginText name;
   final String command;
+  final bool? privateValue;
+  final bool lockAfter;
+  final String? lockAfterSetting;
+  final String when;
 
   factory BookActionContribution.parse({
     required String kind,
@@ -450,9 +467,28 @@ class BookActionContribution extends PluginContribution {
     required int index,
     required Map<String, dynamic> raw,
   }) {
-    if (schema != 1 || raw['command'] != 'privateLibrary.hide') {
+    final command = raw['command'];
+    if (schema != 1 ||
+        !const {'privateLibrary.hide', 'privateLibrary.setPrivate'}
+            .contains(command)) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
           'contributes[$index] has an unsupported book action.');
+    }
+    final newFields = ['private', 'lockAfter', 'lockAfterSetting', 'when'];
+    if ((command == 'privateLibrary.hide' && newFields.any(raw.containsKey)) ||
+        (command == 'privateLibrary.setPrivate' &&
+            (raw['private'] is! bool ||
+                (raw.containsKey('lockAfter') && raw['lockAfter'] is! bool) ||
+                (raw.containsKey('lockAfterSetting') &&
+                    (raw['lockAfterSetting'] is! String ||
+                        !settingKeyPattern
+                            .hasMatch(raw['lockAfterSetting']))) ||
+                (raw.containsKey('lockAfter') &&
+                    raw.containsKey('lockAfterSetting')) ||
+                !const {'public', 'private', 'any'}
+                    .contains(raw['when'] ?? 'any')))) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index] has invalid book action options.');
     }
     return BookActionContribution(
         kind: kind,
@@ -463,7 +499,11 @@ class BookActionContribution extends PluginContribution {
         name: PluginText.parse(raw['name'],
             field: 'contributes[$index].name',
             maxLength: PluginLimits.maxSelectionActionNameLength),
-        command: raw['command'] as String);
+        command: command as String,
+        privateValue: raw['private'] as bool?,
+        lockAfter: raw['lockAfter'] as bool? ?? false,
+        lockAfterSetting: raw['lockAfterSetting'] as String?,
+        when: raw['when'] as String? ?? 'any');
   }
 }
 
@@ -529,7 +569,7 @@ class AiSkillContribution extends PluginContribution {
 
 enum PluginSelectionScope { selection, context }
 
-enum PluginScriptSurface { selection, library, dictionary, article }
+enum PluginScriptSurface { selection, library, dictionary, article, bookImport }
 
 class ScriptActionContribution extends PluginContribution {
   const ScriptActionContribution({
@@ -542,12 +582,14 @@ class ScriptActionContribution extends PluginContribution {
     required this.entry,
     this.surface = PluginScriptSurface.selection,
     this.scope = PluginSelectionScope.selection,
+    this.enabledSetting,
   });
 
   final PluginText name;
   final String entry;
   final PluginScriptSurface surface;
   final PluginSelectionScope scope;
+  final String? enabledSetting;
 
   factory ScriptActionContribution.parse({
     required String kind,
@@ -579,11 +621,22 @@ class ScriptActionContribution extends PluginContribution {
         .firstOrNull;
     if (surface == null ||
         scope == null ||
-        (const {PluginScriptSurface.dictionary, PluginScriptSurface.article}
-                .contains(surface) &&
+        (const {
+              PluginScriptSurface.dictionary,
+              PluginScriptSurface.article,
+              PluginScriptSurface.bookImport
+            }.contains(surface) &&
             scope != PluginSelectionScope.selection)) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
           'contributes[$index] has an invalid surface or scope.');
+    }
+    final enabledSetting = raw['enabledSetting'];
+    if (raw.containsKey('enabledSetting') &&
+        (surface != PluginScriptSurface.bookImport ||
+            enabledSetting is! String ||
+            !settingKeyPattern.hasMatch(enabledSetting))) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].enabledSetting is invalid.');
     }
     return ScriptActionContribution(
       kind: kind,
@@ -597,6 +650,7 @@ class ScriptActionContribution extends PluginContribution {
       entry: entry,
       surface: surface,
       scope: scope,
+      enabledSetting: enabledSetting as String?,
     );
   }
 }
@@ -683,6 +737,14 @@ class SelectionActionContribution extends PluginContribution {
 /// accepted in packages that declare `net:http`.
 enum PluginSettingType { text, number, toggle, select, tip, secret }
 
+enum PluginSettingStorage { sync, device }
+
+const Set<String> kPrivateLibrarySettingBindings = {
+  'privateLibrary.privateOnly',
+  'privateLibrary.autoImport',
+  'privateLibrary.lockAfterHide',
+};
+
 class PluginSettingSpec {
   const PluginSettingSpec({
     required this.key,
@@ -692,6 +754,8 @@ class PluginSettingSpec {
     this.defaultValue,
     this.options = const [],
     this.required = false,
+    this.storage = PluginSettingStorage.sync,
+    this.binding,
   });
 
   final String key;
@@ -700,6 +764,9 @@ class PluginSettingSpec {
   final PluginText? description;
   final Object? defaultValue;
   final List<String> options;
+  final PluginSettingStorage storage;
+  final String? binding;
+  bool get isDevice => storage == PluginSettingStorage.device;
 
   /// Secrets only: when true a lookup fails instead of silently omitting the
   /// header, so a misconfigured source reports a configuration error.
@@ -783,6 +850,22 @@ class PluginSettingSpec {
         break;
     }
     final requiredRaw = raw['required'];
+    final storage = PluginSettingStorage.values
+        .where((entry) => entry.name == (raw['storage'] ?? 'sync'))
+        .firstOrNull;
+    final binding = raw['binding'];
+    if (storage == null ||
+        (raw.containsKey('binding') &&
+            (binding is! String ||
+                !kPrivateLibrarySettingBindings.contains(binding) ||
+                type != PluginSettingType.toggle ||
+                storage != PluginSettingStorage.device)) ||
+        (storage == PluginSettingStorage.device &&
+            (type == PluginSettingType.secret ||
+                type == PluginSettingType.tip))) {
+      throw PluginInstallError(PluginErrorCode.invalidSetting,
+          'settings[$index] has an invalid storage or binding.');
+    }
     if (type == PluginSettingType.secret) {
       if (requiredRaw != null && requiredRaw is! bool) {
         throw PluginInstallError(PluginErrorCode.invalidSetting,
@@ -800,6 +883,8 @@ class PluginSettingSpec {
       defaultValue: defaultValue,
       options: options,
       required: requiredRaw is bool ? requiredRaw : false,
+      storage: storage,
+      binding: binding as String?,
     );
   }
 }
@@ -999,11 +1084,29 @@ class PluginManifest {
       contributions.add(contribution);
     }
     _validateContributionCounts(contributions);
+    if ((capabilities.contains(kLibraryPrivateControlCapability) ||
+            capabilities.contains(kLibraryPrivatePolicyCapability)) &&
+        !capabilities.contains(kLibraryPrivateCapability)) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'Private-library controls and policies require library:private.');
+    }
+    if (capabilities.contains(kLibraryPrivatePolicyCapability) &&
+        !capabilities.contains(kScriptRunCapability)) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'Private-library policies require script:run.');
+    }
     if (contributions.any((entry) => entry is BookActionContribution) &&
         !capabilities
             .containsAll({kBookActionCapability, kLibraryPrivateCapability})) {
       throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
           'Book actions require their book-menu and private-library capabilities.');
+    }
+    if (contributions
+            .whereType<BookActionContribution>()
+            .any((action) => action.command == 'privateLibrary.setPrivate') &&
+        !capabilities.contains(kLibraryPrivateControlCapability)) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'Private-library book controls require library:private-control.');
     }
     for (final action in contributions.whereType<ScriptActionContribution>()) {
       if (!capabilities.contains(kScriptRunCapability) ||
@@ -1012,10 +1115,23 @@ class PluginManifest {
           (action.surface == PluginScriptSurface.dictionary &&
               !capabilities.contains(kDictionaryTransformCapability)) ||
           (action.surface == PluginScriptSurface.article &&
-              !capabilities.contains(kArticleExtractCapability))) {
+              !capabilities.contains(kArticleExtractCapability)) ||
+          (action.surface == PluginScriptSurface.bookImport &&
+              !capabilities.containsAll({
+                kLibraryPrivateCapability,
+                kLibraryPrivatePolicyCapability
+              }))) {
         throw PluginInstallError(PluginErrorCode.capabilityUnavailable,
             'Script actions must declare their execution and surface capabilities.');
       }
+    }
+    if (contributions
+            .whereType<ScriptActionContribution>()
+            .where((action) => action.surface == PluginScriptSurface.bookImport)
+            .length >
+        1) {
+      throw const PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package may declare only one book import policy.');
     }
     if (contributions
             .whereType<ScriptActionContribution>()
@@ -1049,12 +1165,43 @@ class PluginManifest {
         throw PluginInstallError(PluginErrorCode.invalidSetting,
             "settings[$index] is a secret, which requires the 'net:http' capability.");
       }
+      if (setting.isDevice &&
+          !capabilities.contains(kPluginDeviceSettingsCapability)) {
+        throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+            'Device settings require settings:device.');
+      }
+      if (setting.binding != null &&
+          !capabilities.containsAll(
+              {kLibraryPrivateControlCapability, kLibraryPrivateCapability})) {
+        throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+            'Private-library bindings require their control capabilities.');
+      }
       settings.add(setting);
     }
 
     // Every {setting.<key>} and {secret.<key>} a source references must exist,
     // so a typo is an install error rather than a silently empty request.
     final settingByKey = {for (final setting in settings) setting.key: setting};
+    if (settings
+            .where((setting) => setting.binding != null)
+            .map((setting) => setting.binding)
+            .toSet()
+            .length !=
+        settings.where((setting) => setting.binding != null).length) {
+      throw const PluginInstallError(PluginErrorCode.invalidSetting,
+          'A native setting may be bound only once.');
+    }
+    for (final action in contributions) {
+      final key = action is ScriptActionContribution
+          ? action.enabledSetting
+          : action is BookActionContribution
+              ? action.lockAfterSetting
+              : null;
+      if (key != null && settingByKey[key]?.type != PluginSettingType.toggle) {
+        throw const PluginInstallError(PluginErrorCode.invalidContribution,
+            'Action setting references must name a declared toggle.');
+      }
+    }
     for (final source
         in contributions.whereType<DictionarySourceContribution>()) {
       _validateTemplateReferences(source, settingByKey);

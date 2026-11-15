@@ -502,8 +502,8 @@ class BookBottomSheet extends ConsumerWidget {
                   zh
                       ? (pinned ? '取消置顶' : '置顶')
                       : (pinned ? 'Unpin' : 'Pin to top')),
-              for (final action in PluginBookActionRegistry.instance.all
-                  .where(isPluginBookActionAvailable))
+              for (final action in PluginBookActionRegistry.instance.all.where(
+                  (action) => isPluginBookActionAvailable(action, book: book)))
                 PopupMenuItem<BookAction>(
                   key: ValueKey('book-plugin-action-${action.id}'),
                   onTap: () =>

@@ -307,7 +307,10 @@ class Prefs extends ChangeNotifier {
       prefsBackupVersionKey: prefsBackupSchemaVersion,
     };
     for (final String key in prefs.getKeys()) {
-      if (_prefsExportSkipKeys.contains(key)) continue;
+      if (_prefsExportSkipKeys.contains(key) ||
+          key.startsWith('pluginDeviceConfig_')) {
+        continue;
+      }
       final Object? value = readingPromptOverride(key, prefs.get(key));
       final Map<String, Object?>? encoded = encodePrefsBackupEntry(value);
       if (encoded != null) {
@@ -329,7 +332,9 @@ class Prefs extends ChangeNotifier {
     }
     for (final MapEntry<String, dynamic> entry in backup.entries) {
       final String key = entry.key;
-      if (key == prefsBackupVersionKey || _prefsImportSkipKeys.contains(key)) {
+      if (key == prefsBackupVersionKey ||
+          _prefsImportSkipKeys.contains(key) ||
+          key.startsWith('pluginDeviceConfig_')) {
         continue;
       }
       final dynamic entryValue = entry.value;

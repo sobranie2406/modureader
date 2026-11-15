@@ -678,6 +678,9 @@ Future<void> saveBook(
       updateTime: DateTime.now());
 
   try {
+    if (provideBook != null) {
+      await PrivateLibrary.instance.registerImportedId(provideBook);
+    }
     await PrivateLibrary.instance.onImported(book, isNew: provideBook == null);
     book.id = await bookDao.insertBook(book, sourceMd5: sourceMd5);
   } catch (_) {
@@ -689,6 +692,12 @@ Future<void> saveBook(
       if (await savedCover.exists()) await savedCover.delete();
     }
     rethrow;
+  }
+  try {
+    await PrivateLibrary.instance.registerImportedId(book);
+  } catch (_) {
+    // The source mark still protects this successfully imported book.
+    AnxLog.warning('Imported private book identity could not be cached');
   }
   if (linkedPath != null) {
     await BookSources.store?.save(md5, dbFilePath,

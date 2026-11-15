@@ -68,6 +68,7 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
   };
 
   static String? _type(String key) {
+    if (key.startsWith('pluginDeviceConfig_')) return null;
     if (_types.containsKey(key)) return _types[key];
     if ([
       'aiConfig_',

@@ -13,6 +13,7 @@ import 'package:modu_reader/page/plugins/article_capture_page.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_private_library_bridge.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:path/path.dart' as p;
 
@@ -27,6 +28,7 @@ Future<void> runPluginAction(BuildContext context,
     ValueChanged<int>? onNoteCreated,
     PluginScriptRuntime? scriptRuntime,
     PrivateLibrary? privateLibrary,
+    PrivateLibraryBookPicker? pickPrivateBooks,
     Future<List<Book>> Function()? selectBooks}) async {
   final runtime = scriptRuntime ?? PluginHost.runtimeFor(pluginId);
   final ownerManifest = runtime.host.manifestFor(pluginId);
@@ -43,12 +45,14 @@ Future<void> runPluginAction(BuildContext context,
       runtime.isRunning(pluginId) &&
       runtime.host.isScriptRunnable(pluginId);
   Book? book;
+  PluginPrivateLibraryBridge? privateBridge;
   final exposedBooks = <Book>[];
   ModalRoute<dynamic>? resultRoute;
   NavigatorState? resultNavigator;
   bool readable() =>
       !contextRevoked &&
       (book == null || privacy.canRead(book)) &&
+      (privateBridge?.canReadExposedData ?? true) &&
       (!privateDataUsed || privacy.unlocked);
   void dismissResult() {
     final route = resultRoute, navigator = resultNavigator;
@@ -95,6 +99,14 @@ Future<void> runPluginAction(BuildContext context,
       }
     }
     if (!context.mounted) return;
+    privateBridge = PluginPrivateLibraryBridge(
+        context: context,
+        host: runtime.host,
+        pluginId: pluginId,
+        isCurrent: current,
+        book: book,
+        pickBooks: pickPrivateBooks,
+        library: privacy);
     messenger?.showSnackBar(SnackBar(
       content: Text(t('正在运行插件…', 'Running plugin…')),
       duration: const Duration(seconds: 10),
@@ -127,8 +139,17 @@ Future<void> runPluginAction(BuildContext context,
               if (!privacy.active) {
                 throw const PluginScriptFailure('permission');
               }
-              unawaited(privacy.open(context));
+              unawaited(privacy.open(context,
+                  optionsOwner: runtime.host.development ? runtime.host : null,
+                  showPolicyOptions: !(ownerManifest?.capabilities
+                          .contains(kLibraryPrivateControlCapability) ??
+                      false)));
               return {'opened': true};
+            case 'privateLibrary.state':
+            case 'privateLibrary.updateOptions':
+            case 'privateLibrary.selectBooks':
+            case 'privateLibrary.setPrivate':
+              return privateBridge!.call(method, args);
             case 'privateLibrary.lock':
               if (!privacy.active) {
                 throw const PluginScriptFailure('permission');
@@ -266,6 +287,8 @@ Future<void> runPluginAction(BuildContext context,
     if (!context.mounted) return;
     final code = error is PluginScriptFailure ? error.code : 'execution';
     final message = switch (code) {
+      'cancelled' when privateBridge?.didCommit == true =>
+        t('私密书籍已更新。', 'Private books updated.'),
       'cancelled' => t('插件任务已取消。', 'Plugin task cancelled.'),
       'busy' => t('插件正在运行，请稍后再试。', 'A plugin is running. Try again shortly.'),
       'timeout' => t('插件运行超时，已停止。', 'Plugin timed out and was stopped.'),
@@ -280,6 +303,7 @@ Future<void> runPluginAction(BuildContext context,
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   } finally {
     invocationActive = false;
+    privateBridge?.dispose();
     runtime.host.removeListener(ownerChanged);
     privacy.removeListener(policyChanged);
   }

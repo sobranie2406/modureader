@@ -29,6 +29,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     PluginNetworkGuard? networkGuard,
     PluginHttpClient? httpClient,
     this.timeout = const Duration(seconds: 10),
+    this.nativeInteractionTimeout = const Duration(minutes: 2),
     this.onDiagnostic,
   })  : _host = host,
         _engineFactory = engineFactory,
@@ -57,6 +58,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
   final PluginNetworkGuard _guard;
   final PluginHttpClient _http;
   final Duration timeout;
+  final Duration nativeInteractionTimeout;
   final void Function(Map<String, Object>)? onDiagnostic;
   void _diagnostic(
       String id, String action, String stage, String code, int elapsed) {
@@ -100,6 +102,10 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         (action.surface == PluginScriptSurface.article &&
             (!manifest.capabilities.contains(kArticleExtractCapability) ||
                 action.scope != PluginSelectionScope.selection)) ||
+        (action.surface == PluginScriptSurface.bookImport &&
+            (!manifest.capabilities.contains(kLibraryPrivatePolicyCapability) ||
+                !manifest.capabilities.contains(kLibraryPrivateCapability) ||
+                action.scope != PluginSelectionScope.selection)) ||
         !manifest.contributions.any((c) => identical(c, action))) {
       _logFailure(pluginId, record?.version ?? 'unknown', action.id,
           'unavailable', 'validate', 0);
@@ -125,11 +131,14 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         isContextValid);
     _jobs[pluginId] = job;
     _diagnostic(pluginId, action.id, 'validate', 'started', 0);
-    final limit = action.surface == PluginScriptSurface.dictionary &&
+    final limit = (action.surface == PluginScriptSurface.dictionary ||
+                action.surface == PluginScriptSurface.bookImport) &&
             timeout > const Duration(seconds: 2)
         ? const Duration(seconds: 2)
         : timeout;
-    job.timer = Timer(limit, () => _abort(job, 'timeout'));
+    job.remaining = limit;
+    job.nativeRemaining = nativeInteractionTimeout;
+    _resumeExecution(job);
     cancel?.whenCancelled(() {
       if (identical(_jobs[pluginId], job) && !job.result.isCompleted) {
         _abort(job, 'cancelled');
@@ -187,32 +196,47 @@ class PluginScriptRuntime with WidgetsBindingObserver {
             spec.key: config[spec.key] ?? spec.defaultValue,
       };
       // Only named fields from the trusted UI cross the process boundary.
+      final importPolicy = action.surface == PluginScriptSurface.bookImport;
       final payload = article
           ? _articleInput(input, settings, action.id)
-          : <String, Object?>{
-              'selection':
-                  input['selection'] is String ? input['selection'] : '',
-              if (action.surface != PluginScriptSurface.dictionary &&
-                  action.scope == PluginSelectionScope.context)
-                'context': input['context'] is String ? input['context'] : '',
-              'settings': settings,
-              'actionId': action.id,
-              if (action.surface != PluginScriptSurface.dictionary &&
-                  input['book'] is Map)
-                'book': _bookSummary(input['book'] as Map),
-            };
+          : importPolicy
+              ? {
+                  'book': input['book'] is Map
+                      ? _bookSummary(input['book'] as Map)
+                      : throw const PluginScriptFailure('result'),
+                  'settings': settings,
+                  'actionId': action.id,
+                }
+              : <String, Object?>{
+                  'selection':
+                      input['selection'] is String ? input['selection'] : '',
+                  if (action.surface != PluginScriptSurface.dictionary &&
+                      action.scope == PluginSelectionScope.context)
+                    'context':
+                        input['context'] is String ? input['context'] : '',
+                  'settings': settings,
+                  'actionId': action.id,
+                  if (action.surface != PluginScriptSurface.dictionary &&
+                      input['book'] is Map)
+                    'book': _bookSummary(input['book'] as Map),
+                };
       _bounded(payload, article ? maxArticleInputBytes : maxInputBytes);
       job.stage = 'execute';
       final result = await job.engine.execute(utf8.decode(bytes), payload,
-          onCall: (method, args) =>
-              article || action.surface == PluginScriptSurface.dictionary
-                  ? Future.error(const PluginScriptFailure('permission'))
-                  : _call(id, manifest, method, args, hostCall, job));
+          onCall: (method, args) => article ||
+                  importPolicy ||
+                  action.surface == PluginScriptSurface.dictionary
+              ? Future.error(const PluginScriptFailure('permission'))
+              : _call(id, manifest, method, args, hostCall, job));
       _check(id, job);
       job.stage = 'result';
       _bounded(result, article ? maxArticleResultBytes : maxResultBytes);
       if (article) {
         validateArticleResult(result);
+      } else if (importPolicy) {
+        if (result.length != 1 || result['private'] is! bool) {
+          throw const PluginScriptFailure('result');
+        }
       } else if (action.surface == PluginScriptSurface.dictionary) {
         final candidates = result['candidates'];
         if (result.length != 1 ||
@@ -321,10 +345,17 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       'privateLibrary.open' ||
       'privateLibrary.lock' =>
         kLibraryPrivateCapability,
+      'privateLibrary.state' ||
+      'privateLibrary.updateOptions' ||
+      'privateLibrary.selectBooks' ||
+      'privateLibrary.setPrivate' =>
+        kLibraryPrivateControlCapability,
       'articles.capture' => kArticleCaptureCapability,
       _ => throw const PluginScriptFailure('permission'),
     };
-    if (!manifest.capabilities.contains(permission)) {
+    if (!manifest.capabilities.contains(permission) ||
+        (permission == kLibraryPrivateControlCapability &&
+            !manifest.capabilities.contains(kLibraryPrivateCapability))) {
       throw const PluginScriptFailure('permission');
     }
     job.callBusy = true;
@@ -357,7 +388,17 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         value = {'text': utf8.decode(bytes)};
       } else {
         if (hostCall == null) throw const PluginScriptFailure('permission');
-        value = await hostCall(method, args);
+        final interactive = const {
+          'privateLibrary.updateOptions',
+          'privateLibrary.selectBooks',
+          'privateLibrary.setPrivate'
+        }.contains(method);
+        if (interactive) _beginNativeInteraction(job);
+        try {
+          value = await hostCall(method, args);
+        } finally {
+          if (interactive) _endNativeInteraction(job);
+        }
       }
       _check(id, job);
       _bounded(value, maxResultBytes);
@@ -396,10 +437,52 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     }
   }
 
+  void _resumeExecution(_ScriptJob job) {
+    if (job.result.isCompleted) return;
+    if (job.remaining <= Duration.zero) {
+      _abort(job, 'timeout');
+      return;
+    }
+    job.executionClock
+      ..reset()
+      ..start();
+    job.timer = Timer(job.remaining, () => _abort(job, 'timeout'));
+  }
+
+  void _beginNativeInteraction(_ScriptJob job) {
+    job.timer?.cancel();
+    job.remaining -= job.executionClock.elapsed;
+    job.executionClock.stop();
+    if (job.remaining <= Duration.zero ||
+        job.nativeRemaining <= Duration.zero) {
+      _abort(job, 'timeout');
+      throw const PluginScriptFailure('timeout');
+    }
+    job.nativeClock
+      ..reset()
+      ..start();
+    job.timer = Timer(job.nativeRemaining, () => _abort(job, 'timeout'));
+  }
+
+  void _endNativeInteraction(_ScriptJob job) {
+    job.timer?.cancel();
+    job.nativeRemaining -= job.nativeClock.elapsed;
+    job.nativeClock.stop();
+    if (!job.result.isCompleted) {
+      if (job.nativeRemaining <= Duration.zero) {
+        _abort(job, 'timeout');
+      } else {
+        _resumeExecution(job);
+      }
+    }
+  }
+
   void _abort(_ScriptJob job, String code) {
     if (job.result.isCompleted) return;
     job.cancel.cancel();
     job.timer?.cancel();
+    job.executionClock.stop();
+    job.nativeClock.stop();
     _completeFailure(job, PluginScriptFailure(code));
     unawaited(job.engine.dispose().catchError((_) {}));
   }
@@ -482,6 +565,8 @@ class _ScriptJob {
   final result = Completer<Map<String, dynamic>>();
   final cancel = PluginCancelToken();
   Timer? timer;
+  Duration remaining = Duration.zero, nativeRemaining = Duration.zero;
+  final executionClock = Stopwatch(), nativeClock = Stopwatch();
   int calls = 0, requests = 0;
   bool callBusy = false;
 }

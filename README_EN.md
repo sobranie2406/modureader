@@ -162,6 +162,17 @@ Library backups preserve books and reading records. Settings backups carry your 
 
 Report a bug or suggest a feature: [GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) · [Feedback form](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)
 
+## Plugin development
+
+Plugin source, packages and the reviewed catalog live in [Modu Plugin](https://github.com/sobranie2406/modu-plugin).
+
+- Features, rules, dependencies and configuration update independently through plugin packages. The host provides stable, general interfaces; only new underlying capabilities require a Modu update.
+- Reviewed plugins can declare broader permissions and resource budgets in their manifests, subject to capability and version checks.
+- Entries and settings belong on the Plugins page and plugin details. Book and reader menus expose declared actions, which disappear when the plugin is disabled or removed.
+- Normal use requires catalog review and signature verification. Local Developer debugging is off by default and allows temporary testing of unreviewed packages, cleared when debugging is disabled or the app restarts.
+
+[Development rules](docs/development/plugin-development.md) · [Runtime API](docs/development/plugin-script-runtime.md) · [Review and publication](docs/development/plugin-trust.md)
+
 ## Contribute
 
 Help improve Modu with bug reports, code or documentation. If you enjoy the app, a Star helps others discover it.

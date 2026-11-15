@@ -12,3 +12,6 @@ test/fixtures/plugins/web-clipper-1.1.0/THIRD_PARTY_NOTICES.md -whitespace
 # ignore diff for generated files
 *.gen.dart binary
 *.gen.dart linguist-generated=true
+
+test/fixtures/plugins/web-clipper-1.1.1/extract.js -whitespace linguist-generated=true
+test/fixtures/plugins/web-clipper-1.1.1/THIRD_PARTY_NOTICES.md -whitespace

@@ -38,9 +38,11 @@ void main() {
       final entries = PluginCatalog.parse(jsonEncode(catalog));
       await host.trust.acceptCatalog(envelope);
       for (final name in [
-        'dictionary-transform',
-        'web-clipper-1.1.0',
-        'private-books-1.1.0'
+        'text-tools-1.0.1',
+        'prompt-pack-1.1.1',
+        'dictionary-transform-1.0.1',
+        'web-clipper-1.1.1',
+        'private-books-1.2.0'
       ]) {
         final sources = <String, String>{};
         final directory = Directory('test/fixtures/plugins/$name');
@@ -62,9 +64,11 @@ void main() {
         expect(
             host.manifestFor(manifest.id)!.capabilities,
             contains(switch (name) {
-              'dictionary-transform' => kDictionaryTransformCapability,
-              'web-clipper-1.1.0' => kArticleExtractCapability,
-              _ => kBookActionCapability
+              'dictionary-transform-1.0.1' => kDictionaryTransformCapability,
+              'web-clipper-1.1.1' => kArticleExtractCapability,
+              'private-books-1.2.0' => kBookActionCapability,
+              'prompt-pack-1.1.1' => kAiPromptPackCapability,
+              _ => kScriptRunCapability
             }));
         expect(await host.trust.reviewedFiles(manifest.id, manifest.version),
             isNotNull);

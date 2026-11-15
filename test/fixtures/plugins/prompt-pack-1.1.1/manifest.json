@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.prompt-pack",
+  "version": "1.1.1",
+  "name": { "zh-CN": "示例提示词包", "en": "Example prompt pack" },
+  "description": {
+    "zh-CN": "摘要、追问与划词解释，可设置语气、字数和原文引用。",
+    "en": "Summaries, follow-up questions and selection explanations with configurable tone, length and quotations."
+  },
+  "author": { "name": "Modu contributors", "url": "https://github.com/sobranie2406/modureader" },
+  "license": "CC0-1.0",
+  "minAppVersion": "1.3.10",
+  "capabilities": ["ai:prompt-pack", "ui:selection-action"],
+  "contributes": [
+    {
+      "kind": "aiSkill",
+      "schema": 1,
+      "id": "deep-summary",
+      "name": { "zh-CN": "深度摘要", "en": "Deep summary" },
+      "description": {
+        "zh-CN": "按论点—证据—结论归纳。",
+        "en": "Claim–evidence–conclusion summary."
+      },
+      "prompt": "阅读当前内容，按“核心结论 / 论证链 / 证据 / 隐含假设”四部分归纳，用要点说明。回答风格为 {setting.tone}：concise 用简洁表达，detailed 可适当展开。总字数最多 {setting.max_words} 字。引用原文设为 {setting.quote_original}：true 时可引用必要短句，false 时不引用原文。",
+      "enabled": true
+    },
+    {
+      "kind": "aiSkill",
+      "schema": 1,
+      "id": "socratic-questions",
+      "name": { "zh-CN": "苏格拉底提问", "en": "Socratic questions" },
+      "description": {
+        "zh-CN": "针对当前内容提出 3 个追问。",
+        "en": "Three follow-up questions about the current content."
+      },
+      "prompt": "针对当前内容提出 3 个由浅入深的追问，并说明每个问题想检验什么。回答风格为 {setting.tone}：concise 用简洁表达，detailed 可适当展开。总字数最多 {setting.max_words} 字。引用原文设为 {setting.quote_original}：true 时可引用必要短句，false 时不引用原文。",
+      "enabled": true
+    },
+    {
+      "kind": "selectionAction",
+      "schema": 1,
+      "id": "explain-selection",
+      "name": { "zh-CN": "简明解释", "en": "Explain simply" },
+      "icon": "lightbulb",
+      "prompt": "解释 {selection} 的含义与关键概念，不编造。回答风格为 {setting.tone}：concise 用简洁表达，detailed 可适当展开。总字数最多 {setting.max_words} 字。引用原文设为 {setting.quote_original}：true 时可引用必要短句，false 时不引用原文。",
+      "scope": "context",
+      "enabled": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "tone",
+      "type": "select",
+      "label": { "zh-CN": "回答语气", "en": "Answer tone" },
+      "options": ["concise", "detailed"],
+      "defaultValue": "concise"
+    },
+    {
+      "key": "quote_original",
+      "type": "toggle",
+      "label": { "zh-CN": "引用原文", "en": "Quote the original" },
+      "description": {
+        "zh-CN": "回答可引用必要的原文短句。",
+        "en": "Allow short quotations where useful."
+      },
+      "defaultValue": false
+    },
+    {
+      "key": "max_words",
+      "type": "number",
+      "label": { "zh-CN": "最大字数", "en": "Maximum words" },
+      "defaultValue": 300
+    }
+  ],
+  "hostApi": 1
+}

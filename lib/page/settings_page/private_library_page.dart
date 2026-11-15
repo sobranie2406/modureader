@@ -13,21 +13,43 @@ String _t(BuildContext context, String zh, String en) =>
 Future<T?> _settledDialog<T>(
     {required BuildContext context,
     required WidgetBuilder builder,
-    VoidCallback? onDismissed}) async {
+    VoidCallback? onDismissed,
+    bool Function()? isCurrent,
+    Listenable? invalidation}) async {
+  if (isCurrent?.call() == false) return null;
   final route = DialogRoute<T>(context: context, builder: builder);
-  final result = await Navigator.of(context, rootNavigator: true).push(route);
-  onDismissed?.call();
-  await route.completed;
-  return result;
+  final navigator = Navigator.of(context, rootNavigator: true);
+  void dismiss() {
+    if (isCurrent?.call() == false && navigator.mounted && route.isActive) {
+      try {
+        navigator.removeRoute(route);
+      } catch (_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => dismiss());
+      }
+    }
+  }
+
+  invalidation?.addListener(dismiss);
+  try {
+    final result = await navigator.push(route);
+    onDismissed?.call();
+    await route.completed;
+    return isCurrent?.call() == false ? null : result;
+  } finally {
+    invalidation?.removeListener(dismiss);
+  }
 }
 
 Future<bool> showPrivateLibraryUnlock(
-    BuildContext context, PrivateLibrary library) async {
+    BuildContext context, PrivateLibrary library,
+    {bool Function()? isCurrent, Listenable? invalidation}) async {
   final pin = TextEditingController();
   var busy = false, failed = false, finished = false, dismissed = false;
   try {
     return await _settledDialog<bool>(
             context: context,
+            isCurrent: isCurrent,
+            invalidation: invalidation,
             onDismissed: () {
               dismissed = true;
               if (busy && !finished) library.cancelPendingAuthentication();
@@ -71,6 +93,7 @@ Future<bool> showPrivateLibraryUnlock(
                               onPressed: busy || library.corrupt
                                   ? null
                                   : () async {
+                                      if (isCurrent?.call() == false) return;
                                       setState(() {
                                         busy = true;
                                         failed = false;
@@ -92,7 +115,11 @@ Future<bool> showPrivateLibraryUnlock(
                                                     'Could not unlock. Try again.'))));
                                         return;
                                       }
-                                      if (!context.mounted || dismissed) return;
+                                      if (!context.mounted ||
+                                          dismissed ||
+                                          isCurrent?.call() == false) {
+                                        return;
+                                      }
                                       if (success) {
                                         finished = true;
                                         Navigator.pop(context, true);
@@ -137,9 +164,29 @@ Future<bool?> showPrivateLibraryDeactivate(BuildContext context) => showDialog<
 
 class PrivateLibrarySettings extends StatelessWidget {
   const PrivateLibrarySettings(
-      {super.key, required this.library, this.embedded = false});
+      {super.key,
+      required this.library,
+      this.embedded = false,
+      this.showPolicyOptions = true,
+      this.optionsOwner});
   final PrivateLibrary library;
   final bool embedded;
+  final bool showPolicyOptions;
+  final Object? optionsOwner;
+
+  Future<void> _saveOptions({bool? privateOnly, bool? autoImport}) async {
+    final owner = optionsOwner;
+    if (owner == null) {
+      await library.setOptions(
+          privateOnly: privateOnly, autoImport: autoImport);
+    } else {
+      library.setOptionsOverlay(owner, {
+        ...library.policyOptionsFor(owner),
+        if (privateOnly != null) 'privateOnly': privateOnly,
+        if (autoImport != null) 'autoImport': autoImport,
+      });
+    }
+  }
 
   Widget _body(List<Widget> children, {EdgeInsetsGeometry? padding}) => embedded
       ? Padding(
@@ -235,6 +282,7 @@ class PrivateLibrarySettings extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: library,
       builder: (context, _) {
+        final options = library.policyOptionsFor(optionsOwner);
         if (!library.active) {
           return Center(child: Text(_t(context, '插件已停用', 'Plugin disabled')));
         }
@@ -283,7 +331,7 @@ class PrivateLibrarySettings extends StatelessWidget {
         ]);
         Future<void> changeVisibility(bool value) async {
           try {
-            await library.setOptions(privateOnly: value);
+            await _saveOptions(privateOnly: value);
           } catch (_) {
             if (context.mounted) _failure(context);
           }
@@ -315,65 +363,80 @@ class PrivateLibrarySettings extends StatelessWidget {
                 subtitle: Text(_t(context, library.hasPin ? '6 位密码' : '无密码',
                     library.hasPin ? 'Six-digit PIN' : 'No PIN')),
                 trailing: authenticationActions),
-          ListTile(
-              title: Text(_t(context, '解锁后显示', 'After unlocking')),
-              subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: embedded
-                      ? Wrap(spacing: 8, runSpacing: 8, children: [
-                          for (final value in [false, true])
-                            ChoiceChip(
-                              label: Text(_t(context, value ? '仅私密书籍' : '全部书籍',
-                                  value ? 'Private only' : 'All books')),
-                              selected: library.privateOnly == value,
-                              onSelected: (_) => changeVisibility(value),
-                            ),
-                        ])
-                      : SegmentedButton<bool>(
-                          segments: [
-                              ButtonSegment(
-                                  value: false,
-                                  label:
-                                      Text(_t(context, '全部书籍', 'All books'))),
-                              ButtonSegment(
-                                  value: true,
-                                  label: Text(
-                                      _t(context, '仅私密书籍', 'Private only')))
-                            ],
-                          selected: {
-                              library.privateOnly
-                            },
-                          onSelectionChanged: (v) =>
-                              changeVisibility(v.single)))),
-          SwitchListTile(
-              value: library.autoImport,
-              title: Text(_t(context, '新导入书籍设为私密', 'Make new imports private')),
-              onChanged: (v) async {
-                try {
-                  await library.setOptions(autoImport: v);
-                } catch (_) {
-                  if (context.mounted) _failure(context);
-                }
-              }),
-          ListTile(
-              leading: const Icon(Icons.library_books_outlined),
-              title: Text(_t(context, '管理私密书籍', 'Manage private books')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                      builder: (_) => _PrivateBooksPage(library: library)))),
+          if (showPolicyOptions)
+            ListTile(
+                title: Text(_t(context, '解锁后显示', 'After unlocking')),
+                subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: embedded
+                        ? Wrap(spacing: 8, runSpacing: 8, children: [
+                            for (final value in [false, true])
+                              ChoiceChip(
+                                label: Text(_t(
+                                    context,
+                                    value ? '仅私密书籍' : '全部书籍',
+                                    value ? 'Private only' : 'All books')),
+                                selected: options['privateOnly'] == value,
+                                onSelected: (_) => changeVisibility(value),
+                              ),
+                          ])
+                        : SegmentedButton<bool>(
+                            segments: [
+                                ButtonSegment(
+                                    value: false,
+                                    label:
+                                        Text(_t(context, '全部书籍', 'All books'))),
+                                ButtonSegment(
+                                    value: true,
+                                    label: Text(
+                                        _t(context, '仅私密书籍', 'Private only')))
+                              ],
+                            selected: {
+                                options['privateOnly']!
+                              },
+                            onSelectionChanged: (v) =>
+                                changeVisibility(v.single)))),
+          if (showPolicyOptions)
+            SwitchListTile(
+                value: options['autoImport']!,
+                title:
+                    Text(_t(context, '新导入书籍设为私密', 'Make new imports private')),
+                onChanged: (v) async {
+                  try {
+                    await _saveOptions(autoImport: v);
+                  } catch (_) {
+                    if (context.mounted) _failure(context);
+                  }
+                }),
+          if (showPolicyOptions)
+            ListTile(
+                leading: const Icon(Icons.library_books_outlined),
+                title: Text(_t(context, '管理私密书籍', 'Manage private books')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                        builder: (_) => _PrivateBooksPage(library: library)))),
         ]);
       });
 }
 
 class PrivateLibraryPage extends StatelessWidget {
-  const PrivateLibraryPage({super.key, required this.library});
+  const PrivateLibraryPage(
+      {super.key,
+      required this.library,
+      this.showPolicyOptions = true,
+      this.optionsOwner});
   final PrivateLibrary library;
+  final bool showPolicyOptions;
+  final Object? optionsOwner;
   @override
   Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(title: Text(_t(context, '私密书库', 'Private library'))),
-      body: PrivateLibrarySettings(library: library));
+      body: PrivateLibrarySettings(
+          library: library,
+          showPolicyOptions: showPolicyOptions,
+          optionsOwner: optionsOwner));
 }
 
 void _failure(BuildContext context) =>
@@ -393,6 +456,153 @@ class _PrivateLocked extends StatelessWidget {
               icon: const Icon(Icons.lock_outline),
               onPressed: () => library.requestUnlock(context),
               label: Text(_t(context, '解锁私密书库', 'Unlock private library'))));
+}
+
+Future<List<Book>?> selectPrivateLibraryBooks(BuildContext context,
+    {required PrivateLibrary library,
+    required bool Function() isCurrent,
+    Listenable? owner,
+    bool? privateOnly,
+    bool multiple = true,
+    int limit = 100,
+    Future<List<Book>> Function()? loadBooks}) async {
+  final session = library.authenticationSession;
+  bool current() =>
+      context.mounted &&
+      isCurrent() &&
+      library.active &&
+      !library.corrupt &&
+      library.isAuthenticationCurrent(session);
+  if (!current()) return null;
+  final navigator = Navigator.of(context);
+  late MaterialPageRoute<List<Book>> route;
+  void dismiss() {
+    if (!current() && navigator.mounted && route.isActive) {
+      try {
+        navigator.removeRoute(route);
+      } catch (_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => dismiss());
+      }
+    }
+  }
+
+  route = MaterialPageRoute<List<Book>>(
+      builder: (_) => _PrivateBookPicker(
+          library: library,
+          current: current,
+          owner: owner,
+          privateOnly: privateOnly,
+          multiple: multiple,
+          limit: limit,
+          loadBooks: loadBooks ?? bookDao.selectNotDeleteBooks));
+  library.addListener(dismiss);
+  owner?.addListener(dismiss);
+  try {
+    final selected = await navigator.push(route);
+    await route.completed;
+    return current() ? selected : null;
+  } finally {
+    library.removeListener(dismiss);
+    owner?.removeListener(dismiss);
+  }
+}
+
+class _PrivateBookPicker extends StatefulWidget {
+  const _PrivateBookPicker(
+      {required this.library,
+      required this.current,
+      required this.owner,
+      required this.privateOnly,
+      required this.multiple,
+      required this.limit,
+      required this.loadBooks});
+  final PrivateLibrary library;
+  final bool Function() current;
+  final Listenable? owner;
+  final bool? privateOnly;
+  final bool multiple;
+  final int limit;
+  final Future<List<Book>> Function() loadBooks;
+  @override
+  State<_PrivateBookPicker> createState() => _PrivateBookPickerState();
+}
+
+class _PrivateBookPickerState extends State<_PrivateBookPicker> {
+  late final _books = widget.loadBooks();
+  final _selected = <int>{};
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: Listenable.merge([widget.library, widget.owner]),
+      builder: (context, _) => Scaffold(
+          appBar: AppBar(title: Text(_t(context, '选择书籍', 'Select books'))),
+          body: !widget.current()
+              ? const SizedBox.shrink()
+              : FutureBuilder<List<Book>>(
+                  future: _books,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                          child: Text(
+                              _t(context, '无法读取书架', 'Could not load books')));
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final books = snapshot.data!
+                        .where((book) =>
+                            !book.isDeleted &&
+                            book.id > 0 &&
+                            (widget.privateOnly == null ||
+                                widget.library.isPrivate(book) ==
+                                    widget.privateOnly))
+                        .toList();
+                    return Column(children: [
+                      Expanded(
+                          child: ListView.builder(
+                              itemCount: books.length,
+                              itemBuilder: (context, index) {
+                                final book = books[index];
+                                return CheckboxListTile(
+                                    key: ValueKey('private-select-${book.id}'),
+                                    title: Text(book.title),
+                                    subtitle: Text(book.author),
+                                    value: _selected.contains(book.id),
+                                    onChanged: (selected) {
+                                      if (!widget.current()) return;
+                                      setState(() {
+                                        if (selected != true) {
+                                          _selected.remove(book.id);
+                                        } else if (!widget.multiple) {
+                                          _selected
+                                            ..clear()
+                                            ..add(book.id);
+                                        } else if (_selected.length <
+                                            widget.limit) {
+                                          _selected.add(book.id);
+                                        }
+                                      });
+                                    });
+                              })),
+                      SafeArea(
+                          child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: FilledButton(
+                                  key: const ValueKey('private-select-confirm'),
+                                  onPressed: _selected.isEmpty
+                                      ? null
+                                      : () {
+                                          if (widget.current()) {
+                                            Navigator.pop(
+                                                context,
+                                                books
+                                                    .where((book) => _selected
+                                                        .contains(book.id))
+                                                    .toList());
+                                          }
+                                        },
+                                  child: Text(_t(context, '确定', 'Confirm'))))),
+                    ]);
+                  })));
 }
 
 class _PrivateBooksPage extends StatefulWidget {

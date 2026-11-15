@@ -70,7 +70,8 @@ void main() {
                   item: action,
                   book: book,
                   host: host,
-                  privateLibrary: library),
+                  privateLibrary: library,
+                  readBook: (_) async => book),
               child: const Text('Hide'));
         }))));
     await tester.runAsync(() => tester.tap(find.text('Hide')));
@@ -103,6 +104,77 @@ void main() {
         raw: {'name': 'Hide', 'command': 'privateLibrary.hide'});
     expect(
         available(RegisteredPluginBookAction(action.pluginId, forged)), false);
+  });
+
+  for (final lockAfter in [false, true]) {
+    testWidgets('plugin setting chooses lock after hiding: $lockAfter',
+        (tester) async {
+      host.dispose();
+      final manifest = PluginManifest.parse(manifestJson(capabilities: [
+        'ui:book-action',
+        'library:private',
+        'library:private-control'
+      ], contributes: [
+        {
+          'kind': 'bookAction',
+          'schema': 1,
+          'id': 'hide',
+          'name': 'Hide',
+          'command': 'privateLibrary.setPrivate',
+          'private': true,
+          'lockAfter': lockAfter,
+          'when': 'public'
+        }
+      ]));
+      host = _Host(manifest);
+      action = RegisteredPluginBookAction(manifest.id,
+          manifest.contributions.whereType<BookActionContribution>().single);
+      expect(
+          isPluginBookActionAvailable(action,
+              host: host, privateLibrary: library, book: book),
+          true);
+      await mount(tester);
+      expect(await tester.runAsync(() => pending!), true);
+      expect(library.isPrivate(book), true);
+      expect(library.unlocked, !lockAfter);
+      if (lockAfter) await tester.runAsync(library.unlock);
+      expect(
+          isPluginBookActionAvailable(action,
+              host: host, privateLibrary: library, book: book),
+          false);
+    });
+  }
+
+  testWidgets('plugin restore changes only the selected private book',
+      (tester) async {
+    await tester.runAsync(() => library.setBooksPrivate([book], true));
+    host.dispose();
+    final manifest = PluginManifest.parse(manifestJson(capabilities: [
+      'ui:book-action',
+      'library:private',
+      'library:private-control'
+    ], contributes: [
+      {
+        'kind': 'bookAction',
+        'schema': 1,
+        'id': 'restore',
+        'name': 'Restore',
+        'command': 'privateLibrary.setPrivate',
+        'private': false,
+        'when': 'private'
+      }
+    ]));
+    host = _Host(manifest);
+    action = RegisteredPluginBookAction(manifest.id,
+        manifest.contributions.whereType<BookActionContribution>().single);
+    await mount(tester);
+    expect(await tester.runAsync(() => pending!), true);
+    expect(library.isPrivate(book), false);
+    expect(library.unlocked, true);
+    expect(
+        isPluginBookActionAvailable(action,
+            host: host, privateLibrary: library, book: book),
+        false);
   });
 
   testWidgets('hiding an unavailable local file marks only metadata and locks',

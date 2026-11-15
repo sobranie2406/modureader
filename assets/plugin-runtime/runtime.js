@@ -62,7 +62,13 @@
         library:Object.freeze({list:args=>request('library.list',args)}),
         notes:Object.freeze({save:args=>request('notes.save',args)}),
         articles:Object.freeze({capture:()=>request('articles.capture')}),
-        privateLibrary:Object.freeze({open:()=>request('privateLibrary.open'),lock:()=>request('privateLibrary.lock')})
+        privateLibrary:Object.freeze({
+          open:()=>request('privateLibrary.open'),lock:()=>request('privateLibrary.lock'),
+          state:()=>request('privateLibrary.state'),
+          updateOptions:args=>request('privateLibrary.updateOptions',args),
+          selectBooks:args=>request('privateLibrary.selectBooks',args),
+          setPrivate:args=>request('privateLibrary.setPrivate',args)
+        })
       });
       self.onmessage = async event => {
         const message = event.data;

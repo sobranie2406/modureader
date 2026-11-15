@@ -14,10 +14,15 @@ import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/widgets/plugins/plugin_script_action.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../service/plugins/plugin_test_utils.dart';
+
 class _Host extends PluginHost {
   _Host() : super(paths: PluginPaths(rootPath: '/tmp/modu_script_privacy'));
   @override
   bool isScriptRunnable(String id) => true;
+  PluginManifest? manifest;
+  @override
+  PluginManifest? manifestFor(String id) => manifest;
 }
 
 class _Runtime extends PluginScriptRuntime {
@@ -118,6 +123,12 @@ void main() {
                     action: action,
                     scriptRuntime: runtime,
                     privateLibrary: privacy,
+                    pickPrivateBooks: (
+                            {required isCurrent,
+                            privateOnly,
+                            required multiple,
+                            required limit}) async =>
+                        [secret],
                     selectBooks: () async => books ?? [secret]);
                 unawaited(task!.then((_) {
                   finished = true;
@@ -134,6 +145,30 @@ void main() {
     runtime.result.complete({'title': 'Plugin result', 'text': text});
     await tester.pumpAndSettle();
   }
+
+  testWidgets('native-selected private titles cannot return after a lock',
+      (tester) async {
+    host.manifest = PluginManifest.parse(manifestJson(
+        id: plugin,
+        capabilities: [
+          'script:run',
+          'library:private',
+          'library:private-control'
+        ],
+        contributes: []));
+    await show(tester);
+    final rows = await tester.runAsync(() =>
+        runtime.call!('privateLibrary.selectBooks', {'private': true})) as List;
+    expect((rows.single as Map)['title'], secret.title);
+    privacy.lock();
+    expect(runtime.cancelled, [plugin]);
+    expect(runtime.contextValid!(), false);
+    await tester.runAsync(privacy.unlock);
+    expect(runtime.contextValid!(), false);
+    await complete(tester, secret.title);
+    expect(find.text(secret.title, skipOffstage: false), findsNothing);
+    expect(finished, true);
+  });
 
   testWidgets(
       'a library action that received a private title is cancelled on lock and cannot return late',

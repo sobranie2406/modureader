@@ -138,17 +138,23 @@ test('only frozen, named host API methods are exposed and direct network/storage
     const methods = [await modu.http.get({url:'https://example.com'}),
       await modu.library.list({limit:1}), await modu.notes.save({text:'note'}),
       await modu.articles.capture(),
-      await modu.privateLibrary.open(), await modu.privateLibrary.lock()];
+      await modu.privateLibrary.open(), await modu.privateLibrary.state(),
+      await modu.privateLibrary.updateOptions({privateOnly:true}),
+      await modu.privateLibrary.selectBooks({private:false}),
+      await modu.privateLibrary.setPrivate({bookIds:[2],private:true}),
+      await modu.privateLibrary.lock()];
     return {blocked, methods, keys:Object.keys(modu), frozen:Object.isFrozen(modu)};
   `);
   const message = await within(f.result);
   assert.equal(message.kind, 'result');
   assert.equal(message.value.blocked.length, 9);
   assert.deepEqual(message.value.methods,
-    ['http.get','library.list','notes.save','articles.capture','privateLibrary.open','privateLibrary.lock']);
+    ['http.get','library.list','notes.save','articles.capture','privateLibrary.open',
+      'privateLibrary.state','privateLibrary.updateOptions','privateLibrary.selectBooks',
+      'privateLibrary.setPrivate','privateLibrary.lock']);
   assert.deepEqual(message.value.keys, ['http','library','notes','articles','privateLibrary']);
   assert.equal(message.value.frozen, true);
-  assert.deepEqual(f.messages.filter(message => message.kind === 'call').map(message => message.id), [1,2,3,4,5,6]);
+  assert.deepEqual(f.messages.filter(message => message.kind === 'call').map(message => message.id), [1,2,3,4,5,6,7,8,9,10]);
 });
 
 for (const kind of ['result', 'request']) test(`oversized ${kind} is stopped before reaching the native bridge`, async t => {

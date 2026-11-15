@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.private-books",
+  "version": "1.2.0",
+  "name": {
+    "zh-CN": "私密书籍",
+    "en": "Private books"
+  },
+  "description": {
+    "zh-CN": "管理私密书籍，设置显示范围、导入和隐藏规则。",
+    "en": "Manage private books and configure visibility, import and hide policies."
+  },
+  "author": {
+    "name": "Modu"
+  },
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": [
+    "script:run",
+    "library:private",
+    "ui:book-action",
+    "library:private-control",
+    "library:private-policy",
+    "settings:device"
+  ],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "open",
+      "name": {
+        "zh-CN": "私密书籍",
+        "en": "Private books"
+      },
+      "entry": "main.js",
+      "surface": "library"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "lock",
+      "name": {
+        "zh-CN": "锁定私密书籍",
+        "en": "Lock private books"
+      },
+      "entry": "main.js",
+      "surface": "library"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "add",
+      "name": {
+        "zh-CN": "加入私密书籍",
+        "en": "Add private books"
+      },
+      "entry": "main.js",
+      "surface": "library"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "remove",
+      "name": {
+        "zh-CN": "移出私密书籍",
+        "en": "Remove private books"
+      },
+      "entry": "main.js",
+      "surface": "library"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "import-policy",
+      "name": {
+        "zh-CN": "私密导入规则",
+        "en": "Private import policy"
+      },
+      "entry": "import.js",
+      "surface": "bookImport",
+      "scope": "selection",
+      "enabledSetting": "auto_import"
+    },
+    {
+      "kind": "bookAction",
+      "schema": 1,
+      "id": "hide",
+      "name": {
+        "zh-CN": "隐藏",
+        "en": "Hide"
+      },
+      "command": "privateLibrary.setPrivate",
+      "private": true,
+      "lockAfterSetting": "lock_after_hide",
+      "when": "public"
+    },
+    {
+      "kind": "bookAction",
+      "schema": 1,
+      "id": "restore",
+      "name": {
+        "zh-CN": "移出私密",
+        "en": "Remove from private"
+      },
+      "command": "privateLibrary.setPrivate",
+      "private": false,
+      "when": "private"
+    }
+  ],
+  "settings": [
+    {
+      "key": "private_only",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "只显示私密书籍",
+        "en": "Show private books only"
+      },
+      "defaultValue": false,
+      "storage": "device",
+      "binding": "privateLibrary.privateOnly"
+    },
+    {
+      "key": "auto_import",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "新导入书籍加入私密",
+        "en": "Make imported books private"
+      },
+      "defaultValue": false,
+      "storage": "device",
+      "binding": "privateLibrary.autoImport"
+    },
+    {
+      "key": "lock_after_hide",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "隐藏后立即锁定",
+        "en": "Lock after hiding"
+      },
+      "defaultValue": true,
+      "storage": "device",
+      "binding": "privateLibrary.lockAfterHide"
+    }
+  ]
+}

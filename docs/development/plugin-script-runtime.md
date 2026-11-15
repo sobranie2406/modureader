@@ -8,7 +8,7 @@ review admission, with separate temporary packages, state and trust; ordinary
 installation still requires the signed catalog.
 
 Packages remain schema 1 / host API 1. `scriptAction` declares `id`, localized
-`name`, relative `.js` `entry`, `surface` (`selection`, `library`, `dictionary` or `article`) and `scope`
+`name`, relative `.js` `entry`, `surface` (`selection`, `library`, `dictionary`, `article` or `bookImport`) and `scope`
 (`selection` or `context`). It requires `script:run`; selection actions also
 require `ui:selection-action`. Existing prompt and AI toolbar formats are unchanged.
 The dictionary surface additionally requires `dictionary:transform` and uses
@@ -30,7 +30,40 @@ Host API methods:
 | `modu.notes.save({text})` | `note:write` | Native confirmation; app binds the note to the actual selected book/CFI and uses the existing DAO |
 | `modu.privateLibrary.open()` | `library:private` | Opens the native protection UI; no credentials cross the bridge |
 | `modu.privateLibrary.lock()` | `library:private` | Revokes the private session |
+| `modu.privateLibrary.state()` | `library:private-control` + `library:private` | Native state and local policy booleans, no credentials or book data |
+| `modu.privateLibrary.updateOptions({privateOnly,autoImport,lockAfterHide})` | Same | Authenticated local options; only supplied booleans change |
+| `modu.privateLibrary.selectBooks({private,multiple,limit})` | Same | Native picker, at most 100 summaries with id/title/author/private; grants belong to this invocation and authentication session |
+| `modu.privateLibrary.setPrivate({bookIds,private,lockAfter})` | Same | Revalidates selected IDs against native grants and saves local marks; optional lock after commit |
 | `modu.articles.capture()` | `article:capture` | Opens native URL capture, Markdown preview, export and bookshelf import; returns `{opened: true}` |
+
+## Plugin-owned private policies and settings
+
+Private plugin rules, visibility choices, import decisions and book-menu behavior
+are declared or executed by the package. Native code retains authentication,
+selection grants, access checks and synchronization/backup exclusions. A package
+with `library:private-control` opens only the native protection controls; its
+business settings are rendered from its manifest in plugin details. Legacy
+packages retain their original native page and `privateLibrary.hide` action.
+
+Settings default to synced plugin storage. `storage: "device"` requires
+`settings:device` and excludes that value from sync, settings export and backup.
+Device toggles may bind to `privateLibrary.privateOnly`,
+`privateLibrary.autoImport` or `privateLibrary.lockAfterHide` with private-control
+permission. These bindings preserve existing native values and require native
+authentication to edit. Development sessions use temporary overrides. Template
+placeholders `{setting.<key>}` and script `input.settings` receive effective,
+declared non-secret settings from the same host configuration.
+
+A `bookImport` action requires `library:private-policy`, `library:private` and
+`script:run`, uses `scope: "selection"` and optionally declares `enabledSetting`
+referencing a package toggle. A false gate skips the Worker. Input contains only
+`book: {id,title,author,format}`, settings and actionId; return exactly
+`{private: boolean}`. All host calls are denied and the deadline is two seconds.
+Enabled policies run before the database insert. Any true decision marks the
+book private; errors, changed settings or replaced owners abort the import.
+Without this surface, older plugins retain the existing local auto-import
+option. New capabilities reject unsupported hosts before installation; the
+first host upgrade is required even where older Beta builds share version 1.3.10.
 
 ## Dictionary preprocessing
 
@@ -108,7 +141,11 @@ WebView2 environment. Missing Worker support fails closed, without parent eval.
 
 Ordinary-action limits: 128 KiB source, 64 KiB input/result/bridge messages, 16 host calls,
 one call in flight, one execution per plugin, two per runtime, and a ten-second
-total deadline. HTTP additionally uses the shared burst/daily budget. Disabling,
+execution deadline. Native private-option editing, selection and marking pause
+that execution clock while their host call is pending, with a shared two-minute
+interaction budget per invocation. This is a wall-clock budget, not a CPU quota;
+reviewed scripts must await the native reply. State reads and other calls retain
+the ordinary deadline. HTTP additionally uses the shared burst/daily budget. Disabling,
 upgrading, removing or globally disabling plugins cancels tasks before changing
 their files or contributions. Backgrounding also cancels tasks. Late DNS and
 bridge replies must pass the same live-job check before doing work.

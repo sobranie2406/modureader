@@ -80,6 +80,14 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
       throw const PluginInstallError(PluginErrorCode.tooManyContributions,
           'A package may declare only one article extractor.');
     }
+    if (contributions
+            .whereType<ScriptActionContribution>()
+            .where((action) => action.surface == PluginScriptSurface.bookImport)
+            .length >
+        1) {
+      throw const PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package may declare only one book import policy.');
+    }
     for (final action in contributions) {
       if (action is! ScriptActionContribution ||
           (action.surface == PluginScriptSurface.selection &&
@@ -89,7 +97,18 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
                   .contains(kDictionaryTransformCapability)) ||
           (action.surface == PluginScriptSurface.article &&
               (!manifest.capabilities.contains(kArticleExtractCapability) ||
-                  action.scope != PluginSelectionScope.selection))) {
+                  action.scope != PluginSelectionScope.selection)) ||
+          (action.surface == PluginScriptSurface.bookImport &&
+              (!manifest.capabilities.containsAll({
+                    kLibraryPrivateCapability,
+                    kLibraryPrivatePolicyCapability
+                  }) ||
+                  action.scope != PluginSelectionScope.selection)) ||
+          (action.enabledSetting != null &&
+              (action.surface != PluginScriptSurface.bookImport ||
+                  !manifest.settings.any((setting) =>
+                      setting.key == action.enabledSetting &&
+                      setting.type == PluginSettingType.toggle)))) {
         throw const PluginInstallError(PluginErrorCode.invalidContribution,
             'Script action or its declared permissions are invalid.');
       }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +22,121 @@ void main() {
     library = PrivateLibrary(preferences: prefs);
   });
   tearDown(() => library.dispose());
+
+  test('plugin options reuse device-local values and expose no protection data',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setBooksPrivate([secret], true);
+    await library.setOptions(privateOnly: true, autoImport: true);
+    expect(library.lockAfterHide, true);
+    await library.setOptions(lockAfterHide: false);
+    expect(library.storedPolicyOptions, {
+      'privateOnly': true,
+      'autoImport': true,
+      'lockAfterHide': false,
+    });
+    expect(library.pluginState.keys.toSet(), {
+      'active',
+      'enabled',
+      'unlocked',
+      'hasPin',
+      'privateOnly',
+      'autoImport',
+      'lockAfterHide'
+    });
+    expect(jsonEncode(library.pluginState), isNot(contains('private.epub')));
+    final restarted = PrivateLibrary(preferences: prefs);
+    addTearDown(restarted.dispose);
+    expect(restarted.storedPolicyOptions, library.storedPolicyOptions);
+    expect(restarted.unlocked, false);
+  });
+
+  test('development options overlay does not change official values or marks',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setBooksPrivate([secret], true);
+    final stored = prefs.getString(PrivateLibrary.storageKey);
+    final owner = Object();
+    library.setOptionsOverlay(owner,
+        {'privateOnly': true, 'autoImport': true, 'lockAfterHide': false});
+    expect(library.privateOnly, true);
+    expect(library.policyOptionsFor(owner)['autoImport'], true);
+    expect(library.storedPolicyOptions['autoImport'], false);
+    expect(prefs.getString(PrivateLibrary.storageKey), stored);
+    library.clearOptionsOverlay(owner);
+    expect(library.privateOnly, false);
+    expect(library.lockAfterHide, true);
+    expect(library.isPrivate(secret), true);
+    expect(prefs.getString(PrivateLibrary.storageKey), stored);
+    library.lock();
+    expect(() => library.setOptionsOverlay(owner, {'autoImport': true}),
+        throwsStateError);
+  });
+
+  test('plugin policy chooses imports before the legacy automatic flag',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    library.importPolicy = (_) async => true;
+    await library.onImported(secret, isNew: true);
+    expect(library.isPrivate(secret), true);
+    await library.setOptions(autoImport: true);
+    library.importPolicy = (_) async => false;
+    await library.onImported(ordinary, isNew: true);
+    expect(library.isPrivate(ordinary), false);
+    library.importPolicy = (_) async => null;
+    await library.onImported(ordinary, isNew: true);
+    expect(library.isPrivate(ordinary), true);
+  });
+
+  test('failed or replaced import policies cannot silently admit a public book',
+      () async {
+    library.setPluginActive(true);
+    library.importPolicy = (_) async => throw StateError('policy failed');
+    await expectLater(
+        library.onImported(secret, isNew: true), throwsStateError);
+    expect(library.isPrivate(secret), false);
+    final result = Completer<bool?>();
+    library.importPolicy = (_) => result.future;
+    final importing = library.onImported(secret, isNew: true);
+    library.importPolicy = null;
+    result.complete(false);
+    await expectLater(importing, throwsStateError);
+    expect(library.isPrivate(secret), false);
+  });
+
+  test(
+      'import policies may protect while locked and IDs survive file replacement',
+      () async {
+    library.setPluginActive(true);
+    library.importPolicy = (_) async => true;
+    final pendingBook = secret.copyWith(id: -1);
+    await library.onImported(pendingBook, isNew: true);
+    expect(library.unlocked, false);
+    pendingBook.id = 42;
+    await library.registerImportedId(pendingBook);
+    final replacement = pendingBook.copyWith(md5: 'new', filePath: 'new.epub');
+    expect(library.isPrivate(replacement), true);
+    expect(library.canSyncBook(replacement), false);
+    expect(library.syncExcludedLocalBookIds, contains(42));
+    await library.registerImportedId(ordinary);
+    expect(library.syncExcludedLocalBookIds, isNot(contains(ordinary.id)));
+  });
+
+  test('duplicate imports do not run a policy or change existing privacy',
+      () async {
+    library.setPluginActive(true);
+    var calls = 0;
+    library.importPolicy = (_) async {
+      calls++;
+      return true;
+    };
+    await library.onImported(secret, isNew: false);
+    expect(calls, 0);
+    expect(library.isPrivate(secret), false);
+  });
 
   test('sync exclusions outlive UI sessions and follow local file replacement',
       () async {

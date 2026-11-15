@@ -284,8 +284,9 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
           trailing: const Icon(Icons.chevron_right)),
       for (final action in manifest?.contributions
               .whereType<ScriptActionContribution>()
-              .where(
-                  (action) => action.surface != PluginScriptSurface.article) ??
+              .where((action) =>
+                  action.surface != PluginScriptSurface.article &&
+                  action.surface != PluginScriptSurface.bookImport) ??
           const <ScriptActionContribution>[])
         ListTile(
             key: ValueKey('plugin-developer-run-${plugin.id}-${action.id}'),
@@ -295,6 +296,13 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
             onTap: _working || plugin.status != PluginStatus.enabled
                 ? null
                 : () => _run(plugin.id, action)),
+      if (manifest?.contributions.whereType<ScriptActionContribution>().any(
+              (action) => action.surface == PluginScriptSurface.bookImport) ??
+          false)
+        ListTile(
+            leading: const Icon(Icons.library_add_outlined),
+            title: Text(t('导入书籍策略', 'Book import policy')),
+            subtitle: Text(t('导入一本书籍进行测试', 'Import a book to test'))),
       if (manifest?.contributions
               .whereType<ScriptActionContribution>()
               .any((action) => action.surface == PluginScriptSurface.article) ??

@@ -38,7 +38,19 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
   bool _active = false, _unlocked = false, _corrupt = false;
   bool _observing = false;
   int revision = 0, _session = 0;
+  int _policyEpoch = 0;
+  Future<bool?> Function(Book)? _importPolicy;
+  final _optionOverlays = <Object, Map<String, bool>>{};
   Future<void> _writes = Future.value();
+
+  int get authenticationSession => _session;
+  bool isAuthenticationCurrent(int session) => unlocked && session == _session;
+
+  set importPolicy(Future<bool?> Function(Book)? policy) {
+    if (identical(_importPolicy, policy)) return;
+    _importPolicy = policy;
+    _policyEpoch++;
+  }
 
   bool get _storageReady => _injected != null || Prefs.isReady;
 
@@ -139,14 +151,60 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   bool get privateOnly {
-    _load();
-    return _config['privateOnly'] == true;
+    return policyOptions['privateOnly']!;
   }
 
   bool get autoImport {
-    _load();
-    return _config['autoImport'] == true;
+    return policyOptions['autoImport']!;
   }
+
+  bool get lockAfterHide => policyOptions['lockAfterHide']!;
+
+  Map<String, bool> get storedPolicyOptions {
+    _load();
+    return {
+      'privateOnly': _config['privateOnly'] == true,
+      'autoImport': _config['autoImport'] == true,
+      'lockAfterHide': _config['lockAfterHide'] != false,
+    };
+  }
+
+  Map<String, bool> get policyOptions => {
+        ...storedPolicyOptions,
+        for (final options in _optionOverlays.values) ...options,
+      };
+
+  Map<String, bool> policyOptionsFor(Object? owner) => {
+        ...storedPolicyOptions,
+        ...?_optionOverlays[owner],
+      };
+
+  void setOptionsOverlay(Object owner, Map<String, bool> values,
+      {bool Function()? isCurrent}) {
+    if (!unlocked || isCurrent?.call() == false) {
+      throw StateError('Private library locked');
+    }
+    if (values.keys.any((key) => !storedPolicyOptions.containsKey(key))) {
+      throw const FormatException('Invalid private library option');
+    }
+    _optionOverlays[owner] = Map.of(values);
+    _policyEpoch++;
+    _changed();
+  }
+
+  void clearOptionsOverlay(Object owner) {
+    if (_optionOverlays.remove(owner) == null) return;
+    _policyEpoch++;
+    _changed();
+  }
+
+  Map<String, Object?> get pluginState => {
+        'active': active,
+        'enabled': enabled,
+        'unlocked': unlocked,
+        'hasPin': hasPin,
+        ...policyOptions,
+      };
 
   String _identity(Book book) => book.md5?.isNotEmpty == true
       ? 'm:${book.md5!.toLowerCase()}'
@@ -288,6 +346,7 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
     _load();
     if (_active == value) return;
     _active = value;
+    _policyEpoch++;
     _unlocked = false;
     _session++;
     _changed();
@@ -319,13 +378,16 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _save(Map<String, dynamic> Function() transform,
-      {int? session}) {
+      {int? session, bool Function()? isCurrent}) {
     _load();
     final done = _writes.then((_) async {
       if (corrupt || !_storageReady || _loaded == null) {
         throw StateError('Private library unavailable');
       }
       if (session != null) _checkSession(session);
+      if (isCurrent?.call() == false) {
+        throw StateError('Private library request expired');
+      }
       final next = transform();
       final previous = _loaded!.getString(storageKey);
       try {
@@ -333,6 +395,9 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
           throw StateError('Could not save private library');
         }
         if (session != null) _checkSession(session);
+        if (isCurrent?.call() == false) {
+          throw StateError('Private library request expired');
+        }
       } catch (_) {
         if (previous == null) {
           await _loaded!.remove(storageKey);
@@ -353,19 +418,29 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
     return done;
   }
 
-  Future<void> setOptions({bool? privateOnly, bool? autoImport}) {
+  Future<void> setOptions(
+      {bool? privateOnly,
+      bool? autoImport,
+      bool? lockAfterHide,
+      bool Function()? isCurrent}) {
     if (!unlocked) throw StateError('Private library locked');
     return _save(
-        () => {
-              ..._config,
-              'books': _private.toList(),
-              if (privateOnly != null) 'privateOnly': privateOnly,
-              if (autoImport != null) 'autoImport': autoImport
-            },
-        session: _session);
+            () => {
+                  ..._config,
+                  'books': _private.toList(),
+                  if (privateOnly != null) 'privateOnly': privateOnly,
+                  if (autoImport != null) 'autoImport': autoImport,
+                  if (lockAfterHide != null) 'lockAfterHide': lockAfterHide,
+                },
+            session: _session,
+            isCurrent: isCurrent)
+        .then<void>((_) {
+      _policyEpoch++;
+    });
   }
 
-  Future<void> setBooksPrivate(Iterable<Book> books, bool value) {
+  Future<void> setBooksPrivate(Iterable<Book> books, bool value,
+      {bool Function()? isCurrent}) {
     if (!unlocked) throw StateError('Private library locked');
     final items = books.toList();
     return _save(() {
@@ -394,7 +469,7 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
         'books': next.toList(),
         'bookIds': {for (final e in ids.entries) e.key.toString(): e.value}
       };
-    }, session: _session);
+    }, session: _session, isCurrent: isCurrent);
   }
 
   Future<void> setEnabled(bool value) async {
@@ -402,19 +477,49 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
     await _save(
         () => {..._config, 'books': _private.toList(), 'enabled': value},
         session: _session);
+    _policyEpoch++;
     lock();
   }
 
   Future<void> onImported(Book book, {required bool isNew}) async {
-    if (!isNew || !active || !enabled || !autoImport) return;
-    await _save(() => {
-          ..._config,
-          'books': {..._private, _identity(book)}.toList(),
-          'bookIds': {
-            for (final e in _privateIds.entries) e.key.toString(): e.value,
-            if (book.id > 0) book.id.toString(): _identity(book)
-          }
-        });
+    if (!isNew || !active || !enabled) return;
+    final epoch = _policyEpoch;
+    final policy = _importPolicy;
+    final decision = await policy?.call(book);
+    bool current() => epoch == _policyEpoch && active && enabled;
+    if (!current()) throw StateError('Private import policy changed');
+    if (!(decision ?? autoImport)) return;
+    await _save(
+        () => {
+              ..._config,
+              'books': {..._private, _identity(book)}.toList(),
+              'bookIds': {
+                for (final e in _privateIds.entries) e.key.toString(): e.value,
+                if (book.id > 0) book.id.toString(): _identity(book)
+              }
+            },
+        isCurrent: current);
+  }
+
+  Future<void> registerImportedId(Book book) async {
+    if (book.id <= 0 || !isPrivate(book)) return;
+    await _save(() {
+      final identity = _private.contains(_identity(book))
+          ? _identity(book)
+          : _private.contains('f:${book.filePath}')
+              ? 'f:${book.filePath}'
+              : null;
+      if (identity == null || _privateIds[book.id] == identity) return _config;
+      return {
+        ..._config,
+        'books': _private.toList(),
+        'bookIds': {
+          for (final entry in _privateIds.entries)
+            entry.key.toString(): entry.value,
+          book.id.toString(): identity,
+        }
+      };
+    });
   }
 
   Future<bool> unlock([String pin = '']) async {
@@ -466,16 +571,24 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
         session: session);
   }
 
-  Future<bool> requestUnlock(BuildContext context, {bool force = false}) async {
-    if (!active) return false;
+  Future<bool> requestUnlock(BuildContext context,
+      {bool force = false,
+      bool Function()? isCurrent,
+      Listenable? invalidation}) async {
+    if (!active || isCurrent?.call() == false) return false;
     if (unlocked && !force) return true;
-    return await showPrivateLibraryUnlock(context, this);
+    return await showPrivateLibraryUnlock(context, this,
+        isCurrent: isCurrent, invalidation: invalidation);
   }
 
-  Future<void> open(BuildContext context) async {
+  Future<void> open(BuildContext context,
+      {bool showPolicyOptions = true, Object? optionsOwner}) async {
     if (!active) throw StateError('Private library plugin is not enabled');
     await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => PrivateLibraryPage(library: this)));
+        builder: (_) => PrivateLibraryPage(
+            library: this,
+            showPolicyOptions: showPolicyOptions,
+            optionsOwner: optionsOwner)));
   }
 
   Future<bool> authorizeDeactivate(BuildContext context) async {
@@ -505,6 +618,9 @@ class PrivateLibrary extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _policyEpoch++;
+    _importPolicy = null;
+    _optionOverlays.clear();
     _session++;
     _unlocked = false;
     if (_observing) WidgetsBinding.instance.removeObserver(this);

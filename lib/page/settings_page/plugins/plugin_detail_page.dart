@@ -10,6 +10,7 @@ import 'package:modu_reader/page/settings_page/plugins/plugins_page.dart';
 import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/config/config_item.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:modu_reader/service/plugins/handlers/selection_action_handler.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
@@ -73,7 +74,14 @@ class PluginDetailPage extends StatelessWidget {
                             context, '私密书籍设置', 'Private book settings')),
                         padding: EdgeInsets.zero,
                         child: PrivateLibrarySettings(
-                            library: PrivateLibrary.instance, embedded: true),
+                            library: PrivateLibrary.instance,
+                            embedded: true,
+                            optionsOwner: host.development ? host : null,
+                            showPolicyOptions: !(host
+                                    .manifestFor(pluginId)
+                                    ?.settings
+                                    .any((s) => s.binding != null) ??
+                                false)),
                       ),
                     _readmeSection(context),
                     _diagnosticSection(context, record),
@@ -190,6 +198,8 @@ class PluginDetailPage extends StatelessWidget {
                     '查词未命中时自动尝试', 'Used when an exact lookup has no match')),
                 PluginScriptSurface.article => Text(ModuStrings.text(
                     context, '在网页稍后阅读中使用', 'Used by Web clipper')),
+                PluginScriptSurface.bookImport => Text(ModuStrings.text(
+                    context, '导入书籍时使用', 'Used when importing books')),
                 PluginScriptSurface.library => null,
               },
               trailing: action.surface == PluginScriptSurface.library
@@ -370,6 +380,10 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   Timer? _saveTimer;
   bool _dirty = false;
   bool _saveFailed = false;
+  int? _bindingSession;
+  bool _unlocking = false;
+  int _editRevision = 0;
+  bool _disposing = false;
 
   @override
   void initState() {
@@ -379,13 +393,24 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   }
 
   @override
+  void didUpdateWidget(covariant _PluginSettingsForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_dirty) {
+      _config = PluginConfig.sanitize(
+          widget.manifest, widget.host.configFor(widget.pluginId));
+    }
+  }
+
+  @override
   void dispose() {
+    _disposing = true;
     _saveTimer?.cancel();
     if (_saveTimer != null || _dirty) unawaited(_save());
     super.dispose();
   }
 
   void _onChanged(Map<String, dynamic> values) {
+    _editRevision++;
     _config = values;
     _dirty = true;
     _saveTimer?.cancel();
@@ -397,23 +422,68 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   Future<void> _save() async {
     _saveTimer = null;
     if (!_dirty) return;
+    final revision = _editRevision;
     if (!identical(widget.host.manifestFor(widget.pluginId), widget.manifest)) {
       _dirty = false;
       return;
     }
+    if (_bindingSession != null &&
+        !PrivateLibrary.instance.isAuthenticationCurrent(_bindingSession!)) {
+      _dirty = false;
+      if (mounted && !_disposing) {
+        setState(() {
+          _config = widget.host.configFor(widget.pluginId);
+          _saveFailed = true;
+        });
+      }
+      return;
+    }
     try {
       await widget.host.saveConfig(widget.pluginId, _config);
-      _dirty = false;
-      if (mounted && _saveFailed) setState(() => _saveFailed = false);
+      if (revision == _editRevision) {
+        _dirty = false;
+        _bindingSession = null;
+      }
+      if (mounted && !_disposing && _saveFailed) {
+        setState(() => _saveFailed = false);
+      }
     } catch (_) {
-      if (mounted) setState(() => _saveFailed = true);
+      if (mounted && !_disposing) setState(() => _saveFailed = true);
     }
   }
 
   List<ConfigItem> _items(String locale) {
     return [
-      for (final spec in widget.manifest.settings) _configItem(spec, locale),
+      for (final spec in widget.manifest.settings)
+        if (spec.binding == null) _configItem(spec, locale),
     ];
+  }
+
+  Future<void> _changeBinding(PluginSettingSpec spec, bool value) async {
+    if (_unlocking || !widget.host.isScriptRunnable(widget.pluginId)) return;
+    _unlocking = true;
+    try {
+      bool current() =>
+          mounted &&
+          !_disposing &&
+          identical(
+              widget.host.manifestFor(widget.pluginId), widget.manifest) &&
+          widget.host.isScriptRunnable(widget.pluginId);
+      if (!await PrivateLibrary.instance.requestUnlock(context,
+          isCurrent: current, invalidation: widget.host)) {
+        return;
+      }
+      if (!mounted ||
+          !identical(
+              widget.host.manifestFor(widget.pluginId), widget.manifest) ||
+          !widget.host.isScriptRunnable(widget.pluginId)) {
+        return;
+      }
+      _bindingSession = PrivateLibrary.instance.authenticationSession;
+      setState(() => _onChanged({..._config, spec.key: value}));
+    } finally {
+      _unlocking = false;
+    }
   }
 
   ConfigItem _configItem(PluginSettingSpec spec, String locale) {
@@ -495,6 +565,22 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
           initialConfig: _config,
           onConfigChanged: _onChanged,
         ),
+        for (final spec
+            in widget.manifest.settings.where((s) => s.binding != null))
+          SwitchListTile(
+            key: ValueKey('plugin-binding-${spec.key}'),
+            title: spec.description == null
+                ? Text(spec.label?.resolve(locale) ?? spec.key)
+                : SettingHelpTitle(
+                    title: spec.label?.resolve(locale) ?? spec.key,
+                    description: spec.description!.resolve(locale)),
+            value: _config[spec.key] as bool? ??
+                spec.defaultValue as bool? ??
+                false,
+            onChanged: widget.host.isScriptRunnable(widget.pluginId)
+                ? (value) => unawaited(_changeBinding(spec, value))
+                : null,
+          ),
         if (_saveFailed)
           Text(
             ModuStrings.text(

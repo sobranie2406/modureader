@@ -13,6 +13,7 @@ import 'package:modu_reader/service/plugins/plugin_package.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_trust.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/service/plugins/plugin_private_import_policy.dart';
 import 'package:modu_reader/utils/app_version.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart';
@@ -94,6 +95,7 @@ class PluginHost extends ChangeNotifier {
   final _reservedIds = <String>{};
   PluginState _developmentState = const PluginState();
   final _developmentConfig = <String, Map<String, dynamic>>{};
+  Future<void> _configWrites = Future.value();
   final _runtimes = <PluginScriptRuntime>{};
   PluginScriptRuntime? _developmentRuntime;
   bool _sessionOpen = true;
@@ -134,6 +136,7 @@ class PluginHost extends ChangeNotifier {
   }
 
   static void detachDevelopment(PluginHost developer) {
+    PrivateLibrary.instance.clearOptionsOverlay(developer);
     final official = developer._peer;
     developer._peer = null;
     if (identical(official?._peer, developer)) {
@@ -168,27 +171,113 @@ class PluginHost extends ChangeNotifier {
     }
   }
 
-  Map<String, dynamic> configFor(String id) => development
-      ? Map.of(_developmentConfig[id] ?? const {})
-      : Prefs().pluginConfig(id);
-  Future<void> saveConfig(String id, Map<String, dynamic> values) async {
-    if (development) {
-      _ensureUsable();
-      if (byId(id) == null) throw StateError('Development plugin unavailable.');
-      PluginConfig.validate(id, values, manifest: manifestFor(id));
-      _developmentConfig[id] = Map.of(values);
-      notifyListeners();
-    } else {
-      await Prefs().savePluginConfig(id, values);
+  Map<String, dynamic> configFor(String id) {
+    if (development && (_disposed || !_sessionOpen)) return {};
+    final manifest = manifestFor(id);
+    if (manifest == null) return development ? {} : Prefs().pluginConfig(id);
+    final saved = development
+        ? Map<String, dynamic>.of(_developmentConfig[id] ?? const {})
+        : PluginConfig.forStorage(
+            manifest, Prefs().pluginConfig(id), PluginSettingStorage.sync);
+    if (!development) {
+      final raw = Prefs().prefs.get(PluginConfig.deviceKeyFor(id));
+      try {
+        if (raw != null) {
+          saved.addAll(PluginConfig.forStorage(
+              manifest, PluginConfig.decode(raw), PluginSettingStorage.device));
+        }
+      } on FormatException {
+        // A broken local override falls back to package defaults.
+      }
     }
+    final native = development
+        ? PrivateLibrary.instance.policyOptionsFor(this)
+        : PrivateLibrary.instance.storedPolicyOptions;
+    for (final spec in manifest.settings) {
+      if (spec.binding != null) {
+        saved[spec.key] = native[spec.binding!.split('.').last]!;
+      }
+    }
+    return PluginConfig.sanitize(manifest, saved);
+  }
+
+  Future<void> saveConfig(String id, Map<String, dynamic> values) {
+    final manifest = manifestFor(id);
+    final session = PrivateLibrary.instance.authenticationSession;
+    final snapshot = Map<String, dynamic>.of(values);
+    final operation = _configWrites.then((_) async {
+      bool current() =>
+          !_disposed &&
+          _sessionOpen &&
+          identical(manifestFor(id), manifest) &&
+          byId(id)?.isUsable == true &&
+          (!development || Prefs().experimentalPluginsEnabled);
+      if (manifest == null || !current()) {
+        throw StateError('Plugin settings are unavailable.');
+      }
+      PluginConfig.validate(id, snapshot, manifest: manifest);
+      final native = development
+          ? PrivateLibrary.instance.policyOptionsFor(this)
+          : PrivateLibrary.instance.storedPolicyOptions;
+      final bindings = <String, bool>{
+        for (final spec in manifest.settings)
+          if (spec.binding != null &&
+              snapshot[spec.key] is bool &&
+              snapshot[spec.key] != native[spec.binding!.split('.').last])
+            spec.binding!.split('.').last: snapshot[spec.key] as bool,
+      };
+      if (bindings.isNotEmpty) {
+        bool authorized() =>
+            current() &&
+            isScriptRunnable(id) &&
+            PrivateLibrary.instance.isAuthenticationCurrent(session);
+        if (!authorized()) throw StateError('Private library locked.');
+        if (development) {
+          PrivateLibrary.instance.setOptionsOverlay(this,
+              {...PrivateLibrary.instance.policyOptionsFor(this), ...bindings},
+              isCurrent: authorized);
+        } else {
+          await PrivateLibrary.instance.setOptions(
+              privateOnly: bindings['privateOnly'],
+              autoImport: bindings['autoImport'],
+              lockAfterHide: bindings['lockAfterHide'],
+              isCurrent: authorized);
+        }
+      }
+      if (!current()) throw StateError('Plugin settings changed.');
+      if (development) {
+        _developmentConfig[id] = PluginConfig.sanitize(manifest, snapshot);
+      } else {
+        final device = PluginConfig.forStorage(
+            manifest, snapshot, PluginSettingStorage.device);
+        if (!await Prefs()
+            .prefs
+            .setString(PluginConfig.deviceKeyFor(id), jsonEncode(device))) {
+          throw StateError('Could not save device plugin settings.');
+        }
+        if (!current()) throw StateError('Plugin settings changed.');
+        await Prefs().savePluginConfig(
+            id,
+            PluginConfig.forStorage(
+                manifest, snapshot, PluginSettingStorage.sync));
+      }
+      notifyListeners();
+    });
+    _configWrites = operation.catchError((_) {});
+    return operation;
   }
 
   Future<void> _removeData(String id) async {
     if (development) {
+      if (_manifests[id]?.capabilities.contains(kLibraryPrivateCapability) ??
+          false) {
+        PrivateLibrary.instance.clearOptionsOverlay(this);
+      }
       _developmentConfig.remove(id);
       await _saveState(_state.remove(id));
     } else {
       await Prefs().removePluginData(id);
+      await Prefs().prefs.remove(PluginConfig.deviceKeyFor(id));
     }
   }
 
@@ -208,6 +297,7 @@ class PluginHost extends ChangeNotifier {
         if (!skipAuthorization) await _authorizePrivateRemoval(null);
         await _suspendPlugins();
         _sessionOpen = false;
+        PrivateLibrary.instance.clearOptionsOverlay(this);
         _developmentConfig.clear();
         _developmentState = const PluginState();
         _plugins = const [];
@@ -303,6 +393,7 @@ class PluginHost extends ChangeNotifier {
 
   Future<void> _initialize() async {
     if (_disposed) return;
+    PluginPrivateImportPolicy.attach(PrivateLibrary.instance);
     await _initializeOnce();
   }
 
@@ -633,6 +724,14 @@ class PluginHost extends ChangeNotifier {
           applied: List.unmodifiable(applied),
         );
         await _saveState(_state.upsert(record));
+        if (development &&
+            existing != null &&
+            (_manifests[manifest.id]
+                    ?.capabilities
+                    .contains(kLibraryPrivateCapability) ??
+                false)) {
+          PrivateLibrary.instance.clearOptionsOverlay(this);
+        }
         _manifests[manifest.id] = manifest;
         _manifestTexts[manifest.id] = pkg.manifestText;
         _upsertMemory(record);
@@ -742,6 +841,11 @@ class PluginHost extends ChangeNotifier {
       if (!development) Prefs().userPrompts = prompts;
       if (!development) await Prefs().saveSelectionToolbar(toolbar);
       rethrow;
+    }
+    if (development &&
+        (_manifests[id]?.capabilities.contains(kLibraryPrivateCapability) ??
+            false)) {
+      PrivateLibrary.instance.clearOptionsOverlay(this);
     }
     notifyListeners();
   }
@@ -988,6 +1092,7 @@ class PluginHost extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    if (development) PrivateLibrary.instance.clearOptionsOverlay(this);
     if (development) {
       for (final record in _plugins) {
         unawaited(_contributions.remove(record.applied).catchError((_) {}));

@@ -16,6 +16,7 @@
 - 插件的管理、功能入口和设置集中在「插件」及对应插件详情中。不得把某个插件的设置单独加入应用主设置列表。
 - 书籍、划词和阅读菜单可以放插件声明的操作入口。入口跟随插件的安装、启用、停用和卸载，不按插件 ID 写死在菜单里。
 - 普通配置通过 manifest 的 `settings` 声明，在插件详情中呈现。密码校验、文件选择等需要原生交互的内容由宿主处理，也只能从对应插件页面进入。
+- 仅本机设置声明 `storage: "device"` 和 `settings:device` 能力，不进入同步或设置备份。私密显示、自动导入、隐藏后锁定可绑定 `privateLibrary.privateOnly`、`privateLibrary.autoImport`、`privateLibrary.lockAfterHide`；绑定项须为本机 toggle，修改先验证原生解锁，保留用户已有值。
 - 未安装或未启用插件时，不显示它的入口或设置。脚本与采集任务开始前及异步返回后都要复查插件状态；停用、卸载或重新加载后，旧脚本不得继续提交操作。用户在预览页已提交的原生文件保存或书籍导入，由对应保存流程完成。
 
 ## 书籍菜单动作
@@ -28,11 +29,18 @@
   "schema": 1,
   "id": "hide",
   "name": {"zh-CN": "隐藏", "en": "Hide"},
-  "command": "privateLibrary.hide"
+  "command": "privateLibrary.setPrivate",
+  "private": true,
+  "when": "public",
+  "lockAfterSetting": "lock_after_hide"
 }
 ```
 
-该动作需要 `ui:book-action` 与 `library:private` 权限。宿主只处理用户实际选中的书籍，负责验证、保存和锁定；插件不接触 PIN、文件路径或数据库连接。
+该动作需要 `ui:book-action`、`library:private` 和 `library:private-control` 权限。`when` 可为 `public`、`private` 或 `any`；`private` 指定目标状态；`lockAfter` 或 `lockAfterSetting` 指定操作后是否锁定，后者引用本包 toggle。旧 `privateLibrary.hide` 保留原行为。
+
+批量处理由插件调用原生选书接口，再提交所选 ID。选择授权仅用于本次动作和解锁会话；宿主复查书籍身份后保存，不把 PIN、文件路径或数据库连接交给插件。
+
+新书归入规则使用纯脚本 `surface: "bookImport"`、`scope: "selection"`，声明 `library:private-policy` 与 `library:private`。只接收书籍摘要和本包设置，返回 `{private: true/false}`，不允许任何宿主调用。可用 `enabledSetting` 指定本包 toggle，关闭时不启动 Worker。规则在入库前完成，失败或配置过期时中止导入，避免先同步后标记。多个启用规则中任一个返回 true 即归入私密。
 
 新增宿主扩展点应有对应的能力标记。旧版本不支持该能力时，应在安装前说明需要更新应用；不能仅用同一正式版本号区分不同 Beta 的接口。
 

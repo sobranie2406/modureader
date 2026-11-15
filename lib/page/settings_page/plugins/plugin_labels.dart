@@ -26,6 +26,15 @@ String pluginCapabilityLabel(BuildContext context, String capability) {
       return ModuStrings.text(context, '保存笔记', 'Save notes');
     case kLibraryPrivateCapability:
       return ModuStrings.text(context, '管理私密书籍', 'Manage private books');
+    case kLibraryPrivateControlCapability:
+      return ModuStrings.text(
+          context, '选择书籍并设置私密状态', 'Choose books and change private status');
+    case kLibraryPrivatePolicyCapability:
+      return ModuStrings.text(
+          context, '判断新书是否归入私密书库', 'Decide whether imported books are private');
+    case kPluginDeviceSettingsCapability:
+      return ModuStrings.text(
+          context, '仅在本机保存插件设置', 'Store plugin settings on this device');
     case kDictionaryTransformCapability:
       return ModuStrings.text(
           context, '生成查词变体', 'Suggest dictionary word forms');

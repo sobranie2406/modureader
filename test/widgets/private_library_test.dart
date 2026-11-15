@@ -57,6 +57,87 @@ void main() {
   }
 
   testWidgets(
+      'policy-aware plugins keep only the native authentication controls',
+      (tester) async {
+    await tester.runAsync(() => library.unlock());
+    await tester.pumpWidget(MaterialApp(
+        home: PrivateLibraryPage(library: library, showPolicyOptions: false)));
+    await tester.pumpAndSettle();
+    expect(find.text('Authentication'), findsOneWidget);
+    expect(find.text('After unlocking'), findsNothing);
+    expect(find.text('Make new imports private'), findsNothing);
+    expect(find.text('Manage private books'), findsNothing);
+    expect(find.text('Set'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'native book selection grants explicit choices and closes on lock',
+      (tester) async {
+    final public = Book.mock().copyWith(id: 1, title: 'Public title');
+    final secret = Book.mock().copyWith(
+        id: 2,
+        title: 'Private title',
+        md5: 'private',
+        filePath: 'private.epub');
+    await tester.runAsync(() async {
+      await library.unlock();
+      await library.setBooksPrivate([secret], true);
+    });
+    List<Book>? selected;
+    await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) {
+      return Scaffold(
+          body: TextButton(
+              onPressed: () => selectPrivateLibraryBooks(context,
+                      library: library,
+                      isCurrent: () => true,
+                      privateOnly: true,
+                      multiple: false,
+                      loadBooks: () async => [public, secret])
+                  .then((value) => selected = value),
+              child: const Text('Select')));
+    })));
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    expect(find.text('Public title'), findsNothing);
+    expect(find.text('Private title'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('private-select-2')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('private-select-confirm')));
+    await tester.pumpAndSettle();
+    expect(selected?.single.id, 2);
+    selected = null;
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    expect(find.text('Private title'), findsOneWidget);
+    library.lock();
+    await tester.pumpAndSettle();
+    expect(selected, isNull);
+    expect(find.text('Private title'), findsNothing);
+    expect(find.text('Select'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('legacy development settings use only a temporary option overlay',
+      (tester) async {
+    await tester.runAsync(() => library.unlock());
+    final owner = Object();
+    final saved = Prefs().prefs.getString(PrivateLibrary.storageKey);
+    await tester.pumpWidget(MaterialApp(
+        home: PrivateLibraryPage(library: library, optionsOwner: owner)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Private only'));
+    await tester.pumpAndSettle();
+    expect(library.privateOnly, true);
+    expect(library.storedPolicyOptions['privateOnly'], false);
+    expect(Prefs().prefs.getString(PrivateLibrary.storageKey), saved);
+    library.clearOptionsOverlay(owner);
+    await tester.pumpAndSettle();
+    expect(library.privateOnly, false);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'native unlocking and cancellation keep dialog controllers alive through exit',
       (tester) async {
     await open(tester);

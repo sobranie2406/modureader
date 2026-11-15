@@ -146,6 +146,170 @@ void main() {
   Matcher failure(String code) =>
       isA<PluginScriptFailure>().having((e) => e.code, 'code', code);
 
+  Future<void> installPrivateControls() => install(capabilities: [
+        'script:run',
+        'ui:selection-action',
+        'library:private',
+        'library:private-control'
+      ]);
+
+  test('private-control methods require their declared capability', () async {
+    await install(
+        capabilities: ['script:run', 'ui:selection-action', 'library:private']);
+    var calls = 0;
+    final response = runtime.run(
+        pluginId: id,
+        action: action,
+        hostCall: (_, __) async {
+          calls++;
+          return null;
+        });
+    await engine.ready.future;
+    for (final method in [
+      'state',
+      'updateOptions',
+      'selectBooks',
+      'setPrivate'
+    ]) {
+      await expectLater(engine.call('privateLibrary.$method', {}),
+          throwsA(failure('permission')));
+    }
+    expect(calls, 0);
+    engine.result.complete({'text': ''});
+    await response;
+  });
+
+  test('native picker wait does not exhaust the script execution budget',
+      () async {
+    await installPrivateControls();
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => engine,
+        timeout: const Duration(seconds: 1),
+        nativeInteractionTimeout: const Duration(seconds: 3));
+    final waiting = Completer<Object?>();
+    final response = runtime.run(
+        pluginId: id, action: action, hostCall: (_, __) => waiting.future);
+    await engine.ready.future;
+    final call = engine.call('privateLibrary.selectBooks', {});
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(runtime.isRunning(id), true);
+    waiting.complete(<Object>[]);
+    expect(await call, isEmpty);
+    engine.result.complete({'text': 'selected'});
+    expect(await response, {'text': 'selected'});
+  });
+
+  test(
+      'native waits share a cumulative budget and cannot revive a cancelled job',
+      () async {
+    await installPrivateControls();
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => engine,
+        timeout: const Duration(seconds: 2),
+        nativeInteractionTimeout: const Duration(milliseconds: 350));
+    var waiting = Completer<Object?>();
+    final response = runtime.run(
+        pluginId: id, action: action, hostCall: (_, __) => waiting.future);
+    final expired = expectLater(response, throwsA(failure('timeout')));
+    await engine.ready.future;
+    final first = engine.call('privateLibrary.selectBooks', {});
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    waiting.complete(<Object>[]);
+    await first;
+    waiting = Completer<Object?>();
+    final second =
+        engine.call('privateLibrary.updateOptions', {'privateOnly': true});
+    final rejected = expectLater(second, throwsA(failure('cancelled')));
+    await expired;
+    waiting.complete({'privateOnly': true});
+    await rejected;
+    expect(runtime.isRunning(id), false);
+    expect(engine.disposed, greaterThan(0));
+  });
+
+  test('private state reads retain the ordinary execution deadline', () async {
+    await installPrivateControls();
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => engine,
+        timeout: const Duration(milliseconds: 500));
+    final waiting = Completer<Object?>();
+    final response = runtime.run(
+        pluginId: id, action: action, hostCall: (_, __) => waiting.future);
+    final expired = expectLater(response, throwsA(failure('timeout')));
+    await engine.ready.future;
+    final state = engine.call('privateLibrary.state', {});
+    final rejected = expectLater(state, throwsA(failure('cancelled')));
+    await expired;
+    waiting.complete({});
+    await rejected;
+  });
+
+  test('import policy receives a safe summary and cannot call host methods',
+      () async {
+    final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
+    (m['contributes'] as List).first['surface'] = 'bookImport';
+    files['manifest.json'] = jsonEncode(m);
+    await install(capabilities: [
+      'script:run',
+      'library:private',
+      'library:private-policy'
+    ]);
+    final response = runtime.run(
+        pluginId: id,
+        action: action,
+        input: {
+          'selection': 'secret text',
+          'context': 'private context',
+          'book': {
+            'id': 8,
+            'title': 'A book',
+            'format': 'epub',
+            'filePath': '/secret',
+            'md5': 'hidden'
+          }
+        },
+        hostCall: (_, __) async => throw StateError('must not reach host'));
+    await engine.ready.future;
+    expect(engine.input.keys.toSet(), {'book', 'settings', 'actionId'});
+    expect(
+        engine.input['book'], {'id': 8, 'title': 'A book', 'format': 'epub'});
+    for (final method in [
+      'privateLibrary.state',
+      'privateLibrary.selectBooks',
+      'http.get',
+      'library.list',
+      'notes.save'
+    ]) {
+      await expectLater(
+          engine.call(method, {}), throwsA(failure('permission')));
+    }
+    engine.result.complete({'private': true});
+    expect(await response, {'private': true});
+  });
+
+  test('import policy rejects an ambiguous result', () async {
+    final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
+    (m['contributes'] as List).first['surface'] = 'bookImport';
+    files['manifest.json'] = jsonEncode(m);
+    await install(capabilities: [
+      'script:run',
+      'library:private',
+      'library:private-policy'
+    ]);
+    final response = run({
+      'book': {'id': 1}
+    });
+    await engine.ready.future;
+    engine.result.complete({'private': false, 'text': 'unexpected'});
+    await expectLater(response, throwsA(failure('result')));
+  });
+
   Future<void> installDictionary() async {
     final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
     (m['contributes'] as List).first['surface'] = 'dictionary';

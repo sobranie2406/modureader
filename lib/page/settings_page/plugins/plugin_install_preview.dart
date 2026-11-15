@@ -183,14 +183,17 @@ class PluginInstallPreviewPage extends StatelessWidget {
                 ? ModuStrings.text(context, '插件功能', 'Plugin action')
                 : action.surface == PluginScriptSurface.dictionary
                     ? ModuStrings.text(context, '查词文字', 'Dictionary query')
-                    : action.surface == PluginScriptSurface.article
+                    : action.surface == PluginScriptSurface.bookImport
                         ? ModuStrings.text(
-                            context, '离线处理网页正文', 'Process article HTML offline')
-                        : action.scope == PluginSelectionScope.context
-                            ? ModuStrings.text(
-                                context, '划词与上下文', 'Selection and context')
-                            : ModuStrings.text(
-                                context, '仅划词文字', 'Selected text only')),
+                            context, '导入书籍时自动运行', 'Runs when importing books')
+                        : action.surface == PluginScriptSurface.article
+                            ? ModuStrings.text(context, '离线处理网页正文',
+                                'Process article HTML offline')
+                            : action.scope == PluginSelectionScope.context
+                                ? ModuStrings.text(
+                                    context, '划词与上下文', 'Selection and context')
+                                : ModuStrings.text(
+                                    context, '仅划词文字', 'Selected text only')),
       for (final action in bookActions)
         _valueTile(
             context,

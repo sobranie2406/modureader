@@ -12,11 +12,24 @@ class PluginConfig {
   const PluginConfig._();
 
   static const String prefix = 'pluginConfig_';
+  static const String devicePrefix = 'pluginDeviceConfig_';
   static const int maxEntries = 40;
   static const int maxKeyLength = 40;
   static const int maxTextLength = 8000;
 
   static String keyFor(String pluginId) => '$prefix$pluginId';
+  static String deviceKeyFor(String pluginId) => '$devicePrefix$pluginId';
+
+  static Map<String, dynamic> forStorage(PluginManifest manifest,
+      Map<String, dynamic> values, PluginSettingStorage storage) {
+    final specs = {for (final spec in manifest.settings) spec.key: spec};
+    return {
+      for (final entry in sanitize(manifest, values).entries)
+        if (specs[entry.key]?.binding == null &&
+            (specs[entry.key]?.storage ?? PluginSettingStorage.sync) == storage)
+          entry.key: entry.value,
+    };
+  }
 
   static Map<String, dynamic> decode(Object? raw) {
     if (raw is String) {

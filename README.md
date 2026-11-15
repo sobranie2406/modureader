@@ -184,6 +184,17 @@
 
 提交 Bug 或功能建议：[GitHub Issues](https://github.com/sobranie2406/modureader/issues/new/choose) · [在线反馈表](https://docs.qq.com/smartsheet/form/dxaiuhjrhCar%2Ft00i2h%2FvI8Bvs?tab=t00i2h)
 
+## 插件开发
+
+插件源码、安装包与上架目录统一维护在 [Modu Plugin](https://github.com/sobranie2406/modu-plugin)。
+
+- 功能、规则、依赖和配置随插件包独立更新。宿主提供稳定的通用接口，只有新增底层能力时才需要升级默读。
+- 经审核的插件可通过清单声明所需的更广权限和资源额度，按能力与版本检查启用。
+- 入口和设置集中在「插件」及插件详情；书籍、阅读菜单只显示插件声明的动作，停用或卸载时撤下。
+- 正式使用需审核上架并校验签名。本机「开发者调试」默认关闭，可临时调试未审核包，关闭调试或重启后清除。
+
+[开发规范](docs/development/plugin-development.md) · [运行接口](docs/development/plugin-script-runtime.md) · [审核与上架](docs/development/plugin-trust.md)
+
 ## 参与项目
 
 欢迎提交问题、改进代码或完善文档。如果默读对你有帮助，也欢迎点一个 Star。

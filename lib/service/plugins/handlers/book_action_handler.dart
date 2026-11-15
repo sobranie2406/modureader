@@ -81,7 +81,23 @@ class BookActionContributionHandler implements PluginContributionHandler {
       if (action is! BookActionContribution ||
           action.kind != kind ||
           action.schema != 1 ||
-          action.command != 'privateLibrary.hide' ||
+          !const {'privateLibrary.hide', 'privateLibrary.setPrivate'}
+              .contains(action.command) ||
+          (action.command == 'privateLibrary.setPrivate' &&
+              (!manifest.capabilities
+                      .contains(kLibraryPrivateControlCapability) ||
+                  action.privateValue == null ||
+                  !const {'public', 'private', 'any'}.contains(action.when))) ||
+          (action.command == 'privateLibrary.hide' &&
+              (action.privateValue != null ||
+                  action.lockAfter ||
+                  action.lockAfterSetting != null ||
+                  action.when != 'any')) ||
+          (action.lockAfterSetting != null &&
+              (action.lockAfter ||
+                  !manifest.settings.any((setting) =>
+                      setting.key == action.lockAfterSetting &&
+                      setting.type == PluginSettingType.toggle))) ||
           action.name.resolve(null).trim().isEmpty) {
         throw const PluginInstallError(PluginErrorCode.invalidContribution,
             'The book action is not supported.');

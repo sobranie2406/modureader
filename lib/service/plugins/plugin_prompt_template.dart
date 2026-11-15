@@ -1,4 +1,3 @@
-import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/user_prompt.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
@@ -109,7 +108,7 @@ class PluginPromptTemplate {
 
   static Map<String, dynamic> _configFor(String pluginId) {
     try {
-      return _host.isInitialized ? Prefs().pluginConfig(pluginId) : const {};
+      return _host.isInitialized ? _host.configFor(pluginId) : const {};
     } catch (_) {
       return const {};
     }
