@@ -1,3 +1,31 @@
+# Modu 1.3.10 Beta4
+
+Build / 构建：**10181** · Android ARM64 · Prerelease / 测试版
+
+### English
+
+- Feat(plugins): Keep private-book visibility, import rules and hide/restore actions in the plugin, with settings saved only on this device.
+- Fix(plugins): Apply prompt-pack tone, length and quotation settings when running templates.
+- Feat(plugins): Add reusable native book-selection and marking interfaces so supported plugin rules and features can update independently.
+- Fix(books): Preserve private status, notes and progress when replacing older private-book files; continue excluding private data from sync.
+
+### 简体中文
+
+- Feat(plugins): 私密书籍的显示、导入与隐藏／移出规则交由插件管理，相关设置仅在本机保存。
+- Fix(plugins): 提示词包的语气、字数和原文引用设置实际参与模板运行。
+- Feat(plugins): 补齐通用选书和私密标记接口，已有接口支持的规则与功能可通过更新插件获得。
+- Fix(books): 替换旧私密书籍文件时保留私密状态、笔记和进度，私密资料继续排除同步。
+
+### Downloads / 下载
+
+Android ARM64 APK and SHA-256 checksum. / 安卓 ARM64 安装包及 SHA-256 校验文件。
+
+Private books 1.2.0 requires this host update. Plugins remain optional downloads from the plugin page. / 私密书籍 1.2.0 需要本次应用更新；插件仍在插件页面按需下载。
+
+[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.10-beta.4) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.10-beta.4/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.10-beta.4/NOTICE)
+
+---
+
 # Modu 1.3.9
 
 Build / 构建：**10177** · Stable / 正式版
