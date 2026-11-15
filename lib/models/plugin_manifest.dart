@@ -22,6 +22,7 @@ class PluginLimits {
   static const int maxDisplayNameLength = 40;
   static const int maxSelectionActionNameLength = 30;
   static const int maxSelectionActionsPerPlugin = 24;
+  static const int maxBookActionsPerPlugin = 24;
   static const int maxDictionarySourcesPerPlugin = 8;
   static const int maxScriptBytes = 128 * 1024;
   static const int maxDescriptionLength = 2000;
@@ -37,6 +38,7 @@ class PluginLimits {
 const Set<String> kP1SupportedCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
+  'ui:book-action',
   'net:http',
   'storage:plugin',
   'script:run',
@@ -51,6 +53,7 @@ const Set<String> kP1SupportedCapabilities = {
 const Set<String> kKnownCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
+  'ui:book-action',
   'net:http',
   'script:run',
   'library:read',
@@ -63,10 +66,12 @@ const Set<String> kKnownCapabilities = {
 
 const String kAiPromptPackCapability = 'ai:prompt-pack';
 const String kSelectionActionCapability = 'ui:selection-action';
+const String kBookActionCapability = 'ui:book-action';
 const String kAiSkillContributionKind = 'aiSkill';
 const String kSelectionActionContributionKind = 'selectionAction';
 const String kDictionarySourceContributionKind = 'dictionarySource';
 const String kScriptActionContributionKind = 'scriptAction';
+const String kBookActionContributionKind = 'bookAction';
 const String kScriptRunCapability = 'script:run';
 const String kLibraryReadCapability = 'library:read';
 const String kNoteWriteCapability = 'note:write';
@@ -386,6 +391,14 @@ sealed class PluginContribution {
       return ScriptActionContribution.parse(
           kind: kind, schema: schema, id: id, index: index, raw: json);
     }
+    if (kind == kBookActionContributionKind) {
+      if (!_skillIdPattern.hasMatch(id)) {
+        throw PluginInstallError(PluginErrorCode.invalidContribution,
+            'contributes[$index].id is invalid.');
+      }
+      return BookActionContribution.parse(
+          kind: kind, schema: schema, id: id, index: index, raw: json);
+    }
     // Forward compatibility: an unknown kind is skipped even if new fields or
     // a missing id would fail the known-kind schema (decision D1).
     warnings.add(
@@ -407,6 +420,45 @@ class UnknownContribution extends PluginContribution {
     required super.index,
     required super.raw,
   });
+}
+
+/// A package-provided book menu entry for a bounded native command, not code.
+class BookActionContribution extends PluginContribution {
+  const BookActionContribution({
+    required super.kind,
+    required super.schema,
+    required super.id,
+    required super.index,
+    required super.raw,
+    required this.name,
+    required this.command,
+  });
+
+  final PluginText name;
+  final String command;
+
+  factory BookActionContribution.parse({
+    required String kind,
+    required int schema,
+    required String id,
+    required int index,
+    required Map<String, dynamic> raw,
+  }) {
+    if (schema != 1 || raw['command'] != 'privateLibrary.hide') {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index] has an unsupported book action.');
+    }
+    return BookActionContribution(
+        kind: kind,
+        schema: schema,
+        id: id,
+        index: index,
+        raw: raw,
+        name: PluginText.parse(raw['name'],
+            field: 'contributes[$index].name',
+            maxLength: PluginLimits.maxSelectionActionNameLength),
+        command: raw['command'] as String);
+  }
 }
 
 class AiSkillContribution extends PluginContribution {
@@ -940,6 +992,12 @@ class PluginManifest {
       contributions.add(contribution);
     }
     _validateContributionCounts(contributions);
+    if (contributions.any((entry) => entry is BookActionContribution) &&
+        !capabilities
+            .containsAll({kBookActionCapability, kLibraryPrivateCapability})) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'Book actions require their book-menu and private-library capabilities.');
+    }
     for (final action in contributions.whereType<ScriptActionContribution>()) {
       if (!capabilities.contains(kScriptRunCapability) ||
           (action.surface == PluginScriptSurface.selection &&
@@ -1073,6 +1131,12 @@ class PluginManifest {
     if (actions > PluginLimits.maxSelectionActionsPerPlugin) {
       throw PluginInstallError(PluginErrorCode.tooManyContributions,
           'A package may declare at most ${PluginLimits.maxSelectionActionsPerPlugin} selection actions.');
+    }
+    final bookActions =
+        contributions.whereType<BookActionContribution>().length;
+    if (bookActions > PluginLimits.maxBookActionsPerPlugin) {
+      throw const PluginInstallError(PluginErrorCode.tooManyContributions,
+          'A package has too many book actions.');
     }
   }
 

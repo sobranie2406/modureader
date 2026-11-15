@@ -124,7 +124,8 @@ class _BookItemState extends ConsumerState<BookItem> {
                                         .titleMedium),
                               ),
                               if (pinned) const Icon(Icons.push_pin, size: 16),
-                              if (Prefs().webdavStatus)
+                              if (Prefs().webdavStatus &&
+                                  PrivateLibrary.instance.canSyncBook(book))
                                 SizedBox(
                                   width: 24,
                                   height: 24,
@@ -310,7 +311,8 @@ class _BookItemState extends ConsumerState<BookItem> {
                                   ),
                                 ),
                               ),
-                              if (Prefs().webdavStatus)
+                              if (Prefs().webdavStatus &&
+                                  PrivateLibrary.instance.canSyncBook(book))
                                 SizedBox(
                                   height: 20,
                                   width: 20,

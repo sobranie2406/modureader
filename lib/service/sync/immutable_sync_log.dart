@@ -15,7 +15,9 @@ import 'package:modu_reader/service/sync/sync_paths.dart';
 /// state INCLUDING tombstones, so offline devices can still converge.
 class ImmutableSyncLog {
   ImmutableSyncLog(this.client, this.staging, Directory cache,
-      {required Directory durableDirectory})
+      {required Directory durableDirectory,
+      this.filterPending,
+      this.filteringNeeded})
       : verifiedCache = Directory('${cache.path}/modu-sync-record-cache-v1'),
         pending = Directory(
             '${durableDirectory.path}/modu-sync-pending-v1/${sha256.convert(utf8.encode(jsonEncode(client.syncIdentity)))}');
@@ -23,6 +25,11 @@ class ImmutableSyncLog {
   final Directory staging;
   final Directory pending;
   final Directory verifiedCache;
+  final Future<List<RowSyncRecord>> Function(List<RowSyncRecord>)?
+      filterPending;
+  final bool Function()? filteringNeeded;
+  bool get _filterActive =>
+      filterPending != null && (filteringNeeded?.call() ?? true);
   static final _shard = RegExp(r'^[0-9a-f]$');
   static final _batch = RegExp(r'^([0-9a-f]{64})\.db$');
   static const maxBatchBytes = 64 * 1024 * 1024;
@@ -63,7 +70,21 @@ class ImmutableSyncLog {
   Future<bool> resumePending() async {
     final files = await readPendingFiles();
     for (final entry in files.entries) {
-      await _upload(entry.value, _batch.firstMatch(entry.key)![1]!);
+      final filter = filterPending;
+      if (!_filterActive) {
+        await _upload(entry.value, _batch.firstMatch(entry.key)![1]!);
+      } else {
+        final original = await RowSyncArchive.read(entry.value.path);
+        final allowed = await filter!(original);
+        if (sameSyncRecords(original, allowed)) {
+          await _upload(entry.value, _batch.firstMatch(entry.key)![1]!);
+        } else {
+          // Keep the original recovery copy until its public successor is
+          // durable. Never remove or rewrite an old cloud batch.
+          if (allowed.isNotEmpty) await publish(allowed);
+          if (await entry.value.exists()) await entry.value.delete();
+        }
+      }
     }
     return files.isNotEmpty;
   }
@@ -185,6 +206,7 @@ class ImmutableSyncLog {
   /// Competing compactors can remove each other's output only if it was one of
   /// their inputs (and is therefore preserved by their own verified successor).
   Future<int> compactIfNeeded() async {
+    if (_filterActive) return 0;
     final inputs = _readFiles;
     final records = _readRecords;
     if (inputs == null ||
@@ -201,6 +223,7 @@ class ImmutableSyncLog {
   /// covers all records returned by read(). Reliable CAS uses database8.db;
   /// compatibility mode uses a content-addressed batch in this same directory.
   Future<int> reclaimReadBatches({String? keep}) async {
+    if (_filterActive) return 0;
     final inputs = _readFiles;
     if (inputs == null) return 0;
     final obsolete = inputs.keys.where((path) => path != keep).toList();
@@ -209,6 +232,7 @@ class ImmutableSyncLog {
     // and any remaining inputs are sufficient to retry safely on the next sync.
     for (var i = 0; i < obsolete.length; i += 4) {
       await Future.wait(obsolete.skip(i).take(4).map((path) async {
+        if (_filterActive) return;
         try {
           await client.remove(path);
           removed++;
@@ -223,6 +247,7 @@ class ImmutableSyncLog {
   }
 
   Future<String> publish(List<RowSyncRecord> records) async {
+    if (_filterActive) records = await filterPending!(records);
     final source = File('${staging.path}/publish-log.db');
     if (await source.exists()) await source.delete();
     // Sorting gives identical batches the same bytes/name on every client.
@@ -243,6 +268,12 @@ class ImmutableSyncLog {
     final folder = '${SyncPaths.recordLog}/${digest.substring(0, 1)}';
     final target = '$folder/$digest.db';
     await client.mkdirAll(folder);
+    if (_filterActive) {
+      final records = await RowSyncArchive.read(source.path);
+      if (!sameSyncRecords(records, await filterPending!(records))) {
+        throw StateError('私密书籍状态已改变，请重新同步');
+      }
+    }
     // Plain PUT is allowed ONLY for this content-addressed, immutable object,
     // never database8.db. Retrying the same name can only resend the same bytes.
     await client.uploadFile(source.path, target);

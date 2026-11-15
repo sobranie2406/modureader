@@ -17,7 +17,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-      'published signed catalog admits both optional plugins with the production key',
+      'published signed catalog admits optional plugins with the production key',
       () async {
     SharedPreferences.setMockInitialValues(
         {'experimentalPluginsEnabled': true});
@@ -36,7 +36,11 @@ void main() {
       final catalog = await PluginCatalogSignature().decode(envelope);
       final entries = PluginCatalog.parse(jsonEncode(catalog));
       await host.trust.acceptCatalog(envelope);
-      for (final name in ['dictionary-transform', 'web-clipper']) {
+      for (final name in [
+        'dictionary-transform',
+        'web-clipper',
+        'private-books-1.1.0'
+      ]) {
         final sources = <String, String>{};
         await for (final file
             in Directory('test/fixtures/plugins/$name').list()) {
@@ -53,9 +57,11 @@ void main() {
         expect(host.byId(manifest.id)!.status, PluginStatus.enabled);
         expect(
             host.manifestFor(manifest.id)!.capabilities,
-            contains(name == 'dictionary-transform'
-                ? kDictionaryTransformCapability
-                : kArticleCaptureCapability));
+            contains(switch (name) {
+              'dictionary-transform' => kDictionaryTransformCapability,
+              'web-clipper' => kArticleCaptureCapability,
+              _ => kBookActionCapability
+            }));
         expect(await host.trust.reviewedFiles(manifest.id, manifest.version),
             isNotNull);
       }

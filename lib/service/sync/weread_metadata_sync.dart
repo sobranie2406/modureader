@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/sync/private_book_sync_client.dart';
 import 'package:modu_reader/service/sync/sync_client_base.dart';
 import 'package:modu_reader/service/weread/weread_store.dart';
 import 'package:crypto/crypto.dart';
@@ -38,7 +40,9 @@ class WereadMetadataSync {
     try {
       final localBooks = <Book>[];
       for (final book in books) {
-        if (!book.isDeleted && _md5.hasMatch(book.md5?.toLowerCase() ?? '')) {
+        if (!book.isDeleted &&
+            PrivateLibrary.instance.canSyncBook(book) &&
+            _md5.hasMatch(book.md5?.toLowerCase() ?? '')) {
           localBooks.add(book);
         }
       }
@@ -57,13 +61,14 @@ class WereadMetadataSync {
                   entry.name!,
             };
       for (final book in localBooks) {
+        if (!PrivateLibrary.instance.canSyncBook(book)) continue;
         final id = book.md5!.toLowerCase();
         final local = store(book);
         if (WereadData.revision(await local.read()) == null &&
             !folders.contains(id)) {
           continue;
         }
-        await _syncBook(id, local, staging);
+        await _syncBook(book, id, local, staging);
       }
     } finally {
       try {
@@ -89,21 +94,21 @@ class WereadMetadataSync {
     return WereadData.normalize(raw['data']);
   }
 
-  Future<void> _download(String path, File file) =>
+  Future<void> _download(String path, File file, SyncClientBase client) =>
       client.downloadFile(path, file.path, onProgress: (bytes, _) {
         if (bytes > WereadData.maxBytes) {
           throw const FormatException('WeRead sync exceeds limit');
         }
       });
 
-  Future<void> _publish(
-      File file, String folder, String id, Directory stage) async {
+  Future<void> _publish(File file, String folder, String id, Directory stage,
+      SyncClientBase client) async {
     final name = file.uri.pathSegments.last;
     await _read(file, name, id);
     await client.mkdirAll(folder);
     await client.uploadFile(file.path, '$folder/$name');
     final verify = File('${stage.path}/verify.json');
-    await _download('$folder/$name', verify);
+    await _download('$folder/$name', verify, client);
     await _read(verify, name, id);
     final cached = File('${cache.path}/weread-sync-verified/$name');
     await cached.parent.create(recursive: true);
@@ -111,7 +116,11 @@ class WereadMetadataSync {
     await file.delete();
   }
 
-  Future<void> _syncBook(String id, WereadStore local, Directory stage) async {
+  Future<void> _syncBook(
+      Book book, String id, WereadStore local, Directory stage) async {
+    final client = PrivateBookSyncClient(
+        this.client, () => PrivateLibrary.instance.canSyncBook(book));
+    client.check();
     final folder = '$root/$id';
     final destination =
         sha256.convert(utf8.encode(jsonEncode(client.syncIdentity)));
@@ -120,7 +129,7 @@ class WereadMetadataSync {
     await pending.create(recursive: true);
     await for (final file in pending.list(followLinks: false)) {
       if (file is File && _name.hasMatch(file.uri.pathSegments.last)) {
-        await _publish(file, folder, id, stage);
+        await _publish(file, folder, id, stage, client);
       }
     }
     final names = <String>[];
@@ -154,7 +163,7 @@ class WereadMetadataSync {
       }
       if (incoming == null) {
         final download = File('${stage.path}/incoming.json');
-        await _download('$folder/$name', download);
+        await _download('$folder/$name', download, client);
         incoming = await _read(download, name, id);
         await file.parent.create(recursive: true);
         await download.copy(file.path);
@@ -166,7 +175,9 @@ class WereadMetadataSync {
       merged = WereadData.merge(merged, incoming);
     }
     // Rereads under the store lock so an association changed during download wins.
+    client.check();
     merged = await local.merge(merged);
+    client.check();
     if (WereadData.revision(merged) == null) return;
     final bytes =
         utf8.encode(jsonEncode({'version': 1, 'bookMd5': id, 'data': merged}));
@@ -177,8 +188,8 @@ class WereadMetadataSync {
     if (!names.contains(name)) {
       final part = File('${pending.path}/$name.part');
       await part.writeAsBytes(bytes, flush: true);
-      await _publish(
-          await part.rename('${pending.path}/$name'), folder, id, stage);
+      await _publish(await part.rename('${pending.path}/$name'), folder, id,
+          stage, client);
     }
     // Only remove inputs read successfully and incorporated into this verified
     // successor. Concurrent uploads not in our listing remain untouched.

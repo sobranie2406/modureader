@@ -12,6 +12,7 @@ import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/page/plugins/article_capture_page.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:path/path.dart' as p;
 
@@ -27,17 +28,22 @@ Future<void> runPluginAction(BuildContext context,
     PluginScriptRuntime? scriptRuntime,
     PrivateLibrary? privateLibrary,
     Future<List<Book>> Function()? selectBooks}) async {
-  final runtime = scriptRuntime ?? PluginScriptRuntime.instance;
+  final runtime = scriptRuntime ?? PluginHost.runtimeFor(pluginId);
+  final ownerManifest = runtime.host.manifestFor(pluginId);
+  var invocationActive = true;
+  var privateDataUsed = false, contextRevoked = false;
   final privacy = privateLibrary ?? PrivateLibrary.instance;
   final messenger = ScaffoldMessenger.maybeOf(context);
   String t(String zh, String en) => ModuStrings.text(context, zh, en);
   bool current() =>
+      invocationActive &&
+      !contextRevoked &&
       context.mounted &&
+      identical(runtime.host.manifestFor(pluginId), ownerManifest) &&
       runtime.isRunning(pluginId) &&
       runtime.host.isScriptRunnable(pluginId);
   Book? book;
   final exposedBooks = <Book>[];
-  var privateDataUsed = false, contextRevoked = false;
   ModalRoute<dynamic>? resultRoute;
   NavigatorState? resultNavigator;
   bool readable() =>
@@ -69,6 +75,16 @@ Future<void> runPluginAction(BuildContext context,
     }
   }
 
+  void ownerChanged() {
+    if (!identical(runtime.host.manifestFor(pluginId), ownerManifest) ||
+        !runtime.host.isScriptRunnable(pluginId)) {
+      contextRevoked = true;
+      runtime.cancelPlugin(pluginId);
+      dismissResult();
+    }
+  }
+
+  runtime.host.addListener(ownerChanged);
   privacy.addListener(policyChanged);
   try {
     if (bookId != null) {
@@ -104,7 +120,8 @@ Future<void> runPluginAction(BuildContext context,
               if (args.isNotEmpty) {
                 throw const PluginScriptFailure('permission');
               }
-              unawaited(showArticleCapturePage(context, pluginId: pluginId));
+              unawaited(showArticleCapturePage(context,
+                  pluginId: pluginId, host: runtime.host));
               return {'opened': true};
             case 'privateLibrary.open':
               if (!privacy.active) {
@@ -203,6 +220,7 @@ Future<void> runPluginAction(BuildContext context,
           }
           throw const PluginScriptFailure('permission');
         });
+    invocationActive = false;
     messenger?.hideCurrentSnackBar();
     if (!context.mounted || !readable()) return;
     final text = result['text'] as String? ?? '';
@@ -261,6 +279,8 @@ Future<void> runPluginAction(BuildContext context,
     };
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   } finally {
+    invocationActive = false;
+    runtime.host.removeListener(ownerChanged);
     privacy.removeListener(policyChanged);
   }
 }

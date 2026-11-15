@@ -12,15 +12,15 @@ class PluginDictionaryTransform {
   })  : _runtime = runtime,
         _registry = registry ?? PluginScriptActionRegistry.instance;
 
-  PluginScriptRuntime? _runtime;
+  final PluginScriptRuntime? _runtime;
   final PluginScriptActionRegistry _registry;
-  final _pending = <String>{};
+  final _pending = <String, PluginScriptRuntime>{};
   int _generation = 0;
 
   void cancel() {
     _generation++;
-    for (final id in _pending) {
-      _runtime?.cancelPlugin(id);
+    for (final entry in _pending.entries) {
+      entry.value.cancelPlugin(entry.key);
     }
     _pending.clear();
   }
@@ -44,12 +44,12 @@ class PluginDictionaryTransform {
         PluginHost.isEnabled &&
         Prefs().experimentalPluginsEnabled;
     final result = <String>{};
-    final runtime = _runtime ??= PluginScriptRuntime.instance;
     for (final registered in actions) {
+      final runtime = _runtime ?? PluginHost.runtimeFor(registered.pluginId);
       if (!current()) return [];
       if (!identical(_registry.byId(registered.id), registered)) continue;
       if (runtime.isRunning(registered.pluginId)) continue;
-      _pending.add(registered.pluginId);
+      _pending[registered.pluginId] = runtime;
       try {
         final value = await runtime.run(
             pluginId: registered.pluginId,

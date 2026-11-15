@@ -7,6 +7,8 @@ import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/models/selection_toolbar.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_labels.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugins_page.dart';
+import 'package:modu_reader/page/settings_page/private_library_page.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/config/config_item.dart';
 import 'package:modu_reader/service/plugins/handlers/selection_action_handler.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
@@ -33,7 +35,7 @@ class PluginDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([host, Prefs()]),
+      animation: Listenable.merge([host, Prefs(), PrivateLibrary.instance]),
       builder: (context, _) {
         final record = host.byId(pluginId);
         return Scaffold(
@@ -49,6 +51,7 @@ class PluginDetailPage extends StatelessWidget {
                       'This plugin is no longer installed.')),
                 )
               : ListView(
+                  key: const ValueKey('plugin-details-scroll'),
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
                     _basicSection(context, record),
@@ -57,6 +60,21 @@ class PluginDetailPage extends StatelessWidget {
                     if (host.manifestFor(pluginId)?.settings.isNotEmpty ??
                         false)
                       _settingsSection(context),
+                    if (record.status == PluginStatus.enabled &&
+                        PrivateLibrary.instance.active &&
+                        (host
+                                .manifestFor(pluginId)
+                                ?.capabilities
+                                .contains(kLibraryPrivateCapability) ??
+                            false))
+                      SettingsSection.content(
+                        key: const ValueKey('plugin-private-library-settings'),
+                        title: Text(ModuStrings.text(
+                            context, '私密书籍设置', 'Private book settings')),
+                        padding: EdgeInsets.zero,
+                        child: PrivateLibrarySettings(
+                            library: PrivateLibrary.instance, embedded: true),
+                      ),
                     _readmeSection(context),
                     _diagnosticSection(context, record),
                   ],
@@ -119,6 +137,12 @@ class PluginDetailPage extends StatelessWidget {
             .whereType<ScriptActionContribution>()
             .toList() ??
         const <ScriptActionContribution>[];
+    final bookActions = host
+            .manifestFor(pluginId)
+            ?.contributions
+            .whereType<BookActionContribution>()
+            .toList() ??
+        const <BookActionContribution>[];
     final toolbarItems = Prefs().selectionToolbar.items;
     final usedSlots = toolbarItems
         .where((item) =>
@@ -131,7 +155,7 @@ class PluginDetailPage extends StatelessWidget {
     return SettingsSection(
       title: Text(ModuStrings.text(context, '贡献内容', 'Contributions')),
       tiles: [
-        if (record.applied.isEmpty && scripts.isEmpty)
+        if (record.applied.isEmpty && scripts.isEmpty && bookActions.isEmpty)
           CustomSettingsTile(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -140,8 +164,9 @@ class PluginDetailPage extends StatelessWidget {
             ),
           )
         else
-          for (final applied in record.applied
-              .where((entry) => entry.kind != kScriptActionContributionKind))
+          for (final applied in record.applied.where((entry) =>
+              entry.kind != kScriptActionContributionKind &&
+              entry.kind != kBookActionContributionKind))
             CustomSettingsTile(
               child: ListTile(
                 leading: Icon(applied.kind == kSelectionActionContributionKind
@@ -181,6 +206,18 @@ class PluginDetailPage extends StatelessWidget {
                       }
                     }
                   : null,
+            ),
+          ),
+        for (final action in bookActions)
+          CustomSettingsTile(
+            child: ListTile(
+              key: ValueKey('plugin-book-action-${action.id}'),
+              leading: const Icon(Icons.menu_book_outlined),
+              title: Text(action.name
+                  .resolve(Localizations.localeOf(context).toLanguageTag())),
+              subtitle: Text(ModuStrings.text(
+                  context, '在书籍长按操作菜单中使用', 'Use from the book actions menu')),
+              enabled: record.status == PluginStatus.enabled,
             ),
           ),
         if (hasActions)
@@ -227,9 +264,10 @@ class PluginDetailPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: _PluginSettingsForm(
-              key: ValueKey('plugin-settings-${manifest.id}'),
+              key: ObjectKey(manifest),
               pluginId: manifest.id,
               manifest: manifest,
+              host: host,
             ),
           ),
         ),
@@ -314,10 +352,12 @@ class _PluginSettingsForm extends StatefulWidget {
     super.key,
     required this.pluginId,
     required this.manifest,
+    required this.host,
   });
 
   final String pluginId;
   final PluginManifest manifest;
+  final PluginHost host;
 
   @override
   State<_PluginSettingsForm> createState() => _PluginSettingsFormState();
@@ -333,7 +373,7 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   void initState() {
     super.initState();
     _config = PluginConfig.sanitize(
-        widget.manifest, Prefs().pluginConfig(widget.pluginId));
+        widget.manifest, widget.host.configFor(widget.pluginId));
   }
 
   @override
@@ -355,8 +395,12 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   Future<void> _save() async {
     _saveTimer = null;
     if (!_dirty) return;
+    if (!identical(widget.host.manifestFor(widget.pluginId), widget.manifest)) {
+      _dirty = false;
+      return;
+    }
     try {
-      await Prefs().savePluginConfig(widget.pluginId, _config);
+      await widget.host.saveConfig(widget.pluginId, _config);
       _dirty = false;
       if (mounted && _saveFailed) setState(() => _saveFailed = false);
     } catch (_) {

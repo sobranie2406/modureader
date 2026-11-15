@@ -1,4 +1,6 @@
 import 'package:modu_reader/service/sync/book_cloud_deletions.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/sync/private_book_sync_client.dart';
 import 'package:modu_reader/service/book_local_sources.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:async';
@@ -716,12 +718,15 @@ class Sync extends _$Sync {
   }
 
   Future<void> queueCloudBookDeletion(Iterable<Book> books) async {
+    final publicBooks =
+        books.where(PrivateLibrary.instance.canSyncBook).toList();
+    if (publicBooks.isEmpty) return;
     final client = _syncClient;
     if (client == null || !client.isConfigured) {
       throw StateError('Sync is not configured');
     }
     await BookCloudDeletions(io.File(getBasePath('book_cloud_deletions.json')))
-        .enqueue(client, books);
+        .enqueue(client, publicBooks);
     await _pendingSync.request();
   }
 
@@ -731,14 +736,23 @@ class Sync extends _$Sync {
 
     AnxLog.info('Sync: syncFiles');
     final localBooks = await bookDao.selectNotDeleteBooks();
+    final allBooks = await bookDao.selectAllBooks();
+    bool allowed(String path) => canSyncBookAsset(allBooks, path);
     final bookFiles = {
-      for (final book in localBooks
-          .where((book) => !book.isLinked && !book.isRemovedLocally))
+      for (final book in localBooks.where((book) =>
+          !book.isLinked &&
+          !book.isRemovedLocally &&
+          PrivateLibrary.instance.canSyncBook(book) &&
+          allowed(book.filePath)))
         book.filePath: book.fileFullPath
     };
     final currentBooks = bookFiles.keys.toList();
-    List<String> currentCover =
-        (await bookDao.getCurrentCover()).where((p) => p.isNotEmpty).toList();
+    final currentCover = localBooks
+        .map((book) => book.coverPath)
+        .where((path) => path.isNotEmpty && allowed(path))
+        .toSet()
+        .toList();
+    if (currentBooks.isEmpty && currentCover.isEmpty) return;
 
     final listing = assetListing ?? SyncAssetListing(client);
     if (!identical(listing.client, client)) {
@@ -749,13 +763,15 @@ class Sync extends _$Sync {
 
     // Sync cover files
     for (var file in currentCover) {
+      if (!allowed(file)) continue;
       if (!remoteCoversName.contains(file) &&
           io.File(getBasePath(file)).existsSync()) {
         await uploadFile(getBasePath(file), SyncPaths.data(file));
         listing.uploaded(file);
       }
       if (!io.File(getBasePath(file)).existsSync() &&
-          remoteCoversName.contains(file)) {
+          remoteCoversName.contains(file) &&
+          allowed(file)) {
         await downloadFile(SyncPaths.data(file), getBasePath(file));
       }
     }
@@ -765,6 +781,7 @@ class Sync extends _$Sync {
       client: client,
       currentPaths: currentBooks,
       listedPaths: remoteBooksName,
+      canSyncPath: allowed,
       onRemotePresent: listing.uploaded,
       localFile: (path) => io.File(bookFiles[path]!),
       upload: (local, remote) async {
@@ -860,11 +877,28 @@ class Sync extends _$Sync {
     );
   }
 
+  Future<SyncClientBase> _assetTransferClient(
+      SyncClientBase client, String remotePath) async {
+    const prefix = '${SyncPaths.root}/data/';
+    if (!remotePath.startsWith(prefix)) return client;
+    final path = remotePath.substring(prefix.length);
+    if (!path.startsWith('file/') && !path.startsWith('cover/')) return client;
+    final books = await bookDao.selectAllBooks();
+    final guarded =
+        PrivateBookSyncClient(client, () => canSyncBookAsset(books, path));
+    guarded.check();
+    return guarded;
+  }
+
   Future<void> uploadFile(
     String localPath,
     String remotePath, [
     bool replace = true,
   ]) async {
+    final configured = _syncClient;
+    final client = configured == null
+        ? null
+        : await _assetTransferClient(configured, remotePath);
     changeState(state.copyWith(
       direction: SyncDirection.upload,
       fileName: localPath.split('/').last,
@@ -872,7 +906,6 @@ class Sync extends _$Sync {
       total: 0,
     ));
 
-    final client = _syncClient;
     if (client != null) {
       final status = ref.read(syncStatusProvider.notifier);
       var completed = false;
@@ -902,10 +935,11 @@ class Sync extends _$Sync {
 
   Future<void> downloadFile(String remotePath, String localPath,
       {String? expectedMd5}) async {
-    final client = _syncClient;
-    if (client == null) {
+    final configured = _syncClient;
+    if (configured == null) {
       throw const SyncFeedbackFailure(SyncFailureCode.notConfigured);
     }
+    final client = await _assetTransferClient(configured, remotePath);
     _activeDownloads++;
     changeState(state.copyWith(isSyncing: true));
     var completed = false;
@@ -973,6 +1007,8 @@ class Sync extends _$Sync {
   }
 
   Future<void> releaseBook(Book book) async {
+    book = await bookDao.selectBookById(book.id);
+    if (!PrivateLibrary.instance.canSyncBook(book)) return;
     if (book.isLinked) {
       AnxToast.show(ModuStrings.text(
           navigatorKey.currentContext!,
@@ -983,6 +1019,9 @@ class Sync extends _$Sync {
     final syncStatus = await ref.read(syncStatusProvider.future);
 
     Future<void> deleteLocalBook() async {
+      if (!PrivateLibrary.instance.canSyncBook(book)) {
+        throw const PrivateBookSyncBlocked();
+      }
       final client = _syncClient;
       if (client != null) {
         await WereadMetadataSync(
@@ -995,6 +1034,9 @@ class Sync extends _$Sync {
           cache: await getAnxCacheDir(),
           durableDirectory: await getAnxDataBasesDir(),
         ).sync([book]);
+      }
+      if (!PrivateLibrary.instance.canSyncBook(book)) {
+        throw const PrivateBookSyncBlocked();
       }
       await io.File(book.fileFullPath).delete();
       await BookSources.store?.remove(book.md5, book.filePath);
@@ -1032,8 +1074,13 @@ class Sync extends _$Sync {
   }
 
   Future<void> downloadMultipleBooks(List<int> bookIds) async {
-    AnxLog.info(
-        'WebDAV: Starting download for ${bookIds.length} remote books.');
+    final books = <Book>[];
+    for (final id in bookIds) {
+      final book = await bookDao.selectBookById(id);
+      if (PrivateLibrary.instance.canSyncBook(book)) books.add(book);
+    }
+    if (books.isEmpty) return;
+    AnxLog.info('WebDAV: Starting download for ${books.length} remote books.');
     int successCount = 0;
     int failCount = 0;
 
@@ -1050,12 +1097,15 @@ class Sync extends _$Sync {
       return;
     }
 
-    for (final bookId in bookIds) {
+    for (final book in books) {
+      final bookId = book.id;
+      if (!PrivateLibrary.instance.canSyncBook(book)) continue;
       try {
-        final book = await bookDao.selectBookById(bookId);
         AnxLog.info('WebDAV: Downloading book ID $bookId: ${book.title}');
         await _downloadBook(book);
         successCount++;
+      } on PrivateBookSyncBlocked {
+        continue;
       } catch (e) {
         AnxLog.severe('WebDAV: Failed to download book ID $bookId: $e');
         failCount++;
@@ -1094,6 +1144,9 @@ class Sync extends _$Sync {
       // A shelf widget can still hold the pre-replacement filename.
       book = await bookDao.selectBookById(book.id);
       if (book.isDeleted) return;
+      if (!PrivateLibrary.instance.canSyncBook(book)) {
+        throw const PrivateBookSyncBlocked();
+      }
       if (book.isLinked && !asInternalCopy) {
         throw StateError(
             '原位书籍未上传原书，请在当前设备重新授权或普通导入。 / Add the original in place or import it on this device.');
@@ -1149,6 +1202,8 @@ class Sync extends _$Sync {
         }
       }
       await ref.read(bookListProvider.notifier).refresh();
+    } on PrivateBookSyncBlocked {
+      rethrow;
     } catch (e) {
       AnxToast.show(e is BookFileIntegrityException
           ? bookIntegrityFailureMessage(chinese: _chineseFeedback)

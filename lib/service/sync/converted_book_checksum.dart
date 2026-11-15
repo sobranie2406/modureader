@@ -6,6 +6,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:xml/xml.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/private_library.dart';
 
 import 'row_sync_store.dart';
 import 'sync_paths.dart';
@@ -60,6 +62,8 @@ class ConvertedBookChecksum {
       ${bookId == null ? '' : 'AND b.id=?'}''', bookId == null ? [] : [bookId]);
     var repaired = 0;
     for (final row in rows) {
+      final book = Book.fromDb(row);
+      if (!PrivateLibrary.instance.canSyncBook(book)) continue;
       final expected = row['file_md5'];
       if (expected is! String || !_digest.hasMatch(expected)) continue;
       final path = row['file_path'] as String;
@@ -87,6 +91,7 @@ class ConvertedBookChecksum {
         continue;
       }
       await db.transaction((txn) async {
+        if (!PrivateLibrary.instance.canSyncBook(book)) return;
         // A replacement, deletion or concurrent sync may have happened during IO.
         final current = await txn.query('tb_books',
             columns: ['id'],

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/sync/private_book_sync_client.dart';
 import 'package:modu_reader/service/knowledge/book_index_lock.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:modu_reader/service/knowledge/book_source_fingerprint.dart';
@@ -54,10 +56,17 @@ class KnowledgeIndexSync {
     try {
       for (final book in books) {
         if (!enabled()) break;
-        if (book.isDeleted || !await sourceFile(book).exists()) continue;
+        if (book.isDeleted ||
+            !PrivateLibrary.instance.canSyncBook(book) ||
+            !await sourceFile(book).exists()) {
+          continue;
+        }
+        final client = PrivateBookSyncClient(
+            this.client, () => PrivateLibrary.instance.canSyncBook(book));
         await withBookIndexLock(book.id, () async {
           final temporary = await temporaryRoot.createTemp('book-');
           try {
+            client.check();
             if (!enabled() || book.isDeleted || !await isBookCurrent(book)) {
               return;
             }
@@ -154,6 +163,7 @@ class KnowledgeIndexSync {
               return;
             }
             // All identity/format checks finished before touching the active index.
+            client.check();
             await file.parent.create(recursive: true);
             final staging = File('${file.path}.sync-import');
             await File(staged).copy(staging.path);
@@ -163,7 +173,9 @@ class KnowledgeIndexSync {
               await staging.delete();
               return;
             }
+            client.check();
             await staging.rename(file.path);
+            client.check();
             final summary = File('${file.path}.summary');
             final summaryData =
                 jsonDecode(await File('$staged.summary').readAsString()) as Map;

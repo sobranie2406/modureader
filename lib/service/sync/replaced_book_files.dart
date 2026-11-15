@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/sync/private_book_sync_client.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:modu_reader/service/sync/immutable_sync_log.dart';
 import 'package:modu_reader/service/sync/row_sync_engine.dart';
@@ -35,6 +37,11 @@ class ReplacedBookFiles {
   static Future<void> record(
       DatabaseExecutor txn, Map<String, Object?> old, String nextPath) async {
     final oldPath = old['file_path'];
+    if (!PrivateLibrary.instance.canSyncSource(
+        md5: old['file_md5'] is String ? old['file_md5'] as String : null,
+        filePath: oldPath is String ? oldPath : null)) {
+      return;
+    }
     if (oldPath == nextPath) return;
     if (!_bookPath(oldPath) || !_bookPath(nextPath)) return;
     final identity = await txn.query(syncRecordsTable,
@@ -157,6 +164,10 @@ class ReplacedBookFiles {
   }
 
   Future<int> reclaim() async {
+    // Historical cloud logs cannot prove an old file has no private owner.
+    if (PrivateLibrary.instance.hasSyncExclusions) return 0;
+    final client = PrivateBookSyncClient(
+        this.client, () => !PrivateLibrary.instance.hasSyncExclusions);
     final endpoint = _endpoint;
     final staging = await cache.createTemp('modu-replaced-files-');
     var reclaimed = 0;
@@ -165,9 +176,11 @@ class ReplacedBookFiles {
       // Another device (or an older release) may have performed the replacement.
       // Recover explicit old paths from verified records for the SAME stable book
       // identity, never infer relationships from a title, timestamp or file size.
-      await _rememberHistory(staging);
+      await _rememberHistory(staging, client);
+      if (PrivateLibrary.instance.hasSyncExclusions) return 0;
       final pending = await store.db.query(table);
       for (final item in pending) {
+        if (PrivateLibrary.instance.hasSyncExclusions) return reclaimed;
         if (_endpoint != endpoint) throw StateError('Sync endpoint changed');
         final oldPath = item['old_path'];
         final oldMd5 = item['old_md5'];
@@ -178,6 +191,7 @@ class ReplacedBookFiles {
         }
         final path = SyncPaths.data(oldPath as String);
         final props = await client.readProps(path);
+        if (PrivateLibrary.instance.hasSyncExclusions) return reclaimed;
         if (props == null) continue;
         if (props.isDir != false ||
             props.size == null ||
@@ -186,7 +200,8 @@ class ReplacedBookFiles {
           continue;
         }
 
-        final cloud = await _cloudSnapshot(staging);
+        final cloud = await _cloudSnapshot(staging, client);
+        if (PrivateLibrary.instance.hasSyncExclusions) return reclaimed;
         final local = await store.snapshot();
         final replacement = _eligible(item, local, cloud);
         if (replacement == null) continue;
@@ -197,13 +212,13 @@ class ReplacedBookFiles {
         // A database pointer or successful PUT alone is not proof of a complete
         // replacement. Read back the bytes before touching the old object.
         final next = File('${staging.path}/replacement');
-        if (!await _downloadBook(SyncPaths.data(nextPath), next) ||
+        if (!await _downloadBook(SyncPaths.data(nextPath), next, client) ||
             (await md5.bind(next.openRead()).first).toString() !=
                 nextMd5.toLowerCase()) {
           continue;
         }
         final old = File('${staging.path}/old');
-        if (!await _downloadBook(path, old) ||
+        if (!await _downloadBook(path, old, client) ||
             (await md5.bind(old.openRead()).first).toString() !=
                 oldMd5.toLowerCase()) {
           continue;
@@ -217,7 +232,7 @@ class ReplacedBookFiles {
         final verify = File('${staging.path}/verify');
         // A previously denied DELETE must not re-upload the same recovery
         // copy on every sync. Reuse it only after verifying its actual bytes.
-        final backupExists = await _downloadBook(backup, verify);
+        final backupExists = await _downloadBook(backup, verify, client);
         if (!backupExists ||
             (await sha256.bind(verify.openRead()).first).toString() != digest) {
           await client.mkdirAll(folder);
@@ -230,11 +245,11 @@ class ReplacedBookFiles {
 
         // Recheck both endpoints after all slow transfers. Any concurrent change
         // postpones cleanup; nothing is inferred from titles or timestamps.
-        if (!await _downloadBook(path, verify) ||
+        if (!await _downloadBook(path, verify, client) ||
             (await sha256.bind(verify.openRead()).first).toString() != digest) {
           continue;
         }
-        final freshCloud = await _cloudSnapshot(staging);
+        final freshCloud = await _cloudSnapshot(staging, client);
         final freshLocal = await store.snapshot();
         if (!_sameBookReferences(cloud, freshCloud) ||
             !_sameBookReferences(local, freshLocal) ||
@@ -242,6 +257,7 @@ class ReplacedBookFiles {
           continue;
         }
         if (_endpoint != endpoint) throw StateError('Sync endpoint changed');
+        if (PrivateLibrary.instance.hasSyncExclusions) return reclaimed;
         await client.remove(path);
         reclaimed++;
       }
@@ -251,7 +267,8 @@ class ReplacedBookFiles {
     }
   }
 
-  Future<void> _rememberHistory(Directory staging) async {
+  Future<void> _rememberHistory(
+      Directory staging, SyncClientBase client) async {
     final local = {
       for (final record in await store.snapshot())
         if (record.kind == 'book' && !record.deleted) record.id: record,
@@ -302,7 +319,8 @@ class ReplacedBookFiles {
         b.where((r) => r.kind == 'book' || r.kind == 'life'),
       );
 
-  Future<bool> _downloadBook(String path, File target) async {
+  Future<bool> _downloadBook(
+      String path, File target, SyncClientBase client) async {
     final props = await client.readProps(path);
     if (props?.isDir != false ||
         props?.size == null ||
@@ -345,7 +363,8 @@ class ReplacedBookFiles {
     return a.single;
   }
 
-  Future<List<RowSyncRecord>> _cloudSnapshot(Directory staging) async {
+  Future<List<RowSyncRecord>> _cloudSnapshot(
+      Directory staging, SyncClientBase client) async {
     final log = ImmutableSyncLog(client, staging, cache,
         durableDirectory: durableDirectory);
     final journal = await log.read();

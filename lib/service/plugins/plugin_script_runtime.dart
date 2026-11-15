@@ -29,11 +29,13 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     PluginNetworkGuard? networkGuard,
     PluginHttpClient? httpClient,
     this.timeout = const Duration(seconds: 10),
+    this.onDiagnostic,
   })  : _host = host,
         _engineFactory = engineFactory ?? WebViewPluginScriptEngine.new,
         _guard = networkGuard ?? PluginNetworkGuard(),
         _http = httpClient ?? PluginHttpClient(budget: PluginHttpBudget()) {
     WidgetsBinding.instance.addObserver(this);
+    this.host.registerRuntime(this);
   }
 
   static PluginScriptRuntime? _instance;
@@ -55,6 +57,20 @@ class PluginScriptRuntime with WidgetsBindingObserver {
   final PluginNetworkGuard _guard;
   final PluginHttpClient _http;
   final Duration timeout;
+  final void Function(Map<String, Object>)? onDiagnostic;
+  void _diagnostic(
+      String id, String action, String stage, String code, int elapsed) {
+    try {
+      onDiagnostic?.call({
+        'id': id,
+        'action': action,
+        'stage': stage,
+        'code': code,
+        'elapsedMs': elapsed
+      });
+    } catch (_) {/* Observer only. */}
+  }
+
   final _jobs = <String, _ScriptJob>{};
   static const maxInputBytes = 64 * 1024, maxResultBytes = 64 * 1024;
   bool isRunning(String id) => _jobs[id]?.result.isCompleted == false;
@@ -90,6 +106,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     final job = _ScriptJob(
         _engineFactory(), pluginId, record.version, action.id, isContextValid);
     _jobs[pluginId] = job;
+    _diagnostic(pluginId, action.id, 'validate', 'started', 0);
     final limit = action.surface == PluginScriptSurface.dictionary &&
             timeout > const Duration(seconds: 2)
         ? const Duration(seconds: 2)
@@ -135,7 +152,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       }
       _check(id, job);
       job.stage = 'input';
-      final config = Prefs().pluginConfig(id);
+      final config = host.configFor(id);
       final settings = <String, Object?>{
         for (final spec in manifest.settings)
           if (!spec.isSecret && spec.type != PluginSettingType.tip)
@@ -181,6 +198,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
           (result['title'] as String? ?? '').length > 120) {
         throw const PluginScriptFailure('result');
       }
+      _diagnostic(id, action.id, 'result', 'completed',
+          job.elapsed.elapsedMilliseconds);
       job.result.complete(result);
     } on PluginScriptFailure catch (error) {
       _completeFailure(job, error);
@@ -314,7 +333,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         job.elapsed.elapsedMilliseconds);
   }
 
-  static void _logFailure(String id, String version, String action, String code,
+  void _logFailure(String id, String version, String action, String code,
       String stage, int elapsed) {
     String token(String value) =>
         RegExp(r'^[A-Za-z0-9_.-]{1,80}$').hasMatch(value) ? value : 'unknown';
@@ -334,6 +353,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     final message =
         'Plugin script failed: plugin=${token(id)} version=${token(version)} '
         'action=${token(action)} code=$safeCode stage=${token(stage)} elapsed_ms=$elapsed';
+    _diagnostic(token(id), token(action), token(stage), safeCode, elapsed);
+    if (host.development) return;
     if (safeCode == 'cancelled') {
       AnxLog.info(message);
     } else {
@@ -363,6 +384,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
 
   void dispose() {
     cancelAll();
+    host.unregisterRuntime(this);
     WidgetsBinding.instance.removeObserver(this);
   }
 }

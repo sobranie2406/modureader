@@ -1,12 +1,18 @@
 # Plugin trust / 插件审核与上架
 
-Only releases listed in the project-reviewed catalog can run. The official source
+Ordinary plugin installation and execution require the project-reviewed catalog. The official source
 is https://github.com/sobranie2406/modu-plugin. Repository commits are not admission:
 `catalog.source.json` is the readable review record, and `catalog.json` is its
 Ed25519-signed envelope. Modu embeds the verification public key, never the signing
 key. Unsigned catalogs, altered payloads and unknown signing keys are rejected.
 
-只有官方插件仓库中审核上架的版本可以启用。提交源码不等于上架；目录签名和包内每个文件都必须校验通过。
+普通安装只启用官方插件仓库中审核上架的版本。提交源码不等于上架；目录签名和包内每个文件都必须校验通过。
+
+The default-off [local development session](plugin-development.md#本机开发调试)
+is an explicit, user-enabled exception for device testing. Its packages, hashes,
+configuration and logs are temporary and separate from official trust. It cannot
+approve a release, overwrite a matching official ID or change normal installation
+checks. Closing the session or restarting removes execution authority.
 
 ## Download sources
 

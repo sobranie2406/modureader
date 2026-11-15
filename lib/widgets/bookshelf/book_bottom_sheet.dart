@@ -4,6 +4,11 @@ import 'package:modu_reader/service/book_source_actions.dart';
 import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/plugins/handlers/book_action_handler.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/widgets/plugins/plugin_book_action.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:modu_reader/service/book_local_sources.dart';
 import 'dart:math';
@@ -321,8 +326,16 @@ class BookBottomSheet extends ConsumerWidget {
 
     final zh = Localizations.localeOf(context).languageCode == 'zh';
     final pinned = ref.watch(bookshelfPinsProvider).contains(bookPinKey(book));
+    // The selected book can disappear as unlocking changes the shelf filter.
+    final actionContext =
+        Scaffold.maybeOf(context)?.context ?? Navigator.of(context).context;
     final menu = AnimatedBuilder(
-      animation: bookKnowledgeIndexQueue,
+      animation: Listenable.merge([
+        bookKnowledgeIndexQueue,
+        PluginBookActionRegistry.instance,
+        PluginHost.instance,
+        PrivateLibrary.instance,
+      ]),
       builder: (context, _) => FutureBuilder<bool>(
         future: BookKnowledgeIndexService().hasIndex(book),
         builder: (context, snapshot) {
@@ -489,6 +502,24 @@ class BookBottomSheet extends ConsumerWidget {
                   zh
                       ? (pinned ? '取消置顶' : '置顶')
                       : (pinned ? 'Unpin' : 'Pin to top')),
+              for (final action in PluginBookActionRegistry.instance.all
+                  .where(isPluginBookActionAvailable))
+                PopupMenuItem<BookAction>(
+                  key: ValueKey('book-plugin-action-${action.id}'),
+                  onTap: () =>
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (actionContext.mounted) {
+                      unawaited(runPluginBookAction(actionContext,
+                          item: action, book: book));
+                    }
+                  }),
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.extension_outlined),
+                    title: Text(action.action.name.resolve(
+                        Localizations.localeOf(context).toLanguageTag())),
+                  ),
+                ),
               entry(
                   BookAction.vectorize,
                   active
@@ -512,6 +543,7 @@ class BookBottomSheet extends ConsumerWidget {
                   L10n.of(context).bookSyncStatusReleaseSpace,
                   enabled: local &&
                       Prefs().webdavStatus &&
+                      PrivateLibrary.instance.canSyncBook(book) &&
                       !active &&
                       !book.isLinked),
               const PopupMenuDivider(),
@@ -530,7 +562,9 @@ class BookBottomSheet extends ConsumerWidget {
                   entry(BookAction.copyInternal, Icons.copy_outlined,
                       ModuStrings.text(context, '复制到默读', 'Copy into Modu'),
                       enabled: !active),
-                if (!local && Prefs().webdavStatus)
+                if (!local &&
+                    Prefs().webdavStatus &&
+                    PrivateLibrary.instance.canSyncBook(book))
                   entry(
                       BookAction.downloadInternal,
                       Icons.download,

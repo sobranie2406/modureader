@@ -123,25 +123,27 @@ void main() {
     expect(picked, isTrue);
   });
 
-  testWidgets('experimental switch requires confirmation on every enable',
+  testWidgets(
+      'global switch directly manages plugins and confirms every enable',
       (tester) async {
     await tester.runAsync(() => host.setExperimentalEnabled(false));
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: ExperimentalSettings(host: host))));
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: PluginSettings(host: host, catalog: _EmptyCatalog()))));
     await tester.pumpAndSettle();
     expect(find.text('Manage plugins'), findsNothing);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const ValueKey('experimental-plugins-switch')));
     await tester.pumpAndSettle();
     expect(find.text('Enable plugins?'), findsOneWidget);
     expect(Prefs().experimentalPluginsEnabled, isFalse);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(Prefs().experimentalPluginsEnabled, isFalse);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const ValueKey('experimental-plugins-switch')));
     await tester.pumpAndSettle();
     await tester
         .tap(find.byKey(const ValueKey('confirm-experimental-plugins')));
@@ -149,17 +151,31 @@ void main() {
       await settleAsync(tester);
     }
     expect(Prefs().experimentalPluginsEnabled, isTrue);
-    expect(find.text('Manage plugins'), findsOneWidget);
+    expect(find.text('Manage plugins'), findsNothing);
+    expect(find.text('Install plugin…'), findsOneWidget);
     expect(host.isInitialized, isTrue,
         reason: 'enabling must complete before another toggle');
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const ValueKey('experimental-plugins-switch')));
     await settleAsync(tester);
     expect(Prefs().experimentalPluginsEnabled, isFalse);
     expect(find.text('Manage plugins'), findsNothing);
-    await tester.tap(find.byType(Switch));
+    expect(find.text('Install plugin…'), findsNothing);
+    expect(find.byKey(const ValueKey('plugin-developer-switch')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('experimental-plugins-switch')));
     await tester.pumpAndSettle();
     expect(find.text('Enable plugins?'), findsOneWidget);
     expect(Prefs().experimentalPluginsEnabled, isFalse);
+  });
+
+  testWidgets('old experimental route opens plugin settings directly',
+      (tester) async {
+    await tester.runAsync(() => host.setExperimentalEnabled(false));
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: ExperimentalSettings(host: host))));
+    await tester.pumpAndSettle();
+    expect(find.byType(PluginSettings), findsOneWidget);
+    expect(find.text('Enable plugins'), findsOneWidget);
+    expect(find.text('Manage plugins'), findsNothing);
   });
 
   testWidgets('an installed plugin renders its name, version and status',
@@ -177,12 +193,14 @@ void main() {
     await installSample(tester);
     await pumpSettings(tester);
 
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(
+        find.byKey(const ValueKey('plugin-switch-com.example.prompt-pack')));
     await settleAsync(tester);
     expect(Prefs().userPrompts, isEmpty);
     expect(find.textContaining('v1.0.0 · Disabled'), findsOneWidget);
 
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(
+        find.byKey(const ValueKey('plugin-switch-com.example.prompt-pack')));
     await settleAsync(tester);
     expect(Prefs().userPrompts, hasLength(2));
   });

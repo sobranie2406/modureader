@@ -22,6 +22,63 @@ void main() {
   });
   tearDown(() => library.dispose());
 
+  test('sync exclusions outlive UI sessions and follow local file replacement',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setBooksPrivate([secret], true);
+    final replacement =
+        secret.copyWith(md5: 'replacement', filePath: 'new.epub');
+    expect(library.canSyncBook(replacement), false);
+    expect(library.isPrivate(replacement), true);
+    await library.setBooksPrivate([replacement], true);
+    await library.setEnabled(false);
+    library.setPluginActive(false);
+    expect(library.canRead(replacement), true);
+    expect(library.canSyncBook(replacement), false);
+    final restarted = PrivateLibrary(preferences: prefs);
+    addTearDown(restarted.dispose);
+    expect(restarted.canSyncBook(replacement), false);
+    expect(restarted.bookPredicate(), '1'); // Protection UI was explicitly off.
+    restarted.setPluginActive(true);
+    await restarted.unlock();
+    await restarted.setBooksPrivate([replacement], false);
+    expect(restarted.canSyncBook(replacement), true);
+    expect(restarted.hasSyncExclusions, false);
+  });
+
+  test('path marks survive later MD5 discovery; shared history stays local',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    final noHash = secret.copyWith(md5: '');
+    await library.setBooksPrivate([noHash], true);
+    await library.protectHistory('private-history');
+    expect(library.canSyncBook(secret), false);
+    expect(library.canSyncHistory('private-history'), false);
+    expect(library.canSyncHistory('legacy', unscoped: true), false);
+    expect(library.canSyncHistory('public'), true);
+    await library.clearProtection();
+    expect(library.canSyncBook(secret), true);
+    expect(library.canSyncHistory('private-history'), true);
+    expect(library.hasSyncExclusions, false);
+  });
+
+  test(
+      'protected conversations still require sanitization after book unmarking',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setBooksPrivate([secret], true);
+    await library.protectHistory('private-conversation');
+    await library.setBooksPrivate([secret], false);
+    expect(library.canSyncBook(secret), true);
+    expect(library.hasSyncExclusions, true);
+    expect(library.canSyncHistory('private-conversation'), false);
+    await library.clearProtection();
+    expect(library.hasSyncExclusions, false);
+  });
+
   test('no plugin adds no entrance or filtering; activation starts locked',
       () async {
     expect(library.showEntry, false);
@@ -120,6 +177,65 @@ void main() {
     expect(library.isPrivate(secret), true);
     expect(library.autoImport, false);
     expect(library.hasPin, false);
+  });
+
+  test('worker derivation accepts the existing PBKDF2-SHA256 PIN format',
+      () async {
+    await prefs.setString(
+        PrivateLibrary.storageKey,
+        jsonEncode({
+          'books': ['m:private'], 'salt': 'AAECAwQFBgcICQoLDA0ODw==',
+          // Independent PBKDF2-HMAC-SHA256 vector: 210000 rounds, 32-byte output.
+          'hash': '986qxnMbMmzuHyS3MK9F7gz4EXIuhMjAubUlwLFpHTo='
+        }));
+    library.setPluginActive(true);
+    expect(await library.unlock('654321'), false);
+    expect(await library.unlock('123456'), true);
+    expect(library.canRead(secret), true);
+  });
+
+  test('cancelling verification or PIN creation rejects late worker results',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setPin('123456');
+    library.lock();
+    final checking = library.unlock('123456');
+    library.cancelPendingAuthentication();
+    expect(await checking, false);
+    expect(library.unlocked, false);
+    await library.unlock('123456');
+    final before = prefs.getString(PrivateLibrary.storageKey);
+    final saving = library.setPin('654321');
+    final rejected = expectLater(saving, throwsStateError);
+    library.cancelPendingAuthentication();
+    await rejected;
+    expect(prefs.getString(PrivateLibrary.storageKey), before);
+    expect(library.unlocked, true);
+    library.lock();
+    expect(await library.unlock('123456'), true);
+  });
+
+  test('disposed authentication cannot unlock or notify a dead service',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setPin('123456');
+    final discarded = PrivateLibrary(preferences: prefs)..setPluginActive(true);
+    final checking = discarded.unlock('123456');
+    discarded.dispose();
+    expect(await checking, false);
+  });
+
+  test('reauthentication does not refresh unchanged library visibility',
+      () async {
+    library.setPluginActive(true);
+    await library.unlock();
+    await library.setPin('123456');
+    var notifications = 0;
+    library.addListener(() => notifications++);
+    expect(await library.unlock('123456'), true);
+    expect(notifications, 0);
   });
 
   test('automatic privacy applies only to new imports and works while locked',

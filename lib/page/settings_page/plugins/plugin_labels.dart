@@ -12,6 +12,8 @@ String pluginCapabilityLabel(BuildContext context, String capability) {
     case kSelectionActionCapability:
       return ModuStrings.text(
           context, '添加划词工具栏动作', 'Add selection toolbar actions');
+    case kBookActionCapability:
+      return ModuStrings.text(context, '添加书籍操作菜单', 'Add book menu actions');
     case 'storage:plugin':
       return ModuStrings.text(context, '使用插件私有目录', 'Use plugin storage');
     case kScriptRunCapability:

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:modu_reader/service/sync/immutable_sync_log.dart';
+import 'package:modu_reader/service/sync/private_book_sync.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:dio/dio.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
@@ -233,13 +235,23 @@ class RowSyncEngine {
     bool? atomicSupport;
     try {
       final log = ImmutableSyncLog(client, staging, cache,
-          durableDirectory: durableDirectory ?? cache);
+          durableDirectory: durableDirectory ?? cache,
+          filteringNeeded: () => PrivateLibrary.instance.hasSyncExclusions,
+          filterPending: (records) async {
+            if (!PrivateLibrary.instance.hasSyncExclusions) return records;
+            return PrivateBookSyncFilter(
+                    [...await store.snapshot(), ...records])
+                .allowedRecords(records);
+          });
       Future<RowSyncOutcome> finish(RowSyncOutcome outcome,
           {String? checkpoint}) async {
         // Maintenance is best-effort AFTER data synchronization. Upload/read-
         // back failure leaves every old input intact; DELETE failure leaves a
         // valid successor plus redundant inputs, never missing records.
         try {
+          // Existing cloud private copies remain untouched until an explicit
+          // user cleanup; compaction would republish or delete those batches.
+          if (PrivateLibrary.instance.hasSyncExclusions) return outcome;
           var removed = 0;
           if (checkpoint != null && log.hasReadBatches) {
             final verified = File('${staging.path}/verified-checkpoint.db');
@@ -331,15 +343,19 @@ class RowSyncEngine {
         // published, not mistaken for an unchanged already-normalized cloud.
         final remoteBaseline = mergeSyncRecords(remoteRecords, journal,
             reconcileBookIdentities: false);
-        remoteRecords = mergeSyncRecords(remoteBaseline, []);
-        final repairsRemoteIdentity =
-            !sameSyncRecords(remoteBaseline, remoteRecords);
-        var local = await store.snapshot();
+        var localSnapshot = await store.snapshot();
+        var privacy = PrivateBookSyncFilter(
+            [...localSnapshot, ...remoteBaseline, ...pendingRecords]);
+        remoteRecords =
+            mergeSyncRecords(privacy.allowedRecords(remoteBaseline), []);
+        final repairsRemoteIdentity = !sameSyncRecords(
+            privacy.allowedRecords(remoteBaseline), remoteRecords);
+        var local = privacy.allowedRecords(localSnapshot);
         if (!previewConfirmed) {
           final decision = await onPreview!(SyncPreviewContext(
             local: local,
             remote: remoteRecords,
-            pendingRecords: pendingRecords,
+            pendingRecords: privacy.allowedRecords(pendingRecords),
             localChangedAt: latestSyncRecordTime(local),
             remoteChangedAt: latestSyncRecordTime(remoteRecords),
             remoteFileAt: metadata?.mTime,
@@ -359,13 +375,19 @@ class RowSyncEngine {
             published = await log.resumePending() || published;
             pendingFiles = {};
           }
-          local = await store.snapshot();
+          localSnapshot = await store.snapshot();
+          privacy = PrivateBookSyncFilter(
+              [...localSnapshot, ...remoteBaseline, ...pendingRecords]);
+          local = privacy.allowedRecords(localSnapshot);
+          remoteRecords =
+              mergeSyncRecords(privacy.allowedRecords(remoteBaseline), []);
         }
+        final allowedPending = privacy.allowedRecords(pendingRecords);
         final planned = resolveSyncConflicts(
             local: local,
             remote: remoteRecords,
             merged: mergeSyncRecords(
-                local, mergeSyncRecords(remoteRecords, pendingRecords)),
+                local, mergeSyncRecords(remoteRecords, allowedPending)),
             resolution: previewResolution);
         if (!backedUp &&
             (remoteRecords.isNotEmpty || pendingRecords.isNotEmpty) &&
@@ -374,7 +396,9 @@ class RowSyncEngine {
           backedUp = true;
         }
         var merged = await store.merge(remoteRecords,
-            resolution: previewResolution, pendingRecords: pendingRecords);
+            resolution: previewResolution,
+            pendingRecords: allowedPending,
+            protectPrivateBooks: true);
         // Metadata-only local migrations run after learning remote replacements
         // and before the unchanged fast path. Publish the repaired snapshot in
         // this same sync, without resurrecting an obsolete local book file.
@@ -382,6 +406,10 @@ class RowSyncEngine {
           await afterMerge!();
           merged = await store.snapshot();
         }
+        var mergedSnapshot = merged;
+        privacy = PrivateBookSyncFilter(
+            [...mergedSnapshot, ...remoteBaseline, ...pendingRecords]);
+        merged = privacy.allowedRecords(mergedSnapshot);
         // Counts only: enough to distinguish an empty metadata view from a
         // successful merge without exposing titles, paths, accounts or keys.
         int bookRecords(List<RowSyncRecord> records) =>
@@ -394,6 +422,11 @@ class RowSyncEngine {
             !legacyArchive &&
             !repairsRemoteIdentity &&
             sameSyncRecords(merged, remoteRecords)) {
+          if (PrivateLibrary.instance.hasSyncExclusions) {
+            return await finish(published
+                ? RowSyncOutcome.published
+                : RowSyncOutcome.unchanged);
+          }
           if (log.hasReadBatches) {
             atomicSupport ??= await client.supportsAtomicSyncWrites();
           }
@@ -415,7 +448,17 @@ class RowSyncEngine {
         // Include assets imported while the remote database was downloading.
         // Changes after this merged snapshot are picked up by the next pass.
         await beforePublish?.call();
+        mergedSnapshot = await store.snapshot();
+        privacy = PrivateBookSyncFilter(
+            [...mergedSnapshot, ...remoteBaseline, ...pendingRecords]);
+        merged = privacy.allowedRecords(mergedSnapshot);
+        final privacyRevision = PrivateLibrary.instance.syncExclusionToken;
+        bool privacyChanged() =>
+            PrivateLibrary.instance.syncExclusionToken != privacyRevision;
         atomicSupport ??= await client.supportsAtomicSyncWrites();
+        // Appending public operations leaves old private cloud copies intact;
+        // replacing a checkpoint would resend them or silently remove them.
+        if (PrivateLibrary.instance.hasSyncExclusions) atomicSupport = false;
         Future<void> publishLog() async {
           atomicSupport = false;
           // On first legacy migration, seed all legacy records as well. Once
@@ -427,12 +470,17 @@ class RowSyncEngine {
           final delta = merged
               .where((r) => known[r.key] != jsonEncode(r.toMap()))
               .toList();
+          if (privacyChanged()) throw StateError('私密书籍状态已改变，请重新同步');
           if (delta.isNotEmpty) await log.publish(delta);
           published = true;
         }
 
         Future<RowSyncOutcome?> finishPublished({String? checkpoint}) async {
-          if (sameSyncRecords(await store.snapshot(), merged)) {
+          final current = await store.snapshot();
+          final currentPrivacy =
+              PrivateBookSyncFilter([...current, ...remoteBaseline]);
+          if (!privacyChanged() &&
+              sameSyncRecords(currentPrivacy.allowedRecords(current), merged)) {
             return finish(RowSyncOutcome.published, checkpoint: checkpoint);
           }
           // Live reading need not stop for an upload to succeed. Newer local
@@ -451,7 +499,11 @@ class RowSyncEngine {
           continue;
         }
         final upload = '${staging.path}/upload-$attempt.db';
-        await RowSyncArchive.write(upload, merged);
+        // Preserve previously published private records byte-for-byte in the
+        // checkpoint view; local private edits never participate in this merge.
+        await RowSyncArchive.write(
+            upload, [...merged, ...privacy.protectedRecords(remoteBaseline)]);
+        if (privacyChanged()) continue;
         try {
           await client.uploadFileConditionally(upload, remotePath,
               expectedETag: remote?.eTag, createOnly: remote == null);

@@ -160,10 +160,10 @@ void main() {
     view.params.onReceivedHttpError!(
         view.controller,
         WebResourceRequest(
-            url: WebUri('https://blocked.invalid/'), isForMainFrame: true),
+            url: view.params.initialData!.baseUrl!, isForMainFrame: true),
         WebResourceResponse(statusCode: 403, reasonPhrase: 'Blocked'));
     await rejected;
-    expect(engine.diagnosticStage, 'page_http_error');
+    expect(engine.diagnosticStage, 'page_http_error_403');
   });
 
   test('main-frame load errors fail an unfinished engine immediately',
@@ -331,5 +331,74 @@ void main() {
             request: URLRequest(url: WebUri('https://blocked.invalid/')),
             isForMainFrame: true));
     expect(navigation, NavigationActionPolicy.CANCEL);
+  });
+
+  test('only the exact initial main document is served from memory', () async {
+    final view = await start();
+    final url = view.params.initialData!.baseUrl!;
+    final response = await view.params.shouldInterceptRequest!(view.controller,
+        WebResourceRequest(url: url, isForMainFrame: true, method: 'GET'));
+    expect(response!.statusCode, 200);
+    expect(response.contentType, 'text/html');
+    expect(utf8.decode(response.data!), view.params.initialData!.data);
+    expect(url.scheme, 'https');
+    expect(url.host, endsWith('.modu-plugin.invalid'));
+    for (final request in [
+      WebResourceRequest(url: url, isForMainFrame: false),
+      WebResourceRequest(url: url, isForMainFrame: true, method: 'POST'),
+      WebResourceRequest(url: WebUri('$url?changed=1'), isForMainFrame: true),
+      WebResourceRequest(
+          url: WebUri('https://modu-plugin.invalid/another/index.html'),
+          isForMainFrame: true),
+    ]) {
+      expect(
+          (await view.params.shouldInterceptRequest!(view.controller, request))!
+              .statusCode,
+          403);
+    }
+    view.loadStop();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+        (await view.params.shouldInterceptRequest!(view.controller,
+                WebResourceRequest(url: url, isForMainFrame: true)))!
+            .statusCode,
+        403);
+    await view.native.message({
+      'kind': 'result',
+      'value': {'text': 'ok'}
+    });
+    expect(await result, {'text': 'ok'});
+  });
+
+  test('a blocked auxiliary HTTP request cannot abort the memory runtime',
+      () async {
+    final view = await start();
+    view.params.onReceivedHttpError!(
+        view.controller,
+        WebResourceRequest(url: WebUri('https://blocked.invalid/')),
+        WebResourceResponse(statusCode: 403, reasonPhrase: 'Blocked'));
+    view.loadStop();
+    await view.native.message({
+      'kind': 'result',
+      'value': {'text': 'ok'}
+    });
+    expect(await result, {'text': 'ok'});
+  });
+
+  test('separate executions never share a web storage origin', () async {
+    final first = await start();
+    final secondBrowser = _Browser();
+    InAppWebViewPlatform.instance = secondBrowser;
+    final secondEngine = WebViewPluginScriptEngine();
+    addTearDown(secondEngine.dispose);
+    secondEngine.execute('return {text:"ok"};', {},
+        onCall: (_, __) async => null).ignore();
+    final second = await secondBrowser.created.future;
+    final firstUrl = first.params.initialData!.baseUrl!;
+    final secondUrl = second.params.initialData!.baseUrl!;
+    expect(firstUrl.host, isNot(secondUrl.host));
+    expect(firstUrl.host, matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
+    expect(secondUrl.host, matches(r'^run-[a-z0-9-]+-local\.modu-plugin\.invalid$'));
+    InAppWebViewPlatform.instance = browser;
   });
 }

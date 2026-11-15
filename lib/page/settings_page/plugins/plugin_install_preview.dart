@@ -12,13 +12,17 @@ import 'package:flutter/material.dart';
 /// answers "what will this add and what does it get access to" so the user can
 /// cancel without leaving state behind.
 class PluginInstallPreviewPage extends StatelessWidget {
-  const PluginInstallPreviewPage({super.key, required this.preview});
+  const PluginInstallPreviewPage(
+      {super.key, required this.preview, this.temporary = false});
 
   final PluginPreview preview;
+  final bool temporary;
 
-  static Future<bool> show(BuildContext context, PluginPreview preview) async {
+  static Future<bool> show(BuildContext context, PluginPreview preview,
+      {bool temporary = false}) async {
     final confirmed = await Navigator.of(context).push<bool>(MaterialPageRoute(
-      builder: (_) => PluginInstallPreviewPage(preview: preview),
+      builder: (_) =>
+          PluginInstallPreviewPage(preview: preview, temporary: temporary),
     ));
     return confirmed ?? false;
   }
@@ -30,11 +34,18 @@ class PluginInstallPreviewPage extends StatelessWidget {
     final description = manifest.description.resolve(locale).trim();
     return Scaffold(
       appBar: AppBar(
-        title: Text(ModuStrings.text(context, '安装插件', 'Install plugin')),
+        title: Text(temporary
+            ? ModuStrings.text(context, '临时导入插件', 'Import temporary plugin')
+            : ModuStrings.text(context, '安装插件', 'Install plugin')),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          if (temporary)
+            Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(ModuStrings.text(context, '仅用于本机调试，关闭开发者调试或重启后清除。',
+                    'For local testing only. Cleared when debugging is disabled or the app restarts.'))),
           SettingsSection(
             title: Text(ModuStrings.text(context, '基本信息', 'Package')),
             tiles: [
@@ -130,7 +141,9 @@ class PluginInstallPreviewPage extends StatelessWidget {
                 child: FilledButton(
                   key: const ValueKey('plugin-install-confirm'),
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(ModuStrings.text(context, '安装', 'Install')),
+                  child: Text(temporary
+                      ? ModuStrings.text(context, '临时导入', 'Import temporarily')
+                      : ModuStrings.text(context, '安装', 'Install')),
                 ),
               ),
             ],
@@ -150,6 +163,8 @@ class PluginInstallPreviewPage extends StatelessWidget {
         manifest.contributions.whereType<UnknownContribution>().length;
     final scripts =
         manifest.contributions.whereType<ScriptActionContribution>().toList();
+    final bookActions =
+        manifest.contributions.whereType<BookActionContribution>().toList();
     return [
       if (prompts > 0)
         _valueTile(context, ModuStrings.text(context, 'AI 提示词', 'AI prompts'),
@@ -173,6 +188,13 @@ class PluginInstallPreviewPage extends StatelessWidget {
                             context, '划词与上下文', 'Selection and context')
                         : ModuStrings.text(
                             context, '仅划词文字', 'Selected text only')),
+      for (final action in bookActions)
+        _valueTile(
+            context,
+            action.name
+                .resolve(Localizations.localeOf(context).toLanguageTag()),
+            ModuStrings.text(
+                context, '在书籍长按操作菜单中使用', 'Use from the book actions menu')),
       if (manifest.settings.isNotEmpty)
         _valueTile(
             context,
@@ -183,7 +205,11 @@ class PluginInstallPreviewPage extends StatelessWidget {
             context,
             ModuStrings.text(context, '未知的贡献类型会被跳过，不影响其余内容。',
                 'Unknown contribution kinds are skipped; the rest still installs.')),
-      if (prompts == 0 && actions == 0 && scripts.isEmpty && skipped == 0)
+      if (prompts == 0 &&
+          actions == 0 &&
+          scripts.isEmpty &&
+          bookActions.isEmpty &&
+          skipped == 0)
         _notice(
             context,
             ModuStrings.text(

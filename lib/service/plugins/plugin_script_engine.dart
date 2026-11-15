@@ -55,6 +55,8 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
     final nonce = base64Url
         .encode(List.generate(24, (_) => Random.secure().nextInt(256)));
     final handler = 'plugin_$nonce';
+    final origin = 'run-${nonce.toLowerCase().replaceAll('_', '-')}-local';
+    final pageUrl = WebUri('https://$origin.modu-plugin.invalid/index.html');
     final html = '<!doctype html><meta charset="utf-8">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
         'script-src \'nonce-$nonce\'; worker-src blob:; child-src blob:; '
@@ -64,7 +66,8 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
     _diagnosticStage = 'webview_creation';
     _view = AnxHeadlessWebView(
       webViewEnvironment: webViewEnvironment,
-      initialData: InAppWebViewInitialData(data: html),
+      initialData: InAppWebViewInitialData(
+          data: html, baseUrl: pageUrl, historyUrl: pageUrl),
       initialSettings: InAppWebViewSettings(
         javaScriptEnabled: true,
         javaScriptCanOpenWindowsAutomatically: false,
@@ -83,12 +86,29 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
         mediaPlaybackRequiresUserGesture: true,
         disableContextMenu: true,
       ),
-      shouldOverrideUrlLoading: (_, action) async =>
-          !_started && action.request.url.toString() == 'about:blank'
-              ? NavigationActionPolicy.ALLOW
-              : NavigationActionPolicy.CANCEL,
-      shouldInterceptRequest: (_, request) async => WebResourceResponse(
-          statusCode: 403, reasonPhrase: 'Blocked', data: Uint8List(0)),
+      shouldOverrideUrlLoading: (_, action) async => !_started &&
+              (action.request.url == pageUrl ||
+                  action.request.url.toString() == 'about:blank')
+          ? NavigationActionPolicy.ALLOW
+          : NavigationActionPolicy.CANCEL,
+      shouldInterceptRequest: (_, request) async {
+        // Some Android providers request the in-memory document through this hook.
+        if (!_disposed &&
+            !_started &&
+            request.isForMainFrame != false &&
+            (request.method == null || request.method == 'GET') &&
+            request.url == pageUrl) {
+          return WebResourceResponse(
+              statusCode: 200,
+              reasonPhrase: 'OK',
+              contentType: 'text/html',
+              contentEncoding: 'utf-8',
+              headers: {'Cache-Control': 'no-store'},
+              data: Uint8List.fromList(utf8.encode(html)));
+        }
+        return WebResourceResponse(
+            statusCode: 403, reasonPhrase: 'Blocked', data: Uint8List(0));
+      },
       onCreateWindow: (_, __) async => false,
       onPermissionRequest: (_, request) async => PermissionResponse(
           resources: request.resources, action: PermissionResponseAction.DENY),
@@ -185,7 +205,11 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
         }
       },
       onLoadError: (_, __, ___, ____) => _fail('page_load_error'),
-      onLoadHttpError: (_, __, ___, ____) => _fail('page_http_error'),
+      onLoadHttpError: (_, url, status, __) {
+        if (url == pageUrl) {
+          _fail('page_http_error_${status.clamp(100, 599)}');
+        }
+      },
     );
     await _view!.run();
     return _result.future;

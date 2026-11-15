@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,34 @@ import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/page/settings_page/private_library_page.dart';
 import 'package:modu_reader/service/private_library.dart';
+
+class _PendingUnlock extends PrivateLibrary {
+  _PendingUnlock(SharedPreferences prefs) : super(preferences: prefs);
+  final result = Completer<bool>();
+  int cancellations = 0;
+  @override
+  bool get hasPin => true;
+  @override
+  Future<bool> unlock([String pin = '']) => result.future;
+  @override
+  void cancelPendingAuthentication() {
+    cancellations++;
+    super.cancelPendingAuthentication();
+  }
+}
+
+class _PendingPin extends PrivateLibrary {
+  _PendingPin(SharedPreferences prefs) : super(preferences: prefs);
+  final result = Completer<void>();
+  int cancellations = 0;
+  @override
+  Future<void> setPin(String? pin) => result.future;
+  @override
+  void cancelPendingAuthentication() {
+    cancellations++;
+    super.cancelPendingAuthentication();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +116,99 @@ void main() {
     await tester.pumpAndSettle();
     expect(allowed, true);
     expect(library.hasPrivateBooks, true);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'PIN verification shows progress and cancellation ignores its late result',
+      (tester) async {
+    final pending = _PendingUnlock(Prefs().prefs)..setPluginActive(true);
+    addTearDown(pending.dispose);
+    bool? result;
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => TextButton(
+                onPressed: () => showPrivateLibraryUnlock(context, pending)
+                    .then((value) => result = value),
+                child: const Text('Open')))));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('private-library-pin')), '123456');
+    await tester.tap(find.widgetWithText(FilledButton, 'Unlock'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, 'Cancel'))
+            .onPressed,
+        isNotNull);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(result, false);
+    expect(pending.cancellations, 1);
+    pending.result.complete(true);
+    await tester.pumpAndSettle();
+    expect(result, false);
+    expect(find.text('Open'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'cancelling PIN creation preserves its settings route after a late completion',
+      (tester) async {
+    final pending = _PendingPin(Prefs().prefs)..setPluginActive(true);
+    addTearDown(pending.dispose);
+    await tester.runAsync(() => pending.unlock());
+    await tester
+        .pumpWidget(MaterialApp(home: PrivateLibraryPage(library: pending)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Set'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, '123456');
+    await tester.enterText(find.byType(TextField).last, '123456');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(pending.cancellations, 1);
+    pending.result.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Manage private books'), findsOneWidget);
+    expect(find.text('Could not save. Try again.'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'a failed PIN worker restores the unlock controls without exposing its error',
+      (tester) async {
+    final pending = _PendingUnlock(Prefs().prefs)..setPluginActive(true);
+    addTearDown(pending.dispose);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: Builder(
+                builder: (context) => TextButton(
+                    onPressed: () => showPrivateLibraryUnlock(context, pending),
+                    child: const Text('Open'))))));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('private-library-pin')), '123456');
+    await tester.tap(find.widgetWithText(FilledButton, 'Unlock'));
+    await tester.pump();
+    pending.result.completeError(StateError('PRIVATE_PIN_SECRET'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Unlock'))
+            .onPressed,
+        isNotNull);
+    expect(find.text('Could not unlock. Try again.'), findsOneWidget);
+    expect(find.textContaining('PRIVATE_PIN_SECRET'), findsNothing);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 

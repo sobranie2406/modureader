@@ -7,6 +7,8 @@ import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_detail_page.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_install_preview.dart';
+import 'package:modu_reader/page/settings_page/plugins/plugin_developer_page.dart';
+import 'package:modu_reader/service/plugins/plugin_developer_session.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_catalog.dart';
 import 'package:modu_reader/widgets/settings/settings_section.dart';
@@ -16,12 +18,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 class PluginSettings extends StatefulWidget {
-  const PluginSettings({super.key, this.host, this.pickPackage, this.catalog});
+  const PluginSettings(
+      {super.key,
+      this.host,
+      this.pickPackage,
+      this.catalog,
+      this.developerSession});
 
   /// Injectable for tests; defaults to the app-wide singleton.
   final PluginHost? host;
   final Future<File?> Function()? pickPackage;
   final PluginCatalog? catalog;
+  final PluginDeveloperSession? developerSession;
 
   @override
   State<PluginSettings> createState() => _PluginSettingsState();
@@ -38,6 +46,10 @@ class _PluginSettingsState extends State<PluginSettings> {
   int _catalogRequest = 0;
 
   PluginHost get _host => widget.host ?? PluginHost.instance;
+  PluginDeveloperSession get _developer =>
+      widget.developerSession ?? PluginDeveloperSession.instance;
+  bool get _enabled =>
+      PluginHost.isEnabled && Prefs().experimentalPluginsEnabled;
 
   @override
   void initState() {
@@ -45,7 +57,7 @@ class _PluginSettingsState extends State<PluginSettings> {
     _catalogSource = Prefs().pluginCatalogSource;
     _catalog = widget.catalog ?? PluginCatalog(sourceId: _catalogSource);
     unawaited(_catalog.changeSource(_catalogSource).then<void>((_) async {
-      if (mounted) await _loadCatalog();
+      if (mounted && _enabled) await _loadCatalog();
     }));
   }
 
@@ -56,7 +68,7 @@ class _PluginSettingsState extends State<PluginSettings> {
   }
 
   Future<void> _loadCatalog() async {
-    if (_loadingCatalog) return;
+    if (_loadingCatalog || !_enabled) return;
     final request = ++_catalogRequest;
     setState(() {
       _loadingCatalog = true;
@@ -79,7 +91,7 @@ class _PluginSettingsState extends State<PluginSettings> {
   }
 
   Future<void> _changeCatalogSource(String? value) async {
-    if (value == null || value == _catalogSource || _busy) return;
+    if (value == null || value == _catalogSource || _busy || !_enabled) return;
     final request = ++_catalogRequest;
     setState(() {
       _catalogSource = value;
@@ -102,87 +114,205 @@ class _PluginSettingsState extends State<PluginSettings> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _host,
+      animation: Listenable.merge([_host, Prefs(), _developer]),
       builder: (context, _) {
         final plugins = _host.plugins;
         final enabled = plugins
             .where((plugin) => plugin.status == PluginStatus.enabled)
             .length;
         return settingsSections(sections: [
-          SettingsSection(
-            title:
-                Text(ModuStrings.text(context, '已安装插件', 'Installed plugins')),
-            tiles: [
-              SettingsTile.navigation(
-                key: const ValueKey('plugin-install'),
-                leading: const Icon(Icons.add_box_outlined),
-                title:
-                    Text(ModuStrings.text(context, '安装插件…', 'Install plugin…')),
-                description: Text(ModuStrings.text(context, "安装项目提供的插件包。",
-                    "Install plugin packages provided by the project.")),
-                enabled: !_busy,
-                onPressed: _busy ? null : (_) => _install(),
-              ),
-              if (plugins.isEmpty)
-                CustomSettingsTile(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      ModuStrings.text(
-                          context, "还没有安装插件。", "No plugins installed yet."),
-                      style: Theme.of(context).textTheme.bodyMedium,
+          SettingsSection(tiles: [
+            SettingsTile.switchTile(
+              key: const ValueKey('experimental-plugins-switch'),
+              leading: const Icon(Icons.extension_outlined),
+              title: Text(ModuStrings.text(context, '启用插件', 'Enable plugins')),
+              initialValue: _enabled,
+              enabled: !_busy && !_developer.busy && PluginHost.isEnabled,
+              onToggle: _toggleGlobal,
+            ),
+          ]),
+          if (_enabled) ...[
+            SettingsSection(
+              title:
+                  Text(ModuStrings.text(context, '已安装插件', 'Installed plugins')),
+              tiles: [
+                SettingsTile.navigation(
+                  key: const ValueKey('plugin-install'),
+                  leading: const Icon(Icons.add_box_outlined),
+                  title: Text(
+                      ModuStrings.text(context, '安装插件…', 'Install plugin…')),
+                  description: Text(ModuStrings.text(context, "安装项目提供的插件包。",
+                      "Install plugin packages provided by the project.")),
+                  enabled: !_busy,
+                  onPressed: _busy ? null : (_) => _install(),
+                ),
+                if (plugins.isEmpty)
+                  CustomSettingsTile(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        ModuStrings.text(
+                            context, "还没有安装插件。", "No plugins installed yet."),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
-                ),
-              for (final plugin in plugins)
-                CustomSettingsTile(
-                  child: _PluginTile(
-                    plugin: plugin,
-                    onOpen: () => _openDetail(plugin.id),
-                    onInstall: () => _install(replaceId: plugin.id),
-                    onUninstall: () => _confirmUninstall(plugin),
-                    onToggle: (value) => _toggle(plugin, value),
+                for (final plugin in plugins)
+                  CustomSettingsTile(
+                    child: _PluginTile(
+                      plugin: plugin,
+                      enabled: !_busy,
+                      onOpen: () => _openDetail(plugin.id),
+                      onInstall: () => _install(replaceId: plugin.id),
+                      onUninstall: () => _confirmUninstall(plugin),
+                      onToggle: (value) => _toggle(plugin, value),
+                    ),
                   ),
-                ),
-            ],
-          ),
-          _catalogSection(context),
-          if (plugins.isNotEmpty)
+              ],
+            ),
+            _catalogSection(context),
             SettingsSection(
-              title: Text(ModuStrings.text(context, '插件摘要', 'Plugin summary')),
+              title:
+                  Text(ModuStrings.text(context, '本机开发', 'Local development')),
+              tiles: [
+                SettingsTile.switchTile(
+                  key: const ValueKey('plugin-developer-switch'),
+                  leading: const Icon(Icons.code_outlined),
+                  title: Text(ModuStrings.text(
+                      context, '开发者调试', 'Developer debugging')),
+                  description: Text(ModuStrings.text(
+                      context,
+                      '临时运行本机插件，关闭调试或重启后清除。',
+                      'Test local plugins until debugging is disabled or the app restarts.')),
+                  initialValue: _developer.enabled,
+                  enabled: !_busy && !_developer.busy,
+                  onToggle: _toggleDeveloper,
+                ),
+                if (_developer.enabled)
+                  SettingsTile.navigation(
+                    key: const ValueKey('plugin-developer-open'),
+                    leading: const Icon(Icons.developer_mode_outlined),
+                    title: Text(ModuStrings.text(
+                        context, '本机调试工作区', 'Local debugging workspace')),
+                    enabled: !_busy && !_developer.busy,
+                    onPressed: (_) => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => PluginDeveloperPage(
+                                session: _developer,
+                                pickPackage: widget.pickPackage))),
+                  ),
+              ],
+            ),
+            if (plugins.isNotEmpty)
+              SettingsSection(
+                title:
+                    Text(ModuStrings.text(context, '插件摘要', 'Plugin summary')),
+                tiles: [
+                  CustomSettingsTile(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        ModuStrings.text(
+                            context,
+                            '已安装 $enabled 个，共 ${plugins.length} 个。停用插件会移除它添加的提示词和划词动作；卸载会删除插件文件。',
+                            '$enabled of ${plugins.length} enabled. Disabling removes the prompts and toolbar actions it added; uninstalling deletes its files.'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            SettingsSection(
+              title: Text(ModuStrings.text(context, '关于插件包', 'About packages')),
               tiles: [
                 CustomSettingsTile(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      ModuStrings.text(
-                          context,
-                          '已安装 $enabled 个，共 ${plugins.length} 个。停用插件会移除它添加的提示词和划词动作；卸载会删除插件文件。',
-                          '$enabled of ${plugins.length} enabled. Disabling removes the prompts and toolbar actions it added; uninstalling deletes its files.'),
+                      ModuStrings.text(context, "选择下载的 .moduplugin 或 ZIP 插件包。",
+                          "Choose a downloaded .moduplugin or ZIP package."),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ),
               ],
             ),
-          SettingsSection(
-            title: Text(ModuStrings.text(context, '关于插件包', 'About packages')),
-            tiles: [
-              CustomSettingsTile(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    ModuStrings.text(context, "选择下载的 .moduplugin 或 ZIP 插件包。",
-                        "Choose a downloaded .moduplugin or ZIP package."),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          ],
         ]);
       },
     );
+  }
+
+  Future<bool> _confirmEnable({required bool developer}) async =>
+      await showDialog<bool>(
+          context: context,
+          builder: (dialog) => AlertDialog(
+                title: Text(developer
+                    ? ModuStrings.text(
+                        context, '开启本机调试？', 'Enable local debugging?')
+                    : ModuStrings.text(context, '开启插件？', 'Enable plugins?')),
+                content: Text(developer
+                    ? ModuStrings.text(
+                        context,
+                        '仅在本机临时运行未审核、未签名插件。导入时确认权限和校验值，关闭调试或重启后清除。',
+                        'Run unreviewed, unsigned plugins temporarily on this device. Confirm permissions and the package hash before importing. Disabling debugging or restarting clears them.')
+                    : ModuStrings.text(context, '安装项目提供的插件，按插件声明的权限使用。',
+                        'Install project plugins and use their declared permissions.')),
+                scrollable: true,
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialog, false),
+                      child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
+                  FilledButton(
+                      key: ValueKey(developer
+                          ? 'confirm-plugin-developer'
+                          : 'confirm-experimental-plugins'),
+                      onPressed: () => Navigator.pop(dialog, true),
+                      child: Text(ModuStrings.text(context, '开启', 'Enable'))),
+                ],
+              )) ??
+      false;
+
+  Future<void> _toggleGlobal(bool value) async {
+    if (_busy || _developer.busy) return;
+    setState(() => _busy = true);
+    try {
+      if (value && !await _confirmEnable(developer: false)) return;
+      if (!mounted) return;
+      // The host authorizes and closes both official and developer plugins.
+      await _host.setExperimentalEnabled(value);
+      if (!mounted) return;
+      if (value) {
+        await _loadCatalog();
+      } else {
+        ++_catalogRequest;
+        await _catalog.cancel();
+        if (mounted) {
+          setState(() {
+            _entries = const [];
+            _catalogError = null;
+            _loadingCatalog = false;
+          });
+        }
+      }
+    } catch (error) {
+      if (mounted) await _showError(error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _toggleDeveloper(bool value) async {
+    if (_busy || _developer.busy || !_enabled) return;
+    setState(() => _busy = true);
+    try {
+      if (value && !await _confirmEnable(developer: true)) return;
+      if (mounted && _enabled) await _developer.setEnabled(value);
+    } catch (error) {
+      if (mounted) await _showError(error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   SettingsSection _catalogSection(BuildContext context) => SettingsSection(
@@ -264,7 +394,7 @@ class _PluginSettingsState extends State<PluginSettings> {
       );
 
   Future<void> _installFromCatalog(PluginCatalogEntry entry) async {
-    if (_busy || entry.requiresAppUpdate(_host.appVersion)) return;
+    if (_busy || !_enabled || entry.requiresAppUpdate(_host.appVersion)) return;
     setState(() {
       _busy = true;
       _downloadingId = entry.id;
@@ -285,7 +415,7 @@ class _PluginSettingsState extends State<PluginSettings> {
       }
       if (!mounted) return;
       final confirmed = await PluginInstallPreviewPage.show(context, preview);
-      if (!confirmed || !mounted) return;
+      if (!confirmed || !mounted || !_enabled) return;
       final installed = await _host.install(download.file,
           allowSameVersion: replacing, expectedSha256: entry.sha256);
       if (mounted && installed.warnings.isNotEmpty) {
@@ -308,7 +438,7 @@ class _PluginSettingsState extends State<PluginSettings> {
   }
 
   Future<void> _toggle(PluginRecord plugin, bool value) async {
-    if (_busy) return;
+    if (_busy || !_enabled) return;
     setState(() => _busy = true);
     try {
       if (value) {
@@ -324,7 +454,7 @@ class _PluginSettingsState extends State<PluginSettings> {
   }
 
   Future<void> _install({String? replaceId}) async {
-    if (_busy) return;
+    if (_busy || !_enabled) return;
     setState(() => _busy = true);
     try {
       final file = await (widget.pickPackage?.call() ?? _pickPackage());
@@ -335,7 +465,7 @@ class _PluginSettingsState extends State<PluginSettings> {
           await _host.preview(file, allowSameVersion: replaceId != null);
       if (!mounted) return;
       final confirmed = await PluginInstallPreviewPage.show(context, preview);
-      if (!confirmed || !mounted) return;
+      if (!confirmed || !mounted || !_enabled) return;
       final result = await _host.install(file,
           allowSameVersion: replaceId != null, expectedSha256: preview.sha256);
       if (!mounted) return;
@@ -362,6 +492,7 @@ class _PluginSettingsState extends State<PluginSettings> {
   }
 
   Future<void> _openDetail(String id) async {
+    if (!_enabled) return;
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PluginDetailPage(pluginId: id, host: _host),
     ));
@@ -434,6 +565,7 @@ class _PluginSettingsState extends State<PluginSettings> {
 
 class _PluginTile extends StatelessWidget {
   const _PluginTile({
+    required this.enabled,
     required this.plugin,
     required this.onOpen,
     required this.onInstall,
@@ -442,6 +574,7 @@ class _PluginTile extends StatelessWidget {
   });
 
   final PluginRecord plugin;
+  final bool enabled;
   final VoidCallback onOpen;
   final VoidCallback onInstall;
   final VoidCallback onUninstall;
@@ -468,10 +601,12 @@ class _PluginTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Switch(
+            key: ValueKey('plugin-switch-${plugin.id}'),
             value: plugin.status == PluginStatus.enabled,
-            onChanged: usable ? onToggle : null,
+            onChanged: enabled && usable ? onToggle : null,
           ),
           PopupMenuButton<String>(
+            enabled: enabled,
             key: ValueKey('plugin-menu-${plugin.id}'),
             onSelected: (value) {
               switch (value) {
@@ -503,7 +638,7 @@ class _PluginTile extends StatelessWidget {
           ),
         ],
       ),
-      onTap: onOpen,
+      onTap: enabled ? onOpen : null,
     );
   }
 }

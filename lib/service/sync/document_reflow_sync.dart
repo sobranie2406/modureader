@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/custom_css_profile.dart';
+import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/sync/private_book_sync_client.dart';
 import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 import 'package:modu_reader/service/sync/sync_client_base.dart';
 import 'package:crypto/crypto.dart';
@@ -45,7 +47,9 @@ class DocumentReflowSync {
   Future<void> _sync(Iterable<Book> books) async {
     final candidates = <Book>[];
     for (final book in books) {
-      if (!book.isDeleted && _bookId.hasMatch(book.md5?.toLowerCase() ?? '')) {
+      if (!book.isDeleted &&
+          PrivateLibrary.instance.canSyncBook(book) &&
+          _bookId.hasMatch(book.md5?.toLowerCase() ?? '')) {
         candidates.add(book);
       }
     }
@@ -65,11 +69,12 @@ class DocumentReflowSync {
                   entry.name!
             };
       for (final book in candidates) {
+        if (!PrivateLibrary.instance.canSyncBook(book)) continue;
         final id = book.md5!.toLowerCase();
         final local = store(book);
         final data = await local.syncSnapshot();
         if ((data['pages'] as Map).isEmpty && !folders.contains(id)) continue;
-        await _syncBook(id, local, staging);
+        await _syncBook(book, id, local, staging);
         folders.add(id);
       }
     } finally {
@@ -77,7 +82,7 @@ class DocumentReflowSync {
     }
   }
 
-  Future<List<String>> _list(String folder) async {
+  Future<List<String>> _list(String folder, SyncClientBase client) async {
     if (await client.readProps(folder) == null) return [];
     final names = <String>[];
     for (final file in await client.readSyncDirectory(folder)) {
@@ -112,7 +117,7 @@ class DocumentReflowSync {
         data['data'] as Map<String, dynamic>);
   }
 
-  Future<void> _download(String path, File file) =>
+  Future<void> _download(String path, File file, SyncClientBase client) =>
       client.downloadFile(path, file.path, onProgress: (received, _) {
         if (received > DocumentReflowSyncData.maxBytes) {
           throw const FormatException('OCR sync exceeds size limit');
@@ -120,12 +125,12 @@ class DocumentReflowSync {
       });
 
   Future<void> _publish(File pending, String folder, String name, String id,
-      Directory staging) async {
+      Directory staging, SyncClientBase client) async {
     await _read(pending, name, id);
     await client.mkdirAll(folder);
     await client.uploadFile(pending.path, '$folder/$name');
     final verify = File('${staging.path}/verify.json');
-    await _download('$folder/$name', verify);
+    await _download('$folder/$name', verify, client);
     await _read(verify, name, id);
     final cached = File('${cache.path}/ocr-sync-verified/$name');
     await cached.parent.create(recursive: true);
@@ -133,8 +138,11 @@ class DocumentReflowSync {
     await pending.delete(); // Only after a complete verified read-back.
   }
 
-  Future<void> _syncBook(
-      String id, DocumentReflowStore local, Directory staging) async {
+  Future<void> _syncBook(Book book, String id, DocumentReflowStore local,
+      Directory staging) async {
+    final client = PrivateBookSyncClient(
+        this.client, () => PrivateLibrary.instance.canSyncBook(book));
+    client.check();
     final folder = '$root/$id';
     final destination =
         sha256.convert(utf8.encode(jsonEncode(client.syncIdentity)));
@@ -144,12 +152,13 @@ class DocumentReflowSync {
     // Repair interrupted immutable uploads before attempting to read them.
     await for (final file in pending.list(followLinks: false)) {
       if (file is File && _snapshotName.hasMatch(file.uri.pathSegments.last)) {
-        await _publish(file, folder, file.uri.pathSegments.last, id, staging);
+        await _publish(
+            file, folder, file.uri.pathSegments.last, id, staging, client);
       }
     }
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final names = await _list(folder);
+        final names = await _list(folder, client);
         var merged = await local.syncSnapshot();
         var bytes = 0;
         for (final name in names) {
@@ -164,7 +173,7 @@ class DocumentReflowSync {
           }
           if (incoming == null) {
             file = File('${staging.path}/incoming.json');
-            await _download('$folder/$name', file);
+            await _download('$folder/$name', file, client);
             incoming = await _read(file, name, id);
             final cached = File('${cache.path}/ocr-sync-verified/$name');
             await cached.parent.create(recursive: true);
@@ -177,8 +186,12 @@ class DocumentReflowSync {
           merged = DocumentReflowSyncData.merge(merged, incoming);
         }
         // Compaction may race another device's listing. Retry the complete scan.
-        if (jsonEncode(names) != jsonEncode(await _list(folder))) continue;
+        if (jsonEncode(names) != jsonEncode(await _list(folder, client))) {
+          continue;
+        }
+        client.check();
         await local.mergeSynced(merged);
+        client.check();
         // Include edits saved during the downloads, under the store's write lock.
         merged = await local.syncSnapshot();
         if ((merged['pages'] as Map).isEmpty) return;
@@ -192,7 +205,7 @@ class DocumentReflowSync {
           final part = File('${pending.path}/$name.part');
           await part.writeAsBytes(bytesOut, flush: true);
           final outgoing = await part.rename('${pending.path}/$name');
-          await _publish(outgoing, folder, name, id, staging);
+          await _publish(outgoing, folder, name, id, staging, client);
         }
         // Only reclaim fully read inputs after their complete successor is verified.
         // Concurrent publications absent from this scan are never touched.

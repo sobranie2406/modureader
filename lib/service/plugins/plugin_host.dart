@@ -12,6 +12,7 @@ import 'package:modu_reader/service/plugins/plugin_contributions.dart';
 import 'package:modu_reader/service/plugins/plugin_package.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_trust.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
 import 'package:modu_reader/utils/app_version.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart';
@@ -69,6 +70,7 @@ class PluginPreview {
 class PluginHost extends ChangeNotifier {
   PluginHost({
     PluginPaths? paths,
+    this.development = false,
     PluginPackageReader? reader,
     PluginContributions? contributions,
     PluginTrust? trust,
@@ -85,6 +87,132 @@ class PluginHost extends ChangeNotifier {
   static PluginHost? _instance;
 
   static PluginHost get instance => _instance ??= PluginHost();
+
+  final bool development;
+  PluginHost? _peer;
+  Future<void> Function()? _closeDeveloperSession;
+  final _reservedIds = <String>{};
+  PluginState _developmentState = const PluginState();
+  final _developmentConfig = <String, Map<String, dynamic>>{};
+  final _runtimes = <PluginScriptRuntime>{};
+  PluginScriptRuntime? _developmentRuntime;
+  bool _sessionOpen = true;
+  static PluginHost? _activeDeveloper;
+  static bool get hasDevelopmentSession => _activeDeveloper != null;
+
+  static PluginHost executionHostFor(String id) =>
+      _activeDeveloper?.byId(id) != null ? _activeDeveloper! : instance;
+
+  static PluginScriptRuntime runtimeFor(String id) {
+    final owner = executionHostFor(id);
+    return owner.development
+        ? owner._developmentRuntime ??= PluginScriptRuntime(host: owner)
+        : PluginScriptRuntime.instance;
+  }
+
+  void registerRuntime(PluginScriptRuntime runtime) {
+    _runtimes.add(runtime);
+    if (development) _developmentRuntime = runtime;
+  }
+
+  void unregisterRuntime(PluginScriptRuntime runtime) =>
+      _runtimes.remove(runtime);
+
+  static void attachDevelopment(PluginHost official, PluginHost developer,
+      {Future<void> Function()? onGlobalDisable}) {
+    if (!developer.development ||
+        official.development ||
+        official._peer != null ||
+        _activeDeveloper != null) {
+      throw StateError('A development session is already active.');
+    }
+    official._peer = developer;
+    official._closeDeveloperSession = onGlobalDisable;
+    developer._peer = official;
+    _activeDeveloper = developer;
+    official.notifyListeners();
+  }
+
+  static void detachDevelopment(PluginHost developer) {
+    final official = developer._peer;
+    developer._peer = null;
+    if (identical(official?._peer, developer)) {
+      official!._peer = null;
+      official._closeDeveloperSession = null;
+    }
+    if (identical(_activeDeveloper, developer)) _activeDeveloper = null;
+    PrivateLibrary.instance
+        .setPluginActive(official?._hasPrivateProvider ?? false);
+    official?.notifyListeners();
+  }
+
+  bool get _hasPrivateProvider =>
+      !_disposed &&
+      _sessionOpen &&
+      _compiledIn &&
+      Prefs().experimentalPluginsEnabled &&
+      _plugins.any((record) =>
+          record.status == PluginStatus.enabled &&
+          (_manifests[record.id]
+                  ?.capabilities
+                  .contains(kLibraryPrivateCapability) ??
+              false));
+
+  PluginState get _state =>
+      development ? _developmentState : Prefs().pluginState;
+  Future<void> _saveState(PluginState state) async {
+    if (development) {
+      _developmentState = state;
+    } else {
+      await Prefs().savePluginState(state);
+    }
+  }
+
+  Map<String, dynamic> configFor(String id) => development
+      ? Map.of(_developmentConfig[id] ?? const {})
+      : Prefs().pluginConfig(id);
+  Future<void> saveConfig(String id, Map<String, dynamic> values) async {
+    if (development) {
+      _ensureUsable();
+      if (byId(id) == null) throw StateError('Development plugin unavailable.');
+      PluginConfig.validate(id, values, manifest: manifestFor(id));
+      _developmentConfig[id] = Map.of(values);
+      notifyListeners();
+    } else {
+      await Prefs().savePluginConfig(id, values);
+    }
+  }
+
+  Future<void> _removeData(String id) async {
+    if (development) {
+      _developmentConfig.remove(id);
+      await _saveState(_state.remove(id));
+    } else {
+      await Prefs().removePluginData(id);
+    }
+  }
+
+  void _reserveIdentity(String id) {
+    if (_peer?.byId(id) != null ||
+        _peer?._reservedIds.contains(id) == true ||
+        (development && _peer?._state.byId(id) != null)) {
+      throw const PluginInstallError(PluginErrorCode.invalidPackage,
+          'An official or development plugin with this ID already exists. Remove it from the other list first.');
+    }
+    _reservedIds.add(id);
+  }
+
+  Future<void> closeDevelopment({bool skipAuthorization = false}) =>
+      _exclusive(() async {
+        if (!development) throw StateError('Not a development host.');
+        if (!skipAuthorization) await _authorizePrivateRemoval(null);
+        await _suspendPlugins();
+        _sessionOpen = false;
+        _developmentConfig.clear();
+        _developmentState = const PluginState();
+        _plugins = const [];
+        notifyListeners();
+      });
 
   final PluginPaths _paths;
   final PluginTrust trust;
@@ -109,6 +237,7 @@ class PluginHost extends ChangeNotifier {
 
   bool isScriptRunnable(String id) =>
       !_disposed &&
+      _sessionOpen &&
       !_scriptsMutating &&
       _compiledIn &&
       Prefs().experimentalPluginsEnabled &&
@@ -116,13 +245,9 @@ class PluginHost extends ChangeNotifier {
 
   @override
   void notifyListeners() {
-    if (identical(this, _instance)) {
-      PrivateLibrary.instance.setPluginActive(_plugins.any((record) =>
-          record.status == PluginStatus.enabled &&
-          (_manifests[record.id]
-                  ?.capabilities
-                  .contains(kLibraryPrivateCapability) ??
-              false)));
+    if (identical(this, _instance) || _peer != null) {
+      PrivateLibrary.instance.setPluginActive(
+          _hasPrivateProvider || (_peer?._hasPrivateProvider ?? false));
     }
     super.notifyListeners();
   }
@@ -134,6 +259,9 @@ class PluginHost extends ChangeNotifier {
     _pending = done.future;
     return previous.then((_) async {
       _scriptsMutating = true;
+      for (final runtime in _runtimes.toList()) {
+        runtime.cancelAll();
+      }
       if (identical(this, _instance)) PluginScriptRuntime.cancelExisting();
       try {
         return await action();
@@ -192,7 +320,7 @@ class PluginHost extends ChangeNotifier {
       _appVersion = '';
     }
 
-    final loaded = Prefs().pluginState;
+    final loaded = _state;
     final next = <PluginRecord>[];
     var changed = false;
     _manifests.clear();
@@ -206,8 +334,7 @@ class PluginHost extends ChangeNotifier {
     _initialized = true;
     if (changed) {
       try {
-        await Prefs()
-            .savePluginState(PluginState(plugins: List.unmodifiable(next)));
+        await _saveState(PluginState(plugins: List.unmodifiable(next)));
       } catch (error) {
         AnxLog.warning('Could not persist reconciled plugin state: $error');
       }
@@ -216,6 +343,16 @@ class PluginHost extends ChangeNotifier {
   }
 
   Future<_Reconciled> _reconcile(PluginRecord record) async {
+    if (_peer?.byId(record.id) != null ||
+        _peer?._reservedIds.contains(record.id) == true) {
+      // Settings restoration must not replace another scope's live registry.
+      return _Reconciled(
+          record: record.copyWith(
+              status: PluginStatus.disabled,
+              applied: const [],
+              lastError: 'This ID is active in another plugin scope.'),
+          changed: true);
+    }
     final directory = _paths.pluginDir(record.id);
     if (!await directory.exists()) {
       _manifests.remove(record.id);
@@ -301,7 +438,9 @@ class PluginHost extends ChangeNotifier {
               : [
                   ...persistent,
                   for (final kind in _contributions.registry.kinds)
-                    if (_contributions.registry.forKind(kind)!.runtimeOnly)
+                    if (_contributions.registry.forKind(kind)!.runtimeOnly &&
+                        manifest.contributions
+                            .any((entry) => entry.kind == kind))
                       ...await _contributions.registry.forKind(kind)!.apply(
                           manifest,
                           manifest.contributions
@@ -351,9 +490,13 @@ class PluginHost extends ChangeNotifier {
     if (!_initialized) await _initialize();
     final pkg = await _reader.read(package);
     try {
+      _ensureUsable();
       final manifest = pkg.manifest;
+      _reserveIdentity(manifest.id);
       _ensureSupportedCapabilities(manifest);
-      await trust.verify(pkg.staging, manifest.id, manifest.version);
+      if (!development) {
+        await trust.verify(pkg.staging, manifest.id, manifest.version);
+      }
       if (_appVersion.isNotEmpty) manifest.ensureCompatibleWith(_appVersion);
       final existing = byId(manifest.id);
       _checkVersionConflict(existing, manifest,
@@ -368,6 +511,7 @@ class PluginHost extends ChangeNotifier {
         installedVersion: existing?.version,
       );
     } finally {
+      _reservedIds.remove(pkg.manifest.id);
       await pkg.dispose();
     }
   }
@@ -407,7 +551,7 @@ class PluginHost extends ChangeNotifier {
       if (runes.length <= PluginPreview.maxReadmeChars) return text;
       return '${String.fromCharCodes(runes.take(PluginPreview.maxReadmeChars))}…';
     } catch (error) {
-      AnxLog.warning('Could not read plugin README: $error');
+      if (!development) AnxLog.warning('Could not read plugin README: $error');
       return null;
     }
   }
@@ -418,6 +562,14 @@ class PluginHost extends ChangeNotifier {
           allowSameVersion: allowSameVersion, expectedSha256: expectedSha256));
 
   void _ensureSupportedCapabilities(PluginManifest manifest) {
+    if (development &&
+        (manifest.contributions.isEmpty ||
+            manifest.contributions.any((c) =>
+                c is! ScriptActionContribution &&
+                c is! BookActionContribution))) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'Development mode supports scriptAction and bookAction only; aiSkill and selectionAction are not supported.');
+    }
     // Script networking uses the bounded host proxy; dictionary contributions
     // still need their separate lookup integration.
     if (manifest.capabilities.contains('net:http') &&
@@ -435,13 +587,16 @@ class PluginHost extends ChangeNotifier {
     if (!_initialized) await _initialize();
     final pkg = await _reader.read(package);
     try {
+      _ensureUsable();
       if (expectedSha256 != null && pkg.sha256 != expectedSha256) {
         throw const PluginInstallError(PluginErrorCode.invalidPackage,
             'Package changed after preview. Select it again to review it.');
       }
       final manifest = pkg.manifest;
+      _reserveIdentity(manifest.id);
       _ensureSupportedCapabilities(manifest);
       await trust.verify(pkg.staging, manifest.id, manifest.version);
+      _ensureUsable();
       if (_appVersion.isNotEmpty) manifest.ensureCompatibleWith(_appVersion);
 
       final existing = byId(manifest.id);
@@ -457,9 +612,14 @@ class PluginHost extends ChangeNotifier {
         // Remove owned values first: edited values become ordinary user entries,
         // and retired actions release their slots before validating the upgrade.
         if (existing != null) await _contributions.remove(existing.applied);
+        _ensureUsable();
+        _reserveIdentity(manifest.id);
         applied = await _contributions.apply(manifest);
+        _ensureUsable();
         previousFiles = await _placeFiles(pkg);
         filesPlaced = true;
+        _ensureUsable();
+        _reserveIdentity(manifest.id);
 
         final record = PluginRecord(
           id: manifest.id,
@@ -472,7 +632,7 @@ class PluginHost extends ChangeNotifier {
           status: PluginStatus.enabled,
           applied: List.unmodifiable(applied),
         );
-        await Prefs().savePluginState(Prefs().pluginState.upsert(record));
+        await _saveState(_state.upsert(record));
         _manifests[manifest.id] = manifest;
         _manifestTexts[manifest.id] = pkg.manifestText;
         _upsertMemory(record);
@@ -481,9 +641,16 @@ class PluginHost extends ChangeNotifier {
         return PluginInstallResult(
             record: record, warnings: List.unmodifiable(pkg.warnings));
       } catch (error) {
-        Prefs().userPrompts = promptsSnapshot;
+        if (development) {
+          await _contributions.remove(applied);
+          final oldManifest = existing == null ? null : _manifests[existing.id];
+          if (!_disposed && oldManifest != null) {
+            await _contributions.apply(oldManifest);
+          }
+        }
+        if (!development) Prefs().userPrompts = promptsSnapshot;
         try {
-          await Prefs().saveSelectionToolbar(toolbarSnapshot);
+          if (!development) await Prefs().saveSelectionToolbar(toolbarSnapshot);
         } catch (_) {
           // The original failure is more useful; the snapshot is retried on
           // the next plugin mutation.
@@ -492,11 +659,19 @@ class PluginHost extends ChangeNotifier {
         rethrow;
       }
     } finally {
+      _reservedIds.remove(pkg.manifest.id);
       await pkg.dispose();
     }
   }
 
-  Future<void> enable(String id) => _exclusive(() => _enable(id));
+  Future<void> enable(String id) => _exclusive(() async {
+        _reserveIdentity(id);
+        try {
+          await _enable(id);
+        } finally {
+          _reservedIds.remove(id);
+        }
+      });
 
   Future<void> _enable(String id) async {
     _ensureUsable();
@@ -519,6 +694,7 @@ class PluginHost extends ChangeNotifier {
     final promptsSnapshot = Prefs().userPrompts;
     final toolbarSnapshot = Prefs().selectionToolbar;
     try {
+      _reserveIdentity(id);
       final applied = await _contributions.apply(manifest);
       final newIds = applied.map((entry) => entry.id).toSet();
       final stale =
@@ -529,13 +705,13 @@ class PluginHost extends ChangeNotifier {
         applied: List.unmodifiable(applied),
         clearLastError: true,
       );
-      await Prefs().savePluginState(Prefs().pluginState.upsert(updated));
+      await _saveState(_state.upsert(updated));
       _upsertMemory(updated);
       notifyListeners();
     } catch (_) {
-      Prefs().userPrompts = promptsSnapshot;
+      if (!development) Prefs().userPrompts = promptsSnapshot;
       try {
-        await Prefs().saveSelectionToolbar(toolbarSnapshot);
+        if (!development) await Prefs().saveSelectionToolbar(toolbarSnapshot);
       } catch (_) {
         // Best effort; the enable operation already failed.
       }
@@ -560,11 +736,11 @@ class PluginHost extends ChangeNotifier {
       await _contributions.remove(record.applied);
       final updated =
           record.copyWith(status: PluginStatus.disabled, applied: const []);
-      await Prefs().savePluginState(Prefs().pluginState.upsert(updated));
+      await _saveState(_state.upsert(updated));
       _upsertMemory(updated);
     } catch (_) {
-      Prefs().userPrompts = prompts;
-      await Prefs().saveSelectionToolbar(toolbar);
+      if (!development) Prefs().userPrompts = prompts;
+      if (!development) await Prefs().saveSelectionToolbar(toolbar);
       rethrow;
     }
     notifyListeners();
@@ -580,10 +756,10 @@ class PluginHost extends ChangeNotifier {
     final toolbar = Prefs().selectionToolbar;
     try {
       await _contributions.remove(record.applied);
-      await Prefs().removePluginData(id);
+      await _removeData(id);
     } catch (_) {
-      Prefs().userPrompts = prompts;
-      await Prefs().saveSelectionToolbar(toolbar);
+      if (!development) Prefs().userPrompts = prompts;
+      if (!development) await Prefs().saveSelectionToolbar(toolbar);
       rethrow;
     }
     _plugins = _plugins.where((plugin) => plugin.id != id).toList();
@@ -600,7 +776,10 @@ class PluginHost extends ChangeNotifier {
         await _deleteQuietly(trashed);
       }
     } catch (error) {
-      AnxLog.warning('Could not delete files of $id: ${describeError(error)}');
+      if (!development) {
+        AnxLog.warning(
+            'Could not delete files of $id: ${describeError(error)}');
+      }
     }
   }
 
@@ -615,10 +794,10 @@ class PluginHost extends ChangeNotifier {
 
   void _ensureUsable() {
     if (!_compiledIn || !Prefs().experimentalPluginsEnabled) {
-      throw PluginInstallError(PluginErrorCode.internal,
-          'Enable plugins in Experimental features first.');
+      throw PluginInstallError(
+          PluginErrorCode.internal, 'Enable plugins first.');
     }
-    if (_disposed) {
+    if (_disposed || (development && !_sessionOpen)) {
       throw PluginInstallError(
           PluginErrorCode.internal, 'Plugin host is disposed.');
     }
@@ -642,15 +821,25 @@ class PluginHost extends ChangeNotifier {
         rethrow;
       }
     } else {
-      await _authorizePrivateRemoval(null);
+      for (final runtime
+          in _peer?._runtimes.toList() ?? <PluginScriptRuntime>[]) {
+        runtime.cancelAll();
+      }
+      await _authorizePrivateRemoval(null, allScopes: true);
+      await _closeDeveloperSession?.call();
       await _suspendPlugins();
       await Prefs().saveExperimentalPluginsEnabled(false);
     }
     notifyListeners();
   }
 
-  Future<void> _authorizePrivateRemoval(String? id) async {
-    if (!identical(this, _instance) || !PrivateLibrary.instance.active) return;
+  Future<void> _authorizePrivateRemoval(String? id,
+      {bool allScopes = false}) async {
+    if ((!identical(this, _instance) && _peer == null) ||
+        !PrivateLibrary.instance.active) {
+      return;
+    }
+    if (!allScopes && _peer?._hasPrivateProvider == true) return;
     if (id != null) {
       if (!(_manifests[id]?.capabilities.contains(kLibraryPrivateCapability) ??
           false)) {
@@ -676,7 +865,7 @@ class PluginHost extends ChangeNotifier {
   }
 
   Future<void> _suspendPlugins() async {
-    final state = Prefs().pluginState;
+    final state = _state;
     final prompts = Prefs().userPrompts;
     final toolbar = Prefs().selectionToolbar;
     try {
@@ -691,15 +880,15 @@ class PluginHost extends ChangeNotifier {
         ));
       }
       if (state.plugins.isNotEmpty) {
-        await Prefs().savePluginState(PluginState(plugins: next));
+        await _saveState(PluginState(plugins: next));
       }
       _plugins = next;
       _initialized = false;
       _manifests.clear();
       _manifestTexts.clear();
     } catch (_) {
-      Prefs().userPrompts = prompts;
-      await Prefs().saveSelectionToolbar(toolbar);
+      if (!development) Prefs().userPrompts = prompts;
+      if (!development) await Prefs().saveSelectionToolbar(toolbar);
       rethrow;
     }
   }
@@ -799,9 +988,18 @@ class PluginHost extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    if (development) {
+      for (final record in _plugins) {
+        unawaited(_contributions.remove(record.applied).catchError((_) {}));
+      }
+    }
+    for (final runtime in _runtimes.toList()) {
+      runtime.cancelAll();
+    }
     if (identical(this, _instance)) {
       PluginScriptRuntime.cancelExisting();
-      PrivateLibrary.instance.setPluginActive(false);
+      PrivateLibrary.instance
+          .setPluginActive(_peer?._hasPrivateProvider ?? false);
     }
     super.dispose();
   }

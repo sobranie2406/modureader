@@ -12,7 +12,7 @@ const syncPositionResetPrefix = 'modu-position-reset-v1:';
 class RowSyncRecord {
   const RowSyncRecord(
       this.kind, this.id, this.clock, this.revision, this.deleted, this.data,
-      {this.narration});
+      {this.narration, this.localId});
 
   final String kind;
   final String id;
@@ -21,6 +21,9 @@ class RowSyncRecord {
   final bool deleted;
   final Map<String, Object?> data;
   final NarrationPosition? narration;
+
+  /// Local ownership only; never part of the transport map or sync identity.
+  final int? localId;
   String get key => '$kind/$id';
 
   Map<String, Object?> toMap() => {
@@ -42,6 +45,7 @@ class RowSyncRecord {
       row['deleted'] == 1,
       Map<String, Object?>.from(jsonDecode(row['payload'] as String) as Map),
       narration: NarrationPosition.decode(row['narration']),
+      localId: row['local_id'] as int?,
     )));
   }
 }

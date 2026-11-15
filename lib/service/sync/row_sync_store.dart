@@ -7,6 +7,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:modu_reader/service/sync/row_sync_record.dart';
 import 'package:modu_reader/service/sync/sync_paths.dart';
 import 'package:modu_reader/service/sync/replaced_book_files.dart';
+import 'package:modu_reader/service/sync/private_book_sync.dart';
+import 'package:modu_reader/service/private_library.dart';
 
 const syncRecordsTable = 'modu_sync_records';
 const _control = 'modu_sync_control';
@@ -494,6 +496,7 @@ class RowSyncStore {
   /// record, so the choice converges instead of being re-asked every sync.
   Future<List<RowSyncRecord>> merge(List<RowSyncRecord> remote,
       {bool importOnlyMissingRecords = false,
+      bool protectPrivateBooks = false,
       List<RowSyncRecord> pendingRecords = const [],
       SyncConflictResolution resolution =
           SyncConflictResolution.newest}) async {
@@ -502,7 +505,19 @@ class RowSyncStore {
       validate(record);
     }
     return db.transaction((txn) async {
-      final local = await _snapshot(txn);
+      final snapshot = await _snapshot(txn);
+      final privacyToken = PrivateLibrary.instance.syncExclusionToken;
+      final privacy =
+          PrivateBookSyncFilter([...snapshot, ...remote, ...pendingRecords]);
+      final protected = protectPrivateBooks
+          ? privacy.protectedRecords(snapshot)
+          : <RowSyncRecord>[];
+      final local =
+          protectPrivateBooks ? privacy.allowedRecords(snapshot) : snapshot;
+      if (protectPrivateBooks) {
+        remote = privacy.allowedRecords(remote);
+        pendingRecords = privacy.allowedRecords(pendingRecords);
+      }
       // Capture before alias rebinding can retire the row holding our locator.
       final incomingHashes = {
         for (final r in remote.where((r) => r.kind == 'book'))
@@ -547,6 +562,10 @@ class RowSyncStore {
         validate(record);
       }
       final old = {for (final r in local) r.key: jsonEncode(r.toMap())};
+      if (protectPrivateBooks &&
+          privacyToken != PrivateLibrary.instance.syncExclusionToken) {
+        throw StateError('私密书籍状态已改变，请重新同步');
+      }
       await txn.update(_control, {'applying': 1});
       if (await _rebindBookAliases(txn, merged)) old.clear();
       final ids = <String, Map<String, int>>{};
@@ -668,7 +687,12 @@ class RowSyncStore {
       final maxClock = merged.fold<int>(0, (v, r) => v > r.clock ? v : r.clock);
       await txn.rawUpdate(
           'UPDATE $_control SET applying=0, clock=MAX(clock,?)', [maxClock]);
-      return merged;
+      if (protectPrivateBooks &&
+          privacyToken != PrivateLibrary.instance.syncExclusionToken) {
+        throw StateError('私密书籍状态已改变，请重新同步');
+      }
+      // Protected rows never enter allocation, alias rebinding or live writes.
+      return [...merged, ...protected];
     });
   }
 

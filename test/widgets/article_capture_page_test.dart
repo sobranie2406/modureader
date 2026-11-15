@@ -15,6 +15,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _Host extends PluginHost {
   _Host() : super(paths: PluginPaths(rootPath: '/tmp/modu_article_widget'));
   bool enabled = true, hasCapability = true;
+  PluginManifest? _manifest;
+  void reload() {
+    _manifest = null;
+    notifyListeners();
+  }
+
   void change({bool? enabled, bool? hasCapability}) {
     this.enabled = enabled ?? this.enabled;
     this.hasCapability = hasCapability ?? this.hasCapability;
@@ -26,7 +32,7 @@ class _Host extends PluginHost {
       enabled && Prefs().experimentalPluginsEnabled;
   @override
   PluginManifest? manifestFor(String id) => hasCapability
-      ? PluginManifest.fromJson({
+      ? _manifest ??= PluginManifest.fromJson({
           'schemaVersion': 1,
           'hostApi': 1,
           'id': 'com.modu.web-clipper',
@@ -186,6 +192,9 @@ void main() {
     expect(find.byKey(const ValueKey('article-preview')), findsNothing);
     host.change(hasCapability: true);
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('article-fetch')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await show(tester);
     await capture(tester);
     await Prefs().saveExperimentalPluginsEnabled(false);
     await tester.pumpAndSettle();
@@ -294,5 +303,21 @@ void main() {
     pending.complete(_article);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('same-version reload revokes the original page and late capture',
+      (tester) async {
+    final pending = Completer<CapturedArticle>();
+    service.next = () => pending.future;
+    await show(tester);
+    await tester.tap(find.byKey(const ValueKey('article-fetch')));
+    await tester.pump();
+    host.reload();
+    await tester.pumpAndSettle();
+    expect(service.lastCancel!.isCancelled, true);
+    pending.complete(_article);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('article-preview')), findsNothing);
+    expect(find.byKey(const ValueKey('article-import')), findsNothing);
+    expect(find.byKey(const ValueKey('article-fetch')), findsNothing);
   });
 }

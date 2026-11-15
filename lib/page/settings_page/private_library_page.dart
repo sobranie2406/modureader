@@ -11,9 +11,12 @@ String _t(BuildContext context, String zh, String en) =>
     ModuStrings.text(context, zh, en);
 
 Future<T?> _settledDialog<T>(
-    {required BuildContext context, required WidgetBuilder builder}) async {
+    {required BuildContext context,
+    required WidgetBuilder builder,
+    VoidCallback? onDismissed}) async {
   final route = DialogRoute<T>(context: context, builder: builder);
   final result = await Navigator.of(context, rootNavigator: true).push(route);
+  onDismissed?.call();
   await route.completed;
   return result;
 }
@@ -21,10 +24,14 @@ Future<T?> _settledDialog<T>(
 Future<bool> showPrivateLibraryUnlock(
     BuildContext context, PrivateLibrary library) async {
   final pin = TextEditingController();
-  var busy = false, failed = false;
+  var busy = false, failed = false, finished = false, dismissed = false;
   try {
     return await _settledDialog<bool>(
             context: context,
+            onDismissed: () {
+              dismissed = true;
+              if (busy && !finished) library.cancelPendingAuthentication();
+            },
             builder: (context) => StatefulBuilder(
                 builder: (context, setState) => AlertDialog(
                         title: Text(
@@ -58,9 +65,7 @@ Future<bool> showPrivateLibraryUnlock(
                                     'Unlock to view private books.')),
                         actions: [
                           TextButton(
-                              onPressed: busy
-                                  ? null
-                                  : () => Navigator.pop(context, false),
+                              onPressed: () => Navigator.pop(context, false),
                               child: Text(_t(context, '取消', 'Cancel'))),
                           FilledButton(
                               onPressed: busy || library.corrupt
@@ -70,10 +75,26 @@ Future<bool> showPrivateLibraryUnlock(
                                         busy = true;
                                         failed = false;
                                       });
-                                      final success =
-                                          await library.unlock(pin.text);
-                                      if (!context.mounted) return;
+                                      bool success;
+                                      try {
+                                        success =
+                                            await library.unlock(pin.text);
+                                      } catch (_) {
+                                        if (!context.mounted || dismissed) {
+                                          return;
+                                        }
+                                        setState(() => busy = false);
+                                        ScaffoldMessenger.maybeOf(context)
+                                            ?.showSnackBar(SnackBar(
+                                                content: Text(_t(
+                                                    context,
+                                                    '解锁失败，请重试',
+                                                    'Could not unlock. Try again.'))));
+                                        return;
+                                      }
+                                      if (!context.mounted || dismissed) return;
                                       if (success) {
+                                        finished = true;
                                         Navigator.pop(context, true);
                                       } else {
                                         setState(() {
@@ -82,7 +103,15 @@ Future<bool> showPrivateLibraryUnlock(
                                         });
                                       }
                                     },
-                              child: Text(_t(context, '解锁', 'Unlock')))
+                              child: busy
+                                  ? SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          semanticsLabel:
+                                              _t(context, '正在解锁', 'Unlocking')))
+                                  : Text(_t(context, '解锁', 'Unlock')))
                         ]))) ??
         false;
   } finally {
@@ -95,8 +124,8 @@ Future<bool?> showPrivateLibraryDeactivate(BuildContext context) => showDialog<
     context: context,
     builder: (context) => AlertDialog(
             title: Text(_t(context, '停用私密书库', 'Disable private library')),
-            content: Text(_t(context, '停用后，私密书籍将恢复显示。书籍、笔记和进度会保留。',
-                'Private books will become visible. Books, notes and progress are kept.')),
+            content: Text(_t(context, '停用后，私密书籍恢复为普通书籍，并按当前设置参与同步。书籍、笔记和进度会保留。',
+                'Disabling makes private books ordinary books that follow your sync settings. Books, notes and progress are kept.')),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context, false),
@@ -107,15 +136,30 @@ Future<bool?> showPrivateLibraryDeactivate(BuildContext context) => showDialog<
             ]));
 
 class PrivateLibrarySettings extends StatelessWidget {
-  const PrivateLibrarySettings({super.key, required this.library});
+  const PrivateLibrarySettings(
+      {super.key, required this.library, this.embedded = false});
   final PrivateLibrary library;
+  final bool embedded;
+
+  Widget _body(List<Widget> children, {EdgeInsetsGeometry? padding}) => embedded
+      ? Padding(
+          padding: padding ?? EdgeInsets.zero,
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children))
+      : ListView(padding: padding, children: children);
 
   Future<void> _setPin(BuildContext context) async {
     final pin = TextEditingController(), repeat = TextEditingController();
-    var failed = false, busy = false;
+    var failed = false, busy = false, finished = false, dismissed = false;
     try {
       await _settledDialog<void>(
           context: context,
+          onDismissed: () {
+            dismissed = true;
+            if (busy && !finished) library.cancelPendingAuthentication();
+          },
           builder: (context) => StatefulBuilder(
               builder: (context, setState) => AlertDialog(
                       title: Text(_t(context, '设置 6 位密码', 'Set six-digit PIN')),
@@ -145,8 +189,7 @@ class PrivateLibrarySettings extends StatelessWidget {
                       ]),
                       actions: [
                         TextButton(
-                            onPressed:
-                                busy ? null : () => Navigator.pop(context),
+                            onPressed: () => Navigator.pop(context),
                             child: Text(_t(context, '取消', 'Cancel'))),
                         FilledButton(
                             onPressed: busy
@@ -161,17 +204,26 @@ class PrivateLibrarySettings extends StatelessWidget {
                                     setState(() => busy = true);
                                     try {
                                       await library.setPin(pin.text);
-                                      if (context.mounted) {
+                                      if (context.mounted && !dismissed) {
+                                        finished = true;
                                         Navigator.pop(context);
                                       }
                                     } catch (_) {
-                                      if (context.mounted) {
+                                      if (context.mounted && !dismissed) {
                                         setState(() => busy = false);
                                         _failure(context);
                                       }
                                     }
                                   },
-                            child: Text(_t(context, '保存', 'Save')))
+                            child: busy
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        semanticsLabel:
+                                            _t(context, '正在保存', 'Saving')))
+                                : Text(_t(context, '保存', 'Save')))
                       ])));
     } finally {
       pin.dispose();
@@ -202,13 +254,42 @@ class PrivateLibrarySettings extends StatelessWidget {
               }
             });
         if (!library.enabled || !library.unlocked) {
-          return ListView(children: [
+          return _body([
             enabled,
             if (library.enabled)
-              SizedBox(height: 240, child: _PrivateLocked(library: library))
+              embedded
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: _PrivateLocked(library: library))
+                  : SizedBox(
+                      height: 240, child: _PrivateLocked(library: library))
           ]);
         }
-        return ListView(padding: const EdgeInsets.all(16), children: [
+        final authenticationActions = Wrap(children: [
+          if (library.hasPin)
+            TextButton(
+                onPressed: () async {
+                  try {
+                    await library.setPin(null);
+                  } catch (_) {
+                    if (context.mounted) _failure(context);
+                  }
+                },
+                child: Text(_t(context, '移除', 'Remove'))),
+          TextButton(
+              onPressed: () => _setPin(context),
+              child: Text(_t(context, library.hasPin ? '修改' : '设置',
+                  library.hasPin ? 'Change' : 'Set')))
+        ]);
+        Future<void> changeVisibility(bool value) async {
+          try {
+            await library.setOptions(privateOnly: value);
+          } catch (_) {
+            if (context.mounted) _failure(context);
+          }
+        }
+
+        return _body(padding: const EdgeInsets.all(16), [
           enabled,
           ListTile(
               leading: const Icon(Icons.lock_open),
@@ -217,49 +298,53 @@ class PrivateLibrarySettings extends StatelessWidget {
                   key: const ValueKey('private-library-lock'),
                   onPressed: library.lock,
                   child: Text(_t(context, '锁定', 'Lock')))),
-          ListTile(
-              title: Text(_t(context, '验证方式', 'Authentication')),
-              subtitle: Text(_t(context, library.hasPin ? '6 位密码' : '无密码',
-                  library.hasPin ? 'Six-digit PIN' : 'No PIN')),
-              trailing: Wrap(children: [
-                if (library.hasPin)
-                  TextButton(
-                      onPressed: () async {
-                        try {
-                          await library.setPin(null);
-                        } catch (_) {
-                          if (context.mounted) _failure(context);
-                        }
-                      },
-                      child: Text(_t(context, '移除', 'Remove'))),
-                TextButton(
-                    onPressed: () => _setPin(context),
-                    child: Text(_t(context, library.hasPin ? '修改' : '设置',
-                        library.hasPin ? 'Change' : 'Set')))
-              ])),
+          if (embedded)
+            Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_t(context, '验证方式', 'Authentication')),
+                      Text(_t(context, library.hasPin ? '6 位密码' : '无密码',
+                          library.hasPin ? 'Six-digit PIN' : 'No PIN')),
+                      authenticationActions,
+                    ]))
+          else
+            ListTile(
+                title: Text(_t(context, '验证方式', 'Authentication')),
+                subtitle: Text(_t(context, library.hasPin ? '6 位密码' : '无密码',
+                    library.hasPin ? 'Six-digit PIN' : 'No PIN')),
+                trailing: authenticationActions),
           ListTile(
               title: Text(_t(context, '解锁后显示', 'After unlocking')),
               subtitle: Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(
-                            value: false,
-                            label: Text(_t(context, '全部书籍', 'All books'))),
-                        ButtonSegment(
-                            value: true,
-                            label: Text(_t(context, '仅私密书籍', 'Private only')))
-                      ],
-                      selected: {
-                        library.privateOnly
-                      },
-                      onSelectionChanged: (v) async {
-                        try {
-                          await library.setOptions(privateOnly: v.single);
-                        } catch (_) {
-                          if (context.mounted) _failure(context);
-                        }
-                      }))),
+                  child: embedded
+                      ? Wrap(spacing: 8, runSpacing: 8, children: [
+                          for (final value in [false, true])
+                            ChoiceChip(
+                              label: Text(_t(context, value ? '仅私密书籍' : '全部书籍',
+                                  value ? 'Private only' : 'All books')),
+                              selected: library.privateOnly == value,
+                              onSelected: (_) => changeVisibility(value),
+                            ),
+                        ])
+                      : SegmentedButton<bool>(
+                          segments: [
+                              ButtonSegment(
+                                  value: false,
+                                  label:
+                                      Text(_t(context, '全部书籍', 'All books'))),
+                              ButtonSegment(
+                                  value: true,
+                                  label: Text(
+                                      _t(context, '仅私密书籍', 'Private only')))
+                            ],
+                          selected: {
+                              library.privateOnly
+                            },
+                          onSelectionChanged: (v) =>
+                              changeVisibility(v.single)))),
           SwitchListTile(
               value: library.autoImport,
               title: Text(_t(context, '新导入书籍设为私密', 'Make new imports private')),

@@ -1,5 +1,12 @@
 # Reviewed JavaScript plugins
 
+UI placement and local development follow [the plugin development rules](plugin-development.md).
+Plugin features and settings belong on the plugin page and its detail pages, not
+as independent main-settings entries. Book and reader menus expose only registered
+actions. The default-off local development session is an explicit exception to
+review admission, with separate temporary packages, state and trust; ordinary
+installation still requires the signed catalog.
+
 Packages remain schema 1 / host API 1. `scriptAction` declares `id`, localized
 `name`, relative `.js` `entry`, `surface` (`selection`, `library` or `dictionary`) and `scope`
 (`selection` or `context`). It requires `script:run`; selection actions also
@@ -91,7 +98,10 @@ at the reading route and data exits so script removal cannot bypass protection.
 Explicit deactivation requires native verification before clearing protection;
 passive package loss locks remaining private marks until the plugin is restored.
 The local credential record is excluded from settings export/import and backup.
-No book-file encryption or new synchronization format is introduced.
+Private books and their associated notes, positions and assets are excluded from
+synchronization and outgoing backups even while unlocked. Complete device-local
+recovery snapshots remain intact. Existing cloud copies are not automatically
+deleted. No book-file encryption or new synchronization format is introduced.
 
 Implementation reference: HapeLee/legado-with-MD3 at
 `4efe24965915a326f5e910197cb73966892f2eb0`, especially PrivateAccessGateway,

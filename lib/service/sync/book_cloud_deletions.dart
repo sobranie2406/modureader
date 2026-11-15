@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/sync/sync_client_base.dart';
 import 'package:modu_reader/service/sync/sync_paths.dart';
 
@@ -31,6 +32,7 @@ class BookCloudDeletions {
       _change((rows) async {
         final endpoint = jsonEncode(client.syncIdentity);
         for (final book in books) {
+          if (!PrivateLibrary.instance.canSyncBook(book)) continue;
           rows.removeWhere(
               (r) => r['endpoint'] == endpoint && r['path'] == book.filePath);
           rows.add({
@@ -51,9 +53,15 @@ class BookCloudDeletions {
         for (final row in rows.where((r) => r['endpoint'] == endpoint)) {
           final path = row['path'] as String;
           final hash = row['md5'];
+          bool allowed() => PrivateLibrary.instance
+              .canSyncSource(md5: hash is String ? hash : null, filePath: path);
+          if (!allowed()) continue;
           final same = books.where(
               (b) => b.filePath == path || (hash != null && b.md5 == hash));
           if (same.isEmpty) continue;
+          if (same.any((book) => !PrivateLibrary.instance.canSyncBook(book))) {
+            continue;
+          }
           final generation = same.first.updateTime.millisecondsSinceEpoch;
           if (same.any((b) => !b.isDeleted) ||
               (row['generation'] != null && row['generation'] != generation)) {
@@ -62,6 +70,12 @@ class BookCloudDeletions {
           }
           row['generation'] = generation;
           for (final asset in [path, row['cover'] as String]) {
+            bool assetAllowed() =>
+                allowed() &&
+                !books.any((book) =>
+                    !PrivateLibrary.instance.canSyncBook(book) &&
+                    (book.filePath == asset || book.coverPath == asset));
+            if (!assetAllowed()) continue;
             if (asset.isEmpty ||
                 books.any((b) =>
                     !b.isDeleted &&
@@ -78,6 +92,7 @@ class BookCloudDeletions {
             }
             final remote = SyncPaths.data(asset);
             final props = await client.readProps(remote);
+            if (!assetAllowed()) continue;
             if (props == null) continue;
             if (props.isDir != false) {
               throw const FormatException(

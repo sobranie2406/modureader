@@ -16,9 +16,9 @@ import 'package:modu_reader/utils/save_file_to_download.dart';
 import 'package:modu_reader/widgets/markdown/styled_markdown.dart';
 
 Future<void> showArticleCapturePage(BuildContext context,
-        {required String pluginId}) =>
+        {required String pluginId, PluginHost? host}) =>
     Navigator.of(context).push<void>(MaterialPageRoute(
-        builder: (_) => ArticleCapturePage(pluginId: pluginId)));
+        builder: (_) => ArticleCapturePage(pluginId: pluginId, host: host)));
 
 class ArticleCapturePage extends ConsumerStatefulWidget {
   const ArticleCapturePage(
@@ -41,9 +41,12 @@ class ArticleCapturePage extends ConsumerStatefulWidget {
 class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
     with WidgetsBindingObserver {
   final _url = TextEditingController();
-  late final PluginHost _host = widget.host ?? PluginHost.instance;
+  late final PluginHost _host =
+      widget.host ?? PluginHost.executionHostFor(widget.pluginId);
   late final ArticleCaptureService _service =
       widget.service ?? ArticleCaptureService();
+  late final PluginManifest? _openingManifest;
+  bool _revoked = false;
   PluginCancelToken? _cancel;
   CapturedArticle? _article;
   String? _status;
@@ -52,6 +55,8 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
   int _generation = 0;
 
   bool get _available =>
+      !_revoked &&
+      identical(_openingManifest, _host.manifestFor(widget.pluginId)) &&
       _host.isScriptRunnable(widget.pluginId) &&
       (_host
               .manifestFor(widget.pluginId)
@@ -63,6 +68,7 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
   @override
   void initState() {
     super.initState();
+    _openingManifest = _host.manifestFor(widget.pluginId);
     WidgetsBinding.instance.addObserver(this);
     _host.addListener(_pluginChanged);
     Prefs().addListener(_pluginChanged);
@@ -71,6 +77,7 @@ class _ArticleCapturePageState extends ConsumerState<ArticleCapturePage>
   void _pluginChanged() {
     if (!mounted) return;
     if (!_available) {
+      _revoked = true;
       _cancel?.cancel();
       _generation++;
       _article = null;

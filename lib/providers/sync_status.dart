@@ -5,6 +5,8 @@ import 'package:modu_reader/enums/sync_direction.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/sync_status.dart';
 import 'package:modu_reader/providers/sync.dart';
+import 'package:modu_reader/providers/private_library.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/sync/webdav_request_policy.dart';
 import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:modu_reader/utils/log/common.dart';
@@ -16,7 +18,9 @@ part 'sync_status.g.dart';
 List<int> syncingBookIds(Iterable<Book> books, String fileName) {
   if (fileName.isEmpty || fileName.endsWith('.db')) return const [];
   return books
-      .where((book) => book.filePath.split('/').last == fileName)
+      .where((book) =>
+          PrivateLibrary.instance.canSyncBook(book) &&
+          book.filePath.split('/').last == fileName)
       .map((book) => book.id)
       .toList();
 }
@@ -47,7 +51,10 @@ class SyncStatus extends _$SyncStatus {
   int _refreshGeneration = 0;
   List<Book> allBooksInBookShelf = [];
   @override
-  Future<SyncStatusModel> build() => _buildStatus();
+  Future<SyncStatusModel> build() {
+    ref.watch(privateLibraryRevisionProvider);
+    return _buildStatus();
+  }
 
   Future<SyncStatusModel> _buildStatus({List<String>? remoteFileNames}) async {
     final books = await _listAllBooksInBookShelf();
@@ -100,6 +107,7 @@ class SyncStatus extends _$SyncStatus {
   }
 
   Future<List<int>> _listRemoteFiles(List<Book> books) async {
+    if (books.isEmpty) return [];
     Future<List<int>> core() async {
       final remoteFiles =
           await ref.read(syncProvider.notifier).listRemoteBookFiles();
@@ -150,7 +158,9 @@ class SyncStatus extends _$SyncStatus {
   }
 
   Future<List<Book>> _listAllBooksInBookShelf() async {
-    return await bookDao.selectNotDeleteBooks();
+    return (await bookDao.selectNotDeleteBooks())
+        .where(PrivateLibrary.instance.canSyncBook)
+        .toList();
   }
 
   Future<int?> pathToBookId(String filePath) async {

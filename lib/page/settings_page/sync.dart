@@ -11,6 +11,8 @@ import 'package:modu_reader/page/settings_page/settings_page.dart';
 
 import 'package:modu_reader/dao/database.dart';
 import 'package:modu_reader/service/local_data/backup_safety.dart';
+import 'package:modu_reader/service/local_data/portable_backup.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:modu_reader/service/ai/ai_history.dart';
 import 'package:modu_reader/enums/sync_protocol.dart';
@@ -400,22 +402,37 @@ class _SyncSettingState extends ConsumerState<SyncSetting> {
 
       _showDataDialog(L10n.of(context).exporting);
 
+      final privacy = PrivateLibrary.instance;
+      final privacyRevision = privacy.revision;
       await AiHistoryStore.migrateLegacyHistory();
-      final File prefsBackupFile =
-          await _createPrefsBackupFile(password: password);
-      prefsFile = prefsBackupFile;
       snapshot = File(await DBHelper.prepareUploadSnapshot());
+      final documents = Directory(await getAnxDocumentsPath());
+      final selection = privacy.hasSyncExclusions
+          ? await sanitizePortableBackup(snapshot)
+          : null;
+      final history = selection == null
+          ? null
+          : await portableBackupAiHistory(documents, selection);
+      final File prefsBackupFile = await _createPrefsBackupFile(
+          password: password, publicIds: selection?.publicBookIds);
+      prefsFile = prefsBackupFile;
 
       final zipPath = await compute(createZipFile, {
-        'documentPath': await getAnxDocumentsPath(),
+        'documentPath': documents.path,
         'tempPath': (await getAnxTempDir()).path,
         'prefsBackupFilePath': prefsBackupFile.path,
         'snapshotPath': snapshot.path,
+        if (selection != null) 'publicBookAssets': selection.assets.toList(),
+        if (history != null) 'publicAiHistory': history,
       });
 
       final file = File(zipPath);
       SmartDialog.dismiss();
       if (await file.exists()) {
+        if (privacy.revision != privacyRevision) {
+          await file.delete();
+          throw StateError('私密书籍设置已更改，请重新导出。');
+        }
         String fileName =
             'Modu-Backup-${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}-v3.zip';
 
@@ -801,12 +818,13 @@ Future<String> createZipFile(Map<String, dynamic> params) async {
       '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
   final zipPath = '${params['tempPath']}/Modu-Backup-$date.zip';
   final docPath = params['documentPath'] as String;
+  final publicAssets = (params['publicBookAssets'] as List?)?.cast<String>();
   final directoryList = [
-    getFileDir(path: docPath),
-    getCoverDir(path: docPath),
+    if (publicAssets == null) getFileDir(path: docPath),
+    if (publicAssets == null) getCoverDir(path: docPath),
     getFontDir(path: docPath),
     getBgimgDir(path: docPath),
-    Directory(path.join(docPath, 'ai')),
+    if (publicAssets == null) Directory(path.join(docPath, 'ai')),
     // await getAnxSharedPrefsDir(),
     // await getAnxShredPrefsFile(),
     prefsBackupFile,
@@ -820,9 +838,53 @@ Future<String> createZipFile(Map<String, dynamic> params) async {
   await encoder.addFile(
       File(params['snapshotPath'] as String), 'databases/app_database.db');
 
+  if (publicAssets != null) {
+    for (final relative in publicAssets.toSet().toList()..sort()) {
+      final parts = relative.split('/');
+      if (parts.length < 2 ||
+          !{'file', 'cover'}.contains(parts.first) ||
+          relative.contains(RegExp(r'[\\:\x00-\x1f]')) ||
+          parts.any((part) => part.isEmpty || part == '.' || part == '..')) {
+        throw const FormatException('Invalid backup asset');
+      }
+      var valid = true;
+      for (var i = 1; i <= parts.length; i++) {
+        final type = await FileSystemEntity.type(
+            path.joinAll([docPath, ...parts.take(i)]),
+            followLinks: false);
+        if (type !=
+            (i == parts.length
+                ? FileSystemEntityType.file
+                : FileSystemEntityType.directory)) {
+          valid = false;
+          break;
+        }
+      }
+      if (valid) {
+        await encoder.addFile(
+            File(path.joinAll([docPath, ...parts])), relative);
+      }
+    }
+    final bytes = utf8.encode(params['publicAiHistory'] as String? ?? '[]');
+    encoder
+        .addArchiveFile(ArchiveFile('ai/ai_history.json', bytes.length, bytes));
+  }
+
   for (final dir in directoryList) {
     if (dir is Directory) {
-      if (await dir.exists()) await encoder.addDirectory(dir);
+      if (await dir.exists()) {
+        if (publicAssets == null) {
+          await encoder.addDirectory(dir);
+        } else {
+          await for (final file
+              in dir.list(recursive: true, followLinks: false)) {
+            if (file is File) {
+              await encoder.addFile(file,
+                  '${path.basename(dir.path)}/${path.relative(file.path, from: dir.path).replaceAll('\\', '/')}');
+            }
+          }
+        }
+      }
     } else if (dir is File) {
       await encoder.addFile(dir);
     }
@@ -849,10 +911,12 @@ Future<void> extractZipFile(Map<String, String> params) async {
   }
 }
 
-Future<File> _createPrefsBackupFile({required String password}) async {
+Future<File> _createPrefsBackupFile(
+    {required String password, Set<int>? publicIds}) async {
   final Directory tempDir = await getAnxTempDir();
   final File backupFile = File('${tempDir.path}/$_prefsBackupFileName');
-  final backup = await Prefs().buildPrefsBackupMap();
+  var backup = await Prefs().buildPrefsBackupMap();
+  if (publicIds != null) backup = portableBackupPreferences(backup, publicIds);
   final Map<String, dynamic> prefsMap = password.isEmpty
       ? withoutBackupCredentials(backup)
       : {

@@ -69,6 +69,62 @@ void main() {
     expect(archive.findFile('databases/app_database.db'), isNotNull);
     expect(archive.findFile('file/test.epub'), isNotNull);
   });
+  test(
+      'private-aware ZIP contains only selected public assets and sanitized AI history, without sidecars or linked files',
+      () async {
+    final prefs =
+        await File('${root.path}/modu_shared_prefs.json').writeAsString('{}');
+    final snapshot =
+        await File('${root.path}/snapshot.db').writeAsString('public database');
+    await File('${root.path}/snapshot.db-wal').writeAsString('PRIVATE_WAL');
+    final doc = await Directory('${root.path}/documents').create();
+    for (final name in [
+      'file/public.epub',
+      'file/private.epub',
+      'file/unknown-cache.json',
+      'cover/public.png',
+      'cover/private.png',
+      'ai/ai_history.json',
+      'ai/ai_history.json.corrupt-1',
+      'ai/ai_history.json.tmp',
+      'font/public.ttf'
+    ]) {
+      await File('${doc.path}/$name').create(recursive: true);
+      await File('${doc.path}/$name').writeAsString(
+          name.contains('public') ? 'public' : 'PRIVATE_CONTENT');
+    }
+    await Link('${doc.path}/file/linked.epub')
+        .create('${doc.path}/file/private.epub');
+    final zip = await compute(createZipFile, <String, dynamic>{
+      'documentPath': doc.path,
+      'tempPath': root.path,
+      'prefsBackupFilePath': prefs.path,
+      'snapshotPath': snapshot.path,
+      'publicBookAssets': [
+        'file/public.epub',
+        'cover/public.png',
+        'file/linked.epub'
+      ],
+      'publicAiHistory': '[{"id":"public"}]',
+    });
+    final archive = ZipDecoder().decodeBytes(await File(zip).readAsBytes());
+    expect(
+        archive.files
+            .where((file) => file.isFile)
+            .map((file) => file.name)
+            .toSet(),
+        {
+          'databases/app_database.db',
+          'file/public.epub',
+          'cover/public.png',
+          'font/public.ttf',
+          'ai/ai_history.json',
+          'modu_shared_prefs.json'
+        });
+    for (final entry in archive.files.where((file) => file.isFile)) {
+      expect(String.fromCharCodes(entry.content), isNot(contains('PRIVATE')));
+    }
+  });
   for (final outcome in ['success', 'cancel', 'error']) {
     test('Android bytes use app cache and clean up after $outcome', () async {
       String? staged;
