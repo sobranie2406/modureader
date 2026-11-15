@@ -184,6 +184,26 @@ void main() {
     );
   });
 
+  test('preview builds use the same plugin API floor as their base app release',
+      () {
+    final manifest = parse(manifestJson(minAppVersion: '1.3.10'));
+    for (final version in [
+      '1.3.10-beta.1+10178',
+      '1.3.10-preview.2',
+      '1.3.11-beta.1',
+      '1.3.10'
+    ]) {
+      expect(() => manifest.ensureCompatibleWith(version), returnsNormally);
+    }
+    for (final version in ['1.3.9-beta.9+99999', '1.3.9+99999']) {
+      expect(
+          () => manifest.ensureCompatibleWith(version),
+          throwsA(isA<PluginInstallError>().having(
+              (error) => error.code, 'code', PluginErrorCode.appTooOld)));
+    }
+    expect(() => manifest.ensureCompatibleWith('unknown'), returnsNormally);
+  });
+
   test('manifest size and JSON shape are bounded', () {
     final huge = ' ' * (PluginLimits.maxManifestBytes + 1);
     expect(

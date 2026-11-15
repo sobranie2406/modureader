@@ -1076,15 +1076,15 @@ class PluginManifest {
     }
   }
 
-  /// Compares [minAppVersion] against the running app version, ignoring build
-  /// metadata. Unknown running versions skip the check rather than block
-  /// installs (tests and custom builds).
+  /// Compares [minAppVersion] against the app's major/minor/patch; preview
+  /// labels keep the same API. Unknown versions skip this check (custom builds).
   void ensureCompatibleWith(String appVersion) {
     final min = minAppVersion;
     if (min == null) return;
     Version? current;
     try {
-      current = Version.parse(appVersion.split('+').first);
+      final parsed = Version.parse(appVersion.split('+').first);
+      current = Version(parsed.major, parsed.minor, parsed.patch);
     } on FormatException {
       return;
     }

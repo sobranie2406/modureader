@@ -42,7 +42,8 @@ class PluginCatalogEntry {
   bool requiresAppUpdate(String appVersion) {
     if (!supported) return true;
     try {
-      return Version.parse(appVersion.split('+').first) <
+      final parsed = Version.parse(appVersion.split('+').first);
+      return Version(parsed.major, parsed.minor, parsed.patch) <
           Version.parse(minAppVersion);
     } on FormatException {
       return true;

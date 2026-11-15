@@ -112,6 +112,41 @@ void main() {
   });
 
   test(
+      'preview app versions use the base release for the catalog compatibility floor',
+      () {
+    final item = catalogItem()..['minAppVersion'] = '1.3.10';
+    final entry = PluginCatalog.parse(catalogJson([item])).single;
+    for (final version in [
+      '1.3.10-beta.1+10178',
+      '1.3.10-preview.2',
+      '1.3.11-beta.1',
+      '1.3.10'
+    ]) {
+      expect(entry.requiresAppUpdate(version), false);
+    }
+    for (final version in [
+      '1.3.9-beta.9+99999',
+      '1.3.9+99999',
+      '',
+      'unknown'
+    ]) {
+      expect(entry.requiresAppUpdate(version), true);
+    }
+    for (final change in <void Function(Map<String, dynamic>)>[
+      (item) => item['hostApi'] = 2,
+      (item) => item['capabilities'] = ['future:capability'],
+    ]) {
+      final incompatible = {...item};
+      change(incompatible);
+      expect(
+          PluginCatalog.parse(catalogJson([incompatible]))
+              .single
+              .requiresAppUpdate('1.3.10-beta.1+10178'),
+          true);
+    }
+  });
+
+  test(
       'network catalogs require a valid signature and retain its exact envelope',
       () async {
     final payload = catalogJson([catalogItem(version: '2.0.0')]);
