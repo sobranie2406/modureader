@@ -53,6 +53,7 @@ function fixture({workerAvailable = true, bridgeReady = true, onCall = async () 
   const host = {
     addEventListener: events.addEventListener.bind(events),
     removeEventListener: events.removeEventListener.bind(events),
+    setTimeout, clearTimeout,
     Blob: BrowserBlob,
     Worker: workerAvailable ? BrowserWorker : undefined,
     URL: {
@@ -84,10 +85,11 @@ function fixture({workerAvailable = true, bridgeReady = true, onCall = async () 
     start(source, input = {}) {
       host.moduPluginStart({source, input, handler: 'host-only-handler'});
     },
-    readyBridge() {
+    readyBridge({emitEvent = true} = {}) {
       host.flutter_inappwebview = nativeBridge;
-      events.dispatchEvent(new Event(readyEvent));
+      if (emitEvent) events.dispatchEvent(new Event(readyEvent));
     },
+    signalReady() { events.dispatchEvent(new Event(readyEvent)); },
     get readyListeners() { return getEventListeners(events, readyEvent).length; },
     async dispose() {
       host.moduPluginStop();
@@ -251,5 +253,39 @@ test('stopping while the native bridge is pending removes its listener and ignor
   f.start('return {text:"must not restart"};');
   assert.equal(f.workers.length, 0);
   assert.equal(f.blobs.size, 0);
+  assert.deepEqual(f.messages, []);
+});
+
+test('an early ready event cannot strand a bridge injected later without another event', async t => {
+  const f = fixture({bridgeReady:false}); t.after(() => f.dispose());
+  f.signalReady();
+  assert.equal(f.host.moduPluginStart({source:'return {text:input.selection};',
+    input:{selection:'late bridge'}, handler:'host-only-handler'}), 'waiting_bridge');
+  f.readyBridge({emitEvent:false});
+  assert.deepEqual(await within(f.result), {kind:'result',value:{text:'late bridge'}});
+  assert.equal(f.workers.length, 1);
+  assert.equal(f.readyListeners, 0);
+  assert.equal(f.blobs.size, 0);
+});
+
+test('polling and a simultaneous ready event start only one worker', async t => {
+  const f = fixture({bridgeReady:false}); t.after(() => f.dispose());
+  f.start('return {text:"once"};');
+  f.signalReady();
+  f.readyBridge();
+  assert.deepEqual(await within(f.result), {kind:'result',value:{text:'once'}});
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.equal(f.workers.length, 1);
+  assert.equal(f.messages.length, 1);
+});
+
+test('stopping cancels bridge polling even when late injection has no ready event', async t => {
+  const f = fixture({bridgeReady:false}); t.after(() => f.dispose());
+  f.start('return {text:"must not run"};');
+  f.host.moduPluginStop();
+  f.readyBridge({emitEvent:false});
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.equal(f.workers.length, 0);
+  assert.equal(f.readyListeners, 0);
   assert.deepEqual(f.messages, []);
 });

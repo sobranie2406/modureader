@@ -1,23 +1,33 @@
 /* Trusted host bootstrap. Plugin source is passed as data, never HTML. */
 (() => {
   'use strict';
-  let worker = null, workerUrl = null, count = 0, started = false, closed = false, ready = null;
-  const stop = () => { closed=true; if(ready)window.removeEventListener('flutterInAppWebViewPlatformReady',ready); if (worker) worker.terminate(); worker = null; if(workerUrl) URL.revokeObjectURL(workerUrl); workerUrl=null; };
+  let worker = null, workerUrl = null, count = 0, started = false, closed = false, ready = null, retry = null;
+  const clearReadiness = () => {
+    if (ready) window.removeEventListener('flutterInAppWebViewPlatformReady', ready);
+    if (retry !== null) clearTimeout(retry);
+    ready = null; retry = null;
+  };
+  const stop = () => { closed=true; clearReadiness(); if (worker) worker.terminate(); worker = null; if(workerUrl) URL.revokeObjectURL(workerUrl); workerUrl=null; };
   window.moduPluginStop = stop;
   window.moduPluginStart = ({source, input, handler}) => {
-    if (started || closed) return;
+    if (closed) return 'stopped';
+    if (started) return 'running';
     const bridge = window.flutter_inappwebview;
     if (!bridge || typeof bridge.callHandler !== 'function') {
       if (!ready) {
-        ready=()=>{ready=null;window.moduPluginStart({source,input,handler});};
+        ready=()=>window.moduPluginStart({source,input,handler});
         window.addEventListener('flutterInAppWebViewPlatformReady',ready,{once:true});
       }
-      return;
+      // Native startup can emit its ready event before callHandler is injected.
+      // The host deadline owns this retry and calls stop on timeout/cancellation.
+      if (retry === null) retry=setTimeout(()=>{retry=null;window.moduPluginStart({source,input,handler});},50);
+      return 'waiting_bridge';
     }
+    clearReadiness();
     started = true;
     const send = value => bridge.callHandler(handler, JSON.stringify(value));
     if (typeof Worker !== 'function' || typeof Blob !== 'function') {
-      void send({kind:'error'}); return;
+      void send({kind:'error'}); return 'unsupported_worker';
     }
     const prelude = `
       'use strict';
@@ -59,7 +69,7 @@
     `;
     const url = URL.createObjectURL(new Blob([prelude, source, suffix],{type:'application/javascript'}));
     workerUrl = url;
-    try { worker = new Worker(url); } catch (_) { void send({kind:'error'}); return; }
+    try { worker = new Worker(url); } catch (_) { void send({kind:'error'}); return 'worker_error'; }
     const current = worker;
     current.onerror = () => { if(worker===current){stop();void send({kind:'error'});} };
     current.onmessage = async event => {
@@ -80,5 +90,6 @@
       }
     };
     current.postMessage({start:true,input});
+    return 'running';
   };
 })();

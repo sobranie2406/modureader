@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
@@ -13,6 +14,7 @@ import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_trust.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'plugin_test_utils.dart';
@@ -57,6 +59,19 @@ class Http extends PluginHttpClient {
     requests++;
     return Uint8List.fromList(utf8.encode('ok'));
   }
+}
+
+class _DiagnosticEngine extends WebViewPluginScriptEngine {
+  final delegate = Engine();
+  @override
+  String get diagnosticStage => 'waiting_bridge';
+  @override
+  Future<Map<String, dynamic>> execute(
+          String source, Map<String, Object?> input,
+          {required PluginHostCall onCall}) =>
+      delegate.execute(source, input, onCall: onCall);
+  @override
+  Future<void> dispose() => delegate.dispose();
 }
 
 void main() {
@@ -282,6 +297,128 @@ void main() {
         timeout: const Duration(milliseconds: 50));
     await expectLater(run(), throwsA(failure('timeout')));
     expect(engine.disposed, greaterThan(0));
+  });
+  test('timeout logs one safe warning with action, elapsed time and stage',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => engine,
+        timeout: const Duration(milliseconds: 50));
+    await expectLater(
+        run({'selection': 'PRIVATE_SELECTION', 'context': 'PRIVATE_CONTEXT'}),
+        throwsA(failure('timeout')));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.level, Level.WARNING);
+    expect(record.message,
+        contains('plugin=$id version=1.0.0 action=${action.id}'));
+    expect(record.message, contains('code=timeout stage=execute'));
+    expect(record.message, matches(r'elapsed_ms=\d+'));
+    expect(record.message, isNot(contains('PRIVATE_')));
+    expect(record.error, isNull);
+    expect(record.stackTrace, isNull);
+  });
+  test('execution errors never log private exception text, source or inputs',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    final result = run({
+      'selection': 'PRIVATE_SELECTION',
+      'context': 'PRIVATE_CONTEXT',
+      'book': {'title': 'PRIVATE_BOOK'}
+    });
+    await engine.ready.future;
+    engine.result
+        .completeError(StateError('PRIVATE_ERROR https://secret.example/PIN '
+            'PRIVATE_SETTING PRIVATE_SOURCE /Users/private/book.epub'));
+    await expectLater(result, throwsA(failure('execution')));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.level, Level.WARNING);
+    expect(record.message, contains('code=execution stage=execute'));
+    expect(record.message, isNot(contains('PRIVATE_')));
+    expect(record.message, isNot(contains('https://')));
+    expect(record.message, isNot(contains('/Users/')));
+    expect(record.message, isNot(contains(engine.source!)));
+    expect(record.error, isNull);
+    expect(record.stackTrace, isNull);
+  });
+  test('cancellation is recorded once as info despite late engine errors',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    final result = run();
+    await engine.ready.future;
+    final cancelled = expectLater(result, throwsA(failure('cancelled')));
+    runtime.cancelPlugin(id);
+    runtime.cancelPlugin(id);
+    await cancelled;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.level, Level.INFO);
+    expect(record.message, contains('code=cancelled'));
+    expect(records.where((r) => r.level >= Level.WARNING), isEmpty);
+  });
+  test('unknown failure codes cannot inject private values into diagnostics',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    final result = run();
+    await engine.ready.future;
+    engine.result.completeError(
+        const PluginScriptFailure('PRIVATE_CODE https://secret.example'));
+    await expectLater(result, throwsA(isA<PluginScriptFailure>()));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.message, contains('code=execution'));
+    expect(record.message, isNot(contains('PRIVATE_CODE')));
+    expect(record.message, isNot(contains('https://')));
+  });
+  test('a WebView timeout records its concrete bridge or worker stage',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    runtime.dispose();
+    final diagnostic = _DiagnosticEngine();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => diagnostic,
+        timeout: const Duration(milliseconds: 50));
+    final result = run();
+    await diagnostic.delegate.ready.future;
+    await expectLater(result, throwsA(failure('timeout')));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.message, contains('code=timeout stage=waiting_bridge'));
+  });
+  test(
+      'unavailable metadata cannot inject a URL or multiline content into logs',
+      () async {
+    final records = <LogRecord>[];
+    final listener = AnxLog.log.onRecord.listen(records.add);
+    addTearDown(listener.cancel);
+    await expectLater(
+        runtime.run(
+            pluginId: 'https://PRIVATE_URL\nPRIVATE_TEXT', action: action),
+        throwsA(failure('unavailable')));
+    final record = records
+        .singleWhere((r) => r.message.startsWith('Plugin script failed:'));
+    expect(record.message, contains('plugin=unknown'));
+    expect(record.message, contains('code=unavailable stage=validate'));
+    expect(record.message, isNot(contains('PRIVATE_')));
+    expect(record.message, isNot(contains('https://')));
+    expect(record.message, isNot(contains('\n')));
   });
   test('rejects source changes even with injected manifest trust', () async {
     await File('${host.paths.pluginDir(id).path}/main.js')

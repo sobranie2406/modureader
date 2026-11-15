@@ -10,6 +10,7 @@ import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'package:path/path.dart' as p;
 
 import 'plugin_host.dart';
@@ -78,12 +79,16 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         !_enabled(pluginId, record.version) ||
         !manifest.capabilities.contains(kScriptRunCapability) ||
         !manifest.contributions.any((c) => identical(c, action))) {
+      _logFailure(pluginId, record?.version ?? 'unknown', action.id,
+          'unavailable', 'validate', 0);
       return Future.error(const PluginScriptFailure('unavailable'));
     }
     if (_jobs.containsKey(pluginId) || _jobs.length >= 2) {
+      _logFailure(pluginId, record.version, action.id, 'busy', 'queue', 0);
       return Future.error(const PluginScriptFailure('busy'));
     }
-    final job = _ScriptJob(_engineFactory(), record.version, isContextValid);
+    final job = _ScriptJob(
+        _engineFactory(), pluginId, record.version, action.id, isContextValid);
     _jobs[pluginId] = job;
     final limit = action.surface == PluginScriptSurface.dictionary &&
             timeout > const Duration(seconds: 2)
@@ -115,6 +120,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       final directory = host.paths.pluginDir(id);
       await host.trust.verify(directory, id, job.version);
       _check(id, job);
+      job.stage = 'source';
       final file = File(p.join(directory.path, action.entry));
       if (await file.length() > PluginLimits.maxScriptBytes) {
         throw const PluginScriptFailure('size');
@@ -128,6 +134,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         throw const PluginScriptFailure('unavailable');
       }
       _check(id, job);
+      job.stage = 'input';
       final config = Prefs().pluginConfig(id);
       final settings = <String, Object?>{
         for (final spec in manifest.settings)
@@ -147,12 +154,14 @@ class PluginScriptRuntime with WidgetsBindingObserver {
           'book': _bookSummary(input['book'] as Map),
       };
       _bounded(payload, maxInputBytes);
+      job.stage = 'execute';
       final result = await job.engine.execute(utf8.decode(bytes), payload,
           onCall: (method, args) =>
               action.surface == PluginScriptSurface.dictionary
                   ? Future.error(const PluginScriptFailure('permission'))
                   : _call(id, manifest, method, args, hostCall, job));
       _check(id, job);
+      job.stage = 'result';
       _bounded(result, maxResultBytes);
       if (action.surface == PluginScriptSurface.dictionary) {
         final candidates = result['candidates'];
@@ -174,11 +183,9 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       }
       job.result.complete(result);
     } on PluginScriptFailure catch (error) {
-      if (!job.result.isCompleted) job.result.completeError(error);
+      _completeFailure(job, error);
     } catch (_) {
-      if (!job.result.isCompleted) {
-        job.result.completeError(const PluginScriptFailure('execution'));
-      }
+      _completeFailure(job, const PluginScriptFailure('execution'));
     } finally {
       job.timer?.cancel();
       job.cancel.cancel();
@@ -221,6 +228,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       throw const PluginScriptFailure('permission');
     }
     job.callBusy = true;
+    final previousStage = job.stage;
+    job.stage = 'host_call';
     try {
       Object? value;
       if (method == 'http.get') {
@@ -231,11 +240,13 @@ class PluginScriptRuntime with WidgetsBindingObserver {
             manifest.network == null) {
           throw const PluginScriptFailure('quota');
         }
+        job.stage = 'dns';
         final target = await _guard.validate(
             network: manifest.network!,
             uri: Uri.parse(args['url'] as String),
             headers: const {});
         _check(id, job);
+        job.stage = 'http';
         final bytes = await _http.get(
             target: target,
             timeout: Duration(milliseconds: manifest.network!.timeoutMs),
@@ -253,6 +264,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       return value;
     } finally {
       job.callBusy = false;
+      job.stage = previousStage;
     }
   }
 
@@ -287,10 +299,46 @@ class PluginScriptRuntime with WidgetsBindingObserver {
   void _abort(_ScriptJob job, String code) {
     job.cancel.cancel();
     job.timer?.cancel();
-    if (!job.result.isCompleted) {
-      job.result.completeError(PluginScriptFailure(code));
-    }
+    _completeFailure(job, PluginScriptFailure(code));
     unawaited(job.engine.dispose().catchError((_) {}));
+  }
+
+  void _completeFailure(_ScriptJob job, PluginScriptFailure failure) {
+    if (job.result.isCompleted) return;
+    job.result.completeError(failure);
+    final engine = job.engine;
+    final stage = job.stage == 'execute' && engine is WebViewPluginScriptEngine
+        ? engine.diagnosticStage
+        : job.stage;
+    _logFailure(job.pluginId, job.version, job.actionId, failure.code, stage,
+        job.elapsed.elapsedMilliseconds);
+  }
+
+  static void _logFailure(String id, String version, String action, String code,
+      String stage, int elapsed) {
+    String token(String value) =>
+        RegExp(r'^[A-Za-z0-9_.-]{1,80}$').hasMatch(value) ? value : 'unknown';
+    final safeCode = const {
+      'unavailable',
+      'busy',
+      'cancelled',
+      'timeout',
+      'execution',
+      'permission',
+      'quota',
+      'size',
+      'result'
+    }.contains(code)
+        ? code
+        : 'execution';
+    final message =
+        'Plugin script failed: plugin=${token(id)} version=${token(version)} '
+        'action=${token(action)} code=$safeCode stage=${token(stage)} elapsed_ms=$elapsed';
+    if (safeCode == 'cancelled') {
+      AnxLog.info(message);
+    } else {
+      AnxLog.warning(message);
+    }
   }
 
   void cancelPlugin(String id) {
@@ -320,9 +368,12 @@ class PluginScriptRuntime with WidgetsBindingObserver {
 }
 
 class _ScriptJob {
-  _ScriptJob(this.engine, this.version, this.isContextValid);
+  _ScriptJob(this.engine, this.pluginId, this.version, this.actionId,
+      this.isContextValid);
   final PluginScriptEngine engine;
-  final String version;
+  final String pluginId, version, actionId;
+  final elapsed = Stopwatch()..start();
+  String stage = 'verify';
   final bool Function()? isContextValid;
   final result = Completer<Map<String, dynamic>>();
   final cancel = PluginCancelToken();
