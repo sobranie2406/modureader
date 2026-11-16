@@ -555,8 +555,8 @@ const getCSS = ({ fontSize,
         color:rgb(167, 96, 52) !important;
     }
     
-    a > img {
-        font-size: ${fontSize}em !important;
+    img[data-modu-inline-image] {
+        font-size: inherit !important;
     }
 
     * {
@@ -630,14 +630,7 @@ const getCSS = ({ fontSize,
 
 
     /*  Paragraphs containing only an image — don't change */
-    ${(globalThis.CSS?.supports?.('selector(:has(*))') ?? true) ? `p:has(> img:only-child),
-    p:has(> span:only-child > img:only-child),
-    p:has(> img:not(.has-text-siblings)),
-    p:has(> a:first-child + img:last-child),
-    div:has(> img:only-child),
-    div:has(> span:only-child > img:only-child),
-    div:has(> img:not(.has-text-siblings)),
-    div:has(> a:first-child + img:last-child)` : '[data-modu-image-paragraph]'}  {
+    [data-modu-image-paragraph] {
         text-indent: initial !important;
         font-size: initial !important;
         height: initial !important;

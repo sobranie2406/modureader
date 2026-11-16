@@ -1,6 +1,49 @@
 const marker = '/* modu-reader-font-weight */';
 const preserved = 'h1, h2, h3, h4, h5, h6, [role="heading"], b, strong, svg, math, script, style';
 const savedWeights = new WeakMap();
+const imageWrappers = new Set(['img', 'span', 'a', 'b', 'strong', 'i', 'em', 'u',
+  's', 'small', 'sup', 'sub', 'br', 'wbr', 'picture', 'source', 'modu-page-run']);
+
+function prepareReaderImages(doc) {
+  for (const el of doc.body.querySelectorAll('[data-modu-image-paragraph], [data-modu-inline-image]')) {
+    el.removeAttribute('data-modu-image-paragraph');
+    el.removeAttribute('data-modu-inline-image');
+  }
+  const textBlocks = new Map();
+  const hidden = el => {
+    for (let parent = el; parent; parent = parent.parentElement) {
+      if (parent.matches('script,style,template,[hidden]') || parent.style?.display === 'none') return true;
+    }
+    return false;
+  };
+  const hasText = block => {
+    if (textBlocks.has(block)) return textBlocks.get(block);
+    const walker = doc.createTreeWalker(block, 4);
+    let text = false;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (/[^\s\u200b-\u200d\u2060\ufeff]/u.test(node.data) &&
+          !node.parentElement?.closest('svg,math') && !hidden(node.parentElement)) {
+        text = true;
+        break;
+      }
+    }
+    textBlocks.set(block, text);
+    return text;
+  };
+  for (const img of doc.body.querySelectorAll('img')) {
+    if (img.closest('svg,math')) continue;
+    const block = img.closest('p,div') ?? doc.body;
+    img.toggleAttribute('data-modu-inline-image', hasText(block));
+  }
+  for (const [block, text] of textBlocks) {
+    // Text nodes count too; :only-child ignores prose around an embedded glyph.
+    // Structural containers keep their publisher dimensions, even without text.
+    if (block !== doc.body && !text &&
+        [...block.querySelectorAll('*')].every(el => imageWrappers.has(el.localName) || hidden(el))) {
+      block.setAttribute('data-modu-image-paragraph', '');
+    }
+  }
+}
 
 // Change ordinary text through inheritance, not a blanket numeric override:
 // spans inside headings/emphasis and later user CSS keep their own weight.
@@ -48,18 +91,13 @@ export function readerFontWeightCSS({ fontWeight = 400, simulateBold = false, us
 // Restore it when following book styles again. Never modify the source file.
 export function prepareReaderFontWeight(doc, styles) {
   if (!doc?.body) return;
+  prepareReaderImages(doc);
   // Old WebViews discard an entire selector list containing :has/:where.
   // Attribute markers keep the same matching rules without changing text/CFIs.
   if (!doc.defaultView?.CSS?.supports?.('selector(:has(*))')) {
     for (const el of doc.body.querySelectorAll('div,p')) {
       el.toggleAttribute('data-modu-paragraph', el.localName === 'div' &&
         !el.querySelector(':not(b):not(a):not(em):not(i):not(strong):not(u):not(span):not(modu-page-run)'));
-      const children = [...el.children];
-      const imageOnly = children.length === 1 && (children[0].localName === 'img' ||
-        (children[0].localName === 'span' && children[0].children.length === 1 && children[0].firstElementChild.localName === 'img'));
-      el.toggleAttribute('data-modu-image-paragraph', imageOnly ||
-        children.some(child => child.localName === 'img' && !child.classList.contains('has-text-siblings')) ||
-        (children.length === 2 && children[0].localName === 'a' && children[1].localName === 'img'));
     }
   }
   if (!doc.defaultView?.CSS?.supports?.('selector(:where(*))')) {
