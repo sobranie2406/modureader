@@ -145,10 +145,14 @@ List<RowSyncRecord> mergeSyncRecords(
 /// How records that exist on BOTH devices with different content are resolved.
 ///
 /// `newest` keeps the operation clock ordering used by every other merge path.
-/// The two explicit choices only apply to [divergentSyncKeys]; records that
-/// exist on one side alone are always merged normally, so a preference can
-/// never delete a book, note or session that only one device knows about.
-enum SyncConflictResolution { newest, preferLocal, preferRemote }
+/// The explicit choices only apply to [divergentSyncKeys]; records that exist on
+/// one side alone are always merged normally, so a preference can never delete a
+/// book, note or session that only one device knows about.
+///
+/// [uploadOnly] is different in kind: it skips the local merge entirely, so this
+/// device receives nothing, and publishes its own state to the cloud while
+/// keeping records the cloud holds and this device has never seen.
+enum SyncConflictResolution { newest, preferLocal, preferRemote, uploadOnly }
 
 /// Keys that both sides published with different CONTENT.
 ///
@@ -199,7 +203,10 @@ List<RowSyncRecord> resolveSyncConflicts({
   int? clock,
 }) {
   final records = merged.toList();
-  if (resolution == SyncConflictResolution.newest) return records;
+  if (resolution == SyncConflictResolution.newest ||
+      resolution == SyncConflictResolution.uploadOnly) {
+    return records;
+  }
   final keys = divergentSyncKeys(local, remote);
   if (keys.isEmpty) return records;
   final preferred = {
@@ -272,14 +279,26 @@ RowSyncRecord _winner(RowSyncRecord a, RowSyncRecord b) {
         (a.narration?.encode() ?? '').compareTo(b.narration?.encode() ?? '');
   }
   final winner = comparison >= 0 ? a : b;
+  // Legacy same-day sessions were migrated onto ONE shared key per book/day.
+  // Keeping only the larger value silently dropped the other device's minutes,
+  // so two untouched legacy rows are added. The result gets a new revision and
+  // clock, which makes the addition idempotent: the next merge sees a normal
+  // record and falls back to clock ordering instead of adding again.
   if (a.kind == 'time' &&
       a.id.startsWith('legacy:') &&
+      a.revision == 'legacy' &&
+      b.revision == 'legacy' &&
       !a.deleted &&
       !b.deleted) {
-    final x = a.data['reading_time'] as int;
-    final y = b.data['reading_time'] as int;
-    return RowSyncRecord(winner.kind, winner.id, winner.clock, winner.revision,
-        false, {...winner.data, 'reading_time': x > y ? x : y});
+    final x = a.data['reading_time'];
+    final y = b.data['reading_time'];
+    if (x is int && y is int && x != y) {
+      final clock = (a.clock > b.clock ? a.clock : b.clock) + 1;
+      final revision = 'legacy-sum:'
+          '${sha256.convert(utf8.encode(jsonEncode([a.id, x < y ? x : y, x < y ? y : x])))}';
+      return RowSyncRecord('time', a.id, clock, revision, false,
+          {...winner.data, 'reading_time': x + y});
+    }
   }
   return winner;
 }

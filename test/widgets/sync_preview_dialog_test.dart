@@ -1,4 +1,4 @@
-import 'package:modu_reader/config/shared_preference_provider.dart';
+﻿import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/service/config_transfer/settings_modules.dart';
 import 'package:modu_reader/service/sync/row_sync_record.dart';
 import 'package:modu_reader/service/sync/sync_preview.dart';
@@ -97,6 +97,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('shows timestamps, book changes and reading deltas',
       (tester) async {
     await openDialog(tester, onResult: (_) {});
@@ -144,10 +151,58 @@ void main() {
       opened = true;
     });
 
-    await tester.tap(find.byKey(const ValueKey('sync-preview-confirm')));
-    await tester.pumpAndSettle();
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-confirm')));
     expect(opened, isTrue);
     expect(result, SyncConflictResolution.newest);
+  });
+
+  testWidgets('deleting books cannot be started before acknowledging it',
+      (tester) async {
+    await openDialog(tester, onResult: (_) {});
+
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.byKey(const ValueKey('sync-preview-confirm')))
+            .onPressed,
+        isNull);
+    expect(find.textContaining('I understand this sync deletes books'),
+        findsOneWidget);
+
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.byKey(const ValueKey('sync-preview-confirm')))
+            .onPressed,
+        isNotNull);
+  });
+
+  testWidgets('upload only is offered as a marked dangerous choice',
+      (tester) async {
+    await openDialog(tester, onResult: (_) {});
+
+    final label = tester.widget<Text>(find.text('Upload only'));
+    expect(label.style?.fontWeight, FontWeight.bold);
+    final theme = Theme.of(tester.element(find.text('Upload only')));
+    expect(label.style?.color, theme.colorScheme.error);
+
+    await tapVisible(tester, find.text('Upload only'));
+    expect(find.textContaining('this device is not modified'), findsOneWidget);
+  });
+
+  testWidgets('cloud removals warn that the other device loses the book',
+      (tester) async {
+    await openDialog(tester, uploading: true, onResult: (_) {});
+
+    expect(
+        find.textContaining(
+            'will also be deleted in the cloud and on the other device'),
+        findsOneWidget);
   });
 
   testWidgets('choosing the cloud preference returns preferRemote',
@@ -155,13 +210,12 @@ void main() {
     SyncConflictResolution? result;
     await openDialog(tester, onResult: (value) => result = value);
 
-    await tester.ensureVisible(find.text('Keep cloud'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Keep cloud'));
-    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Keep cloud'));
     expect(find.textContaining('Unsynced local changes'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('sync-preview-confirm')));
-    await tester.pumpAndSettle();
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-confirm')));
     expect(result, SyncConflictResolution.preferRemote);
   });
 
@@ -192,3 +246,5 @@ void main() {
     expect(settingsModuleForKey('syncPreviewBeforeSync'), 'webdav');
   });
 }
+
+

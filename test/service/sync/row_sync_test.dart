@@ -304,7 +304,7 @@ void main() {
     expect(await b.query('tb_reading_time'), isEmpty);
   });
 
-  test('legacy daily totals take max and future sessions are additive',
+  test('legacy daily totals are summed once and future sessions are additive',
       () async {
     final x = await fixture(install: false);
     final y = await fixture(install: false);
@@ -326,7 +326,7 @@ void main() {
           (await x.rawQuery(
                   'SELECT SUM(reading_time) AS total FROM tb_reading_time'))
               .single['total'],
-          170);
+          290);
     } finally {
       await x.close();
       await y.close();
