@@ -4,6 +4,7 @@ import 'package:modu_reader/service/sync/row_sync_record.dart';
 import 'package:modu_reader/service/sync/sync_preview.dart';
 import 'package:modu_reader/widgets/sync/sync_preview_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,8 +80,18 @@ void main() {
 
   Future<void> openDialog(WidgetTester tester,
       {required void Function(SyncConflictResolution?) onResult,
-      bool uploading = false}) async {
+      bool uploading = false,
+      Locale locale = const Locale('en'),
+      double textScale = 1}) async {
     await tester.pumpWidget(MaterialApp(
+      locale: locale,
+      supportedLocales: const [Locale('en'), Locale('zh')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
@@ -116,7 +127,8 @@ void main() {
     expect(find.text('+30 min'), findsOneWidget);
     expect(find.text('Divergent records'), findsOneWidget);
     expect(find.text('Records on both devices'), findsOneWidget);
-    expect(find.textContaining('not book files'), findsOneWidget);
+    expect(find.text('On neither shelf'), findsOneWidget);
+    expect(find.textContaining('not downloaded book files'), findsNothing);
   });
 
   testWidgets('the help button explains records versus book files',
@@ -125,9 +137,12 @@ void main() {
 
     await tester.tap(find.byTooltip('Help'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('book files are untouched'), findsOneWidget);
+    expect(find.textContaining('not downloaded book files'), findsOneWidget);
     expect(find.textContaining('Record only in the cloud'), findsOneWidget);
-    expect(find.textContaining('first time you open the book'), findsOneWidget);
+    expect(find.textContaining('as needed'), findsOneWidget);
+    expect(find.textContaining('Deleted notes and reading time stay deleted'),
+        findsOneWidget);
+    expect(find.textContaining('which books leave the shelf'), findsOneWidget);
   });
 
   testWidgets('the local preference states that cloud-only records still merge',
@@ -139,9 +154,39 @@ void main() {
     await tester.tap(find.text('Keep local'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('still merged in'), findsOneWidget);
-    expect(find.textContaining('Deletions propagate'), findsOneWidget);
+    expect(
+        find.textContaining('cloud-only records still merge'), findsOneWidget);
+    expect(find.textContaining('stay deleted'), findsNothing);
   });
+
+  for (final locale in const [Locale('en'), Locale('zh')]) {
+    testWidgets('help scrolls and dismisses on a small screen ($locale)',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await openDialog(tester,
+          onResult: (_) {}, locale: locale, textScale: 1.3);
+
+      await tester
+          .tap(find.byTooltip(locale.languageCode == 'zh' ? '说明' : 'Help'));
+      await tester.pumpAndSettle();
+      final downloadHelp = find.text(locale.languageCode == 'zh'
+          ? '书籍原文单独同步，可按需下载。'
+          : 'Book files sync separately and can download as needed.');
+      await tester.ensureVisible(downloadHelp);
+      await tester.pumpAndSettle();
+      expect(downloadHelp.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      expect(downloadHelp, findsNothing);
+      expect(find.byKey(const ValueKey('sync-preview-confirm')).hitTestable(),
+          findsOneWidget);
+    });
+  }
 
   testWidgets('an uploading device sees its own changes as upload deltas',
       (tester) async {
@@ -185,7 +230,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Keep cloud'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Unsynced local changes'), findsOneWidget);
+    expect(
+        find.textContaining('local-only records still upload'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sync-preview-confirm')));
     await tester.pumpAndSettle();
     expect(result, SyncConflictResolution.preferRemote);

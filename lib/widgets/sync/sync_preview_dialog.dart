@@ -150,12 +150,16 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          Text(
-            time == null
-                ? _text('无记录', 'None')
-                : DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal()),
-            style:
-                const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              time == null
+                  ? _text('无记录', 'None')
+                  : DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal()),
+              textAlign: TextAlign.end,
+              style:
+                  const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+            ),
           ),
         ],
       ),
@@ -180,7 +184,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         Icons.download_outlined
       ],
       [
-        _text('两端都已删除', 'Deleted on both devices'),
+        _text('两端均不在书架', 'On neither shelf'),
         preview.bothDeletedBooks,
         Icons.delete_outline
       ],
@@ -204,15 +208,6 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
               ],
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            _text(
-                '这里统计的是书籍记录（书名、进度、笔记的归属），不是书籍文件。原文在换设备后首次打开某本书时才会下载。',
-                'These counts are book records (title, progress, note ownership), not book files. Originals download when you first open a book on another device.'),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
       ],
     );
   }
@@ -242,10 +237,11 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(width: 6),
               Text(subtitle, style: theme.textTheme.bodySmall),
             ],
           ),
@@ -400,48 +396,18 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         if (_resolution == SyncConflictResolution.preferLocal)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_text('云端较新的改动会被本机覆盖。',
-                    'Newer cloud changes will be overwritten by this device.')),
-                Text(
-                  _text(
-                      '仅云端独有的记录仍会并入本机，否则会丢失另一台设备的历史。',
-                      'Records that exist only in the cloud are still merged in, otherwise the other device\'s history would be lost.'),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
+            child: Text(_text('冲突记录采用本机内容，云端独有记录仍会合并。',
+                'Conflicts use local content; cloud-only records still merge.')),
           ),
         if (_resolution == SyncConflictResolution.preferRemote)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _text('本机未同步的改动会被云端覆盖。',
-                      'Unsynced local changes will be overwritten by the cloud.'),
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-                Text(
-                  _text(
-                      '仅本机独有的记录仍会保留并上传，否则会丢失本设备的历史。',
-                      'Records that exist only on this device are still kept and uploaded, otherwise this device\'s history would be lost.'),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+            child: Text(
+              _text('冲突记录采用云端内容，本机独有记录仍会上传。',
+                  'Conflicts use cloud content; local-only records still upload.'),
+              style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            _text('删除会同步到另一端，以上选择无法恢复已删除的笔记或记录。',
-                'Deletions propagate; the choice above cannot restore deleted notes or records.'),
-            style: theme.textTheme.bodySmall,
-          ),
-        ),
       ],
     );
   }
@@ -470,21 +436,24 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(_text('这里只预览记录的合并结果，不会动你的书籍文件。',
-            'This dialog previews how records merge; your book files are untouched.')),
+        Text(_text('这里统计书架记录，不代表书籍文件已下载。',
+            'These counts are shelf records, not downloaded book files.')),
         const SizedBox(height: 8),
-        _helpLine('两端都有记录：两台设备都有这本书，进度或笔记可能不同。',
-            'On both devices: both sides know the book; progress or notes may differ.'),
-        _helpLine('仅本机有记录：云端还没有这本书，本次会把记录上传。',
-            'Record only here: the cloud does not know this book yet, so its record is uploaded.'),
-        _helpLine('仅云端有记录：本机还没有这本书，本次会把记录下载并加入书架。',
-            'Record only in the cloud: this device does not know the book yet, so its record is downloaded and added to the shelf.'),
-        _helpLine('两端都已删除：两端都删掉了这本书，记录作为墓碑保留，避免旧设备把它“复活”。',
-            'Deleted on both devices: both sides removed the book; a tombstone keeps an old device from resurrecting it.'),
+        _helpLine('两端都有记录：本机和云端书架都有这本书。',
+            'On both devices: the book is on both shelves.'),
+        _helpLine(
+            '仅本机有记录：将上传书籍记录。', 'Record only here: its record will upload.'),
+        _helpLine('仅云端有记录：将下载记录并加入书架。',
+            'Record only in the cloud: its record will download to this shelf.'),
+        _helpLine('两端均不在书架：保留同步记录，避免旧设备重新加入。',
+            'On neither shelf: sync records remain so older devices do not add the book again.'),
+        _helpLine('冲突选项只处理两端不一致的记录，单端独有记录仍会合并。',
+            'The conflict choice only affects differing records; records found on one side still merge.'),
+        _helpLine('已删除的笔记和阅读时长不会恢复。书籍是否移出书架，以预览结果为准。',
+            'Deleted notes and reading time stay deleted. The preview shows which books leave the shelf.'),
         const SizedBox(height: 8),
-        Text(_text(
-            '书籍文件（epub / pdf）单独同步：只上传本机已有的文件，换设备后首次打开某本书时才会下载原文。',
-            'Book files (epub / pdf) sync separately: only files present here are uploaded, and an original downloads the first time you open the book on another device.')),
+        Text(_text('书籍原文单独同步，可按需下载。',
+            'Book files sync separately and can download as needed.')),
       ],
     );
   }
