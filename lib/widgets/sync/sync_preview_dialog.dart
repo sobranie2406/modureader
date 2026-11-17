@@ -3,6 +3,7 @@ import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/service/sync/row_sync_record.dart';
 import 'package:modu_reader/service/sync/sync_preview.dart';
 import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -47,7 +48,13 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         children: [
           const Icon(Icons.fact_check_outlined, size: 22),
           const SizedBox(width: 8),
-          Expanded(child: Text(_text('同步预览', 'Sync preview'))),
+          Expanded(
+            child: SettingHelp(
+              key: const ValueKey('sync-preview-help'),
+              title: Text(_text('同步预览', 'Sync preview')),
+              description: _helpBody(),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -165,12 +172,16 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          Text(
-            time == null
-                ? _text('无记录', 'None')
-                : DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal()),
-            style:
-                const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              time == null
+                  ? _text('无记录', 'None')
+                  : DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal()),
+              textAlign: TextAlign.end,
+              style:
+                  const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+            ),
           ),
         ],
       ),
@@ -180,28 +191,32 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
   Widget _bookDistribution(SyncPreview preview) {
     final rows = <List<Object>>[
       [
-        _text('两端都有', 'On both devices'),
+        _text('两端都有记录', 'Records on both devices'),
         preview.sharedBooks,
         Icons.library_books_outlined
       ],
       [
-        _text('仅本机（将上传）', 'Local only (will upload)'),
+        _text('仅本机有记录（将上传）', 'Record only here (uploads)'),
         preview.localOnlyBooks,
         Icons.upload_outlined
       ],
       [
-        _text('仅云端（将下载）', 'Cloud only (will download)'),
+        _text('仅云端有记录（将下载）', 'Record only in cloud (downloads)'),
         preview.remoteOnlyBooks,
         Icons.download_outlined
       ],
       [
-        _text('两端都已删除', 'Deleted on both'),
+        _text('两端均不在书架', 'On neither shelf'),
         preview.bothDeletedBooks,
         Icons.delete_outline
       ],
     ];
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(_text('书籍记录', 'Book records'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
         for (final row in rows)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -244,10 +259,11 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(width: 6),
               Text(subtitle, style: theme.textTheme.bodySmall),
             ],
           ),
@@ -421,8 +437,8 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              _text('云端较新的改动会被本机覆盖；仅云端独有的记录仍会并入本机。',
-                  'Newer cloud changes will be overwritten by this device; cloud-only records are still merged in.'),
+              _text('冲突记录采用本机内容，云端独有的记录仍会并入本机。',
+                  'Conflicts use local content; cloud-only records still merge in.'),
               style: danger,
             ),
           ),
@@ -430,8 +446,8 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              _text('本机未同步的改动会被云端覆盖；仅本机独有的记录仍会保留并上传。',
-                  'Unsynced local changes will be overwritten by the cloud; local-only records are still kept and uploaded.'),
+              _text('冲突记录采用云端内容，本机独有的记录仍会保留并上传。',
+                  'Conflicts use cloud content; local-only records are still kept and uploaded.'),
               style: danger,
             ),
           ),
@@ -498,6 +514,38 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
       ),
     );
   }
+
+  Widget _helpBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(_text('这里统计书架记录，不代表书籍文件已下载。',
+            'These counts are shelf records, not downloaded book files.')),
+        const SizedBox(height: 8),
+        _helpLine('两端都有记录：本机和云端书架都有这本书。',
+            'On both devices: the book is on both shelves.'),
+        _helpLine(
+            '仅本机有记录：将上传书籍记录。', 'Record only here: its record will upload.'),
+        _helpLine('仅云端有记录：将下载记录并加入书架。',
+            'Record only in the cloud: its record will download to this shelf.'),
+        _helpLine('两端均不在书架：保留同步记录，避免旧设备重新加入。',
+            'On neither shelf: sync records remain so older devices do not add the book again.'),
+        _helpLine('冲突选项只处理两端不一致的记录，单端独有记录仍会合并。',
+            'The conflict choice only affects differing records; records found on one side still merge.'),
+        _helpLine('已删除的笔记和阅读时长不会恢复。书籍是否移出书架，以预览结果为准。',
+            'Deleted notes and reading time stay deleted. The preview shows which books leave the shelf.'),
+        const SizedBox(height: 8),
+        Text(_text('书籍原文单独同步，可按需下载。',
+            'Book files sync separately and can download as needed.')),
+      ],
+    );
+  }
+
+  Widget _helpLine(String zh, String en) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text('· ${_text(zh, en)}'),
+      );
 
   String _kindLabel(String kind) => _text(
         switch (kind) {

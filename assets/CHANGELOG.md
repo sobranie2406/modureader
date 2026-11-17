@@ -6,7 +6,7 @@ Latest stable: **1.3.9+10177**. Updated 2026-11-13.
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
-## Unreleased
+## 1.3.10-beta.4
 
 ### English
 
