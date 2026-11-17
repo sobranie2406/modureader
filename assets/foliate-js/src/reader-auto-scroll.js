@@ -16,6 +16,10 @@ export const autoScrollPixelsPerSecond = (samples, fallback = 10) => {
 export class ReaderAutoScroll {
   running = false
   generation = 0
+  inputGeneration = 0
+  suspended = false
+  pointers = new Map()
+  touch = null
   documents = new WeakSet()
   constructor({ renderer, canRun = () => true, onStop = () => {}, host = window }) {
     Object.assign(this, { renderer, canRun, onStop, host })
@@ -28,26 +32,34 @@ export class ReaderAutoScroll {
   attach(doc) {
     if (!doc || this.documents.has(doc)) return
     this.documents.add(doc)
-    let pointer, touch
     const point = event => ({ x: event.clientX, y: event.clientY })
     const dragged = (start, current) => start &&
       Math.hypot(current.clientX - start.x, current.clientY - start.y) > 8
     const opts = { capture: true, passive: true }
     doc.addEventListener('pointerdown', event => {
-      pointer = event.button === 0 ? { ...point(event), id: event.pointerId } : null
+      if (event.button !== 0) return
+      this.pointers.set(event.pointerId, point(event))
+      if (this.pointers.size > 1) this.stop('input')
     }, opts)
     doc.addEventListener('pointermove', event => {
-      if (event.pointerId === pointer?.id && dragged(pointer, event)) this.stop('input')
+      if (dragged(this.pointers.get(event.pointerId), event)) this.deferInput()
     }, opts)
-    for (const type of ['pointerup', 'pointercancel']) doc.addEventListener(type, () => { pointer = null }, opts)
+    for (const type of ['pointerup', 'pointercancel']) doc.addEventListener(type, event => {
+      if (type === 'pointercancel' && this.touch) this.deferInput()
+      this.pointers.delete(event.pointerId)
+      this.resumeInput()
+    }, opts)
     doc.addEventListener('touchstart', event => {
-      touch = event.touches.length === 1 ? point(event.touches[0]) : null
+      this.touch ??= event.touches[0] ? point(event.touches[0]) : null
       if (event.touches.length > 1) this.stop('input')
     }, opts)
     doc.addEventListener('touchmove', event => {
-      if (touch && event.touches[0] && dragged(touch, event.touches[0])) this.stop('input')
+      if (this.touch && event.touches[0] && dragged(this.touch, event.touches[0])) this.deferInput()
     }, opts)
-    for (const type of ['touchend', 'touchcancel']) doc.addEventListener(type, () => { touch = null }, opts)
+    for (const type of ['touchend', 'touchcancel']) doc.addEventListener(type, event => {
+      if (!event.touches?.length) this.touch = null
+      this.resumeInput()
+    }, opts)
     for (const type of ['wheel', 'keydown'])
       doc.addEventListener(type, () => this.stop('input'), { capture: true, passive: true })
     doc.addEventListener('selectionchange', () => {
@@ -62,13 +74,26 @@ export class ReaderAutoScroll {
   }
   refresh() {
     this.lastEstimate = null
-    if (this.running && this.eInkMode && !this.advancing) this.scheduleEink?.()
+    if (this.running && !this.suspended && this.eInkMode && !this.advancing) this.scheduleEink?.()
+  }
+  deferInput() {
+    if (!this.running || this.suspended) return
+    this.suspended = true
+    this.inputGeneration++
+    this.resumePending = false
+    this.cancelScheduled()
+    this.currentRenderer.setAutoScrolling?.(false)
+  }
+  resumeInput() {
+    if (!this.running || !this.suspended || this.pointers.size || this.touch) return
+    this.suspended = false
+    this.resumePending = true
+    this.resumeDriver?.()
   }
   cancelScheduled() {
     if (this.frame != null) this.host.cancelAnimationFrame(this.frame)
     if (this.timer != null) this.host.clearTimeout(this.timer)
     this.frame = this.timer = null
-    this.scheduleEink = null
   }
   set({ enabled, speed = 1, session, eInkMode = false } = {}) {
     if (enabled !== true) { this.stop('manual'); return false }
@@ -76,12 +101,15 @@ export class ReaderAutoScroll {
     if (!this.available(renderer)) { this.stop('unsupported'); return false }
     this.speed = Math.max(.1, Math.min(4, Number.isFinite(speed) ? speed : 1))
     if (this.running && this.currentRenderer === renderer && this.eInkMode === eInkMode) {
-      if (eInkMode && !this.advancing) this.scheduleEink?.()
+      if (eInkMode && !this.suspended && !this.advancing) this.scheduleEink?.()
       return true
     }
     if (this.running && this.currentRenderer === renderer) this.cancelScheduled()
     else this.stop('renderer')
     this.running = true
+    this.suspended = false
+    this.resumePending = false
+    this.scheduleEink = null
     this.session = session ?? this.session
     this.eInkMode = eInkMode
     this.advancing = false
@@ -95,7 +123,7 @@ export class ReaderAutoScroll {
     for (const { doc } of renderer.getContents?.() ?? []) this.attach(doc)
     const generation = ++this.generation
     const active = () => this.running && this.generation === generation &&
-      this.renderer() === renderer && this.available(renderer)
+      !this.suspended && this.renderer() === renderer && this.available(renderer)
     const pace = time => {
       if (this.lastEstimate == null || time - this.lastEstimate >= 1000) {
         try {
@@ -107,10 +135,15 @@ export class ReaderAutoScroll {
       return this.speed * this.pixelsPerSecond
     }
     const advance = async (distance, time) => {
+      const inputGeneration = this.inputGeneration
+      const stepActive = () => inputGeneration === this.inputGeneration && active()
       this.advancing = true
       try {
-        const result = await renderer.autoScrollBy(distance, active)
-        if (!active()) { if (this.generation === generation) this.stop('inactive'); return false }
+        const result = await renderer.autoScrollBy(distance, stepActive)
+        if (!stepActive()) {
+          if (this.generation === generation && inputGeneration === this.inputGeneration) this.stop('inactive')
+          return false
+        }
         if (typeof result === 'number' && Number.isFinite(result) && result >= 0) {
           // Subpixel scrollTop may still quantize to physical pixels. Keep both
           // undershoot and overshoot instead of losing or multiplying distance.
@@ -123,13 +156,21 @@ export class ReaderAutoScroll {
         }
         return true
       } catch {
-        if (this.generation === generation) this.stop('error')
+        if (this.generation === generation && inputGeneration === this.inputGeneration) this.stop('error')
         return false
       } finally {
-        if (this.generation === generation) this.advancing = false
+        if (this.generation === generation) {
+          this.advancing = false
+          this.resumeDriver?.()
+        }
       }
     }
-    const schedule = () => { this.frame = this.host.requestAnimationFrame(tick) }
+    const schedule = () => {
+      const inputGeneration = this.inputGeneration
+      this.frame = this.host.requestAnimationFrame(time => {
+        if (inputGeneration === this.inputGeneration) return tick(time)
+      })
+    }
     const tick = async time => {
       if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
       this.frame = null
@@ -141,14 +182,29 @@ export class ReaderAutoScroll {
       if (distance > 0 && !await advance(distance, time)) return
       if (active()) schedule()
     }
+    this.resumeDriver = () => {
+      if (!this.resumePending || this.suspended || this.advancing) return
+      if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
+      this.resumePending = false
+      // Manual scrolling owns the viewport; discard old motion, not its position.
+      this.distance = 0
+      this.lastTime = this.lastFlush = this.lastEstimate = null
+      renderer.flushAutoScrollPosition?.()
+      renderer.setAutoScrolling?.(true)
+      if (this.eInkMode) this.scheduleEink()
+      else schedule()
+    }
     if (eInkMode) {
       const now = () => this.host.performance?.now?.() ?? Date.now()
       this.scheduleEink = () => {
         if (this.timer != null) this.host.clearTimeout(this.timer)
+        if (this.suspended) return
         if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
+        const inputGeneration = this.inputGeneration
         const step = this.distance > .001 ? this.distance : renderer.getAutoScrollStep?.() ?? 600
         const delay = Math.max(100, Math.min(2147483647, step / pace(now()) * 1000))
         this.timer = this.host.setTimeout(async () => {
+          if (inputGeneration !== this.inputGeneration) return
           if (!active()) { if (this.generation === generation) this.stop('inactive'); return }
           this.timer = null
           if (this.distance <= .001) this.distance += step
@@ -163,7 +219,13 @@ export class ReaderAutoScroll {
     if (!this.running) return
     this.running = false
     this.generation++
+    this.inputGeneration++
+    this.suspended = false
+    this.resumePending = false
     this.cancelScheduled()
+    this.scheduleEink = this.resumeDriver = null
+    this.pointers.clear()
+    this.touch = null
     const renderer = this.currentRenderer
     this.currentRenderer = null
     try { renderer.flushAutoScrollPosition?.() }

@@ -1188,7 +1188,10 @@ export class Paginator extends HTMLElement {
     const moved = this.#container.scrollTop - before
     return moved > 0 ? moved : before >= this.viewSize - this.size - .001 ? 'end' : 0
   }
-  flushAutoScrollPosition() { this.#afterScroll('auto-scroll', true) }
+  flushAutoScrollPosition() {
+    if (!this.#autoScrolling) this.#continuous?.track()
+    this.#afterScroll('auto-scroll', true)
+  }
   snap(vx, vy, touchState) {
     if (this.#isSnapping) return
     

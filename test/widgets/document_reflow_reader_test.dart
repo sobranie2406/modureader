@@ -1791,7 +1791,208 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  for (final operation in ['drag', 'wheel', 'selection', 'menu', 'navigate']) {
+  for (final comparison in [false, true]) {
+    for (final cancel in [false, true]) {
+      testWidgets(
+          'manual drag defers auto scroll and resumes at the viewport (comparison=$comparison, cancel=$cancel)',
+          (tester) async {
+        Prefs().pageTurnStyle = PageTurn.scroll;
+        var stopped = 0, reads = 0;
+        await open(tester, comparison: comparison, extract: (_) async {
+          reads++;
+          return List.generate(150, (i) => 'Paragraph $i.').join('\n\n');
+        });
+        final scroll = reflowScroll(tester);
+        final reader = key.currentState!;
+        expect(reader.startAutoScroll(1, () => stopped++), isTrue);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        final before = scroll.offset;
+        final gesture = await tester
+            .startGesture(tester.getCenter(reflowViewport()), pointer: 71);
+        await gesture.moveBy(const Offset(0, -40));
+        await gesture.moveBy(const Offset(0, -120));
+        await tester.pump(const Duration(milliseconds: 300));
+        final held = scroll.offset;
+        expect(held, greaterThan(before + 50));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(scroll.offset, held);
+        expect(stopped, 0);
+        if (cancel) {
+          await gesture.cancel();
+        } else {
+          await gesture.up();
+        }
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(scroll.offset, greaterThanOrEqualTo(held));
+        final released = scroll.offset;
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(scroll.offset, greaterThan(released));
+        expect(scroll.offset - released, lessThan(30));
+        expect(stopped, 0);
+        expect(reads, 1);
+        expect(pages, [0]);
+        reader.stopAutoScroll();
+        expect(stopped, 1);
+      });
+    }
+  }
+
+  testWidgets(
+      'release preserves ballistic scrolling before auto scroll resumes',
+      (tester) async {
+    Prefs().pageTurnStyle = PageTurn.scroll;
+    await open(tester,
+        extract: (_) async =>
+            List.generate(200, (i) => 'Paragraph $i.').join('\n\n'));
+    final scroll = reflowScroll(tester);
+    var stopped = 0;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    await tester.fling(reflowViewport(), const Offset(0, -250), 1200);
+    expect(scroll.position.isScrollingNotifier.value, isTrue);
+    await tester.pump();
+    final released = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(scroll.offset, greaterThan(released + 10));
+    expect(scroll.position.isScrollingNotifier.value, isTrue);
+    expect(stopped, 0);
+    for (var i = 0; i < 100 && scroll.position.isScrollingNotifier.value; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(scroll.position.isScrollingNotifier.value, isFalse);
+    final settled = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset, greaterThan(settled));
+    expect(scroll.offset - settled, lessThan(30));
+    expect(stopped, 0);
+    key.currentState!.stopAutoScroll();
+  });
+
+  for (final operation in ['pause', 'selection', 'background', 'multi-touch']) {
+    testWidgets('late drag release cannot resume after $operation',
+        (tester) async {
+      Prefs().pageTurnStyle = PageTurn.scroll;
+      await open(tester,
+          extract: (_) async =>
+              List.generate(150, (i) => 'Paragraph $i.').join('\n\n'));
+      final scroll = reflowScroll(tester);
+      var stopped = 0;
+      expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+      await tester.pump();
+      final gesture = await tester
+          .startGesture(tester.getCenter(reflowViewport()), pointer: 81);
+      await gesture.moveBy(const Offset(0, -40));
+      await gesture.moveBy(const Offset(0, -100));
+      await tester.pump(const Duration(milliseconds: 300));
+      switch (operation) {
+        case 'pause':
+          key.currentState!.stopAutoScroll();
+        case 'selection':
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('reflow-text')))
+              .controller!
+              .selection = const TextSelection(baseOffset: 0, extentOffset: 4);
+        case 'background':
+          for (final state in [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+          await tester.pump(const Duration(milliseconds: 20));
+          for (final state in [
+            AppLifecycleState.hidden,
+            AppLifecycleState.inactive,
+            AppLifecycleState.resumed
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+        case 'multi-touch':
+          final second = await tester.startGesture(
+              tester.getCenter(reflowViewport()) + const Offset(50, 0),
+              pointer: 82);
+          await second.cancel();
+      }
+      expect(stopped, 1);
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      final offset = scroll.offset;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(scroll.offset, offset);
+      expect(stopped, 1);
+      key.currentState!.stopAutoScroll();
+    });
+  }
+
+  testWidgets('an unrelated pointer end does not release the held auto scroll',
+      (tester) async {
+    await open(tester,
+        extract: (_) async =>
+            List.generate(150, (i) => 'Paragraph $i.').join('\n\n'));
+    final scroll = reflowScroll(tester);
+    var stopped = 0;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump();
+    final gesture = await tester
+        .startGesture(tester.getCenter(reflowViewport()), pointer: 91);
+    await gesture.moveBy(const Offset(0, -40));
+    await gesture.moveBy(const Offset(0, -100));
+    await tester.pump(const Duration(milliseconds: 100));
+    final listener = tester
+        .widgetList<Listener>(find.byType(Listener))
+        .firstWhere((listener) =>
+            listener.onPointerDown != null &&
+            listener.onPointerUp != null &&
+            listener.onPointerSignal != null &&
+            listener.behavior == HitTestBehavior.opaque);
+    listener.onPointerUp!(const PointerUpEvent(pointer: 999));
+    final held = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(scroll.offset, held);
+    expect(stopped, 0);
+    await gesture.cancel();
+    key.currentState!.stopAutoScroll();
+  });
+
+  testWidgets('eink drag release waits a fresh interval at the new viewport',
+      (tester) async {
+    Prefs().eInkMode = true;
+    Prefs().scrollAutoAlign = false;
+    Prefs().scrollPagePercent = 80;
+    await open(tester,
+        extract: (_) async => List.filled(100, '甲乙丙').join('\n\n'));
+    final scroll = reflowScroll(tester);
+    final distance = scroll.position.viewportDimension * .8;
+    final rate =
+        (scroll.position.maxScrollExtent + scroll.position.viewportDimension) /
+            60;
+    final interval = (distance / rate * 1000).round();
+    var stopped = 0;
+    expect(key.currentState!.startAutoScroll(1, () => stopped++), isTrue);
+    await tester.pump(Duration(milliseconds: interval - 1));
+    final gesture = await tester
+        .startGesture(tester.getCenter(reflowViewport()), pointer: 101);
+    await gesture.moveBy(const Offset(0, -40));
+    await gesture.moveBy(const Offset(0, -100));
+    await tester.pump(Duration(milliseconds: interval * 2));
+    final held = scroll.offset;
+    expect(held, greaterThan(50));
+    expect(stopped, 0);
+    await gesture.cancel();
+    await tester.pump(Duration(milliseconds: interval - 1));
+    expect(scroll.offset, held);
+    await tester.pump(const Duration(milliseconds: 202));
+    expect(scroll.offset, closeTo(held + distance, .01));
+    expect(stopped, 0);
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    key.currentState!.stopAutoScroll();
+  });
+
+  for (final operation in ['wheel', 'selection', 'menu', 'navigate']) {
     testWidgets('manual $operation stops reflow auto scroll once',
         (tester) async {
       Prefs().pageTurnStyle = PageTurn.scroll;
@@ -1808,10 +2009,6 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       switch (operation) {
-        case 'drag':
-          final gesture = await tester.startGesture(tester.getCenter(viewport));
-          await gesture.moveBy(const Offset(0, -40));
-          await gesture.cancel();
         case 'wheel':
           await tester.sendEventToBinding(PointerScrollEvent(
               position: tester.getCenter(viewport),

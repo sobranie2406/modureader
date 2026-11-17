@@ -149,14 +149,169 @@ test('a tap or small finger jitter keeps scrolling so the host can reveal the fl
   await f.step();assert.deepEqual(f.stopped,[]);assert.deepEqual(f.moves,[3]);f.scroll.stop();
 });
 
-for(const pointer of [true,false])test(`${pointer?'mouse':'touch'} dragging pauses without consuming the gesture`,()=>{
-  const f=fixture();f.scroll.set({enabled:true});
+for(const pointer of [true,false])test(`${pointer?'mouse':'touch'} dragging defers motion and resumes from the manual viewport`,async()=>{
+  const f=fixture();let position=0;
+  f.renderer.autoScrollBy=async(distance,active)=>{
+    if(!active())return 'inactive';position+=distance;f.moves.push(distance);return 'moved';
+  };
+  f.renderer.flushAutoScrollPosition=()=>f.flushed.push(position);
+  f.scroll.set({enabled:true,session:7});await f.step(0);await f.step();
+  const generation=f.scroll.generation;
   if(pointer)send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});
   else send(f.doc,'touchstart',{touches:[{clientX:10,clientY:10}]});
   const event=pointer?send(f.doc,'pointermove',{pointerId:1,clientX:10,clientY:30}):
     send(f.doc,'touchmove',{touches:[{clientX:10,clientY:30}]});
-  assert.equal(event.defaultPrevented,false);assert.deepEqual(f.stopped,['input']);assert.equal(f.pending.size,0);
+  assert.equal(event.defaultPrevented,false);assert.deepEqual(f.stopped,[]);assert.equal(f.pending.size,0);
+  assert.equal(f.scroll.running,true);assert.equal(f.scroll.generation,generation);
+  assert.deepEqual(f.enabled,[true,false]);
+  position=500;await f.step(10000);assert.deepEqual(f.moves,[3]);
+  if(pointer)send(f.doc,'pointerup',{pointerId:1});
+  else send(f.doc,'touchend',{touches:[]});
+  assert.equal(f.flushed.at(-1),500,'resume flushes the manually chosen viewport');
+  assert.deepEqual(f.enabled,[true,false,true]);
+  await f.step(0);assert.equal(position,500);
+  await f.step();assert.equal(position,503,'no old offset or held-time catch-up');
+  assert.deepEqual(f.stoppedSessions,[]);f.scroll.stop();
 });
+
+test('Android native pan waits for touchend after pointercancel without restarting the host session',async()=>{
+  const f=fixture();f.scroll.set({enabled:true,session:'android'});await f.step(0);
+  send(f.doc,'pointerdown',{button:0,pointerId:1,pointerType:'touch',clientX:10,clientY:10});
+  send(f.doc,'touchstart',{touches:[{clientX:10,clientY:10}]});
+  send(f.doc,'pointercancel',{pointerId:1,pointerType:'touch'});
+  assert.deepEqual(f.enabled,[true,false]);assert.equal(f.pending.size,0);
+  for(let y=30;y<=90;y+=30){send(f.doc,'touchmove',{touches:[{clientX:10,clientY:y}]});await f.step()}
+  assert.deepEqual(f.moves,[]);assert.deepEqual(f.stoppedSessions,[]);
+  send(f.doc,'touchend',{touches:[]});assert.equal(f.pending.size,1);
+  await f.step(0);await f.step();assert.deepEqual(f.moves,[3]);
+  assert.equal(f.scroll.session,'android');f.scroll.stop();
+});
+
+for(const type of ['pointercancel','touchcancel'])test(`${type} ends a single cancelled drag without leaving a suspended driver`,async()=>{
+  const f=fixture();f.scroll.set({enabled:true});await f.step(0);
+  if(type==='pointercancel'){
+    send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:0,clientY:0});
+    send(f.doc,'pointermove',{pointerId:1,clientX:0,clientY:20});
+    send(f.doc,type,{pointerId:1});
+  }else{
+    send(f.doc,'touchstart',{touches:[{clientX:0,clientY:0}]});
+    send(f.doc,'touchmove',{touches:[{clientX:0,clientY:20}]});
+    send(f.doc,type,{touches:[]});
+  }
+  await f.step(0);await f.step();assert.deepEqual(f.moves,[3]);
+  assert.deepEqual(f.stopped,[]);assert.deepEqual(f.enabled,[true,false,true]);f.scroll.stop();
+});
+
+test('paired input streams both release before resuming and unrelated releases do not resume',async()=>{
+  const f=fixture();f.scroll.set({enabled:true});await f.step(0);
+  send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:0,clientY:0});
+  send(f.doc,'touchstart',{touches:[{clientX:0,clientY:0}]});
+  send(f.doc,'pointermove',{pointerId:1,clientX:0,clientY:20});
+  send(f.doc,'pointerup',{pointerId:99});send(f.doc,'touchend',{touches:[]});
+  await f.step();assert.deepEqual(f.moves,[]);assert.equal(f.pending.size,0);
+  send(f.doc,'pointerup',{pointerId:1});await f.step(0);await f.step();
+  assert.deepEqual(f.moves,[3]);assert.deepEqual(f.stopped,[]);f.scroll.stop();
+});
+
+for(const kind of ['pointer','touch'])test(`multiple ${kind} contacts preserve the explicit input stop until a new start`,async()=>{
+  const f=fixture();f.scroll.set({enabled:true});await f.step(0);
+  if(kind==='pointer'){
+    for(const id of [1,2,3])send(f.doc,'pointerdown',{button:0,pointerId:id,clientX:0,clientY:0});
+    for(const id of [1,2,3])send(f.doc,'pointerup',{pointerId:id});
+  }else{
+    send(f.doc,'touchstart',{touches:[{clientX:0,clientY:0}]});
+    send(f.doc,'touchmove',{touches:[{clientX:0,clientY:20}]});
+    send(f.doc,'touchstart',{touches:[{clientX:0,clientY:20},{clientX:20,clientY:20}]});
+    send(f.doc,'touchend',{touches:[{clientX:0,clientY:20}]});
+    send(f.doc,'touchend',{touches:[]});
+  }
+  await f.step(1000);assert.deepEqual(f.stopped,['input']);assert.deepEqual(f.moves,[]);
+  assert.equal(f.scroll.running,false);assert.equal(f.pending.size,0);assert.equal(f.timers.size,0);
+  f.scroll.set({enabled:true});await f.step(0);await f.step();assert.deepEqual(f.moves,[3]);f.scroll.stop();
+});
+
+for(const reason of ['manual','selection','inactive','wheel','keydown'])test(`${reason} during a deferred drag prevents late release from restarting`,async()=>{
+  const f=fixture();f.scroll.set({enabled:true});await f.step(0);
+  send(f.doc,'touchstart',{touches:[{clientX:0,clientY:0}]});
+  send(f.doc,'touchmove',{touches:[{clientX:0,clientY:20}]});
+  if(reason==='manual')f.scroll.set({enabled:false});
+  if(reason==='selection'){f.doc.getSelection=()=> 'selected';send(f.doc,'selectionchange')}
+  if(reason==='inactive'){f.doc.visibilityState='hidden';send(f.doc,'visibilitychange')}
+  if(reason==='wheel'||reason==='keydown')send(f.doc,reason);
+  send(f.doc,'touchend',{touches:[]});await f.step(30000);
+  assert.deepEqual(f.stopped,[reason==='wheel'||reason==='keydown'?'input':reason]);assert.deepEqual(f.moves,[]);
+  assert.equal(f.scroll.running,false);assert.equal(f.pending.size,0);assert.equal(f.timers.size,0);
+});
+
+test('deferred input discards partial auto motion and uses the new visible pace after release',async()=>{
+  const f=fixture(),requested=[];let consumed=false,pace=30;
+  f.renderer.getAutoScrollSpeed=()=>pace;
+  f.renderer.autoScrollBy=async distance=>{requested.push(distance);return consumed?distance:0};
+  f.scroll.set({enabled:true});await f.step(0);await f.step();assert.deepEqual(requested,[3]);
+  send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:0,clientY:0});
+  send(f.doc,'pointermove',{pointerId:1,clientX:0,clientY:20});
+  consumed=true;pace=50;f.scroll.set({enabled:true,speed:2});f.scroll.refresh();
+  assert.equal(f.pending.size,0);
+  send(f.doc,'pointerup',{pointerId:1});await f.step(0);await f.step();
+  assert.deepEqual(requested,[3,10]);assert.deepEqual(f.stopped,[]);f.scroll.stop();
+});
+
+test('a cancelled animation frame cannot move or replace the resumed driver',async()=>{
+  const f=fixture();f.scroll.set({enabled:true});await f.step(0);
+  const late=[...f.pending.values()][0];
+  send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:0,clientY:0});
+  send(f.doc,'pointermove',{pointerId:1,clientX:0,clientY:20});
+  send(f.doc,'pointerup',{pointerId:1});
+  await late(30000);
+  assert.deepEqual(f.moves,[]);assert.equal(f.pending.size,1);
+  await f.step(0);await f.step();assert.deepEqual(f.moves,[3]);f.scroll.stop();
+});
+
+test('e-ink manual drag restarts a full interval at the current viewport and ignores the old timer',async()=>{
+  const f=fixture();let position=0;
+  f.renderer.autoScrollBy=async(distance,active)=>{if(!active())return 'inactive';position+=distance;f.moves.push(distance);return distance};
+  f.renderer.flushAutoScrollPosition=()=>f.flushed.push(position);
+  f.scroll.set({enabled:true,eInkMode:true,session:8});await f.step(1999);
+  const late=[...f.timers.values()][0].fn;
+  send(f.doc,'touchstart',{touches:[{clientX:0,clientY:0}]});
+  send(f.doc,'touchmove',{touches:[{clientX:0,clientY:20}]});
+  position=900;await f.step(10000);assert.deepEqual(f.moves,[]);assert.equal(f.timers.size,0);
+  f.scroll.set({enabled:true,eInkMode:true,speed:2});f.scroll.refresh();assert.equal(f.timers.size,0);
+  send(f.doc,'touchend',{touches:[]});assert.equal(f.flushed.at(-1),900);
+  assert.equal(f.timers.size,1);assert.equal([...f.timers.values()][0].delay,1000);
+  await late();assert.deepEqual(f.moves,[]);assert.equal(f.timers.size,1);
+  await f.step(999);assert.equal(position,900);await f.step(1);assert.equal(position,960);
+  assert.deepEqual(f.stoppedSessions,[]);assert.deepEqual(f.enabled,[true,false,true]);f.scroll.stop();
+});
+
+for(const eInkMode of [false,true])for(const result of ['moved','end','error'])
+  test(`drag invalidates an in-flight ${eInkMode?'e-ink':'smooth'} step (${result}) before resuming once`,async()=>{
+    const f=fixture();let release,position=0,calls=0;
+    const gate=new Promise(resolve=>release=resolve);
+    f.renderer.autoScrollBy=async(distance,active)=>{
+      calls++;
+      if(calls===1){await gate;if(result==='error')throw Error('old load failed');if(!active())return 'inactive';if(result==='end')return 'end'}
+      if(!active())return 'inactive';position+=distance;f.moves.push(distance);return distance;
+    };
+    f.renderer.flushAutoScrollPosition=()=>f.flushed.push(position);
+    f.scroll.set({enabled:true,eInkMode,session:42});
+    let flight;
+    if(eInkMode){
+      const timer=[...f.timers.values()][0];f.timers.clear();flight=timer.fn();await Promise.resolve();
+    }else {await f.step(0);await f.step()}
+    assert.equal(calls,1);
+    send(f.doc,'pointerdown',{button:0,pointerId:1,clientX:0,clientY:0});
+    send(f.doc,'pointermove',{pointerId:1,clientX:0,clientY:20});position=700;
+    send(f.doc,'pointerup',{pointerId:1});await f.step(30000);
+    assert.equal(calls,1,'one old advance at most until its cancellation settles');
+    assert.equal(f.pending.size+f.timers.size,0);
+    release();await flight;await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(position,700);assert.deepEqual(f.stoppedSessions,[]);assert.equal(f.flushed.at(-1),700);
+    assert.equal(f.pending.size+f.timers.size,1,'one replacement scheduler only');
+    await f.step(eInkMode?2000:0);if(!eInkMode)await f.step();
+    assert.equal(position,eInkMode?760:703);assert.equal(calls,2);
+    f.scroll.stop();assert.equal(f.pending.size+f.timers.size,0);
+  });
 
 test('normal pace measures Chinese characters and English words, including mixed pages',()=>{
   assert.equal(autoScrollPixelsPerSecond([{text:'字'.repeat(300),height:600}]),10);

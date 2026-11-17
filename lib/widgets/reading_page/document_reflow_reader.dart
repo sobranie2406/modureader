@@ -563,7 +563,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   double _autoScrollPixelsPerSecond = 0, _autoScrollExtent = -1;
   double _autoScrollViewport = -1;
   String? _autoScrollText;
-  Offset? _autoScrollPointerOrigin;
+  final _autoScrollPointers = <int>{};
   (bool, int, bool)? _autoScrollSettings;
   bool get _autoScrollRunning => _autoScrollStopped != null;
 
@@ -594,7 +594,6 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     _autoScrollStopped = onStopped;
     _autoScrollText = null;
     _autoScrollElapsed = null;
-    _autoScrollPointerOrigin = null;
     _restartAutoScrollDriver();
     return true;
   }
@@ -643,6 +642,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       stopAutoScroll();
       return;
     }
+    if (_autoScrollInteracting) {
+      _autoScrollTimer =
+          Timer(const Duration(milliseconds: 180), _scheduleEinkAutoScroll);
+      return;
+    }
     _estimateAutoScrollRate();
     final remaining = _scroll.position.maxScrollExtent - _scroll.offset;
     if (remaining <= .5) {
@@ -665,9 +669,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       stopAutoScroll();
       return;
     }
-    if (_translation.busy ||
-        _autoScrollPointerOrigin != null ||
-        _pendingViewportRestore != null) {
+    if (_autoScrollInteracting) {
+      _scheduleEinkAutoScroll();
+      return;
+    }
+    if (_translation.busy || _pendingViewportRestore != null) {
       _autoScrollTimer =
           Timer(const Duration(milliseconds: 180), _stepEinkAutoScroll);
       return;
@@ -704,7 +710,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     // Visible translation can extend the text; wait for its existing request.
     if (previous == null ||
         _translation.busy ||
-        _autoScrollPointerOrigin != null ||
+        _autoScrollInteracting ||
         _pendingViewportRestore != null) {
       return;
     }
@@ -748,18 +754,30 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         (extent + viewport) / (seconds < 1 ? 1 : seconds);
   }
 
+  bool get _autoScrollInteracting =>
+      _autoScrollPointers.isNotEmpty ||
+      (_scroll.hasClients && _scroll.position.isScrollingNotifier.value);
+
   void _autoScrollPointerDown(PointerDownEvent event) {
     _cancelViewportRestore();
-    if (_autoScrollPointerOrigin != null) stopAutoScroll();
-    _autoScrollPointerOrigin = event.position;
+    _autoScrollPointers.add(event.pointer);
+    if (_autoScrollPointers.length > 1) stopAutoScroll();
+    if (_autoScrollRunning && Prefs().eInkMode) {
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+    }
   }
 
-  void _autoScrollPointerMove(PointerMoveEvent event) {
-    final origin = _autoScrollPointerOrigin;
-    if (origin != null &&
-        (event.position - origin).distance >
-            (event.kind == PointerDeviceKind.mouse ? 2 : kTouchSlop)) {
-      stopAutoScroll();
+  void _autoScrollPointerEnd(PointerEvent event) {
+    if (!_autoScrollPointers.remove(event.pointer) ||
+        _autoScrollPointers.isNotEmpty) {
+      return;
+    }
+    // A release never starts a stopped session, and e-ink gets a full new interval.
+    if (_autoScrollRunning && Prefs().eInkMode) {
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+      _scheduleEinkAutoScroll();
     }
   }
 
@@ -795,7 +813,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         !viewport.hasSize ||
         !_scroll.hasClients ||
         _scroll.offset <= _scroll.position.minScrollExtent + .5 ||
-        _autoScrollPointerOrigin != null) {
+        _autoScrollInteracting) {
       return null;
     }
     final controller = _readingController;
@@ -2091,9 +2109,8 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       body: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _autoScrollPointerDown,
-        onPointerMove: _autoScrollPointerMove,
-        onPointerUp: (_) => _autoScrollPointerOrigin = null,
-        onPointerCancel: (_) => _autoScrollPointerOrigin = null,
+        onPointerUp: _autoScrollPointerEnd,
+        onPointerCancel: _autoScrollPointerEnd,
         onPointerSignal: (_) {
           _cancelViewportRestore();
           stopAutoScroll();
