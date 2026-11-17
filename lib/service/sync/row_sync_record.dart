@@ -279,26 +279,16 @@ RowSyncRecord _winner(RowSyncRecord a, RowSyncRecord b) {
         (a.narration?.encode() ?? '').compareTo(b.narration?.encode() ?? '');
   }
   final winner = comparison >= 0 ? a : b;
-  // Legacy same-day sessions were migrated onto ONE shared key per book/day.
-  // Keeping only the larger value silently dropped the other device's minutes,
-  // so two untouched legacy rows are added. The result gets a new revision and
-  // clock, which makes the addition idempotent: the next merge sees a normal
-  // record and falls back to clock ordering instead of adding again.
+  // Legacy book/day totals can share an old synced baseline. Without session
+  // provenance they cannot safely be added; only new session IDs are additive.
   if (a.kind == 'time' &&
       a.id.startsWith('legacy:') &&
-      a.revision == 'legacy' &&
-      b.revision == 'legacy' &&
       !a.deleted &&
       !b.deleted) {
-    final x = a.data['reading_time'];
-    final y = b.data['reading_time'];
-    if (x is int && y is int && x != y) {
-      final clock = (a.clock > b.clock ? a.clock : b.clock) + 1;
-      final revision = 'legacy-sum:'
-          '${sha256.convert(utf8.encode(jsonEncode([a.id, x < y ? x : y, x < y ? y : x])))}';
-      return RowSyncRecord('time', a.id, clock, revision, false,
-          {...winner.data, 'reading_time': x + y});
-    }
+    final x = a.data['reading_time'] as int;
+    final y = b.data['reading_time'] as int;
+    return RowSyncRecord(winner.kind, winner.id, winner.clock, winner.revision,
+        false, {...winner.data, 'reading_time': x > y ? x : y});
   }
   return winner;
 }

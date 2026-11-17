@@ -229,18 +229,26 @@ SyncPreview buildSyncPreview({
   final localProgressView = uploadOnly ? mergedProgress : localProgress;
   // Upload-only keeps cloud-only records, so the cloud's post-sync counts are
   // the union of both sides rather than this device's view.
-  final cloudView = uploadOnly
-      ? mergeSyncRecords(
-          remote, mergeSyncRecords(local, context.pendingRecords))
-      : merged;
-  final allKnownBooks = {...remoteBooks, ...localBooksView, ...mergedBooks};
+  final cloudView = uploadOnly ? mergeSyncRecords(merged, remote) : merged;
+  final cloudBooks = _bookInfo(cloudView);
+  final cloudVisible = _visibleBooks(cloudView);
+  final cloudProgress = _progressByBook(cloudView);
+  final allKnownBooks = {
+    ...remoteBooks,
+    ...localBooksView,
+    ...mergedBooks,
+    ...cloudBooks,
+  };
 
   List<SyncPreviewBook> bookList(Set<String> ids,
       {required Map<String, double> before,
       required Map<String, double> after}) {
     final books = <SyncPreviewBook>[];
     for (final id in ids) {
-      final data = mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
+      final data = cloudBooks[id] ??
+          mergedBooks[id] ??
+          localBooks[id] ??
+          remoteBooks[id];
       if (data == null) continue;
       books.add(SyncPreviewBook(
         title: _title(data, id),
@@ -261,7 +269,10 @@ SyncPreview buildSyncPreview({
       final old = before[id];
       final next = after[id];
       if (old == null || next == null || (next - old).abs() < 0.001) continue;
-      final data = mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
+      final data = cloudBooks[id] ??
+          mergedBooks[id] ??
+          localBooks[id] ??
+          remoteBooks[id];
       if (data == null) continue;
       books.add(SyncPreviewBook(
         title: _title(data, id),
@@ -290,12 +301,8 @@ SyncPreview buildSyncPreview({
     // "Local only" means the cloud has no record of the book at all, so the
     // merge really uploads it. A book the cloud deleted still has a record and
     // is reported through removedBooks instead of being counted as an upload.
-    localOnlyBooks: localVisibleView
-        .difference(_knownBookIds(remote))
-        .length,
-    remoteOnlyBooks: remoteVisible
-        .difference(_knownBookIds(localView))
-        .length,
+    localOnlyBooks: localVisibleView.difference(_knownBookIds(remote)).length,
+    remoteOnlyBooks: remoteVisible.difference(_knownBookIds(localView)).length,
     bothDeletedBooks: allKnownBooks.keys
         .toSet()
         .difference(localVisibleView.union(remoteVisible))
@@ -304,26 +311,18 @@ SyncPreview buildSyncPreview({
         before: const {}, after: mergedProgress),
     removedBooks: bookList(localVisibleView.difference(mergedVisible),
         before: localProgressView, after: const {}),
-    progressChangedBooks:
-        progressList(mergedVisible.intersection(localVisibleView),
-            before: localProgressView, after: mergedProgress),
-    uploadedBooks: bookList(
-        // Upload-only never revives a book the cloud deleted, so only books
-        // without any cloud record are reported as gains.
-        uploadOnly
-            ? mergedVisible.difference(_knownBookIds(remote))
-            : mergedVisible.difference(remoteVisible),
-        before: const {}, after: mergedProgress),
-    cloudRemovedBooks: bookList(
-        uploadOnly
-            ? remoteVisible.where((id) => _deletedLocally(merged, id)).toSet()
-            : remoteVisible.difference(mergedVisible),
-        before: remoteProgress,
-        after: const {}),
-    uploadedProgressChangedBooks: progressList(
-        mergedVisible.intersection(remoteVisible),
-        before: remoteProgress,
+    progressChangedBooks: progressList(
+        mergedVisible.intersection(localVisibleView),
+        before: localProgressView,
         after: mergedProgress),
+    uploadedBooks: bookList(cloudVisible.difference(remoteVisible),
+        before: const {}, after: cloudProgress),
+    cloudRemovedBooks: bookList(remoteVisible.difference(cloudVisible),
+        before: remoteProgress, after: const {}),
+    uploadedProgressChangedBooks: progressList(
+        cloudVisible.intersection(remoteVisible),
+        before: remoteProgress,
+        after: cloudProgress),
     localNoteCount: _noteCount(localView),
     mergedNoteCount: _noteCount(merged),
     remoteNoteCount: _noteCount(remote),
@@ -372,26 +371,6 @@ Set<String> _visibleBooks(Iterable<RowSyncRecord> records) {
           deleted[record.id] != true)
         record.id
   };
-}
-
-/// True when this device knows the book and has deleted it, either as a hard
-/// tombstone or through the `life` soft-delete flag. Upload-only uses this to
-/// keep cloud-only books out of the "the cloud will lose" list, because those
-/// records stay in the cloud untouched.
-bool _deletedLocally(Iterable<RowSyncRecord> records, String id) {
-  var known = false;
-  var deleted = false;
-  for (final record in records) {
-    if (record.id != id || (record.kind != 'book' && record.kind != 'life')) {
-      continue;
-    }
-    known = true;
-    if (record.deleted ||
-        (record.kind == 'life' && record.data['is_deleted'] == 1)) {
-      deleted = true;
-    }
-  }
-  return known && deleted;
 }
 
 Map<String, double> _progressByBook(Iterable<RowSyncRecord> records) {
