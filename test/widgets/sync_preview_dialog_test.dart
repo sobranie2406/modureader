@@ -115,6 +115,32 @@ void main() {
     expect(find.text('+3 (10 → 13)'), findsOneWidget);
     expect(find.text('+30 min'), findsOneWidget);
     expect(find.text('Divergent records'), findsOneWidget);
+    expect(find.text('Records on both devices'), findsOneWidget);
+    expect(find.textContaining('not book files'), findsOneWidget);
+  });
+
+  testWidgets('the help button explains records versus book files',
+      (tester) async {
+    await openDialog(tester, onResult: (_) {});
+
+    await tester.tap(find.byTooltip('Help'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('book files are untouched'), findsOneWidget);
+    expect(find.textContaining('Record only in the cloud'), findsOneWidget);
+    expect(find.textContaining('first time you open the book'), findsOneWidget);
+  });
+
+  testWidgets('the local preference states that cloud-only records still merge',
+      (tester) async {
+    await openDialog(tester, onResult: (_) {});
+
+    await tester.ensureVisible(find.text('Keep local'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep local'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('still merged in'), findsOneWidget);
+    expect(find.textContaining('Deletions propagate'), findsOneWidget);
   });
 
   testWidgets('an uploading device sees its own changes as upload deltas',
