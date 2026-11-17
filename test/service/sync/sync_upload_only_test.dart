@@ -148,7 +148,7 @@ void main() {
     expect(preview.uploadNoteDelta, 2, reason: '2 local notes vs 1 cloud note');
   });
 
-  test('legacy same-day sessions from two devices are summed exactly once',
+  test('legacy copies sharing a baseline take max on repeated merges',
       () async {
     final x = await fixture(install: false);
     final y = await fixture(install: false);
@@ -156,7 +156,10 @@ void main() {
       await x.insert('tb_reading_time',
           {'book_id': 1, 'date': '2026-09-08', 'reading_time': 60});
       await y.insert('tb_reading_time',
-          {'book_id': 1, 'date': '2026-09-08', 'reading_time': 120});
+          {'book_id': 1, 'date': '2026-09-08', 'reading_time': 60});
+      // A copied old library already includes these 60 seconds. Reading on the
+      // copy before upgrading extends that total, not a second independent row.
+      await y.update('tb_reading_time', {'reading_time': 120});
       await x.transaction((txn) => RowSyncStore.install(txn));
       await y.transaction((txn) => RowSyncStore.install(txn));
       final sx = RowSyncStore(x);
@@ -167,18 +170,17 @@ void main() {
           .single['total'] as int;
 
       await sx.merge(await sy.snapshot());
-      expect(await total(x), 180, reason: '60 + 120 must both survive');
-      // Re-merging the same pair must not add the minutes twice.
+      expect(await total(x), 120,
+          reason: 'The shared baseline is counted once');
       await sx.merge(await sy.snapshot());
-      expect(await total(x), 180);
+      expect(await total(x), 120);
       await sy.merge(await sx.snapshot());
-      expect(await total(y), 180);
+      expect(await total(y), 120);
       await sx.merge(await sy.snapshot());
-      expect(await total(x), 180);
+      expect(await total(x), 120);
     } finally {
       await x.close();
       await y.close();
     }
   });
 }
-

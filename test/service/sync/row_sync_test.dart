@@ -304,7 +304,7 @@ void main() {
     expect(await b.query('tb_reading_time'), isEmpty);
   });
 
-  test('legacy daily totals are summed once and future sessions are additive',
+  test('legacy daily totals take max and future sessions are additive',
       () async {
     final x = await fixture(install: false);
     final y = await fixture(install: false);
@@ -326,10 +326,91 @@ void main() {
           (await x.rawQuery(
                   'SELECT SUM(reading_time) AS total FROM tb_reading_time'))
               .single['total'],
-          290);
+          170);
     } finally {
       await x.close();
       await y.close();
+    }
+  });
+
+  test(
+      'legacy totals converge across batch order, repeated copies and checkpoints',
+      () {
+    RowSyncRecord legacy(int seconds, int clock) => RowSyncRecord(
+            'time', 'legacy:shared-book-day', clock, 'legacy', false, {
+          'book_id': 'shared-book',
+          'date': '2026-09-08',
+          'reading_time': seconds,
+          'round': 1,
+        });
+    final records = [legacy(60, 101), legacy(120, 100), legacy(180, 102)];
+    final expected = mergeSyncRecords(records, []);
+    expect(expected.single.data['reading_time'], 180);
+    expect(expected.single.clock, 102);
+    expect(expected.single.revision, 'legacy');
+    for (final order in [
+      [0, 1, 2],
+      [0, 2, 1],
+      [1, 0, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+      [2, 1, 0],
+    ]) {
+      final a = [records[order[0]]];
+      final b = [records[order[1]]];
+      final c = [records[order[2]]];
+      final ab = mergeSyncRecords(a, b);
+      final bc = mergeSyncRecords(b, c);
+      for (final merged in [
+        mergeSyncRecords([...a, ...b, ...c], []),
+        mergeSyncRecords(ab, c),
+        mergeSyncRecords(a, bc),
+        mergeSyncRecords(ab, bc),
+        mergeSyncRecords([...a, ...b, ...a], [...b, ...c, ...c]),
+        mergeSyncRecords(expected, expected),
+      ]) {
+        expect(sameSyncRecords(merged, expected), isTrue,
+            reason:
+                'merge order $order must not invent or lose a legacy total');
+      }
+    }
+  });
+
+  test('three migrated devices preserve the maximum shared daily baseline',
+      () async {
+    final devices = <Database>[];
+    try {
+      for (final seconds in [60, 120, 180]) {
+        final db = await fixture(install: false);
+        devices.add(db);
+        await db.insert('tb_reading_time',
+            {'book_id': 1, 'date': '2026-09-08', 'reading_time': seconds});
+        await db.transaction((txn) => RowSyncStore.install(txn));
+      }
+      final stores = devices.map(RowSyncStore.new).toList();
+      await stores[0].merge(await stores[1].snapshot());
+      await stores[1].merge(await stores[2].snapshot());
+      for (var round = 0; round < 3; round++) {
+        for (var index = 0; index < stores.length; index++) {
+          await stores[index]
+              .merge(await stores[(index + 1) % stores.length].snapshot());
+        }
+      }
+      for (final db in devices) {
+        expect((await db.query('tb_reading_time')).single['reading_time'], 180);
+      }
+      expect(
+          sameSyncRecords(
+              await stores[0].snapshot(), await stores[1].snapshot()),
+          isTrue);
+      expect(
+          sameSyncRecords(
+              await stores[1].snapshot(), await stores[2].snapshot()),
+          isTrue);
+    } finally {
+      for (final db in devices) {
+        await db.close();
+      }
     }
   });
 
