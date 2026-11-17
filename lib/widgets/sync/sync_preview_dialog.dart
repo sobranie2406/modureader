@@ -31,12 +31,18 @@ class SyncPreviewDialog extends StatefulWidget {
 class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
   SyncConflictResolution _resolution = SyncConflictResolution.newest;
 
+  bool _uploadOnly = false;
+  bool _deletionAcknowledged = false;
+
+  SyncConflictResolution get _selectedResolution =>
+      _uploadOnly ? SyncConflictResolution.uploadOnly : _resolution;
+
   String _text(String zh, String en) => ModuStrings.text(context, zh, en);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final preview = widget.buildPreview(_resolution);
+    final preview = widget.buildPreview(_selectedResolution);
     final lastSynced = Prefs().lastUploadBookDate;
     return AlertDialog(
       key: const ValueKey('sync-preview-dialog'),
@@ -104,12 +110,16 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
                   booksAddedTitle: _text('云端将新增', 'Cloud gains'),
                   booksRemovedTitle: _text('云端将移除', 'Cloud loses'),
                   booksRemoved: preview.cloudRemovedBooks,
-                  removeWarning: null,
+                  removeWarning: preview.cloudRemovedBooks.isNotEmpty
+                      ? _text(
+                          '这 ${preview.cloudRemovedBooks.length} 本书将从云端书架移除，其他设备同步后也会移除。',
+                          '${preview.cloudRemovedBooks.length} book(s) will leave the cloud shelf and other devices after they sync.')
+                      : null,
                   progress: preview.uploadedProgressChangedBooks,
                   noteLabel: _text('云端笔记', 'Cloud notes'),
                   noteDelta: preview.uploadNoteDelta,
                   noteBefore: preview.remoteNoteCount,
-                  noteAfter: preview.mergedNoteCount,
+                  noteAfter: preview.uploadNoteAfter,
                   timeDelta: preview.uploadReadingTimeDelta,
                   theme: theme,
                 ),
@@ -118,12 +128,26 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
                   !preview.remoteMissing)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(_text('两端数据一致，本次只会确认状态。',
-                      'Both sides already match; this sync only confirms the state.')),
+                  child: Text(_uploadOnly
+                      ? _text('本次没有需要上传的变更。', 'No changes need uploading.')
+                      : _text('两端数据一致，本次只会确认状态。',
+                          'Both sides already match; this sync only confirms the state.')),
                 ),
               if (preview.divergentRecords > 0) ...[
                 const Divider(height: 24),
-                _conflictSection(preview, theme),
+                Text(_text('两端记录不一致', 'Divergent records'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(_text(
+                  '有 ${preview.divergentRecords} 处记录内容不一致（${_kinds(preview)}）。',
+                  '${preview.divergentRecords} record(s) differ between devices (${_kinds(preview)}).',
+                )),
+              ] else
+                const Divider(height: 24),
+              _choiceSection(theme),
+              if (preview.deletesBooks) ...[
+                const SizedBox(height: 10),
+                _deletionAcknowledgement(theme),
               ],
             ],
           ),
@@ -137,7 +161,9 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         ),
         FilledButton(
           key: const ValueKey('sync-preview-confirm'),
-          onPressed: () => Navigator.of(context).pop(_resolution),
+          onPressed: preview.deletesBooks && !_deletionAcknowledged
+              ? null
+              : () => Navigator.of(context).pop(_selectedResolution),
           child: Text(_text('开始同步', 'Start sync')),
         ),
       ],
@@ -179,7 +205,9 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
         Icons.upload_outlined
       ],
       [
-        _text('仅云端有记录（将下载）', 'Record only in cloud (downloads)'),
+        _uploadOnly
+            ? _text('仅云端有记录（本次不下载）', 'Cloud-only records (not downloaded)')
+            : _text('仅云端有记录（将下载）', 'Record only in cloud (downloads)'),
         preview.remoteOnlyBooks,
         Icons.download_outlined
       ],
@@ -255,7 +283,7 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
           ],
           if (booksRemoved.isNotEmpty) ...[
             const SizedBox(height: 6),
-            _bookList(booksRemovedTitle, booksRemoved),
+            _bookList(booksRemovedTitle, booksRemoved, danger: true),
           ],
           if (progress.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -302,17 +330,24 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
     );
   }
 
-  Widget _bookList(String title, List<SyncPreviewBook> books) {
+  Widget _bookList(String title, List<SyncPreviewBook> books,
+      {bool danger = false}) {
     const max = 6;
+    final color = danger ? Theme.of(context).colorScheme.error : null;
+    final style =
+        danger ? TextStyle(color: color, fontWeight: FontWeight.bold) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(title,
+            style: style ?? const TextStyle(fontWeight: FontWeight.bold)),
         for (final book in books.take(max))
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text('· ${book.title}',
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: danger ? TextStyle(color: color) : null),
           ),
         if (books.length > max)
           Padding(
@@ -357,58 +392,88 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
 
   String _signed(int value) => value > 0 ? '+$value' : '$value';
 
-  Widget _conflictSection(SyncPreview preview, ThemeData theme) {
-    final kinds = preview.divergentByKind.entries
-        .map((entry) => '${_kindLabel(entry.key)} ${entry.value}')
-        .join('、');
+  String _kinds(SyncPreview preview) => preview.divergentByKind.entries
+      .map((entry) => '${_kindLabel(entry.key)} ${entry.value}')
+      .join('、');
+
+  Widget _choiceSection(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_text('两端记录不一致', 'Divergent records'),
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(_text(
-          '有 ${preview.divergentRecords} 处记录内容不一致（$kinds）。',
-          '${preview.divergentRecords} record(s) differ between devices ($kinds).',
-        )),
-        const SizedBox(height: 8),
-        SegmentedButton<SyncConflictResolution>(
-          key: const ValueKey('sync-preview-resolution'),
-          showSelectedIcon: false,
-          segments: [
-            ButtonSegment(
-              value: SyncConflictResolution.newest,
-              label: Text(_text('较新优先', 'Newest')),
-            ),
-            ButtonSegment(
-              value: SyncConflictResolution.preferLocal,
-              label: Text(_text('以本机为准', 'Keep local')),
-            ),
-            ButtonSegment(
-              value: SyncConflictResolution.preferRemote,
-              label: Text(_text('以云端为准', 'Keep cloud')),
-            ),
-          ],
-          selected: {_resolution},
-          onSelectionChanged: (selected) =>
-              setState(() => _resolution = selected.single),
+        SwitchListTile(
+          key: const ValueKey('sync-preview-upload-only'),
+          title: Text(_text('仅上传', 'Upload only')),
+          value: _uploadOnly,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (value) => setState(() {
+            _uploadOnly = value;
+            _deletionAcknowledged = false;
+          }),
         ),
-        if (_resolution == SyncConflictResolution.preferLocal)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(_text('冲突记录采用本机内容，云端独有记录仍会合并。',
-                'Conflicts use local content; cloud-only records still merge.')),
+        if (!_uploadOnly) ...[
+          Text(_text('冲突处理方式', 'Conflict handling'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          SegmentedButton<SyncConflictResolution>(
+            key: const ValueKey('sync-preview-resolution'),
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: SyncConflictResolution.newest,
+                label: Text(_text('较新优先', 'Newest')),
+              ),
+              ButtonSegment(
+                value: SyncConflictResolution.preferLocal,
+                label: Text(_text('以本机为准', 'Keep local')),
+              ),
+              ButtonSegment(
+                value: SyncConflictResolution.preferRemote,
+                label: Text(_text('以云端为准', 'Keep cloud')),
+              ),
+            ],
+            selected: {_resolution},
+            onSelectionChanged: (selected) => setState(() {
+              if (_resolution != selected.single) {
+                _resolution = selected.single;
+                _deletionAcknowledged = false;
+              }
+            }),
           ),
-        if (_resolution == SyncConflictResolution.preferRemote)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              _text('冲突记录采用云端内容，本机独有记录仍会上传。',
-                  'Conflicts use cloud content; local-only records still upload.'),
-              style: TextStyle(color: theme.colorScheme.error),
+          if (_resolution == SyncConflictResolution.preferLocal)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(_text('冲突记录采用本机内容，云端独有记录仍会合并。',
+                  'Conflicts use local content; cloud-only records still merge.')),
             ),
-          ),
+          if (_resolution == SyncConflictResolution.preferRemote)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _text('冲突记录采用云端内容，本机独有记录仍会上传。',
+                    'Conflicts use cloud content; local-only records still upload.'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ),
+        ],
       ],
+    );
+  }
+
+  Widget _deletionAcknowledgement(ThemeData theme) {
+    return CheckboxListTile(
+      key: const ValueKey('sync-preview-deletion-ack'),
+      value: _deletionAcknowledged,
+      onChanged: (value) =>
+          setState(() => _deletionAcknowledged = value ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(
+        _text('确认将以上书籍移出书架',
+            'Confirm removing the listed books from their shelves'),
+        style: TextStyle(
+            color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -425,7 +490,12 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
           Icon(Icons.warning_amber_rounded,
               size: 18, color: theme.colorScheme.error),
           const SizedBox(width: 8),
-          Expanded(child: Text(message)),
+          Expanded(
+            child: Text(message,
+                style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -443,12 +513,14 @@ class _SyncPreviewDialogState extends State<SyncPreviewDialog> {
             'On both devices: the book is on both shelves.'),
         _helpLine(
             '仅本机有记录：将上传书籍记录。', 'Record only here: its record will upload.'),
-        _helpLine('仅云端有记录：将下载记录并加入书架。',
-            'Record only in the cloud: its record will download to this shelf.'),
+        _helpLine('仅云端有记录：双向同步时下载到本机书架。',
+            'Record only in the cloud: it downloads to this shelf during two-way sync.'),
         _helpLine('两端均不在书架：保留同步记录，避免旧设备重新加入。',
             'On neither shelf: sync records remain so older devices do not add the book again.'),
         _helpLine('冲突选项只处理两端不一致的记录，单端独有记录仍会合并。',
             'The conflict choice only affects differing records; records found on one side still merge.'),
+        _helpLine('仅上传：发送本机变更，不下载云端变更；云端合并时采用较新记录。',
+            'Upload only sends local changes without downloading cloud changes. The cloud merge keeps newer records.'),
         _helpLine('已删除的笔记和阅读时长不会恢复。书籍是否移出书架，以预览结果为准。',
             'Deleted notes and reading time stay deleted. The preview shows which books leave the shelf.'),
         const SizedBox(height: 8),

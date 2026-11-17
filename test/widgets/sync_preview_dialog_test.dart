@@ -8,6 +8,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../service/sync/sync_preview_test.dart' as records;
+
 SyncPreview preview({bool uploading = false}) => SyncPreview(
       localChangedAt: DateTime(2026, 11, 3, 18, 10),
       remoteChangedAt: DateTime(2026, 11, 3, 17, 40),
@@ -81,6 +83,7 @@ void main() {
   Future<void> openDialog(WidgetTester tester,
       {required void Function(SyncConflictResolution?) onResult,
       bool uploading = false,
+      SyncPreview Function(SyncConflictResolution)? buildPreview,
       Locale locale = const Locale('en'),
       double textScale = 1}) async {
     await tester.pumpWidget(MaterialApp(
@@ -96,8 +99,8 @@ void main() {
         body: Builder(
           builder: (context) => TextButton(
             onPressed: () async {
-              onResult(await showSyncPreviewDialog(
-                  context, (_) => preview(uploading: uploading)));
+              onResult(await showSyncPreviewDialog(context,
+                  buildPreview ?? (_) => preview(uploading: uploading)));
             },
             child: const Text('open'),
           ),
@@ -105,6 +108,13 @@ void main() {
       ),
     ));
     await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
     await tester.pumpAndSettle();
   }
 
@@ -185,6 +195,20 @@ void main() {
       expect(downloadHelp, findsNothing);
       expect(find.byKey(const ValueKey('sync-preview-confirm')).hitTestable(),
           findsOneWidget);
+      await tapVisible(
+          tester, find.byKey(const ValueKey('sync-preview-upload-only')));
+      expect(
+          find.byKey(const ValueKey('sync-preview-resolution')), findsNothing);
+      await tapVisible(
+          tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+      expect(tester.takeException(), isNull);
+      await tapVisible(
+          tester, find.byKey(const ValueKey('sync-preview-upload-only')));
+      final preferences = find.byKey(const ValueKey('sync-preview-resolution'));
+      await tester.ensureVisible(preferences);
+      await tester.pumpAndSettle();
+      expect(preferences.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
 
@@ -215,10 +239,123 @@ void main() {
       opened = true;
     });
 
-    await tester.tap(find.byKey(const ValueKey('sync-preview-confirm')));
-    await tester.pumpAndSettle();
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-confirm')));
     expect(opened, isTrue);
     expect(result, SyncConflictResolution.newest);
+  });
+
+  testWidgets('deleting books cannot be started before acknowledging it',
+      (tester) async {
+    await openDialog(tester, onResult: (_) {});
+
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.byKey(const ValueKey('sync-preview-confirm')))
+            .onPressed,
+        isNull);
+    expect(find.textContaining('Confirm removing the listed books'),
+        findsOneWidget);
+
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.byKey(const ValueKey('sync-preview-confirm')))
+            .onPressed,
+        isNotNull);
+  });
+
+  testWidgets(
+      'upload only is separate from conflict preferences and returns its mode',
+      (tester) async {
+    SyncConflictResolution? result;
+    await openDialog(tester, onResult: (value) => result = value);
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-upload-only')));
+    expect(find.byKey(const ValueKey('sync-preview-resolution')), findsNothing);
+    expect(find.text('Cloud-only records (not downloaded)'), findsOneWidget);
+    expect(find.text('Record only in cloud (downloads)'), findsNothing);
+    expect(find.textContaining('Nothing is lost'), findsNothing);
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-confirm')));
+    expect(result, SyncConflictResolution.uploadOnly);
+  });
+
+  testWidgets('upload-only empty state does not claim both sides match',
+      (tester) async {
+    final context = SyncPreviewContext(
+      local: [records.book('a'), records.position('a', .1, clock: 1000)],
+      remote: [records.book('a'), records.position('a', .8, clock: 2000)],
+    );
+    await openDialog(tester,
+        onResult: (_) {},
+        buildPreview: (resolution) =>
+            buildSyncPreview(context: context, resolution: resolution));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-upload-only')));
+    expect(find.text('No changes need uploading.'), findsOneWidget);
+    expect(find.textContaining('Both sides already match'), findsNothing);
+  });
+
+  testWidgets(
+      'cloud removals describe shelf changes without an irreversible claim',
+      (tester) async {
+    await openDialog(tester, uploading: true, onResult: (_) {});
+    expect(find.textContaining('will leave the cloud shelf'), findsOneWidget);
+    expect(find.textContaining('cannot be undone'), findsNothing);
+  });
+
+  testWidgets(
+      'a different conflict strategy clears the previous deletion acknowledgement',
+      (tester) async {
+    await openDialog(tester,
+        onResult: (_) {},
+        buildPreview: (resolution) => preview(
+            uploading: resolution == SyncConflictResolution.preferRemote));
+    final acknowledgement =
+        find.byKey(const ValueKey('sync-preview-deletion-ack'));
+    final confirm = find.byKey(const ValueKey('sync-preview-confirm'));
+    await tapVisible(tester, acknowledgement);
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+    await tapVisible(tester, find.text('Keep cloud'));
+    expect(find.text('· Removed cloud novel'), findsOneWidget);
+    expect(tester.widget<CheckboxListTile>(acknowledgement).value, isFalse);
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    await tapVisible(tester, acknowledgement);
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+  });
+
+  testWidgets(
+      'upload-only toggles clear acknowledgements and preserve the merge preference',
+      (tester) async {
+    final resolutions = <SyncConflictResolution>[];
+    await openDialog(tester, onResult: (_) {}, buildPreview: (resolution) {
+      resolutions.add(resolution);
+      return preview();
+    });
+    final acknowledgement =
+        find.byKey(const ValueKey('sync-preview-deletion-ack'));
+    final mode = find.byKey(const ValueKey('sync-preview-upload-only'));
+    await tapVisible(tester, find.text('Keep local'));
+    await tapVisible(tester, acknowledgement);
+    await tapVisible(tester, mode);
+    expect(resolutions.last, SyncConflictResolution.uploadOnly);
+    expect(tester.widget<CheckboxListTile>(acknowledgement).value, isFalse);
+    await tapVisible(tester, acknowledgement);
+    await tapVisible(tester, mode);
+    expect(resolutions.last, SyncConflictResolution.preferLocal);
+    expect(tester.widget<CheckboxListTile>(acknowledgement).value, isFalse);
+    final choices = tester.widget<SegmentedButton<SyncConflictResolution>>(
+        find.byKey(const ValueKey('sync-preview-resolution')));
+    expect(choices.segments, hasLength(3));
+    expect(choices.selected, {SyncConflictResolution.preferLocal});
   });
 
   testWidgets('choosing the cloud preference returns preferRemote',
@@ -226,14 +363,13 @@ void main() {
     SyncConflictResolution? result;
     await openDialog(tester, onResult: (value) => result = value);
 
-    await tester.ensureVisible(find.text('Keep cloud'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Keep cloud'));
-    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Keep cloud'));
     expect(
         find.textContaining('local-only records still upload'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('sync-preview-confirm')));
-    await tester.pumpAndSettle();
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-deletion-ack')));
+    await tapVisible(
+        tester, find.byKey(const ValueKey('sync-preview-confirm')));
     expect(result, SyncConflictResolution.preferRemote);
   });
 

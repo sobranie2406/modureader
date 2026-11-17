@@ -97,6 +97,8 @@ class SyncPreview {
     required this.divergentRecords,
     required this.divergentByKind,
     required this.resolution,
+    this.cloudNoteCount,
+    this.cloudReadingSeconds,
   });
 
   final DateTime? localChangedAt;
@@ -138,12 +140,29 @@ class SyncPreview {
   final Map<String, int> divergentByKind;
   final SyncConflictResolution resolution;
 
+  /// What the cloud holds after an upload-only pass. Upload-only keeps records
+  /// that only the cloud knows, so the upload deltas cannot be derived from the
+  /// merged view (which is this device only). Null for every other choice.
+  final int? cloudNoteCount;
+  final int? cloudReadingSeconds;
+
   int get noteDelta => mergedNoteCount - localNoteCount;
   int get readingTimeDelta => mergedReadingSeconds - localReadingSeconds;
-  int get uploadNoteDelta => mergedNoteCount - remoteNoteCount;
-  int get uploadReadingTimeDelta => mergedReadingSeconds - remoteReadingSeconds;
+  int get uploadNoteAfter => cloudNoteCount ?? mergedNoteCount;
+  int get uploadReadingSecondsAfter =>
+      cloudReadingSeconds ?? mergedReadingSeconds;
+  int get uploadNoteDelta => uploadNoteAfter - remoteNoteCount;
+  int get uploadReadingTimeDelta =>
+      uploadReadingSecondsAfter - remoteReadingSeconds;
 
   bool get removesBooks => removedBooks.isNotEmpty;
+
+  bool get uploadOnly => resolution == SyncConflictResolution.uploadOnly;
+
+  /// Books disappear on one of the two sides and cannot be restored by a later
+  /// merge, so the dialog asks for an explicit acknowledgement first.
+  bool get deletesBooks =>
+      removedBooks.isNotEmpty || cloudRemovedBooks.isNotEmpty;
 
   bool get hasDownloadChanges =>
       addedBooks.isNotEmpty ||
@@ -180,13 +199,18 @@ SyncPreview buildSyncPreview({
 }) {
   final local = context.local;
   final remote = context.remote;
-  final merged = resolveSyncConflicts(
-    local: local,
-    remote: remote,
-    merged: mergeSyncRecords(
-        local, mergeSyncRecords(remote, context.pendingRecords)),
-    resolution: resolution,
-  );
+  final uploadOnly = resolution == SyncConflictResolution.uploadOnly;
+  // Upload-only never imports the cloud, so the merged view is this device plus
+  // its own pending operations.
+  final merged = uploadOnly
+      ? mergeSyncRecords(local, context.pendingRecords)
+      : resolveSyncConflicts(
+          local: local,
+          remote: remote,
+          merged: mergeSyncRecords(
+              local, mergeSyncRecords(remote, context.pendingRecords)),
+          resolution: resolution,
+        );
 
   final localBooks = _bookInfo(local);
   final remoteBooks = _bookInfo(remote);
@@ -197,14 +221,34 @@ SyncPreview buildSyncPreview({
   final localProgress = _progressByBook(local);
   final remoteProgress = _progressByBook(remote);
   final mergedProgress = _progressByBook(merged);
-  final allKnownBooks = {...remoteBooks, ...localBooks, ...mergedBooks};
+  // With upload-only the local side of every delta is the post-merge view, so
+  // the dialog reports no incoming changes.
+  final localView = uploadOnly ? merged : local;
+  final localBooksView = uploadOnly ? mergedBooks : localBooks;
+  final localVisibleView = uploadOnly ? mergedVisible : localVisible;
+  final localProgressView = uploadOnly ? mergedProgress : localProgress;
+  // Upload-only keeps cloud-only records, so the cloud's post-sync counts are
+  // the union of both sides rather than this device's view.
+  final cloudView = uploadOnly ? mergeSyncRecords(merged, remote) : merged;
+  final cloudBooks = _bookInfo(cloudView);
+  final cloudVisible = _visibleBooks(cloudView);
+  final cloudProgress = _progressByBook(cloudView);
+  final allKnownBooks = {
+    ...remoteBooks,
+    ...localBooksView,
+    ...mergedBooks,
+    ...cloudBooks,
+  };
 
   List<SyncPreviewBook> bookList(Set<String> ids,
       {required Map<String, double> before,
       required Map<String, double> after}) {
     final books = <SyncPreviewBook>[];
     for (final id in ids) {
-      final data = mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
+      final data = cloudBooks[id] ??
+          mergedBooks[id] ??
+          localBooks[id] ??
+          remoteBooks[id];
       if (data == null) continue;
       books.add(SyncPreviewBook(
         title: _title(data, id),
@@ -225,7 +269,10 @@ SyncPreview buildSyncPreview({
       final old = before[id];
       final next = after[id];
       if (old == null || next == null || (next - old).abs() < 0.001) continue;
-      final data = mergedBooks[id] ?? localBooks[id] ?? remoteBooks[id];
+      final data = cloudBooks[id] ??
+          mergedBooks[id] ??
+          localBooks[id] ??
+          remoteBooks[id];
       if (data == null) continue;
       books.add(SyncPreviewBook(
         title: _title(data, id),
@@ -250,39 +297,43 @@ SyncPreview buildSyncPreview({
     remoteChangedAt: context.remoteChangedAt,
     remoteFileAt: context.remoteFileAt,
     remoteMissing: context.remoteMissing,
-    sharedBooks: localVisible.intersection(remoteVisible).length,
+    sharedBooks: localVisibleView.intersection(remoteVisible).length,
     // "Local only" means the cloud has no record of the book at all, so the
     // merge really uploads it. A book the cloud deleted still has a record and
     // is reported through removedBooks instead of being counted as an upload.
-    localOnlyBooks: localVisible.difference(remoteBooks.keys.toSet()).length,
-    remoteOnlyBooks: remoteVisible.difference(localBooks.keys.toSet()).length,
+    localOnlyBooks: localVisibleView.difference(_knownBookIds(remote)).length,
+    remoteOnlyBooks: remoteVisible.difference(_knownBookIds(localView)).length,
     bothDeletedBooks: allKnownBooks.keys
         .toSet()
-        .difference(localVisible.union(remoteVisible))
+        .difference(localVisibleView.union(remoteVisible))
         .length,
-    addedBooks: bookList(mergedVisible.difference(localVisible),
+    addedBooks: bookList(mergedVisible.difference(localVisibleView),
         before: const {}, after: mergedProgress),
-    removedBooks: bookList(localVisible.difference(mergedVisible),
-        before: localProgress, after: const {}),
-    progressChangedBooks: progressList(mergedVisible.intersection(localVisible),
-        before: localProgress, after: mergedProgress),
-    uploadedBooks: bookList(mergedVisible.difference(remoteVisible),
-        before: const {}, after: mergedProgress),
-    cloudRemovedBooks: bookList(remoteVisible.difference(mergedVisible),
+    removedBooks: bookList(localVisibleView.difference(mergedVisible),
+        before: localProgressView, after: const {}),
+    progressChangedBooks: progressList(
+        mergedVisible.intersection(localVisibleView),
+        before: localProgressView,
+        after: mergedProgress),
+    uploadedBooks: bookList(cloudVisible.difference(remoteVisible),
+        before: const {}, after: cloudProgress),
+    cloudRemovedBooks: bookList(remoteVisible.difference(cloudVisible),
         before: remoteProgress, after: const {}),
     uploadedProgressChangedBooks: progressList(
-        mergedVisible.intersection(remoteVisible),
+        cloudVisible.intersection(remoteVisible),
         before: remoteProgress,
-        after: mergedProgress),
-    localNoteCount: _noteCount(local),
+        after: cloudProgress),
+    localNoteCount: _noteCount(localView),
     mergedNoteCount: _noteCount(merged),
     remoteNoteCount: _noteCount(remote),
-    localReadingSeconds: _readingSeconds(local),
+    localReadingSeconds: _readingSeconds(localView),
     mergedReadingSeconds: _readingSeconds(merged),
     remoteReadingSeconds: _readingSeconds(remote),
     divergentRecords: divergent.length,
     divergentByKind: divergentByKind,
     resolution: resolution,
+    cloudNoteCount: uploadOnly ? _noteCount(cloudView) : null,
+    cloudReadingSeconds: uploadOnly ? _readingSeconds(cloudView) : null,
   );
 }
 
@@ -295,6 +346,14 @@ Map<String, Map<String, Object?>> _bookInfo(Iterable<RowSyncRecord> records) =>
     {
       for (final record in records)
         if (record.kind == 'book' && !record.deleted) record.id: record.data
+    };
+
+/// Every book id either side has a record for, tombstones included. Used to
+/// tell "the cloud has never heard of this book" apart from "the cloud deleted
+/// it", which the merge treats very differently.
+Set<String> _knownBookIds(Iterable<RowSyncRecord> records) => {
+      for (final record in records)
+        if (record.kind == 'book' || record.kind == 'life') record.id
     };
 
 /// Visible shelf books: a live book record whose `life` state is not deleted.

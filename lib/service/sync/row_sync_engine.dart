@@ -168,6 +168,27 @@ class RowSyncArchive {
 
 enum RowSyncOutcome { unchanged, published, publishedWithPendingChanges }
 
+String _previewContent(Iterable<RowSyncRecord> records) {
+  final sorted = records.toList()..sort((a, b) => a.key.compareTo(b.key));
+  return jsonEncode([
+    for (final record in sorted)
+      [
+        record.key,
+        record.deleted,
+        Map.fromEntries(record.data.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key))),
+        record.narration?.encode(),
+      ],
+  ]);
+}
+
+Set<String> _previewRemovals(SyncPreview preview) => {
+      for (final book in preview.removedBooks)
+        jsonEncode(['local', book.filePath, book.title]),
+      for (final book in preview.cloudRemovedBooks)
+        jsonEncode(['cloud', book.filePath, book.title]),
+    };
+
 class RowSyncEngine {
   RowSyncEngine(
       {required this.store,
@@ -294,6 +315,20 @@ class RowSyncEngine {
       // A retry after a concurrent publish must not re-ask the same question.
       var previewConfirmed = onPreview == null;
       var previewResolution = SyncConflictResolution.newest;
+      String? previewedRemote;
+      var previewedRemovals = <String>{};
+      bool hasNewRemovals(List<RowSyncRecord> local, List<RowSyncRecord> remote,
+          List<RowSyncRecord> pending) {
+        if (onPreview == null) return false;
+        final preview = buildSyncPreview(
+            context: SyncPreviewContext(
+                local: local, remote: remote, pendingRecords: pending),
+            resolution: previewResolution);
+        return _previewRemovals(preview)
+            .difference(previewedRemovals)
+            .isNotEmpty;
+      }
+
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         // Both transports always consume the immutable log, including after
         // ETags recover. Otherwise intermittent capabilities split the library.
@@ -351,8 +386,14 @@ class RowSyncEngine {
         final repairsRemoteIdentity = !sameSyncRecords(
             privacy.allowedRecords(remoteBaseline), remoteRecords);
         var local = privacy.allowedRecords(localSnapshot);
+        if (previewConfirmed && onPreview != null) {
+          // A shared key can acquire new content or a deletion during a retry.
+          if (_previewContent(remoteRecords) != previewedRemote) {
+            previewConfirmed = false;
+          }
+        }
         if (!previewConfirmed) {
-          final decision = await onPreview!(SyncPreviewContext(
+          final context = SyncPreviewContext(
             local: local,
             remote: remoteRecords,
             pendingRecords: privacy.allowedRecords(pendingRecords),
@@ -360,11 +401,15 @@ class RowSyncEngine {
             remoteChangedAt: latestSyncRecordTime(remoteRecords),
             remoteFileAt: metadata?.mTime,
             remoteMissing: remote == null && journal.isEmpty,
-          ));
+          );
+          final decision = await onPreview!(context);
           if (decision.cancelled) throw const SyncPreviewCancelled();
           previewResolution =
               decision.resolution ?? SyncConflictResolution.newest;
           previewConfirmed = true;
+          previewedRemote = _previewContent(remoteRecords);
+          previewedRemovals = _previewRemovals(buildSyncPreview(
+              context: context, resolution: previewResolution));
         }
         // Assets first: retrying after an interrupted transfer must not advertise
         // unavailable books as synchronized. Still after the read-only preview,
@@ -383,20 +428,32 @@ class RowSyncEngine {
               mergeSyncRecords(privacy.allowedRecords(remoteBaseline), []);
         }
         final allowedPending = privacy.allowedRecords(pendingRecords);
-        final planned = resolveSyncConflicts(
-            local: local,
-            remote: remoteRecords,
-            merged: mergeSyncRecords(
-                local, mergeSyncRecords(remoteRecords, allowedPending)),
-            resolution: previewResolution);
+        if (hasNewRemovals(local, remoteRecords, allowedPending)) {
+          previewConfirmed = false;
+          continue;
+        }
+        final uploadOnly =
+            previewResolution == SyncConflictResolution.uploadOnly;
+        final planned = uploadOnly
+            ? mergeSyncRecords(local, allowedPending)
+            : resolveSyncConflicts(
+                local: local,
+                remote: remoteRecords,
+                merged: mergeSyncRecords(
+                    local, mergeSyncRecords(remoteRecords, allowedPending)),
+                resolution: previewResolution);
         if (!backedUp &&
             (remoteRecords.isNotEmpty || pendingRecords.isNotEmpty) &&
             !sameSyncRecords(local, planned)) {
           await beforeMerge?.call();
           backedUp = true;
         }
-        var merged = await store.merge(remoteRecords,
-            resolution: previewResolution,
+        // Upload-only deliberately receives nothing: the local database is only
+        // touched by its own pending operations.
+        var merged = await store.merge(
+            uploadOnly ? const <RowSyncRecord>[] : remoteRecords,
+            resolution:
+                uploadOnly ? SyncConflictResolution.newest : previewResolution,
             pendingRecords: allowedPending,
             protectPrivateBooks: true);
         // Metadata-only local migrations run after learning remote replacements
@@ -410,6 +467,14 @@ class RowSyncEngine {
         privacy = PrivateBookSyncFilter(
             [...mergedSnapshot, ...remoteBaseline, ...pendingRecords]);
         merged = privacy.allowedRecords(mergedSnapshot);
+        // Direction changes local application, not the cloud's merge rules.
+        List<RowSyncRecord> publishedView(List<RowSyncRecord> localView) {
+          if (!uploadOnly) return localView;
+          return mergeSyncRecords(
+              localView, privacy.allowedRecords(remoteBaseline));
+        }
+
+        var publishRecords = publishedView(merged);
         // Counts only: enough to distinguish an empty metadata view from a
         // successful merge without exposing titles, paths, accounts or keys.
         int bookRecords(List<RowSyncRecord> records) =>
@@ -421,7 +486,7 @@ class RowSyncEngine {
         if ((remote != null || journal.isNotEmpty) &&
             !legacyArchive &&
             !repairsRemoteIdentity &&
-            sameSyncRecords(merged, remoteRecords)) {
+            sameSyncRecords(publishRecords, remoteRecords)) {
           if (PrivateLibrary.instance.hasSyncExclusions) {
             return await finish(published
                 ? RowSyncOutcome.published
@@ -452,6 +517,12 @@ class RowSyncEngine {
         privacy = PrivateBookSyncFilter(
             [...mergedSnapshot, ...remoteBaseline, ...pendingRecords]);
         merged = privacy.allowedRecords(mergedSnapshot);
+        publishRecords = publishedView(merged);
+        if (hasNewRemovals(
+            merged, remoteRecords, privacy.allowedRecords(pendingRecords))) {
+          previewConfirmed = false;
+          continue;
+        }
         final privacyRevision = PrivateLibrary.instance.syncExclusionToken;
         bool privacyChanged() =>
             PrivateLibrary.instance.syncExclusionToken != privacyRevision;
@@ -467,7 +538,7 @@ class RowSyncEngine {
           final known = {
             for (final r in baseline) r.key: jsonEncode(r.toMap())
           };
-          final delta = merged
+          final delta = publishRecords
               .where((r) => known[r.key] != jsonEncode(r.toMap()))
               .toList();
           if (privacyChanged()) throw StateError('私密书籍状态已改变，请重新同步');
@@ -501,8 +572,10 @@ class RowSyncEngine {
         final upload = '${staging.path}/upload-$attempt.db';
         // Preserve previously published private records byte-for-byte in the
         // checkpoint view; local private edits never participate in this merge.
-        await RowSyncArchive.write(
-            upload, [...merged, ...privacy.protectedRecords(remoteBaseline)]);
+        await RowSyncArchive.write(upload, [
+          ...publishRecords,
+          ...privacy.protectedRecords(remoteBaseline),
+        ]);
         if (privacyChanged()) continue;
         try {
           await client.uploadFileConditionally(upload, remotePath,

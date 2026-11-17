@@ -145,10 +145,14 @@ List<RowSyncRecord> mergeSyncRecords(
 /// How records that exist on BOTH devices with different content are resolved.
 ///
 /// `newest` keeps the operation clock ordering used by every other merge path.
-/// The two explicit choices only apply to [divergentSyncKeys]; records that
-/// exist on one side alone are always merged normally, so a preference can
-/// never delete a book, note or session that only one device knows about.
-enum SyncConflictResolution { newest, preferLocal, preferRemote }
+/// The explicit choices only apply to [divergentSyncKeys]; records that exist on
+/// one side alone are always merged normally, so a preference can never delete a
+/// book, note or session that only one device knows about.
+///
+/// [uploadOnly] is different in kind: it skips the local merge entirely, so this
+/// device receives nothing, and publishes its own state to the cloud while
+/// keeping records the cloud holds and this device has never seen.
+enum SyncConflictResolution { newest, preferLocal, preferRemote, uploadOnly }
 
 /// Keys that both sides published with different CONTENT.
 ///
@@ -199,7 +203,10 @@ List<RowSyncRecord> resolveSyncConflicts({
   int? clock,
 }) {
   final records = merged.toList();
-  if (resolution == SyncConflictResolution.newest) return records;
+  if (resolution == SyncConflictResolution.newest ||
+      resolution == SyncConflictResolution.uploadOnly) {
+    return records;
+  }
   final keys = divergentSyncKeys(local, remote);
   if (keys.isEmpty) return records;
   final preferred = {
@@ -272,6 +279,8 @@ RowSyncRecord _winner(RowSyncRecord a, RowSyncRecord b) {
         (a.narration?.encode() ?? '').compareTo(b.narration?.encode() ?? '');
   }
   final winner = comparison >= 0 ? a : b;
+  // Legacy book/day totals can share an old synced baseline. Without session
+  // provenance they cannot safely be added; only new session IDs are additive.
   if (a.kind == 'time' &&
       a.id.startsWith('legacy:') &&
       !a.deleted &&
