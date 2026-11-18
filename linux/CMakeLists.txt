@@ -89,6 +89,25 @@ set_target_properties(${BINARY_NAME}
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modu_onnxruntime_package.cmake")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+  set(MODU_ORT_ARCH "x64")
+  set(MODU_ORT_LIBRARY_SHA256 "3da6146e14e7b8aaec625dde11d6114c7457c87a5f93d744897da8781e35c673")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+  set(MODU_ORT_ARCH "arm64")
+  set(MODU_ORT_LIBRARY_SHA256 "0afd69a0ae38c5099fd0e8604dda398ac43dee67cd9c6394b5142b19e82528de")
+else()
+  message(FATAL_ERROR "Unsupported ONNX Runtime architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+set(MODU_ORT_NATIVE_LIBRARY "${modu_ort_SOURCE_DIR}/runtimes/linux-${MODU_ORT_ARCH}/native/libonnxruntime.so")
+file(SHA256 "${MODU_ORT_NATIVE_LIBRARY}" MODU_ORT_ACTUAL_SHA256)
+if(NOT MODU_ORT_ACTUAL_SHA256 STREQUAL MODU_ORT_LIBRARY_SHA256)
+  message(FATAL_ERROR "ONNX Runtime Linux library checksum mismatch")
+endif()
+# The plugin's unchecked GitHub download no longer exists; use the verified package.
+set(USE_SYSTEM_ONNXRUNTIME ON CACHE BOOL "Use verified ONNX Runtime" FORCE)
+set(ONNXRUNTIME_LIBRARY "${MODU_ORT_NATIVE_LIBRARY}" CACHE FILEPATH "ONNX Runtime library" FORCE)
+set(ONNXRUNTIME_INCLUDE_DIR "${modu_ort_SOURCE_DIR}/build/native/include" CACHE PATH "ONNX Runtime headers" FORCE)
 include(flutter/generated_plugins.cmake)
 if(TARGET flutter_inappwebview_linux_plugin)
   # The plugin references a newer optional API absent in Debian's WPE 2.48.
@@ -128,6 +147,21 @@ foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endforeach(bundled_library)
+
+install(FILES "${MODU_ORT_NATIVE_LIBRARY}"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" RENAME "libonnxruntime.so.${MODU_ORT_VERSION}"
+  COMPONENT Runtime)
+install(CODE "
+  file(CREATE_LINK \"libonnxruntime.so.${MODU_ORT_VERSION}\" \"${INSTALL_BUNDLE_LIB_DIR}/libonnxruntime.so.1\" SYMBOLIC)
+  file(CREATE_LINK \"libonnxruntime.so.1\" \"${INSTALL_BUNDLE_LIB_DIR}/libonnxruntime.so\" SYMBOLIC)
+" COMPONENT Runtime)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LINUX-RUNTIME.txt"
+  "ONNX Runtime ${MODU_ORT_VERSION}: ${MODU_ORT_NUGET_URL}\n"
+  "Package SHA-256: ${MODU_ORT_NUGET_SHA256}\n"
+  "Library SHA-256: ${MODU_ORT_LIBRARY_SHA256}\n"
+  "MIT license and ThirdPartyNotices: LICENSES/ONNXRuntime-1.22.0-*.txt\n")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LINUX-RUNTIME.txt"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
 
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux/")

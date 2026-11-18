@@ -10,6 +10,7 @@ import struct
 import subprocess
 import tarfile
 import tempfile
+import urllib.error
 import urllib.request
 from windows_runtime import prepare_windows_runtime, verify_crt
 from verify_mobile import verify_apple_bundle
@@ -225,38 +226,88 @@ DEB_DEPENDS = ('libc6 (>= 2.41), libstdc++6 (>= 14), libgcc-s1, libgtk-3-0t64, '
                'libasound2t64, libpulse0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good')
 
 
+LINUX_ONNX_LIBRARY_SHA256 = {
+    'x64': '3da6146e14e7b8aaec625dde11d6114c7457c87a5f93d744897da8781e35c673',
+    'arm64': '0afd69a0ae38c5099fd0e8604dda398ac43dee67cd9c6394b5142b19e82528de',
+}
+LINUX_ONNX_ARCHIVES = {
+    'x64': ('x64', '8344d55f93d5bc5021ce342db50f62079daf39aaafb5d311a451846228be49b3'),
+    'arm64': ('aarch64', 'bb76395092d150b52c7092dc6b8f2fe4d80f0f3bf0416d2f269193e347e24702'),
+}
+
+
+def verify_linux_onnx_library(library, arch):
+    if library.is_symlink() or not library.is_file():
+        raise ValueError('Expected a real ONNX Runtime shared library')
+    with library.open('rb') as source:
+        if hashlib.file_digest(source, 'sha256').hexdigest() != LINUX_ONNX_LIBRARY_SHA256[arch]:
+            raise ValueError('ONNX Runtime library checksum mismatch')
+    with library.open('rb') as source:
+        header = source.read(24)
+    if (len(header) != 24 or header[:6] != b'\x7fELF\x02\x01' or
+            struct.unpack_from('<H', header, 18)[0] != {'x64': 62, 'arm64': 183}[arch]):
+        raise ValueError('Mislabeled ONNX Runtime library architecture')
+
+
 def prepare_linux_runtime(app, arch, work):
-    # flutter_onnxruntime 1.8.4 bundles only a symlink, omitting its target.
-    # Supply the exact upstream version used to link the released plugin.
-    upstream_arch, digest = {
-        'x64': ('x64', '8344d55f93d5bc5021ce342db50f62079daf39aaafb5d311a451846228be49b3'),
-        'arm64': ('aarch64', 'bb76395092d150b52c7092dc6b8f2fe4d80f0f3bf0416d2f269193e347e24702'),
-    }[arch]
-    basename = f'onnxruntime-linux-{upstream_arch}-1.22.0'
-    url = f'https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/{basename}.tgz'
-    archive = work / 'onnxruntime.tgz'
-    with urllib.request.urlopen(url, timeout=120) as response, archive.open('wb') as target:
-        shutil.copyfileobj(response, target)
-    with archive.open('rb') as source:
-        if hashlib.file_digest(source, 'sha256').hexdigest() != digest:
-            raise ValueError('Official ONNX Runtime archive checksum mismatch')
     library = app / 'lib/libonnxruntime.so.1.22.0'
-    with tarfile.open(archive) as source:
-        member = source.getmember(f'{basename}/lib/{library.name}')
-        if not member.isfile():
-            raise ValueError('Expected a real ONNX Runtime shared library')
-        with source.extractfile(member) as data, library.open('wb') as target:
-            shutil.copyfileobj(data, target)
-    soname = app / 'lib/libonnxruntime.so.1'
-    if not soname.exists():
-        soname.symlink_to(library.name)
+    provenance = app / 'LINUX-RUNTIME.txt'
+    if library.exists() or library.is_symlink():
+        # New builds already install the hash-pinned NuGet payload during CMake.
+        verify_linux_onnx_library(library, arch)
+        if not provenance.is_file():
+            provenance.write_text(
+                'ONNX Runtime 1.22.0: verified existing runtime payload\n'
+                f'Library SHA-256: {LINUX_ONNX_LIBRARY_SHA256[arch]}\n', encoding='utf-8')
+    else:
+        if provenance.is_file() and 'Package SHA-256:' in provenance.read_text(encoding='utf-8'):
+            raise ValueError('Verified ONNX Runtime build payload is missing')
+        # Historical plugin bundles omitted the real target of their symlink.
+        _restore_linux_runtime(library, arch, work, provenance)
+    for name, target in [('libonnxruntime.so.1', library.name),
+                         ('libonnxruntime.so', 'libonnxruntime.so.1')]:
+        link = library.parent / name
+        if link.is_symlink():
+            link.unlink()
+        elif link.exists():
+            verify_linux_onnx_library(link, arch)
+            link.unlink()
+        link.symlink_to(target)
     # Plugin files carry absolute CI build paths. Relocate them to the package's
     # own library directory; never add application libraries to global ldconfig.
     for plugin in (app / 'lib').glob('*.so'):
         if not plugin.is_symlink() and plugin.name != 'libapp.so':
             command('patchelf', '--set-rpath', '$ORIGIN', plugin)
     command('patchelf', '--set-rpath', '$ORIGIN/lib', app / 'modu')
-    (app / 'LINUX-RUNTIME.txt').write_text(
+    with provenance.open('a', encoding='utf-8') as record:
+        record.write('ELF RPATH metadata made relocatable; application source is recorded in SOURCE.txt.\n')
+
+
+def _restore_linux_runtime(library, arch, work, provenance):
+    upstream_arch, digest = LINUX_ONNX_ARCHIVES[arch]
+    basename = f'onnxruntime-linux-{upstream_arch}-1.22.0'
+    urls = [f'https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/{basename}.tgz',
+            f'https://dl.photoprism.app/onnx/runtime/v1.22.0/{basename}.tgz']
+    archive = work / 'onnxruntime.tgz'
+    for index, url in enumerate(urls):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response, archive.open('wb') as target:
+                shutil.copyfileobj(response, target)
+            break
+        except (urllib.error.URLError, TimeoutError):
+            if index == len(urls) - 1:
+                raise
+    with archive.open('rb') as source:
+        if hashlib.file_digest(source, 'sha256').hexdigest() != digest:
+            raise ValueError('Official ONNX Runtime archive checksum mismatch')
+    with tarfile.open(archive) as source:
+        member = source.getmember(f'{basename}/lib/{library.name}')
+        if not member.isfile():
+            raise ValueError('Expected a real ONNX Runtime shared library')
+        with source.extractfile(member) as data, library.open('wb') as target:
+            shutil.copyfileobj(data, target)
+    verify_linux_onnx_library(library, arch)
+    provenance.write_text(
         f'ONNX Runtime 1.22.0: {url}\nSHA-256: {digest}\n'
         'MIT license and ThirdPartyNotices: LICENSES/ONNXRuntime-1.22.0-*.txt\n'
         'Missing runtime payload restored; ELF RPATH metadata made relocatable.\n'

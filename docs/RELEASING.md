@@ -93,7 +93,7 @@ Starting with 1.2.2, full releases contain **nine packages and nine SHA-256 file
 - Windows installers/apps have no commercial Authenticode signature. Verify the source and SHA-256.
 - iOS releases have no distribution signature and no App Store/TestFlight distribution. Sign the app and Share Extension with your own valid account/profiles. There is no x64 iPhone package.
 
-Linux packages include the ONNX Runtime 1.22.0 shared library omitted by an older plugin layout. patchelf makes library lookup relative to installation paths rather than CI paths. Pinned official runtime downloads are hash-checked, with provenance in LINUX-RUNTIME.txt and licenses retained. Historical repackaging fixed distribution, not app business code.
+Linux builds use ONNX Runtime 1.22.0 from Microsoft's official NuGet package, with pinned package and architecture-specific library hashes. CMake installs the real shared library and relative SONAME links; packaging verifies and reuses that payload without another download. patchelf keeps library lookup relative to installation paths, with provenance in LINUX-RUNTIME.txt and licenses retained. Historical repackaging can restore the same library from a hash-checked upstream archive or PhotoPrism mirror; it does not rebuild app code.
 
 ## Documentation conventions
 
