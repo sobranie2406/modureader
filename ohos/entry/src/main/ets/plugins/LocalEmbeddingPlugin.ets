@@ -39,7 +39,9 @@ export default class LocalEmbeddingPlugin implements FlutterPlugin, MethodCallHa
           await embedding.load(args.get('modelPath') as string);
           if (this.channel === channel) result.success(null);
         } else if (call.method === 'embed') {
-          const vector = await embedding.embed(args.get('ids') as BigInt64Array, args.get('dimensions') as number);
+          const ids = args.get('ids') as BigInt64Array;
+          const bytes = new Uint8Array(ids.buffer, ids.byteOffset, ids.byteLength);
+          const vector = await embedding.embed(bytes, args.get('dimensions') as number);
           if (this.channel === channel) result.success(vector);
         } else {
           await embedding.close();

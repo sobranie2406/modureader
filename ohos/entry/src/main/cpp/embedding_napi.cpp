@@ -117,6 +117,18 @@ void Complete(napi_env env, napi_status status, void *data) {
   napi_delete_async_work(env, job->work);
 }
 
+bool ReadByteView(napi_env env, napi_value input, size_t maximum, void **data, size_t *length) {
+  napi_typedarray_type type;
+  size_t offset = 0, buffer_bytes = 0;
+  void *backing = nullptr;
+  napi_value buffer;
+  return napi_get_typedarray_info(env, input, &type, length, data, &buffer, &offset) == napi_ok &&
+      type == napi_uint8_array && *length > 0 && *length <= maximum && *data &&
+      napi_get_arraybuffer_info(env, buffer, &backing, &buffer_bytes) == napi_ok && backing &&
+      offset <= buffer_bytes && *length <= buffer_bytes - offset &&
+      *data == static_cast<uint8_t *>(backing) + offset;
+}
+
 napi_value Queue(napi_env env, napi_callback_info info, Operation operation) {
   size_t argc = 3;
   napi_value args[3];
@@ -136,30 +148,22 @@ napi_value Queue(napi_env env, napi_callback_info info, Operation operation) {
       job->path.assign(path.data(), length);
     }
   } else if (operation == Operation::Embed) {
-    napi_typedarray_type type;
-    size_t length = 0, offset = 0;
+    size_t length = 0;
     void *ids = nullptr;
-    napi_value buffer;
-    valid = argc == 2 && napi_get_typedarray_info(env, args[0], &type, &length, &ids, &buffer, &offset) == napi_ok &&
-        type == napi_bigint64_array && length > 0 && length <= 512 && ids &&
+    valid = argc == 2 && ReadByteView(env, args[0], 512 * sizeof(int64_t), &ids, &length) &&
         napi_get_value_int32(env, args[1], &job->dimensions) == napi_ok &&
         (job->dimensions == 384 || job->dimensions == 512);
-    if (valid) job->ids.assign(static_cast<int64_t *>(ids), static_cast<int64_t *>(ids) + length);
+    if (valid) {
+      job->ids.resize(modu::EmbeddingTokenCount(length));
+      std::memcpy(job->ids.data(), ids, length);
+    }
   } else if (operation == Operation::OcrRun) {
-    napi_typedarray_type type;
-    size_t length = 0, offset = 0, name_length = 0;
+    size_t length = 0, name_length = 0;
     void *values = nullptr;
-    void *backing = nullptr;
-    size_t buffer_bytes = 0;
-    napi_value buffer;
     uint32_t rank = 0;
     valid = argc == 3 &&
         napi_get_value_string_utf8(env, args[0], nullptr, 0, &name_length) == napi_ok && name_length == 3 &&
-        napi_get_typedarray_info(env, args[1], &type, &length, &values, &buffer, &offset) == napi_ok &&
-        type == napi_uint8_array && length > 0 && length <= modu::kMaxOcrInputElements * sizeof(float) && values &&
-        napi_get_arraybuffer_info(env, buffer, &backing, &buffer_bytes) == napi_ok && backing &&
-        offset <= buffer_bytes && length <= buffer_bytes - offset &&
-        values == static_cast<uint8_t *>(backing) + offset &&
+        ReadByteView(env, args[1], modu::kMaxOcrInputElements * sizeof(float), &values, &length) &&
         napi_get_array_length(env, args[2], &rank) == napi_ok && rank == 4;
     if (valid) {
       char name[4] = {};

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:modu_reader/service/plugins/plugin_catalog.dart';
@@ -442,19 +443,29 @@ void main() {
     expect(requests, 3);
   });
 
-  test('Gitee fallback shares the raw request deadline and cancellation',
-      () async {
-    var calls = 0;
-    final stalled = PluginCatalog(
-        sourceId: 'gitee',
-        timeout: const Duration(milliseconds: 5),
-        clientFactory: () => CatalogClient((_) {
-              calls++;
-              return Completer<http.StreamedResponse>().future;
-            }));
-    addTearDown(stalled.dispose);
-    await expectLater(stalled.load(), failure('network'));
-    expect(calls, 1);
+  test('Gitee does not start a fallback after the raw request deadline', () {
+    fakeAsync((time) {
+      var calls = 0;
+      const timeout = Duration(seconds: 20);
+      final stalled = PluginCatalog(
+          sourceId: 'gitee',
+          timeout: timeout,
+          clientFactory: () => CatalogClient((_) {
+                calls++;
+                return Completer<http.StreamedResponse>().future;
+              }));
+      addTearDown(stalled.dispose);
+      Object? error;
+      unawaited(stalled.load().then<void>((_) {},
+          onError: (Object exception) => error = exception));
+      time.elapse(timeout);
+      expect(calls, 1);
+      expect(error,
+          isA<PluginCatalogFailure>().having((e) => e.code, 'code', 'network'));
+    });
+  });
+
+  test('Gitee cancellation stops a pending API fallback', () async {
     final enteredApi = Completer<void>();
     final catalog = PluginCatalog(
         sourceId: 'gitee',

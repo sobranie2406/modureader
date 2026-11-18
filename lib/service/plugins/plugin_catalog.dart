@@ -18,6 +18,10 @@ class PluginCatalogFailure implements Exception {
   String toString() => 'PluginCatalogFailure($code)';
 }
 
+class _PluginCatalogDeadline extends PluginCatalogFailure {
+  const _PluginCatalogDeadline() : super('network');
+}
+
 class PluginCatalogEntry {
   const PluginCatalogEntry._({
     required this.id,
@@ -263,7 +267,11 @@ class PluginCatalog {
       return await _read(Uri.parse('$_baseUrl$path'), maxBytes,
           budget: remaining());
     } on PluginCatalogFailure catch (error) {
-      if (error.code != 'network' || _sourceId != 'gitee') rethrow;
+      if (error is _PluginCatalogDeadline ||
+          error.code != 'network' ||
+          _sourceId != 'gitee') {
+        rethrow;
+      }
       _check(generation);
       final uri = Uri.https(
           'gitee.com',
@@ -343,7 +351,10 @@ class PluginCatalog {
         _check(generation);
         return bytes.takeBytes();
       })()
-          .timeout(budget);
+          .timeout(budget, onTimeout: () {
+        _check(generation);
+        throw const _PluginCatalogDeadline();
+      });
       return await Future.any([
         operation,
         _cancelled.future.then<Uint8List>(

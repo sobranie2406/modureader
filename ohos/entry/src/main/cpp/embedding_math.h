@@ -8,6 +8,13 @@
 #include <vector>
 
 namespace modu {
+inline size_t EmbeddingTokenCount(size_t bytes) {
+  if (!bytes || bytes % sizeof(int64_t) != 0 || bytes > 512 * sizeof(int64_t)) {
+    throw std::invalid_argument("Invalid embedding token bytes");
+  }
+  return bytes / sizeof(int64_t);
+}
+
 inline std::vector<double> PoolEmbedding(const float *values, size_t count,
                                         const std::vector<int64_t> &shape,
                                         size_t tokens, size_t dimensions) {

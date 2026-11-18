@@ -8,6 +8,11 @@ template <typename F> void Rejects(F fn) {
   assert(rejected);
 }
 int main() {
+  assert(modu::EmbeddingTokenCount(65 * sizeof(int64_t)) == 65);
+  assert(modu::EmbeddingTokenCount(512 * sizeof(int64_t)) == 512);
+  Rejects([] { modu::EmbeddingTokenCount(0); });
+  Rejects([] { modu::EmbeddingTokenCount(65); });
+  Rejects([] { modu::EmbeddingTokenCount(513 * sizeof(int64_t)); });
   for (size_t dimensions : {384, 512}) {
     std::vector<float> hidden(2 * dimensions, 0);
     hidden[0] = 6;
