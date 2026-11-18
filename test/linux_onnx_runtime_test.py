@@ -2,7 +2,9 @@
 import hashlib
 import io
 from pathlib import Path
+import shutil
 import struct
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -12,6 +14,41 @@ import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/release'))
 import native_installers as native
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class LinuxOnnxBuildLinkTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake is required for the build-link fixture')
+    def test_build_soname_and_runner_search_path_exist_before_plugin_configuration(self):
+        source = (ROOT / 'linux/CMakeLists.txt').read_text()
+        start = source.index('set(MODU_ORT_LINK_DIR ')
+        end = source.index('# The plugin\'s unchecked', start)
+        self.assertLess(start, source.index('include(flutter/generated_plugins.cmake)'))
+        binding = next(line for line in source.splitlines()
+                       if line.startswith('set(ONNXRUNTIME_LIBRARY '))
+        for arch in ('x64', 'arm64'):
+            with self.subTest(arch=arch), tempfile.TemporaryDirectory(prefix='modu ort link ') as temporary:
+                root = Path(temporary).resolve()
+                library = root / f'runtimes/linux-{arch}/native/libonnxruntime.so'
+                library.parent.mkdir(parents=True)
+                library.write_bytes(b'configure-only fixture')
+                (root / 'main.c').write_text('int main(void) { return 0; }\n')
+                (root / 'CMakeLists.txt').write_text(
+                    'cmake_minimum_required(VERSION 3.14)\nproject(OrtLinkSmoke C)\n'
+                    'set(BINARY_NAME smoke)\nadd_executable(smoke main.c)\n'
+                    f'set(MODU_ORT_NATIVE_LIBRARY "{library}")\n' + source[start:end] + binding + '\n'
+                    'get_target_property(flags smoke LINK_OPTIONS)\n'
+                    'file(WRITE "${CMAKE_BINARY_DIR}/flags.txt" "${flags}\\n${ONNXRUNTIME_LIBRARY}")\n')
+                build = root / 'build'
+                result = subprocess.run(['cmake', '-S', str(root), '-B', str(build)],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                link = build / 'modu-onnxruntime/libonnxruntime.so.1'
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(link.resolve(), library)
+                self.assertEqual((build / 'flags.txt').read_text().splitlines(), [
+                    f'LINKER:-rpath-link,{link.parent}', str(link)])
 
 
 class LinuxOnnxRuntimeTest(unittest.TestCase):
