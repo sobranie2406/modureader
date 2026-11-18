@@ -1,4 +1,4 @@
-# HarmonyOS 本地向量推理
+# HarmonyOS 本地 ONNX 推理
 
 `modu/ohos_embedding` 使用独立的 ONNX Runtime CPU 会话。加载、推理和释放均在原生异步任务中执行，通道按顺序调用；不访问远程向量接口。
 
@@ -19,7 +19,7 @@ python3 scripts/harmony/prepare_embedding_runtime.py
 - `embed({ids: Int64List, dimensions})`：最多 512 个 token，返回 384 或 512 维归一化向量。
 - `close()`：释放当前会话。
 
-当前仅接入向量模型。OCR 需要另接检测、识别会话及张量管线，不能调用向量接口替代。
+`modu/ohos_ocr` 复用同一个 ONNX 运行库，分别加载文字检测和识别模型。`load({path})` 打开单个模型，`run({name, data, shape})` 接收 Float32 图像张量并返回输出张量及形状，`close()` 释放 OCR 会话。
 
 本地检查：
 
@@ -27,4 +27,4 @@ python3 scripts/harmony/prepare_embedding_runtime.py
 python3 -B -m unittest discover -s test -p 'harmony_*test.py' -v
 ```
 
-原生编译可用 SDK 的 `native/build/cmake/ohos.toolchain.cmake`，指定 `OHOS_ARCH=arm64-v8a`。上线验收还应在 HarmonyOS 设备上执行四个内置模型的加载、中文/英文向量、重复加载/释放和后台退出；编译及池化单测不能代替设备推理结果。
+原生编译可用 SDK 的 `native/build/cmake/ohos.toolchain.cmake`，指定 `OHOS_ARCH=arm64-v8a`。设备验收覆盖内置向量模型、英文和中文文本推理、OCR 模型切换、PDF 文字提取和扫描页识别。

@@ -9,6 +9,7 @@ import 'ocr_models.dart';
 import 'ocr_processing.dart';
 import 'ocr_model_metadata.dart';
 import 'document_text_geometry.dart';
+import 'ohos_ocr_bridge.dart';
 
 class OcrCancellation {
   bool cancelled = false;
@@ -24,7 +25,12 @@ class OcrCancellation {
 }
 
 class LocalOcrService {
+  LocalOcrService({OhosOcrBridge? ohosBridge})
+      : _ohos = ohosBridge ??
+            (Platform.operatingSystem == 'ohos' ? const OhosOcrBridge() : null);
+
   static bool _running = false;
+  final OhosOcrBridge? _ohos;
 
   /// Single on-demand job, no persistent queue, no restart/recovery task.
   Future<String> recognize(
@@ -47,13 +53,26 @@ class LocalOcrService {
     _running = true;
     final port = ReceivePort();
     Isolate? worker;
+    var ohosLoadStarted = false;
+    Object? failure;
     try {
       cancellation.check();
       await store.verify();
       cancellation.check();
       final root = await store.root();
-      final token = RootIsolateToken.instance;
-      if (token == null) throw StateError('OCR worker unavailable');
+      final ohos = _ohos;
+      final token = ohos == null ? RootIsolateToken.instance : null;
+      if (ohos == null && token == null) {
+        throw StateError('OCR worker unavailable');
+      }
+      cancellation.check();
+      if (ohos != null) {
+        // Keep the HarmonyOS channel on the root isolate. Image processing
+        // and recognition decoding still run in the Dart worker.
+        ohosLoadStarted = true;
+        await ohos.load(root.path);
+        cancellation.check();
+      }
       worker = await Isolate.spawn(
           _ocrWorker, [port.sendPort, token, root.path, image, store.model.id],
           onError: port.sendPort, onExit: port.sendPort);
@@ -61,6 +80,14 @@ class LocalOcrService {
         if (event is SendPort) {
           cancellation._notify = () => event.send('cancel');
           if (cancellation.cancelled) event.send('cancel');
+        } else if (ohos != null &&
+            event is List &&
+            event.first == 'nativeRun') {
+          cancellation.check();
+          final output = await ohos.run(event[1] as String,
+              event[2] as Float32List, (event[3] as List).cast<int>());
+          cancellation.check();
+          (event[4] as SendPort).send(output);
         } else if (event is List && event.first == 'progress') {
           progress?.call(event[1] as int, event[2] as int);
         } else if (event is List && event.first == 'result') {
@@ -72,11 +99,20 @@ class LocalOcrService {
         }
       }
       throw StateError('OCR worker stopped');
+    } catch (error) {
+      failure = error;
+      rethrow;
     } finally {
       cancellation._notify = null;
       port.close();
       worker?.kill();
-      _running = false;
+      try {
+        if (ohosLoadStarted) await _ohos!.close();
+      } catch (_) {
+        if (failure == null) rethrow;
+      } finally {
+        _running = false;
+      }
     }
   }
 }
@@ -84,8 +120,9 @@ class LocalOcrService {
 @pragma('vm:entry-point')
 void _ocrWorker(List<Object?> args) async {
   final reply = args[0] as SendPort;
-  BackgroundIsolateBinaryMessenger.ensureInitialized(
-      args[1] as RootIsolateToken);
+  final token = args[1] as RootIsolateToken?;
+  final onOhos = token == null;
+  if (!onOhos) BackgroundIsolateBinaryMessenger.ensureInitialized(token);
   final commands = ReceivePort();
   var cancelled = false;
   commands.listen((_) => cancelled = true);
@@ -99,9 +136,9 @@ void _ocrWorker(List<Object?> args) async {
     final alphabet = model.files.containsKey('rec.yml')
         ? ocrAlphabetFromConfig(await File('$path/rec.yml').readAsString())
         : ocrAlphabet(await File('$path/rec.onnx').readAsBytes());
-    if (Platform.isAndroid) {
+    if (!onOhos && Platform.isAndroid) {
       await android.invokeMethod<void>('load', {'path': path});
-    } else {
+    } else if (!onOhos) {
       for (final name in ['det', 'rec']) {
         if (cancelled) throw StateError('cancelled');
         sessions[name] = await OnnxRuntime().createSession('$path/$name.onnx',
@@ -115,6 +152,24 @@ void _ocrWorker(List<Object?> args) async {
     Future<(List<double>, List<int>)> run(
         String name, Float32List values, List<int> shape) async {
       if (cancelled) throw StateError('cancelled');
+      if (onOhos) {
+        final answer = ReceivePort();
+        try {
+          reply.send(['nativeRun', name, values, shape, answer.sendPort]);
+          final output = await answer.first as Map;
+          final data = output['data'] as List;
+          return (
+            data is Float32List
+                ? data
+                : data
+                    .map((v) => (v as num).toDouble())
+                    .toList(growable: false),
+            (output['shape'] as List).cast<int>()
+          );
+        } finally {
+          answer.close();
+        }
+      }
       if (Platform.isAndroid) {
         final value = await android.invokeMapMethod<String, dynamic>(
             'run', {'name': name, 'data': values, 'shape': shape});
@@ -156,7 +211,7 @@ void _ocrWorker(List<Object?> args) async {
     result = ['error'];
   } finally {
     try {
-      if (Platform.isAndroid) {
+      if (!onOhos && Platform.isAndroid) {
         await android.invokeMethod<void>('close');
       }
       for (final session in sessions.values) {

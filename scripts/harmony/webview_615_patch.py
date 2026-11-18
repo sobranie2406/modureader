@@ -23,6 +23,42 @@ def replacements():
     def add(path, old, new, count=1):
         edits.append((path, old, new, count))
 
+    # StandardMessageCodec decodes nested Dart maps as native Maps on OHOS.
+    add(VIEW, '  callAsyncJavaScript(functionBody: string, args:',
+        '''  private stringifyJavaScriptArgument(value: Object | null | undefined): string | undefined {
+    if (value instanceof Map) {
+      const entries: Array<string> = [];
+      (value as Map<string, Object | null | undefined>).forEach((item: Object | null | undefined, key: string): void => {
+        const encoded: string | undefined = this.stringifyJavaScriptArgument(item);
+        if (encoded !== undefined) entries.push(JSON.stringify(key) + ':' + encoded);
+      });
+      return '{' + entries.join(',') + '}';
+    }
+    if (Array.isArray(value)) {
+      const items: Array<Object | null | undefined> = value as Array<Object | null | undefined>;
+      return '[' + items.map((item: Object | null | undefined): string =>
+        this.stringifyJavaScriptArgument(item) ?? 'null').join(',') + ']';
+    }
+    if (value !== null && typeof value === 'object') {
+      const fields: Record<string, Object | null | undefined> = value as Record<string, Object | null | undefined>;
+      const entries: Array<string> = [];
+      for (const key of Object.keys(fields)) {
+        const encoded: string | undefined = this.stringifyJavaScriptArgument(fields[key]);
+        if (encoded !== undefined) entries.push(JSON.stringify(key) + ':' + encoded);
+      }
+      return '{' + entries.join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  callAsyncJavaScript(functionBody: string, args:''')
+    add(VIEW, '      let functionArgumentsObj = JSON.stringify(argsObj);',
+        '''      const functionArgumentsJson: string = this.stringifyJavaScriptArgument(argsObj) ?? '{}';
+      const functionArgumentsObj: string = 'JSON.parse(' + JSON.stringify(functionArgumentsJson) + ')';''')
+    add(VIEW,
+        '.replace(PluginScriptsUtil.VAR_FUNCTION_ARGUMENTS_OBJ, functionArgumentsObj)',
+        '.replace(PluginScriptsUtil.VAR_FUNCTION_ARGUMENTS_OBJ, () => functionArgumentsObj)')
+
     # ArkWeb uses the loadData base URL for window.location. Stripping the
     # reader's query loses the book capability, importing flag and style.
     add(VIEW, '      let baseUrl = this.buildLoopbackBaseUrl(url);',

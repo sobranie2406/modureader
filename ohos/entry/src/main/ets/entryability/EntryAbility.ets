@@ -8,6 +8,7 @@ import FileExportPlugin from '../plugins/FileExportPlugin';
 import ReaderWakelockPlugin from '../plugins/ReaderWakelockPlugin';
 import ReaderCutoutPlugin from '../plugins/ReaderCutoutPlugin';
 import LocalEmbeddingPlugin from '../plugins/LocalEmbeddingPlugin';
+import LocalOcrPlugin from '../plugins/LocalOcrPlugin';
 
 export default class EntryAbility extends FlutterAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -27,5 +28,6 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new ReaderWakelockPlugin())
     flutterEngine.getPlugins()?.add(new ReaderCutoutPlugin())
     flutterEngine.getPlugins()?.add(new LocalEmbeddingPlugin())
+    flutterEngine.getPlugins()?.add(new LocalOcrPlugin())
   }
 }

@@ -108,6 +108,78 @@ async function call(name, argumentsMap = {}) {
   return response;
 }
 (async () => {
+  // Exercise native Map serialization and the actual pinned page wrapper.
+  const wrapperSource = sources[prefix + 'plugin_scripts_js/PluginScriptsUtil.ets'];
+  const fields = wrapperSource.slice(
+    wrapperSource.indexOf('  public static VAR_PLACEHOLDER_VALUE'),
+    wrapperSource.indexOf('  public static EVALUATE_JAVASCRIPT_WITH_CONTENT_WORLD_WRAPPER_JS_SOURCE'));
+  const scripts = vm.runInNewContext(stripTypeScriptTypes(
+    'class PluginScriptsUtil {\n' + fields + '\n}\nPluginScriptsUtil', {mode: 'transform'}),
+    {JavaScriptBridgeJS: {JAVASCRIPT_BRIDGE_NAME: 'flutter_inappwebview'}});
+  let nextUuid = 0;
+  const asyncView = harness(viewSource, ['stringifyJavaScriptArgument', 'callAsyncJavaScript'], {
+    Map, Object, PluginScriptsUtil: scripts,
+    util: {generateRandomUUID: () => String(++nextUuid)},
+    Log: {e() {}}, TAG: 'test',
+  });
+  asyncView.callAsyncJavaScriptCallbacks = new Map();
+  asyncView.waitControllerAttached = () => Promise.resolve();
+  asyncView.requireUserContentController = () => ({generateCodeForScriptEvaluation: code => code});
+  async function invokePage(body, args, pageFunctions) {
+    return await new Promise(resolve => {
+      const window = {...pageFunctions, flutter_inappwebview: {
+        callHandler(name, response) {
+          assert.equal(name, 'callAsyncJavaScript');
+          const callback = asyncView.callAsyncJavaScriptCallbacks.get(response.resultUuid);
+          assert.ok(callback);
+          callback.onReceiveValue(JSON.stringify(response));
+          asyncView.callAsyncJavaScriptCallbacks.delete(response.resultUuid);
+        },
+      }};
+      asyncView.requireController = () => ({
+        runJavaScriptExt(code) {
+          vm.runInNewContext(code, {window});
+          return Promise.resolve('null');
+        },
+      });
+      asyncView.callAsyncJavaScript(body, args, null, {
+        onReceiveValue: value => resolve(JSON.parse(value)),
+      });
+    });
+  }
+  const crop = new Map([['x', .1], ['y', .2], ['width', .6], ['height', .7]]);
+  const label = '中 文 " \\ $& $\' $` 😀';
+  const markers = [null, false, 0, '', undefined, new Map([['label', label]])];
+  const request = new Map([['page', 3], ['width', 960], ['crop', crop], ['markers', markers],
+    ['wrapped', {nested: new Map([['enabled', true]]), omit: undefined}],
+    ['__proto__', new Map([['polluted', 'kept as data']])]]);
+  const expected = {page: 3, width: 960, crop: {x: .1, y: .2, width: .6, height: .7},
+    markers: [null, false, 0, '', null, {label}], wrapped: {nested: {enabled: true}},
+    ['__proto__']: {polluted: 'kept as data'}};
+  for (const name of ['renderPdfRegion', 'extractDocumentText']) {
+    const result = await invokePage(`return await window.${name}(request);`,
+      new Map([['request', request]]), {[name]: value => value});
+    assert.equal(result.error, null);
+    assert.deepEqual(result.value, expected);
+    assert.equal(Object.hasOwn(result.value, '__proto__'), true);
+    assert.equal(Object.getPrototypeOf(result.value), Object.prototype);
+  }
+  const layout = new Map([['columns', 2], ['margins', new Map([['top', .05]])]]);
+  const readingView = new Map([['zoom', 1.5], ['rotation', 0], ['display', new Map([['hideWatermarks', true]])]]);
+  const applied = await invokePage('return window.setPdfReadingLayout(config, enabled, view);',
+    new Map([['config', layout], ['enabled', false], ['view', readingView]]),
+    {setPdfReadingLayout: (config, enabled, view) => ({config, enabled, view})});
+  assert.deepEqual(applied.value, {config: {columns: 2, margins: {top: .05}}, enabled: false,
+    view: {zoom: 1.5, rotation: 0, display: {hideWatermarks: true}}});
+  const reflow = await invokePage('return window.getDocumentReflowInfo(page, config, enabled, imageEpub, hideWatermarks);',
+    new Map([['page', null], ['config', layout], ['enabled', true], ['imageEpub', false], ['hideWatermarks', true]]),
+    {getDocumentReflowInfo: (page, config, enabled, imageEpub, hideWatermarks) => ({page, config, enabled, imageEpub, hideWatermarks})});
+  assert.deepEqual(reflow.value, {page: null, config: {columns: 2, margins: {top: .05}},
+    enabled: true, imageEpub: false, hideWatermarks: true});
+  assert.equal(request.get('crop'), crop, 'transport must not mutate native arguments');
+  assert.equal(asyncView.callAsyncJavaScriptCallbacks.size, 0);
+  assert.equal({}.polluted, undefined);
+
   const clientSource = sources[prefix + 'webview/in_app_webview/InAppWebViewClient.ets'];
   let requestOptions;
   let destroyed = 0;

@@ -168,8 +168,12 @@ class WebViewRealSourceTest(unittest.TestCase):
             self.assertEqual((self.root / name).read_bytes(), content)
 
     def test_native_guard_focus_and_zoom_control_flow(self):
+        sources = dict(self.patched)
+        wrapper = ('flutter_inappwebview_ohos/ohos/src/main/ets/components/plugin/'
+                   'plugin_scripts_js/PluginScriptsUtil.ets')
+        sources[wrapper] = (self.upstream / wrapper).read_text()
         result = subprocess.run(['node', str(ROOT / 'test/harmony_webview_runtime_test.cjs')],
-                                input=json.dumps(self.patched), text=True, capture_output=True)
+                                input=json.dumps(sources), text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('checks passed', result.stdout)
 
