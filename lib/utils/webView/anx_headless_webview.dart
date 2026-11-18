@@ -63,6 +63,14 @@ class AnxHeadlessWebView {
     this.webViewEnvironment,
   });
 
+  // The HarmonyOS WebView fork requires a Future result for these callbacks.
+  static Future<T> Function(A, B)? _asyncCallback<T, A, B>(
+    FutureOr<T> Function(A, B)? callback,
+  ) =>
+      callback == null
+          ? null
+          : (first, second) async => callback(first, second);
+
   Future<void> run() {
     if (_stopping || _disposed) {
       return Future.error(StateError('Background reader is closing'));
@@ -105,10 +113,10 @@ class AnxHeadlessWebView {
         onReceivedError: _onReceivedError,
         onReceivedHttpError: _onReceivedHttpError,
         onRenderProcessGone: _onRenderProcessGone,
-        shouldOverrideUrlLoading: shouldOverrideUrlLoading,
-        shouldInterceptRequest: shouldInterceptRequest,
-        onCreateWindow: onCreateWindow,
-        onPermissionRequest: onPermissionRequest,
+        shouldOverrideUrlLoading: _asyncCallback(shouldOverrideUrlLoading),
+        shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
+        onCreateWindow: _asyncCallback(onCreateWindow),
+        onPermissionRequest: _asyncCallback(onPermissionRequest),
       );
       try {
         await _headlessWebView?.run();
@@ -173,10 +181,10 @@ class AnxHeadlessWebView {
             onReceivedError: _onReceivedError,
             onReceivedHttpError: _onReceivedHttpError,
             onRenderProcessGone: _onRenderProcessGone,
-            shouldOverrideUrlLoading: shouldOverrideUrlLoading,
-            shouldInterceptRequest: shouldInterceptRequest,
-            onCreateWindow: onCreateWindow,
-            onPermissionRequest: onPermissionRequest,
+            shouldOverrideUrlLoading: _asyncCallback(shouldOverrideUrlLoading),
+            shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
+            onCreateWindow: _asyncCallback(onCreateWindow),
+            onPermissionRequest: _asyncCallback(onPermissionRequest),
             onWebViewCreated: (controller) {
               onWebViewCreated?.call(controller);
             },
