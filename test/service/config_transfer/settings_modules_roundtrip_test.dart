@@ -59,7 +59,6 @@ void main() {
     'vectorModelEnabled': false,
     'ocrModelId': 'ppocr-v5-mobile-1',
     'ocrModelDownloadSource': 'gitee',
-    'vectorModelConfig': '{"apiKey":"test-only-secret","dimensions":512}',
     'ttsRate': 1.2,
     'ttsService': 'xiaomi',
     'ttsVoiceModel_xiaomi': 'mimo_default',
@@ -89,6 +88,35 @@ void main() {
   Map<String, Object?> snapshot() => {
         for (final key in Prefs().prefs.getKeys()) key: Prefs().prefs.get(key),
       };
+
+  test('old settings files and links skip retired remote embedding fields',
+      () async {
+    await initialize({});
+    final oldFile = jsonEncode({
+      'kind': GlobalSettingsTransfer.kind,
+      'version': 2,
+      'preferences': {
+        prefsBackupVersionKey: 1,
+        'vectorModelMode': {'type': 'string', 'value': 'remote'},
+        'vectorModelConfig': {'type': 'string', 'value': '{"apiKey":"old"}'},
+        'vectorLocalModelId': {'type': 'string', 'value': 'all-MiniLM-L6-v2'},
+      },
+    });
+    for (final input in [oldFile, GlobalSettingsTransfer.link(oldFile)]) {
+      final values = await GlobalSettingsTransfer.decode(input);
+      await GlobalSettingsTransfer.apply(Prefs(), values);
+      expect(values.keys, isNot(containsAll(retiredEmbeddingPreferenceKeys)));
+      expect(Prefs().vectorLocalModelId, 'all-MiniLM-L6-v2');
+    }
+    expect(snapshot().keys.any(retiredEmbeddingPreferenceKeys.contains), false);
+    final exported = await GlobalSettingsTransfer.export(Prefs(),
+        scope: 'vector', includeSecrets: true);
+    expect(
+        jsonDecode(exported)['preferences']
+            .keys
+            .any(retiredEmbeddingPreferenceKeys.contains),
+        false);
+  });
 
   for (final modelId in [
     'ppocr-v6-small-1',

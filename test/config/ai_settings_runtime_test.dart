@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:modu_reader/service/tts/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,7 +55,7 @@ void main() {
     expect(Prefs().translationAiService, 'usable');
   });
 
-  test('vector and speech runtime factories use their settings selections',
+  test('legacy remote vector settings are retired without affecting speech',
       () async {
     SharedPreferences.setMockInitialValues({
       'vectorModelEnabled': true,
@@ -70,8 +71,11 @@ void main() {
     await Prefs().initPrefs();
 
     final embedding = EmbeddingProviderFactory.fromPrefs();
-    expect(embedding, isA<OpenAiCompatibleEmbeddingProvider>());
-    expect(embedding!.modelId, 'embedding-test');
+    expect(embedding, isA<LocalOnnxEmbeddingProvider>());
+    expect(embedding!.modelId, 'bge-small-zh-v1.5');
+    expect(Prefs().prefs.containsKey('vectorModelMode'), isFalse);
+    expect(Prefs().prefs.containsKey('vectorModelConfig'), isFalse);
+    embedding.store.close();
     expect(getTtsService(Prefs().ttsService), TtsService.edge);
 
     Prefs().vectorModelEnabled = false;

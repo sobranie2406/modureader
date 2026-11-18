@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:modu_reader/service/knowledge/embedding_provider.dart';
+import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -34,17 +39,57 @@ void main() {
   late BookKnowledgeIndexQueue queue;
   late List<int> started;
   late List<String> messages;
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  final model = LocalEmbeddingModels.byId(LocalEmbeddingModels.defaultModelId);
+  final modelBytes = Uint8List.fromList(utf8.encode('fixture model'));
+  final tokenizerBytes = Uint8List.fromList(utf8.encode('{}'));
+  final fixtureFiles = {
+    'model_quantized.onnx': modelBytes,
+    'tokenizer.json': tokenizerBytes,
+  };
+  late Directory installedModel;
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('modu-local-index-');
     previousPaths = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _ModelPaths(directory.path);
     SharedPreferences.setMockInitialValues({
       'vectorModelEnabled': true,
-      'vectorModelMode': 'remote',
-      'vectorModelConfig':
-          '{"modelId":"fixture","endpoint":"http://localhost:11434/v1/embeddings"}',
     });
     await Prefs().initPrefs();
+    messenger.setMockMessageHandler('flutter/assets', (message) async {
+      if (const StringCodec().decodeMessage(message) !=
+          EmbeddingModelManifest.assetPath) {
+        return null;
+      }
+      return const StringCodec().encodeMessage(jsonEncode({
+        'models': [
+          for (final item in LocalEmbeddingModels.all)
+            {
+              'id': item.id,
+              'repository': item.hfModelId,
+              'revision': '0' * 40,
+              'files': [
+                for (final f in fixtureFiles.entries)
+                  {
+                    'name': f.key,
+                    'path': f.key.endsWith('.onnx') ? 'onnx/${f.key}' : f.key,
+                    'size': f.value.length,
+                    'sha256': sha256.convert(f.value).toString(),
+                  },
+              ],
+            },
+        ],
+      }));
+    });
+    rootBundle.evict(EmbeddingModelManifest.assetPath);
+    final store = LocalEmbeddingModelStore();
+    installedModel = await store.modelDirectory(model);
+    store.close();
+    await installedModel.create(recursive: true);
+    for (final f in fixtureFiles.entries) {
+      await File('${installedModel.path}/${f.key}').writeAsBytes(f.value);
+    }
     previousPath = documentPath;
     documentPath = directory.path;
     local = Book.mock().copyWith(id: 1, filePath: 'local.txt');
@@ -61,6 +106,8 @@ void main() {
     await queue.pauseAndCancelAll();
     await Future<void>.delayed(Duration.zero);
     queue.dispose();
+    messenger.setMockMessageHandler('flutter/assets', null);
+    rootBundle.evict(EmbeddingModelManifest.assetPath);
     documentPath = previousPath;
     PathProviderPlatform.instance = previousPaths;
     await directory.delete(recursive: true);
@@ -207,18 +254,18 @@ void main() {
 
   test('missing local model does not start extraction or download files',
       () async {
-    Prefs().vectorModelMode = 'builtin';
+    await installedModel.delete(recursive: true);
     await queueBookForVectorization(local,
         queue: queue, showMessage: messages.add);
     expect(queue.items, isEmpty);
     expect(started, isEmpty);
     expect(messages.single, contains('尚未下载或文件损坏'));
-    expect(await Directory('${directory.path}/models').exists(), isFalse);
+    expect(await installedModel.exists(), isFalse);
     expect(await Directory('${directory.path}/knowledge').exists(), isFalse);
   });
 
   test(
-      'batch skips unavailable book override but permits configured remote model without local models',
+      'batch queues an installed default model and skips a missing local override',
       () async {
     await File(remote.fileFullPath).writeAsString('Now local');
     await BookEmbeddingPreferences.save(remote, 'local:multilingual-e5-small');
@@ -229,30 +276,6 @@ void main() {
     expect(messages.single, contains('已将 1 本书'));
     expect(messages.single, contains('已跳过 1 本向量模型不可用'));
     expect(messages.single, contains('Multilingual E5'));
-  });
-
-  test(
-      'configured remote model needs no local model, but invalid credentials never enqueue',
-      () async {
-    await Prefs().saveVectorModelConfig({
-      'modelId': 'remote',
-      'endpoint': 'https://example.com/v1',
-      'apiKey': ''
-    });
-    await queueBookForVectorization(local,
-        queue: queue, showMessage: messages.add);
-    expect(queue.items, isEmpty);
-    expect(messages.single, contains('API 密钥'));
-  });
-
-  test('invalid remote endpoint is presented as a configuration error',
-      () async {
-    await Prefs()
-        .saveVectorModelConfig({'modelId': 'remote', 'endpoint': 'not-a-url'});
-    await queueBookForVectorization(local,
-        queue: queue, showMessage: messages.add);
-    expect(queue.items, isEmpty);
-    expect(messages.single, contains('配置无效'));
   });
 
   test('execution rechecks switch and preserves old index and marker',
@@ -278,7 +301,7 @@ void main() {
   test(
       'worker rejects missing model before diagnostics, extraction or marker creation',
       () async {
-    Prefs().vectorModelMode = 'builtin';
+    await installedModel.delete(recursive: true);
     final service = BookKnowledgeIndexService();
     var events = 0;
     await expectLater(

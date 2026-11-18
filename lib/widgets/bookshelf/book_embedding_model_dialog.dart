@@ -6,6 +6,7 @@ import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:flutter/material.dart';
 
 Future<void> showBookEmbeddingModelDialog(BuildContext context, Book book) =>
@@ -60,9 +61,7 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
           final prefs = Prefs();
           final defaultName = !prefs.vectorModelEnabled
               ? '向量功能已关闭'
-              : prefs.vectorModelMode == 'remote'
-                  ? '${prefs.vectorModelConfig['modelId'] ?? '远程模型'}'
-                  : LocalEmbeddingModels.byId(prefs.vectorLocalModelId).name;
+              : LocalEmbeddingModels.byId(prefs.vectorLocalModelId).name;
           Widget option(String value, String title, String subtitle) =>
               RadioListTile<String>(
                 value: value,
@@ -96,29 +95,25 @@ class _BookEmbeddingModelDialogState extends State<BookEmbeddingModelDialog> {
                             ModuStrings.format(context, '跟随设置中的全局模型：{model}',
                                 'Follow the global model: {model}',
                                 values: {'model': defaultName})),
-                        for (final model in LocalEmbeddingModels.all)
-                          option(
-                              'local:${model.id}',
-                              model.name,
-                              ModuStrings.format(
-                                  context,
-                                  '本地 · {dimensions} 维 · {languages}',
-                                  'Local · {dimensions} dimensions · {languages}',
-                                  values: {
-                                    'dimensions': model.dimensions,
-                                    'languages': model.languages
-                                  })),
-                        option(
-                            'remote',
-                            ModuStrings.text(
-                                context, '使用远程模型', 'Use remote model'),
-                            ModuStrings.format(context, '使用向量设置中的接口和密钥：{model}',
-                                'Use the endpoint and key from embedding settings: {model}',
-                                values: {
-                                  'model': prefs.vectorModelConfig['modelId'] ??
-                                      ModuStrings.text(
-                                          context, '尚未配置', 'Not configured')
-                                })),
+                        if (LocalOnnxEmbeddingProvider.isSupported)
+                          for (final model in LocalEmbeddingModels.all)
+                            option(
+                                'local:${model.id}',
+                                model.name,
+                                ModuStrings.format(
+                                    context,
+                                    '本地 · {dimensions} 维 · {languages}',
+                                    'Local · {dimensions} dimensions · {languages}',
+                                    values: {
+                                      'dimensions': model.dimensions,
+                                      'languages': model.languages
+                                    }))
+                        else
+                          Text(ModuStrings.text(
+                            context,
+                            LocalOnnxEmbeddingProvider.unsupportedMessage,
+                            LocalOnnxEmbeddingProvider.unsupportedMessageEn,
+                          )),
                         const SizedBox(height: 12),
                         SettingHelp(
                             title: Text(ModuStrings.text(

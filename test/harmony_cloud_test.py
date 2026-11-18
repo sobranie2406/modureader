@@ -16,6 +16,8 @@ from collect_unsigned import collect, verify_native_assets, package_release
 from verify_tools import verify
 from prepare import overrides, prepare
 
+NATIVE_LIBRARY = bytes.fromhex('7f454c460201010000000000000000000300b700') + bytes(44)
+
 
 def fixture(path, version='1.2.2', build=10087, source_version=None):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -26,7 +28,11 @@ def fixture(path, version='1.2.2', build=10087, source_version=None):
         archive.writestr('resources/rawfile/flutter_assets/pubspec.yaml',
                          f'version: {source_version or version}+{build}\n')
         archive.writestr('libs/arm64-v8a/libtokenizers_ffi.so',
-                         bytes.fromhex('7f454c460201010000000000000000000300b700') + bytes(44))
+                         NATIVE_LIBRARY)
+        for name in ('libmodu_embedding.so', 'libonnxruntime.so', 'libc++_shared.so'):
+            archive.writestr(f'libs/arm64-v8a/{name}', NATIVE_LIBRARY)
+        for name in ('LICENSE', 'ThirdPartyNotices.txt'):
+            archive.writestr(f'resources/rawfile/onnxruntime/{name}', 'fixture license')
         archive.writestr('resources/rawfile/flutter_assets/NativeAssetsManifest.json',
                          json.dumps({'native-assets': {'ohos_arm64': {
                              'package:hf_tokenizers/src/bindings.dart':
@@ -34,6 +40,34 @@ def fixture(path, version='1.2.2', build=10087, source_version=None):
 
 
 class HarmonyCloudTest(unittest.TestCase):
+    def setUp(self):
+        runtime = patch('collect_unsigned.runtime_manifest', return_value={
+            'librarySha256': hashlib.sha256(NATIVE_LIBRARY).hexdigest()})
+        runtime.start()
+        self.addCleanup(runtime.stop)
+
+    def test_local_inference_runtime_or_notices_cannot_be_missing_or_replaced(self):
+        from io import BytesIO
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / 'entry-unsigned.hap'
+            fixture(source)
+            for removed in ('libs/arm64-v8a/libmodu_embedding.so',
+                            'libs/arm64-v8a/libonnxruntime.so',
+                            'libs/arm64-v8a/libc++_shared.so',
+                            'resources/rawfile/onnxruntime/ThirdPartyNotices.txt'):
+                data = BytesIO()
+                with zipfile.ZipFile(source) as original, zipfile.ZipFile(data, 'w') as changed:
+                    for item in original.infolist():
+                        if item.filename != removed:
+                            changed.writestr(item, original.read(item))
+                with self.subTest(removed=removed), zipfile.ZipFile(data) as archive:
+                    with self.assertRaises(ValueError):
+                        verify_native_assets(archive)
+            with zipfile.ZipFile(source) as archive, patch('collect_unsigned.runtime_manifest',
+                    return_value={'librarySha256': '0' * 64}):
+                with self.assertRaisesRegex(ValueError, 'audited OHOS library'):
+                    verify_native_assets(archive)
+
     def test_beta_requires_numeric_platform_and_exact_bundled_version(self):
         for native, bundled, build in [
                 ('1.2.11', '1.2.11-beta.1', 10130),

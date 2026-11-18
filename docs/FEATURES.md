@@ -134,11 +134,11 @@ Source: [skills](../lib/service/ai/readany_skills.dart), [execution](../lib/serv
 
 ## 8. Embedding models and semantic retrieval
 
-Embedding, chat and OCR models have different jobs and settings. Vector models default to enabled/local mode with BGE Small ZH v1.5. Other local choices are BGE Small EN, all-MiniLM-L6-v2 and Multilingual E5 Small, or configure a remote embeddings API. Downloads are explicit and verified. Remote embedding sends indexed snippets/queries and may cost money.
+Embedding, chat and OCR models have different jobs and settings. All embedding models run locally. They are enabled by default, with BGE Small ZH v1.5 selected. Other choices are BGE Small EN, all-MiniLM-L6-v2 and Multilingual E5 Small. Models can be downloaded from Hugging Face or Gitee, or imported offline; files are verified before use.
 
 Download the model and book body, then use **Vectorize / Re-vectorize** in the book menu. Manual and automatic work share a queue; indexing after import starts off. **Stop Vectorization** disables automatic indexing and cancels active/queued work while retaining completed indexes, books and models.
 
-Changed content/models require rebuilding; an app upgrade alone should not invalidate an unchanged index. Missing/incompatible models fall back to keywords rather than comparing incompatible vectors; optional index corruption does not block normal search.
+Changed content/models require rebuilding; books previously indexed with a remote model need re-vectorizing locally. An app upgrade alone should not invalidate an unchanged local index. Missing/incompatible models fall back to keywords rather than comparing incompatible vectors; optional index corruption does not block normal search.
 
 Indexes stay local and are not transferred through WebDAV/S3 sync. Other devices build their own. Upgrades do not automatically delete historical cloud indexes. Local embeddings do not make remote chat offline: relevant context still goes to the selected chat provider.
 
@@ -223,7 +223,7 @@ Source: [updates](../lib/service/update/app_update.dart), [feedback](../lib/page
 | --- | --- |
 | Downloaded books, notes, dictionaries | Local; book remote resources/enabled scripts or CSS can still network |
 | Local OCR/embedding | Model download requires network; inference is local |
-| Remote AI/embeddings/speech/translation | Required text/context/query sent to selected provider |
+| Remote AI/speech/translation | Required text/context/query sent to selected provider |
 | Search/AI online lookup | Query sent to sites; synthesis may call selected AI |
 | Sync | In-scope data sent to configured WebDAV/object storage |
 | Feedback | User-reviewed public GitHub issue; optional diagnostics |

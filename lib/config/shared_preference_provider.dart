@@ -65,7 +65,10 @@ const int prefsBackupSchemaVersion = 1;
 const String _prefsBackupEntryTypeKey = 'type';
 const String _prefsBackupEntryValueKey = 'value';
 
+const retiredEmbeddingPreferenceKeys = {'vectorModelMode', 'vectorModelConfig'};
+
 const Set<String> _prefsImportSkipKeys = {
+  ...retiredEmbeddingPreferenceKeys,
   'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
@@ -108,6 +111,7 @@ const Set<String> _prefsImportSkipKeys = {
 };
 
 const Set<String> _prefsExportSkipKeys = {
+  ...retiredEmbeddingPreferenceKeys,
   'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
@@ -249,8 +253,6 @@ class Prefs extends ChangeNotifier {
   static const String _pluginConfigPrefix = 'pluginConfig_';
   static const String _readAnySkillStatesKey = 'readAnySkillStates';
   static const String _readAnySkillPromptsKey = 'readAnySkillPrompts';
-  static const String _vectorModelConfigKey = 'vectorModelConfig';
-
   Future<void> initPrefs() async {
     prefs = await SharedPreferences.getInstance();
     _readyForReads = true;
@@ -258,6 +260,9 @@ class Prefs extends ChangeNotifier {
     // Remove only the retired toggle, never local indexes or remote files.
     if (prefs.containsKey('syncKnowledgeIndexes')) {
       await prefs.remove('syncKnowledgeIndexes');
+    }
+    for (final key in retiredEmbeddingPreferenceKeys) {
+      if (prefs.containsKey(key)) await prefs.remove(key);
     }
     saveBeginDate();
     notifyListeners();
@@ -1637,16 +1642,6 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get vectorModelMode => prefs.getString('vectorModelMode') ?? 'builtin';
-
-  set vectorModelMode(String value) {
-    prefs.setString(
-      'vectorModelMode',
-      value == 'remote' ? 'remote' : 'builtin',
-    );
-    notifyListeners();
-  }
-
   String get vectorLocalModelId =>
       prefs.getString('vectorLocalModelId') ?? 'bge-small-zh-v1.5';
 
@@ -1717,21 +1712,6 @@ class Prefs extends ChangeNotifier {
 
   set vectorLocalModelId(String value) {
     prefs.setString('vectorLocalModelId', value);
-    notifyListeners();
-  }
-
-  Map<String, dynamic> get vectorModelConfig {
-    final raw = prefs.getString(_vectorModelConfigKey);
-    if (raw == null || raw.isEmpty) return const {};
-    try {
-      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
-    } catch (_) {
-      return const {};
-    }
-  }
-
-  Future<void> saveVectorModelConfig(Map<String, dynamic> config) async {
-    await prefs.setString(_vectorModelConfigKey, jsonEncode(config));
     notifyListeners();
   }
 

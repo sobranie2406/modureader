@@ -80,9 +80,8 @@ class BookKnowledgeRetriever {
                 dimensions: snapshot.embeddingDimensions)) {
           requestedVector = true;
           // Bound local tokenization too, not the full lexical/chat prompt.
-          final embeddingQuery = embedding.mode == 'builtin'
-              ? String.fromCharCodes(query.trim().runes.take(4096))
-              : query.trim();
+          final embeddingQuery =
+              String.fromCharCodes(query.trim().runes.take(4096));
           final vectors = await embedding.embedBatchCancellable(
               [embeddingQuery],
               isCancelled: isCancelled);
@@ -96,8 +95,14 @@ class BookKnowledgeRetriever {
       AnxLog.warning('AI vector query unavailable; using lexical index');
     } finally {
       // An unused local provider must not tear down another indexing task.
-      if (requestedVector || embedding?.mode == 'remote') {
-        await embedding?.release();
+      try {
+        if (requestedVector) {
+          await embedding?.release();
+        } else {
+          embedding?.close();
+        }
+      } catch (_) {
+        AnxLog.warning('AI vector engine cleanup failed');
       }
     }
     if (isCancelled()) return const [];

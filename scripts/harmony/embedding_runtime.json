@@ -1,0 +1,10 @@
+{
+  "version": "1.27.0",
+  "target": "ohos-arm64",
+  "url": "https://huggingface.co/csukuangfj2/onnxruntime-libs/resolve/41fd15f8cef1509cb75e4c462e6834886ffaabf4/onnxruntime-ohos-arm64-v8a-1.27.0.zip",
+  "archiveSha256": "6891743ed53e370f643a6ae55d7a56dd9f3b22151ec195202c09ee4234466b7c",
+  "librarySha256": "4888f13dc420d94e50b028af26b42b4323bd82ea07d2a36a04945397188cc72d",
+  "buildSource": "https://github.com/csukuangfj/onnxruntime-libs/blob/master/.github/workflows/harmony-os-shared.yaml",
+  "upstreamSource": "https://github.com/microsoft/onnxruntime/tree/v1.27.0",
+  "license": "MIT"
+}

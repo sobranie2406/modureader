@@ -44,7 +44,6 @@ void validateSettingsValue(String key, dynamic value,
     'pageTurnMode': ['simple', 'custom'],
     // Older versions saved the system theme as "auto".
     'themeMode': ['system', 'light', 'dark', 'auto'],
-    'vectorModelMode': ['builtin', 'remote'],
     'vectorModelDownloadSource': ['huggingFace', 'gitee'],
     'ocrModelDownloadSource': ['upstream', 'gitee'],
     'ocrModelId': [
@@ -201,7 +200,7 @@ void validateSettingsValue(String key, dynamic value,
     }
   }
   if (key == 's3Info') S3Config(object());
-  if (key == 'vectorModelConfig' || key.startsWith('translateServiceConfig_')) {
+  if (key.startsWith('translateServiceConfig_')) {
     object();
   }
   if (key == 'remoteLibraryViewOptions') {

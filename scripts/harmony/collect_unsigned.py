@@ -10,6 +10,7 @@ import shutil
 import zipfile
 import re
 import argparse
+from prepare_embedding_runtime import is_arm64_library, runtime_manifest
 
 
 def verify_native_assets(archive):
@@ -29,6 +30,17 @@ def verify_native_assets(archive):
         'package:hf_tokenizers/src/bindings.dart')
     if entry != ['absolute', 'libtokenizers_ffi.so']:
         raise ValueError('HAP native-assets manifest does not map the OHOS tokenizer.')
+    for name in ('libmodu_embedding.so', 'libonnxruntime.so', 'libc++_shared.so'):
+        path = f'libs/arm64-v8a/{name}'
+        if path not in names or not is_arm64_library(archive.read(path)[:20]):
+            raise ValueError(f'HAP is missing the OHOS arm64 local inference library: {name}')
+    runtime = archive.read('libs/arm64-v8a/libonnxruntime.so')
+    if hashlib.sha256(runtime).hexdigest() != runtime_manifest()['librarySha256']:
+        raise ValueError('HAP ONNX Runtime does not match the audited OHOS library.')
+    for name in ('LICENSE', 'ThirdPartyNotices.txt'):
+        path = f'resources/rawfile/onnxruntime/{name}'
+        if path not in names or not archive.read(path).strip():
+            raise ValueError('HAP is missing ONNX Runtime license notices.')
 
 
 def collect(root: Path) -> list[Path]:

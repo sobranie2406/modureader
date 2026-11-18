@@ -6,6 +6,8 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {},
+  "dependencies": {
+    "libmodu_embedding.so": "file:./src/main/cpp/types/libmodu_embedding"
+  },
 }
 

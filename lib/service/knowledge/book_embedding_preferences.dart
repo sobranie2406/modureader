@@ -5,7 +5,6 @@ import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:crypto/crypto.dart';
 
-/// Book-local model references only. Credentials remain in vector settings.
 /// A file identity avoids binding restored preferences to reused database IDs.
 class BookEmbeddingPreferences {
   static String keyFor(Book book) {
@@ -15,10 +14,12 @@ class BookEmbeddingPreferences {
     return 'bookEmbeddingModel_${sha256.convert(utf8.encode(identity))}';
   }
 
-  static String? choiceFor(Book book) => Prefs().prefs.getString(keyFor(book));
+  static String? choiceFor(Book book) {
+    final choice = Prefs().prefs.getString(keyFor(book));
+    return choice == 'remote' ? null : choice;
+  }
 
   static bool isValid(String choice) =>
-      choice == 'remote' ||
       LocalEmbeddingModels.all.any((model) => choice == 'local:${model.id}');
 
   static Future<void> save(Book book, String? choice) async {
@@ -36,7 +37,6 @@ class BookEmbeddingPreferences {
   static String labelFor(Book book) {
     final choice = choiceFor(book);
     if (choice == null) return '使用默认模型';
-    if (choice == 'remote') return '远程模型（设置中的接口）';
     for (final model in LocalEmbeddingModels.all) {
       if (choice == 'local:${model.id}') return model.name;
     }

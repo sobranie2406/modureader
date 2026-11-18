@@ -26,8 +26,7 @@ codeHighlightTheme enabledAiTools''',
       '''readAnySkillStates readAnySkillPrompts userPrompts autoSummaryPreviousContent aiReadingSkillsVisible readAnySkillOrder''',
   'plugins': 'pluginState',
   'vector':
-      '''vectorModelEnabled autoVectorizeOnImport vectorModelMode vectorLocalModelId
-vectorModelDownloadSource vectorModelConfig''',
+      'vectorModelEnabled autoVectorizeOnImport vectorLocalModelId vectorModelDownloadSource',
   'ocr':
       'ocrModelId ocrModelDownloadSource ocrPrecacheEnabled ocrPrecachePages',
   'tts':

@@ -212,9 +212,9 @@ Unreleased: local model cards offer **Offline import**. Copy the complete `model
 
 Open **Settings → Vector Model / Embedding Models**. Embedding models retrieve passages; chat models answer questions. They are configured separately.
 
-Local models include Chinese BGE (default), English BGE, MiniLM and multilingual E5. Download from Hugging Face or Gitee with size and SHA-256 verification. Missing models are not silently downloaded. A remote embeddings API receives indexed passages and queries and may charge for them.
+All embedding models run locally: Chinese BGE (default), English BGE, MiniLM and multilingual E5. Download from Hugging Face or Gitee, or import model files offline, with size and SHA-256 verification.
 
-Index / re-index from a book's menu, or enable automatic indexing after import (off by default). Unavailable models or books without local files cannot be queued. If both model and source book are unchanged, an upgrade or replacement package alone should not invalidate a valid index. Changing the model or content requires re-indexing.
+Index / re-index from a book's menu, or enable automatic indexing after import (off by default). Unavailable models or books without local files cannot be queued. If both model and source book are unchanged, an upgrade or replacement package alone should not invalidate a valid local index. Changing the model or content requires re-indexing. Books previously indexed with a remote model need re-vectorizing locally.
 
 **Stop vectorization**, in the library task bar and model settings, disables automatic indexing and cancels active and queued tasks while retaining completed indexes, books and models. Turning off automatic indexing alone cancels automatic tasks without preventing later manual indexing.
 

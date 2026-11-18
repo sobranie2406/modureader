@@ -20,8 +20,8 @@ class ModelSettings extends StatelessWidget {
               key: const ValueKey('model-settings-vector'),
               leading: const Icon(Icons.hub_outlined),
               title: Text(ModuStrings.text(context, '向量模型', 'Vector model')),
-              description: Text(ModuStrings.text(context, '语义搜索与 RAG · 本地或远程模型',
-                  'Semantic search and RAG · Local or remote models')),
+              description: Text(ModuStrings.text(
+                  context, '本地语义搜索与 RAG', 'Local semantic search and RAG')),
               onPressed: (context) => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => SettingsPageBody(

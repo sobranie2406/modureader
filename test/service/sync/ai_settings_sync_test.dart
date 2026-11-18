@@ -74,7 +74,7 @@ void main() {
       final snapshot = collectAiSettingsForSync(preferences);
 
       expect(snapshot, contains('aiProviders'));
-      expect(snapshot, contains('vectorModelConfig'));
+      expect(snapshot, isNot(contains('vectorModelConfig')));
       expect(snapshot, contains('onlineTtsConfig_openai'));
       expect(snapshot, contains('translateServiceConfig_deepl'));
       expect(snapshot, isNot(contains('webdavInfo')));
@@ -92,6 +92,22 @@ void main() {
         'chat-secret',
       );
     });
+  });
+
+  test('old encrypted settings do not restore remote embedding preferences',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await applyAiSettingsFromSync(prefs, {
+      'vectorModelMode': 'remote',
+      'vectorModelConfig': '{"apiKey":"fixture"}',
+      'vectorLocalModelId': 'all-MiniLM-L6-v2',
+      'ttsService': 'edge',
+    });
+    expect(prefs.containsKey('vectorModelMode'), false);
+    expect(prefs.containsKey('vectorModelConfig'), false);
+    expect(prefs.getString('vectorLocalModelId'), 'all-MiniLM-L6-v2');
+    expect(prefs.getString('ttsService'), 'edge');
   });
 
   test(

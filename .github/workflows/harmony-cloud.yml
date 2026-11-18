@@ -121,6 +121,12 @@ jobs:
           echo 'RUSTUP_TOOLCHAIN=1.94.0' >> "$GITHUB_ENV"
           chmod +x scripts/harmony/ohos-clang.sh
           echo "MODU_OHOS_CLANG=$GITHUB_WORKSPACE/scripts/harmony/ohos-clang.sh" >> "$GITHUB_ENV"
+      - name: Stage checksum-pinned OHOS local embedding runtime
+        if: github.event_name == 'push' || inputs.build_hap
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harmony/prepare_embedding_runtime.py 2>&1 | tee build/harmony-diagnostics/embedding-runtime.log
       - name: Audit required adapters and profiles (fail on missing support)
         shell: bash
         env:

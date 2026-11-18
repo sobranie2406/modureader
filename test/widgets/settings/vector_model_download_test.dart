@@ -69,9 +69,13 @@ void main() {
     expect(Prefs().vectorModelDownloadSource, 'huggingFace');
   });
 
-  testWidgets('bundled models show offline availability without downloading',
+  testWidgets('local models replace legacy remote controls without downloading',
       (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'vectorModelMode': 'remote',
+      'vectorModelConfig':
+          '{"modelId":"fixture","endpoint":"https://example.com/v1"}',
+    });
     await Prefs().initPrefs();
     expect(Prefs().vectorModelDownloadSource, 'huggingFace');
     final store = ControlledModelStore(bundled: true);
@@ -85,6 +89,10 @@ void main() {
     expect(find.textContaining('已内嵌 · 离线可用'), findsNWidgets(4));
     expect(find.text('测试推理'), findsNWidgets(4));
     expect(find.text('下载并使用'), findsNothing);
+    expect(find.text('模型来源'), findsNothing);
+    expect(find.text('远程 API'), findsNothing);
+    expect(find.text('远程模型'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
     expect(store.calls, 0);
     final cards = find.byType(Card);
     expect(cards, findsNWidgets(4));

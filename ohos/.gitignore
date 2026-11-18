@@ -18,6 +18,8 @@
 **/libs/**/libapp.so
 **/libs/**/libflutter.so
 **/libs/**/libvmservice_snapshot.so
+**/libs/**/libonnxruntime.so
+/entry/src/main/resources/rawfile/onnxruntime/
 
 # Only unsigned build profiles belong in source control. Signing material stays
 # local and is rejected by the cloud packaging job.

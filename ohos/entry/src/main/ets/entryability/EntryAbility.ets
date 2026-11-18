@@ -7,6 +7,7 @@ import { GeneratedPluginRegistrant } from '../plugins/GeneratedPluginRegistrant'
 import FileExportPlugin from '../plugins/FileExportPlugin';
 import ReaderWakelockPlugin from '../plugins/ReaderWakelockPlugin';
 import ReaderCutoutPlugin from '../plugins/ReaderCutoutPlugin';
+import LocalEmbeddingPlugin from '../plugins/LocalEmbeddingPlugin';
 
 export default class EntryAbility extends FlutterAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -25,5 +26,6 @@ export default class EntryAbility extends FlutterAbility {
     flutterEngine.getPlugins()?.add(new LinkedBookFilesPlugin())
     flutterEngine.getPlugins()?.add(new ReaderWakelockPlugin())
     flutterEngine.getPlugins()?.add(new ReaderCutoutPlugin())
+    flutterEngine.getPlugins()?.add(new LocalEmbeddingPlugin())
   }
 }

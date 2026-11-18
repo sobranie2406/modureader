@@ -54,7 +54,7 @@ pageFooterLeftMargin pageFooterRightMargin pageFooterFontSize aiPanelWidth aiPan
         in '''wereadApiKey locale themeMode appLayoutMode readStyle readTheme classicalTranslationTextStyle languageTranslationTextStyle annotationType annotationColor ttsService ttsBufferSettings
 pageTurnStyle translateService translateFrom translateTo fullTextTranslateService fullTextTranslateFrom
 fullTextTranslateTo translationAiService classicalTranslationEngine classicalTranslationDirection classicalTranslationAiService readerToolbar readingRules chapterSplitCustomRules chapterSplitSelectedRuleId
-selectedAiService vectorModelMode vectorLocalModelId vectorModelDownloadSource vectorModelConfig aiProviders ocrModelId ocrModelDownloadSource
+selectedAiService vectorLocalModelId vectorModelDownloadSource aiProviders ocrModelId ocrModelDownloadSource
 userPrompts readAnySkillStates readAnySkillPrompts pageTurnMode customPageTurnConfig bookshelfFolderStyle
 readingInfo onlineTtsService sortField sortOrder notesViewSortField notesViewSortDirection notesExportSortField
 notesExportSortDirection excerptShareTemplate writingMode translationMode httpProxyHost httpProxyTestUrl
@@ -356,7 +356,8 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
     final file = envelope(text);
     final raw = file['preferences'];
     if (raw is! Map) throw const FormatException('设置格式无效 / Invalid settings');
-    final values = Map<String, dynamic>.from(raw);
+    final values = Map<String, dynamic>.from(raw)
+      ..removeWhere((key, _) => retiredEmbeddingPreferenceKeys.contains(key));
     if (file['version'] == 1 && values.values.any(_isReset)) {
       throw const FormatException('Defaults require settings format 2');
     }
@@ -441,6 +442,8 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
   /// Restore only fields present in the file; omitted secrets/local preferences
   /// stay untouched. Roll back on a write error. Does not initiate network work.
   static Future<void> apply(Prefs prefs, Map<String, dynamic> values) async {
+    values = Map.of(values)
+      ..removeWhere((key, _) => retiredEmbeddingPreferenceKeys.contains(key));
     validate(values);
     final pending = <String, Object?>{};
     for (final entry in values.entries) {

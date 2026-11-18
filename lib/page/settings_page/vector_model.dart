@@ -2,14 +2,12 @@ import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
-import 'package:modu_reader/service/knowledge/embedding_provider.dart';
 import 'package:modu_reader/service/knowledge/embedding_model_manifest.dart';
 import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:modu_reader/widgets/bookshelf/stop_vectorization_button.dart';
 import 'package:modu_reader/utils/toast/common.dart';
 import 'package:modu_reader/widgets/common/anx_button.dart';
-import 'package:modu_reader/widgets/common/anx_segmented_button.dart';
 import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:modu_reader/widgets/settings/settings_tile.dart';
 import 'package:modu_reader/widgets/settings/settings_title.dart';
@@ -26,12 +24,6 @@ class VectorModelSettings extends StatefulWidget {
 }
 
 class _VectorModelSettingsState extends State<VectorModelSettings> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _modelController;
-  late final TextEditingController _endpointController;
-  late final TextEditingController _apiKeyController;
-  late final TextEditingController _descriptionController;
-  late final TextEditingController _dimensionController;
   late final LocalEmbeddingModelStore _localModelStore;
   final Map<String, bool> _downloadedModels = {};
   final Map<String, bool> _bundledModels = {};
@@ -39,8 +31,6 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   final Set<String> _testingModels = {};
   final Set<String> _deletingModels = {};
   bool _loadingLocalModels = true;
-  bool _obscureApiKey = true;
-  bool _testing = false;
   String? _importingId;
 
   Future<void> _importLocalModel(LocalEmbeddingModel model) async {
@@ -79,32 +69,17 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   void initState() {
     super.initState();
     Prefs().addListener(_refreshPreferences);
-    final config = VectorModelConfig.fromJson(Prefs().vectorModelConfig);
-    _nameController = TextEditingController(text: config.name);
-    _modelController = TextEditingController(text: config.modelId);
-    _endpointController = TextEditingController(text: config.endpoint);
-    _apiKeyController = TextEditingController(text: config.apiKey);
-    _descriptionController = TextEditingController(text: config.description);
-    _dimensionController = TextEditingController(
-      text: config.dimension?.toString() ?? '',
-    );
     _localModelStore = widget.modelStore ?? LocalEmbeddingModelStore();
     _localModelStore.downloadSource =
         Prefs().vectorModelDownloadSource == 'gitee'
             ? EmbeddingDownloadSource.gitee
             : EmbeddingDownloadSource.huggingFace;
-    _refreshLocalModels();
+    if (LocalOnnxEmbeddingProvider.isSupported) _refreshLocalModels();
   }
 
   @override
   void dispose() {
     Prefs().removeListener(_refreshPreferences);
-    _nameController.dispose();
-    _modelController.dispose();
-    _endpointController.dispose();
-    _apiKeyController.dispose();
-    _descriptionController.dispose();
-    _dimensionController.dispose();
     _localModelStore.close();
     super.dispose();
   }
@@ -116,58 +91,6 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   bool get _isChinese => Localizations.localeOf(context).languageCode == 'zh';
 
   String _label(String zh, String en) => _isChinese ? zh : en;
-
-  VectorModelConfig _formConfig({int? detectedDimension}) {
-    return VectorModelConfig(
-      name: _nameController.text.trim(),
-      modelId: _modelController.text.trim(),
-      endpoint: _endpointController.text.trim(),
-      apiKey: _apiKeyController.text.trim(),
-      description: _descriptionController.text.trim(),
-      dimension:
-          detectedDimension ?? int.tryParse(_dimensionController.text.trim()),
-    );
-  }
-
-  Future<void> _save({int? detectedDimension}) async {
-    final config = _formConfig(detectedDimension: detectedDimension);
-    await Prefs().saveVectorModelConfig(config.toJson());
-    if (detectedDimension != null) {
-      _dimensionController.text = detectedDimension.toString();
-    }
-    if (mounted) {
-      AnxToast.show(
-          ModuStrings.text(context, '向量模型配置已保存', 'Vector model saved'));
-      setState(() {});
-    }
-  }
-
-  Future<void> _testConnection() async {
-    if (_testing) return;
-    setState(() => _testing = true);
-    OpenAiCompatibleEmbeddingProvider? provider;
-    try {
-      provider = OpenAiCompatibleEmbeddingProvider(config: _formConfig());
-      final vector = await provider.embed(ModuStrings.text(
-          context, '默读向量模型连接测试', 'Modu embedding connection test'));
-      await _save(detectedDimension: vector.length);
-      if (mounted) {
-        AnxToast.show(
-          _label(
-            '连接成功，向量维度 ${vector.length}',
-            'Connected, ${vector.length} dimensions',
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        AnxToast.show(_label('连接失败：$error', 'Connection failed: $error'));
-      }
-    } finally {
-      provider?.close();
-      if (mounted) setState(() => _testing = false);
-    }
-  }
 
   Future<void> _refreshLocalModels() async {
     final states = <String, bool>{};
@@ -314,7 +237,6 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
   @override
   Widget build(BuildContext context) {
     final prefs = Prefs();
-    final isRemote = prefs.vectorModelMode == 'remote';
     return settingsSections(
       sections: [
         SettingsSection(
@@ -363,37 +285,22 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
             ),
           ],
         ),
-        SettingsSection(
-          title: Text(ModuStrings.text(context, '模型来源', 'Model source')),
-          tiles: [
-            CustomSettingsTile(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: AnxSegmentedButton<String>(
-                  selected: {prefs.vectorModelMode},
-                  segments: [
-                    SegmentButtonItem(
-                      value: 'builtin',
-                      label: ModuStrings.text(context, '本地模型', 'Local models'),
-                      icon: const Icon(Icons.computer_rounded),
-                    ),
-                    SegmentButtonItem(
-                      value: 'remote',
-                      label: ModuStrings.text(context, '远程 API', 'Remote API'),
-                      icon: const Icon(Icons.cloud_outlined),
-                    ),
-                  ],
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) return;
-                    prefs.vectorModelMode = selection.first;
-                    setState(() {});
-                  },
+        if (!LocalOnnxEmbeddingProvider.isSupported)
+          SettingsSection(
+            title: Text(_label('本地模型', 'Local models')),
+            tiles: [
+              CustomSettingsTile(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(_label(
+                    LocalOnnxEmbeddingProvider.unsupportedMessage,
+                    LocalOnnxEmbeddingProvider.unsupportedMessageEn,
+                  )),
                 ),
               ),
-            ),
-          ],
-        ),
-        if (!isRemote)
+            ],
+          ),
+        if (LocalOnnxEmbeddingProvider.isSupported)
           SettingsSection(
             title: Text(ModuStrings.text(
                 context, '本地模型 · 按需下载', 'Local models · On-demand download')),
@@ -433,13 +340,6 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
               CustomSettingsTile(
                 child: _buildLocalModels(),
               ),
-            ],
-          ),
-        if (isRemote)
-          SettingsSection(
-            title: Text(ModuStrings.text(context, '远程模型', 'Remote model')),
-            tiles: [
-              CustomSettingsTile(child: _buildRemoteForm()),
             ],
           ),
       ],
@@ -641,94 +541,5 @@ class _VectorModelSettingsState extends State<VectorModelSettings> {
         return '适合中英文及多语言书籍的语义检索。';
     }
     return model.description;
-  }
-
-  Widget _buildRemoteForm() {
-    InputDecoration decoration(String label, {String? helper}) {
-      return InputDecoration(
-        labelText: label,
-        helper: (helper) == null
-            ? null
-            : SettingHelpTitle(
-                title: ModuStrings.text(context, "说明", "Help"),
-                description: helper),
-        border: const OutlineInputBorder(),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: decoration(ModuStrings.text(context, '名称', 'Name')),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _modelController,
-            decoration:
-                decoration(ModuStrings.text(context, '模型 ID', 'Model ID')),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _endpointController,
-            keyboardType: TextInputType.url,
-            decoration: decoration(
-              ModuStrings.text(context, 'API 端点', 'API endpoint'),
-              helper: ModuStrings.text(
-                  context,
-                  '支持 API 根地址、/v1 地址或完整 /embeddings 地址',
-                  'Accepts an API root, /v1 base, or full /embeddings URL'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _apiKeyController,
-            obscureText: _obscureApiKey,
-            decoration:
-                decoration(ModuStrings.text(context, 'API 密钥', 'API key'))
-                    .copyWith(
-              suffixIcon: IconButton(
-                onPressed: () =>
-                    setState(() => _obscureApiKey = !_obscureApiKey),
-                icon: Icon(
-                  _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _dimensionController,
-            keyboardType: TextInputType.number,
-            decoration: decoration(ModuStrings.text(context, '维度（可留空，测试后自动填写）',
-                'Dimensions (optional; detected by test)')),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _descriptionController,
-            decoration:
-                decoration(ModuStrings.text(context, '描述（可选）', 'Description')),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              AnxButton.outlined(
-                isLoading: _testing,
-                onPressed: _testing ? null : _testConnection,
-                child: Text(ModuStrings.text(context, '测试', 'Test')),
-              ),
-              const SizedBox(width: 8),
-              AnxButton(
-                onPressed: () => _save(),
-                child: Text(ModuStrings.text(context, '保存', 'Save')),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }

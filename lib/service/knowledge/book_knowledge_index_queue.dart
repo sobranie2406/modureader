@@ -6,6 +6,7 @@ import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_service.dart';
 import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/foundation.dart';
 
@@ -120,7 +121,10 @@ class BookKnowledgeIndexQueue extends ChangeNotifier {
   int _automaticGeneration = 0;
 
   int get automaticGeneration => _automaticGeneration;
-  bool get acceptsAutomatic => _accepting && _automaticIndexingAllowed();
+  bool get acceptsAutomatic =>
+      _accepting &&
+      LocalOnnxEmbeddingProvider.isSupported &&
+      _automaticIndexingAllowed();
 
   /// Mark all jobs before awaiting cleanup; a queued job must not sneak in.
   Future<void> cancelAll() {

@@ -37,6 +37,13 @@ class BuiltinEmbedding extends TestEmbedding {
   String get mode => 'builtin';
 }
 
+class FailingEmbedding extends TestEmbedding {
+  FailingEmbedding() : super(fail: true);
+
+  @override
+  Future<void> release() async => throw StateError('engine unavailable');
+}
+
 class SlowEmbedding extends TestEmbedding {
   final pending = Completer<List<List<double>>>();
   final released = Completer<void>();
@@ -55,7 +62,7 @@ class SlowEmbedding extends TestEmbedding {
   }
 }
 
-KnowledgeIndexSnapshot testSnapshot() {
+KnowledgeIndexSnapshot testSnapshot({String mode = 'local'}) {
   const relevant = KnowledgeChunk(
       id: '1:chapter-a:0',
       bookId: '1',
@@ -74,7 +81,7 @@ KnowledgeIndexSnapshot testSnapshot() {
         VectorEntry(chunk: relevant, vector: [1, 0]),
         VectorEntry(chunk: other, vector: [0, 1]),
       ],
-      embeddingMode: 'local',
+      embeddingMode: mode,
       embeddingModelId: 'test-model',
       embeddingDimensions: 2);
 }
@@ -172,6 +179,18 @@ void main() {
     expect(provider.releases, 0);
   });
 
+  test('a retired remote index remains searchable by keyword only', () async {
+    final provider = BuiltinEmbedding();
+    final retriever = BookKnowledgeRetriever(
+      loadSnapshot: (_) async => testSnapshot(mode: 'remote'),
+      embeddingFactory: (_) => provider,
+    );
+    expect(
+        (await retriever.search(Book.mock(), 'winter')).single.chunk.chapterId,
+        'chapter-b');
+    expect(provider.calls, 0);
+  });
+
   test('unavailable model falls back to lexical evidence', () async {
     final provider = TestEmbedding(fail: true);
     final results = await BookKnowledgeRetriever(
@@ -179,6 +198,14 @@ void main() {
         embeddingFactory: (_) => provider).search(Book.mock(), 'winter');
     expect(results.single.chunk.chapterId, 'chapter-b');
     expect(provider.releases, 1);
+  });
+
+  test('failed model cleanup does not prevent keyword fallback', () async {
+    final results = await BookKnowledgeRetriever(
+      loadSnapshot: (_) async => testSnapshot(),
+      embeddingFactory: (_) => FailingEmbedding(),
+    ).search(Book.mock(), 'winter');
+    expect(results.single.chunk.chapterId, 'chapter-b');
   });
 
   test('missing/corrupt/foreign index cannot fabricate evidence', () async {

@@ -55,22 +55,18 @@ void main() {
         isNull);
   });
 
-  test(
-      'remote references current settings; per-book data contains no credentials',
-      () async {
-    await Prefs().saveVectorModelConfig(
-        {'modelId': 'remote-one', 'apiKey': 'fixture-only'});
-    await BookEmbeddingPreferences.save(book, 'remote');
+  test('legacy remote choice uses the selected default local model', () async {
+    await Prefs()
+        .prefs
+        .setString(BookEmbeddingPreferences.keyFor(book), 'remote');
+    Prefs().vectorLocalModelId = 'all-MiniLM-L6-v2';
+    expect(BookEmbeddingPreferences.choiceFor(book), isNull);
     final provider = EmbeddingProviderFactory.fromBook(book)!;
-    expect(provider.mode, 'remote');
-    expect(provider.modelId, 'remote-one');
-    provider.close();
-    expect(Prefs().prefs.getString(BookEmbeddingPreferences.keyFor(book)),
-        'remote');
-    await Prefs().saveVectorModelConfig({'modelId': 'remote-two'});
-    final changed = EmbeddingProviderFactory.fromBook(book)!;
-    expect(changed.modelId, 'remote-two');
-    changed.close();
+    expect(provider.mode, 'builtin');
+    expect(provider.modelId, 'all-MiniLM-L6-v2');
+    provider.store.close();
+    await expectLater(
+        BookEmbeddingPreferences.save(book, 'remote'), throwsArgumentError);
   });
 
   test('global off stays off even with explicit per-book choice', () async {
@@ -114,8 +110,10 @@ void main() {
       expect(source, contains('EmbeddingProviderFactory.${entry.value}'));
       expect(source, isNot(contains('EmbeddingProviderFactory.fromPrefs()')));
     }
-    expect(File('lib/providers/ai_chat.dart').readAsStringSync(),
-        matches(RegExp(r'BookKnowledgeRetriever\(\)\.search\(\s*book,\s*query,')));
+    expect(
+        File('lib/providers/ai_chat.dart').readAsStringSync(),
+        matches(
+            RegExp(r'BookKnowledgeRetriever\(\)\.search\(\s*book,\s*query,')));
     expect(
         File('lib/service/ai/tools/repository/book_content_search_repository.dart')
             .readAsStringSync(),

@@ -23,12 +23,10 @@ const Set<String> _aiSettingsPreferenceKeys = {
   'aiContextTurns',
   'aiRpm',
   'translationAiService',
-  // Vector model settings. vectorModelConfig may contain a remote API key.
+  // Local vector model settings.
   'vectorModelEnabled',
   'autoVectorizeOnImport',
-  'vectorModelMode',
   'vectorLocalModelId',
-  'vectorModelConfig',
   // Translation provider settings.
   'translateService',
   'fullTextTranslateService',
@@ -91,6 +89,7 @@ Future<void> applyAiSettingsFromSync(
           'classicalTranslationDirection',
           'classicalTranslationTextStyle',
           'languageTranslationTextStyle',
+          ...retiredEmbeddingPreferenceKeys,
         }.contains(key));
   for (final entry in values.entries) {
     if (!isAiSettingsSyncPreference(entry.key) ||

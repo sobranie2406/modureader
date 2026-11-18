@@ -33,7 +33,7 @@ Future<void> queueBookForVectorization(
     notify(error.message);
     return;
   } on FormatException {
-    notify('向量模型配置无效，请前往「设置 → 离线本地模型设置 → 向量模型」检查接口和模型配置');
+    notify('向量模型配置无效，请前往「设置 → 离线本地模型设置 → 向量模型」检查模型');
     return;
   }
   final added = (queue ?? bookKnowledgeIndexQueue).enqueue(book);
@@ -74,7 +74,7 @@ Future<void> queueBooksForVectorization(
       modelErrors.add(error.message);
     } on FormatException {
       unavailable++;
-      modelErrors.add('向量模型配置无效，请前往「设置 → 离线本地模型设置 → 向量模型」检查接口和模型配置');
+      modelErrors.add('向量模型配置无效，请前往「设置 → 离线本地模型设置 → 向量模型」检查模型');
     }
   }
   // Batch validation can take time; do not enqueue if switched off meanwhile.

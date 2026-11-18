@@ -17,6 +17,7 @@ import 'package:modu_reader/utils/reader_route_observer.dart';
 import 'package:modu_reader/service/feedback/crash_journal.dart';
 import 'package:modu_reader/service/knowledge/bundled_model_defaults.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
+import 'package:modu_reader/service/knowledge/onnx_embedding_provider.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 
 import 'package:modu_reader/config/app_identity.dart';
@@ -170,6 +171,7 @@ Future<void> main(List<String> arguments) async {
   });
   await AppBrightness.instance.initialize(Prefs().prefs);
   await applyBundledModelDefaults(Prefs().prefs);
+  await LocalOnnxEmbeddingProvider.initializeOhos();
   Prefs().addListener(applyVectorizationQueueSettings);
   applyVectorizationQueueSettings();
   HttpOverrides.global = AnxHttpProxyOverrides();

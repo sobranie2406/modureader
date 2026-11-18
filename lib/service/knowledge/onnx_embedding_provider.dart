@@ -7,21 +7,43 @@ import 'dart:typed_data';
 import 'package:modu_reader/service/knowledge/embedding_provider.dart';
 import 'package:modu_reader/service/knowledge/android_embedding_bridge.dart';
 import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
+import 'package:modu_reader/service/knowledge/ohos_embedding_bridge.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:hf_tokenizers/hf_tokenizers.dart';
 import 'package:flutter/services.dart';
 import 'package:modu_reader/service/knowledge/isolate_worker.dart';
 
 class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
+  static bool _ohosAvailable = false;
+
+  static bool get isSupported =>
+      supportsPlatform(Platform.operatingSystem, ohosAvailable: _ohosAvailable);
+
+  static bool supportsPlatform(String operatingSystem,
+          {bool ohosAvailable = false}) =>
+      operatingSystem != 'ohos' || ohosAvailable;
+
+  static Future<void> initializeOhos() async {
+    if (Platform.operatingSystem == 'ohos') {
+      _ohosAvailable = await const OhosEmbeddingBridge().isAvailable();
+    }
+  }
+
+  static const unsupportedMessage = '鸿蒙本机的向量推理组件不可用。';
+  static const unsupportedMessageEn =
+      'The local embedding engine is unavailable on this HarmonyOS device.';
+
   LocalOnnxEmbeddingProvider({
     required this.model,
     LocalEmbeddingModelStore? store,
     LocalOnnxEmbeddingEngine? engine,
   })  : store = store ?? LocalEmbeddingModelStore(),
+        _ownsStore = store == null,
         _engine = engine ?? LocalOnnxEmbeddingEngine.instance;
 
   final LocalEmbeddingModel model;
   final LocalEmbeddingModelStore store;
+  final bool _ownsStore;
   final LocalOnnxEmbeddingEngine _engine;
   Future<void Function()>? _modelUse;
 
@@ -36,6 +58,7 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
 
   @override
   Future<void> ensureReady() async {
+    if (!isSupported) throw StateError(unsupportedMessage);
     final use = _modelUse ??= store.acquireUse(model);
     try {
       await use;
@@ -52,15 +75,27 @@ class LocalOnnxEmbeddingProvider extends EmbeddingProvider {
   }
 
   @override
+  void close() {
+    if (_ownsStore && _modelUse == null) store.close();
+  }
+
+  @override
   Future<void> release() async {
     final use = _modelUse;
-    if (use == null) return;
+    if (use == null) {
+      close();
+      return;
+    }
     try {
       await _engine.release();
     } finally {
       if (identical(_modelUse, use)) {
         _modelUse = null;
-        (await use)();
+        try {
+          (await use)();
+        } finally {
+          close();
+        }
       }
     }
   }
@@ -88,8 +123,12 @@ class LocalOnnxEmbeddingEngine {
   Tokenizer? _tokenizer;
   IsolateWorker? _windowsWorker;
   final _android = const AndroidEmbeddingBridge();
+  final _ohos = const OhosEmbeddingBridge();
   Timer? _idleRelease;
   Future<void> _tail = Future<void>.value();
+
+  bool get _isOhos => Platform.operatingSystem == 'ohos';
+  bool get _usesNativeBridge => Platform.isAndroid || _isOhos;
 
   Future<List<List<double>>> generate(
     LocalEmbeddingModel model,
@@ -127,7 +166,7 @@ class LocalOnnxEmbeddingEngine {
       } finally {
         // A finished/cancelled book must not keep model weights resident while
         // the user reads. Cleanup shares the inference lock, never races a run.
-        if (Platform.isAndroid) {
+        if (_usesNativeBridge) {
           _idleRelease = Timer(const Duration(seconds: 15), () {
             // Engine teardown can remove the channel while this timer fires.
             unawaited(release().catchError((Object _) {}));
@@ -161,7 +200,7 @@ class LocalOnnxEmbeddingEngine {
   ) async {
     if (_activeModelId == model.id &&
         ((Platform.isWindows && _windowsWorker != null) ||
-            ((Platform.isAndroid || _session != null) && _tokenizer != null))) {
+            ((_usesNativeBridge || _session != null) && _tokenizer != null))) {
       return;
     }
     await _closeActiveModel();
@@ -183,8 +222,12 @@ class LocalOnnxEmbeddingEngine {
       LocalEmbeddingModel model, String onnxPath, String tokenizerPath) async {
     final loadedTokenizer = Tokenizer.fromFile(tokenizerPath);
     try {
-      if (Platform.isAndroid) {
-        await _android.load(onnxPath);
+      if (_usesNativeBridge) {
+        if (_isOhos) {
+          await _ohos.load(onnxPath);
+        } else {
+          await _android.load(onnxPath);
+        }
         _tokenizer = loadedTokenizer;
         _activeModelId = model.id;
         return;
@@ -218,6 +261,9 @@ class LocalOnnxEmbeddingEngine {
     }
     if (Platform.isAndroid) {
       return _android.embed(tokenIds, model.dimensions);
+    }
+    if (_isOhos) {
+      return _ohos.embed(tokenIds, model.dimensions);
     }
     final session = _session!;
     final shape = [1, tokenIds.length];
@@ -287,6 +333,7 @@ class LocalOnnxEmbeddingEngine {
     _session = null;
     _activeModelId = null;
     if (Platform.isAndroid) await _android.close();
+    if (_isOhos && LocalOnnxEmbeddingProvider.isSupported) await _ohos.close();
   }
 }
 

@@ -1,6 +1,17 @@
 {
   "apiType": "stageMode",
-  "buildOption": {},
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "abiFilters": ["arm64-v8a"]
+    },
+    "nativeLib": {
+      "debugSymbol": {
+        "strip": true,
+        "exclude": ["**/libonnxruntime.so"]
+      }
+    }
+  },
   "targets": [
     { "name": "default", "runtimeOS": "HarmonyOS" },
     { "name": "ohosTest" }

@@ -21,9 +21,9 @@ The bookshelf book menu's **Vectorize / Re-vectorize** action is the shared manu
 - If a model is unavailable or incompatible, retrieval falls back to keywords instead of comparing vectors from different models.
 - Home AI's search tool falls back to existing full-text search when no valid index or matching snippets are available. A damaged optional index does not block normal search.
 - Home AI does not automatically treat the last-opened book as context or silently send the whole library to the language model.
-- Retrieved snippets are sent as reference material to the selected AI service. With a remote embedding model, queries also go to that embedding service.
+- Embeddings are generated locally. Retrieved snippets are sent as reference material to the selected chat service.
 - Retrieval returns relevant snippets, not complete chapters or a whole-book summary. Each skill still observes its source scope and spoiler limits.
-- Vector indexes remain local; WebDAV vector-index synchronization has been removed. Synchronizing vector-service configuration does not transfer index files.
+- Vector indexes remain local and are not transferred through WebDAV/S3 sync. Books previously indexed with a remote model need re-vectorizing with a local model.
 
 ## Reading skills and saved prompts
 

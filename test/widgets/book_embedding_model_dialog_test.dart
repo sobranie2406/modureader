@@ -4,6 +4,7 @@ import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/service/knowledge/book_embedding_preferences.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_index_queue.dart';
 import 'package:modu_reader/service/knowledge/knowledge_engine.dart';
+import 'package:modu_reader/service/knowledge/local_embedding_models.dart';
 import 'package:modu_reader/widgets/bookshelf/book_embedding_model_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -36,6 +37,16 @@ void main() {
   testWidgets('choose a local model, save, reopen and reset to default',
       (tester) async {
     await open(tester);
+    expect(
+        tester
+            .widgetList<RadioListTile<String>>(
+                find.byType(RadioListTile<String>))
+            .map((radio) => radio.value),
+        [
+          '',
+          for (final model in LocalEmbeddingModels.all) 'local:${model.id}'
+        ]);
+    expect(find.text('使用远程模型'), findsNothing);
     expect(
         tester
             .widget<RadioGroup<String>>(find.byType(RadioGroup<String>).first)
