@@ -60,6 +60,7 @@ void main() {
     expect(find.text('Swipe up for menu'), findsNothing);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.text('Swipe navigation'), findsNothing);
+    expect(find.text('Two pages'), findsNothing);
     expect(tester.takeException(), isNull);
   });
   testWidgets('fit, rotation and reset work without duplicate zoom controls',
@@ -74,6 +75,7 @@ void main() {
             body: SingleChildScrollView(
                 child: PdfReadingControls(
                     initial: const PdfReadingView(),
+                    showSpread: true,
                     save: (value) async => saved.add(value))))));
     await tester.tap(find.text('Page fit').first);
     await tester.pumpAndSettle();
@@ -111,6 +113,14 @@ void main() {
     await tester.tap(find.text('Single page'));
     await tester.pumpAndSettle();
     expect(saved.last.mode, 'single');
+    await tester.ensureVisible(find.text('Two pages'));
+    await tester.tap(find.text('Two pages'));
+    await tester.pumpAndSettle();
+    expect(saved.last.mode, 'spread');
+    await tester.ensureVisible(find.text('Reset view'));
+    await tester.tap(find.text('Reset view'));
+    await tester.pumpAndSettle();
+    expect(saved.last.mode, 'spread');
     expect(tester.takeException(), isNull);
   });
   testWidgets(

@@ -38,6 +38,7 @@ const scrollReader = uri((await source('pdf-scroll-reader'))
     .replace("'./pdf-reading-layout.js'", JSON.stringify(layout))
     .replace("'./pdf-scroll-layout.js'", JSON.stringify(scrollLayout)));
 await import(uri((await source('fixed-layout'))
+    .replace("'./document-regions.js'", JSON.stringify(geometry))
     .replace("'./pdf-zoom-input.js'", JSON.stringify(uri(await source('pdf-zoom-input'))))
     .replace("'./pdf-render-budget.js'", JSON.stringify(uri(await source('pdf-render-budget'))))
     .replace("'./document-reading-options.js'", JSON.stringify(uri(await source('document-reading-options'))))
@@ -149,6 +150,127 @@ test('zoom and pan remember each original page, inherit new pages and reset with
         await h.renderer.goTo({index:0});
         assert.equal(h.renderer.pdfRegionLocation.zoom,2);
     } finally {h.close()}
+});
+
+test('PDF spreads show consecutive original pages, keep the active source page and turn in pairs', async () => {
+    const h = harness(), requests = [];
+    const book = h.renderer.book;
+    book.sections.push({load: async () => html}, {load: async () => html});
+    h.source.render = async (request) => {
+        requests.push(request);
+        return {blob: new Blob(['page']), width: 800, height: 800};
+    };
+    try {
+        await h.renderer.setPdfLayout(config, true);
+        await h.renderer.goTo({index: 1});
+        const original = h.renderer.getContents()[0].doc;
+        const range = original.createRange();
+        range.selectNodeContents(original.querySelector('.textLayer span').firstChild);
+        const cfi = CFI.fromRange(range);
+        assert.equal(await h.renderer.setPdfView({mode: 'spread'}), true);
+        const [right, left] = h.renderer.getContents();
+        assert.deepEqual([right.index, left.index], [1, 0]);
+        for (const {doc} of [right, left]) {
+            assert.equal(CFI.toRange(doc, CFI.parse(cfi)).toString(), 'Original text');
+            assert.equal(doc.scale, 396 / 600);
+            assert.equal(doc.pdfRegion, true);
+        }
+        assert.deepEqual(requests.slice(-2).map(({page, region, width}) => [page, region.width, width]),
+            [[1, 1, 396], [0, 1, 396]], 'spread renders full source pages at the available pane width');
+        const touch = new left.doc.defaultView.Event('touchstart');
+        Object.defineProperty(touch, 'touches', {value: [{screenX: 10, screenY: 10}]});
+        left.doc.dispatchEvent(touch);
+        assert.equal(h.renderer.pdfRegionLocation.page, 0);
+        right.doc.dispatchEvent(new right.doc.defaultView.Event('pointerdown'));
+        assert.equal(h.events.at(-1).index, 1);
+        assert.equal(h.renderer.getContents()[0].doc, right.doc);
+        h.renderer.zoomPdfView(2);
+        assert.equal(right.doc.scale, 2 * 396 / 600);
+        assert.equal(left.doc.scale, right.doc.scale);
+        left.doc.dispatchEvent(new left.doc.defaultView.MouseEvent('mousedown'));
+        const leftCenter = h.renderer.pdfRegionLocation.center;
+        right.doc.dispatchEvent(new right.doc.defaultView.WheelEvent('wheel', {deltaY: 60, cancelable: true}));
+        assert.equal(h.renderer.index, 1, 'the wheel pans the page under the pointer');
+        assert.ok(h.renderer.pdfRegionLocation.center.y > leftCenter.y);
+        left.doc.dispatchEvent(new left.doc.defaultView.MouseEvent('mousedown'));
+        assert.deepEqual(h.renderer.pdfRegionLocation.center, leftCenter);
+        h.renderer.zoomPdfView(1, true);
+        await h.renderer.next();
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [2, 3]);
+        await h.renderer.next();
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [4]);
+        assert.equal(await h.renderer.next(), false);
+        await h.renderer.prev();
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [2, 3]);
+        await h.renderer.goTo({index: 3});
+        for (const mode of ['single', 'spread', 'scroll', 'spread', 'single']) {
+            assert.equal(await h.renderer.setPdfView({mode}), true);
+            assert.equal(h.renderer.index, 3, `source page after selecting ${mode}`);
+        }
+        assert.equal(h.renderer.pdfRegionLocation.total, 4, 'switching back restores the saved crop panels');
+    } finally { h.close(); }
+});
+
+test('a failed companion page keeps the previous PDF view and can be retried', async () => {
+    const h = harness();
+    try {
+        await h.renderer.setPdfLayout({version: 1, pages: {}}, true);
+        await h.renderer.goTo({index: 0});
+        const original = h.renderer.getContents()[0].doc;
+        const render = h.source.render;
+        h.source.render = async (request) => {
+            if (request.page === 1) throw new Error('Companion could not load');
+            return render(request);
+        };
+        assert.equal(await h.renderer.setPdfView({mode: 'spread'}), false);
+        assert.equal(h.renderer.pdfView.mode, 'single');
+        assert.deepEqual(h.renderer.getContents().map(x => x.doc), [original]);
+        h.source.render = render;
+        assert.equal(await h.renderer.setPdfView({mode: 'spread'}), true);
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [0, 1]);
+    } finally { h.close(); }
+});
+
+test('changing to a spread finishes before another PDF layout or navigation can start', async () => {
+    const h = harness();
+    let begin, finish;
+    const secondPageStarted = new Promise(resolve => { begin = resolve; });
+    const finishSecondPage = new Promise(resolve => { finish = resolve; });
+    try {
+        await h.renderer.setPdfLayout(config, true);
+        await h.renderer.goTo({index: 0});
+        const render = h.source.render;
+        h.source.render = async request => {
+            if (request.page === 1) { begin(); await finishSecondPage; }
+            return render(request);
+        };
+        const changing = h.renderer.setPdfView({mode: 'spread'});
+        await secondPageStarted;
+        assert.equal(await h.renderer.setPdfLayout(config, true), false);
+        assert.equal(await h.renderer.goTo({index: 2}), false);
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [0]);
+        finish();
+        assert.equal(await changing, true);
+        assert.equal(h.renderer.pdfView.mode, 'spread');
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [0, 1]);
+        assert.equal(await h.renderer.setPdfLayout(config, true), true);
+    } finally { finish(); h.close(); }
+});
+
+test('reopening a PDF spread restores its source page and viewport', async () => {
+    const h = harness(), reopened = harness();
+    try {
+        await h.renderer.setPdfLayout(config, true);
+        await h.renderer.goTo({index: 1});
+        await h.renderer.setPdfView({mode: 'spread', zoom: 3});
+        h.renderer.panPdfView(25, 70);
+        const position = h.renderer.pdfRegionLocation;
+        assert.equal(position.signature, 'pdf-spread');
+        await reopened.renderer.setPdfView(h.renderer.pdfView);
+        await reopened.renderer.setPdfLayout(config, true, position);
+        await reopened.renderer.goTo({index: 1});
+        assert.deepEqual(reopened.renderer.pdfRegionLocation, position);
+    } finally { h.close(); reopened.close(); }
 });
 
 test('two-finger zoom and enlarged-page drag use existing pixels without starting page turns', async () => {

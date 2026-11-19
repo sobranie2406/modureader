@@ -60,6 +60,7 @@ Source: [reading settings](../lib/page/settings_page/reading.dart), [style contr
 PDFs use original-page controls. Import samples EPUB/MOBI/AZW3/FB2 content to classify image books; opening reads the saved result. A book-menu action can correct classification. Ordinary text books keep their normal menus.
 
 - Fit page/width, 100%–1500% zoom, rotation, viewport movement and single-page/continuous scrolling.
+- Choose **Two pages** in the PDF page turning options to show adjacent source pages side by side. An unpaired final page is shown on its own.
 - Automatic/manual crop, panel divisions and reading order, stored per book without overwriting originals.
 - Ink tone, contrast, darkening, whitening, sharpening and watermark fading, with original comparison.
 - More controls include page borders, scroll separators, grayscale, pan-before-turn and horizontal/reversed/vertical/tap-only navigation.

@@ -15,6 +15,7 @@ class PdfReadingControls extends StatefulWidget {
       {super.key,
       required this.initial,
       required this.save,
+      this.showSpread = false,
       this.watermarkAvailable = false,
       this.cropControls,
       this.preview,
@@ -22,6 +23,7 @@ class PdfReadingControls extends StatefulWidget {
   final Future<Map<String, dynamic>> Function(Map<String, dynamic>)? preview;
   final VoidCallback? cancelPreview;
   final bool watermarkAvailable;
+  final bool showSpread;
   final Widget? cropControls;
   final PdfReadingView initial;
   final Future<void> Function(PdfReadingView) save;
@@ -205,6 +207,7 @@ class _PdfReadingControlsState extends State<PdfReadingControls> {
               label: text('翻页方式', 'Page turning'),
               child: choices({
                 'single': text('单页', 'Single page'),
+                if (widget.showSpread) 'spread': text('双页并排', 'Two pages'),
                 'scroll': text('连续卷轴', 'Continuous scroll')
               }, _view.mode, (v) => _apply(_view.copyWith(mode: v))),
             ),

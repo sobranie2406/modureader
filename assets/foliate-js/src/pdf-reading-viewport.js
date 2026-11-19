@@ -5,7 +5,7 @@ import { normalizeDocumentDisplay } from './document-reading-options.js'
 export const normalizePdfView = (value = {}) => {
     const zoom = value.zoom ?? 1, fit = value.fit ?? 'screen', mode = value.mode ?? 'single'
     if (!Number.isFinite(zoom) || zoom < 1 || zoom > 15 || !['screen', 'width'].includes(fit) ||
-        !['single', 'scroll'].includes(mode))
+        !['single', 'spread', 'scroll'].includes(mode))
         throw new RangeError('Invalid PDF view')
     // Older saved views allowed 15x; retain their fit/position while capping zoom.
     return { zoom: Math.min(8, zoom), fit, rotation: normalizeRotation(value.rotation ?? 0), mode,

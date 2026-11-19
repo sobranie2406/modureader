@@ -51,7 +51,7 @@ void main() {
     expect(store.read('fresh-position')['enabled'], isTrue);
   });
   test(
-      'legacy view defaults to single page; continuous preference persists per book',
+      'legacy view defaults to single page; layout preference persists per book',
       () async {
     expect(
         PdfReadingView.fromJson({'zoom': 2, 'fit': 'width', 'rotation': 0})
@@ -63,8 +63,18 @@ void main() {
         throwsFormatException);
     final store = PdfReadingStateStore(await SharedPreferences.getInstance());
     await store.saveView('scroll-book', const PdfReadingView(mode: 'scroll'));
+    await store.saveView('spread-book', const PdfReadingView(mode: 'spread'));
     expect(store.readView('scroll-book').mode, 'scroll');
+    expect(store.readView('spread-book').mode, 'spread');
     expect(store.readView('other-book').mode, 'single');
+    await store.savePosition('spread-book', 'cfi', {
+      ...position,
+      'signature': 'pdf-spread',
+      'zoom': 2,
+    });
+    expect(store.readView('spread-book').zoom, 2);
+    expect(store.read('spread-book')['position']['signature'], 'pdf-spread');
+    expect(store.read('spread-book')['pageViews'], isNull);
   });
   test('viewport preferences and normalized center survive independent writes',
       () async {

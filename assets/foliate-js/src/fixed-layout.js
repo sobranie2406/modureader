@@ -6,6 +6,10 @@ import { normalizeDocumentDisplay, attachDocumentGestures } from './document-rea
 import { PdfScrollReader } from './pdf-scroll-reader.js'
 import { PdfRenderBudget } from './pdf-render-budget.js'
 import { attachPdfZoomInput } from './pdf-zoom-input.js'
+import { FULL_PAGE } from './document-regions.js'
+
+const PDF_SPREAD_GAP = 8
+const PDF_SPREAD_SIGNATURE = 'pdf-spread'
 
 const parseViewport = str => str
     ?.split(/[,;\s]/) // NOTE: technically, only the comma is valid
@@ -57,12 +61,11 @@ export class FixedLayout extends HTMLElement {
     #pdfFallback = false
     #pdfResume
     #pdfGeneration = 0
-    #pdfUrl
+    #pdfCompanion
     #pdfBusy = false
     #pdfRetry
     #pdfView = normalizePdfView()
-    #pdfCenter
-    #pdfPlan
+    #pdfModeChanging = false
     #pdfPageViews = {}
     #pdfBoxZoom = false
     #pdfViewportDirty = false
@@ -71,7 +74,7 @@ export class FixedLayout extends HTMLElement {
     zoomPdfView(zoom, reset = false) {
         if (!Number.isFinite(zoom) || !this.#pdfEnabled || this.#pdfBusy) return false
         this.#pdfView = { ...this.#pdfView, zoom: Math.max(1, Math.min(8, zoom)) }
-        if (reset) this.#pdfCenter = null
+        if (reset) for (const frame of this.#pdfFrames()) frame.center = null
         this.#render()
         if (reset && this.#pdfScroll) this.#pdfScroll.resetPosition()
         this.#schedulePdfDetail(true)
@@ -79,7 +82,6 @@ export class FixedLayout extends HTMLElement {
     }
     #pdfDetailGeneration = 0
     #pdfDetailTimer
-    #pdfDetailUrl
     #pdfPrefetchTimer
     #pdfPrefetchGeneration = 0
     #pdfPrefetchBusy = false
@@ -113,7 +115,7 @@ export class FixedLayout extends HTMLElement {
     get isNavigating() { return this.#pdfBusy }
     get pdfView() { return { ...this.#pdfView } }
     setPdfView(value) {
-        if (this.#destroyed || this.#pdfBusy || !this.book?.readingRegionRenderer) return false
+        if (this.#destroyed || this.#pdfBusy || this.#pdfModeChanging || !this.book?.readingRegionRenderer) return false
         const next = normalizePdfView(value)
         this.#pdfScroll?.flushPosition()
         if (this.#pdfViewportDirty && this.pdfRegionLocation) this.#reportLocation('viewport')
@@ -121,14 +123,22 @@ export class FixedLayout extends HTMLElement {
         const changeMode = next.mode !== previous.mode
         const changeImage = JSON.stringify(next.enhancement ?? {}) !== JSON.stringify(previous.enhancement ?? {}) ||
             next.display?.hideWatermarks !== previous.display?.hideWatermarks
-        if (next.fit !== this.#pdfView.fit) this.#pdfCenter = null
+        const center = next.fit === previous.fit ? location?.center : null
+        if (next.fit !== previous.fit) for (const frame of this.#pdfFrames()) frame.center = null
         this.#pdfView = next
         this.#autoAt = Date.now()
         if ((changeMode || changeImage) && this.#pdfEnabled && location) {
-            return this.#showPdfPanel(location.page, location.panel, 'layout', null, location.center).then(ok => {
-                if (!ok) { this.#pdfView = previous; this.#pdfScroll?.activate('layout'); this.#pdfRetry = null }
+            this.#pdfModeChanging = changeMode
+            const request = this.#showPdfPanel(location.page, location.panel, 'layout', null, center)
+            const generation = this.#pdfGeneration
+            return request.then(ok => {
+                if (!ok && generation === this.#pdfGeneration) {
+                    this.#pdfView = previous
+                    this.#pdfScroll?.activate('layout')
+                    this.#pdfRetry = null
+                }
                 return ok
-            })
+            }).finally(() => { if (changeMode) this.#pdfModeChanging = false })
         }
         this.#render()
         this.#schedulePdfDetail(true)
@@ -136,8 +146,9 @@ export class FixedLayout extends HTMLElement {
     }
     panPdfView(dx, dy) {
         if (this.#pdfScroll && this.#pdfEnabled && !this.#pdfBusy) return this.#pdfScroll.pan(dx, dy)
-        if (!this.#pdfEnabled || !this.#pdfPlan || this.#pdfBusy || this.#destroyed) return false
-        this.#pdfCenter = panPdfViewport(this.#pdfPlan, dx, dy)
+        const frame = this.#center
+        if (!this.#pdfEnabled || !frame?.plan || this.#pdfBusy || this.#destroyed) return false
+        frame.center = panPdfViewport(frame.plan, dx, dy)
         this.#render()
         this.#schedulePdfDetail(true)
         return true
@@ -157,12 +168,13 @@ export class FixedLayout extends HTMLElement {
         if (!this.#pdfEnabled || this.#pdfPage < 0) return null
         return { page: this.#pdfPage, panel: this.#pdfPanel,
             total: this.#pdfFallback ? 1 : readingRegions(this.#pdfLayout, this.#pdfPage).length,
-            signature: this.#pdfFallback ? 'original-target' : layoutSignature(this.#pdfLayout, this.#pdfPage),
+            signature: this.#pdfView.mode === 'spread' ? PDF_SPREAD_SIGNATURE
+                : this.#pdfFallback ? 'original-target' : this.#pdfLayoutSignature(this.#pdfPage),
             zoom: this.#pdfView.zoom,
-            center: this.#pdfCenter ? { ...this.#pdfCenter } : null }
+            center: this.#center?.center ? { ...this.#center.center } : null }
     }
     async setPdfLayout(config, enabled, resume) {
-        if (!this.book.readingRegionRenderer) return false
+        if (!this.book.readingRegionRenderer || this.#pdfModeChanging) return false
         const layout = validateReadingLayout(config)
         this.#pdfScroll?.flushPosition()
         if (this.#pdfViewportDirty && this.pdfRegionLocation && !this.#pdfBusy) this.#reportLocation('viewport')
@@ -177,10 +189,12 @@ export class FixedLayout extends HTMLElement {
         this.#pdfScroll?.suspend()
         if (page < 0) return true
         if (this.#pdfEnabled) {
-            const center = resume?.page === page && resume?.signature === layoutSignature(layout, page)
+            const center = resume?.page === page && resume?.signature === this.#pdfLayoutSignature(page)
                 ? resume.center : null
-            const ok = await this.#showPdfPanel(page, restoredPanel(layout, page, resume), 'layout', null, center)
-            if (!ok) {
+            const request = this.#showPdfPanel(page, restoredPanel(layout, page, resume), 'layout', null, center)
+            const generation = this.#pdfGeneration
+            const ok = await request
+            if (!ok && generation === this.#pdfGeneration) {
                 this.#pdfLayout = previous.layout
                 this.#pdfEnabled = previous.enabled
                 this.#pdfRetry = null
@@ -200,14 +214,17 @@ export class FixedLayout extends HTMLElement {
             this.#pdfScroll?.activate('layout')
             return false
         }
-        this.#releasePdfUrl()
         return true
     }
-    #releasePdfUrl() {
-        if (this.#pdfUrl) URL.revokeObjectURL(this.#pdfUrl)
-        this.#pdfUrl = null
-        if (this.#pdfDetailUrl) URL.revokeObjectURL(this.#pdfDetailUrl)
-        this.#pdfDetailUrl = null
+    #pdfLayoutSignature(page) {
+        return this.#pdfView.mode === 'spread' ? PDF_SPREAD_SIGNATURE : layoutSignature(this.#pdfLayout, page)
+    }
+    #pdfFrames() { return [this.#center, this.#pdfCompanion].filter(frame => frame?.crop) }
+    #releasePdfUrls(frames = this.#pdfFrames()) {
+        for (const frame of frames) {
+            if (frame.baseUrl) URL.revokeObjectURL(frame.baseUrl)
+            if (frame.detailUrl) URL.revokeObjectURL(frame.detailUrl)
+        }
     }
     #cancelPdfDetail() {
         clearTimeout(this.#pdfDetailTimer)
@@ -226,7 +243,8 @@ export class FixedLayout extends HTMLElement {
             adjacentPanel(this.#pdfLayout, this.book.sections.length, this.#pdfPage, this.#pdfPanel, 1, this.book)
         const generation = ++this.#pdfPrefetchGeneration
         // Only native PDFs opt in. Never probe ordinary ebook chapters here.
-        if (!target || !this.book?.sections[target.page]?.loadFrame || this.#pdfScroll || !this.#pdfEnabled) return
+        if (!target || !this.book?.sections[target.page]?.loadFrame || this.#pdfScroll || !this.#pdfEnabled ||
+            this.#pdfView.mode === 'spread') return
         const active = () => !this.#destroyed && !this.#pdfBusy && this.#pdfEnabled &&
             generation === this.#pdfPrefetchGeneration
         this.#pdfPrefetchTimer = setTimeout(async () => {
@@ -267,25 +285,29 @@ export class FixedLayout extends HTMLElement {
         }, 100)
     }
     async #refreshPdfDetail() {
-        const frame = this.#center, plan = this.#pdfPlan
-        if (!frame?.crop || !plan || this.#pdfBusy || !this.#pdfEnabled || frame.iframe.contentDocument.documentElement.dataset.documentImage === 'false') return
+        if (this.#pdfBusy || !this.#pdfEnabled) return
+        const generation = ++this.#pdfDetailGeneration
+        const active = () => !this.#destroyed && this.#pdfEnabled && generation === this.#pdfDetailGeneration
+        for (const frame of this.#pdfFrames()) {
+            if (!active()) return
+            await this.#refreshPdfFrame(frame, active)
+        }
+        if (active()) this.#schedulePdfPrefetch()
+    }
+    async #refreshPdfFrame(frame, active) {
+        const { plan } = frame
+        if (!plan || frame.iframe.contentDocument.documentElement.dataset.documentImage === 'false') return
         const density = plan.scale * (devicePixelRatio || 1)
         // The initial cropped raster already covers the whole crop. Do not
         // render/encode it again at essentially the same screen resolution.
         if (frame.raster && frame.raster.width / frame.crop.width >= frame.width * density - 2 &&
-            frame.raster.height / frame.crop.height >= frame.height * density - 2) {
-            this.#schedulePdfPrefetch()
-            return
-        }
-        const generation = ++this.#pdfDetailGeneration
-        const active = () => !this.#destroyed && this.#pdfEnabled &&
-            frame === this.#center && generation === this.#pdfDetailGeneration
+            frame.raster.height / frame.crop.height >= frame.height * density - 2) return
         let url
         try {
             const region = plan.sourceRegion, dpr = devicePixelRatio || 1
             // Render in source orientation, then rotate both raster and text
             // with the iframe matrix. Never allocate a zoomed whole-page canvas.
-            const result = await this.book.readingRegionRenderer.render({ page: this.#pdfPage, region,
+            const result = await this.book.readingRegionRenderer.render({ page: frame.index, region,
                 enhancement: this.#pdfView.enhancement,
                 hideWatermarks: this.#pdfView.display?.hideWatermarks,
                 width: region.width * frame.width * plan.scale * dpr,
@@ -305,8 +327,8 @@ export class FixedLayout extends HTMLElement {
             // Append after all original nodes to keep existing CFI paths stable.
             frame.iframe.contentDocument.body.append(img)
             frame.detail = img
-            if (this.#pdfDetailUrl) URL.revokeObjectURL(this.#pdfDetailUrl)
-            this.#pdfDetailUrl = url
+            if (frame.detailUrl) URL.revokeObjectURL(frame.detailUrl)
+            frame.detailUrl = url
             url = null
             this.dispatchEvent(new CustomEvent('pdf-detail', { detail: { state: 'ready' } }))
         } catch (_) {
@@ -314,10 +336,10 @@ export class FixedLayout extends HTMLElement {
             if (active()) this.dispatchEvent(new CustomEvent('pdf-detail', { detail: { state: 'failed' } }))
         } finally {
             if (url) URL.revokeObjectURL(url)
-            if (active()) this.#schedulePdfPrefetch()
         }
     }
-    #attachPdfPan(doc) {
+    #attachPdfPan(frame) {
+        const doc = frame.iframe.contentDocument
         attachPdfZoomInput(doc, {
             active: () => this.#pdfEnabled && !this.#pdfBusy && this.readerActive,
             zoom: () => this.#pdfView.zoom,
@@ -326,18 +348,20 @@ export class FixedLayout extends HTMLElement {
             boxMode: () => this.#pdfBoxZoom,
             onGestureEnd: () => { if (this.#pdfViewportDirty) this.#reportLocation('viewport') },
             box: rect => {
-                const frame = this.#center, plan = this.#pdfPlan, bounds = this.getBoundingClientRect()
-                if (!frame || !plan) return
-                this.#pdfCenter = {x:(rect.x+rect.width/2)/frame.width,y:(rect.y+rect.height/2)/frame.height}
+                const frame = this.#center, plan = frame?.plan, bounds = this.getBoundingClientRect()
+                if (!plan) return
+                frame.center = {x:(rect.x+rect.width/2)/frame.width,y:(rect.y+rect.height/2)/frame.height}
                 const swapped = plan.rotation % 180 !== 0
-                this.zoomPdfView(this.#pdfView.zoom * Math.min(bounds.width/((swapped ? rect.height : rect.width)*plan.scale),
+                const width = this.#pdfCompanion ? (bounds.width - PDF_SPREAD_GAP) / 2 : bounds.width
+                this.zoomPdfView(this.#pdfView.zoom * Math.min(width/((swapped ? rect.height : rect.width)*plan.scale),
                     bounds.height/((swapped ? rect.width : rect.height)*plan.scale)))
             },
         })
         doc.addEventListener('wheel', event => {
             if (!this.#pdfEnabled || event.ctrlKey || event.metaKey) return
             if (doc.getSelection()?.type === 'Range') return
-            const plan = this.#pdfPlan
+            this.#focusPdfPage(frame)
+            const plan = this.#center?.plan
             const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? plan?.height ?? 1 : 1
             if (this.panPdfView(event.deltaX * multiplier, event.deltaY * multiplier)) {
                 event.preventDefault()
@@ -351,7 +375,8 @@ export class FixedLayout extends HTMLElement {
         if (reason !== 'layout' && this.#pdfViewportDirty && this.pdfRegionLocation && !this.#pdfBusy)
             this.#reportLocation('viewport')
         const previousView = this.#pdfView
-        if (reason !== 'layout' && typeof anchor !== 'function') {
+        const spread = this.#pdfView.mode === 'spread'
+        if (!spread && reason !== 'layout' && typeof anchor !== 'function') {
             const saved = this.#pdfPageViews[`${page}:${panel}`]
             if (saved?.signature === layoutSignature(this.#pdfLayout, page) &&
                 Number.isFinite(saved.zoom) && saved.zoom >= 1 && saved.zoom <= 15) {
@@ -360,106 +385,121 @@ export class FixedLayout extends HTMLElement {
             } else center ??= this.pdfRegionLocation?.center
         }
         if (this.#pdfView.mode === 'scroll') {
-            const ok = await this.#showPdfScroll(page, panel, reason, anchor, center)
-            if (!ok) this.#pdfView = previousView
+            const request = this.#showPdfScroll(page, panel, reason, anchor, center)
+            const generation = this.#pdfGeneration
+            const ok = await request
+            if (!ok && generation === this.#pdfGeneration) this.#pdfView = previousView
             return ok
         }
-        let regions = readingRegions(this.#pdfLayout, page)
-        let crop = regions[panel], fallback = false
-        if (!crop) return false
+        if (!spread && !readingRegions(this.#pdfLayout, page)[panel]) return false
+        const otherPage = page % 2 ? page - 1 : page + 1
+        const paired = spread && otherPage < this.book.sections.length
         const generation = ++this.#pdfGeneration
         this.#cancelPdfDetail()
         this.#pdfScroll?.suspend()
         this.#pdfBusy = true
         this.#pdfRetry = () => this.#showPdfPanel(page, panel, reason, anchor, center)
         this.dispatchEvent(new CustomEvent('chapter-state', { detail: { state: 'loading' } }))
-        let frame, url, committed = false
+        const frames = []
+        let committed = false
         const active = () => !this.#destroyed && generation === this.#pdfGeneration
+        const checkActive = () => { if (!active()) throw new DOMException('Reader closed', 'AbortError') }
         try {
-            const section = this.book.sections[page]
-            const src = await (section.loadFrame ? section.loadFrame() : section.load())
-            if (!active()) return false
-            frame = await this.#createFrame('center', { index: page, src }, true)
-            if (!active()) return false
-            const nativeText = frame.iframe.contentDocument.documentElement.dataset.documentImage === 'false'
-            if (nativeText) { crop = {x:0,y:0,width:1,height:1}; panel = 0; fallback = true }
-            else {
-                regions = await resolveReadingRegions(this.#pdfLayout, page, this.book,
+            const load = async (index, requestedPanel, textAnchor, position) => {
+                const section = this.book.sections[index]
+                const src = await (section.loadFrame ? section.loadFrame() : section.load())
+                checkActive()
+                const frame = await this.#createFrame('center', { index, src }, true)
+                frames.push(frame)
+                checkActive()
+                const doc = frame.iframe.contentDocument
+                const nativeText = doc.documentElement.dataset.documentImage === 'false'
+                let fallback = nativeText || spread
+                const regions = fallback ? [FULL_PAGE] : await resolveReadingRegions(this.#pdfLayout, index, this.book,
                     {hideWatermarks: this.#pdfView.display?.hideWatermarks, active})
-                if (!active()) return false
-                crop = regions[panel]
-            }
-            // Search/note CFIs keep their original text nodes. Locate the target
-            // before cropping; never land on a different invisible panel.
-            if (typeof anchor === 'function' && !nativeText) {
-                Object.assign(frame.iframe.style, { display: 'block', width: `${frame.width}px`, height: `${frame.height}px` })
-                const target = anchor(frame.iframe.contentDocument)
-                if (typeof target?.getClientRects === 'function') {
-                    let rect = [...target.getClientRects()].find(r => r.width > 0 && r.height > 0)
-                    if (!rect) {
-                        const node = target.startContainer?.nodeType === 3
-                            ? target.startContainer.parentElement : target.startContainer
-                        if (node?.closest?.('.textLayer')) rect = node.getBoundingClientRect()
-                    }
-                    if (rect) {
-                        const x = (rect.left + Math.min(1, rect.width / 2)) / frame.width
-                        const y = (rect.top + rect.height / 2) / frame.height
-                        center = { x, y }
-                        const found = regions.findIndex(r => x >= r.x && y >= r.y &&
-                            x < r.x + r.width && y < r.y + r.height)
-                        fallback = found < 0
-                        panel = fallback ? 0 : found
-                        crop = fallback ? { x: 0, y: 0, width: 1, height: 1 } : regions[panel]
+                checkActive()
+                let shownPanel = fallback ? 0 : requestedPanel
+                // Resolve text anchors in original page coordinates before clipping.
+                if (typeof textAnchor === 'function' && !nativeText) {
+                    Object.assign(frame.iframe.style, { display: 'block', width: `${frame.width}px`, height: `${frame.height}px` })
+                    const target = textAnchor(doc)
+                    if (typeof target?.getClientRects === 'function') {
+                        let rect = [...target.getClientRects()].find(r => r.width > 0 && r.height > 0)
+                        if (!rect) {
+                            const node = target.startContainer?.nodeType === 3
+                                ? target.startContainer.parentElement : target.startContainer
+                            if (node?.closest?.('.textLayer')) rect = node.getBoundingClientRect()
+                        }
+                        if (rect) {
+                            const x = (rect.left + Math.min(1, rect.width / 2)) / frame.width
+                            const y = (rect.top + rect.height / 2) / frame.height
+                            position = { x, y }
+                            if (!spread) {
+                                const found = regions.findIndex(r => x >= r.x && y >= r.y &&
+                                    x < r.x + r.width && y < r.y + r.height)
+                                fallback = found < 0
+                                shownPanel = fallback ? 0 : found
+                            }
+                        }
                     }
                 }
+                const crop = fallback ? FULL_PAGE : regions[shownPanel]
+                if (!nativeText) {
+                    const bounds = this.getBoundingClientRect(), dpr = devicePixelRatio || 1
+                    const width = paired ? (bounds.width - PDF_SPREAD_GAP) / 2 : bounds.width
+                    const result = await this.book.readingRegionRenderer.render({ page: index, region: crop,
+                        enhancement: this.#pdfView.enhancement,
+                        hideWatermarks: this.#pdfView.display?.hideWatermarks,
+                        width: Math.max(1, width * dpr), height: Math.max(1, bounds.height * dpr) })
+                    checkActive()
+                    frame.raster = {width: result.width, height: result.height}
+                    frame.baseUrl = URL.createObjectURL(result.blob)
+                    const img = doc.querySelector('[data-document-base]') ?? doc.querySelector('img')
+                    img.src = frame.baseUrl
+                    // Keep original text/annotation DOM and its CFI paths.
+                    Object.assign(img.style, { position: 'absolute',
+                        left: `${crop.x * frame.width}px`, top: `${crop.y * frame.height}px`,
+                        width: `${crop.width * frame.width}px`, height: `${crop.height * frame.height}px` })
+                    await img.decode()
+                    checkActive()
+                }
+                doc.pdfRegion = true
+                return Object.assign(frame, { crop, center: position, panel: shownPanel, fallback })
             }
-            const bounds = this.getBoundingClientRect()
-            if (!nativeText) {
-            const result = await this.book.readingRegionRenderer.render({ page, region: crop,
-                enhancement: this.#pdfView.enhancement,
-                hideWatermarks: this.#pdfView.display?.hideWatermarks,
-                width: Math.max(1, bounds.width * (devicePixelRatio || 1)),
-                height: Math.max(1, bounds.height * (devicePixelRatio || 1)) })
-            if (!active()) return false
-            frame.raster = {width: result.width, height: result.height}
-            url = URL.createObjectURL(result.blob)
-            const img = frame.iframe.contentDocument.querySelector('[data-document-base]') ?? frame.iframe.contentDocument.querySelector('img')
-            img.src = url
-            // Keep the original text/annotation DOM and its CFI paths. Only
-            // replace the bitmap, at its original page-coordinate rectangle.
-            Object.assign(img.style, { position: 'absolute',
-                left: `${crop.x * frame.width}px`, top: `${crop.y * frame.height}px`,
-                width: `${crop.width * frame.width}px`, height: `${crop.height * frame.height}px` })
-            await img.decode()
-            }
-            if (!active()) return false
-            frame.crop = crop
-            frame.iframe.contentDocument.pdfRegion = true
+            // The raster renderer cancels the previous request when a new one starts.
+            const frame = await load(page, panel, anchor, center)
+            const companion = paired ? await load(otherPage, 0, null, null) : null
+            checkActive()
             this.#pdfScroll?.destroy()
             this.#pdfScroll = null
-            // Reparenting an iframe reloads its browsing context. Leave the
-            // candidate in place and remove only the previously visible frames.
+            this.#releasePdfUrls()
+            // Reparenting an iframe reloads its browsing context.
             for (const child of [...this.#root.children])
-                if (child !== frame.element) child.remove()
-            Object.assign(frame.element.style, { position: '', visibility: '' })
+                if (child.localName !== 'style' && !frames.some(item => item.element === child)) child.remove()
             this.#left = this.#right = null
             this.#center = frame
+            this.#pdfCompanion = companion
             this.#side = 'center'
             this.#pdfPage = page
-            this.#pdfPanel = panel
-            this.#pdfFallback = fallback
-            this.#pdfCenter = center
-            this.#releasePdfUrl()
-            this.#pdfUrl = url
-            url = null
+            this.#pdfPanel = frame.panel
+            this.#pdfFallback = frame.fallback
+            for (const item of frames) Object.assign(item.element.style, { position: '', visibility: '' })
             this.#render()
-            this.#attachPdfPan(frame.iframe.contentDocument)
-            attachDocumentGestures(frame.iframe.contentDocument,
-                () => ({...this.#pdfView, display: {...this.#pdfView.display, swipeMenu: false}}),
-                direction => direction > 0 ? this.next() : this.prev(),
-                () => this.dispatchEvent(new CustomEvent('document-menu')))
-            this.dispatchEvent(new CustomEvent('load', { detail: { doc: frame.iframe.contentDocument, index: page } }))
-            frame = null // committed; failures/cancellation must not remove it
+            // Announce the active page last to the shared selection tools.
+            for (const item of frames.slice().reverse()) {
+                const doc = item.iframe.contentDocument
+                if (companion) {
+                    const focus = () => this.#focusPdfPage(item)
+                    for (const type of ['pointerdown', 'touchstart', 'mousedown', 'focusin'])
+                        doc.addEventListener(type, focus, {capture: true, passive: true})
+                }
+                this.#attachPdfPan(item)
+                attachDocumentGestures(doc,
+                    () => ({...this.#pdfView, display: {...this.#pdfView.display, swipeMenu: false}}),
+                    direction => direction > 0 ? this.next() : this.prev(),
+                    () => this.dispatchEvent(new CustomEvent('document-menu')))
+                this.dispatchEvent(new CustomEvent('load', { detail: { doc, index: item.index } }))
+            }
             committed = true
             this.#reportLocation(reason)
             this.#pdfRetry = null
@@ -472,11 +512,21 @@ export class FixedLayout extends HTMLElement {
             }
             return false
         } finally {
-            frame?.element.remove()
-            if (url) URL.revokeObjectURL(url)
+            if (!committed) {
+                for (const frame of frames) frame.element.remove()
+                this.#releasePdfUrls(frames)
+            }
             if (active() && !committed) this.#pdfView = previousView
             if (active()) { this.#pdfBusy = false; this.#schedulePdfDetail() }
         }
+    }
+    #focusPdfPage(frame) {
+        if (this.#pdfBusy || this.#pdfCompanion !== frame) return
+        this.#pdfCompanion = this.#center
+        this.#center = frame
+        this.#pdfPage = frame.index
+        this.dispatchEvent(new CustomEvent('activate', { detail: { doc: frame.iframe.contentDocument, index: frame.index } }))
+        this.#reportLocation('focus')
     }
     async #showPdfScroll(page, panel, reason, anchor, center) {
         const generation = ++this.#pdfGeneration
@@ -505,10 +555,12 @@ export class FixedLayout extends HTMLElement {
             if (!await flow.open(page, panel, anchor, center) || !active()) return false
             this.#pdfScroll?.destroy()
             this.#pdfScroll = flow
-            for (const child of [...this.#root.children]) if (child !== flow.element) child.remove()
+            this.#releasePdfUrls()
+            for (const child of [...this.#root.children])
+                if (child !== flow.element && child.localName !== 'style') child.remove()
             Object.assign(flow.element.style, { position: 'relative', visibility: '' })
             this.#left = this.#right = this.#center = null
-            this.#releasePdfUrl()
+            this.#pdfCompanion = null
             committed = true
             this.#pdfRetry = null
             flow.activate(reason)
@@ -615,24 +667,28 @@ export class FixedLayout extends HTMLElement {
         const target = side === 'left' ? left : right
         const { width, height } = this.getBoundingClientRect()
         if (this.#center?.crop) {
-            const frame = this.#center, crop = frame.crop
-            if (width <= 0 || height <= 0) return
-            const plan = pdfViewport({ pageWidth: frame.width, pageHeight: frame.height,
-                width, height, crop, view: this.#pdfView, center: this.#pdfCenter })
-            this.#pdfPlan = plan
-            this.#pdfCenter = plan.center
-            frame.iframe.contentDocument.scale = plan.scale
-            frame.iframe.contentDocument.pdfClientPoint = (x, y) => {
-                const rect = frame.element.getBoundingClientRect(), [a, b, c, d, e, f] = plan.matrix
-                return { x: rect.left + a * x + c * y + e, y: rect.top + b * x + d * y + f }
+            const paneWidth = this.#pdfCompanion ? (width - PDF_SPREAD_GAP) / 2 : width
+            if (paneWidth <= 0 || height <= 0) return
+            for (const frame of this.#pdfFrames()) {
+                const plan = pdfViewport({ pageWidth: frame.width, pageHeight: frame.height,
+                    width: paneWidth, height, crop: frame.crop, view: this.#pdfView, center: frame.center })
+                frame.plan = plan
+                frame.center = plan.center
+                const doc = frame.iframe.contentDocument
+                doc.scale = plan.scale
+                doc.pdfClientPoint = (x, y) => {
+                    const rect = frame.element.getBoundingClientRect(), [a, b, c, d, e, f] = plan.matrix
+                    return { x: rect.left + a * x + c * y + e, y: rect.top + b * x + d * y + f }
+                }
+                Object.assign(frame.iframe.style, { width: `${frame.width}px`, height: `${frame.height}px`,
+                    transform: `matrix(${plan.matrix.join(',')})`,
+                    transformOrigin: 'top left', display: 'block' })
+                Object.assign(frame.element.style, { width: `${plan.width}px`, height: `${plan.height}px`,
+                    order: String(frame.index), marginLeft: this.#pdfCompanion && frame.index % 2 ? `${PDF_SPREAD_GAP}px` : '',
+                    flexShrink: '0', overflow: 'hidden', display: 'block',
+                    outline: this.#pdfView.display?.border ? '1px solid #888' : '',
+                    filter: this.#pdfView.display?.grayscale ? 'grayscale(1)' : '' })
             }
-            Object.assign(frame.iframe.style, { width: `${frame.width}px`, height: `${frame.height}px`,
-                transform: `matrix(${plan.matrix.join(',')})`,
-                transformOrigin: 'top left', display: 'block' })
-            Object.assign(frame.element.style, { width: `${plan.width}px`, height: `${plan.height}px`,
-                flexShrink: '0', overflow: 'hidden', display: 'block',
-                outline: this.#pdfView.display?.border ? '1px solid #888' : '',
-                filter: this.#pdfView.display?.grayscale ? 'grayscale(1)' : '' })
             return
         }
         const portrait = this.spread !== 'both' && this.spread !== 'portrait'
@@ -690,8 +746,10 @@ export class FixedLayout extends HTMLElement {
             const frames = [nextLeft, nextRight, nextCenter].filter(Boolean)
             this.#pdfScroll?.destroy()
             this.#pdfScroll = null
+            this.#releasePdfUrls()
+            this.#pdfCompanion = null
             for (const child of [...this.#root.children])
-                if (!frames.some(frame => frame.element === child)) child.remove()
+                if (child.localName !== 'style' && !frames.some(frame => frame.element === child)) child.remove()
             this.#left = nextLeft
             this.#right = nextRight
             this.#center = nextCenter
@@ -791,7 +849,7 @@ export class FixedLayout extends HTMLElement {
         this.#pdfViewportDirty = false
         const region = this.pdfRegionLocation
         if (region?.zoom) this.#pdfView = {...this.#pdfView, zoom:region.zoom}
-        if (region && region.signature !== 'original-target')
+        if (region && region.signature !== 'original-target' && region.signature !== PDF_SPREAD_SIGNATURE)
             this.#pdfPageViews[`${region.page}:${region.panel}`] = { ...region }
         this.dispatchEvent(new CustomEvent('relocate', { detail:
             { reason, range: null, index: this.index,
@@ -843,9 +901,10 @@ export class FixedLayout extends HTMLElement {
         const section = book.sections[resolved.index]
         if (!section) return
         if (this.#pdfEnabled) {
+            if (this.#pdfModeChanging) return false
             const panel = restoredPanel(this.#pdfLayout, resolved.index, this.#pdfResume)
             const center = this.#pdfResume?.page === resolved.index &&
-                this.#pdfResume?.signature === layoutSignature(this.#pdfLayout, resolved.index)
+                this.#pdfResume?.signature === this.#pdfLayoutSignature(resolved.index)
                 ? this.#pdfResume.center : null
             this.#pdfResume = null
             return this.#showPdfPanel(resolved.index, panel, 'navigation', resolved.textAnchor ? resolved.anchor : null, center)
@@ -869,16 +928,21 @@ export class FixedLayout extends HTMLElement {
     }
     #movePdfPanel(direction) {
         if (this.#pdfBusy) return false
-        if (normalizeDocumentDisplay(this.#pdfView.display).tapPan && this.#pdfPlan) {
-            const plan=this.#pdfPlan, frame=this.#center
+        const frame = this.#center, plan = frame?.plan
+        if (normalizeDocumentDisplay(this.#pdfView.display).tapPan && plan) {
             const crop=frame.crop
             // Page-space vertical traversal after rotation; only consume a
             // page turn while there is an unread part of the current viewport.
             const top=plan.visible.y,bottom=top+plan.visible.height
             const target=pdfViewport({pageWidth:frame.width,pageHeight:frame.height,
-                width:this.clientWidth,height:this.clientHeight,crop,view:this.#pdfView,
+                width:this.#pdfCompanion ? (this.clientWidth - PDF_SPREAD_GAP) / 2 : this.clientWidth,
+                height:this.clientHeight,crop,view:this.#pdfView,
                 center:panPdfViewport(plan,0,direction*this.clientHeight*.8)})
             if (Math.abs(target.visible.y-top)>.00001 && bottom>top) return this.panPdfView(0,direction*this.clientHeight*.8)
+        }
+        if (this.#pdfView.mode === 'spread') {
+            const page = this.#pdfPage - this.#pdfPage % 2 + direction * 2
+            return this.#showPdfPanel(page, 0, 'page')
         }
         if (this.#pdfFallback) {
             const page = this.#pdfPage + direction
@@ -901,7 +965,7 @@ export class FixedLayout extends HTMLElement {
     nextSection() { return this.#adjacentSection(1) }
     getContents() {
         const contents = this.#pdfScroll ? this.#pdfScroll.getContents()
-            : [this.#left, this.#center, this.#right].filter(frame => frame && !frame.blank)
+            : [this.#left, this.#center, this.#pdfCompanion, this.#right].filter(frame => frame && !frame.blank)
             .map(frame => ({ doc: frame.iframe.contentDocument, index: frame.index }))
         const documents = new Set(contents.map(x => x.doc))
         for (const [doc, overlayer] of this.#overlayers) if (!documents.has(doc)) {
@@ -920,7 +984,7 @@ export class FixedLayout extends HTMLElement {
         this.#pdfGeneration++
         this.#cancelPdfDetail()
         this.#pdfScroll?.destroy()
-        this.#releasePdfUrl()
+        this.#releasePdfUrls()
         this.#observer.unobserve(this)
         this.book?.releasePageResources?.()
     }

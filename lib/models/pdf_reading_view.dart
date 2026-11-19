@@ -29,7 +29,7 @@ class PdfReadingView {
         !['screen', 'width'].contains(fit) ||
         rotation is! int ||
         ![0, 90, 180, 270].contains(rotation) ||
-        !['single', 'scroll'].contains(mode)) {
+        !['single', 'spread', 'scroll'].contains(mode)) {
       throw const FormatException('Invalid PDF view');
     }
     return PdfReadingView(

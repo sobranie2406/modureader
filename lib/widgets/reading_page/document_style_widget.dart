@@ -216,6 +216,7 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
             PdfReadingControls(
               key: ValueKey(widget.player.cssBookKey),
               initial: widget.player.pdfReadingView,
+              showSpread: widget.player.isPdfDocument,
               cropControls: cropControls,
               watermarkAvailable: _watermarkAvailable,
               save: widget.player.setPdfReadingView,

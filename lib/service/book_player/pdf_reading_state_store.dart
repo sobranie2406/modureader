@@ -101,11 +101,13 @@ class PdfReadingStateStore {
       if (position is Map &&
           position['zoom'] is num &&
           position['signature'] != 'original-target') {
-        entry['pageViews'] = {
-          if (entry['pageViews'] is Map)
-            ...Map<String, dynamic>.from(entry['pageViews']),
-          '${position['page']}:${position['panel']}': position,
-        };
+        if (position['signature'] != 'pdf-spread') {
+          entry['pageViews'] = {
+            if (entry['pageViews'] is Map)
+              ...Map<String, dynamic>.from(entry['pageViews']),
+            '${position['page']}:${position['panel']}': position,
+          };
+        }
         entry['view'] = {
           ...readView(bookKey).toJson(),
           'zoom': position['zoom'],
