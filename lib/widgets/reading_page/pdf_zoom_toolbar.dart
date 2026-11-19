@@ -108,8 +108,10 @@ class _PdfZoomToolbarState extends State<PdfZoomToolbar> {
                                 .withValues(alpha: .20),
                             child: ValueListenableBuilder<double>(
                                 valueListenable: widget.zoom,
-                                builder: (context, zoom, _) => Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                builder: (context, zoom, _) => Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
                                         children: [
                                           if (!_collapsed) ...[
                                             IconButton(

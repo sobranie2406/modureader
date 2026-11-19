@@ -122,4 +122,37 @@ void main() {
     expect(find.byTooltip('Rectangle zoom'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('zoom controls fit inside a narrow landscape comparison pane',
+      (tester) async {
+    final zoom = ValueNotifier<double>(2);
+    addTearDown(zoom.dispose);
+    final pane = GlobalKey();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SizedBox(
+                key: pane,
+                width: 156,
+                height: 390,
+                child: PdfZoomToolbar(
+                    zoom: zoom,
+                    change: (v, _) async => zoom.value = v,
+                    boxZoom: (_) async {})))));
+    expect(tester.takeException(), isNull);
+    final bounds = tester.getRect(find.byKey(pane));
+    for (final label in [
+      'Zoom out',
+      'Zoom in',
+      'Reset zoom (keep crop)',
+      'Rectangle zoom',
+      'Hide zoom',
+    ]) {
+      expect(bounds.contains(tester.getCenter(find.byTooltip(label))), isTrue,
+          reason: label);
+    }
+    await tester.tap(find.byTooltip('Zoom in'));
+    await tester.pumpAndSettle();
+    expect(zoom.value, 2.25);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
