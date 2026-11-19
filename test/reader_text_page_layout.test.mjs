@@ -309,6 +309,37 @@ test('short endings, title-only, explicit breaks, mid-page headings and mixed me
   }
 });
 
+test('an illustration opening the next page preserves the preceding text spacing', () => {
+  for (const placement of ['opening', 'image-only', 'inline', 'after-text']) {
+    const { doc, dom } = fixture();
+    const [preceding, following] = doc.querySelectorAll('p');
+    preceding.textContent = '字'.repeat(5);
+    const image = doc.createElement('img');
+    const imageTop = placement === 'after-text' ? 100 : 20;
+    const imageHeight = placement === 'inline' ? 24 : 240;
+    image.getClientRects = () => [{
+      left: 330, top: imageTop, bottom: imageTop + imageHeight, width: 280, height: imageHeight,
+    }];
+    following.before(image);
+    if (placement === 'opening') {
+      following.textContent = '字'.repeat(4);
+      const getClientRects = dom.window.Element.prototype.getClientRects;
+      dom.window.Element.prototype.getClientRects = function () {
+        return getClientRects.call(this).map(rect => this.parentElement === following
+          ? { ...rect, top: rect.top + 250, bottom: rect.bottom + 250 } : rect);
+      };
+    }
+    if (placement === 'image-only') following.remove();
+    alignPaginatedText(doc, layout, false);
+    const lines = [...preceding.children].map(run => run.getClientRects()[0]);
+    const natural = placement === 'opening' || placement === 'image-only';
+    assert.equal(lines[0].top, 20, placement);
+    assert.equal(lines[1].top - lines[0].top, natural ? 40 : 96.5, placement);
+    assert.equal(lines.at(-1).bottom, natural ? 204 : 430, placement);
+    dom.window.close();
+  }
+});
+
 test('publisher numbered headings keep text, floating border and CFI together', () => {
   const { doc, dom } = fixture();
   const heading = doc.createElement('h4');

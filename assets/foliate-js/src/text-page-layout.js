@@ -155,10 +155,10 @@ export function fitTextLineSpacing(doc, viewport = 0) {
   spacingStyles.set(doc, originals)
 }
 
-export function pageLineOffsets(rows, top, bottom, last) {
+export function pageLineOffsets(rows, top, bottom, keepSpacing) {
   if (!rows.length) return []
   const start = top - rows[0].top
-  if (last) return rows.map(() => start)
+  if (keepSpacing) return rows.map(() => start)
   if (rows.length < 2) return null
   const extra = bottom - rows.at(-1).bottom - start
   const step = extra / (rows.length - 1)
@@ -182,7 +182,7 @@ export function alignPaginatedText(doc, { height, topMargin, bottomMargin, colum
   const pageOf = r => Math.max(0, Math.floor((r.left - gap / 2 + 1) / stride))
   const pages = new Map()
   const pageAt = index => {
-    if (!pages.has(index)) pages.set(index, { runs: [], notes: [], unsafe: false, headingBottom: null })
+    if (!pages.has(index)) pages.set(index, { runs: [], notes: [], unsafe: false, headingBottom: null, firstMedia: null })
     return pages.get(index)
   }
   // Read all geometry before writing offsets: no repeated forced layouts.
@@ -201,9 +201,11 @@ export function alignPaginatedText(doc, { height, topMargin, bottomMargin, colum
   // collide with independently shifted source glyphs. Hidden translations have no rects.
   for (const el of [...doc.body.querySelectorAll('img, svg, table, pre, ruby, math, video, figure, .translated-text'), ...protectedBlocks]) {
     if (isNote(el)) continue
+    const isIllustration = el.matches('img:not([data-modu-inline-image]), svg, video, figure')
     const rects = [...el.getClientRects()].filter(r => r.width > 0 && r.height > 0)
     for (const r of rects) {
       const index = pageOf(r), page = pageAt(index)
+      if (isIllustration && (!page.firstMedia || r.top < page.firstMedia.top)) page.firstMedia = r
       // Keep opening titles intact without disabling alignment of the prose below.
       if (index === 0 && rects.length === 1 && el.matches('h1,h2,h3,h4,h5,h6'))
         page.headingBottom = Math.max(page.headingBottom ?? -Infinity, r.bottom)
@@ -215,7 +217,6 @@ export function alignPaginatedText(doc, { height, topMargin, bottomMargin, colum
     if (r.width > 0 && r.height > 0) pageAt(pageOf(r)).notes.push({ el, r,
       oldTop: parseFloat(doc.defaultView.getComputedStyle(el).top) || 0 })
   }
-  const last = Math.max(...pages.keys())
   const forced = new Set()
   const forcedBreak = value => /^(always|page|column|left|right|recto|verso)$/.test(value)
   const transformed = style => (style.transform && style.transform !== 'none') ||
@@ -253,9 +254,11 @@ export function alignPaginatedText(doc, { height, topMargin, bottomMargin, colum
     if (page.headingBottom !== null && page.headingBottom > rows[0].top) continue
     // Preserve the title-to-prose gap; only the remaining prose gaps may expand.
     const top = page.headingBottom === null ? topMargin : rows[0].top
-    // A skipped/blank column is an explicit layout boundary, not prose overflow.
-    const offsets = pageLineOffsets(rows, top, height - bottomMargin,
-      index === last || !pages.has(index + 1))
+    const next = pages.get(index + 1)
+    const firstMedia = next?.firstMedia
+    // An illustration can force an early page turn; keep the preceding lines together.
+    const endsBeforeMedia = firstMedia && next.runs.every(({ r }) => r.top >= firstMedia.bottom - 1)
+    const offsets = pageLineOffsets(rows, top, height - bottomMargin, !next || endsBeforeMedia)
     if (!offsets) continue
     for (const { el, r, oldTop } of page.notes) {
       const distances = rows.map(row => Math.abs((row.top + row.bottom) / 2 - (r.top + r.bottom) / 2))
