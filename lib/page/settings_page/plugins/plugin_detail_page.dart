@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/models/selection_toolbar.dart';
 import 'package:modu_reader/page/settings_page/plugins/plugin_labels.dart';
@@ -117,8 +118,26 @@ class PluginDetailPage extends StatelessWidget {
   }
 
   Widget _permissionSection(BuildContext context) {
-    final capabilities =
-        host.manifestFor(pluginId)?.capabilities ?? const <String>{};
+    final manifest = host.manifestFor(pluginId);
+    final capabilities = manifest?.capabilities ?? const <String>{};
+    final record = host.byId(pluginId);
+    final enabled = record?.status == PluginStatus.enabled;
+    // Runtime grants are the ones the user controls; install-tier ones are
+    // listed lower as information, exactly like a store permission screen.
+    final runtimeByGroup = <PluginPermissionGroup, List<PluginPermissionSpec>>{};
+    final installOnly = <String>[];
+    for (final capability in capabilities) {
+      final spec = pluginPermissionSpec(capability);
+      if (spec == null || !spec.isRuntime) {
+        installOnly.add(capability);
+        continue;
+      }
+      runtimeByGroup.putIfAbsent(spec.group, () => []).add(spec);
+    }
+    final orderedGroups = [
+      for (final group in PluginPermissionGroup.values)
+        if (runtimeByGroup.containsKey(group)) group,
+    ];
     return SettingsSection(
       title: Text(ModuStrings.text(context, '权限', 'Permissions')),
       tiles: [
@@ -130,12 +149,99 @@ class PluginDetailPage extends StatelessWidget {
                   'No additional permissions declared, or the package is unavailable.')),
             ),
           )
-        else
-          for (final capability in capabilities)
+        else ...[
+          if (orderedGroups.isNotEmpty)
+            CustomSettingsTile(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Text(
+                  !enabled
+                      ? ModuStrings.text(
+                          context,
+                          '启用插件后可以授权这些权限。',
+                          'Enable the plugin to grant these permissions.')
+                      : ModuStrings.text(
+                          context,
+                          '以下权限默认关闭。插件只有在你开启后才能使用对应能力，撤回后正在运行的任务会立即停止。',
+                          'These permissions are off by default. A plugin can use them only after you switch them on, and revoking one stops its running task.'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ),
+          for (final group in orderedGroups) ...[
+            CustomSettingsTile(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(
+                  pluginPermissionGroupLabel(context, group),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary),
+                ),
+              ),
+            ),
+            for (final spec in runtimeByGroup[group]!)
+              _permissionSwitch(context, spec, enabled: enabled),
+          ],
+          for (final capability in installOnly)
             _valueTile(context, pluginCapabilityLabel(context, capability),
                 capability),
+        ],
       ],
     );
+  }
+
+  /// One runtime grant. Turning [PluginPermissionSpec.danger] on asks first,
+  /// because these are the ones that cost money or read the clipboard.
+  AbstractSettingsTile _permissionSwitch(
+      BuildContext context, PluginPermissionSpec spec,
+      {required bool enabled}) {
+    final granted = host.hasPermission(pluginId, spec.token);
+    return CustomSettingsTile(
+      child: SwitchListTile(
+        key: ValueKey('plugin-permission-${spec.token}'),
+        secondary: Icon(spec.danger ? Icons.warning_amber_outlined : Icons.shield_outlined,
+            color: spec.danger && granted
+                ? Theme.of(context).colorScheme.error
+                : null),
+        title: Text(pluginCapabilityLabel(context, spec.token)),
+        subtitle: Text(spec.token),
+        value: granted,
+        onChanged: !enabled
+            ? null
+            : (value) => _toggle(context, spec, value),
+      ),
+    );
+  }
+
+  Future<void> _toggle(
+      BuildContext context, PluginPermissionSpec spec, bool value) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (value && spec.danger) {
+      final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialog) => AlertDialog(
+                title: Text(pluginCapabilityLabel(context, spec.token)),
+                content: Text(ModuStrings.text(
+                  context,
+                  '开启后该插件可以使用此能力，你随时可以在本页关闭。',
+                  'The plugin will be able to use this capability. You can switch it off here at any time.',
+                )),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialog, false),
+                      child: Text(ModuStrings.text(context, '取消', 'Cancel'))),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(dialog, true),
+                      child: Text(ModuStrings.text(context, '开启', 'Turn on'))),
+                ],
+              ));
+      if (confirmed != true) return;
+    }
+    try {
+      await host.setPermission(pluginId, spec.token, value);
+    } on PluginInstallError catch (error) {
+      messenger?.showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Widget _contributionSection(BuildContext context, PluginRecord record) {
