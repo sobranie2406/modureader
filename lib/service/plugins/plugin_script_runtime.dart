@@ -46,7 +46,12 @@ const Set<String> kPluginServiceMethods = {
   'open.url',
 };
 
-/// Methods that may open native UI and therefore pause the execution clock.
+/// Methods whose latency is not the plugin's CPU time.
+///
+/// These either open native UI or wait on the user's own model, translation or
+/// speech service. The execution clock pauses while one is pending, bounded by
+/// the shared native-interaction budget, so a slow model server cannot turn a
+/// correct plugin into a timeout failure.
 const Set<String> kPluginInteractiveMethods = {
   'privateLibrary.updateOptions',
   'privateLibrary.selectBooks',
@@ -56,6 +61,9 @@ const Set<String> kPluginInteractiveMethods = {
   'ui.select',
   'share.text',
   'clipboard.read',
+  'ai.complete',
+  'translate.text',
+  'tts.speak',
 };
 
 class PluginScriptFailure implements Exception {
