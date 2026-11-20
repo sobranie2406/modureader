@@ -174,6 +174,16 @@ void main() {
     expect(host.hasPermission(_id, 'ai:invoke'), isFalse);
   });
 
+  test('an upgrade drops a grant the new version no longer declares', () async {
+    await install(['ai:invoke', 'note:read']);
+    await host.setPermission(_id, 'ai:invoke', true);
+    await host.setPermission(_id, 'note:read', true);
+    // The new version keeps only note:read.
+    await install(['note:read']);
+    expect(host.grantedPermissions(_id), {'note:read'});
+    expect(host.hasPermission(_id, 'ai:invoke'), isFalse);
+  });
+
   test('permission grants never enter the settings backup', () async {
     await install(['ai:invoke']);
     await host.setPermission(_id, 'ai:invoke', true);

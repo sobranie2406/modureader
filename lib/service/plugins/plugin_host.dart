@@ -535,6 +535,16 @@ class PluginHost extends ChangeNotifier {
     await Prefs().savePluginPermissions(store);
   }
 
+  /// Drops grants for capabilities [manifest] no longer declares.
+  Future<void> _prunePermissions(PluginManifest manifest) async {
+    final store = Prefs().pluginPermissions;
+    final pruned = PluginPermissions.prune(store, manifest);
+    if (PluginPermissions.encode(pruned) == PluginPermissions.encode(store)) {
+      return;
+    }
+    await Prefs().savePluginPermissions(pruned);
+  }
+
   @override
   void notifyListeners() {
     if (identical(this, _instance) || _peer != null) {
@@ -927,6 +937,12 @@ class PluginHost extends ChangeNotifier {
         );
         await _saveState(_state.upsert(record));
         await _seedLegacyPermissions(manifest, wasInstalled: existing != null);
+        // A new version may have dropped a capability. Keeping its grant would
+        // silently re-authorise it if a later version re-added the token, so the
+        // store is pruned against what this version actually declares.
+        if (!development) {
+          await _prunePermissions(manifest);
+        }
         if (development &&
             existing != null &&
             (_manifests[manifest.id]
