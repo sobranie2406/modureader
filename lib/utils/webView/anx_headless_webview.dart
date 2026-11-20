@@ -201,23 +201,37 @@ class AnxHeadlessWebView {
     return _disposing ??= _dispose();
   }
 
+  /// How long dispose waits for a late native creation before giving up.
+  ///
+  /// A WebView2 environment that fails to initialise ("the device is not ready",
+  /// 0x80070015) never completes run(), so without a bound this instance would
+  /// stay in [_instances] marked disposed forever — and because [run] refuses to
+  /// start while any disposed instance is still registered, every later
+  /// background WebView would fail for the rest of the session.
+  static const Duration _creationGrace = Duration(seconds: 5);
+
   Future<void> _dispose() async {
-    // Windows plugin dispose is a no-op until run() has completed. Wait for
-    // late creation before disposing; callers may bound their own wait, but
-    // retain this instance until native cleanup really finishes.
     try {
-      await _running;
-    } catch (_) {
-      // A failed creation may still have allocated a native controller.
+      // Windows plugin dispose is a no-op until run() has completed. Wait for
+      // late creation before disposing; callers may bound their own wait, but
+      // retain this instance until native cleanup really finishes.
+      try {
+        await _running?.timeout(_creationGrace);
+      } catch (_) {
+        // A failed or wedged creation may still have allocated a controller.
+      }
+      if (_headlessWebView != null) {
+        await _headlessWebView?.dispose();
+        _headlessWebView = null;
+      }
+      if (_overlayEntry != null) {
+        _overlayEntry?.remove();
+        _overlayEntry = null;
+      }
+    } finally {
+      // Always unregister, otherwise one failed dispose wedges every later
+      // background WebView.
+      _instances.remove(this);
     }
-    if (_headlessWebView != null) {
-      await _headlessWebView?.dispose();
-      _headlessWebView = null;
-    }
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
-    }
-    _instances.remove(this);
   }
 }

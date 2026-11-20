@@ -308,6 +308,9 @@ Future<void> runPluginAction(BuildContext context,
       'timeout' => t('插件运行超时，已停止。', 'Plugin timed out and was stopped.'),
       'permission' =>
         t('插件没有此操作的权限。', 'This plugin cannot perform that action.'),
+      // The package declares the capability; the user has not switched it on.
+      'denied' => t('插件需要先开启权限：设置 → 插件 → 该插件 → 权限。',
+          'Turn this permission on first: Settings → Plugins → this plugin → Permissions.'),
       'size' ||
       'result' =>
         t('插件内容过大或结果无效。', 'Plugin input or result is invalid or too large.'),
