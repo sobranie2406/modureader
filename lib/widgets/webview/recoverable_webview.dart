@@ -2,6 +2,7 @@ import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'webview_hit_region.dart';
 
 /// A dead Android renderer must be removed, never reloaded or reused.
 class RecoverableWebView extends StatefulWidget {
@@ -36,14 +37,16 @@ class _RecoverableWebViewState extends State<RecoverableWebView> {
       );
     }
     final generation = _generation;
-    return KeyedSubtree(
-      key: ValueKey(generation),
-      child: widget.builder((_, detail) {
-        if (!mounted || _gone || generation != _generation) return;
-        AnxLog.warning('WebView renderer gone: didCrash=${detail.didCrash}');
-        setState(() => _gone = true);
-        widget.onGone?.call();
-      }),
+    return WebViewRouteGuard(
+      child: KeyedSubtree(
+        key: ValueKey(generation),
+        child: widget.builder((_, detail) {
+          if (!mounted || _gone || generation != _generation) return;
+          AnxLog.warning('WebView renderer gone: didCrash=${detail.didCrash}');
+          setState(() => _gone = true);
+          widget.onGone?.call();
+        }),
+      ),
     );
   }
 }

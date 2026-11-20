@@ -1,4 +1,5 @@
 import 'package:modu_reader/widgets/reading_page/reader_web_brightness.dart';
+import 'package:modu_reader/widgets/webview/webview_hit_region.dart';
 import 'dart:async';
 import 'package:modu_reader/utils/webView/web_scrollbar.dart';
 
@@ -117,7 +118,7 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
       return Text(dictionaryLabel(context, '正在加载图文…', 'Loading content…'),
           style: Theme.of(context).textTheme.bodySmall);
     }
-    return SizedBox(
+    final content = SizedBox(
       height: height,
       child: InAppWebView(
         webViewEnvironment: webViewEnvironment,
@@ -171,5 +172,6 @@ class _DictionaryOriginalState extends State<DictionaryOriginal> {
         },
       ),
     );
+    return WebViewRouteGuard(child: content);
   }
 }

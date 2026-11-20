@@ -15,6 +15,15 @@
   }
 
 
+  #footnote-backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 999;
+  }
+
   #footnote-dialog {
     /*
     padding: var(safe-area-inset-top) var(safe-area-inset-right) var(safe-area-inset-bottom) var(safe-area-inset-left);
@@ -56,6 +65,7 @@
     min-height: 0;
   }
 </style>
+<div id="footnote-backdrop" hidden></div>
 <div id="footnote-dialog">
   <main></main>
 </div>

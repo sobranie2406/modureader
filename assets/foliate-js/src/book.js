@@ -817,19 +817,19 @@ const readingFeaturesDocHandler = (doc) => {
 
 
 const footnoteDialog = document.getElementById('footnote-dialog')
+const footnoteBackdrop = document.getElementById('footnote-backdrop')
 let footnoteSizing = null
 footnoteDialog.style.display = 'none'
 const closeFootnote = () => {
   footnoteSizing?.destroy()
   footnoteSizing = null
   footnoteDialog.style.display = 'none'
+  footnoteBackdrop.hidden = true
   reader.closeFootnote()
   delete globalThis.footnoteSelection
   callFlutter("onFootnoteClose")
 }
-footnoteDialog.addEventListener('click', e => {
-  if (e.target === footnoteDialog) closeFootnote()
-})
+footnoteBackdrop.addEventListener('click', closeFootnote)
 
 const replaceFootnote = (view, sourceFontSize) => {
   footnoteSizing?.destroy()
@@ -924,6 +924,7 @@ class Reader {
         desktop: style.desktopPageInput === true,
         sourceElement,
       })
+      footnoteBackdrop.hidden = false
     })
     this.#originalContent = null
   }

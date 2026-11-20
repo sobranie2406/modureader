@@ -5,6 +5,32 @@ import { createRequire } from 'node:module';
 const source = await readFile(new URL('../assets/foliate-js/src/footnote-size.js', import.meta.url), 'utf8');
 const { footnoteBoxSize, attachFootnoteSizing, footnoteFontSize, footnoteBoxPosition, footnoteAnchorRect } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
+test('footnotes close from the transparent backdrop, including the page margins', async () => {
+  const { JSDOM } = createRequire(`${process.env.MODU_JSDOM_ROOT}/package.json`)('jsdom');
+  const html = await readFile(new URL('../assets/foliate-js/index.html', import.meta.url), 'utf8');
+  const book = await readFile(new URL('../assets/foliate-js/src/book.js', import.meta.url), 'utf8');
+  const dom = new JSDOM(html);
+  const { document } = dom.window;
+  let closes = 0;
+  const bind = book.slice(book.indexOf('const footnoteDialog ='), book.indexOf('const replaceFootnote ='));
+  new Function('document', 'reader', 'callFlutter', bind)(document, { closeFootnote() {} }, name => {
+    assert.equal(name, 'onFootnoteClose');
+    closes++;
+  });
+  const backdrop = document.getElementById('footnote-backdrop');
+  const dialog = document.getElementById('footnote-dialog');
+  assert.equal(backdrop.hidden, true);
+  dialog.style.display = 'block';
+  backdrop.hidden = false;
+  dialog.querySelector('main').click();
+  assert.equal(closes, 0);
+  backdrop.click();
+  assert.equal(closes, 1);
+  assert.equal(backdrop.hidden, true);
+  assert.equal(dialog.style.display, 'none');
+  dom.window.close();
+});
+
 test('footnote type follows the reader at 80 percent without changing its size', async () => {
   for (const size of [.6, 1, 1.4, 2, 3, 5]) {
     assert.ok(Math.abs(footnoteFontSize(size) - size * .8) < 1e-10);

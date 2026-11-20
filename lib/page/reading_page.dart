@@ -65,6 +65,7 @@ import 'package:modu_reader/widgets/reading_page/translation_widget.dart';
 import 'package:modu_reader/widgets/reading_page/translation_toolbar_action.dart';
 import 'package:modu_reader/widgets/reading_page/book_search.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
+import 'package:modu_reader/widgets/webview/webview_hit_region.dart';
 import 'package:modu_reader/widgets/bookshelf/book_cover.dart';
 import 'package:modu_reader/widgets/page_router/reader_cover_hero.dart';
 import 'package:modu_reader/widgets/reading_page/selection_search_browser.dart';
@@ -2039,9 +2040,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                   behavior: HitTestBehavior.opaque,
                   onVerticalDragUpdate: (details) {},
                   onVerticalDragEnd: (details) {},
-                  child: Container(
-                    color: Colors.transparent,
-                  )),
+                  child: const MacOSWebViewHitRegion()),
             ),
             Column(
               children: [

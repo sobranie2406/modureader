@@ -1,4 +1,5 @@
 import 'package:modu_reader/widgets/webview/recoverable_webview.dart';
+import 'package:modu_reader/widgets/webview/webview_hit_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +25,67 @@ class _PageState extends State<_Page> {
 }
 
 void main() {
+  testWidgets('macOS protects covered WebViews across nested popups',
+      (tester) async {
+    var disposals = 0;
+    final hitRegions = find.byType(MacOSWebViewHitRegion);
+    const outside = Offset(20, 20);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: Builder(builder: (context) {
+        return Column(children: [
+          Expanded(
+            child: RecoverableWebView(builder: (_) => _Page(() => disposals++)),
+          ),
+          TextButton(
+            onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                barrierColor: Colors.transparent,
+                builder: (context) => WebViewRouteGuard(
+                      child: TextButton(
+                          onPressed: () => showDialog<void>(
+                                context: context,
+                                barrierColor: Colors.transparent,
+                                barrierDismissible: false,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Blocking dialog'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Confirm'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          child: const Text('Nested dialog')),
+                    )),
+            child: const Text('Open popup'),
+          ),
+        ]);
+      }),
+    )));
+    expect(hitRegions, findsNothing);
+    await tester.tap(find.text('Open popup'));
+    await tester.pumpAndSettle();
+    expect(hitRegions, findsOneWidget);
+
+    await tester.tap(find.text('Nested dialog'));
+    await tester.pumpAndSettle();
+    expect(hitRegions, findsNWidgets(2));
+    await tester.tapAt(outside);
+    await tester.pumpAndSettle();
+    expect(find.text('Blocking dialog'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    expect(hitRegions, findsOneWidget);
+    expect(find.text('Nested dialog'), findsOneWidget);
+    await tester.tapAt(outside);
+    await tester.pumpAndSettle();
+    expect(find.text('Nested dialog'), findsNothing);
+    expect(hitRegions, findsNothing);
+    expect(disposals, 0);
+  }, variant: const TargetPlatformVariant({TargetPlatform.macOS}));
+
   testWidgets(
       'renderer loss disposes the native subtree; retry creates a new one',
       (tester) async {
