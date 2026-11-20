@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
 import 'package:modu_reader/service/plugins/plugin_network_guard.dart';
@@ -14,6 +15,48 @@ import 'package:modu_reader/utils/log/common.dart';
 import 'package:path/path.dart' as p;
 
 import 'plugin_host.dart';
+
+/// Host methods implemented in Dart by [PluginHostApi].
+///
+/// Split from the reader-bound methods (`library.list`, `notes.save`, the
+/// private-library bridge and `articles.capture`) which need the live reading
+/// context and therefore still travel through the page-supplied callback.
+const Set<String> kPluginServiceMethods = {
+  'library.tags',
+  'library.groups',
+  'library.tag',
+  'library.move',
+  'books.content',
+  'books.chapter',
+  'notes.list',
+  'reading.stats',
+  'reading.history',
+  'search.library',
+  'knowledge.search',
+  'dictionary.lookup',
+  'ai.complete',
+  'translate.text',
+  'clipboard.write',
+  'clipboard.read',
+  'share.text',
+  'ui.confirm',
+  'ui.prompt',
+  'ui.select',
+  'ui.progress',
+  'open.url',
+};
+
+/// Methods that may open native UI and therefore pause the execution clock.
+const Set<String> kPluginInteractiveMethods = {
+  'privateLibrary.updateOptions',
+  'privateLibrary.selectBooks',
+  'privateLibrary.setPrivate',
+  'ui.confirm',
+  'ui.prompt',
+  'ui.select',
+  'share.text',
+  'clipboard.read',
+};
 
 class PluginScriptFailure implements Exception {
   const PluginScriptFailure(this.code);
@@ -90,6 +133,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     required ScriptActionContribution action,
     Map<String, Object?> input = const {},
     PluginHostCall? hostCall,
+    PluginHostApi? hostApi,
     bool Function()? isContextValid,
     PluginCancelToken? cancel,
   }) {
@@ -144,7 +188,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         _abort(job, 'cancelled');
       }
     });
-    unawaited(_execute(pluginId, manifest, action, input, hostCall, job));
+    unawaited(
+        _execute(pluginId, manifest, action, input, hostCall, hostApi, job));
     return job.result.future;
   }
 
@@ -164,6 +209,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       ScriptActionContribution action,
       Map<String, Object?> input,
       PluginHostCall? hostCall,
+      PluginHostApi? hostApi,
       _ScriptJob job) async {
     try {
       _check(id, job);
@@ -227,7 +273,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
                   importPolicy ||
                   action.surface == PluginScriptSurface.dictionary
               ? Future.error(const PluginScriptFailure('permission'))
-              : _call(id, manifest, method, args, hostCall, job));
+              : _call(id, manifest, method, args, hostCall, hostApi, job));
       _check(id, job);
       job.stage = 'result';
       _bounded(result, article ? maxArticleResultBytes : maxResultBytes);
@@ -332,6 +378,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       String method,
       Map<String, dynamic> args,
       PluginHostCall? hostCall,
+      PluginHostApi? hostApi,
       _ScriptJob job) async {
     _check(id, job);
     _bounded(args, maxInputBytes);
@@ -341,7 +388,26 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     final permission = switch (method) {
       'http.get' => 'net:http',
       'library.list' => kLibraryReadCapability,
+      'library.tags' => kLibraryReadCapability,
+      'library.groups' => kLibraryReadCapability,
+      'library.tag' || 'library.move' => kLibraryWriteCapability,
+      'books.content' => kBookContentCapability,
+      'books.chapter' => kBookContentCapability,
+      'notes.list' => kNoteReadCapability,
       'notes.save' => kNoteWriteCapability,
+      'reading.stats' || 'reading.history' => kReadingReadCapability,
+      'search.library' => kSearchLibraryCapability,
+      'knowledge.search' => kKnowledgeQueryCapability,
+      'ai.complete' => kAiInvokeCapability,
+      'translate.text' => kTranslateInvokeCapability,
+      'tts.speak' => kTtsInvokeCapability,
+      'dictionary.lookup' => kDictionaryLookupCapability,
+      'clipboard.read' => kClipboardReadCapability,
+      'clipboard.write' => kClipboardWriteCapability,
+      'share.text' => kShareTextCapability,
+      'ui.confirm' || 'ui.prompt' || 'ui.select' => kUiDialogCapability,
+      'ui.progress' => kUiProgressCapability,
+      'open.url' => kUrlOpenCapability,
       'privateLibrary.open' ||
       'privateLibrary.lock' =>
         kLibraryPrivateCapability,
@@ -357,6 +423,12 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         (permission == kLibraryPrivateControlCapability &&
             !manifest.capabilities.contains(kLibraryPrivateCapability))) {
       throw const PluginScriptFailure('permission');
+    }
+    // A capability the user has not granted yet fails as `denied` rather than
+    // `permission`, so the UI can offer to open the permission switches instead
+    // of claiming the package is broken.
+    if (!host.hasPermission(id, permission)) {
+      throw const PluginScriptFailure('denied');
     }
     job.callBusy = true;
     final previousStage = job.stage;
@@ -386,13 +458,24 @@ class PluginScriptRuntime with WidgetsBindingObserver {
             pluginId: id,
             cancel: job.cancel);
         value = {'text': utf8.decode(bytes)};
+      } else if (kPluginServiceMethods.contains(method)) {
+        // Implemented in Dart by the host itself, so these methods work from
+        // the reading view, the plugin page and tests alike.
+        if (hostApi == null) throw const PluginScriptFailure('permission');
+        final interactive = kPluginInteractiveMethods.contains(method);
+        if (interactive) _beginNativeInteraction(job);
+        try {
+          value = await hostApi.call(method, args);
+        } catch (error) {
+          throw error is PluginScriptFailure
+              ? error
+              : const PluginScriptFailure('execution');
+        } finally {
+          if (interactive) _endNativeInteraction(job);
+        }
       } else {
         if (hostCall == null) throw const PluginScriptFailure('permission');
-        final interactive = const {
-          'privateLibrary.updateOptions',
-          'privateLibrary.selectBooks',
-          'privateLibrary.setPrivate'
-        }.contains(method);
+        final interactive = kPluginInteractiveMethods.contains(method);
         if (interactive) _beginNativeInteraction(job);
         try {
           value = await hostCall(method, args);
@@ -509,6 +592,7 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       'timeout',
       'execution',
       'permission',
+      'denied',
       'quota',
       'size',
       'result'
