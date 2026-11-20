@@ -59,8 +59,43 @@
       });
       const modu = Object.freeze({
         http:Object.freeze({get:args=>request('http.get',args)}),
-        library:Object.freeze({list:args=>request('library.list',args)}),
-        notes:Object.freeze({save:args=>request('notes.save',args)}),
+        library:Object.freeze({
+          list:args=>request('library.list',args),
+          tags:args=>request('library.tags',args),
+          groups:args=>request('library.groups',args),
+          tag:args=>request('library.tag',args),
+          move:args=>request('library.move',args)
+        }),
+        books:Object.freeze({
+          content:args=>request('books.content',args),
+          chapter:args=>request('books.chapter',args)
+        }),
+        notes:Object.freeze({
+          list:args=>request('notes.list',args),
+          save:args=>request('notes.save',args)
+        }),
+        reading:Object.freeze({
+          stats:args=>request('reading.stats',args),
+          history:args=>request('reading.history',args)
+        }),
+        search:Object.freeze({library:args=>request('search.library',args)}),
+        knowledge:Object.freeze({search:args=>request('knowledge.search',args)}),
+        dictionary:Object.freeze({lookup:args=>request('dictionary.lookup',args)}),
+        ai:Object.freeze({complete:args=>request('ai.complete',args)}),
+        translate:Object.freeze({text:args=>request('translate.text',args)}),
+        tts:Object.freeze({speak:args=>request('tts.speak',args)}),
+        clipboard:Object.freeze({
+          read:()=>request('clipboard.read'),
+          write:args=>request('clipboard.write',args)
+        }),
+        share:Object.freeze({text:args=>request('share.text',args)}),
+        ui:Object.freeze({
+          confirm:args=>request('ui.confirm',args),
+          prompt:args=>request('ui.prompt',args),
+          select:args=>request('ui.select',args),
+          progress:args=>request('ui.progress',args)
+        }),
+        open:Object.freeze({url:args=>request('open.url',args)}),
         articles:Object.freeze({capture:()=>request('articles.capture')}),
         privateLibrary:Object.freeze({
           open:()=>request('privateLibrary.open'),lock:()=>request('privateLibrary.lock'),
