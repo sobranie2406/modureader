@@ -36,6 +36,77 @@ Host API methods:
 | `modu.privateLibrary.setPrivate({bookIds,private,lockAfter})` | Same | Revalidates selected IDs against native grants and saves local marks; optional lock after commit |
 | `modu.articles.capture()` | `article:capture` | Opens native URL capture, Markdown preview, export and bookshelf import; returns `{opened: true}` |
 
+### Reading content and library
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.library.tags({bookId})` | `library:read` | Tags of one readable book, with id and colour; no tags of a locked private book |
+| `modu.library.groups()` | `library:read` | At most 500 folders with id, name and parent |
+| `modu.library.tag({bookIds,name,remove?})` | `library:write` | Creates the tag when missing, then attaches or detaches it; every book is re-checked as readable |
+| `modu.library.move({bookIds,groupId})` | `library:write` | Moves readable books into a folder; `0` means the shelf root |
+| `modu.books.content({maxCharacters?})` | `book:content` | Current chapter text of the open book, at most 12k characters |
+| `modu.books.chapter({href,maxCharacters?})` | `book:content` | One chapter by href, same bound |
+| `modu.notes.list({bookId?,keyword?,limit?})` | `note:read` | Highlights and notes with their chapter and text |
+| `modu.reading.stats({days?})` | `reading:read` | Total and per-book reading seconds for a window |
+| `modu.reading.history({bookId?,limit?})` | `reading:read` | Daily reading entries |
+| `modu.search.library({query,limit?,includeNotes?})` | `search:library` | One query across books and notes |
+| `modu.knowledge.search({query,limit?})` | `knowledge:query` | Local vector index of one book, five-second budget |
+| `modu.dictionary.lookup({word,limit?})` | `dictionary:lookup` | Installed local dictionaries |
+
+### Models
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.ai.complete({prompt,system?})` | `ai:invoke` | The user's configured model, capped at 32k output characters. Billed to the user |
+| `modu.translate.text({text})` | `translate:invoke` | The user's configured translation engine |
+| `modu.tts.speak({text})` | `tts:invoke` | The user's configured voice. The plugin never receives the audio bytes |
+
+### System surfaces
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.clipboard.write({text})` | `clipboard:write` | Copies up to 8k characters |
+| `modu.clipboard.read()` | `clipboard:read` | Returns the plain-text clipboard, at most 8k characters |
+| `modu.share.text({text,subject?})` | `share:text` | Opens the system share sheet |
+| `modu.ui.confirm({title,message})` | `ui:dialog` | Yes/no dialog, returns `{confirmed}` |
+| `modu.ui.prompt({title,message,initial?})` | `ui:dialog` | Text dialog, returns `{text}` |
+| `modu.ui.select({title,options})` | `ui:dialog` | At most 30 options, returns `{selected}` |
+| `modu.ui.progress({label,fraction})` | `ui:progress` | Transient progress bar, grows with a long task |
+| `modu.open.url({url})` | `url:open` | http(s) only; `file:`, `javascript:` and `intent:` are refused |
+
+Every argument is validated against a named-argument allowlist, so an unknown
+key fails the call instead of being ignored, and every list and string has a
+hard bound. A call whose capability the user has not granted fails with
+`denied`, which the UI explains as a missing permission rather than a broken
+package.
+
+## Permissions
+
+Capabilities split in two tiers:
+
+- **Install tier** — materialised by installing the package (`ai:prompt-pack`,
+  `ui:selection-action`, `ui:book-action`, `script:run`, the private-library
+  trio, `settings:device`, `dictionary:transform`, `article:capture`,
+  `article:extract`). Refusing them means not installing, so the details page
+  lists them as information.
+- **Runtime tier** — off by default and switched on per plugin in
+  **插件 → 详情 → 权限**. This covers `net:http`, book and note reads and writes,
+  the library, reading statistics, search, the local vector index, `ai:invoke`,
+  `translate:invoke`, `tts:invoke`, `dictionary:lookup`, the clipboard, the
+  share sheet, `ui:dialog`, `ui:progress` and `url:open`.
+
+Grants are device-local consent, exactly like the experimental switch: they are
+never exported, never travel in a settings backup and never sync. Restoring a
+backup on another device therefore cannot hand a plugin new powers. Revoking a
+capability cancels the plugin's running task, so work already in flight cannot
+finish with a permission that was just withdrawn. Uninstalling removes every
+grant.
+
+Packages that shipped before manual grants existed keep the capabilities they
+already implied (network, library read, notes, the private-library trio and
+article capture) so an app upgrade does not break a working plugin. Every
+capability added later starts denied.
+
 ## Plugin-owned private policies and settings
 
 Private plugin rules, visibility choices, import decisions and book-menu behavior
