@@ -371,6 +371,23 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test('dispose awaits the stop call before tearing the view down', () async {
+    // A platform message still pending when the native view dies is reported by
+    // the Flutter engine as "Failed to respond to a message. This is a memory
+    // leak." Dispose therefore has to await the stop call instead of firing it
+    // and walking away.
+    final view = await start();
+    view.loadStop();
+    final rejected = failed();
+    await engine.dispose();
+    await rejected;
+    expect(view.disposals, 1);
+    expect(
+        view.native.evaluations
+            .any((source) => source.contains('moduPluginStop')),
+        isTrue);
+  });
+
   test('memory document keeps file, network, navigation and popup isolation',
       () async {
     final view = await start();

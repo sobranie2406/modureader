@@ -36,6 +36,10 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
   final _result = Completer<Map<String, dynamic>>();
   bool _disposed = false, _started = false;
   int _messages = 0;
+  /// In-flight JavaScript evaluations. dispose() waits for these, because a
+  /// platform message that is still pending when the native view is destroyed
+  /// is reported by the engine as "Failed to respond to a message".
+  final _pendingJs = <Future<void>>{};
   String _diagnosticStage = 'idle';
   String get diagnosticStage => _diagnosticStage;
 
@@ -187,7 +191,8 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
           _fail('invalid_message');
           return;
         }
-        unawaited(() async {
+        late final Future<void> started;
+        started = () async {
           try {
             final state = await controller.evaluateJavascript(source: '''
 (() => {
@@ -206,8 +211,12 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
             }
           } catch (_) {
             _fail('bootstrap_error');
+          } finally {
+            _pendingJs.remove(started);
           }
-        }());
+        }();
+        _pendingJs.add(started);
+        unawaited(started);
       },
       onConsoleMessage: (_, message) {
         if (message.messageLevel == ConsoleMessageLevel.ERROR) {
@@ -237,10 +246,31 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
     _fail();
     final controller = _controller;
     if (controller != null) {
-      unawaited(controller
-          .evaluateJavascript(
-              source: 'if (window.moduPluginStop) window.moduPluginStop()')
-          .catchError((_) => null));
+      // Ask the worker to stop, but *await* the reply before tearing the view
+      // down. A fire-and-forget call here leaves its platform message pending
+      // when the native side is destroyed, and the Flutter engine reports that
+      // as "Failed to respond to a message. This is a memory leak."
+      //
+      // The timeout keeps a wedged renderer from blocking shutdown: after it
+      // elapses we dispose anyway and accept the leak rather than hang.
+      try {
+        await controller
+            .evaluateJavascript(
+                source: 'if (window.moduPluginStop) window.moduPluginStop()')
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // Cancelled, timed out or already torn down: nothing to do.
+      }
+      // A bootstrap evaluation may still be in flight; it would outlive the
+      // view for the same reason. Bounded so shutdown cannot hang on it.
+      if (_pendingJs.isNotEmpty) {
+        try {
+          await Future.wait(_pendingJs.toList())
+              .timeout(const Duration(seconds: 2));
+        } catch (_) {
+          // Whichever evaluation is stuck is abandoned with the view.
+        }
+      }
     }
     await _view?.dispose();
   }

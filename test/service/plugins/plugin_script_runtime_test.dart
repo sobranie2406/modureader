@@ -807,6 +807,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     final dns = Completer<List<InternetAddress>>();
     final http = Http();
     runtime = PluginScriptRuntime(
@@ -843,6 +846,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     var valid = true, resolved = false;
     final http = Http();
     runtime = PluginScriptRuntime(
@@ -875,6 +881,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     final http = Http();
     runtime = PluginScriptRuntime(
         host: host,
