@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
+import 'package:modu_reader/widgets/plugins/plugin_permission_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,6 +16,8 @@ import 'package:url_launcher/url_launcher.dart';
 /// a widget tree, so the page supplies these and a test supplies none.
 PluginHostServices buildPluginHostServices(
   BuildContext context, {
+  required PluginHost host,
+  required String pluginId,
   Book? book,
   String chapter = '',
   Future<String> Function()? currentChapter,
@@ -44,6 +48,15 @@ PluginHostServices buildPluginHostServices(
       ));
     },
     openUrl: (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
+    // Consent always goes through the same sheet, whether the plugin asked on
+    // its own initiative or the user opened the permission page.
+    requestPermissions: (id, capabilities, reason) =>
+        showPluginPermissionRequest(context,
+            host: host,
+            pluginId: id,
+            capabilities: capabilities,
+            reason: reason),
+    grantedPermissions: (id) async => host.grantedPermissions(id),
     askConfirm: (title, message) async {
       if (!context.mounted) return false;
       final answer = await showDialog<bool>(

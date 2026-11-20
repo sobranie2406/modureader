@@ -96,6 +96,10 @@
           progress:args=>request('ui.progress',args)
         }),
         open:Object.freeze({url:args=>request('open.url',args)}),
+        permissions:Object.freeze({
+          request:args=>request('permissions.request',args),
+          status:()=>request('permissions.status')
+        }),
         articles:Object.freeze({capture:()=>request('articles.capture')}),
         privateLibrary:Object.freeze({
           open:()=>request('privateLibrary.open'),lock:()=>request('privateLibrary.lock'),

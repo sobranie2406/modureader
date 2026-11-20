@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:modu_reader/page/home_page.dart' show webViewEnvironment;
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 
 typedef PluginHostCall = Future<Object?> Function(
     String method, Map<String, dynamic> arguments);
@@ -55,7 +56,15 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
       String source, Map<String, Object?> input,
       {required PluginHostCall onCall}) async {
     if (_disposed || _view != null) throw StateError('Plugin engine is closed');
-    if (Platform.isWindows && webViewEnvironment == null) {
+    // Ask for the environment instead of only reading the cached one: a single
+    // failed start earlier in the session used to leave the cached value null,
+    // so every plugin run failed with "WebView2 is not available" until the app
+    // was restarted. [WebViewEnvironmentBoot] retries and rate-limits attempts.
+    final environment = Platform.isWindows
+        ? await WebViewEnvironmentBoot.instance.ensure()
+        : webViewEnvironment;
+    if (_disposed) throw StateError('Plugin engine is closed');
+    if (Platform.isWindows && environment == null) {
       throw StateError('WebView2 is not available');
     }
     _diagnosticStage = 'bootstrap_asset';
@@ -75,7 +84,7 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
         '<script nonce="$nonce">$bootstrap</script>';
     _diagnosticStage = 'webview_creation';
     _view = AnxHeadlessWebView(
-      webViewEnvironment: webViewEnvironment,
+      webViewEnvironment: environment,
       initialData: InAppWebViewInitialData(
           data: html, baseUrl: pageUrl, historyUrl: pageUrl),
       initialSettings: InAppWebViewSettings(

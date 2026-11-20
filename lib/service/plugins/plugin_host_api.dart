@@ -10,6 +10,8 @@ import 'package:modu_reader/dao/search_repository.dart';
 import 'package:modu_reader/dao/tag.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/book_note.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/models/tag.dart';
 import 'package:modu_reader/service/ai/index.dart';
 import 'package:modu_reader/service/dictionary/local_dictionary.dart';
@@ -59,6 +61,8 @@ class PluginHostServices {
     this.readClipboard,
     this.shareText,
     this.openUrl,
+    this.requestPermissions,
+    this.grantedPermissions,
   });
 
   final PluginReaderSnapshot? reader;
@@ -72,6 +76,19 @@ class PluginHostServices {
   final Future<String?> Function()? readClipboard;
   final Future<void> Function(String text, String? subject)? shareText;
   final Future<bool> Function(Uri uri)? openUrl;
+
+  /// Shows the consent sheet and applies the user's answer.
+  ///
+  /// [capabilities] is what the plugin asked for, already filtered to
+  /// declarations it actually has; an empty list means "everything I declare
+  /// but do not hold yet". The callback returns the grants now in force, which
+  /// may be fewer than requested — the user may switch individual rows off.
+  final Future<Set<String>> Function(
+          String pluginId, List<String> capabilities, String reason)?
+      requestPermissions;
+
+  /// Grants currently held, so a plugin can ask before it needs them.
+  final Future<Set<String>> Function(String pluginId)? grantedPermissions;
 }
 
 /// Executes the non-network host API methods for one plugin.
@@ -150,6 +167,10 @@ class PluginHostApi {
         return _storageWrite(args);
       case 'storage.remove':
         return _storageRemove(args);
+      case 'permissions.request':
+        return _permissionsRequest(args);
+      case 'permissions.status':
+        return _permissionsStatus(args);
       default:
         throw const PluginScriptFailure('permission');
     }
@@ -772,6 +793,60 @@ class PluginHostApi {
     if (!await file.exists()) return {'removed': false};
     await file.delete();
     return {'removed': true};
+  }
+
+  // ---- runtime permissions ------------------------------------------------
+
+  /// Lets a plugin ask for a capability **at the moment it needs it**.
+  ///
+  /// The user still decides: the sheet lists each capability with its own
+  /// switch, and nothing is granted until they confirm. The plugin-supplied
+  /// `reason` is shown above the list so the request can explain itself, but it
+  /// can never pre-approve anything — a blank reason simply prompts without one.
+  ///
+  /// Returns the grants now in force rather than a boolean, so a plugin can
+  /// branch when the user switches on only part of what it asked for.
+  Future<Object?> _permissionsRequest(Map<String, dynamic> args) async {
+    _only(args, const {'capabilities', 'reason'});
+    final request = services.requestPermissions;
+    if (request == null) throw const PluginScriptFailure('permission');
+    final raw = args['capabilities'];
+    if (raw is! List || raw.length > kKnownCapabilities.length) {
+      throw const PluginScriptFailure('permission');
+    }
+    final capabilities = <String>[];
+    for (final value in raw) {
+      // Only runtime-tier tokens: an install-tier one is already granted, and
+      // an unknown one has no catalogue entry to show the user.
+      if (value is! String ||
+          !kKnownCapabilities.contains(value) ||
+          !isRuntimePermission(value)) {
+        throw const PluginScriptFailure('permission');
+      }
+      if (!capabilities.contains(value)) capabilities.add(value);
+    }
+    final reason = args.containsKey('reason')
+        ? _text(args, 'reason', maxLength: 300, allowEmpty: true).trim()
+        : '';
+    final granted = await request(pluginId, capabilities, reason);
+    return {
+      'granted': [
+        for (final value in capabilities)
+          if (granted.contains(value)) value,
+      ],
+      'denied': [
+        for (final value in capabilities)
+          if (!granted.contains(value)) value,
+      ],
+    };
+  }
+
+  Future<Object?> _permissionsStatus(Map<String, dynamic> args) async {
+    _only(args, const {});
+    final read = services.grantedPermissions;
+    if (read == null) throw const PluginScriptFailure('permission');
+    final granted = (await read(pluginId)).toList()..sort();
+    return {'granted': granted};
   }
 
   Future<Object?> _openUrl(Map<String, dynamic> args) async {

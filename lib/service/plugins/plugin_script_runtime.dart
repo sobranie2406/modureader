@@ -48,6 +48,8 @@ const Set<String> kPluginServiceMethods = {
   'storage.read',
   'storage.write',
   'storage.remove',
+  'permissions.request',
+  'permissions.status',
 };
 
 /// Methods whose latency is not the plugin's CPU time.
@@ -68,6 +70,7 @@ const Set<String> kPluginInteractiveMethods = {
   'ai.complete',
   'translate.text',
   'tts.speak',
+  'permissions.request',
 };
 
 class PluginScriptFailure implements Exception {
@@ -427,6 +430,10 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       'storage.write' ||
       'storage.remove' =>
         'storage:plugin',
+      // Asking for consent is itself ungated on purpose: a plugin cannot grant
+      // anything by asking, only surface a sheet the user always decides. If it
+      // were gated, a plugin that lost a grant could never request it back.
+      'permissions.request' || 'permissions.status' => kScriptRunCapability,
       'privateLibrary.open' ||
       'privateLibrary.lock' =>
         kLibraryPrivateCapability,
