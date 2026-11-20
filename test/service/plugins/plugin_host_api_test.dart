@@ -210,6 +210,20 @@ void main() {
           denied());
     });
 
+    test('overwriting an owned file still works at the file limit', () async {
+      // Fill the quota through the API so the test exercises the same path the
+      // plugin does, then update one of those files.
+      for (var index = 0; index < 200; index++) {
+        await api().call(
+            'storage.write', {'name': 'f$index.json', 'text': 'x'});
+      }
+      expect(
+          await api().call('storage.write', {'name': 'f0.json', 'text': 'new'}),
+          {'bytes': 3});
+      expect(await api().call('storage.read', {'name': 'f0.json'}),
+          {'text': 'new'});
+    });
+
     test('writing more than the file limit is refused', () async {
       await expectLater(
           api().call('storage.write', {'name': 'a.json', 'text': 'x' * 300000}),

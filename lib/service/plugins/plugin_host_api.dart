@@ -287,20 +287,21 @@ class PluginHostApi {
     if (remove != null && remove is! bool) {
       throw const PluginScriptFailure('permission');
     }
+    // Check every book first: applying as we go left a half-tagged shelf behind
+    // when one id belonged to a private book the plugin may not touch.
+    for (final bookId in bookIds) {
+      await _readableBook(bookId);
+    }
     if (remove == true) {
       final tag = await tagDao.getTagByName(name);
       if (tag == null) return {'applied': 0};
-      var applied = 0;
       for (final bookId in bookIds) {
-        await _readableBook(bookId);
         await bookTagDao.removeRelation(bookId: bookId, tagId: tag.id);
-        applied++;
       }
-      return {'applied': applied};
+      return {'applied': bookIds.length};
     }
     final tag = await _ensureTag(name);
     for (final bookId in bookIds) {
-      await _readableBook(bookId);
       await bookTagDao.addRelation(bookId: bookId, tagId: tag.id);
     }
     return {'applied': bookIds.length, 'tagId': tag.id};
@@ -775,11 +776,15 @@ class PluginHostApi {
     for (final file in existing) {
       total += await file.length();
     }
-    if (existing.length >= _maxStorageFiles) {
-      throw const PluginScriptFailure('quota');
-    }
     final target = File(p.join(root.path, name));
     final previous = await target.exists() ? await target.length() : 0;
+    // Rewriting a file the plugin already owns must keep working at the limit,
+    // otherwise a plugin that filled its quota could never update what it wrote.
+    final replacing =
+        existing.any((file) => p.basename(file.path) == name);
+    if (!replacing && existing.length >= _maxStorageFiles) {
+      throw const PluginScriptFailure('quota');
+    }
     if (total - previous + text.length > _maxStorageTotalBytes) {
       throw const PluginScriptFailure('quota');
     }
