@@ -680,6 +680,10 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     cancelAll();
     host.unregisterRuntime(this);
     WidgetsBinding.instance.removeObserver(this);
+    // A disposed runtime must not be handed out again: it no longer observes
+    // lifecycle changes, so a script started through it would ignore the app
+    // being backgrounded.
+    if (identical(_instance, this)) _instance = null;
   }
 }
 

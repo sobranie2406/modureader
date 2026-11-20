@@ -238,7 +238,14 @@ class PluginDetailPage extends StatelessWidget {
       if (confirmed != true) return;
     }
     try {
-      await host.setPermission(pluginId, spec.token, value);
+      // Granting must not cancel work in flight — the package may be running
+      // right now and the user is deliberately giving it this capability.
+      // Revoking still goes through the cancelling path.
+      if (value) {
+        await host.grantPermissions(pluginId, [spec.token]);
+      } else {
+        await host.setPermission(pluginId, spec.token, false);
+      }
     } on PluginInstallError catch (error) {
       messenger?.showSnackBar(SnackBar(content: Text(error.message)));
     }
