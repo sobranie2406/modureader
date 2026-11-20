@@ -1973,6 +1973,32 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Plugins whose permission grants have already been decided once.
+  ///
+  /// Grandfathering an upgraded plugin's capabilities must happen exactly once:
+  /// without this marker, a user who revokes every grant would have them handed
+  /// back on the next start, because "no grants stored" is indistinguishable
+  /// from "never seeded".
+  Set<String> get pluginPermissionSeeded =>
+      (prefs.getStringList(PluginPermissions.seededKey) ?? const [])
+          .toSet();
+
+  Future<void> markPluginPermissionSeeded(String id) async {
+    final seeded = pluginPermissionSeeded..add(id);
+    if (!await prefs.setStringList(
+        PluginPermissions.seededKey, seeded.toList()..sort())) {
+      throw StateError('Could not record plugin permission seeding');
+    }
+  }
+
+  Future<void> clearPluginPermissionSeeded(String id) async {
+    final seeded = pluginPermissionSeeded..remove(id);
+    if (!await prefs.setStringList(
+        PluginPermissions.seededKey, seeded.toList()..sort())) {
+      throw StateError('Could not record plugin permission seeding');
+    }
+  }
+
   bool get aiReadingSkillsVisible =>
       prefs.getBool('aiReadingSkillsVisible') ?? true;
 

@@ -23,6 +23,13 @@ class PluginPermissions {
 
   static const String prefsKey = 'pluginPermissions';
 
+  /// Plugin ids whose grants have already been decided once.
+  ///
+  /// Needed because "no grants stored" means both "the user revoked everything"
+  /// and "this plugin never ran under the permission system", and those two must
+  /// not be treated the same.
+  static const String seededKey = 'pluginPermissionsSeeded';
+
   /// Upper bound on plugins with grants; matches [PluginState.maxRecords].
   static const int maxPlugins = 100;
 
@@ -51,8 +58,13 @@ class PluginPermissions {
     return store[pluginId]?.contains(capability) ?? false;
   }
 
-  /// Grants that [manifest] already implies for a package that shipped before
-  /// manual grants existed, so an upgrade does not break a working plugin.
+  /// Grants that [manifest] already implies for a package that **shipped
+  /// before** manual grants existed, so an upgrade does not break a working
+  /// plugin.
+  ///
+  /// Only ever applied to a plugin that was already installed, never to a fresh
+  /// one: a new plugin must ask for everything, otherwise the grandfather list
+  /// becomes a quiet way to skip the permission screen.
   static Set<String> legacyGrants(PluginManifest manifest) {
     final runtime = requestedRuntime(manifest);
     return {

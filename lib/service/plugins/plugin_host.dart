@@ -281,6 +281,7 @@ class PluginHost extends ChangeNotifier {
       await Prefs().removePluginData(id);
       await Prefs().prefs.remove(PluginConfig.deviceKeyFor(id));
       await _revokeAllPermissions(id);
+      await Prefs().clearPluginPermissionSeeded(id);
     }
     // Plugin data is inside the plugin's own directory tree, so uninstalling
     // removes it. If it cannot be deleted the package is still gone.
@@ -429,6 +430,9 @@ class PluginHost extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    // A user decision is recorded even when it is "deny everything", so the
+    // grandfather seeding cannot hand the capability back on the next start.
+    await Prefs().markPluginPermissionSeeded(id);
     final store = Map<String, Set<String>>.from(Prefs().pluginPermissions);
     final next = Set<String>.from(store[id] ?? const <String>{});
     if (granted) {
@@ -475,16 +479,32 @@ class PluginHost extends ChangeNotifier {
   Set<String> _developmentGrants(String id) =>
       Set.unmodifiable(_developmentPermissionGrants[id] ?? const <String>{});
 
-  /// Gives a freshly installed package the grants it already implied before
-  /// manual permission control existed, so an upgrade is not a regression.
-  Future<void> _seedLegacyPermissions(PluginManifest manifest) async {
-    final legacy = PluginPermissions.legacyGrants(manifest);
-    if (legacy.isEmpty) return;
-    if (development) {
-      _developmentPermissionGrants[manifest.id] = legacy;
+  /// Gives an **upgraded** package the grants it already implied before manual
+  /// permission control existed, so the upgrade is not a regression.
+  ///
+  /// A fresh install never seeds: its grants must all be requested on the
+  /// permission screen. The seeded marker distinguishes the two cases, because
+  /// "no grants stored" is also what "the user revoked everything" looks like.
+  Future<void> _seedLegacyPermissions(PluginManifest manifest,
+      {required bool wasInstalled}) async {
+    if (!wasInstalled) {
+      if (!development) {
+        await Prefs().markPluginPermissionSeeded(manifest.id);
+      }
       return;
     }
+    if (!development && Prefs().pluginPermissionSeeded.contains(manifest.id)) {
+      return;
+    }
+    final legacy = PluginPermissions.legacyGrants(manifest);
+    if (development) {
+      if (legacy.isNotEmpty) _developmentPermissionGrants[manifest.id] = legacy;
+      return;
+    }
+    await Prefs().markPluginPermissionSeeded(manifest.id);
+    if (legacy.isEmpty) return;
     final store = Map<String, Set<String>>.from(Prefs().pluginPermissions);
+    // Never overwrite a decision the user already made under the new system.
     if (store.containsKey(manifest.id)) return;
     store[manifest.id] = legacy;
     await Prefs().savePluginPermissions(store);
@@ -881,7 +901,7 @@ class PluginHost extends ChangeNotifier {
           applied: List.unmodifiable(applied),
         );
         await _saveState(_state.upsert(record));
-        await _seedLegacyPermissions(manifest);
+        await _seedLegacyPermissions(manifest, wasInstalled: existing != null);
         if (development &&
             existing != null &&
             (_manifests[manifest.id]

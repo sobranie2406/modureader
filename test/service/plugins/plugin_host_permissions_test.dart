@@ -114,6 +114,31 @@ void main() {
     expect(host.hasPermission(_id, 'ai:invoke'), isTrue);
   });
 
+  test('a fresh install never inherits grandfathered grants', () async {
+    // library:read and note:write predate manual grants, so an upgraded plugin
+    // keeps them; a brand new plugin must still ask.
+    await install(['library:read', 'note:write']);
+    expect(host.grantedPermissions(_id), isEmpty);
+    expect(host.hasPermission(_id, 'library:read'), isFalse);
+  });
+
+  test('revoking everything does not resurrect on the next start', () async {
+    await install(['library:read']);
+    await host.setPermission(_id, 'library:read', true);
+    await host.revokeAllPermissions(_id);
+    host.dispose();
+
+    final reopened = PluginHost(
+      trust: FixturePluginTrust(),
+      paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
+      appVersionResolver: () async => '1.3.10',
+    );
+    await reopened.initialize();
+    expect(reopened.grantedPermissions(_id), isEmpty);
+    reopened.dispose();
+    host = reopened;
+  });
+
   test('grants survive a restart', () async {
     await install(['ai:invoke']);
     await host.setPermission(_id, 'ai:invoke', true);
