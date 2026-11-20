@@ -7,10 +7,10 @@ import 'package:modu_reader/service/plugins/plugin_host.dart';
 /// Asks the user to grant runtime capabilities, with the plugin's own reason.
 ///
 /// This is the only way a plugin can obtain a runtime grant at run time. The
-/// user sees one row per capability with its own switch and a link back to the
-/// full permission page, so a request for three capabilities cannot smuggle in
-/// a fourth, and "allow once" is not offered — grants are durable device
-/// decisions, exactly like the switch on the details page.
+/// user sees one row per capability with its own checkbox, so a request for
+/// three capabilities cannot smuggle in a fourth, and "allow once" is not
+/// offered — grants are durable device decisions, exactly like the switch on
+/// the details page.
 ///
 /// Returns the grants in force after the dialog closes. Cancelling or tapping
 /// outside returns the grants the plugin already held, never a fresh one.
@@ -21,8 +21,13 @@ Future<Set<String>> showPluginPermissionRequest(
   required List<String> capabilities,
   required String reason,
 }) async {
+  // Only what this package actually declares: showing a row the host would
+  // refuse to grant would let a plugin ask for a permission it never requested
+  // at installation, and the grant call would then fail after the user agreed.
+  final declared = host.manifestFor(pluginId)?.capabilities ?? const <String>{};
   final requested = <PluginPermissionSpec>[];
   for (final capability in capabilities) {
+    if (!declared.contains(capability)) continue;
     final spec = pluginPermissionSpec(capability);
     if (spec != null && spec.isRuntime) requested.add(spec);
   }
