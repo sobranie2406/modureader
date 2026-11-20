@@ -99,7 +99,7 @@ const List<PluginPermissionSpec> kPluginPermissions = [
       tier: PluginPermissionTier.user,
       group: PluginPermissionGroup.content,
       zh: '读取已授权书籍列表',
-      en: 'Read the book list'),
+      en: 'Read granted books'),
   PluginPermissionSpec(
       token: kBookContentCapability,
       tier: PluginPermissionTier.user,
