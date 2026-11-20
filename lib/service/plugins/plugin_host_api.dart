@@ -142,6 +142,14 @@ class PluginHostApi {
         return _uiProgress(args);
       case 'open.url':
         return _openUrl(args);
+      case 'storage.list':
+        return _storageList(args);
+      case 'storage.read':
+        return _storageRead(args);
+      case 'storage.write':
+        return _storageWrite(args);
+      case 'storage.remove':
+        return _storageRemove(args);
       default:
         throw const PluginScriptFailure('permission');
     }
@@ -669,6 +677,103 @@ class PluginHostApi {
     return {'shown': true};
   }
 
+  // ---- plugin storage ------------------------------------------------------
+
+  /// Files live outside the verified package, so writing cannot make the
+  /// installed plugin look tampered with on the next start.
+  static const int _maxStorageFiles = 200;
+  static const int _maxStorageFileBytes = 256 * 1024;
+  static const int _maxStorageTotalBytes = 4 * 1024 * 1024;
+
+  Directory get _storageRoot => pluginOwnedDirectory(pluginId);
+
+  /// Rejects anything that is not a flat, safe file name.
+  ///
+  /// Names are compared after normalisation as well as by pattern: the pattern
+  /// catches intent, the containment check catches a missed rule.
+  String _storageName(Object? raw) {
+    if (raw is! String || raw.isEmpty || raw.length > 64) {
+      throw const PluginScriptFailure('permission');
+    }
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]*\.json$').hasMatch(raw)) {
+      throw const PluginScriptFailure('permission');
+    }
+    final resolved = p.normalize(p.join(_storageRoot.path, raw));
+    if (p.dirname(resolved) != p.normalize(_storageRoot.path)) {
+      throw const PluginScriptFailure('permission');
+    }
+    return raw;
+  }
+
+  Future<List<File>> _storageFiles() async {
+    final root = _storageRoot;
+    if (!await root.exists()) return const [];
+    final files = <File>[];
+    await for (final entity in root.list(followLinks: false)) {
+      if (entity is File && entity.path.toLowerCase().endsWith('.json')) {
+        files.add(entity);
+        if (files.length > _maxStorageFiles) {
+          throw const PluginScriptFailure('quota');
+        }
+      }
+    }
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files;
+  }
+
+  Future<Object?> _storageList(Map<String, dynamic> args) async {
+    _only(args, const {});
+    final files = await _storageFiles();
+    return [
+      for (final file in files)
+        {
+          'name': p.basename(file.path),
+          'bytes': await file.length(),
+        }
+    ];
+  }
+
+  Future<Object?> _storageRead(Map<String, dynamic> args) async {
+    _only(args, const {'name'});
+    final file = File(p.join(_storageRoot.path, _storageName(args['name'])));
+    if (!await file.exists()) return {'text': null};
+    if (await file.length() > _maxStorageFileBytes) {
+      throw const PluginScriptFailure('size');
+    }
+    return {'text': await file.readAsString()};
+  }
+
+  Future<Object?> _storageWrite(Map<String, dynamic> args) async {
+    _only(args, const {'name', 'text'});
+    final name = _storageName(args['name']);
+    final text = _text(args, 'text', maxLength: _maxStorageFileBytes);
+    final root = _storageRoot;
+    if (!await root.exists()) await root.create(recursive: true);
+    var total = 0;
+    final existing = await _storageFiles();
+    for (final file in existing) {
+      total += await file.length();
+    }
+    if (existing.length >= _maxStorageFiles) {
+      throw const PluginScriptFailure('quota');
+    }
+    final target = File(p.join(root.path, name));
+    final previous = await target.exists() ? await target.length() : 0;
+    if (total - previous + text.length > _maxStorageTotalBytes) {
+      throw const PluginScriptFailure('quota');
+    }
+    await target.writeAsString(text, flush: true);
+    return {'bytes': text.length};
+  }
+
+  Future<Object?> _storageRemove(Map<String, dynamic> args) async {
+    _only(args, const {'name'});
+    final file = File(p.join(_storageRoot.path, _storageName(args['name'])));
+    if (!await file.exists()) return {'removed': false};
+    await file.delete();
+    return {'removed': true};
+  }
+
   Future<Object?> _openUrl(Map<String, dynamic> args) async {
     _only(args, const {'url'});
     final raw = _text(args, 'url', maxLength: 2048).trim();
@@ -689,4 +794,4 @@ class PluginHostApi {
 
 /// The plugin's own data directory, resolved through the same root as packages.
 Directory pluginOwnedDirectory(String id) =>
-    Directory(p.join(getBasePath('plugins'), id));
+    Directory(p.join(getBasePath('plugins'), '.data', id));

@@ -44,6 +44,10 @@ const Set<String> kPluginServiceMethods = {
   'ui.select',
   'ui.progress',
   'open.url',
+  'storage.list',
+  'storage.read',
+  'storage.write',
+  'storage.remove',
 };
 
 /// Methods whose latency is not the plugin's CPU time.
@@ -416,6 +420,13 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       'ui.confirm' || 'ui.prompt' || 'ui.select' => kUiDialogCapability,
       'ui.progress' => kUiProgressCapability,
       'open.url' => kUrlOpenCapability,
+      // Implicit by design: every plugin already owns a private directory, so
+      // `storage:plugin` is accepted in a manifest but never stored as a grant.
+      'storage.list' ||
+      'storage.read' ||
+      'storage.write' ||
+      'storage.remove' =>
+        'storage:plugin',
       'privateLibrary.open' ||
       'privateLibrary.lock' =>
         kLibraryPrivateCapability,

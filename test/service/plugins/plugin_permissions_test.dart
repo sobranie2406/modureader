@@ -13,7 +13,6 @@ void main() {
       // A token without a spec would be silently treated as runtime-tier and
       // render as its raw name, so the two lists must stay in step.
       for (final capability in kKnownCapabilities) {
-        if (capability == 'storage:plugin') continue;
         expect(pluginPermissionSpec(capability), isNotNull,
             reason: 'no catalogue entry for $capability');
       }

@@ -285,6 +285,12 @@ const List<PluginPermissionSpec> kPluginPermissions = [
       group: PluginPermissionGroup.installOnly,
       zh: '仅在本机保存插件设置',
       en: 'Store plugin settings on this device'),
+  PluginPermissionSpec(
+      token: 'storage:plugin',
+      tier: PluginPermissionTier.install,
+      group: PluginPermissionGroup.installOnly,
+      zh: '使用插件私有目录',
+      en: 'Use plugin storage'),
 ];
 
 /// Capabilities that already shipped before manual grants existed.

@@ -282,6 +282,17 @@ class PluginHost extends ChangeNotifier {
       await Prefs().prefs.remove(PluginConfig.deviceKeyFor(id));
       await _revokeAllPermissions(id);
     }
+    // Plugin data is inside the plugin's own directory tree, so uninstalling
+    // removes it. If it cannot be deleted the package is still gone.
+    try {
+      final data = _paths.dataDir(id);
+      if (await data.exists()) await data.delete(recursive: true);
+    } catch (error) {
+      if (!development) {
+        AnxLog.warning('Could not delete plugin data of $id: '
+            '${describeError(error)}');
+      }
+    }
   }
 
   void _reserveIdentity(String id) {

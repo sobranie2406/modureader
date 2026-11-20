@@ -1,7 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 
@@ -178,6 +176,44 @@ void main() {
           await api().call('ui.progress', {'label': 'Load', 'fraction': 0.5}),
           {'shown': true});
       expect(asked, ['progress:Load:0.5']);
+    });
+  });
+
+  group('plugin storage', () {
+    setUp(() {
+      // The storage root resolves through the app data path; tests point it at
+      // a temp directory so nothing touches real app data.
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('a name that escapes the plugin directory is refused', () async {
+      for (final name in [
+        '../escape.json',
+        'sub/dir.json',
+        'no-extension',
+        '.hidden.json',
+        'a' * 100 + '.json',
+      ]) {
+        await expectLater(
+            api().call('storage.write', {'name': name, 'text': 'x'}), denied(),
+            reason: name);
+        await expectLater(
+            api().call('storage.read', {'name': name}), denied(),
+            reason: name);
+      }
+    });
+
+    test('storage methods reject unexpected arguments', () async {
+      await expectLater(
+          api().call('storage.list', {'path': '/'}), denied());
+      await expectLater(api().call('storage.read', {'file': 'a.json'}),
+          denied());
+    });
+
+    test('writing more than the file limit is refused', () async {
+      await expectLater(
+          api().call('storage.write', {'name': 'a.json', 'text': 'x' * 300000}),
+          denied());
     });
   });
 
