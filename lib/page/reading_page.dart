@@ -145,6 +145,16 @@ class ReadingPageState extends ConsumerState<ReadingPage>
               epubPlayerKey.currentState?.supportsDocumentImages == false));
 
   bool consumeReaderToolbarTap() {
+    // A tap can reach the native WebView through the transparent menu backdrop.
+    if (!bottomBarOffstage) {
+      if (mounted &&
+          _observedRoute?.isCurrent == true &&
+          !_readerDrawerOpen &&
+          !_searchDialogOpen) {
+        hideBottomBar();
+      }
+      return true;
+    }
     if (!_canUsePageKeys) return false;
     if (_autoScrollVisibility.enabled &&
         (_autoScroll.running || !_autoScrollVisibility.visible)) {

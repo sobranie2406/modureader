@@ -508,6 +508,18 @@ test('host tap consumption keeps the original reading action only when not handl
   }
 });
 
+test('native WebView outside taps dismiss the open reader menu before page actions', async () => {
+  const reading = await readFile(new URL('../lib/page/reading_page.dart', import.meta.url), 'utf8');
+  const player = await readFile(new URL('../lib/page/book_player/epub_player.dart', import.meta.url), 'utf8');
+  assert.match(player, /handlerName: 'onReaderTap',\s*callback: \(_\) =>\s*readingPageKey\.currentState\?\.consumeReaderToolbarTap\(\) \?\? false/);
+  const handler = reading.slice(reading.indexOf('  bool consumeReaderToolbarTap()'),
+    reading.indexOf('  void stopAutoScroll()'));
+  const beforePageKeys = handler.slice(0, handler.indexOf('if (!_canUsePageKeys)'));
+  assert.match(beforePageKeys, /if \(!bottomBarOffstage\)/);
+  assert.match(beforePageKeys, /_observedRoute\?\.isCurrent == true/);
+  assert.match(beforePageKeys, /hideBottomBar\(\);\s*\}\s*return true;/);
+});
+
 test('reader bridge enables ordinary scrolling only, leaving PDF and fixed layouts unchanged',async()=>{
   const book=await readFile(new URL('../assets/foliate-js/src/book.js',import.meta.url),'utf8');
   const chunk=book.slice(book.indexOf('const autoScroll ='),book.indexOf('\nconst setStyle ='));
