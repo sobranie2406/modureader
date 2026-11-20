@@ -73,12 +73,34 @@ Host API methods:
 | `modu.ui.select({title,options})` | `ui:dialog` | At most 30 options, returns `{selected}` |
 | `modu.ui.progress({label,fraction})` | `ui:progress` | Transient progress bar, grows with a long task |
 | `modu.open.url({url})` | `url:open` | http(s) only; `file:`, `javascript:` and `intent:` are refused |
+| `modu.storage.list()` | `storage:plugin` | Files the plugin owns, with sizes |
+| `modu.storage.read({name})` | `storage:plugin` | Returns `{text}`, or `{text: null}` when absent |
+| `modu.storage.write({name,text})` | `storage:plugin` | Replaces one file |
+| `modu.storage.remove({name})` | `storage:plugin` | Deletes one file; `{removed}` |
+
+`storage.*` writes under `<plugins>/.data/<pluginId>`, a sibling of the verified
+package rather than a child, so a plugin cannot overwrite the files the reviewed
+inventory hashes. Names must be flat `*.json` of at most 64 characters, checked by
+pattern and again after normalisation. Limits are 256 KiB per file, 200 files and
+4 MiB total per plugin. Uninstalling deletes the directory with the package.
 
 Every argument is validated against a named-argument allowlist, so an unknown
 key fails the call instead of being ignored, and every list and string has a
 hard bound. A call whose capability the user has not granted fails with
 `denied`, which the UI explains as a missing permission rather than a broken
 package.
+
+Methods that wait on the network or on native UI (`privateLibrary.update*/`
+`selectBooks`/`setPrivate`, `ui.*`, `share.text`, `clipboard.read`,
+`ai.complete`, `translate.text`, `tts.speak`) pause the execution clock while one
+is pending and charge it to a separate two-minute interaction budget. A slow model
+server therefore does not turn a correct plugin into a `timeout`; total wall time
+is still bounded, so a hung plugin cannot run forever.
+
+Worked examples of this surface live in
+[`docs/examples/plugins`](../examples/plugins/README.md): reading reports,
+annotation digests, model-assisted explanation, an owned vocabulary notebook and
+chapter digests.
 
 ## Permissions
 
