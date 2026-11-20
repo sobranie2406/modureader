@@ -5,6 +5,14 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
+
+/// A WebView2 environment that only needs to be non-null: the platform is
+/// stubbed below, so no native object is ever created from it.
+class _Environment extends PlatformWebViewEnvironment {
+  _Environment()
+      : super.implementation(const PlatformWebViewEnvironmentCreationParams());
+}
 
 class _Browser extends InAppWebViewPlatform {
   final created = Completer<_Headless>();
@@ -83,11 +91,16 @@ void main() {
     final previous = InAppWebViewPlatform.instance;
     browser = _Browser();
     InAppWebViewPlatform.instance = browser;
+    // The engine now asks for the environment instead of only reading a cached
+    // value, so the shared boot module needs one for the stubbed platform.
+    WebViewEnvironmentBoot.instance.debugSetEnvironment(
+        WebViewEnvironment.fromPlatform(platform: _Environment()));
     AnxHeadlessWebView.resumeAccepting();
     engine = WebViewPluginScriptEngine();
     calls.clear();
     addTearDown(() async {
       await engine.dispose();
+      WebViewEnvironmentBoot.instance.debugSetEnvironment(null);
       if (previous != null) InAppWebViewPlatform.instance = previous;
     });
   });

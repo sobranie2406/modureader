@@ -649,6 +649,33 @@ void main() {
         engine.call('library.list', {}), throwsA(failure('cancelled')));
     expect(engine.disposed, greaterThan(0));
   });
+  test('an aborted job stops reserving the plugin once its engine releases',
+      () async {
+    // The slot used to be released only when the engine answered its disposal,
+    // so an engine that never answers kept the plugin — and, through the global
+    // two-job cap, every other plugin — permanently "busy".
+    final engines = <Engine>[];
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () {
+          final created = Engine();
+          engines.add(created);
+          return created;
+        },
+        timeout: const Duration(milliseconds: 50));
+    await expectLater(run(), throwsA(failure('timeout')));
+    expect(engines.first.disposed, greaterThan(0));
+    // The released slot is reusable immediately in this fixture: Engine.dispose
+    // resolves at once, so the teardown map is cleared with it.
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final second = run();
+    await engines.last.ready.future;
+    engines.last.result.complete({'text': 'again'});
+    expect(await second, {'text': 'again'});
+    expect(engines.length, 2);
+  });
+
   test('bounds structured results and rejects HTML/action payload fields',
       () async {
     final result = run();

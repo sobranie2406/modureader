@@ -156,6 +156,24 @@ void main() {
     host = reopened;
   });
 
+  test('grantPermissions applies a batch and reports what is in force',
+      () async {
+    await install(['ai:invoke', 'note:read', 'clipboard:write']);
+    final granted =
+        await host.grantPermissions(_id, ['ai:invoke', 'note:read']);
+    expect(granted, {'ai:invoke', 'note:read'});
+    expect(Prefs().pluginPermissions[_id], {'ai:invoke', 'note:read'});
+  });
+
+  test('grantPermissions still refuses an undeclared capability', () async {
+    await install(['note:read']);
+    await expectLater(host.grantPermissions(_id, ['ai:invoke', 'note:read']),
+        throwsA(isA<PluginInstallError>()));
+    // The valid part of the batch is applied before the bad one fails, and
+    // nothing is silently granted for the token the package never declared.
+    expect(host.hasPermission(_id, 'ai:invoke'), isFalse);
+  });
+
   test('permission grants never enter the settings backup', () async {
     await install(['ai:invoke']);
     await host.setPermission(_id, 'ai:invoke', true);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -80,7 +81,11 @@ class _Environment extends PlatformWebViewEnvironment {
 void main() {
   setUp(AnxHeadlessWebView.resumeAccepting);
 
-  for (final overlay in [false, true]) {
+  // Windows has no overlay fallback on purpose: creating a second native view
+  // after a failed creation can race a late WebView2 callback, so the failure is
+  // surfaced instead of hidden. Only exercise the fallback elsewhere.
+  final overlayCases = Platform.isWindows ? [false] : [false, true];
+  for (final overlay in overlayCases) {
     testWidgets(
         '${overlay ? 'overlay fallback' : 'headless'} retains data origin and all host policies',
         (tester) async {
@@ -217,7 +222,13 @@ void main() {
       if (previous != null) InAppWebViewPlatform.instance = previous;
     });
     final request = URLRequest(url: WebUri('http://127.0.0.1/reader.html'));
-    final view = AnxHeadlessWebView(initialUrlRequest: request);
+    // Windows without an environment degrades to the overlay, which has no
+    // headless params to assert on, so supply the environment the app supplies.
+    final view = AnxHeadlessWebView(
+        initialUrlRequest: request,
+        webViewEnvironment: Platform.isWindows
+            ? WebViewEnvironment.fromPlatform(platform: _Environment())
+            : null);
     await Future.wait([view.run(), view.run()]);
     final params = browser.headless!.params;
     expect(params.initialUrlRequest, same(request));

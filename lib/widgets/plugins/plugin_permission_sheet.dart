@@ -50,10 +50,20 @@ Future<Set<String>> showPluginPermissionRequest(
     // Dismissed without confirming: keep whatever was already granted.
     return host.grantedPermissions(pluginId);
   }
+  // Grant first, in one batch that does not disturb running work: the caller is
+  // usually the plugin's own in-flight job, and cancelling it here would make
+  // the just-granted permission impossible to use. Revoking still goes through
+  // setPermission, which stops the plugin's task on purpose.
+  final toGrant = [
+    for (final spec in requested)
+      if (answer.contains(spec.token) && !before.contains(spec.token))
+        spec.token,
+  ];
+  if (toGrant.isNotEmpty) await host.grantPermissions(pluginId, toGrant);
   for (final spec in requested) {
-    final wanted = answer.contains(spec.token);
-    if (before.contains(spec.token) == wanted) continue;
-    await host.setPermission(pluginId, spec.token, wanted);
+    if (before.contains(spec.token) && !answer.contains(spec.token)) {
+      await host.setPermission(pluginId, spec.token, false);
+    }
   }
   return host.grantedPermissions(pluginId);
 }

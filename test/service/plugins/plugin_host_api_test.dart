@@ -217,6 +217,143 @@ void main() {
     });
   });
 
+  group('runtime permissions', () {
+    test('request returns the grants the user actually made', () async {
+      final call = <String, Object>{};
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (id, capabilities, reason) async {
+            call['id'] = id;
+            call['capabilities'] = capabilities;
+            call['reason'] = reason;
+            // The user allowed one of the two.
+            return {capabilities.first};
+          },
+          grantedPermissions: (_) async => {'ai:invoke'},
+        ),
+      );
+      expect(
+          await service.call('permissions.request', {
+            'capabilities': ['ai:invoke', 'clipboard:read'],
+            'reason': 'Needs to summarise the chapter',
+          }),
+          {
+            'granted': ['ai:invoke'],
+            'denied': ['clipboard:read'],
+          });
+      expect(call['id'], 'com.example.host-api');
+      expect(call['capabilities'], ['ai:invoke', 'clipboard:read']);
+      expect(call['reason'], 'Needs to summarise the chapter');
+    });
+
+    test('the reason is optional and bounded', () async {
+      String? seen = 'unset';
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (_, capabilities, reason) async {
+            seen = reason;
+            return <String>{};
+          },
+          grantedPermissions: (_) async => <String>{},
+        ),
+      );
+      await service.call('permissions.request', {
+        'capabilities': ['ai:invoke'],
+      });
+      expect(seen, '');
+      await expectLater(
+          service.call('permissions.request', {
+            'capabilities': ['ai:invoke'],
+            'reason': 'x' * 400,
+          }),
+          denied());
+    });
+
+    test('an install-tier or unknown capability cannot be requested', () async {
+      var asked = 0;
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (_, capabilities, reason) async {
+            asked++;
+            return <String>{};
+          },
+          grantedPermissions: (_) async => <String>{},
+        ),
+      );
+      for (final capability in ['script:run', 'made:up', 42]) {
+        await expectLater(
+            service.call('permissions.request', {
+              'capabilities': [capability],
+            }),
+            denied(),
+            reason: '$capability');
+      }
+      expect(asked, 0);
+    });
+
+    test('a malformed capability list is refused without opening the sheet',
+        () async {
+      var asked = 0;
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (_, capabilities, reason) async {
+            asked++;
+            return <String>{};
+          },
+          grantedPermissions: (_) async => <String>{},
+        ),
+      );
+      for (final raw in [null, 'ai:invoke', <Object>[], ['a' * 200]]) {
+        await expectLater(
+            service.call('permissions.request', {'capabilities': raw}), denied(),
+            reason: '$raw');
+      }
+      expect(asked, 0);
+    });
+
+    test('duplicate requests are collapsed before the user sees them',
+        () async {
+      List<String>? seen;
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (_, capabilities, reason) async {
+            seen = capabilities;
+            return capabilities.toSet();
+          },
+          grantedPermissions: (_) async => <String>{},
+        ),
+      );
+      final result = await service.call('permissions.request', {
+        'capabilities': ['ai:invoke', 'ai:invoke'],
+      });
+      expect(seen, ['ai:invoke']);
+      expect(result, {
+        'granted': ['ai:invoke'],
+        'denied': <String>[],
+      });
+    });
+
+    test('status reports the grants in force', () async {
+      final service = api(
+        overrides: PluginHostServices(
+          requestPermissions: (id, capabilities, reason) async =>
+              const <String>{},
+          grantedPermissions: (_) async => {'note:read', 'ai:invoke'},
+        ),
+      );
+      expect(await service.call('permissions.status', {}),
+          {'granted': ['ai:invoke', 'note:read']});
+    });
+
+    test('without the native surface the calls report permission', () async {
+      final bare = api(overrides: const PluginHostServices());
+      await expectLater(
+          bare.call('permissions.request', {'capabilities': ['ai:invoke']}),
+          denied());
+      await expectLater(bare.call('permissions.status', {}), denied());
+    });
+  });
+
   group('reader-bound methods', () {
     test('without a reader they report permission', () async {
       await expectLater(api().call('books.content', {}), denied());

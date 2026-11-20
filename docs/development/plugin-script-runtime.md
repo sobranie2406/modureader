@@ -78,6 +78,34 @@ Host API methods:
 | `modu.storage.write({name,text})` | `storage:plugin` | Replaces one file |
 | `modu.storage.remove({name})` | `storage:plugin` | Deletes one file; `{removed}` |
 
+### Asking for a permission
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.permissions.request({capabilities,reason?})` | none needed | Shows the consent sheet, returns `{granted,denied}` |
+| `modu.permissions.status()` | none needed | Returns `{granted}` so a plugin can check before asking |
+
+`capabilities` must be runtime-tier tokens the package already declares; an
+install-tier token, an unknown token or an empty list fails the call instead of
+opening a sheet. `reason` is shown above the list, at most 300 characters, and
+is the plugin's chance to explain itself — it never grants anything by itself.
+Each requested capability gets its own switch, unticked by default, so a
+multi-capability request cannot smuggle in a fourth permission. Dismissing the
+sheet returns the grants the plugin already held.
+
+Granting here deliberately does **not** cancel the running task, unlike revoking
+one in the details page: the caller is usually the job that just hit the missing
+capability, and killing it would make the fresh grant unusable. Revoking still
+stops work in flight.
+
+```js
+const { granted } = await modu.permissions.request({
+  capabilities: ['ai:invoke'],
+  reason: '用你的模型总结这一章。',
+});
+if (!granted.includes('ai:invoke')) return { title: '需要授权', text: '' };
+```
+
 `storage.*` writes under `<plugins>/.data/<pluginId>`, a sibling of the verified
 package rather than a child, so a plugin cannot overwrite the files the reviewed
 inventory hashes. Names must be flat `*.json` of at most 64 characters, checked by
@@ -128,6 +156,12 @@ Packages that shipped before manual grants existed keep the capabilities they
 already implied (network, library read, notes, the private-library trio and
 article capture) so an app upgrade does not break a working plugin. Every
 capability added later starts denied.
+
+A plugin can ask for a grant at the moment it needs one with
+`modu.permissions.request()`, which opens the same consent decision as a sheet.
+When an action fails with `denied`, the reading view also offers a **去授权**
+button that opens that sheet pre-filled with everything the package declares but
+does not hold yet, so a first run is one tap away from working.
 
 ## Plugin-owned private policies and settings
 

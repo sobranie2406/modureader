@@ -79,10 +79,10 @@ class PluginHostServices {
 
   /// Shows the consent sheet and applies the user's answer.
   ///
-  /// [capabilities] is what the plugin asked for, already filtered to
-  /// declarations it actually has; an empty list means "everything I declare
-  /// but do not hold yet". The callback returns the grants now in force, which
-  /// may be fewer than requested — the user may switch individual rows off.
+  /// [capabilities] is exactly what the plugin asked for, already filtered to
+  /// tokens it declares and that are runtime-tier. The callback returns the
+  /// grants now in force, which may be fewer than requested — the user may
+  /// switch individual rows off.
   final Future<Set<String>> Function(
           String pluginId, List<String> capabilities, String reason)?
       requestPermissions;
@@ -811,7 +811,9 @@ class PluginHostApi {
     final request = services.requestPermissions;
     if (request == null) throw const PluginScriptFailure('permission');
     final raw = args['capabilities'];
-    if (raw is! List || raw.length > kKnownCapabilities.length) {
+    // An empty request would open a sheet with nothing to decide, so it is
+    // treated as a malformed call rather than a no-op the plugin can loop on.
+    if (raw is! List || raw.isEmpty || raw.length > kKnownCapabilities.length) {
       throw const PluginScriptFailure('permission');
     }
     final capabilities = <String>[];

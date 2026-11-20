@@ -455,6 +455,31 @@ class PluginHost extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Applies grants **without disturbing work that is already running**.
+  ///
+  /// [setPermission] is serialised with package mutations, which cancels every
+  /// running script. That is correct for a settings-page toggle, but it is
+  /// exactly wrong for consent a plugin asks for mid-run: the cancellation
+  /// would kill the very job that just received the permission, so the plugin
+  /// could never proceed. Granting therefore uses its own queue. Revoking still
+  /// goes through [setPermission] and still stops running work.
+  Future<Set<String>> grantPermissions(
+      String id, Iterable<String> capabilities) {
+    final wanted = List<String>.of(capabilities);
+    final operation = _permissionWrites.then((_) async {
+      for (final capability in wanted) {
+        await _setPermission(id, capability, true);
+      }
+      return grantedPermissions(id);
+    });
+    _permissionWrites = operation.then<void>((_) {},
+        onError: (Object _, StackTrace __) {});
+    return operation;
+  }
+
+  /// Queue for permission writes that must not tear down running scripts.
+  Future<void> _permissionWrites = Future.value();
+
   /// Drops every runtime grant a plugin holds.
   Future<void> revokeAllPermissions(String id) =>
       _exclusive(() => _revokeAllPermissions(id));

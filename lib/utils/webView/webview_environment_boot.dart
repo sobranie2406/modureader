@@ -35,11 +35,20 @@ class WebViewEnvironmentBoot {
 
   WebViewEnvironment? _environment;
   Future<WebViewEnvironment?>? _pending;
+
+  /// A test-supplied environment, so engine and runtime tests do not need a
+  /// real WebView2 install. Never set from application code.
+  WebViewEnvironment? _override;
+
+  /// Replaces the environment for the duration of a test. Pass null to clear.
+  void debugSetEnvironment(WebViewEnvironment? environment) {
+    _override = environment;
+  }
   String? _lastError;
   DateTime? _failedAt;
 
   /// Null until [ensure] succeeds at least once.
-  WebViewEnvironment? get environment => _environment;
+  WebViewEnvironment? get environment => _override ?? _environment;
 
   /// True when the platform has a usable WebView2 runtime.
   bool get isSupported => _platformNeedsEnvironment;
@@ -62,6 +71,8 @@ class WebViewEnvironmentBoot {
   /// cooldown after a reported failure (the viewer-facing retry button).
   Future<WebViewEnvironment?> ensure({bool force = false}) {
     if (!_platformNeedsEnvironment) return Future.value(null);
+    final override = _override;
+    if (override != null) return Future.value(override);
     final ready = _environment;
     if (ready != null) return Future.value(ready);
     final failedAt = _failedAt;

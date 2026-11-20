@@ -75,11 +75,52 @@ class AnxHeadlessWebView {
     if (_stopping || _disposed) {
       return Future.error(StateError('Background reader is closing'));
     }
-    if (Platform.isWindows && _instances.any((view) => view._disposed)) {
-      return Future.error(StateError('上一后台阅读器仍在释放，请稍后重试'));
+    // Assigned before the first await so concurrent callers share one attempt
+    // and dispose() always has a future to wait on.
+    return _running ??= _start();
+  }
+
+  Future<void> _start() async {
+    // WebView2 tolerates only one create/destroy at a time. Instead of failing
+    // outright while a previous view finishes releasing — which made a quick
+    // second action, or a retry right after a failure, report "the previous
+    // background reader is still closing" — wait for those disposals, bounded
+    // so a stuck one cannot block forever.
+    //
+    // The wait only happens when there really is a disposal in flight: yielding
+    // on every start would let a caller that disposes immediately race ahead of
+    // creation and skip it entirely.
+    if (hasPendingDisposal) await _awaitPendingDisposals();
+    if (_stopping || _disposed) {
+      throw StateError('Background reader is closing');
     }
+    // No await between the check and the insert, so a concurrent dispose cannot
+    // leave a disposed instance registered.
     _instances.add(this);
-    return _running ??= _run();
+    await _run();
+  }
+
+  static bool get hasPendingDisposal {
+    for (final view in _instances) {
+      if (view._disposed) return true;
+    }
+    return false;
+  }
+
+  Future<void> _awaitPendingDisposals() async {
+    final pending = [
+      for (final view in _instances)
+        if (view._disposed) view._disposing,
+    ].whereType<Future<void>>().toList();
+    if (pending.isEmpty) return;
+    try {
+      await Future.wait(pending).timeout(_creationGrace + _creationGrace);
+    } catch (_) {
+      // Falls through to the check below, which reports the real state.
+    }
+    if (hasPendingDisposal) {
+      throw StateError('上一后台阅读器仍在释放，请稍后重试');
+    }
   }
 
   Future<void> _run() async {

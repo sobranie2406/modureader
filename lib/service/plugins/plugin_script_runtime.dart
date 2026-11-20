@@ -132,6 +132,14 @@ class PluginScriptRuntime with WidgetsBindingObserver {
   }
 
   final _jobs = <String, _ScriptJob>{};
+
+  /// Engines whose job was aborted and is still tearing down.
+  ///
+  /// [_jobs] is released as soon as a job is aborted, because a job whose
+  /// engine never answers would otherwise keep the plugin "busy" forever and —
+  /// with the global two-job cap — block every other plugin for the rest of the
+  /// session. A new run waits for the old engine to finish releasing instead.
+  final _teardowns = <String, Future<void>>{};
   static const maxInputBytes = 64 * 1024, maxResultBytes = 64 * 1024;
   static const maxArticleInputBytes = 16 * 1024 * 1024;
   static const maxArticleResultBytes = 4 * 1024 * 1024;
@@ -170,7 +178,9 @@ class PluginScriptRuntime with WidgetsBindingObserver {
           'unavailable', 'validate', 0);
       return Future.error(const PluginScriptFailure('unavailable'));
     }
-    if (_jobs.containsKey(pluginId) || _jobs.length >= 2) {
+    if (_jobs.containsKey(pluginId) ||
+        _teardowns.containsKey(pluginId) ||
+        _jobs.length >= 2) {
       _logFailure(pluginId, record.version, action.id, 'busy', 'queue', 0);
       return Future.error(const PluginScriptFailure('busy'));
     }
@@ -593,7 +603,16 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     job.executionClock.stop();
     job.nativeClock.stop();
     _completeFailure(job, PluginScriptFailure(code));
-    unawaited(job.engine.dispose().catchError((_) {}));
+    // Release the slot now, not when the engine finally answers: an engine that
+    // never replies must not keep the plugin busy until the next app start.
+    if (identical(_jobs[job.pluginId], job)) _jobs.remove(job.pluginId);
+    _teardowns[job.pluginId] = job.engine
+        .dispose()
+        // Bounded: a native teardown that never returns must not keep the
+        // plugin unusable, and the engine is already unreachable either way.
+        .timeout(const Duration(seconds: 20), onTimeout: () {})
+        .catchError((_) {})
+        .whenComplete(() => _teardowns.remove(job.pluginId));
   }
 
   void _completeFailure(_ScriptJob job, PluginScriptFailure failure) {
