@@ -97,7 +97,14 @@ class AnxHeadlessWebView {
     // No await between the check and the insert, so a concurrent dispose cannot
     // leave a disposed instance registered.
     _instances.add(this);
-    await _run();
+    try {
+      await _run();
+    } catch (_) {
+      // A failed creation owns no native view, so it must not stay registered:
+      // leaving it here would keep a dead view alive for the whole session.
+      _instances.remove(this);
+      rethrow;
+    }
   }
 
   static bool get hasPendingDisposal {
