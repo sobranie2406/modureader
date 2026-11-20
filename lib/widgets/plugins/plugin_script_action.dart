@@ -13,7 +13,9 @@ import 'package:modu_reader/page/plugins/article_capture_page.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_private_library_bridge.dart';
+import 'package:modu_reader/widgets/plugins/plugin_host_services.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:path/path.dart' as p;
 
@@ -25,6 +27,7 @@ Future<void> runPluginAction(BuildContext context,
     int? bookId,
     String cfi = '',
     String chapter = '',
+    Future<String> Function()? chapterContent,
     ValueChanged<int>? onNoteCreated,
     PluginScriptRuntime? scriptRuntime,
     PrivateLibrary? privateLibrary,
@@ -123,6 +126,17 @@ Future<void> runPluginAction(BuildContext context,
           'context': contextText,
           if (book != null) 'book': _summary(book),
         },
+        // Native surfaces the Dart-side host API needs. The reading page adds
+        // chapter access through [chapterContent] when it has a reader.
+        hostApi: PluginHostApi(
+          pluginId: pluginId,
+          services: buildPluginHostServices(
+            context,
+            book: book,
+            chapter: chapter,
+            currentChapter: chapterContent,
+          ),
+        ),
         hostCall: (method, args) async {
           if (!current() || !readable()) {
             throw const PluginScriptFailure('cancelled');

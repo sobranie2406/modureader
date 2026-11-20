@@ -420,6 +420,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             bookId: bookId,
             cfi: cfi,
             chapter: chapter,
+            chapterContent:
+                epubPlayerKey.currentState?.theChapterContent,
             onNoteCreated: onNoteCreated);
         break;
       case 'query':
