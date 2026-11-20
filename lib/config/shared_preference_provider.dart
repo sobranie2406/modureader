@@ -47,6 +47,7 @@ import 'package:modu_reader/models/reading_rules.dart';
 import 'package:modu_reader/models/user_prompt.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_permissions.dart';
 import 'package:modu_reader/service/plugins/plugin_contributions.dart';
 import 'package:modu_reader/widgets/statistic/dashboard_tiles/dashboard_tile_registry.dart';
 import 'package:modu_reader/models/window_info.dart';
@@ -74,6 +75,7 @@ const Set<String> _prefsImportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
+  'pluginPermissions',
   'inPlaceImportEnabled',
   'autoScrollEnabled',
   'autoScrollSpeed',
@@ -117,6 +119,7 @@ const Set<String> _prefsExportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
+  'pluginPermissions',
   'inPlaceImportEnabled',
   'autoScrollEnabled',
   'autoScrollSpeed',
@@ -1942,6 +1945,30 @@ class Prefs extends ChangeNotifier {
   Future<void> savePluginConfig(String id, Map<String, dynamic> values) async {
     if (!await prefs.setString('$_pluginConfigPrefix$id', jsonEncode(values))) {
       throw StateError('Could not save plugin settings');
+    }
+    notifyListeners();
+  }
+
+  /// Device-local runtime permission grants, keyed by plugin id.
+  ///
+  /// Never exported: consent belongs to the device, so restoring a backup on
+  /// another phone cannot silently re-grant a plugin access to the model key,
+  /// the clipboard or the book text.
+  Map<String, Set<String>> get pluginPermissions {
+    final raw = prefs.getString(PluginPermissions.prefsKey);
+    if (raw == null || raw.isEmpty) return const {};
+    try {
+      return PluginPermissions.decode(jsonDecode(raw));
+    } catch (error) {
+      AnxLog.warning('Error loading plugin permissions: $error');
+      return const {};
+    }
+  }
+
+  Future<void> savePluginPermissions(Map<String, Set<String>> grants) async {
+    final encoded = PluginPermissions.encode(grants);
+    if (!await prefs.setString(PluginPermissions.prefsKey, encoded)) {
+      throw StateError('Could not save plugin permissions');
     }
     notifyListeners();
   }
