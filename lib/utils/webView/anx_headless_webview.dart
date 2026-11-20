@@ -141,10 +141,12 @@ class AnxHeadlessWebView {
     }
 
     if (Platform.isWindows && webViewEnvironment == null) {
-      AnxLog.severe(
-          'AnxHeadlessWebView: webViewEnvironment is null on Windows, falling back to Overlay');
-      _runOverlay();
-      return;
+      // Fail loudly instead of using the overlay path: creating a second native
+      // window after a failed environment start races a late WebView2 callback,
+      // and a silent overlay that renders nothing left callers waiting forever
+      // for a load that could never happen.
+      AnxLog.severe('AnxHeadlessWebView: WebView2 environment is unavailable');
+      throw StateError('WebView2 环境不可用，请重试或重启应用');
     }
 
     if (useOverlay) {
@@ -209,8 +211,10 @@ class AnxHeadlessWebView {
   void _runOverlay() {
     final overlay = navigatorKey.currentState?.overlay;
     if (overlay == null) {
+      // Silently returning made run() succeed with no view at all, so every
+      // caller waited for a load stop that never came.
       AnxLog.severe("No context available for AnxHeadlessWebView overlay");
-      return;
+      throw StateError('没有可用的界面上下文，后台阅读器无法启动');
     }
 
     _overlayEntry = OverlayEntry(
