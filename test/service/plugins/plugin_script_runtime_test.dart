@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
@@ -358,6 +359,33 @@ void main() {
     expect(await result, {
       'candidates': ['apple']
     });
+  });
+
+  test('a declared but ungranted capability reports denied, not permission',
+      () async {
+    // 'permission' means the package never declared the token; 'denied' means it
+    // did and the reader has not switched it on. Collapsing the two sent people
+    // looking for a broken package instead of the consent sheet.
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      'ui:dialog',
+    ]);
+    final result = runtime.run(
+        pluginId: id,
+        action: action,
+        hostApi: PluginHostApi(
+            pluginId: id,
+            services: PluginHostServices(askConfirm: (_, __) async => true)));
+    await engine.ready.future;
+    await expectLater(engine.call('ui.confirm', {'title': 'a', 'message': 'b'}),
+        throwsA(failure('denied')));
+    // Granting the capability makes the same call succeed without a restart.
+    await host.grantPermissions(id, ['ui:dialog']);
+    expect(await engine.call('ui.confirm', {'title': 'a', 'message': 'b'}),
+        {'confirmed': true});
+    engine.result.complete({'text': ''});
+    await result;
   });
 
   Future<void> installArticle({String? source, bool library = false}) async {
