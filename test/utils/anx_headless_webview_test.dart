@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,16 +9,21 @@ import 'package:modu_reader/main.dart' show navigatorKey;
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 
 class _Browser extends InAppWebViewPlatform {
-  _Browser({this.failHeadless = false});
+  _Browser({this.failHeadless = false, this.stallCreation = false});
 
   final bool failHeadless;
+
+  /// When true, the first headless run() never completes, reproducing a
+  /// WebView2 environment that fails to initialise.
+  final bool stallCreation;
   _Headless? headless;
   PlatformInAppWebViewWidgetCreationParams? overlay;
 
   @override
   PlatformHeadlessInAppWebView createPlatformHeadlessInAppWebView(
           PlatformHeadlessInAppWebViewCreationParams params) =>
-      headless = _Headless(params, failHeadless);
+      headless = _Headless(params, failHeadless,
+          stall: stallCreation && headless == null);
 
   @override
   PlatformInAppWebViewWidget createPlatformInAppWebViewWidget(
@@ -27,15 +34,19 @@ class _Browser extends InAppWebViewPlatform {
 }
 
 class _Headless extends PlatformHeadlessInAppWebView {
-  _Headless(super.params, this.fail) : super.implementation();
+  _Headless(super.params, this.fail, {this.stall = false})
+      : super.implementation();
 
   final bool fail;
+  final bool stall;
   int runs = 0, disposals = 0;
 
   @override
   Future<void> run() async {
     runs++;
     if (fail) throw StateError('Headless unavailable');
+    // Never completes: the native controller never arrives.
+    if (stall) await Completer<void>().future;
   }
 
   @override
@@ -70,7 +81,11 @@ class _Environment extends PlatformWebViewEnvironment {
 void main() {
   setUp(AnxHeadlessWebView.resumeAccepting);
 
-  for (final overlay in [false, true]) {
+  // Windows has no overlay fallback on purpose: creating a second native view
+  // after a failed creation can race a late WebView2 callback, so the failure is
+  // surfaced instead of hidden. Only exercise the fallback elsewhere.
+  final overlayCases = Platform.isWindows ? [false] : [false, true];
+  for (final overlay in overlayCases) {
     testWidgets(
         '${overlay ? 'overlay fallback' : 'headless'} retains data origin and all host policies',
         (tester) async {
@@ -164,6 +179,63 @@ void main() {
     });
   }
 
+  test('a released view reports itself so owners stop calling into it',
+      () async {
+    // The Windows plugin dereferences the native view inside
+    // UserContentController::createContentWorld; a JavaScript evaluation that
+    // arrives after release crashed the process with an access violation, so the
+    // owner must be able to see the state before dispatching more work.
+    final previous = InAppWebViewPlatform.instance;
+    final browser = _Browser();
+    InAppWebViewPlatform.instance = browser;
+    addTearDown(() {
+      if (previous != null) InAppWebViewPlatform.instance = previous;
+    });
+    final environment =
+        WebViewEnvironment.fromPlatform(platform: _Environment());
+    final view = AnxHeadlessWebView(
+        webViewEnvironment: environment,
+        initialUrlRequest: URLRequest(url: WebUri('https://example.com/c')));
+    expect(view.isDisposed, isFalse);
+    await view.run();
+    expect(view.isDisposed, isFalse);
+    await view.dispose();
+    expect(view.isDisposed, isTrue);
+  });
+
+  test('a stalled creation does not wedge every later background view',
+      () async {
+    // A WebView2 environment that never finishes initialising ("the device is
+    // not ready", 0x80070015) leaves run() pending forever. dispose() must still
+    // unregister the instance: run() refuses to start while any disposed view is
+    // registered, so leaking one would break every later background WebView for
+    // the rest of the session — which is exactly what made plugin actions fail.
+    final previous = InAppWebViewPlatform.instance;
+    final browser = _Browser(stallCreation: true);
+    InAppWebViewPlatform.instance = browser;
+    addTearDown(() {
+      if (previous != null) InAppWebViewPlatform.instance = previous;
+    });
+    final environment =
+        WebViewEnvironment.fromPlatform(platform: _Environment());
+    final stalled = AnxHeadlessWebView(
+        webViewEnvironment: environment,
+        initialUrlRequest: URLRequest(url: WebUri('https://example.com/a')));
+    // Do not await: creation never completes on purpose.
+    unawaited(stalled.run());
+    // dispose must give up on the stalled creation and still unregister.
+    await stalled.dispose().timeout(const Duration(seconds: 20));
+
+    // The next background view must be allowed to start.
+    final next = AnxHeadlessWebView(
+        webViewEnvironment: environment,
+        initialUrlRequest: URLRequest(url: WebUri('https://example.com/b')));
+    addTearDown(next.dispose);
+    await next.run();
+    expect(browser.headless!.params.initialUrlRequest!.url.toString(),
+        'https://example.com/b');
+  });
+
   test(
       'existing URL-only reader keeps optional policies unset and disposes once',
       () async {
@@ -174,7 +246,13 @@ void main() {
       if (previous != null) InAppWebViewPlatform.instance = previous;
     });
     final request = URLRequest(url: WebUri('http://127.0.0.1/reader.html'));
-    final view = AnxHeadlessWebView(initialUrlRequest: request);
+    // Windows without an environment degrades to the overlay, which has no
+    // headless params to assert on, so supply the environment the app supplies.
+    final view = AnxHeadlessWebView(
+        initialUrlRequest: request,
+        webViewEnvironment: Platform.isWindows
+            ? WebViewEnvironment.fromPlatform(platform: _Environment())
+            : null);
     await Future.wait([view.run(), view.run()]);
     final params = browser.headless!.params;
     expect(params.initialUrlRequest, same(request));

@@ -4,7 +4,16 @@ import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
+
+/// A WebView2 environment that only needs to be non-null: the platform is
+/// stubbed below, so no native object is ever created from it.
+class _Environment extends PlatformWebViewEnvironment {
+  _Environment()
+      : super.implementation(const PlatformWebViewEnvironmentCreationParams());
+}
 
 class _Browser extends InAppWebViewPlatform {
   final created = Completer<_Headless>();
@@ -83,11 +92,16 @@ void main() {
     final previous = InAppWebViewPlatform.instance;
     browser = _Browser();
     InAppWebViewPlatform.instance = browser;
+    // The engine now asks for the environment instead of only reading a cached
+    // value, so the shared boot module needs one for the stubbed platform.
+    WebViewEnvironmentBoot.instance.debugSetEnvironment(
+        WebViewEnvironment.fromPlatform(platform: _Environment()));
     AnxHeadlessWebView.resumeAccepting();
     engine = WebViewPluginScriptEngine();
     calls.clear();
     addTearDown(() async {
       await engine.dispose();
+      WebViewEnvironmentBoot.instance.debugSetEnvironment(null);
       if (previous != null) InAppWebViewPlatform.instance = previous;
     });
   });
@@ -246,7 +260,12 @@ void main() {
       () async {
     final view = await start();
     view.loadStop();
-    final rejected = failed();
+    // A worker error without a code means the script itself threw, so it is a
+    // typed script failure rather than the generic engine StateError.
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'execution')));
     await view.native.message({'kind': 'error'});
     await rejected;
     expect(engine.diagnosticStage, 'worker_error');
@@ -306,13 +325,54 @@ void main() {
       'method': 'privateLibrary.open',
       'arguments': <String, Object?>{},
     });
-    expect(reply, {'error': 'Plugin request failed'});
+    // An unexpected host exception is a script-level failure, and the reply
+    // must never echo the exception text.
+    expect(reply, {'error': 'Plugin request failed', 'code': 'execution'});
     expect(engine.diagnosticStage, 'worker');
     await view.native.message({
       'kind': 'result',
       'value': {'text': 'handled'}
     });
     expect(await result, {'text': 'handled'});
+  });
+
+  test('a host permission failure keeps its code across the bridge', () async {
+    // This is the bug behind "the plugin could not run": the host refused a
+    // capability the user had not granted, but every failure collapsed into one
+    // fixed string, so the UI could not offer the consent sheet.
+    final view = await start(onCall: (_, __) async {
+      throw const PluginScriptFailure('denied');
+    });
+    view.loadStop();
+    final reply = await view.native.message({
+      'kind': 'call',
+      'method': 'privateLibrary.open',
+      'arguments': <String, Object?>{},
+    });
+    expect(reply, {'error': 'Plugin request failed', 'code': 'denied'});
+  });
+
+  test('a worker error reports the code it was given', () async {
+    final view = await start();
+    view.loadStop();
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'denied')));
+    await view.native.message({'kind': 'error', 'code': 'denied'});
+    await rejected;
+    expect(engine.diagnosticStage, 'worker_error');
+  });
+
+  test('a worker cannot invent a failure code the host does not know', () async {
+    final view = await start();
+    view.loadStop();
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'execution')));
+    await view.native.message({'kind': 'error', 'code': 'made-up-code'});
+    await rejected;
   });
 
   test('console diagnostics retain only a fixed stage', () async {
@@ -369,6 +429,23 @@ void main() {
         }),
         isNull);
     expect(calls, isEmpty);
+  });
+
+  test('dispose awaits the stop call before tearing the view down', () async {
+    // A platform message still pending when the native view dies is reported by
+    // the Flutter engine as "Failed to respond to a message. This is a memory
+    // leak." Dispose therefore has to await the stop call instead of firing it
+    // and walking away.
+    final view = await start();
+    view.loadStop();
+    final rejected = failed();
+    await engine.dispose();
+    await rejected;
+    expect(view.disposals, 1);
+    expect(
+        view.native.evaluations
+            .any((source) => source.contains('moduPluginStop')),
+        isTrue);
   });
 
   test('memory document keeps file, network, navigation and popup isolation',

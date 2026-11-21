@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.note-cards",
+  "version": "1.0.0",
+  "name": {
+    "zh-CN": "批注整理",
+    "en": "Annotation digest"
+  },
+  "description": {
+    "zh-CN": "按书汇总划线与批注，生成可直接粘贴的复习清单，并支持把当前书加入标签。演示 note:read、library:read、library:write、share:text。",
+    "en": "Group highlights and notes per book into a review list, and tag the current book. Demonstrates note:read, library:read, library:write and share:text."
+  },
+  "author": {
+    "name": "Modu contributors",
+    "url": "https://github.com/sobranie2406/modureader"
+  },
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": [
+    "script:run",
+    "ui:selection-action",
+    "note:read",
+    "library:read",
+    "search:library",
+    "library:write",
+    "share:text"
+  ],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "digest-notes",
+      "name": {
+        "zh-CN": "汇总批注",
+        "en": "Digest annotations"
+      },
+      "entry": "main.js",
+      "surface": "library",
+      "scope": "selection"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "collect-from-selection",
+      "name": {
+        "zh-CN": "查找相关批注",
+        "en": "Find related annotations"
+      },
+      "entry": "from-selection.js",
+      "surface": "selection",
+      "scope": "selection"
+    }
+  ],
+  "settings": [
+    {
+      "key": "limit",
+      "type": "number",
+      "label": {
+        "zh-CN": "条数上限",
+        "en": "Maximum entries"
+      },
+      "defaultValue": 40
+    },
+    {
+      "key": "with_note",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "包含我的批注",
+        "en": "Include my notes"
+      },
+      "description": {
+        "zh-CN": "关闭时只列出划线原文。",
+        "en": "When off, only the highlighted text is listed."
+      },
+      "defaultValue": true
+    },
+    {
+      "key": "share",
+      "type": "toggle",
+      "label": {
+        "zh-CN": "生成后调用系统分享",
+        "en": "Open the share sheet"
+      },
+      "defaultValue": false
+    }
+  ]
+}

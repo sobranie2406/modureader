@@ -129,3 +129,7 @@ google_service_account.json
 
 # Private device reference captures may contain book text; keep them local.
 /docs/references/hanvon-pdf/
+
+# Example plugin builds are reproducible from the sources next to them; keep the
+# tree small and let "pack then import" stay the one way to obtain a package.
+/docs/examples/plugins/dist/

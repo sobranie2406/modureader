@@ -184,12 +184,11 @@ packages:
     source: hosted
     version: "5.1.0"
   audioplayers_windows:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: audioplayers_windows
-      sha256: "871d3831c25cd2408ddc552600fd4b32fba675943e319a41284704ee038ad563"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/audioplayers_windows"
+      relative: true
+    source: path
     version: "4.2.0"
   battery_plus:
     dependency: "direct main"

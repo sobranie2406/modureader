@@ -44,7 +44,11 @@ class ConfigTransferCodec {
       'data': data,
     };
     final bytes = utf8.encode(jsonEncode(envelope));
-    return '$_moduPrefix${base64Encode(gzip.encode(bytes))}';
+    // Compress as far as gzip can: a maximal settings export sits a few
+    // characters from the 2953-byte QR limit (EC level L), and level 9 buys
+    // ~50 base64 characters over the default level 6. Links decode the same
+    // either way.
+    return '$_moduPrefix${base64Encode(GZipCodec(level: 9).encode(bytes))}';
   }
 
   static DecodedConfigTransfer decode(String token) {

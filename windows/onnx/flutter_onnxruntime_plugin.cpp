@@ -773,7 +773,7 @@ void FlutterOnnxruntimePlugin::HandleRunInference(
       Ort::Value *tensor_ptr = impl_->tensorManager_->getTensor(tensor_id);
       if (tensor_ptr != nullptr) {
         try {
-          // Clone the tensor — ClonedTensor owns both the Ort::Value and its backing buffer
+          // Clone the tensor - ClonedTensor owns both the Ort::Value and its backing buffer
           ClonedTensor cloned = impl_->tensorManager_->cloneTensor(tensor_id);
           if (cloned.value) {
             cloned_inputs.push_back(std::move(cloned));

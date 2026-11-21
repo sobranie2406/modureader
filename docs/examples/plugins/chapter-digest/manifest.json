@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "hostApi": 1,
+  "id": "com.modu.chapter-digest",
+  "version": "1.0.0",
+  "name": {
+    "zh-CN": "章节速览",
+    "en": "Chapter digest"
+  },
+  "description": {
+    "zh-CN": "取当前章节正文做要点速览，可存为批注或复制。演示 book:content、ai.complete 与 knowledge.query。",
+    "en": "Summarise the current chapter, then save or copy it. Demonstrates book:content, ai.complete and knowledge.query."
+  },
+  "author": {
+    "name": "Modu contributors",
+    "url": "https://github.com/sobranie2406/modureader"
+  },
+  "license": "MIT",
+  "minAppVersion": "1.3.10",
+  "capabilities": [
+    "script:run",
+    "ui:selection-action",
+    "book:content",
+    "knowledge:query",
+    "ai:invoke",
+    "note:write",
+    "clipboard:write",
+    "ui:dialog",
+    "ui:progress"
+  ],
+  "contributes": [
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "summarise-chapter",
+      "name": {
+        "zh-CN": "本章速览",
+        "en": "Digest this chapter"
+      },
+      "entry": "main.js",
+      "surface": "selection",
+      "scope": "selection"
+    },
+    {
+      "kind": "scriptAction",
+      "schema": 1,
+      "id": "ask-book",
+      "name": {
+        "zh-CN": "问本书",
+        "en": "Ask this book"
+      },
+      "entry": "ask.js",
+      "surface": "selection",
+      "scope": "selection"
+    }
+  ],
+  "settings": [
+    {
+      "key": "max_chars",
+      "type": "number",
+      "label": {
+        "zh-CN": "正文截取上限（字）",
+        "en": "Characters read"
+      },
+      "defaultValue": 6000
+    },
+    {
+      "key": "bullets",
+      "type": "number",
+      "label": {
+        "zh-CN": "要点条数",
+        "en": "Key points"
+      },
+      "defaultValue": 5
+    }
+  ]
+}

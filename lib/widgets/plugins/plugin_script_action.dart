@@ -9,11 +9,15 @@ import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/book_note.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/page/plugins/article_capture_page.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_private_library_bridge.dart';
+import 'package:modu_reader/widgets/plugins/plugin_host_services.dart';
+import 'package:modu_reader/widgets/plugins/plugin_permission_sheet.dart';
 import 'package:modu_reader/widgets/reading_page/reader_popup.dart';
 import 'package:path/path.dart' as p;
 
@@ -25,6 +29,7 @@ Future<void> runPluginAction(BuildContext context,
     int? bookId,
     String cfi = '',
     String chapter = '',
+    Future<String> Function()? chapterContent,
     ValueChanged<int>? onNoteCreated,
     PluginScriptRuntime? scriptRuntime,
     PrivateLibrary? privateLibrary,
@@ -123,6 +128,19 @@ Future<void> runPluginAction(BuildContext context,
           'context': contextText,
           if (book != null) 'book': _summary(book),
         },
+        // Native surfaces the Dart-side host API needs. The reading page adds
+        // chapter access through [chapterContent] when it has a reader.
+        hostApi: PluginHostApi(
+          pluginId: pluginId,
+          services: buildPluginHostServices(
+            context,
+            host: runtime.host,
+            pluginId: pluginId,
+            book: book,
+            chapter: chapter,
+            currentChapter: chapterContent,
+          ),
+        ),
         hostCall: (method, args) async {
           if (!current() || !readable()) {
             throw const PluginScriptFailure('cancelled');
@@ -292,15 +310,57 @@ Future<void> runPluginAction(BuildContext context,
       'cancelled' => t('插件任务已取消。', 'Plugin task cancelled.'),
       'busy' => t('插件正在运行，请稍后再试。', 'A plugin is running. Try again shortly.'),
       'timeout' => t('插件运行超时，已停止。', 'Plugin timed out and was stopped.'),
-      'permission' =>
-        t('插件没有此操作的权限。', 'This plugin cannot perform that action.'),
+      // The package never declared the capability this action needs, which
+      // means a stale or mismatched install rather than a missing switch.
+      'permission' => t('这个插件版本没有声明该能力，请更新插件包后重试。',
+          'This plugin version does not declare the capability it needs. Update the package and try again.'),
+      // The package declares the capability; the user has not switched it on.
+      // Offer the consent sheet right here rather than sending the reader to a
+      // settings page — the plugin already failed, so the ask must be one tap.
+      'denied' => t('插件需要授权后才能继续。',
+          'This plugin needs your permission to continue.'),
       'size' ||
       'result' =>
         t('插件内容过大或结果无效。', 'Plugin input or result is invalid or too large.'),
       _ => t('插件未能运行，请检查插件是否已启用。',
           'Could not run the plugin. Check that it is enabled.'),
     };
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    final offerPermission = code == 'denied' && context.mounted;
+    messenger?.showSnackBar(SnackBar(
+      content: Text(message),
+      duration: Duration(seconds: offerPermission ? 10 : 4),
+      action: !offerPermission
+          ? null
+          : SnackBarAction(
+              label: t('去授权', 'Review'),
+              onPressed: () async {
+                if (!context.mounted) return;
+                final pending = <String>[
+                  for (final capability in runtime.host
+                          .manifestFor(pluginId)
+                          ?.capabilities ??
+                      const <String>{})
+                    if (isRuntimePermission(capability) &&
+                        !runtime.host.hasPermission(pluginId, capability))
+                      capability,
+                ]..sort();
+                final actionName = action.name.resolve(
+                    Localizations.localeOf(context).toLanguageTag());
+                final granted = await showPluginPermissionRequest(
+                  context,
+                  host: runtime.host,
+                  pluginId: pluginId,
+                  capabilities: pending,
+                  reason: t('“$actionName” 需要这些权限才能运行。',
+                      '“$actionName” needs these permissions to run.'),
+                );
+                if (!context.mounted || granted.isEmpty) return;
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+                    content: Text(t('权限已更新，请再次运行该动作。',
+                        'Permissions updated. Run the action again.'))));
+              },
+            ),
+    ));
   } finally {
     invocationActive = false;
     privateBridge?.dispose();

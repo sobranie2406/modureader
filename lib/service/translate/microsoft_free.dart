@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:modu_reader/enums/lang_list.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/service/translate/index.dart';
@@ -15,6 +17,20 @@ const _maxChunkLength = 4500;
 /// existing settings, but the actual transport is Google's public translation
 /// endpoint. The user-facing label names the transport truthfully.
 class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
+  MicrosoftFreeTranslateProvider({Dio Function()? dioFactory})
+      : _dioFactory = dioFactory ?? _defaultDio;
+
+  /// A fresh client per call so a cancelled lookup cannot leave a connection
+  /// pool behind, but with a **connect** deadline: without one a blocked host
+  /// falls through to the OS timeout (21 s here), then [_translateChunk]'s
+  /// caller retried it twice more.
+  final Dio Function() _dioFactory;
+
+  static Dio _defaultDio() => Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+
   @override
   TranslateService get service => TranslateService.microsoftFree;
 
@@ -62,8 +78,14 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
       yield translated.join();
     } catch (error) {
       if (cancelToken.isCancelled) return;
-      AnxLog.severe('Free translation failed: $error');
-      yield* Stream.error(Exception(error));
+      // A blocked or unreachable endpoint is a normal condition (offline, no
+      // route, a network that filters Google), not a crash: one warning line,
+      // no stack trace, and a failure the caller knows not to retry.
+      final unavailable = error is TranslateUnavailableException;
+      AnxLog.warning(
+          'Free translation ${unavailable ? 'unavailable' : 'failed'}: '
+          '${_describe(error)}');
+      yield* Stream.error(unavailable ? error : Exception(_describe(error)));
     }
   }
 
@@ -73,24 +95,32 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
     LangListEnum to,
     CancelToken cancelToken,
   ) async {
-    final response = await Dio().get(
-      _readAnyFreeTranslateUrl,
-      cancelToken: cancelToken,
-      queryParameters: {
-        'client': 'gtx',
-        'sl': from == LangListEnum.auto ? 'auto' : from.code.toLowerCase(),
-        'tl': to.code.toLowerCase(),
-        'dt': 't',
-        'q': text,
-      },
-      options: Options(
-        receiveTimeout: const Duration(seconds: 15),
-        validateStatus: (status) => status != null && status < 500,
-      ),
-    );
+    final Response<dynamic> response;
+    try {
+      response = await _dioFactory().get<dynamic>(
+        _readAnyFreeTranslateUrl,
+        cancelToken: cancelToken,
+        queryParameters: {
+          'client': 'gtx',
+          'sl': from == LangListEnum.auto ? 'auto' : from.code.toLowerCase(),
+          'tl': to.code.toLowerCase(),
+          'dt': 't',
+          'q': text,
+        },
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+    } on DioException catch (error) {
+      // Nothing about a dropped connection or a rate limit changes within the
+      // retry window, so classify it once instead of trying three times.
+      if (error.type == DioExceptionType.badResponse) rethrow;
+      throw TranslateUnavailableException(_describe(error));
+    }
 
     if (response.statusCode != 200 || response.data is! List) {
-      throw Exception('Free translation HTTP ${response.statusCode}');
+      throw TranslateUnavailableException(
+          'HTTP ${response.statusCode} from the free endpoint');
     }
 
     final data = response.data as List<dynamic>;
@@ -110,6 +140,20 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
       throw Exception('Free translation returned an empty result');
     }
     return result;
+  }
+
+  /// One log-friendly line instead of Dio's multi-line exception dump.
+  static String _describe(Object error) {
+    if (error is TranslateUnavailableException) return _describe(error.cause);
+    if (error is DioException) {
+      final inner = error.error;
+      if (inner is SocketException) {
+        return 'cannot reach ${Uri.parse(_readAnyFreeTranslateUrl).host} '
+            '(socket: ${inner.osError?.message ?? inner.message})';
+      }
+      return '${error.type.name}: ${error.message ?? error}';
+    }
+    return '$error';
   }
 
   List<String> _splitText(String text) {

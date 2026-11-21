@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/main.dart' show navigatorKey;
 import 'package:modu_reader/service/private_library.dart';
@@ -13,6 +14,7 @@ import 'package:modu_reader/service/plugins/plugin_package.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_trust.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
+import 'package:modu_reader/service/plugins/plugin_permissions.dart';
 import 'package:modu_reader/service/plugins/plugin_private_import_policy.dart';
 import 'package:modu_reader/utils/app_version.dart';
 import 'package:modu_reader/utils/log/common.dart';
@@ -278,6 +280,8 @@ class PluginHost extends ChangeNotifier {
     } else {
       await Prefs().removePluginData(id);
       await Prefs().prefs.remove(PluginConfig.deviceKeyFor(id));
+      await _revokeAllPermissions(id);
+      await Prefs().clearPluginPermissionSeeded(id);
     }
   }
 
@@ -332,6 +336,209 @@ class PluginHost extends ChangeNotifier {
       _compiledIn &&
       Prefs().experimentalPluginsEnabled &&
       byId(id)?.status == PluginStatus.enabled;
+
+  // ---- Runtime permissions -------------------------------------------------
+  //
+  // Grants are device-local and never leave it. A capability that is not in
+  // this map is denied, including one a package update just added.
+
+  /// Every grant held on this device, for every plugin.
+  Map<String, Set<String>> get permissionGrants =>
+      development ? const {} : Prefs().pluginPermissions;
+
+  /// Capabilities [id] may use right now: declared, runtime-tier and granted.
+  Set<String> grantedPermissions(String id) {
+    if (development) return _developmentGrants(id);
+    final manifest = manifestFor(id);
+    if (manifest == null) return const {};
+    final store = Prefs().pluginPermissions;
+    return {
+      for (final capability in PluginPermissions.requestedRuntime(manifest))
+        if (PluginPermissions.allows(store, id, capability)) capability,
+    };
+  }
+
+  /// True when the plugin declares [capability] and it is runtime-tier.
+  bool requestsPermission(String id, String capability) {
+    if (!isRuntimePermission(capability)) return true;
+    final manifest = manifestFor(id);
+    if (manifest == null) return false;
+    return manifest.capabilities.contains(capability);
+  }
+
+  /// True when [id] may use [capability] right now.
+  ///
+  /// Install-tier capabilities are answered from the manifest; runtime-tier
+  /// ones from the device grant map, so the check is the single place a new
+  /// host API must consult.
+  bool hasPermission(String id, String capability) {
+    // Implicit by design: installing the package already granted it, and the
+    // parser drops the token from the manifest, so answering from
+    // [PluginManifest.capabilities] would deny a capability with no switch.
+    if (kImplicitCapabilities.contains(capability)) {
+      return manifestFor(id) != null;
+    }
+    if (!isRuntimePermission(capability)) {
+      return manifestFor(id)?.capabilities.contains(capability) ?? false;
+    }
+    if (development) return _developmentGrants(id).contains(capability);
+    return PluginPermissions.allows(
+        Prefs().pluginPermissions, id, capability);
+  }
+
+  /// Turns one runtime capability on or off.
+  ///
+  /// Refuses a capability the package does not declare: a stale grant would
+  /// silently re-authorise it if a later version re-added the token.
+  Future<void> setPermission(String id, String capability, bool granted) =>
+      _exclusive(() => _setPermission(id, capability, granted));
+
+  Future<void> _setPermission(
+      String id, String capability, bool granted) async {
+    _ensureUsable();
+    final manifest = manifestFor(id);
+    if (manifest == null) {
+      throw PluginInstallError(
+          PluginErrorCode.notInstalled, 'Plugin $id is not installed.');
+    }
+    if (!isRuntimePermission(capability)) {
+      throw const PluginInstallError(PluginErrorCode.permissionNotRuntime,
+          'This permission is granted by installing the package.');
+    }
+    if (!manifest.capabilities.contains(capability)) {
+      throw const PluginInstallError(PluginErrorCode.capabilityUnavailable,
+          'The package does not declare this permission.');
+    }
+    if (development) {
+      final next = Set<String>.from(
+          _developmentPermissionGrants[id] ?? const <String>{});
+      if (granted) {
+        next.add(capability);
+      } else {
+        next.remove(capability);
+      }
+      if (next.isEmpty) {
+        _developmentPermissionGrants.remove(id);
+      } else {
+        _developmentPermissionGrants[id] = next;
+      }
+      notifyListeners();
+      return;
+    }
+    // A user decision is recorded even when it is "deny everything", so the
+    // grandfather seeding cannot hand the capability back on the next start.
+    await Prefs().markPluginPermissionSeeded(id);
+    final store = Map<String, Set<String>>.from(Prefs().pluginPermissions);
+    final next = Set<String>.from(store[id] ?? const <String>{});
+    if (granted) {
+      next.add(capability);
+    } else {
+      next.remove(capability);
+    }
+    if (next.isEmpty) {
+      store.remove(id);
+    } else {
+      store[id] = next;
+    }
+    await Prefs().savePluginPermissions(store);
+    // A revoked capability must stop work already in flight.
+    if (!granted) {
+      for (final runtime in _runtimes) {
+        runtime.cancelPlugin(id);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Applies grants **without disturbing work that is already running**.
+  ///
+  /// [setPermission] is serialised with package mutations, which cancels every
+  /// running script. That is correct for a settings-page toggle, but it is
+  /// exactly wrong for consent a plugin asks for mid-run: the cancellation
+  /// would kill the very job that just received the permission, so the plugin
+  /// could never proceed. Granting therefore uses its own queue. Revoking still
+  /// goes through [setPermission] and still stops running work.
+  Future<Set<String>> grantPermissions(
+      String id, Iterable<String> capabilities) {
+    final wanted = List<String>.of(capabilities);
+    final operation = _permissionWrites.then((_) async {
+      for (final capability in wanted) {
+        await _setPermission(id, capability, true);
+      }
+      return grantedPermissions(id);
+    });
+    _permissionWrites = operation.then<void>((_) {},
+        onError: (Object _, StackTrace __) {});
+    return operation;
+  }
+
+  /// Queue for permission writes that must not tear down running scripts.
+  Future<void> _permissionWrites = Future.value();
+
+  /// Drops every runtime grant a plugin holds.
+  Future<void> revokeAllPermissions(String id) =>
+      _exclusive(() => _revokeAllPermissions(id));
+
+  Future<void> _revokeAllPermissions(String id) async {
+    if (development) {
+      _developmentPermissionGrants.remove(id);
+      notifyListeners();
+      return;
+    }
+    final store = Map<String, Set<String>>.from(Prefs().pluginPermissions);
+    if (store.remove(id) == null) return;
+    await Prefs().savePluginPermissions(store);
+    for (final runtime in _runtimes) {
+      runtime.cancelPlugin(id);
+    }
+    notifyListeners();
+  }
+
+  final _developmentPermissionGrants = <String, Set<String>>{};
+
+  Set<String> _developmentGrants(String id) =>
+      Set.unmodifiable(_developmentPermissionGrants[id] ?? const <String>{});
+
+  /// Gives an **upgraded** package the grants it already implied before manual
+  /// permission control existed, so the upgrade is not a regression.
+  ///
+  /// A fresh install never seeds: its grants must all be requested on the
+  /// permission screen. The seeded marker distinguishes the two cases, because
+  /// "no grants stored" is also what "the user revoked everything" looks like.
+  Future<void> _seedLegacyPermissions(PluginManifest manifest,
+      {required bool wasInstalled}) async {
+    if (!wasInstalled) {
+      if (!development) {
+        await Prefs().markPluginPermissionSeeded(manifest.id);
+      }
+      return;
+    }
+    if (!development && Prefs().pluginPermissionSeeded.contains(manifest.id)) {
+      return;
+    }
+    final legacy = PluginPermissions.legacyGrants(manifest);
+    if (development) {
+      if (legacy.isNotEmpty) _developmentPermissionGrants[manifest.id] = legacy;
+      return;
+    }
+    await Prefs().markPluginPermissionSeeded(manifest.id);
+    if (legacy.isEmpty) return;
+    final store = Map<String, Set<String>>.from(Prefs().pluginPermissions);
+    // Never overwrite a decision the user already made under the new system.
+    if (store.containsKey(manifest.id)) return;
+    store[manifest.id] = legacy;
+    await Prefs().savePluginPermissions(store);
+  }
+
+  /// Drops grants for capabilities [manifest] no longer declares.
+  Future<void> _prunePermissions(PluginManifest manifest) async {
+    final store = Prefs().pluginPermissions;
+    final pruned = PluginPermissions.prune(store, manifest);
+    if (PluginPermissions.encode(pruned) == PluginPermissions.encode(store)) {
+      return;
+    }
+    await Prefs().savePluginPermissions(pruned);
+  }
 
   @override
   void notifyListeners() {
@@ -724,6 +931,13 @@ class PluginHost extends ChangeNotifier {
           applied: List.unmodifiable(applied),
         );
         await _saveState(_state.upsert(record));
+        await _seedLegacyPermissions(manifest, wasInstalled: existing != null);
+        // A new version may have dropped a capability. Keeping its grant would
+        // silently re-authorise it if a later version re-added the token, so the
+        // store is pruned against what this version actually declares.
+        if (!development) {
+          await _prunePermissions(manifest);
+        }
         if (development &&
             existing != null &&
             (_manifests[manifest.id]
@@ -871,8 +1085,24 @@ class PluginHost extends ChangeNotifier {
     _manifestTexts.remove(id);
     notifyListeners();
 
-    // File deletion is best-effort: the registry entry is already gone, so a
-    // locked directory cannot leave the plugin half-installed.
+    // File deletion is best-effort and happens **after** the registry update:
+    // the entry is already gone, so a locked or slow directory cannot leave the
+    // plugin listed as installed. Deleting the private data directory belongs
+    // here for the same reason — before the update it kept the uninstalling
+    // page (and any widget test) showing a plugin that was already removed.
+    await _deleteOwnedFiles(id);
+  }
+
+  Future<void> _deleteOwnedFiles(String id) async {
+    try {
+      final data = _paths.dataDir(id);
+      if (await data.exists()) await data.delete(recursive: true);
+    } catch (error) {
+      if (!development) {
+        AnxLog.warning('Could not delete plugin data of $id: '
+            '${describeError(error)}');
+      }
+    }
     try {
       final directory = _paths.pluginDir(id);
       if (await directory.exists()) {

@@ -29,6 +29,7 @@ import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/l10n/app_language.dart';
 import 'package:modu_reader/models/window_info.dart';
 import 'package:modu_reader/page/home_page.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 import 'package:modu_reader/page/reading_page.dart';
 import 'package:modu_reader/page/android_storage_startup.dart';
 import 'package:modu_reader/page/migration_page.dart';
@@ -390,8 +391,7 @@ class _MyAppState extends ConsumerState<MyApp>
       // must outlive them; let the native plugin own its teardown with the
       // Flutter engine instead of freeing it ahead of those controllers.
       if (!Platform.isWindows) {
-        await webViewEnvironment?.dispose();
-        webViewEnvironment = null;
+        await WebViewEnvironmentBoot.instance.dispose();
       }
       PluginHost.instance.dispose();
       await DBHelper.close();
