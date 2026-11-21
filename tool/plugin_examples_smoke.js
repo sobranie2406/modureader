@@ -79,8 +79,12 @@ function makeHost(manifest, notes, granted) {
       throw error;
     }
     if (method === 'permissions.request') {
-      for (const requested of args.capabilities || []) {
-        if (declared.has(requested)) granted.add(requested);
+      // M0DU_DENY=1 models a user who dismisses every consent sheet, which must
+      // still produce a clear result rather than a thrown error.
+      if (!process.env.M0DU_DENY) {
+        for (const requested of args.capabilities || []) {
+          if (declared.has(requested)) granted.add(requested);
+        }
       }
       const grantedNow = (args.capabilities || []).filter((c) => granted.has(c));
       return {
@@ -230,9 +234,20 @@ for (const entry of fs.readdirSync(root)) {
     if (outcome.ok) {
       const keys = Object.keys(outcome.result || {});
       const shaped = keys.every((k) => ['title', 'text', 'candidates', 'private', 'markdown'].includes(k));
+      const result = outcome.result || {};
       if (!shaped) {
         failures++;
         console.log('SHAPE  ' + item.entry + '/' + item.id + ' -> ' + JSON.stringify(keys));
+      } else if (process.env.M0DU_DENY) {
+        // A denied request must tell the reader why, not hand back an empty box.
+        const text = typeof result.text === 'string' ? result.text : '';
+        if (!text.trim()) {
+          failures++;
+          console.log('EMPTY  ' + item.entry + '/' + item.id +
+              ' denied but returned no explanation');
+        } else {
+          console.log('denied-ok ' + item.entry + '/' + item.id + ' -> ' + text);
+        }
       } else {
         console.log('ok     ' + item.entry + '/' + item.id);
       }
