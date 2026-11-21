@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 
@@ -259,7 +260,12 @@ void main() {
       () async {
     final view = await start();
     view.loadStop();
-    final rejected = failed();
+    // A worker error without a code means the script itself threw, so it is a
+    // typed script failure rather than the generic engine StateError.
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'execution')));
     await view.native.message({'kind': 'error'});
     await rejected;
     expect(engine.diagnosticStage, 'worker_error');
@@ -319,13 +325,54 @@ void main() {
       'method': 'privateLibrary.open',
       'arguments': <String, Object?>{},
     });
-    expect(reply, {'error': 'Plugin request failed'});
+    // An unexpected host exception is a script-level failure, and the reply
+    // must never echo the exception text.
+    expect(reply, {'error': 'Plugin request failed', 'code': 'execution'});
     expect(engine.diagnosticStage, 'worker');
     await view.native.message({
       'kind': 'result',
       'value': {'text': 'handled'}
     });
     expect(await result, {'text': 'handled'});
+  });
+
+  test('a host permission failure keeps its code across the bridge', () async {
+    // This is the bug behind "the plugin could not run": the host refused a
+    // capability the user had not granted, but every failure collapsed into one
+    // fixed string, so the UI could not offer the consent sheet.
+    final view = await start(onCall: (_, __) async {
+      throw const PluginScriptFailure('denied');
+    });
+    view.loadStop();
+    final reply = await view.native.message({
+      'kind': 'call',
+      'method': 'privateLibrary.open',
+      'arguments': <String, Object?>{},
+    });
+    expect(reply, {'error': 'Plugin request failed', 'code': 'denied'});
+  });
+
+  test('a worker error reports the code it was given', () async {
+    final view = await start();
+    view.loadStop();
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'denied')));
+    await view.native.message({'kind': 'error', 'code': 'denied'});
+    await rejected;
+    expect(engine.diagnosticStage, 'worker_error');
+  });
+
+  test('a worker cannot invent a failure code the host does not know', () async {
+    final view = await start();
+    view.loadStop();
+    final rejected = expectLater(
+        result,
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'execution')));
+    await view.native.message({'kind': 'error', 'code': 'made-up-code'});
+    await rejected;
   });
 
   test('console diagnostics retain only a fixed stage', () async {

@@ -1,4 +1,28 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities, reason) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: reason
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // 问本书：用本地向量索引检索相关内容，再让模型基于检索结果回答。
+var allowed = await ensurePermissions(["ai:invoke", "knowledge:query"],
+    "就本书内容提问需要模型与本地索引。");
+if (!allowed) {
+  return { title: "问本书", text: "需要模型与本地索引权限。" };
+}
+
 var question = typeof input.selection === "string" ? input.selection.trim() : "";
 if (!question) return { title: "问本书", text: "请先选中一个要问的问题。" };
 if (question.length > 500) question = question.slice(0, 500);

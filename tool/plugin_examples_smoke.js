@@ -1,3 +1,11 @@
+// Capabilities the manifest grants by installing rather than by consent.
+const INSTALL_TIER = new Set([
+  'script:run', 'ui:selection-action', 'ui:book-action', 'ai:prompt-pack',
+  'settings:device', 'dictionary:transform', 'article:capture', 'article:extract',
+  'library:private', 'library:private-control', 'library:private-policy',
+  'storage:plugin',
+]);
+
 // Mirrors PluginScriptRuntime._call's method -> capability map, so an example
 // script that calls a method its manifest does not declare fails here instead
 // of on a user's machine.
@@ -47,9 +55,14 @@ const CAPABILITY = {
 };
 
 // Observations recorded by the stubs, so a script can run without a real host.
-function makeHost(manifest, notes) {
+//
+// `granted` starts empty, matching a fresh device: runtime capabilities are
+// denied until the user consents, so a script that never calls
+// permissions.request fails exactly as it would on a real machine.
+function makeHost(manifest, notes, granted) {
   const declared = new Set(manifest.capabilities);
   const files = new Map();
+  const isRuntime = (capability) => !INSTALL_TIER.has(capability);
   const call = (method, args) => {
     const capability = CAPABILITY[method];
     if (!capability) throw new Error('unknown method ' + method);
@@ -58,6 +71,25 @@ function makeHost(manifest, notes) {
       error.code = 'permission';
       error.missing = capability;
       throw error;
+    }
+    if (isRuntime(capability) && !granted.has(capability)) {
+      const error = new Error('Plugin request failed');
+      error.code = 'denied';
+      error.missing = capability;
+      throw error;
+    }
+    if (method === 'permissions.request') {
+      for (const requested of args.capabilities || []) {
+        if (declared.has(requested)) granted.add(requested);
+      }
+      const grantedNow = (args.capabilities || []).filter((c) => granted.has(c));
+      return {
+        granted: grantedNow,
+        denied: (args.capabilities || []).filter((c) => !granted.has(c)),
+      };
+    }
+    if (method === 'permissions.status') {
+      return { granted: [...granted] };
     }
     notes.push(method);
     switch (method) {
@@ -165,7 +197,7 @@ for (const entry of fs.readdirSync(root)) {
     if (contribution.kind !== 'scriptAction') continue;
     const source = fs.readFileSync(path.join(dir, contribution.entry), 'utf8');
     const notes = [];
-    const call = makeHost(manifest, notes);
+    const call = makeHost(manifest, notes, new Set());
     const input = {
       selection: 'ephemeral',
       context: 'some surrounding context',

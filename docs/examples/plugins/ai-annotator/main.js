@@ -1,5 +1,29 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities, reason) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: reason
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // AI 批注助手：解释所选文字，按需存为笔记。
 // 使用用户在「设置 → AI」中配置的模型，插件不接触任何 API Key。
+var allowed = await ensurePermissions(["ai:invoke", "note:write"],
+    "用你的模型生成讲解并保存为批注。");
+if (!allowed) {
+  return { title: "AI 批注", text: "需要模型与保存笔记的权限。" };
+}
+
 var selection = typeof input.selection === "string" ? input.selection.trim() : "";
 if (!selection) return { title: "AI 解释", text: "请先选择要解释的文字。" };
 if (selection.length > 4000) selection = selection.slice(0, 4000);

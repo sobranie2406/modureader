@@ -1,4 +1,28 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities, reason) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: reason
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // 加入生词本：查词典、可选翻译，然后写进插件自己的生词本文件。
+var allowed = await ensurePermissions(["dictionary:lookup", "translate:invoke"],
+    "查词并记入生词本。");
+if (!allowed) {
+  return { title: "生词本", text: "需要词典与翻译权限。" };
+}
+
 var word = typeof input.selection === "string" ? input.selection.trim() : "";
 if (!word) return { title: "生词本", text: "请先选择要加入的单词。" };
 if (word.length > 64) word = word.slice(0, 64);

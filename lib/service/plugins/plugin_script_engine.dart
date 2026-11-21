@@ -6,6 +6,8 @@ import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:modu_reader/page/home_page.dart' show webViewEnvironment;
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart'
+    show PluginScriptFailure;
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 
@@ -43,6 +45,21 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
   final _pendingJs = <Future<void>>{};
   String _diagnosticStage = 'idle';
   String get diagnosticStage => _diagnosticStage;
+
+  /// Codes a worker may report back. Anything else becomes 'execution', so a
+  /// compromised or buggy script cannot invent a failure the UI would trust.
+  static const Set<String> _workerCodes = {
+    'unavailable',
+    'busy',
+    'cancelled',
+    'timeout',
+    'execution',
+    'permission',
+    'denied',
+    'quota',
+    'size',
+    'result',
+  };
 
   void _fail([String? stage]) {
     if (!_result.isCompleted) {
@@ -168,17 +185,34 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
                     final value = await onCall(message['method'] as String,
                         message['arguments'] as Map<String, dynamic>);
                     return _disposed ? null : {'value': value};
+                  } on PluginScriptFailure catch (failure) {
+                    // Carry the host's own code across the bridge. Collapsing
+                    // every failure into one string made "the user has not
+                    // granted this" indistinguishable from "the package is
+                    // broken", which is exactly what left a real permission
+                    // failure looking like a generic plugin crash.
+                    return {'error': 'Plugin request failed', 'code': failure.code};
                   } catch (_) {
-                    return {'error': 'Plugin request failed'};
+                    return {'error': 'Plugin request failed', 'code': 'execution'};
                   } finally {
                     if (!_disposed && !_result.isCompleted) {
                       _diagnosticStage = 'worker';
                     }
                   }
                 }
-                _fail(message['kind'] == 'error'
-                    ? 'worker_error'
-                    : 'invalid_message');
+                if (message['kind'] == 'error') {
+                  // The worker names the code it was given; anything else is a
+                  // script bug. Typed here so the runtime can log and report the
+                  // real cause instead of a blanket 'execution'.
+                  final code = message['code'];
+                  _result.completeError(PluginScriptFailure(
+                      code is String && _workerCodes.contains(code)
+                          ? code
+                          : 'execution'));
+                  _diagnosticStage = 'worker_error';
+                  return null;
+                }
+                _fail('invalid_message');
               } catch (_) {
                 _fail('invalid_message');
               }

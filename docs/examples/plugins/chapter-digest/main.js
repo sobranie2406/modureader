@@ -1,4 +1,28 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities, reason) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: reason
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // 本章速览：读取当前章节正文，交给用户自己的模型提炼要点。
+var allowed = await ensurePermissions(["book:content", "ai:invoke", "note:write"],
+    "要总结本章，需要正文、模型与保存笔记。");
+if (!allowed) {
+  return { title: "本章速览", text: "需要正文、模型与笔记权限。" };
+}
+
 var settings = input.settings || {};
 var maxChars = parseInt(settings.max_chars, 10);
 if (!(maxChars > 0)) maxChars = 6000;

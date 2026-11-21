@@ -120,7 +120,13 @@
         if (message.reply) {
           const task=pending.get(message.reply); if(!task)return;
           pending.delete(message.reply);
-          if(message.error)task.reject(new Error('Plugin request failed'));else task.resolve(message.value);
+          if(message.error){
+            // Keep the host's failure code: a permission the user has not
+            // granted must not look like a broken package.
+            const error=new Error('Plugin request failed');
+            error.moduCode=typeof message.code==='string'?message.code:'execution';
+            task.reject(error);
+          }else task.resolve(message.value);
           return;
         }
         if (!message.start) return;
@@ -131,7 +137,11 @@
     const suffix = `
           })(message.input,modu);
           post({kind:'result',value:result});
-        } catch (_) { post({kind:'error'}); }
+        } catch (error) {
+          // Report the code the host gave us, or 'execution' for a script bug,
+          // so the diagnostics panel names the real cause.
+          post({kind:'error',code:(error&&typeof error.moduCode==='string')?error.moduCode:'execution'});
+        }
       };
     `;
     const url = URL.createObjectURL(new Blob([prelude, source, suffix],{type:'application/javascript'}));

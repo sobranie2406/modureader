@@ -1,7 +1,30 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: "查找相关批注需要读取书库与笔记。"
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // 查找相关批注：用所选文字搜索整个书库的笔记与书名。
 var query = typeof input.selection === "string" ? input.selection.trim() : "";
 if (!query) return { title: "查找相关批注", text: "请先选择要查找的文字。" };
 if (query.length > 200) query = query.slice(0, 200);
+
+var allowed = await ensurePermissions(["search:library"]);
+if (!allowed) {
+  return { title: "查找相关批注", text: "需要书库与笔记的读取权限。" };
+}
 
 var result = await modu.search.library({ query: query, limit: 20, includeNotes: true });
 var notes = Array.isArray(result && result.notes) ? result.notes : [];

@@ -1,5 +1,29 @@
+// Ask for anything this package declares but the device has not granted yet.
+// Grants start denied, so without this the first run always fails with a bare
+// "could not run" and the reader has to find the permission page themselves.
+async function ensurePermissions(capabilities, reason) {
+  var status = await modu.permissions.status();
+  var granted = (status && status.granted) || [];
+  var missing = [];
+  for (var i = 0; i < capabilities.length; i++) {
+    if (granted.indexOf(capabilities[i]) < 0) missing.push(capabilities[i]);
+  }
+  if (missing.length === 0) return true;
+  var answer = await modu.permissions.request({
+    capabilities: missing,
+    reason: reason
+  });
+  return !!answer && Array.isArray(answer.granted) && answer.granted.length > 0;
+}
+
 // 批注整理：把划线与批注按书汇总成复习清单。
 // 只读取当前可读的书籍与笔记；私密书籍在未解锁时不会出现。
+var allowed = await ensurePermissions(["note:read"],
+    "汇总批注需要读取你的笔记。");
+if (!allowed) {
+  return { title: "批注汇总", text: "需要读取笔记的权限。" };
+}
+
 var settings = input.settings || {};
 var limit = parseInt(settings.limit, 10);
 if (!(limit > 0)) limit = 40;
