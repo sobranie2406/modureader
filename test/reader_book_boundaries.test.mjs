@@ -8,10 +8,10 @@ const {lineAlignedOffset} = await import(`data:text/javascript;base64,${Buffer.f
 const between = (a, b) => source.slice(source.indexOf(a), source.indexOf(b));
 // Execute the production navigation methods with deterministic layout metrics.
 const Renderer = runInNewContext(`class Renderer {
-  #view = {}; #locked = false; #index = 0; #rtl = false; #vertical = false;
+  #view = {layoutRevision: 0}; #locked = false; #index = 0; #rtl = false; #vertical = false;
   #lastNavigation; #navigationWaiters = new Set();
   #continuous; #continuousDisabled = false; #ensureContinuous() {}
-  #lineSettleTimer; #needsLineSettle=false; #scrollPointerDown=false; #destroyed=false;
+  #lineSettleTimer; #needsLineSettle=false; #scrollPointerDown=false; #destroyed=false; #preparingView=false;
   #settledAt; #scrollDirection=1; #margin=0;
   #ignoreNativeScroll = false; #justAnchored = false; #isSnapping = false; #touchState;
   #container = { scrollLeft: 600, scrollTop: 0, style: {} };
@@ -32,6 +32,12 @@ const Renderer = runInNewContext(`class Renderer {
   animated = false;
   hasAttribute() {return this.animated}
   set animationElement(value) {this.#view.element = value}
+  relayout(page, viewSize = this.viewSize) {
+    this.#view.layoutRevision++;
+    this.viewSize = viewSize;
+    this.start = page * this.size;
+  }
+  destroy() {this.#destroyed = true}
   percent = null;
   getAttribute() {return this.percent}
   scrollPageTarget(target) {return target}
@@ -88,6 +94,56 @@ test('compositor turns commit once after completion, preserve RTL and cancel wit
     assert.equal(r.locked,false);
   }
 });
+
+test('an animated page turn interrupted by translation layout continues from the re-anchored page', async () => {
+  for (const direction of ['next', 'prev']) {
+    const reader = new Renderer();
+    reader.animated = true;
+    reader.start = 1200;
+    let rejectAnimation;
+    reader.animationElement = {animate() {
+      return {finished: new Promise((_, reject) => { rejectAnimation = reject; }), cancel() {}};
+    }};
+    const turning = reader[direction]();
+    reader.relayout(3, 5400);
+    rejectAnimation(Object.assign(new Error('Relayout canceled animation'), {name: 'AbortError'}));
+    await turning;
+    assert.equal(reader.page, direction === 'next' ? 4 : 2);
+    assert.equal(reader.relocations, 1);
+    assert.equal(reader.locked, false);
+  }
+});
+
+test('interrupted turns use the new chapter boundary and cannot navigate a destroyed view', async () => {
+  for (const ending of ['reflow', 'shrunk', 'canceled', 'destroyed']) {
+    const reader = new Renderer();
+    reader.animated = true;
+    reader.sections = [{}, {}];
+    reader.start = 1200;
+    let rejectAnimation;
+    reader.animationElement = {animate() {
+      return {finished: new Promise((_, reject) => { rejectAnimation = reject; }), cancel() {}};
+    }};
+    const turning = reader.next();
+    if (ending === 'reflow' || ending === 'destroyed') reader.relayout(3, 5400);
+    if (ending === 'shrunk') reader.relayout(2, 2400);
+    if (ending === 'destroyed') reader.destroy();
+    rejectAnimation(Object.assign(new Error('Canceled animation'), {name: 'AbortError'}));
+    await turning;
+    if (ending === 'shrunk') {
+      assert.equal(reader.index, 1);
+      assert.equal(reader.page, 1);
+      assert.deepEqual(Array.from(reader.visits), [1]);
+    } else {
+      assert.equal(reader.index, 0);
+      assert.equal(reader.page, ending === 'reflow' ? 4 : ending === 'destroyed' ? 3 : 2);
+      assert.equal(reader.relocations, ending === 'reflow' ? 1 : 0);
+      assert.deepEqual(Array.from(reader.visits), []);
+    }
+    assert.equal(reader.locked, false);
+  }
+});
+
 test('disabled motion and unsupported compositor retain direct/fallback page turns',async()=>{
   for(const animated of [false,true]){
     const r=new Renderer();r.animated=animated;

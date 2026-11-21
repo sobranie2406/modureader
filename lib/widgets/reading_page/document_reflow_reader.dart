@@ -542,6 +542,15 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   void _translationChanged() {
+    final mode = _translation.mode.value;
+    final previousMode = classicalTranslation
+        ? classicalTranslationMode.value
+        : translationMode.value;
+    final preserveTap = _showTranslation &&
+        mode == previousMode &&
+        _translatedController.selection.isCollapsed &&
+        ((_expandInitialSelection && _pointerOrigin != null) ||
+            _menuTapTimer?.isActive == true);
     _cancelQuickMark(clearPointers: true);
     if (_showTranslation) {
       _notifyQuickMarkUnavailable();
@@ -549,12 +558,22 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _quickMarkUnavailableNotified = false;
     }
     _configureTranslationStyle();
-    _translationModes.update(_translation.mode.value,
-        isClassical: classicalTranslation);
+    _translationModes.update(mode, isClassical: classicalTranslation);
     _invalidateNarration();
-    clearSelection();
+    if (!preserveTap) clearSelection();
     (widget.selectionInvalidated ?? widget.clearMenu)();
-    _translatedController.text = _translation.text;
+    final text = _translation.text;
+    if (preserveTap) {
+      // Keep the caret from restarting selection detection mid-tap.
+      final selection = _translatedController.selection;
+      final caret = selection.extentOffset.clamp(-1, text.length);
+      _translatedController.value = TextEditingValue(
+          text: text,
+          selection:
+              selection.copyWith(baseOffset: caret, extentOffset: caret));
+    } else {
+      _translatedController.text = text;
+    }
     _translatedController.translatedRanges = _translation.translatedRanges;
     _translatedController.paragraphSpacing = _style.paragraphSpacing;
     if (mounted) setState(() {});

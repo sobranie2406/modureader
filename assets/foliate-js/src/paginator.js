@@ -239,6 +239,7 @@ class View {
   #column = true
   #size
   #layout = {}
+  #layoutRevision = 0
   constructor({ container, onExpand, allowAutoplay = true, allowBookScripts = true }) {
     this.container = container
     this.onExpand = onExpand
@@ -273,6 +274,7 @@ class View {
   get document() {
     return this.#iframe.contentDocument
   }
+  get layoutRevision() { return this.#layoutRevision }
   cancelLoad() { this.#cancelLoad?.() }
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
@@ -387,6 +389,7 @@ class View {
   }
   render(layout, timing) {
     if (!layout) return
+    this.#layoutRevision++
     const resetting = Date.now()
     for (const animation of this.#element.getAnimations?.() ?? []) animation.cancel()
     resetPageAlignment(this.document)
@@ -1595,6 +1598,10 @@ export class Paginator extends HTMLElement {
 
       // Horizontal pages are already laid out. Move their layer on the compositor
       // and commit scrollLeft once, rather than repainting scroll offsets per frame.
+      const view = this.#view
+      const layoutRevision = view?.layoutRevision
+      const pageDelta = reason === 'page' && !this.scrolled
+        ? Math.round(Math.abs(offset) / size) - this.page : 0
       let animation
       const transition = !this.scrolled && !this.#vertical && scrollProp === 'scrollLeft' &&
           this.#view?.element?.animate && typeof Animation !== 'undefined' &&
@@ -1615,9 +1622,18 @@ export class Paginator extends HTMLElement {
         element[scrollProp] = offset
         animation?.cancel()
         finish()
-      }).catch(() => {
+      }).catch(error => {
         animation?.cancel()
         this.#ignoreNativeScroll = false
+        if (error?.name === 'AbortError' && animation && pageDelta &&
+            !this.#destroyed && !this.#preparingView && view === this.#view &&
+            view.layoutRevision !== layoutRevision && !this.scrolled &&
+            this.scrollProp === scrollProp) {
+          // Relayout restored the reading anchor. Turn from its new page.
+          const page = this.page + pageDelta
+          if (page <= 0 || page >= this.pages - 1) return true
+          return this.#scrollToPage(page, reason, { animate: false })
+        }
       })
     } else {
       element[scrollProp] = offset
@@ -2206,7 +2222,7 @@ export class Paginator extends HTMLElement {
     if (this.atStart) return
     const page = this.page - 1
     if (page <= 0) return true
-    return this.#scrollToPage(page, 'page', { animate: true }).then(() => page <= 0)
+    return this.#scrollToPage(page, 'page', { animate: true })
   }
   #scheduleLineSettle() {
     clearTimeout(this.#lineSettleTimer)
@@ -2248,7 +2264,7 @@ export class Paginator extends HTMLElement {
     const page = this.page + 1
     const pages = this.pages
     if (page >= pages - 1) return true
-    return this.#scrollToPage(page, 'page', { animate: true }).then(() => page >= pages - 1)
+    return this.#scrollToPage(page, 'page', { animate: true })
   }
   get scrollPageStep() {
     const percent = Number(this.getAttribute('scroll-page-percent') ?? 80)

@@ -2713,6 +2713,44 @@ void main() {
     expect(field.controller!.text, contains('第0页'));
   });
 
+  for (final mode in [
+    TranslationModeEnum.translationOnly,
+    TranslationModeEnum.bilingual,
+  ]) {
+    for (final beforeRelease in [false, true]) {
+      testWidgets(
+          'translation update preserves a page tap in ${mode.code} '
+          'beforeRelease=$beforeRelease', (tester) async {
+        Prefs().pageTurnMode = 'custom';
+        Prefs().customPageTurnConfig =
+            List.filled(9, PageTurningType.next.index);
+        await open(tester, extract: (page) async => 'Page $page');
+        final response = StreamController<String>();
+        final task = key.currentState!.translateCurrentPage(mode,
+            provider: PageTranslator(stream: response.stream));
+        await tester.pump();
+        await tester.pump();
+        expect(find.byKey(const ValueKey('reflow-translated-text')),
+            findsOneWidget);
+
+        final click = await tester.startGesture(textPoint(tester, 1),
+            kind: PointerDeviceKind.mouse);
+        if (!beforeRelease) await click.up();
+        response.add('Translated page zero');
+        unawaited(response.close());
+        await tester.pump(const Duration(milliseconds: 100));
+        await task;
+        if (beforeRelease) await click.up();
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+
+        expect(pages, [0, 1]);
+        expect(text(tester), 'Page 1');
+        expect(tester.takeException(), isNull);
+      }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+    }
+  }
+
   testWidgets('single text tap respects a custom menu zone once',
       (tester) async {
     Prefs().pageTurnMode = 'custom';
