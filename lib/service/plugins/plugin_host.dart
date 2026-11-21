@@ -283,17 +283,6 @@ class PluginHost extends ChangeNotifier {
       await _revokeAllPermissions(id);
       await Prefs().clearPluginPermissionSeeded(id);
     }
-    // Plugin data is inside the plugin's own directory tree, so uninstalling
-    // removes it. If it cannot be deleted the package is still gone.
-    try {
-      final data = _paths.dataDir(id);
-      if (await data.exists()) await data.delete(recursive: true);
-    } catch (error) {
-      if (!development) {
-        AnxLog.warning('Could not delete plugin data of $id: '
-            '${describeError(error)}');
-      }
-    }
   }
 
   void _reserveIdentity(String id) {
@@ -1096,8 +1085,24 @@ class PluginHost extends ChangeNotifier {
     _manifestTexts.remove(id);
     notifyListeners();
 
-    // File deletion is best-effort: the registry entry is already gone, so a
-    // locked directory cannot leave the plugin half-installed.
+    // File deletion is best-effort and happens **after** the registry update:
+    // the entry is already gone, so a locked or slow directory cannot leave the
+    // plugin listed as installed. Deleting the private data directory belongs
+    // here for the same reason — before the update it kept the uninstalling
+    // page (and any widget test) showing a plugin that was already removed.
+    await _deleteOwnedFiles(id);
+  }
+
+  Future<void> _deleteOwnedFiles(String id) async {
+    try {
+      final data = _paths.dataDir(id);
+      if (await data.exists()) await data.delete(recursive: true);
+    } catch (error) {
+      if (!development) {
+        AnxLog.warning('Could not delete plugin data of $id: '
+            '${describeError(error)}');
+      }
+    }
     try {
       final directory = _paths.pluginDir(id);
       if (await directory.exists()) {
