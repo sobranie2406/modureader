@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
@@ -214,10 +216,22 @@ void main() {
   });
 
   group('plugin storage', () {
+    late Directory storageRoot;
+
     setUp(() {
-      // The storage root resolves through the app data path; tests point it at
-      // a temp directory so nothing touches real app data.
+      // The storage root resolves through the app data path, which is empty in
+      // a unit test: getBasePath('plugins') would be /plugins — uncreatable on
+      // CI. Point the API at a temp directory instead so these tests are
+      // hermetic and cannot write to real app data.
       SharedPreferences.setMockInitialValues({});
+      storageRoot = Directory.systemTemp.createTempSync('modu-api-storage');
+      PluginHostApi.debugStorageRoot =
+          (pluginId) => Directory('${storageRoot.path}/$pluginId');
+    });
+
+    tearDown(() {
+      PluginHostApi.debugStorageRoot = null;
+      if (storageRoot.existsSync()) storageRoot.deleteSync(recursive: true);
     });
 
     test('a name that escapes the plugin directory is refused', () async {

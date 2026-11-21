@@ -728,7 +728,14 @@ class PluginHostApi {
   static const int _maxStorageFileBytes = 256 * 1024;
   static const int _maxStorageTotalBytes = 4 * 1024 * 1024;
 
-  Directory get _storageRoot => pluginOwnedDirectory(pluginId);
+  /// Where one plugin's files live. Overridable so a test never writes to the
+  /// real app data directory — with an empty document root it resolves to
+  /// `/plugins`, which a CI runner cannot create.
+  @visibleForTesting
+  static Directory Function(String pluginId)? debugStorageRoot;
+
+  Directory get _storageRoot =>
+      debugStorageRoot?.call(pluginId) ?? pluginOwnedDirectory(pluginId);
 
   /// Rejects anything that is not a flat, safe file name.
   ///
