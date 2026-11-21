@@ -41,7 +41,7 @@ httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn continu
       key: 'bool',
     for (final key
         in '''themeColor awakeTime dailyCheckInMinutes pageTurningType aiRpm aiMaxTokens aiContextTurns maxAiCacheCount
-readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex scrollPagePercent selectionSearchZoomPercent webTranslationZoomPercent eInkRefreshPages ocrPrecachePages'''
+readingSyncMinutes excerptShareColorIndex excerptShareBgimgIndex httpProxyPort customCssDefaultIndex scrollPagePercent selectionSearchZoomPercent webTranslationZoomPercent eInkRefreshPages ocrPrecachePages languageTranslationPrefetchPages classicalTranslationPrefetchPages'''
             .split(RegExp(r'\s+')))
       key: 'int',
     for (final key

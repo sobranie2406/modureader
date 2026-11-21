@@ -13,12 +13,14 @@ import 'ocr_precache_settings.dart';
 import 'reader_menu_group.dart';
 import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/service/translate/document_page_translation.dart';
+import 'package:modu_reader/service/translate/full_text_translation_identity.dart';
 import 'package:modu_reader/service/translate/index.dart';
 import 'package:modu_reader/service/translate/ai.dart';
 import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:modu_reader/models/translation_text_style.dart';
 import 'package:modu_reader/service/translate/reader_translation_modes.dart';
 import 'package:modu_reader/service/translate/deepl.dart';
+import 'package:modu_reader/service/translate/google_api.dart';
 import 'package:modu_reader/service/translate/microsoft_free.dart';
 import 'package:modu_reader/service/ocr/document_ocr_precache.dart';
 import 'package:modu_reader/utils/app_motion.dart';
@@ -60,6 +62,12 @@ typedef ReflowTranslatedSelection = Future<void> Function(
     String text, String contextText, Rect globalRect, int start);
 typedef ReflowQuickMark = Future<void> Function(DocumentReflowAnchor anchor,
     String text, String contextText, Rect globalRect);
+typedef _PageTranslation = ({
+  TranslationModeEnum mode,
+  TranslateServiceProvider? provider,
+  bool classical,
+  String settings,
+});
 
 /// A reading surface in the reader's body, not a dialog or another book.
 /// The source WebView stays mounted underneath to retain original-page state.
@@ -451,6 +459,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   int _translationRequest = 0;
+  _PageTranslation? _activeTranslation;
+  bool _translationForeground =
+      WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  int _prefetchPages = 0;
   final _translationModes = ReaderTranslationModes();
   ValueNotifier<TranslationModeEnum> get translationMode =>
       _translationModes.language;
@@ -461,12 +474,71 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   _ReflowTextController get _readingController =>
       _showTranslation ? _translatedController : _controller;
 
-  void stopTranslation() {
+  void stopTranslation() => _stopPageTranslation();
+
+  void _stopPageTranslation({bool retainPrefetched = false}) {
     _cancelQuickMark(clearPointers: true);
     _quickMarkTranslationPending = false;
     stopAutoScroll();
     _translationRequest++;
-    _translation.stop();
+    _translationScrollTimer?.cancel();
+    if (!retainPrefetched) _activeTranslation = null;
+    _translation.stop(retainPrefetched: retainPrefetched);
+  }
+
+  int _translationPrefetchPages(bool classical) => classical
+      ? Prefs().classicalTranslationPrefetchPages
+      : Prefs().languageTranslationPrefetchPages;
+
+  void setTranslationForeground(bool foreground) {
+    if (_translationForeground == foreground) return;
+    _translationForeground = foreground;
+    if (!foreground) {
+      _translationScrollTimer?.cancel();
+      _translation.cancelPrefetch();
+      return;
+    }
+    _resumePageTranslation();
+    _queueVisibleTranslation();
+  }
+
+  void _translationPreferencesChanged() {
+    final active = _activeTranslation;
+    if (active == null) return;
+    final identity = fullTextTranslationIdentity(
+        classical: active.classical ? ClassicalTranslation.current() : null,
+        provider: active.provider);
+    if (identity != active.settings) {
+      stopTranslation();
+      return;
+    }
+    final count = _translationPrefetchPages(active.classical);
+    if (_prefetchPages == count) return;
+    _prefetchPages = count;
+    _translation.cancelPrefetch();
+    if (count > 0) _queueVisibleTranslation();
+  }
+
+  void _resumePageTranslation() {
+    final active = _activeTranslation;
+    if (active == null ||
+        _prefetchPages == 0 ||
+        !_translationForeground ||
+        _busy ||
+        _showTranslation ||
+        _quickMarkTranslationPending) {
+      return;
+    }
+    final generation = _generation;
+    unawaited(_translatePage(active.mode,
+            classical: active.classical,
+            provider: active.provider,
+            resume: active)
+        .catchError((Object error) {
+      if (mounted && generation == _generation) {
+        setState(() => _error = error.toString());
+      }
+    }));
   }
 
   void _translationChanged() {
@@ -489,9 +561,22 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
   }
 
   Future<void> translateCurrentPage(TranslationModeEnum mode,
+          {bool force = false,
+          TranslateServiceProvider? provider,
+          bool classical = false}) =>
+      _translatePage(mode,
+          force: force, provider: provider, classical: classical);
+
+  Future<void> _translatePage(TranslationModeEnum mode,
       {bool force = false,
       TranslateServiceProvider? provider,
-      bool classical = false}) async {
+      required bool classical,
+      _PageTranslation? resume}) async {
+    if (mode == TranslationModeEnum.off ||
+        mode == TranslationModeEnum.originalOnly) {
+      stopTranslation();
+      return;
+    }
     _cancelQuickMark();
     stopAutoScroll();
     final page = _page;
@@ -511,7 +596,11 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         _busy ||
         request != _translationRequest ||
         generation != _generation ||
-        page != _page) {
+        page != _page ||
+        (resume != null &&
+            (!_translationForeground ||
+                _prefetchPages == 0 ||
+                _activeTranslation != resume))) {
       return;
     }
     final service = Prefs().fullTextTranslateService;
@@ -520,37 +609,58 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final translator = provider ?? service.provider;
     final classicalTranslator =
         classical ? ClassicalTranslation.current() : null;
+    final identity = fullTextTranslationIdentity(
+        classical: classicalTranslator, provider: provider);
+    if (resume != null && identity != resume.settings) {
+      stopTranslation();
+      return;
+    }
+    _activeTranslation = (
+      mode: mode,
+      provider: provider,
+      classical: classical,
+      settings: identity,
+    );
+    _prefetchPages = _translationPrefetchPages(classical);
     classicalTranslation = classical;
     final visible = _visibleTranslationRange();
-    await _translation.translate(saved ?? page, mode,
-        visibleStart: visible.$1,
-        visibleEnd: visible.$2,
-        settings: classicalTranslator == null
-            ? '${service.name}/${from.name}/${to.name}'
-            : 'classical/${classicalTranslator.identity}',
-        force: force,
-        request: (session, generation, text) => session.translate(
-            generation,
-            (runner) => classicalTranslator != null
-                ? classicalTranslator.translate(text, runner)
-                : translator is AiTranslateProvider
-                    ? translator.translateStream(text, from, to,
-                        isFullText: true, requestRunner: runner)
-                    : translator is MicrosoftFreeTranslateProvider
-                        ? translator.translateStream(text, from, to,
-                            isFullText: true,
-                            whenCancelled: runner.whenCancelled)
-                        : translator is OfficialApiTranslateProvider
-                            ? translator.translateStream(text, from, to,
-                                isFullText: true,
-                                whenCancelled: runner.whenCancelled)
-                            : translator is DeepLTranslateProvider
-                                ? translator.translateStream(text, from, to,
-                                    isFullText: true,
-                                    whenCancelled: runner.whenCancelled)
-                                : translator.translateStream(text, from, to,
-                                    isFullText: true)));
-    _queueVisibleTranslation();
+    try {
+      await _translation.translate(saved ?? page, mode,
+          visibleStart: visible.$1,
+          visibleEnd: visible.$2,
+          settings: identity,
+          force: force,
+          request: (session, generation, text) =>
+              session.translate(generation, (runner) {
+                if (classicalTranslator != null) {
+                  return classicalTranslator.translate(text, runner);
+                }
+                final cancelled = runner.whenCancelled;
+                return switch (translator) {
+                  AiTranslateProvider provider => provider.translateStream(
+                      text, from, to,
+                      isFullText: true, requestRunner: runner),
+                  MicrosoftFreeTranslateProvider provider =>
+                    provider.translateStream(text, from, to,
+                        isFullText: true, whenCancelled: cancelled),
+                  OfficialApiTranslateProvider provider =>
+                    provider.translateStream(text, from, to,
+                        isFullText: true, whenCancelled: cancelled),
+                  DeepLTranslateProvider provider => provider.translateStream(
+                      text, from, to,
+                      isFullText: true, whenCancelled: cancelled),
+                  GoogleApiTranslateProvider provider =>
+                    provider.translateStream(text, from, to,
+                        isFullText: true, whenCancelled: cancelled),
+                  _ => translator.translateStream(text, from, to,
+                      isFullText: true),
+                };
+              }));
+    } catch (_) {
+      if (request == _translationRequest) _activeTranslation = null;
+      rethrow;
+    }
+    if (request == _translationRequest) _queueVisibleTranslation();
   }
 
   final _search = TextEditingController();
@@ -947,21 +1057,66 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       return;
     }
     _translationScrollTimer?.cancel();
-    if (!_showTranslation) return;
+    _translation.cancelPrefetch();
+    if (!_showTranslation || !_translationForeground) return;
     _translationScrollTimer =
         Timer(const Duration(milliseconds: 180), () async {
-      if (!mounted || !_showTranslation) return;
+      if (!mounted || !_showTranslation || !_translationForeground) return;
       if (_translation.busy) {
         _queueVisibleTranslation();
         return;
       }
+      final request = _translationRequest;
       final visible = _visibleTranslationRange();
       try {
         await _translation.translateVisible(visible.$1, visible.$2);
       } catch (error) {
+        if (request == _translationRequest) _activeTranslation = null;
         if (mounted) setState(() => _error = error.toString());
       }
+      final page = _page?.page;
+      if (!mounted ||
+          !_showTranslation ||
+          !_translationForeground ||
+          request != _translationRequest ||
+          _prefetchPages == 0 ||
+          page == null ||
+          _navigationPage != page) {
+        return;
+      }
+      await _translation.prefetch([
+        for (var next = page + 1;
+            next < _total && next <= page + _prefetchPages;
+            next++)
+          next,
+      ], _readUpcomingTranslationPage);
     });
+  }
+
+  Future<DocumentReflowPage?> _readUpcomingTranslationPage(
+      int page, bool Function() active) async {
+    final saved = await widget.store.read(page, '');
+    if (!active()) return null;
+    if (saved != null) return !_forceOcr || saved.ocr ? saved : null;
+    if (_forceOcr) return null;
+
+    final info = await widget.info(page);
+    if (!active() || info['page'] != page || info['imageOnly'] == false) {
+      return null;
+    }
+    final result = DocumentTextResult.decode(await widget.extractText({
+      'page': page,
+      'region': info['region'] ??
+          const {'x': 0.0, 'y': 0.0, 'width': 1.0, 'height': 1.0},
+      'hideWatermarks': info['hideWatermarks'] == true,
+    }));
+    return active() && result.text.trim().isNotEmpty
+        ? DocumentReflowPage(
+            page: page,
+            ocr: false,
+            rawText: result.text,
+            rawRegions: result.regions)
+        : null;
   }
 
   final _focus = FocusNode(debugLabel: 'document_reflow_text');
@@ -1099,6 +1254,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       }
     });
     Prefs().addListener(_configureTranslationStyle);
+    Prefs().addListener(_translationPreferencesChanged);
     Prefs().addListener(_autoScrollPreferencesChanged);
     _configureTranslationStyle();
     _scroll.addListener(_queueVisibleTranslation);
@@ -1117,6 +1273,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     _generation++;
     _translation.removeListener(_translationChanged);
     Prefs().removeListener(_configureTranslationStyle);
+    Prefs().removeListener(_translationPreferencesChanged);
     Prefs().removeListener(_autoScrollPreferencesChanged);
     _translation.dispose();
     _translationModes.dispose();
@@ -1405,7 +1562,13 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     _cancelQuickMark(clearPointers: true);
     stopAutoScroll();
     if (narrationCurrent == null) {
-      stopTranslation();
+      _stopPageTranslation(
+          retainPrefetched: _activeTranslation != null &&
+              _prefetchPages > 0 &&
+              target != null &&
+              target != _page?.page &&
+              anchor == null &&
+              !refresh);
       _invalidateNarration();
     }
     final request = ++_loadRequest;
@@ -1426,6 +1589,15 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       await pending;
     } finally {
       if (identical(_pendingLoad, pending)) _pendingLoad = null;
+    }
+    if (mounted &&
+        request == _loadRequest &&
+        _activeTranslation != null &&
+        _page?.page == target &&
+        _page?.page == _navigationPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && request == _loadRequest) _resumePageTranslation();
+      });
     }
   }
 

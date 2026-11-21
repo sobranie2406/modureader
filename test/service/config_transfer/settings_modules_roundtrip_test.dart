@@ -27,6 +27,8 @@ void main() {
     'classicalTranslationEngine': 'microsoft',
     'classicalTranslationDirection': 'toClassical',
     'classicalTranslationAiService': 'test-classical',
+    'languageTranslationPrefetchPages': 2,
+    'classicalTranslationPrefetchPages': 5,
     'classicalTranslationTextStyle':
         '{"font":"serif","size":24,"bold":true,"italic":true}',
     'languageTranslationTextStyle':
@@ -90,6 +92,33 @@ void main() {
   Map<String, Object?> snapshot() => {
         for (final key in Prefs().prefs.getKeys()) key: Prefs().prefs.get(key),
       };
+
+  for (final key in [
+    'languageTranslationPrefetchPages',
+    'classicalTranslationPrefetchPages'
+  ]) {
+    test('$key imports only integer windows zero to five atomically', () async {
+      await initialize(source);
+      final before = snapshot();
+      for (final invalid in [-1, 6, 1.5, '2', true, null]) {
+        await expectLater(
+            GlobalSettingsTransfer.apply(Prefs(), {
+              prefsBackupVersionKey: 1,
+              'ttsRate': {'type': 'double', 'value': 0.5},
+              key: {'type': 'int', 'value': invalid},
+            }),
+            throwsFormatException);
+        expect(snapshot(), before);
+      }
+      for (final pages in [0, 5]) {
+        await GlobalSettingsTransfer.apply(Prefs(), {
+          prefsBackupVersionKey: 1,
+          key: {'type': 'int', 'value': pages},
+        });
+        expect(Prefs().prefs.getInt(key), pages);
+      }
+    });
+  }
 
   test('custom tap actions retain saved indices and allow Contents', () {
     expect(PageTurningType.none.index, 0);

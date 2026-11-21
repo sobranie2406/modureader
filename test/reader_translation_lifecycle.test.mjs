@@ -16,11 +16,17 @@ function setup() {
     unobserve(el){this.items.delete(el);}
     disconnect(){this.items.clear();}
   }
-  window.flutter_inappwebview={callHandler(name,text,id){return new Promise(resolve=>calls.push({name,text,id,resolve}));}};
+  window.flutter_inappwebview={callHandler(name,text,id,prefetch){return new Promise(resolve=>calls.push({name,text,id,prefetch,resolve}));}};
   const Translator=runInNewContext(source.replace(/export /g,'')+'\nTranslator',
     {window,document:window.document,Node:window.Node,IntersectionObserver:Observer,console});
   const translator=new Translator(), elements=[...window.document.querySelectorAll('p')];
-  elements.forEach((el,i)=>el.getBoundingClientRect=()=>({top:i===2?3000:20+i*30,bottom:i===2?3040:45+i*30,left:10,right:150}));
+  elements.forEach((el,i)=>{
+    el.getBoundingClientRect=()=>({top:i===2?3000:20+i*30,bottom:i===2?3040:45+i*30,left:10,right:150});
+    el.getClientRects=()=>{
+      const rect=el.getBoundingClientRect();
+      return [{...rect,width:rect.right-rect.left,height:rect.bottom-rect.top}];
+    };
+  });
   translator.observeDocument(window.document);
   return {dom,window,translator,calls,observers,elements};
 }
@@ -135,6 +141,61 @@ test('pagination requeues a displaced paragraph when only its tail becomes visib
   s.calls[1].resolve('完整的第二段译文');await tick();
   assert.equal(tail.querySelector('.translated-text').textContent,'完整的第二段译文');
   s.translator.destroy();s.dom.window.close();
+});
+
+test('pretranslation waits for visible work, caches only the upcoming range and renders on arrival', async()=>{
+  const s=setup();
+  const [,next,far]=s.elements;
+  const future=()=>({top:1000,bottom:1050,left:10,right:150});
+  next.getBoundingClientRect=future;
+  const range=s.window.document.createRange();
+  range.selectNode(next);
+
+  s.translator.setPrefetchRange(range,1);
+  assert.equal(s.calls.length,0);
+  await s.translator.setTranslationMode('bilingual',6);
+  s.translator.setPrefetchRange(range,1);
+  assert.deepEqual(s.calls.map(call=>[call.text,call.prefetch]),[['first',0]]);
+  s.calls[0].resolve('当前页');await tick();
+  assert.deepEqual(s.calls.map(call=>[call.text,call.prefetch]),[['first',0],['second',1]]);
+  s.calls[1].resolve('下一页');await tick();
+  assert.equal(next.querySelector('.translated-text'),null,'ahead content must not change pagination');
+  assert.equal(far.querySelector('.translated-text'),null);
+
+  next.getBoundingClientRect=()=>({top:20,bottom:70,left:10,right:150});
+  s.translator.observeVisibleRange(range);
+  await tick();
+  assert.equal(next.querySelector('.translated-text').textContent,'下一页');
+  assert.equal(s.calls.length,2);
+  s.translator.destroy();s.dom.window.close();
+});
+
+test('closing the prefetch window drops future jobs', async()=>{
+  const s=setup();
+  const [,next,far]=s.elements;
+  next.getBoundingClientRect=()=>({top:1000,bottom:1050,left:10,right:150});
+  const range=s.window.document.createRange();
+  range.setStartBefore(next);range.setEndAfter(far);
+  await s.translator.setTranslationMode('bilingual',7);
+  s.translator.setPrefetchRange(range,5);
+  s.translator.setPrefetchRange(null);
+  s.calls[0].resolve('当前页');await tick();
+  assert.equal(s.calls.length,1);
+  s.translator.destroy();s.dom.window.close();
+});
+
+test('prefetch skips a hidden paragraph between range endpoints', async()=>{
+  const s=setup();
+  const [,hidden,far]=s.elements;
+  hidden.getBoundingClientRect=()=>({top:1000,bottom:1050,left:10,right:150});
+  hidden.style.visibility='hidden';
+  const range=s.window.document.createRange();
+  range.setStartBefore(hidden);range.setEndAfter(far);
+  await s.translator.setTranslationMode('bilingual',8);
+  s.translator.setPrefetchRange(range,2);
+  s.calls[0].resolve('当前页');await tick();
+  assert.deepEqual(s.calls.map(call=>call.text),['first','far away']);
+  s.translator.destroy();s.calls[1].resolve('后续页');await tick();s.dom.window.close();
 });
 
 test('failure/cancellation never inserts an error string into book content',async()=>{

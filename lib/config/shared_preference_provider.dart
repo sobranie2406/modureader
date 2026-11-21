@@ -1298,10 +1298,24 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  int get languageTranslationPrefetchPages =>
+      (prefs.getInt('languageTranslationPrefetchPages') ?? 0).clamp(0, 5);
+  set languageTranslationPrefetchPages(int value) {
+    prefs.setInt('languageTranslationPrefetchPages', value.clamp(0, 5));
+    notifyListeners();
+  }
+
   String get classicalTranslationTextStyle =>
       prefs.getString('classicalTranslationTextStyle') ?? '{}';
   set classicalTranslationTextStyle(String value) {
     prefs.setString('classicalTranslationTextStyle', value);
+    notifyListeners();
+  }
+
+  int get classicalTranslationPrefetchPages =>
+      (prefs.getInt('classicalTranslationPrefetchPages') ?? 0).clamp(0, 5);
+  set classicalTranslationPrefetchPages(int value) {
+    prefs.setInt('classicalTranslationPrefetchPages', value.clamp(0, 5));
     notifyListeners();
   }
 

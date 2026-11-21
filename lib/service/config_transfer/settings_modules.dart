@@ -34,7 +34,7 @@ codeHighlightTheme enabledAiTools''',
   'translation':
       '''translateService translateFrom translateTo fullTextTranslateService
 fullTextTranslateFrom fullTextTranslateTo translationAiService translationMode autoTranslateSelection webTranslationZoomPercent
-classicalTranslationEngine classicalTranslationDirection classicalTranslationAiService classicalTranslationTextStyle languageTranslationTextStyle''',
+classicalTranslationEngine classicalTranslationDirection classicalTranslationAiService classicalTranslationTextStyle languageTranslationTextStyle languageTranslationPrefetchPages classicalTranslationPrefetchPages''',
   'webdav':
       '''webdavInfo s3Info syncProtocol autoSync onlySyncWhenWifi syncCompletedToast
 syncPreviewBeforeSync readingTimedSync readingSyncMinutes''',

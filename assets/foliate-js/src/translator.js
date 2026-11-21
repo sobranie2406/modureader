@@ -12,12 +12,12 @@ if (typeof window !== 'undefined') {
 }
 
 // Translation function that calls Flutter's translation service
-const translate = async (text, sessionId) => {
+const translate = async (text, sessionId, prefetchPages) => {
   try {
     // Call Flutter's translation handler
-      return await window.flutter_inappwebview.callHandler('translateText', text, sessionId)
+    return await window.flutter_inappwebview.callHandler('translateText', text, sessionId, prefetchPages)
   } catch (error) {
-    console.error('Translation failed:', error)
+    if (!prefetchPages) console.error('Translation failed:', error)
     return null
   }
 }
@@ -30,6 +30,9 @@ export class Translator {
   #generation = 0
   #sessionId = null
   #queue = []
+  #prefetchQueue = []
+  #prefetchPages = 0
+  #prefetched = new WeakMap()
   #pending = new Set()
   #running = false
   #destroyed = false
@@ -109,6 +112,7 @@ export class Translator {
     if (mode === TranslationMode.OFF) {
       this.#generation++
       this.#queue = []
+      this.#prefetchQueue = []
       this.#pending.clear()
     }
     
@@ -153,6 +157,19 @@ export class Translator {
     }
   }
 
+  setPrefetchRange(range, pages = 0) {
+    this.#prefetchQueue = []
+    this.#prefetchPages = pages
+    if (!range || !pages || this.#destroyed || this.#translationMode === TranslationMode.OFF) return
+    const doc = range.startContainer.ownerDocument
+    for (const element of this.observedElements) {
+      if (element.ownerDocument === doc && !this.#pending.has(element) &&
+          !this.#translatedElements.has(element) && !this.#prefetched.has(element) &&
+          range.intersectsNode(element)) this.#prefetchQueue.push(element)
+    }
+    void this.#drain()
+  }
+
   observeDocument(doc) {
     this.#pruneDocuments()
     // console.log('Observing document for translation, doc:', doc)
@@ -179,6 +196,8 @@ export class Translator {
     this.#pruneDocuments()
     this.#generation++
     this.#queue = []
+    this.#prefetchQueue = []
+    this.#prefetched = new WeakMap()
     this.#pending.clear()
     const previousElements = Array.from(this.observedElements)
 
@@ -299,20 +318,34 @@ export class Translator {
     if (this.#running) return
     this.#running = true
     try {
-      while (this.#queue.length && !this.#destroyed) {
-        const job = this.#queue.shift()
+      while ((this.#queue.length || this.#prefetchQueue.length) && !this.#destroyed) {
+        let job = this.#queue.shift()
+        if (!job) {
+          const element = this.#prefetchQueue.shift()
+          const frameWindow = element.ownerDocument?.defaultView
+          if (!element.isConnected || !frameWindow ||
+              !this.observedElements.has(element) || this.#pending.has(element) ||
+              this.#translatedElements.has(element) || this.#prefetched.has(element) ||
+              frameWindow.getComputedStyle(element).visibility !== 'visible' ||
+              !Array.from(element.getClientRects()).some(rect => rect.width > 0 && rect.height > 0)) continue
+          this.#pending.add(element)
+          job = {element, generation: this.#generation, sessionId: this.#sessionId, prefetchPages: this.#prefetchPages}
+        }
         try {
-          if (job.generation === this.#generation && this.#isVisible(job.element)) {
-            await this.#translateElement(job.element, job.generation, job.sessionId)
+          if (job.generation === this.#generation && (job.prefetchPages || this.#isVisible(job.element))) {
+            await this.#translateElement(job.element, job.generation, job.sessionId, job.prefetchPages ?? 0)
           }
         } finally {
-          if (job.generation === this.#generation) this.#pending.delete(job.element)
+          if (job.generation === this.#generation) {
+            this.#pending.delete(job.element)
+            if (job.prefetchPages) this.#enqueue(job.element)
+          }
         }
       }
     } finally { this.#running = false }
   }
 
-  async #translateElement(element, generation, sessionId) {
+  async #translateElement(element, generation, sessionId, prefetchPages) {
     if (this.#translationMode === TranslationMode.OFF) return
     if (this.#translatedElements.has(element)) return
     
@@ -320,11 +353,17 @@ export class Translator {
     if (!text) return
     
     try {
-      const translatedText = await translate(text, sessionId)
+      const translatedText = this.#prefetched.get(element) ?? await translate(text, sessionId, prefetchPages)
       if (this.#destroyed || generation !== this.#generation ||
           this.#translationMode === TranslationMode.OFF || !element.isConnected ||
           !element.ownerDocument?.defaultView || !this.observedElements.has(element) ||
           typeof translatedText !== 'string' || !translatedText.trim()) return
+
+      if (prefetchPages && !this.#isVisible(element)) {
+        this.#prefetched.set(element, translatedText)
+        return
+      }
+      this.#prefetched.delete(element)
       
       // Mark as translated to prevent re-processing
       this.#translatedElements.set(element, {

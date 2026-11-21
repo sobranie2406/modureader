@@ -347,6 +347,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     if (!isReflowReading) return;
     stopAutoScroll();
     hideBottomBar();
+    reflowReader?.stopTranslation();
     reflowReader?.cancelLoading();
     epubPlayerKey.currentState?.removeOverlay();
     await audioHandler.stop();
@@ -837,6 +838,13 @@ class ReadingPageState extends ConsumerState<ReadingPage>
 
   void _updatePageKeys({bool force = false}) {
     if (!mounted) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final readingForeground = _readingRouteVisible &&
+        !widget.book.isDeleted &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+    epubPlayerKey.currentState?.setTranslationPrefetchForeground(
+        readingForeground && !isReflowReading);
+    reflowReader?.setTranslationForeground(readingForeground && isReflowActive);
     _bindNarrationState();
     final narration = _observedNarrationState!.value;
     final narrationSession = narration == TtsStateEnum.playing ||

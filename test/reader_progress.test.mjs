@@ -87,6 +87,8 @@ test('layout changes notify fresh page counts even if the CFI is unchanged', () 
     #sectionProgress = {getProgress: () => ({section: {current: 1, total: 3}})};
     #tocProgress; #pageProgress; #index; #lastCfi; #lastChapterLocation;
     #translator = {observeVisibleRange: range => this.translationRanges.push(range)};
+    #translationPrefetchPages = 0;
+    #scheduleTranslationPrefetch() {}
     book = {sections: Array(3)};
     events = []; translationRanges = []; renderer = {page: 2, pages: 12};
     history = {replaceState() {}};
@@ -115,6 +117,32 @@ test('both scrolling paths include the active viewport fraction in relocation', 
   const method = source.slice(source.indexOf('  #afterScroll('), source.indexOf('\n  #handleScrollBoundaries('))
   assert.match(method, /size: this\.size \/ Math\.max\(1, height\)/)
   assert.match(method, /detail\.size = this\.size \/ this\.viewSize/)
+})
+
+test('translation prefetch counts forward viewports and stops at the end of the laid-out chapter', async () => {
+  const source = await readFile(new URL('paginator.js', root), 'utf8')
+  const method = source.slice(source.indexOf('  getTranslationPrefetchRange('), source.indexOf('\n  #afterScroll('))
+  const Paginator = runInNewContext(`(class {
+    #preparingView = false; #destroyed = false; #continuous = null; #margin = 12;
+    #view = {document: {body: {}}, element: {getBoundingClientRect: () => ({height: 761})}};
+    #rtl; #getRectMapper() {return rect => rect}
+    page = 2; pages = 10; size = 100; end = 450; sideProp = 'height';
+    constructor(rtl = false) {this.#rtl = rtl}
+    ${method}
+  })`, { getVisibleRange: (_, start, end) => [start, Math.ceil(end)] })
+  const reader = new Paginator()
+  for (const count of [1, 2, 3, 4, 5, 9]) {
+    assert.deepEqual(reader.getTranslationPrefetchRange(count), [200, 200 + Math.min(count, 5) * 100])
+  }
+  assert.deepEqual(new Paginator(true).getTranslationPrefetchRange(1), [400, 500])
+  reader.page = 7
+  assert.deepEqual(reader.getTranslationPrefetchRange(5), [700, 800])
+  reader.page = 8
+  assert.equal(reader.getTranslationPrefetchRange(5), null)
+  assert.equal(reader.getTranslationPrefetchRange(0), null)
+  reader.scrolled = true
+  assert.deepEqual(reader.getTranslationPrefetchRange(2), [438, 638])
+  assert.deepEqual(reader.getTranslationPrefetchRange(5), [438, 761])
 })
 test('fixed-layout chapter buttons skip non-linear sections and stop at book ends', async () => {
   const source = await readFile(new URL('fixed-layout.js', root), 'utf8')

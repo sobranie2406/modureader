@@ -38,7 +38,10 @@ class GoogleApiTranslateProvider extends TranslateServiceProvider {
     LangListEnum to, {
     String? contextText,
     bool isFullText = false,
+    Future<void>? whenCancelled,
   }) async* {
+    final cancelToken = CancelToken();
+    whenCancelled?.then((_) => cancelToken.cancel());
     try {
       final config = getConfig();
       final apiKey = config['api_key']?.toString() ?? '';
@@ -63,7 +66,8 @@ class GoogleApiTranslateProvider extends TranslateServiceProvider {
 
       final uri = Uri.parse(_urlGoogleApi).replace(queryParameters: params);
 
-      final response = await Dio().post(uri.toString());
+      final response =
+          await Dio().post(uri.toString(), cancelToken: cancelToken);
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -78,7 +82,8 @@ class GoogleApiTranslateProvider extends TranslateServiceProvider {
         yield* Stream.error(Exception('Google API Error: ${response.data}'));
       }
     } catch (e) {
-      AnxLog.severe("Translate Google API Error: error=$e");
+      if (cancelToken.isCancelled) return;
+      AnxLog.severe('Translate Google API Error: ${e.runtimeType}');
       yield* Stream.error(Exception(e));
     }
   }

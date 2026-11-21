@@ -1661,6 +1661,28 @@ export class Paginator extends HTMLElement {
     return getVisibleRange(this.#view.document,
       this.start - size, this.end - size, this.#getRectMapper())
   }
+  getTranslationPrefetchRange(pages) {
+    if (!Number.isInteger(pages) || pages < 1 || this.#preparingView || this.#destroyed) return null
+    const size = this.size
+    if (!(size > 0)) return null
+    const entry = this.#continuous?.current
+    const view = entry?.view ?? this.#view
+    if (!view?.document?.body) return null
+    const limit = Math.min(pages, 5)
+    if (this.scrolled) {
+      const origin = entry ? this.#continuous.top(entry) : 0
+      const start = Math.max(0, this.end - origin - this.#margin)
+      const end = Math.min(start + size * limit, view.element.getBoundingClientRect()[this.sideProp])
+      if (end <= start) return null
+      const mapRect = entry ? ({ top, bottom }) => ({ left: top, right: bottom }) : this.#getRectMapper()
+      return getVisibleRange(view.document, start, end - .001, mapRect)
+    }
+    const first = this.page + 1, last = Math.min(first + limit - 1, this.pages - 2)
+    if (last < first) return null
+    const leading = this.#rtl ? -size : size
+    return getVisibleRange(view.document, first * size - leading,
+      (last + 1) * size - leading - .001, this.#getRectMapper())
+  }
   #afterScroll(reason, flush = false) {
     if (reason !== 'scroll' || flush) {
       clearTimeout(this.#scrollRelocateTimer)

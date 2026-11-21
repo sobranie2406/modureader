@@ -117,6 +117,28 @@ void main() {
     session.stop();
   });
 
+  test('cancelling prefetch leaves current-page work and consent active',
+      () async {
+    final session = ReaderTranslationSession();
+    final id = session.start();
+    final visible = StreamController<String>();
+    final ahead = StreamController<String>();
+    final current = session.translate(id, (_) => visible.stream);
+    final prefetch = session.translate(id, (_) => ahead.stream, prefetch: true);
+    final cancelled =
+        expectLater(prefetch, throwsA(isA<TranslationCancelled>()));
+
+    session.cancelPrefetch();
+    await cancelled;
+    expect(session.enabled, isTrue);
+    expect(session.generation, id);
+    visible.add('当前页译文');
+    await visible.close();
+    expect(await current, '当前页译文');
+    await ahead.close();
+    session.stop();
+  });
+
   test(
       'empty reasoning-only response is a failure, never cached as translation',
       () async {

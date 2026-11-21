@@ -262,6 +262,16 @@ class _TranslationWidgetState extends State<TranslationWidget> {
     }
   }
 
+  void _changePrefetchPages(int? pages) {
+    if (pages == null) return;
+    if (widget.classical) {
+      Prefs().classicalTranslationPrefetchPages = pages;
+    } else {
+      Prefs().languageTranslationPrefetchPages = pages;
+    }
+    setState(() => _error = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -378,6 +388,29 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                           child: TranslationTextStyleSettings(
                               classical: widget.classical))),
                 ),
+                const SizedBox(height: 14),
+                ListenableBuilder(
+                    listenable: Prefs(),
+                    builder: (context, _) => DropdownButtonFormField<int>(
+                          key: ValueKey(widget.classical
+                              ? 'reader-classical-prefetch-pages'
+                              : 'reader-language-prefetch-pages'),
+                          initialValue: widget.classical
+                              ? Prefs().classicalTranslationPrefetchPages
+                              : Prefs().languageTranslationPrefetchPages,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                              labelText: ModuStrings.text(context, '预翻译后续页数',
+                                  'Pretranslate following pages')),
+                          items: [
+                            DropdownMenuItem(
+                                value: 0, child: Text(_label('关闭', 'Off'))),
+                            for (var pages = 1; pages <= 5; pages++)
+                              DropdownMenuItem(
+                                  value: pages, child: Text('$pages')),
+                          ],
+                          onChanged: _changePrefetchPages,
+                        )),
                 const SizedBox(height: 14),
                 Text(
                   ModuStrings.text(context, '显示方式', 'Display'),

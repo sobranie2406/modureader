@@ -82,6 +82,8 @@ export class View extends HTMLElement {
   #lastCfi = null
   #lastChapterLocation = null
   #translator = new Translator()
+  #translationPrefetchPages = 0
+  #translationPrefetchTimer
   constructor() {
     super()
     this.history.addEventListener('popstate', ({ detail }) => {
@@ -239,6 +241,9 @@ export class View extends HTMLElement {
     this.history.clear()
     this.tts = null
     this.mediaOverlay = null
+    clearTimeout(this.#translationPrefetchTimer)
+    this.#translationPrefetchTimer = null
+    this.#translationPrefetchPages = 0
     this.#translator?.destroy()
   }
   goToTextStart() {
@@ -276,7 +281,9 @@ export class View extends HTMLElement {
   }
   #onRelocate({ reason, range, index, fraction, size, readingAction, pdfRegion }) {
     this.#index = index
-    if (!this.isFixedLayout && !this.renderer.scrolled) this.#translator.observeVisibleRange(range)
+    if (!this.isFixedLayout && (!this.renderer.scrolled || this.#translationPrefetchPages))
+      this.#translator.observeVisibleRange(range)
+    if (this.#translationPrefetchPages) this.#scheduleTranslationPrefetch()
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)
@@ -930,8 +937,28 @@ export class View extends HTMLElement {
   }
   
   // Translation control methods
-  setTranslationMode(mode, sessionId) {
-    return this.#translator.setTranslationMode(mode, sessionId)
+  async setTranslationMode(mode, sessionId) {
+    await this.#translator.setTranslationMode(mode, sessionId)
+    if (this.#translationPrefetchPages) this.#scheduleTranslationPrefetch()
+  }
+  setTranslationPrefetchPages(pages) {
+    this.#translationPrefetchPages = Number.isInteger(pages) ? Math.max(0, Math.min(5, pages)) : 0
+    this.#scheduleTranslationPrefetch()
+  }
+  #scheduleTranslationPrefetch() {
+    if (!this.#translationPrefetchPages || this.#translator.getTranslationMode() === TranslationMode.OFF) {
+      clearTimeout(this.#translationPrefetchTimer)
+      this.#translationPrefetchTimer = null
+      this.#translator.setPrefetchRange(null)
+      return
+    }
+    if (this.#translationPrefetchTimer != null) return
+    this.#translator.setPrefetchRange(null)
+    this.#translationPrefetchTimer = setTimeout(() => {
+      this.#translationPrefetchTimer = null
+      const pages = this.#translationPrefetchPages
+      this.#translator.setPrefetchRange(this.renderer?.getTranslationPrefetchRange?.(pages), pages)
+    }, 100)
   }
   setTranslationTextStyle(style) {
     this.#translator.setTextStyle(style)

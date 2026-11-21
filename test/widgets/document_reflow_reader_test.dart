@@ -804,6 +804,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+      'opted-in reflow reuses next page translation without running OCR',
+      (tester) async {
+    Prefs().languageTranslationPrefetchPages = 2;
+    await store.save(
+        DocumentReflowPage(
+            page: 1, ocr: true, rawText: 'Raw', editedText: 'Corrected next'),
+        '');
+    final extracted = <int>[];
+    var rendered = false;
+    await open(tester,
+        extract: (page) async {
+          extracted.add(page);
+          return page == 0 ? 'Current' : '';
+        },
+        renderRequest: (_) => rendered = true);
+    final reader = key.currentState!;
+    reader.setTranslationForeground(true);
+    final translator = PageTranslator();
+    final task = reader.translateCurrentPage(
+        TranslationModeEnum.translationOnly,
+        provider: translator);
+    await tester.pump();
+    await task;
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(translator.requests, ['Current', 'Corrected next']);
+    expect(extracted, [0, 2]);
+    expect(rendered, isFalse);
+    expect(store.latest.keys, ['1', '0']);
+
+    await reader.turnOriginalPage(1);
+    await tester.pumpAndSettle();
+    expect(reader.translationMode.value, TranslationModeEnum.translationOnly);
+    expect(reader.actionText, 'Translated Corrected next');
+    expect(translator.requests, ['Current', 'Corrected next']);
+  });
+
   testWidgets('translation transport cancels on source-page navigation',
       (tester) async {
     await open(tester);
