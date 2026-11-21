@@ -6,6 +6,12 @@ const INSTALL_TIER = new Set([
   'storage:plugin',
 ]);
 
+// Tokens the app's parser deliberately drops from a manifest's capability set
+// because installing the package already granted them. The host authorises them
+// without a declaration and without a switch, so an example that calls
+// storage.* must pass here exactly as it does in the app.
+const IMPLICIT = new Set(['storage:plugin']);
+
 // Mirrors PluginScriptRuntime._call's method -> capability map, so an example
 // script that calls a method its manifest does not declare fails here instead
 // of on a user's machine.
@@ -60,13 +66,14 @@ const CAPABILITY = {
 // denied until the user consents, so a script that never calls
 // permissions.request fails exactly as it would on a real machine.
 function makeHost(manifest, notes, granted) {
-  const declared = new Set(manifest.capabilities);
+  const declared = new Set(
+      (manifest.capabilities || []).filter((c) => !IMPLICIT.has(c)));
   const files = new Map();
   const isRuntime = (capability) => !INSTALL_TIER.has(capability);
   const call = (method, args) => {
     const capability = CAPABILITY[method];
     if (!capability) throw new Error('unknown method ' + method);
-    if (!declared.has(capability)) {
+    if (!IMPLICIT.has(capability) && !declared.has(capability)) {
       const error = new Error('Plugin request failed');
       error.code = 'permission';
       error.missing = capability;

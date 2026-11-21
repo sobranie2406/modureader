@@ -6,11 +6,10 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:path/path.dart' as p;
 
-/// Accepted in a manifest but never stored as a grant.
-const String kPluginStorageCapability = 'storage:plugin';
 
 /// The three places that have to agree for a plugin call to work:
 ///
@@ -72,6 +71,18 @@ void main() {
               ' maps to ' +
               entry.value +
               ', which no manifest can declare');
+    }
+  });
+
+  test('an implicit capability needs no switch, so it must be install-tier', () {
+    // hasPermission answers install-tier tokens from the manifest; an implicit
+    // token is dropped from that set, so it must not be runtime-tier either or
+    // no path could ever grant it.
+    for (final capability in kImplicitCapabilities) {
+      expect(kKnownCapabilities, contains(capability));
+      expect(isRuntimePermission(capability), isFalse,
+          reason: capability +
+              ' is granted by installing, so it cannot be a consent switch');
     }
   });
 

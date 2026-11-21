@@ -383,6 +383,12 @@ class PluginHost extends ChangeNotifier {
   /// ones from the device grant map, so the check is the single place a new
   /// host API must consult.
   bool hasPermission(String id, String capability) {
+    // Implicit by design: installing the package already granted it, and the
+    // parser drops the token from the manifest, so answering from
+    // [PluginManifest.capabilities] would deny a capability with no switch.
+    if (kImplicitCapabilities.contains(capability)) {
+      return manifestFor(id) != null;
+    }
     if (!isRuntimePermission(capability)) {
       return manifestFor(id)?.capabilities.contains(capability) ?? false;
     }

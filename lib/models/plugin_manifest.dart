@@ -145,6 +145,17 @@ const String kUiProgressCapability = 'ui:progress';
 const String kUrlOpenCapability = 'url:open';
 const String kKnowledgeQueryCapability = 'knowledge:query';
 const String kSearchLibraryCapability = 'search:library';
+const String kPluginStorageCapability = 'storage:plugin';
+
+/// Capabilities a package holds by being installed.
+///
+/// They are never stored as grants, and a package may name them in its
+/// manifest only for forward compatibility: the parser drops them from
+/// [PluginManifest.capabilities]. Every caller authorising a host call must
+/// therefore treat this set as "declared and granted", exactly like an
+/// install-tier token, or the call fails with `permission` even though the
+/// plugin was never able to fix it — that is what broke `modu.storage.*`.
+const Set<String> kImplicitCapabilities = {kPluginStorageCapability};
 
 enum PluginErrorCode {
   untrustedPackage,
@@ -1080,7 +1091,7 @@ class PluginManifest {
         throw PluginInstallError(PluginErrorCode.invalidManifest,
             'capabilities contains an invalid token.');
       }
-      if (capability == 'storage:plugin') {
+      if (capability == kPluginStorageCapability) {
         // Always granted implicitly; accept but do not store as a grant.
         continue;
       }

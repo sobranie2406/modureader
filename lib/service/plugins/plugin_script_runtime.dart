@@ -109,10 +109,10 @@ const Map<String, String> kPluginMethodCapabilities = {
   'open.url': kUrlOpenCapability,
   // Implicit by design: every plugin owns a private directory, so
   // `storage:plugin` is declared in a manifest but never stored as a grant.
-  'storage.list': 'storage:plugin',
-  'storage.read': 'storage:plugin',
-  'storage.write': 'storage:plugin',
-  'storage.remove': 'storage:plugin',
+  'storage.list': kPluginStorageCapability,
+  'storage.read': kPluginStorageCapability,
+  'storage.write': kPluginStorageCapability,
+  'storage.remove': kPluginStorageCapability,
   // Asking for consent is itself ungated on purpose: a plugin cannot grant
   // anything by asking, only surface a sheet the user always decides. If it
   // were gated, a plugin that lost a grant could never request it back.
@@ -466,7 +466,12 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     }
     final permission = kPluginMethodCapabilities[method] ??
         (throw const PluginScriptFailure('permission'));
-    if (!manifest.capabilities.contains(permission) ||
+    // Implicit capabilities are granted by installing the package and are
+    // deliberately absent from the parsed manifest, so they must not be read
+    // out of it here — doing so made every `modu.storage.*` call fail with
+    // `permission` while the plugin detail page had nothing to switch on.
+    if ((!kImplicitCapabilities.contains(permission) &&
+            !manifest.capabilities.contains(permission)) ||
         (permission == kLibraryPrivateControlCapability &&
             !manifest.capabilities.contains(kLibraryPrivateCapability))) {
       throw const PluginScriptFailure('permission');

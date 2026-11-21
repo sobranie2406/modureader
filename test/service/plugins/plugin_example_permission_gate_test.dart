@@ -86,7 +86,11 @@ void main() {
             in RegExp(r'modu\.[a-z]+\.[a-zA-Z]+').allMatches(source)) {
           final capability =
               kPluginMethodCapabilities[call.group(0)!.substring(5)];
-          if (capability == null || capability == 'storage:plugin') continue;
+          // storage:plugin is implicit: declared for documentation, dropped from
+          // the parsed set, and granted by installing.
+          if (capability == null || kImplicitCapabilities.contains(capability)) {
+            continue;
+          }
           expect(manifest.capabilities, contains(capability),
               reason: '${p.join(directory.path, action.entry)} calls '
                   '${call.group(0)!}, which needs $capability');

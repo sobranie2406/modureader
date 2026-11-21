@@ -56,6 +56,30 @@ class Engine implements PluginScriptEngine {
   }
 }
 
+/// Answers storage calls from memory so the test proves the *gate*, not the
+/// filesystem: a real `PluginHostApi` would resolve an app-data directory.
+class _MemoryStorageApi extends PluginHostApi {
+  _MemoryStorageApi(String pluginId)
+      : super(pluginId: pluginId, services: const PluginHostServices());
+  final files = <String, String>{};
+  @override
+  Future<Object?> call(String method, Map<String, dynamic> args) async {
+    switch (method) {
+      case 'storage.write':
+        files[args['name'] as String] = args['text'] as String;
+        return {'bytes': (args['text'] as String).length};
+      case 'storage.read':
+        return {'text': files[args['name'] as String] ?? ''};
+      case 'storage.list':
+        return {'entries': files.keys.toList()};
+      case 'storage.remove':
+        files.remove(args['name'] as String);
+        return {'removed': true};
+    }
+    throw const PluginScriptFailure('permission');
+  }
+}
+
 class Http extends PluginHttpClient {
   int requests = 0;
   @override
@@ -384,6 +408,42 @@ void main() {
     await host.grantPermissions(id, ['ui:dialog']);
     expect(await engine.call('ui.confirm', {'title': 'a', 'message': 'b'}),
         {'confirmed': true});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('plugin storage needs neither a declaration nor a consent switch',
+      () async {
+    // 'storage:plugin' is install-tier and the parser deliberately drops it from
+    // manifest.capabilities, so authorising storage by reading that set denied a
+    // capability the user could never grant: every modu.storage.* call failed
+    // with 'permission' and the detail page showed no row to switch on.
+    await install(capabilities: ['script:run', 'ui:selection-action']);
+    final api = _MemoryStorageApi(id);
+    final result = runtime.run(pluginId: id, action: action, hostApi: api);
+    await engine.ready.future;
+    expect(await engine.call('storage.write', {'name': 'a.json', 'text': 'hi'}),
+        {'bytes': 2});
+    expect(await engine.call('storage.read', {'name': 'a.json'}), {'text': 'hi'});
+    expect(api.files, {'a.json': 'hi'});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('a manifest that still names storage:plugin behaves the same', () async {
+    // Packages shipped before the token was made implicit declare it; accepting
+    // the token must not change what the plugin is allowed to do.
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      kPluginStorageCapability,
+    ]);
+    final api = _MemoryStorageApi(id);
+    final result = runtime.run(pluginId: id, action: action, hostApi: api);
+    await engine.ready.future;
+    expect(await engine.call('storage.write', {'name': 'b.json', 'text': 'x'}),
+        {'bytes': 1});
+    expect(api.files, {'b.json': 'x'});
     engine.result.complete({'text': ''});
     await result;
   });

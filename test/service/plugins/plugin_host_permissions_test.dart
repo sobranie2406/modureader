@@ -63,6 +63,20 @@ void main() {
     expect(host.grantedPermissions(_id), isEmpty);
   });
 
+  test('an implicit capability is granted whether or not it is declared',
+      () async {
+    // The parser drops 'storage:plugin' from manifest.capabilities, so a host
+    // that answers from that set denies a capability the user cannot switch on.
+    await install(['script:run']);
+    expect(host.hasPermission(_id, kPluginStorageCapability), isTrue);
+    expect(host.manifestFor(_id)!.capabilities,
+        isNot(contains(kPluginStorageCapability)));
+    await install(['script:run', kPluginStorageCapability]);
+    expect(host.hasPermission(_id, kPluginStorageCapability), isTrue);
+    expect(host.manifestFor(_id)!.capabilities,
+        isNot(contains(kPluginStorageCapability)));
+  });
+
   test('granting persists and is visible immediately', () async {
     await install(['ai:invoke', 'note:read']);
     await host.setPermission(_id, 'ai:invoke', true);
