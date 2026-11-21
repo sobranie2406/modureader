@@ -38,6 +38,11 @@ and lets the messenger registration be the only owner:
 cannot outlive its object in practice; it is nulled by nothing, so do not add a
 `delete`/owning pointer back.
 
+`analysis_options.yaml` drops the upstream `package:flame_lint/...` include for
+the same reason every platform override here does: `flame_lint` is a dev
+dependency of the federated package and is not resolved by the app, so
+`flutter analyze` reported an unresolved include.
+
 Verify on upgrade: start the app, play narration or an audiobook, then close the
 window — the process must exit without an `Application Error` event for
 `modu.exe`.
