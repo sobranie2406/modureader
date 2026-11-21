@@ -2621,10 +2621,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }
 
   Future<void> _handlePointerEvents(PointerEvent event) async {
+    if (event is! PointerScrollEvent) return;
+    final desktopPdf = AnxPlatform.isDesktop && isPdfDocument;
     final generation = _wheelInputGeneration;
-    if (AnxPlatform.isDesktop &&
-        isPdfDocument &&
-        event is PointerScrollEvent &&
+    if (desktopPdf &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed)) {
       _wheelInputGeneration++;
@@ -2633,7 +2633,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       return;
     }
     // A zoom may cancel paging while the footnote query is still in flight.
-    if (await isFootNoteOpen() ||
+    if ((!desktopPdf && await isFootNoteOpen()) ||
         generation != _wheelInputGeneration ||
         Prefs().pageTurnStyle == PageTurn.scroll) {
       return;
@@ -2642,21 +2642,33 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (Prefs().keyboardShortcutTurnPage) {
       return;
     }
-    if (event is PointerScrollEvent) {
-      _accumulatedScrollDelta += event.scrollDelta.dy;
-
-      _scrollDebounceTimer?.cancel();
-      _scrollDebounceTimer = Timer(const Duration(milliseconds: 80), () {
-        if (_accumulatedScrollDelta.abs() >= _scrollThreshold) {
-          if (_accumulatedScrollDelta > 0) {
-            nextPage();
-          } else {
-            prevPage();
-          }
+    _accumulatedScrollDelta += event.scrollDelta.dy;
+    _scrollDebounceTimer?.cancel();
+    _scrollDebounceTimer = Timer(const Duration(milliseconds: 80), () {
+      final delta = _accumulatedScrollDelta;
+      _accumulatedScrollDelta = 0;
+      if (!mounted || !delta.isFinite || delta.abs() < _scrollThreshold) return;
+      if (desktopPdf) {
+        if (!_readerReady ||
+            !_isTopOfNavigationStack ||
+            readingPageKey.currentState?.isReflowActive == true ||
+            Prefs().keyboardShortcutTurnPage ||
+            Prefs().pageTurnStyle == PageTurn.scroll) {
+          return;
         }
-        _accumulatedScrollDelta = 0;
-      });
-    }
+        // WebView2 also forwards this wheel event to the PDF viewport. Check
+        // its current fit, zoom and layout before allowing the queued turn.
+        final direction = delta > 0 ? 1 : -1;
+        unawaited(webViewController
+            .evaluateJavascript(
+                source: 'window.turnPdfPageFromWheel?.($direction); void 0;')
+            .catchError((_) => null));
+      } else if (delta > 0) {
+        nextPage();
+      } else {
+        prevPage();
+      }
+    });
   }
 
   @override

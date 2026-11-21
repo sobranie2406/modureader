@@ -152,6 +152,56 @@ test('zoom and pan remember each original page, inherit new pages and reset with
     } finally {h.close()}
 });
 
+test('a PDF wheel pans or turns once, including the edge of a fit-width page', async () => {
+    const h = harness();
+    const code = await source('book');
+    const start = code.indexOf('window.turnPdfPageFromWheel =');
+    const end = code.indexOf('window.setPdfReadingLayout =', start);
+    const window = {isFootNoteOpen: () => footnoteOpen};
+    let footnoteOpen = false;
+    const {renderer} = h;
+    new Function('window', 'reader', 'isPdf', code.slice(start, end))(
+        window, {view: {
+            renderer, next: () => renderer.next(), prev: () => renderer.prev(),
+        }}, true);
+    try {
+        await renderer.setPdfLayout({version: 1, pages: {}}, true);
+        await renderer.setPdfView({fit: 'width'});
+        await renderer.goTo({index: 0});
+        const [{doc}] = renderer.getContents();
+        const wheel = deltaY => doc.dispatchEvent(new doc.defaultView.WheelEvent('wheel',
+            {deltaY, cancelable: true}));
+        const initialY = renderer.pdfRegionLocation.center.y;
+        wheel(60);
+        await window.turnPdfPageFromWheel(1);
+        assert.ok(renderer.pdfRegionLocation.center.y > initialY);
+        assert.equal(renderer.index, 0);
+        wheel(10000);
+        const bottom = renderer.pdfRegionLocation.center.y;
+        wheel(120);
+        await window.turnPdfPageFromWheel(1);
+        assert.equal(renderer.pdfRegionLocation.center.y, bottom);
+        assert.equal(renderer.index, 0);
+
+        assert.equal(await renderer.setPdfView({fit: 'screen', zoom: 2}), true);
+        await window.turnPdfPageFromWheel(1);
+        assert.equal(renderer.index, 0, 'manual zoom also reserves the wheel for panning');
+        assert.equal(await renderer.setPdfView({mode: 'scroll'}), true);
+        assert.equal(window.turnPdfPageFromWheel(1), undefined);
+
+        assert.equal(await renderer.setPdfView({fit: 'screen'}), true);
+        renderer.zoomPdfView(1, true);
+        footnoteOpen = true;
+        await window.turnPdfPageFromWheel(1);
+        assert.equal(renderer.index, 0);
+        footnoteOpen = false;
+        await window.turnPdfPageFromWheel(1);
+        assert.equal(renderer.index, 1, 'whole-page PDF still supports wheel paging');
+        await window.turnPdfPageFromWheel(-1);
+        assert.equal(renderer.index, 0);
+    } finally { h.close(); }
+});
+
 test('PDF spreads show consecutive original pages, keep the active source page and turn in pairs', async () => {
     const h = harness(), requests = [];
     const book = h.renderer.book;

@@ -1929,6 +1929,13 @@ window.setPdfReadingView = value => reader?.view?.renderer?.setPdfView?.(value) 
 window.panPdfReadingView = (dx, dy) => reader?.view?.renderer?.panPdfView?.(dx, dy) ?? false
 window.zoomPdfReadingView = (zoom, reset) => reader?.view?.renderer?.zoomPdfView?.(zoom, reset) ?? false
 window.setPdfBoxZoom = enabled => reader?.view?.renderer?.setPdfBoxZoom?.(enabled) ?? false
+window.turnPdfPageFromWheel = direction => {
+  const view = reader?.view, renderer = view?.renderer
+  if (!isPdf || !renderer?.readerActive || renderer.isNavigating ||
+      renderer.pdfWheelPans || window.isFootNoteOpen()) return
+  if (direction === 1) return view.next()
+  if (direction === -1) return view.prev()
+}
 window.setPdfReadingLayout = async (config, enabled, view) => {
   // Disabling crop keeps zoom available without silently re-enabling saved crops.
   const layout = enabled ? config : {version:1,pages:{}}
