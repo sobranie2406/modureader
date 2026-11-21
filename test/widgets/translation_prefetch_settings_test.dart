@@ -16,13 +16,19 @@ void main() {
   for (final classical in [false, true]) {
     for (final locale in ['en', 'zh']) {
       testWidgets(
-          'prefetch choice stays independent without starting or stopping translation classical=$classical locale=$locale',
+          'prefetch switch remembers its bounded page count independently classical=$classical locale=$locale',
           (tester) async {
         await tester.runAsync(() => L10n.delegate.load(Locale(locale)));
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(360, 900);
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+        const languageStyle =
+            '{"font":"serif","size":18,"bold":false,"italic":true}';
+        const classicalStyle =
+            '{"font":"monospace","size":22,"bold":true,"italic":false}';
+        Prefs().languageTranslationTextStyle = languageStyle;
+        Prefs().classicalTranslationTextStyle = classicalStyle;
         final mode = ValueNotifier(TranslationModeEnum.bilingual);
         addTearDown(() async {
           await tester.pumpWidget(const SizedBox());
@@ -30,51 +36,81 @@ void main() {
           mode.dispose();
         });
         var translated = 0, stopped = 0;
-        await tester.pumpWidget(MaterialApp(
-          localizationsDelegates: L10n.localizationsDelegates,
-          supportedLocales: L10n.supportedLocales,
-          locale: Locale(locale),
-          builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: TextScaler.linear(1.3)),
-              child: child!),
-          home: Scaffold(
-              body: TranslationWidget(
-            bookId: 1,
-            classical: classical,
-            epubPlayerKey: GlobalKey<EpubPlayerState>(),
-            pageTranslationMode: mode,
-            onTranslatePage: (_, __) async {
-              translated++;
-            },
-            onStopPageTranslation: () => stopped++,
-          )),
-        ));
+        Widget app() => MaterialApp(
+              localizationsDelegates: L10n.localizationsDelegates,
+              supportedLocales: L10n.supportedLocales,
+              locale: Locale(locale),
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(1.3)),
+                  child: child!),
+              home: Scaffold(
+                  body: TranslationWidget(
+                bookId: 1,
+                classical: classical,
+                epubPlayerKey: GlobalKey<EpubPlayerState>(),
+                pageTranslationMode: mode,
+                onTranslatePage: (_, __) async {
+                  translated++;
+                },
+                onStopPageTranslation: () => stopped++,
+              )),
+            );
+        await tester.pumpWidget(app());
         await tester.pumpAndSettle();
         final field = find.byKey(ValueKey(classical
             ? 'reader-classical-prefetch-pages'
             : 'reader-language-prefetch-pages'));
-        final dropdown = find.descendant(
-            of: field, matching: find.byType(DropdownButton<int>));
+        final toggle =
+            find.descendant(of: field, matching: find.byType(Switch));
+        final minus = find.descendant(
+            of: field, matching: find.widgetWithIcon(IconButton, Icons.remove));
+        final plus = find.descendant(
+            of: field, matching: find.widgetWithIcon(IconButton, Icons.add));
+        int effectivePages() => classical
+            ? Prefs().classicalTranslationPrefetchPages
+            : Prefs().languageTranslationPrefetchPages;
+        Future<void> change(Finder control) async {
+          await tester.ensureVisible(control);
+          await tester.tap(control);
+          await tester.pumpAndSettle();
+        }
+
+        void expectPages(int pages) {
+          expect(effectivePages(), pages);
+          expect(Prefs().translationPrefetchPageCount(classical: classical),
+              pages);
+          expect(find.descendant(of: field, matching: find.text('$pages')),
+              findsOneWidget);
+        }
+
         expect(field, findsOneWidget);
-        expect(dropdown, findsOneWidget);
         expect(
-            tester
-                .widget<DropdownButton<int>>(dropdown)
-                .items!
-                .map((item) => item.value),
-            [0, 1, 2, 3, 4, 5]);
-        expect(tester.widget<DropdownButton<int>>(dropdown).value, 0);
-        await tester.ensureVisible(field);
-        await tester.tap(field);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('5').last);
-        await tester.pumpAndSettle();
+            find.descendant(of: field, matching: find.byType(SwitchListTile)),
+            findsOneWidget);
         expect(
-            classical
-                ? Prefs().classicalTranslationPrefetchPages
-                : Prefs().languageTranslationPrefetchPages,
-            5);
+            find.descendant(
+                of: field, matching: find.byType(DropdownButton<int>)),
+            findsNothing);
+        expect(tester.widget<Switch>(toggle).value, false);
+        expect(effectivePages(), 0);
+        expect(Prefs().translationPrefetchPageCount(classical: classical), 3);
+        expect(minus, findsNothing);
+        expect(plus, findsNothing);
+
+        await change(toggle);
+        expect(tester.widget<Switch>(toggle).value, true);
+        expectPages(3);
+        for (final pages in [2, 1]) {
+          await change(minus);
+          expectPages(pages);
+        }
+        expect(tester.widget<IconButton>(minus).onPressed, isNull);
+        for (final pages in [2, 3, 4, 5]) {
+          await change(plus);
+          expectPages(pages);
+        }
+        expect(tester.widget<IconButton>(plus).onPressed, isNull);
         expect(
             classical
                 ? Prefs().languageTranslationPrefetchPages
@@ -82,23 +118,29 @@ void main() {
             0);
 
         if (classical) {
-          Prefs().classicalTranslationPrefetchPages = 3;
+          Prefs().classicalTranslationPrefetchPages = 4;
         } else {
-          Prefs().languageTranslationPrefetchPages = 3;
+          Prefs().languageTranslationPrefetchPages = 4;
         }
         await tester.pumpAndSettle();
-        expect(tester.widget<DropdownButton<int>>(dropdown).value, 3);
+        expectPages(4);
 
-        await tester.ensureVisible(field);
-        await tester.tap(field);
+        await change(toggle);
+        expect(tester.widget<Switch>(toggle).value, false);
+        expect(effectivePages(), 0);
+        expect(Prefs().translationPrefetchPageCount(classical: classical), 4);
+        expect(minus, findsNothing);
+        expect(plus, findsNothing);
+        await tester.pumpWidget(const SizedBox());
+        await Prefs().initPrefs();
+        await tester.pumpWidget(app());
         await tester.pumpAndSettle();
-        await tester.tap(find.text(locale == 'zh' ? '关闭' : 'Off').last);
-        await tester.pumpAndSettle();
-        expect(
-            classical
-                ? Prefs().classicalTranslationPrefetchPages
-                : Prefs().languageTranslationPrefetchPages,
-            0);
+        expect(tester.widget<Switch>(toggle).value, false);
+        await change(toggle);
+        expectPages(4);
+        expect(Prefs().translationPrefetchPageCount(classical: !classical), 3);
+        expect(Prefs().languageTranslationTextStyle, languageStyle);
+        expect(Prefs().classicalTranslationTextStyle, classicalStyle);
         expect(translated, 0);
         expect(stopped, 0);
         expect(mode.value, TranslationModeEnum.bilingual);

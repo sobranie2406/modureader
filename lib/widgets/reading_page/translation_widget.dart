@@ -4,6 +4,7 @@ import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:modu_reader/widgets/settings/classical_translation_settings.dart';
 import 'package:modu_reader/widgets/settings/translation_text_style_settings.dart';
 import 'package:modu_reader/widgets/settings/settings_tile.dart';
+import 'page_prefetch_controls.dart';
 import 'reader_popup.dart';
 import 'package:modu_reader/widgets/reading_page/classical_translation_icon.dart';
 import 'package:modu_reader/page/settings_page/translate.dart';
@@ -48,6 +49,7 @@ class _TranslationWidgetState extends State<TranslationWidget> {
   late TranslateService _activeService;
   late LangListEnum _activeTarget;
   bool _translating = false;
+  bool _savingPrefetch = false;
   int _operation = 0;
   ValueNotifier<TranslationModeEnum>? _mode;
   String? _error;
@@ -262,14 +264,24 @@ class _TranslationWidgetState extends State<TranslationWidget> {
     }
   }
 
-  void _changePrefetchPages(int? pages) {
-    if (pages == null) return;
-    if (widget.classical) {
-      Prefs().classicalTranslationPrefetchPages = pages;
-    } else {
-      Prefs().languageTranslationPrefetchPages = pages;
+  Future<void> _savePrefetchPages(int pages) async {
+    if (_savingPrefetch) return;
+    setState(() {
+      _savingPrefetch = true;
+      _error = null;
+    });
+    try {
+      await Prefs()
+          .saveTranslationPrefetch(classical: widget.classical, pages: pages);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(ModuStrings.text(
+                context, '保存失败，请重试', 'Could not save. Please retry.'))));
+      }
+    } finally {
+      if (mounted) setState(() => _savingPrefetch = false);
     }
-    setState(() => _error = null);
   }
 
   @override
@@ -388,29 +400,42 @@ class _TranslationWidgetState extends State<TranslationWidget> {
                           child: TranslationTextStyleSettings(
                               classical: widget.classical))),
                 ),
-                const SizedBox(height: 14),
                 ListenableBuilder(
                     listenable: Prefs(),
-                    builder: (context, _) => DropdownButtonFormField<int>(
-                          key: ValueKey(widget.classical
-                              ? 'reader-classical-prefetch-pages'
-                              : 'reader-language-prefetch-pages'),
-                          initialValue: widget.classical
-                              ? Prefs().classicalTranslationPrefetchPages
-                              : Prefs().languageTranslationPrefetchPages,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                              labelText: ModuStrings.text(context, '预翻译后续页数',
-                                  'Pretranslate following pages')),
-                          items: [
-                            DropdownMenuItem(
-                                value: 0, child: Text(_label('关闭', 'Off'))),
-                            for (var pages = 1; pages <= 5; pages++)
-                              DropdownMenuItem(
-                                  value: pages, child: Text('$pages')),
-                          ],
-                          onChanged: _changePrefetchPages,
-                        )),
+                    builder: (context, _) {
+                      final activePages = widget.classical
+                          ? Prefs().classicalTranslationPrefetchPages
+                          : Prefs().languageTranslationPrefetchPages;
+                      final pages = Prefs().translationPrefetchPageCount(
+                          classical: widget.classical);
+                      return PagePrefetchControls(
+                        key: ValueKey(widget.classical
+                            ? 'reader-classical-prefetch-pages'
+                            : 'reader-language-prefetch-pages'),
+                        title: SettingHelpTitle(
+                          title: ModuStrings.text(
+                              context, '后台预翻译', 'Background pretranslation'),
+                          description: ModuStrings.text(
+                              context,
+                              '阅读时先翻译当前页，再预翻译后续页面。',
+                              'Translate the current page first, then pretranslate the following pages while reading.'),
+                        ),
+                        enabled: activePages > 0,
+                        pages: pages,
+                        pagesLabel: ModuStrings.text(
+                            context, '预翻译后续页数', 'Pretranslate following pages'),
+                        fewerPagesTooltip:
+                            ModuStrings.text(context, '减少预翻译页数', 'Fewer pages'),
+                        morePagesTooltip:
+                            ModuStrings.text(context, '增加预翻译页数', 'More pages'),
+                        onEnabledChanged: _savingPrefetch
+                            ? null
+                            : (enabled) =>
+                                _savePrefetchPages(enabled ? pages : 0),
+                        onPagesChanged:
+                            _savingPrefetch ? null : _savePrefetchPages,
+                      );
+                    }),
                 const SizedBox(height: 14),
                 Text(
                   ModuStrings.text(context, '显示方式', 'Display'),

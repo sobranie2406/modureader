@@ -5,6 +5,7 @@ import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/page/book_player/epub_player.dart';
 import 'package:modu_reader/widgets/reading_page/translation_widget.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -153,7 +154,11 @@ void main() {
     await tester.pumpAndSettle();
     const guidance = 'Translate visible paragraphs and continue as you scroll.';
     expect(find.text(guidance), findsNothing);
-    await tester.tap(find.byIcon(Icons.help_outline).first);
+    final methodHelp = find.descendant(
+        of: find.widgetWithText(SettingHelp, 'Translation'),
+        matching: find.byIcon(Icons.help_outline));
+    await tester.ensureVisible(methodHelp);
+    await tester.tap(methodHelp);
     await tester.pumpAndSettle();
     expect(find.text(guidance), findsOneWidget);
     await tester.tapAt(const Offset(4, 4));
