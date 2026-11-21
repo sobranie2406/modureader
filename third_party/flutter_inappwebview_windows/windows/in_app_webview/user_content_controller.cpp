@@ -21,14 +21,18 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
+    const auto lifetime = webView_->callbackLifetime();
     wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver> executionContextCreated;
     if (succeededOrLog(webView_->webView->GetDevToolsProtocolEventReceiver(L"Runtime.executionContextCreated", &executionContextCreated))) {
       auto hr = executionContextCreated->add_DevToolsProtocolEventReceived(
         Callback<ICoreWebView2DevToolsProtocolEventReceivedEventHandler>(
-          [this](
+          [this, lifetime](
             ICoreWebView2* sender,
             ICoreWebView2DevToolsProtocolEventReceivedEventArgs* args) -> HRESULT
           {
+            if (lifetime.expired()) {
+              return S_OK;
+            }
             wil::unique_cotaskmem_string json;
             if (succeededOrLog(args->get_ParameterObjectAsJson(&json))) {
               nlohmann::json context = nlohmann::json::parse(wide_to_utf8(json.get()))["context"];
@@ -300,7 +304,7 @@ namespace flutter_inappwebview_plugin
 
   void UserContentController::createContentWorld(const std::shared_ptr<ContentWorld> contentWorld, const std::function<void(int)> completionHandler)
   {
-    if (!webView_ || !(webView_->webView) || ContentWorld::isPage(contentWorld)) {
+    if (!webView_ || !(webView_->webView) || !contentWorld || ContentWorld::isPage(contentWorld)) {
       if (completionHandler) {
         completionHandler(-1);
       }
@@ -313,12 +317,20 @@ namespace flutter_inappwebview_plugin
         {"frameId", webView_->pageFrameId()},
         {"worldName", worldName}
       };
+      const auto lifetime = webView_->callbackLifetime();
       auto hr = webView_->webView->CallDevToolsProtocolMethod(L"Page.createIsolatedWorld", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-        [this, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+        [this, lifetime, completionHandler, worldName](HRESULT errorCode, LPCWSTR returnObjectAsJson)
         {
-          if (succeededOrLog(errorCode) && completionHandler) {
-            auto id = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson))["executionContextId"].get<int>();
-            addPluginScriptsIfRequired(std::make_shared<ContentWorld>(worldName));
+          int id = -1;
+          if (!lifetime.expired() && succeededOrLog(errorCode) && returnObjectAsJson) {
+            const auto response = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson), nullptr, false);
+            const auto executionContextId = response.find("executionContextId");
+            if (executionContextId != response.end() && executionContextId->is_number_integer()) {
+              id = executionContextId->get<int>();
+              addPluginScriptsIfRequired(std::make_shared<ContentWorld>(worldName));
+            }
+          }
+          if (completionHandler) {
             completionHandler(id);
           }
           return S_OK;

@@ -133,13 +133,13 @@ test('vertical fitting uses measured column width and preserves the area/screen 
 });
 test('only notes lock scrolling to their writing block axis; book scrolling is unchanged', async () => {
   const paginator = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8');
-  const start = paginator.indexOf("    const flow = this.getAttribute('flow')");
+  const start = paginator.indexOf("    if (flow === 'scrolled')", paginator.indexOf('  #beforeRender('));
   const end = paginator.indexOf('} else if (this.mobileTouchPaging)', start);
   const branch = paginator.slice(start,end).replaceAll('this.#container','this.container')+'}';
-  const renderScroll = new Function('vertical',branch);
+  const renderScroll = new Function('vertical','flow',branch);
   for (const vertical of [true,false]) for (const footnote of [true,false]) {
-    const renderer = {container:{style:{}},getAttribute:()=> 'scrolled',hasAttribute:()=>footnote};
-    renderScroll.call(renderer,vertical);
+    const renderer = {container:{style:{}},hasAttribute:()=>footnote};
+    renderScroll.call(renderer,vertical,'scrolled');
     assert.equal(renderer.container.style.overflowX,footnote&&!vertical?'hidden':'auto');
     assert.equal(renderer.container.style.overflowY,footnote&&vertical?'hidden':'auto');
   }

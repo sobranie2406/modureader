@@ -27,8 +27,10 @@ import 'package:modu_reader/service/translate/classical_translation.dart';
 import 'package:modu_reader/models/translation_text_style.dart';
 import 'package:modu_reader/service/translate/reader_translation_modes.dart';
 import 'package:modu_reader/service/translate/deepl.dart';
+import 'package:modu_reader/service/translate/google_api.dart';
 import 'package:modu_reader/service/translate/microsoft_free.dart';
 import 'package:modu_reader/service/translate/reader_translation_session.dart';
+import 'package:modu_reader/service/translate/full_text_translation_identity.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui';
@@ -39,7 +41,7 @@ import 'package:modu_reader/service/book_player/document_reading_mode_store.dart
 import 'package:modu_reader/service/tts/tts_service.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/book_note.dart';
-import 'package:modu_reader/enums/page_turn_mode.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/enums/reading_info.dart';
 import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/enums/writing_mode.dart';
@@ -94,7 +96,6 @@ import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/webView/gererate_url.dart';
 import 'package:modu_reader/utils/webView/webview_console_message.dart';
 import 'package:modu_reader/widgets/context_menu/context_menu.dart';
-import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:flutter/foundation.dart';
@@ -760,6 +761,42 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     await translateCurrentChapter(mode);
   }
 
+  bool _translationPrefetchForeground = false;
+  int _translationPrefetchPages = 0;
+
+  void setTranslationPrefetchForeground(bool foreground) {
+    if (_translationPrefetchForeground == foreground) return;
+    _translationPrefetchForeground = foreground;
+    _configureTranslationPrefetch();
+  }
+
+  int _requestedTranslationPrefetchPages() {
+    if (!_translationSession.enabled || !_translationPrefetchForeground) {
+      return 0;
+    }
+    final classical = classicalTranslation;
+    final pages = classical
+        ? Prefs().classicalTranslationPrefetchPages
+        : Prefs().languageTranslationPrefetchPages;
+    if (pages == 0) return 0;
+    final identity = fullTextTranslationIdentity(
+        classical: classical ? ClassicalTranslation.current() : null);
+    return identity == _translationIdentity ? pages : 0;
+  }
+
+  void _configureTranslationPrefetch() {
+    final pages = _requestedTranslationPrefetchPages();
+    if (pages == _translationPrefetchPages) return;
+    _translationPrefetchPages = pages;
+    _translationSession.cancelPrefetch();
+    if (!_readerReady || !mounted) return;
+    unawaited(webViewController
+        .evaluateJavascript(
+            source:
+                'reader.view.setTranslationPrefetchPages?.($pages); void 0;')
+        .catchError((_) => null));
+  }
+
   String? _appliedTranslationTextStyle;
   void _configureTranslationTextStyle() {
     final value = classicalTranslation
@@ -789,9 +826,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }) async {
     if (mode != TranslationModeEnum.off) {
       final translator = classical ? ClassicalTranslation.current() : null;
-      final identity = translator == null
-          ? 'standard/${Prefs().fullTextTranslateService.name}/${Prefs().fullTextTranslateFrom.code}/${Prefs().fullTextTranslateTo.code}/${Prefs().translationAiService}'
-          : 'classical/${translator.identity}';
+      final identity = fullTextTranslationIdentity(classical: translator);
       force = force || identity != _translationIdentity;
       _classicalTranslator = translator;
       _translationIdentity = identity;
@@ -829,11 +864,13 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       }
       _appliedTranslationTextStyle = style;
       _configureTranslationTextStyle();
+      _configureTranslationPrefetch();
     } catch (_) {
       if (_translationSession.generation == generation) {
         _translationSession.stop();
         _translationModes.update(TranslationModeEnum.off,
             isClassical: classical);
+        _configureTranslationPrefetch();
       }
       rethrow;
     }
@@ -1612,38 +1649,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     final y = location['y'];
     final part = coordinatesToPart(x, y);
 
-    PageTurningType action;
-    final pageTurnMode = PageTurnMode.fromCode(Prefs().pageTurnMode);
-
-    if (pageTurnMode == PageTurnMode.simple) {
-      // Use predefined page turning types
-      final currentPageTurningType = Prefs().pageTurningType;
-      final pageTurningType = pageTurningTypes[currentPageTurningType];
-      action = pageTurningType[part];
-
-      // Apply swap if enabled
-      if (Prefs().swapPageTurnArea) {
-        if (action == PageTurningType.prev) {
-          action = PageTurningType.next;
-        } else if (action == PageTurningType.next) {
-          action = PageTurningType.prev;
-        }
-      }
-    } else {
-      // Use custom configuration
-      final customConfig = Prefs().customPageTurnConfig;
-      action = PageTurningType.values[customConfig[part]];
-    }
-
-    // Disable mouse/touch page turning when keyboard shortcuts are enabled
-    if (Prefs().keyboardShortcutTurnPage) {
-      // Only allow menu action, disable prev/next page turning
-      if (action == PageTurningType.prev || action == PageTurningType.next) {
-        return;
-      }
-    }
-
-    switch (action) {
+    switch (readerTapAction(part)) {
       case PageTurningType.prev:
         prevPage();
         break;
@@ -1652,6 +1658,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         break;
       case PageTurningType.menu:
         widget.showOrHideAppBarAndBottomBar(true);
+        break;
+      case PageTurningType.contents:
+        if (_isTopOfNavigationStack) {
+          unawaited(readingPageKey.currentState?.tocHandler());
+        }
         break;
       case PageTurningType.none:
         break;
@@ -2085,6 +2096,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           _translationSession.stop();
           _translationModes.update(TranslationModeEnum.off, isClassical: false);
           _classicalTranslator = null;
+          _configureTranslationPrefetch();
           Prefs()
               .setBookTranslationMode(widget.book.id, TranslationModeEnum.off);
           if (!mounted) return;
@@ -2562,15 +2574,24 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     controller.addJavaScriptHandler(
       handlerName: 'translateText',
       callback: (args) async {
+        final prefetchPages = args.length > 2
+            ? ReaderTranslationSession.bridgeGeneration(args[2]) ?? 0
+            : 0;
+        final prefetch = prefetchPages > 0;
         try {
           if (!mounted || args.length < 2 || args[0] is! String) return null;
+          if (prefetch &&
+              prefetchPages != _requestedTranslationPrefetchPages()) {
+            return null;
+          }
           final generation = ReaderTranslationSession.bridgeGeneration(args[1]);
           if (generation == null) return null;
           final text = args[0] as String;
           final classical = _classicalTranslator;
           if (classical != null) {
             return await _translationSession.translate(
-                generation, (runner) => classical.translate(text, runner));
+                generation, (runner) => classical.translate(text, runner),
+                prefetch: prefetch);
           }
           final service = Prefs().fullTextTranslateService;
           final from = Prefs().fullTextTranslateFrom;
@@ -2579,27 +2600,35 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           final provider = service.provider;
           return await _translationSession.translate(
               generation,
-              (runner) => provider is AiTranslateProvider
-                  ? provider.translateStream(text, from, to,
-                      isFullText: true, requestRunner: runner)
-                  : provider is MicrosoftFreeTranslateProvider
-                      ? provider.translateStream(text, from, to,
-                          isFullText: true, whenCancelled: runner.whenCancelled)
-                      : provider is OfficialApiTranslateProvider
-                          ? provider.translateStream(text, from, to,
-                              isFullText: true,
-                              whenCancelled: runner.whenCancelled)
-                          : provider is DeepLTranslateProvider
-                              ? provider.translateStream(text, from, to,
-                                  isFullText: true,
-                                  whenCancelled: runner.whenCancelled)
-                              : provider.translateStream(text, from, to,
-                                  isFullText: true));
+              (runner) => switch (provider) {
+                    AiTranslateProvider provider => provider.translateStream(
+                        text, from, to,
+                        isFullText: true, requestRunner: runner),
+                    MicrosoftFreeTranslateProvider provider =>
+                      provider.translateStream(text, from, to,
+                          isFullText: true,
+                          whenCancelled: runner.whenCancelled),
+                    OfficialApiTranslateProvider provider =>
+                      provider.translateStream(text, from, to,
+                          isFullText: true,
+                          whenCancelled: runner.whenCancelled),
+                    DeepLTranslateProvider provider => provider.translateStream(
+                        text, from, to,
+                        isFullText: true, whenCancelled: runner.whenCancelled),
+                    GoogleApiTranslateProvider provider =>
+                      provider.translateStream(text, from, to,
+                          isFullText: true,
+                          whenCancelled: runner.whenCancelled),
+                    _ => provider.translateStream(text, from, to,
+                        isFullText: true),
+                  },
+              prefetch: prefetch);
         } on TranslationCancelled {
           return null;
         } catch (e) {
           AnxLog.warning('Reader translation request failed: ${e.runtimeType}');
-          if (mounted &&
+          if (!prefetch &&
+              mounted &&
               _translationSession.enabled &&
               args.length > 1 &&
               args[1] == _translationSession.generation) {
@@ -2648,10 +2677,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   }
 
   Future<void> _handlePointerEvents(PointerEvent event) async {
+    if (event is! PointerScrollEvent) return;
+    final desktopPdf = AnxPlatform.isDesktop && isPdfDocument;
     final generation = _wheelInputGeneration;
-    if (AnxPlatform.isDesktop &&
-        isPdfDocument &&
-        event is PointerScrollEvent &&
+    if (desktopPdf &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed)) {
       _wheelInputGeneration++;
@@ -2660,7 +2689,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       return;
     }
     // A zoom may cancel paging while the footnote query is still in flight.
-    if (await isFootNoteOpen() ||
+    if ((!desktopPdf && await isFootNoteOpen()) ||
         generation != _wheelInputGeneration ||
         Prefs().pageTurnStyle == PageTurn.scroll) {
       return;
@@ -2669,21 +2698,33 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (Prefs().keyboardShortcutTurnPage) {
       return;
     }
-    if (event is PointerScrollEvent) {
-      _accumulatedScrollDelta += event.scrollDelta.dy;
-
-      _scrollDebounceTimer?.cancel();
-      _scrollDebounceTimer = Timer(const Duration(milliseconds: 80), () {
-        if (_accumulatedScrollDelta.abs() >= _scrollThreshold) {
-          if (_accumulatedScrollDelta > 0) {
-            nextPage();
-          } else {
-            prevPage();
-          }
+    _accumulatedScrollDelta += event.scrollDelta.dy;
+    _scrollDebounceTimer?.cancel();
+    _scrollDebounceTimer = Timer(const Duration(milliseconds: 80), () {
+      final delta = _accumulatedScrollDelta;
+      _accumulatedScrollDelta = 0;
+      if (!mounted || !delta.isFinite || delta.abs() < _scrollThreshold) return;
+      if (desktopPdf) {
+        if (!_readerReady ||
+            !_isTopOfNavigationStack ||
+            readingPageKey.currentState?.isReflowActive == true ||
+            Prefs().keyboardShortcutTurnPage ||
+            Prefs().pageTurnStyle == PageTurn.scroll) {
+          return;
         }
-        _accumulatedScrollDelta = 0;
-      });
-    }
+        // WebView2 also forwards this wheel event to the PDF viewport. Check
+        // its current fit, zoom and layout before allowing the queued turn.
+        final direction = delta > 0 ? 1 : -1;
+        unawaited(webViewController
+            .evaluateJavascript(
+                source: 'window.turnPdfPageFromWheel?.($direction); void 0;')
+            .catchError((_) => null));
+      } else if (delta > 0) {
+        nextPage();
+      } else {
+        prevPage();
+      }
+    });
   }
 
   @override
@@ -2727,6 +2768,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     Prefs().addListener(_configureEinkPreferences);
     Prefs().addListener(_configureOcrPrecache);
     Prefs().addListener(_configureTranslationTextStyle);
+    Prefs().addListener(_configureTranslationPrefetch);
     getThemeColor();
 
     contextMenu = ContextMenu(
@@ -2818,6 +2860,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     Prefs().removeListener(_configureEinkPreferences);
     Prefs().removeListener(_configureOcrPrecache);
     Prefs().removeListener(_configureTranslationTextStyle);
+    Prefs().removeListener(_configureTranslationPrefetch);
     _ocrPrecache.dispose();
     _einkPageRefresh.dispose();
     _translationSession.stop();
@@ -3105,6 +3148,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         _readerLoadFailed = false;
         _chapterLoadFailed = false;
         _translationSession.stop();
+        _translationPrefetchPages = 0;
         _scrollDebounceTimer?.cancel();
         if (_hasNarrationSession) unawaited(TtsHandler().pause());
         RuntimeDiagnostics.record(RuntimeEvent.reader, state: 'renderer_gone');

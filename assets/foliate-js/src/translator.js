@@ -12,15 +12,18 @@ if (typeof window !== 'undefined') {
 }
 
 // Translation function that calls Flutter's translation service
-const translate = async (text, sessionId) => {
+const translate = async (text, sessionId, prefetchPages) => {
   try {
     // Call Flutter's translation handler
-      return await window.flutter_inappwebview.callHandler('translateText', text, sessionId)
+    return await window.flutter_inappwebview.callHandler('translateText', text, sessionId, prefetchPages)
   } catch (error) {
-    console.error('Translation failed:', error)
+    if (!prefetchPages) console.error('Translation failed:', error)
     return null
   }
 }
+
+const PREFETCH_CACHE_ENTRIES = 512
+const PREFETCH_CACHE_CHARACTERS = 512 * 1024
 
 export class Translator {
   #translationMode = TranslationMode.OFF
@@ -30,6 +33,9 @@ export class Translator {
   #generation = 0
   #sessionId = null
   #queue = []
+  #prefetchQueue = []
+  #prefetchActive = null
+  #prefetched = new Map()
   #pending = new Set()
   #running = false
   #destroyed = false
@@ -109,6 +115,7 @@ export class Translator {
     if (mode === TranslationMode.OFF) {
       this.#generation++
       this.#queue = []
+      this.#prefetchQueue = []
       this.#pending.clear()
     }
     
@@ -144,6 +151,46 @@ export class Translator {
     return this.#translationMode
   }
 
+  observeVisibleRange(range) {
+    if (!range || this.#destroyed || this.#translationMode === TranslationMode.OFF) return
+    const doc = range.startContainer.ownerDocument
+    // Recheck after pagination moves a queued paragraph between columns.
+    for (const element of this.observedElements) {
+      if (element.ownerDocument === doc && range.intersectsNode(element)) this.#enqueue(element)
+    }
+  }
+
+  clearPrefetchQueue() {
+    this.#prefetchQueue = []
+  }
+
+  addPrefetchRange(range, pages = 0) {
+    if (!range || !Number.isInteger(pages) || pages < 1 || pages > 5 ||
+        this.#destroyed || this.#translationMode === TranslationMode.OFF ||
+        window.document.hidden) return
+    const doc = range.startContainer.ownerDocument
+    const owner = doc?.defaultView
+    if (!owner) return
+    // Prepared chapter frames may be destroyed immediately after this callback.
+    for (const element of this.#walkTextNodes(doc.body || doc.documentElement)) {
+      if (!element.isConnected || this.#pending.has(element) ||
+          this.#translatedElements.has(element) || !range.intersectsNode(element) ||
+          element.closest('.translated-text, .translation-source-hidden, [hidden]') ||
+          element.querySelector('.translated-text') || owner.getComputedStyle(element).display === 'none' ||
+          owner.getComputedStyle(element).visibility !== 'visible' ||
+          !Array.from(element.getClientRects()).some(rect => rect.width > 0 && rect.height > 0)) continue
+      const text = element.innerText?.trim()
+      if (!text || this.#prefetched.has(text) ||
+          this.#prefetchQueue.some(job => job.text === text) ||
+          (this.#prefetchActive?.generation === this.#generation &&
+           this.#prefetchActive?.sessionId === this.#sessionId &&
+           this.#prefetchActive.text === text)) continue
+      this.#prefetchQueue.push({text, generation: this.#generation,
+        sessionId: this.#sessionId, prefetchPages: pages})
+    }
+    void this.#drain()
+  }
+
   observeDocument(doc) {
     this.#pruneDocuments()
     // console.log('Observing document for translation, doc:', doc)
@@ -170,6 +217,8 @@ export class Translator {
     this.#pruneDocuments()
     this.#generation++
     this.#queue = []
+    this.#prefetchQueue = []
+    this.#prefetched.clear()
     this.#pending.clear()
     const previousElements = Array.from(this.observedElements)
 
@@ -290,17 +339,49 @@ export class Translator {
     if (this.#running) return
     this.#running = true
     try {
-      while (this.#queue.length && !this.#destroyed) {
+      while ((this.#queue.length || this.#prefetchQueue.length) && !this.#destroyed) {
         const job = this.#queue.shift()
+        if (!job) {
+          const ahead = this.#prefetchQueue.shift()
+          if (ahead.generation !== this.#generation || ahead.sessionId !== this.#sessionId ||
+              this.#translationMode === TranslationMode.OFF || window.document.hidden ||
+              this.#prefetched.has(ahead.text)) continue
+          this.#prefetchActive = ahead
+          try {
+            const result = await translate(ahead.text, ahead.sessionId, ahead.prefetchPages)
+            if (!this.#destroyed && ahead.generation === this.#generation &&
+                ahead.sessionId === this.#sessionId && this.#translationMode !== TranslationMode.OFF &&
+                !window.document.hidden &&
+                typeof result === 'string' && result.trim()) {
+              this.#cachePrefetched(ahead.text, result)
+            }
+          } finally { this.#prefetchActive = null }
+          continue
+        }
         try {
           if (job.generation === this.#generation && this.#isVisible(job.element)) {
             await this.#translateElement(job.element, job.generation, job.sessionId)
           }
         } finally {
-          if (job.generation === this.#generation) this.#pending.delete(job.element)
+          if (job.generation === this.#generation) {
+            this.#pending.delete(job.element)
+          }
         }
       }
     } finally { this.#running = false }
+  }
+
+  #cachePrefetched(text, translated) {
+    if (text.length + translated.length > PREFETCH_CACHE_CHARACTERS) return
+    this.#prefetched.delete(text)
+    this.#prefetched.set(text, translated)
+    let characters = 0
+    for (const [source, result] of this.#prefetched) characters += source.length + result.length
+    while (this.#prefetched.size > PREFETCH_CACHE_ENTRIES || characters > PREFETCH_CACHE_CHARACTERS) {
+      const source = this.#prefetched.keys().next().value
+      characters -= source.length + this.#prefetched.get(source).length
+      this.#prefetched.delete(source)
+    }
   }
 
   async #translateElement(element, generation, sessionId) {
@@ -311,12 +392,12 @@ export class Translator {
     if (!text) return
     
     try {
-      const translatedText = await translate(text, sessionId)
+      const translatedText = this.#prefetched.get(text) ?? await translate(text, sessionId, 0)
       if (this.#destroyed || generation !== this.#generation ||
           this.#translationMode === TranslationMode.OFF || !element.isConnected ||
           !element.ownerDocument?.defaultView || !this.observedElements.has(element) ||
           typeof translatedText !== 'string' || !translatedText.trim()) return
-      
+
       // Mark as translated to prevent re-processing
       this.#translatedElements.set(element, {
         originalText: text,

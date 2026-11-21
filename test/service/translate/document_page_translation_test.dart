@@ -127,6 +127,55 @@ void main() {
     expect(translation.text, 'translated: new page');
   });
 
+  test('opening a prefetched page reuses it and cancels the next request',
+      () async {
+    final started = Completer<void>();
+    var cancelled = false;
+    final stream = StreamController<String>(onCancel: () => cancelled = true);
+    final first = page(edit: 'Current'), next = page(index: 1, edit: 'Next');
+    final following = page(index: 2, edit: 'Following');
+    Future<String> requestPage(
+        ReaderTranslationSession session, int generation, String text) {
+      if (text != 'Following') return request(session, generation, text);
+      return session.translate(generation, (_) {
+        requests.add(text);
+        started.complete();
+        return stream.stream;
+      });
+    }
+
+    await translation.translate(first, TranslationModeEnum.bilingual,
+        settings: 'en', request: requestPage);
+    final prefetch = translation
+        .prefetch([1, 2], (index, _) async => index == 1 ? next : following);
+    await started.future;
+    expect(translation.text, 'Current\n\ntranslated: Current');
+    translation.stop(retainPrefetched: true);
+    await translation.translate(next, TranslationModeEnum.translationOnly,
+        settings: 'en', request: requestPage);
+    await prefetch;
+    await stream.close();
+    expect(cancelled, isTrue);
+    expect(translation.text, 'translated: Next');
+    expect(requests, ['Current', 'Next', 'Following']);
+  });
+
+  test('prefetch is reused only for the matching source revision and settings',
+      () async {
+    final old = page(index: 1, edit: 'Old');
+    final newer = page(index: 1, edit: 'Correction');
+    Future<void> run(DocumentReflowPage source, String settings) =>
+        translation.translate(source, TranslationModeEnum.translationOnly,
+            settings: settings, request: request);
+    await run(page(edit: 'Current'), 'en');
+    await translation.prefetch([1], (_, __) async => old);
+    await run(newer, 'en');
+    await translation.prefetch([2], (_, __) async => page(index: 2));
+    await run(page(index: 2), 'ja');
+    expect(requests,
+        ['Current', 'Old', 'Correction', 'OCR source.', 'OCR source.']);
+  });
+
   test('failure restores original mode and can retry', () async {
     await expectLater(
         translation.translate(page(), TranslationModeEnum.bilingual,

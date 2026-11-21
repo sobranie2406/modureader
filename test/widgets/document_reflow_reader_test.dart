@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:modu_reader/service/installed_fonts.dart';
 import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/service/translate/index.dart';
 import 'package:modu_reader/service/tts/tts_page_source.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
@@ -22,6 +23,7 @@ import 'package:modu_reader/widgets/reading_page/document_text_style_dialog.dart
 import 'package:modu_reader/widgets/reading_page/document_reader_surface.dart';
 import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/more_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/style_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -135,6 +137,7 @@ void main() {
       void Function(Map<String, dynamic>)? renderRequest,
       VoidCallback? clearMenu,
       VoidCallback? openReaderMenu,
+      VoidCallback? openReaderContents,
       ValueChanged<Widget>? openReaderPanel,
       VoidCallback? closeReaderMenu,
       FocusOnKeyEventCallback? readerKeyEvent,
@@ -208,6 +211,7 @@ void main() {
           onPageChanged: navigate ?? (page) async => pages.add(page),
           clearMenu: clearMenu ?? () {},
           onOpenReaderMenu: openReaderMenu,
+          onOpenReaderContents: openReaderContents,
           onOpenReaderPanel: openReaderPanel,
           onCloseReaderMenu: closeReaderMenu,
           loadNotes: () async => notes,
@@ -798,6 +802,44 @@ void main() {
     expect(text(tester), contains('第1页'));
     expect(translator.requests.length, count);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'opted-in reflow reuses next page translation without running OCR',
+      (tester) async {
+    Prefs().languageTranslationPrefetchPages = 2;
+    await store.save(
+        DocumentReflowPage(
+            page: 1, ocr: true, rawText: 'Raw', editedText: 'Corrected next'),
+        '');
+    final extracted = <int>[];
+    var rendered = false;
+    await open(tester,
+        extract: (page) async {
+          extracted.add(page);
+          return page == 0 ? 'Current' : '';
+        },
+        renderRequest: (_) => rendered = true);
+    final reader = key.currentState!;
+    reader.setTranslationForeground(true);
+    final translator = PageTranslator();
+    final task = reader.translateCurrentPage(
+        TranslationModeEnum.translationOnly,
+        provider: translator);
+    await tester.pump();
+    await task;
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(translator.requests, ['Current', 'Corrected next']);
+    expect(extracted, [0, 2]);
+    expect(rendered, isFalse);
+    expect(store.latest.keys, ['1', '0']);
+
+    await reader.turnOriginalPage(1);
+    await tester.pumpAndSettle();
+    expect(reader.translationMode.value, TranslationModeEnum.translationOnly);
+    expect(reader.actionText, 'Translated Corrected next');
+    expect(translator.requests, ['Current', 'Corrected next']);
   });
 
   testWidgets('translation transport cancels on source-page navigation',
@@ -2671,6 +2713,44 @@ void main() {
     expect(field.controller!.text, contains('第0页'));
   });
 
+  for (final mode in [
+    TranslationModeEnum.translationOnly,
+    TranslationModeEnum.bilingual,
+  ]) {
+    for (final beforeRelease in [false, true]) {
+      testWidgets(
+          'translation update preserves a page tap in ${mode.code} '
+          'beforeRelease=$beforeRelease', (tester) async {
+        Prefs().pageTurnMode = 'custom';
+        Prefs().customPageTurnConfig =
+            List.filled(9, PageTurningType.next.index);
+        await open(tester, extract: (page) async => 'Page $page');
+        final response = StreamController<String>();
+        final task = key.currentState!.translateCurrentPage(mode,
+            provider: PageTranslator(stream: response.stream));
+        await tester.pump();
+        await tester.pump();
+        expect(find.byKey(const ValueKey('reflow-translated-text')),
+            findsOneWidget);
+
+        final click = await tester.startGesture(textPoint(tester, 1),
+            kind: PointerDeviceKind.mouse);
+        if (!beforeRelease) await click.up();
+        response.add('Translated page zero');
+        unawaited(response.close());
+        await tester.pump(const Duration(milliseconds: 100));
+        await task;
+        if (beforeRelease) await click.up();
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+
+        expect(pages, [0, 1]);
+        expect(text(tester), 'Page 1');
+        expect(tester.takeException(), isNull);
+      }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
+    }
+  }
+
   testWidgets('single text tap respects a custom menu zone once',
       (tester) async {
     Prefs().pageTurnMode = 'custom';
@@ -2681,6 +2761,38 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     expect(opened, 1);
+  },
+      variant: TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.macOS}));
+
+  test('default tap regions still turn pages and show the reader menu', () {
+    const expectedRow = [
+      PageTurningType.prev,
+      PageTurningType.menu,
+      PageTurningType.next,
+    ];
+    expect(List.generate(9, readerTapAction),
+        [...expectedRow, ...expectedRow, ...expectedRow]);
+    Prefs().pageTurnMode = 'custom';
+    expect(List.generate(9, readerTapAction),
+        [...expectedRow, ...expectedRow, ...expectedRow]);
+  });
+
+  testWidgets('a custom contents tap opens the TOC without turning the page',
+      (tester) async {
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig =
+        List.filled(9, PageTurningType.contents.index);
+    Prefs().keyboardShortcutTurnPage = true;
+    var opened = 0, menus = 0;
+    await open(tester,
+        openReaderContents: () => opened++, openReaderMenu: () => menus++);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(opened, 1);
+    expect(menus, 0);
+    expect(store.latest.keys, ['0']);
   },
       variant: TargetPlatformVariant(
           {TargetPlatform.android, TargetPlatform.macOS}));

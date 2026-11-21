@@ -16,7 +16,7 @@ class ReaderTranslationSession {
 
   int generation = 0;
   bool enabled = false;
-  final _cancelRequests = <void Function()>{};
+  final _cancelRequests = <void Function(), bool>{};
 
   int start() {
     stop();
@@ -27,13 +27,20 @@ class ReaderTranslationSession {
   void stop() {
     enabled = false;
     generation++;
-    for (final cancel in _cancelRequests.toList()) {
+    for (final cancel in _cancelRequests.keys.toList()) {
       cancel();
     }
   }
 
+  void cancelPrefetch() {
+    for (final request in _cancelRequests.entries.toList()) {
+      if (request.value) request.key();
+    }
+  }
+
   Future<String> translate(int requestGeneration,
-      Stream<String> Function(CancelableLangchainRunner) source) async {
+      Stream<String> Function(CancelableLangchainRunner) source,
+      {bool prefetch = false}) async {
     if (!enabled || requestGeneration != generation) {
       throw TranslationCancelled();
     }
@@ -47,7 +54,7 @@ class ReaderTranslationSession {
       unawaited(subscription?.cancel());
     }
 
-    _cancelRequests.add(cancel);
+    _cancelRequests[cancel] = prefetch;
     try {
       subscription = source(runner).listen((value) {
         last = value;

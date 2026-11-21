@@ -303,11 +303,12 @@ test('real View.close is safe before the asynchronous renderer import completes'
     #sectionProgress; #tocProgress; #pageProgress; #searchResults; #translator;
     #lastCfi; #lastChapterLocation;
     #rendererSwitchGeneration = 0; #imageBook;
+    #translationPrefetchTimer; #translationPrefetchPages = 0; #translationPrefetchController;
     history = {clear() {}};
     initTTS() { if (!this.renderer) throw Error('renderer is not ready'); }
     clearSearch() {}
     ${closeMethod}
-  }; View`);
+  }; View`, { clearTimeout });
   assert.doesNotThrow(() => new View().close());
 });
 

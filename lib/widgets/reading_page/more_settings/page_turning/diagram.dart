@@ -1,11 +1,5 @@
 import 'package:flutter/material.dart';
-
-enum PageTurningType {
-  none,
-  next,
-  prev,
-  menu,
-}
+import 'package:modu_reader/enums/page_turning_type.dart';
 
 Widget getPageTurningDiagram(
   BuildContext context,

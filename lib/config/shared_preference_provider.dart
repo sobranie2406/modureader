@@ -1301,11 +1301,98 @@ class Prefs extends ChangeNotifier {
     notifyListeners();
   }
 
+  int get languageTranslationPrefetchPages => _translationPrefetchPages(false);
+  set languageTranslationPrefetchPages(int value) =>
+      _setTranslationPrefetchPages(false, value);
+
   String get classicalTranslationTextStyle =>
       prefs.getString('classicalTranslationTextStyle') ?? '{}';
   set classicalTranslationTextStyle(String value) {
     prefs.setString('classicalTranslationTextStyle', value);
     notifyListeners();
+  }
+
+  int get classicalTranslationPrefetchPages => _translationPrefetchPages(true);
+  set classicalTranslationPrefetchPages(int value) =>
+      _setTranslationPrefetchPages(true, value);
+
+  static String _translationPrefetchPrefix(bool classical) => classical
+      ? 'classicalTranslationPrefetch'
+      : 'languageTranslationPrefetch';
+
+  int _translationPrefetchPages(bool classical) =>
+      (prefs.getInt('${_translationPrefetchPrefix(classical)}Pages') ?? 0)
+          .clamp(0, 5);
+
+  int translationPrefetchPageCount({required bool classical}) {
+    final enabledPages = _translationPrefetchPages(classical);
+    if (enabledPages > 0) return enabledPages;
+    final remembered =
+        prefs.get('${_translationPrefetchPrefix(classical)}RememberedPages');
+    return remembered is int && remembered >= 1 && remembered <= 5
+        ? remembered
+        : 3;
+  }
+
+  Map<String, int> _translationPrefetchChanges(bool classical, int pages) {
+    final prefix = _translationPrefetchPrefix(classical);
+    final previous = _translationPrefetchPages(classical);
+    return {
+      if (pages == 0 && previous > 0) '${prefix}RememberedPages': previous,
+      '${prefix}Pages': pages,
+    };
+  }
+
+  void _setTranslationPrefetchPages(bool classical, int value) {
+    _translationPrefetchChanges(classical, value.clamp(0, 5))
+        .forEach(prefs.setInt);
+    notifyListeners();
+  }
+
+  Future<void>? _translationPrefetchWrites;
+
+  Future<void> saveTranslationPrefetch(
+      {required bool classical, required int pages}) async {
+    if (pages < 0 || pages > 5) throw ArgumentError.value(pages, 'pages');
+    Future<void> save() async {
+      final changes = _translationPrefetchChanges(classical, pages);
+      final previous = {for (final key in changes.keys) key: prefs.getInt(key)};
+      try {
+        for (final entry in changes.entries) {
+          if (!await prefs.setInt(entry.key, entry.value)) {
+            throw StateError('Could not save translation prefetch');
+          }
+        }
+      } catch (_) {
+        for (final entry in previous.entries) {
+          final value = entry.value;
+          try {
+            if (value == null) {
+              await prefs.remove(entry.key);
+            } else {
+              await prefs.setInt(entry.key, value);
+            }
+          } catch (_) {
+            // Restore each cached value even if storage is unavailable.
+          }
+        }
+        rethrow;
+      }
+      notifyListeners();
+    }
+
+    final pending = _translationPrefetchWrites;
+    final operation = pending == null ? save() : pending.then((_) => save());
+    final tail =
+        operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _translationPrefetchWrites = tail;
+    try {
+      await operation;
+    } finally {
+      if (identical(_translationPrefetchWrites, tail)) {
+        _translationPrefetchWrites = null;
+      }
+    }
   }
 
   ClassicalTranslationDirection get classicalTranslationDirection =>

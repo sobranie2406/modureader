@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/models/text_color.dart';
 import 'package:modu_reader/models/translation_text_style.dart';
 import 'package:modu_reader/models/tts_buffer_settings.dart';
@@ -89,6 +90,17 @@ void validateSettingsValue(String key, dynamic value,
   if (key == 'ocrPrecachePages' && (value is! int || value < 1 || value > 5)) {
     throw const FormatException('Invalid OCR prefetch window');
   }
+  if ((key == 'languageTranslationPrefetchPages' ||
+          key == 'classicalTranslationPrefetchPages') &&
+      (value is! int || value < 0 || value > 5)) {
+    throw const FormatException('Invalid translation prefetch window');
+  }
+  if ((key == 'languageTranslationPrefetchRememberedPages' ||
+          key == 'classicalTranslationPrefetchRememberedPages') &&
+      (value is! int || value < 1 || value > 5)) {
+    throw const FormatException(
+        'Invalid remembered translation prefetch window');
+  }
   if (key == 'dailyCheckInMinutes' &&
       (value is! int || value < 0 || value > 120)) {
     throw const FormatException('Invalid daily check-in goal');
@@ -103,7 +115,9 @@ void validateSettingsValue(String key, dynamic value,
   }
   if (key == 'customPageTurnConfig') {
     final cells = (value as String).split(',').map(int.tryParse).toList();
-    if (cells.length != 9 || cells.any((n) => n == null || n < 0 || n > 3)) {
+    if (cells.length != 9 ||
+        cells.any(
+            (n) => n == null || n < 0 || n >= PageTurningType.values.length)) {
       throw const FormatException('Invalid page turn grid');
     }
   }

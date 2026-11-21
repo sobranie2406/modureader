@@ -112,6 +112,10 @@ export class FixedLayout extends HTMLElement {
         doc.head.append(sheet)
     }
     get pdfReading() { return this.#pdfEnabled }
+    get pdfWheelPans() {
+        return this.#pdfEnabled && (this.#pdfView.fit === 'width' ||
+            this.#pdfView.zoom > 1 || this.#pdfView.mode === 'scroll')
+    }
     get isNavigating() { return this.#pdfBusy }
     get pdfView() { return { ...this.#pdfView } }
     setPdfView(value) {

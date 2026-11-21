@@ -6,6 +6,7 @@ import { prepareReaderFontWeight } from './reader-font-weight.js'
 import { SectionWindowCache } from './section-window-cache.js'
 import { ReadingActionGate } from './reading-action-gate.js'
 import { bookFrameSandbox } from './frame-script-policy.js'
+import { sanitizeBookDocument } from './script_policy.js'
 import { ContinuousSectionWindow } from './continuous-section-window.js'
 import { autoScrollPixelsPerSecond } from './reader-auto-scroll.js'
 import { VerticalColumnRules } from './vertical-column-rules.js'
@@ -137,6 +138,38 @@ const getDirection = doc => {
   return { vertical, rtl, writingMode }
 }
 
+async function translationSnapshot(src, signal) {
+  if (!src?.startsWith('blob:')) throw new Error('Local chapter resource required')
+  const response = await fetch(src, { signal })
+  const type = response.headers.get('content-type')?.split(';')[0]
+  if (!response.ok || !['text/html', 'application/xhtml+xml'].includes(type))
+    throw new Error('Unsupported chapter resource')
+  const doc = new DOMParser().parseFromString(await response.text(), type)
+  if (!doc.head || !doc.body) throw new Error('Chapter document unavailable')
+  sanitizeBookDocument(doc)
+  const csp = doc.head.querySelector('meta[http-equiv="Content-Security-Policy"]')
+  csp.setAttribute('content', "default-src 'none'; img-src 'self' blob: data:; " +
+    "style-src 'self' blob: 'unsafe-inline'; font-src 'self' blob: data:; base-uri 'none'; form-action 'none'")
+  for (const link of doc.head.querySelectorAll('link[rel]'))
+    if (!link.relList.contains('stylesheet')) link.remove()
+  // Keep XML stylesheets under the same policy as HTML stylesheet links.
+  let preceding = csp
+  for (const instruction of doc.childNodes) {
+    if (instruction.nodeType !== 7 || instruction.target !== 'xml-stylesheet') continue
+    const href = instruction.data.match(/\bhref\s*=\s*(['"])(.*?)\1/i)?.[2]
+    if (!href) continue
+    const link = doc.createElementNS(doc.documentElement.namespaceURI, 'link')
+    link.setAttribute('rel', 'stylesheet')
+    link.setAttribute('href', href)
+    preceding.after(link)
+    preceding = link
+  }
+  const html = type === 'text/html'
+    ? `${doc.compatMode === 'CSS1Compat' ? '<!doctype html>' : ''}${doc.documentElement.outerHTML}`
+    : new XMLSerializer().serializeToString(doc.documentElement)
+  return URL.createObjectURL(new Blob([html], { type }))
+}
+
 // const getBackground = doc => {
 //   const bodyStyle = doc.defaultView.getComputedStyle(doc.body)
 //   return bodyStyle.backgroundColor === 'rgba(0, 0, 0, 0)'
@@ -206,7 +239,8 @@ class View {
   #column = true
   #size
   #layout = {}
-  constructor({ container, onExpand, allowAutoplay = true }) {
+  #layoutRevision = 0
+  constructor({ container, onExpand, allowAutoplay = true, allowBookScripts = true }) {
     this.container = container
     this.onExpand = onExpand
     this.#iframe.setAttribute('part', 'filter')
@@ -230,7 +264,7 @@ class View {
       display: 'none',
       width: '100%', height: '100%',
     })
-    this.#iframe.setAttribute('sandbox', bookFrameSandbox())
+    this.#iframe.setAttribute('sandbox', allowBookScripts ? bookFrameSandbox() : 'allow-same-origin')
     if (!allowAutoplay) this.#iframe.setAttribute('allow', "autoplay 'none'")
     this.#iframe.setAttribute('scrolling', 'no')
   }
@@ -240,6 +274,7 @@ class View {
   get document() {
     return this.#iframe.contentDocument
   }
+  get layoutRevision() { return this.#layoutRevision }
   cancelLoad() { this.#cancelLoad?.() }
   async load(src, afterLoad, beforeRender) {
     if (typeof src !== 'string') throw new Error(`${src} is not string`)
@@ -354,6 +389,7 @@ class View {
   }
   render(layout, timing) {
     if (!layout) return
+    this.#layoutRevision++
     const resetting = Date.now()
     for (const animation of this.#element.getAnimations?.() ?? []) animation.cancel()
     resetPageAlignment(this.document)
@@ -907,7 +943,6 @@ export class Paginator extends HTMLElement {
     this.#applyBackground()
 
     const { width, height } = this.#container.getBoundingClientRect()
-    const size = vertical ? height : width
     // Container queries are unavailable in older WebViews; ResizeObserver
     // already reruns this layout when the reader's own dimensions change.
     if (!globalThis.CSS?.supports?.('container-type', 'size')) {
@@ -916,36 +951,9 @@ export class Paginator extends HTMLElement {
           ? 'var(--_max-column-count-portrait)' : 'var(--_max-column-count)')
     }
 
-    const style = getComputedStyle(this.#top)
-    const maxInlineSize = parseFloat(style.getPropertyValue('--_column-threshold')) || parseFloat(style.getPropertyValue('--_max-inline-size'))
-    const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count'))
-    const margin = parseFloat(style.getPropertyValue('--_top-margin'))
+    const layout = this.#measureLayout(vertical, width, height)
+    const { flow, margin, gap, maxInlineSize, divisor } = layout
     this.#margin = margin
-
-    const g = parseFloat(style.getPropertyValue('--_gap')) / 100
-    // The gap will be a percentage of the #container, not the whole view.
-    // This means the outer padding will be bigger than the column gap. Let
-    // `a` be the gap percentage. The actual percentage for the column gap
-    // will be (1 - a) * a. Let us call this `b`.
-    //
-    // To make them the same, we start by shrinking the outer padding
-    // setting to `b`, but keep the column gap setting the same at `a`. Then
-    // the actual size for the column gap will be (1 - b) * a. Repeating the
-    // process again and again, we get the sequence
-    //     x₁ = (1 - b) * a
-    //     x₂ = (1 - x₁) * a
-    //     ...
-    // which converges to x = (1 - x) * a. Solving for x, x = a / (1 + a).
-    // So to make the spacing even, we must shrink the outer padding with
-    //     f(x) = x / (1 + x).
-    // But we want to keep the outer padding, and make the inner gap bigger.
-    // So we apply the inverse, f⁻¹ = -x / (x - 1) to the column gap.
-    const gap = -g / (g - 1) * size
-
-    const topMargin = parseFloat(style.getPropertyValue('--_top-margin'))
-    const bottomMargin = parseFloat(style.getPropertyValue('--_bottom-margin'))
-
-    const flow = this.getAttribute('flow')
     if (flow === 'scrolled') {
       // Notes scroll along their block axis only: extra vertical-text columns
       // extend left/right; horizontal text extends down. Leave book flow alone.
@@ -973,29 +981,14 @@ export class Paginator extends HTMLElement {
       // FIXME: vertical-rl only, not -lr
       this.setAttribute('dir', vertical ? 'rtl' : 'ltr')
       this.#top.style.padding = '0'
-      // The column threshold controls pagination, not the width of a scrolling
-      // page. Capping this at 720px makes small side-margin changes disappear
-      // into auto margins on landscape tablets. Use the available inline space
-      // after the padding applied by View.scrolled(). Notes and vertical books
-      // retain their separate sizing policies.
-      const columnWidth = !vertical && !this.hasAttribute('footnote')
-        ? Math.max(1, size - 2 * gap)
-        : maxInlineSize
-
       this.heads = null
       this.feet = null
       // this.#header.replaceChildren()
       // this.#footer.replaceChildren()
 
-      return { flow, margin, gap, columnWidth, topMargin, bottomMargin, width, height,
-        mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
+      return layout
     }
 
-    const divisor = maxColumnCount == 0
-      ? Math.min(2, Math.ceil(size / maxInlineSize))
-      : maxColumnCount
-
-    const columnWidth = (size / divisor) - gap
     this.setAttribute('dir', rtl ? 'rtl' : 'ltr')
 
     const marginalDivisor = vertical
@@ -1015,8 +1008,47 @@ export class Paginator extends HTMLElement {
     // this.#header.replaceChildren(...heads)
     // this.#footer.replaceChildren(...feet)
 
-    return { height, width, margin, gap, columnWidth, topMargin, bottomMargin,
-      mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
+    return layout
+  }
+  #measureLayout(vertical, width, height) {
+    const size = vertical ? height : width
+    const style = getComputedStyle(this.#top)
+    const maxInlineSize = parseFloat(style.getPropertyValue('--_column-threshold')) || parseFloat(style.getPropertyValue('--_max-inline-size'))
+    const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count'))
+    const margin = parseFloat(style.getPropertyValue('--_top-margin'))
+
+    const g = parseFloat(style.getPropertyValue('--_gap')) / 100
+    // The gap will be a percentage of the #container, not the whole view.
+    // This means the outer padding will be bigger than the column gap. Let
+    // `a` be the gap percentage. The actual percentage for the column gap
+    // will be (1 - a) * a. Let us call this `b`.
+    //
+    // To make them the same, we start by shrinking the outer padding
+    // setting to `b`, but keep the column gap setting the same at `a`. Then
+    // the actual size for the column gap will be (1 - b) * a. Repeating the
+    // process again and again, we get the sequence
+    //     x₁ = (1 - b) * a
+    //     x₂ = (1 - x₁) * a
+    //     ...
+    // which converges to x = (1 - x) * a. Solving for x, x = a / (1 + a).
+    // So to make the spacing even, we must shrink the outer padding with
+    //     f(x) = x / (1 + x).
+    // But we want to keep the outer padding, and make the inner gap bigger.
+    // So we apply the inverse, f⁻¹ = -x / (x - 1) to the column gap.
+    const gap = -g / (g - 1) * size
+
+    const bottomMargin = parseFloat(style.getPropertyValue('--_bottom-margin'))
+
+    const flow = this.getAttribute('flow')
+    const divisor = maxColumnCount == 0
+      ? Math.min(2, Math.ceil(size / maxInlineSize))
+      : maxColumnCount
+    // The column threshold controls pagination, not scrolling text width.
+    const columnWidth = flow === 'scrolled'
+      ? (vertical || this.hasAttribute('footnote') ? maxInlineSize : Math.max(1, size - 2 * gap))
+      : (size / divisor) - gap
+    return { flow, height, width, margin, gap, columnWidth, maxInlineSize, divisor,
+      topMargin: margin, bottomMargin, mobileImageFit: this.getAttribute('mobile-image-fit') === 'true' }
   }
   render() {
     if (this.#continuous) {
@@ -1566,6 +1598,10 @@ export class Paginator extends HTMLElement {
 
       // Horizontal pages are already laid out. Move their layer on the compositor
       // and commit scrollLeft once, rather than repainting scroll offsets per frame.
+      const view = this.#view
+      const layoutRevision = view?.layoutRevision
+      const pageDelta = reason === 'page' && !this.scrolled
+        ? Math.round(Math.abs(offset) / size) - this.page : 0
       let animation
       const transition = !this.scrolled && !this.#vertical && scrollProp === 'scrollLeft' &&
           this.#view?.element?.animate && typeof Animation !== 'undefined' &&
@@ -1586,9 +1622,18 @@ export class Paginator extends HTMLElement {
         element[scrollProp] = offset
         animation?.cancel()
         finish()
-      }).catch(() => {
+      }).catch(error => {
         animation?.cancel()
         this.#ignoreNativeScroll = false
+        if (error?.name === 'AbortError' && animation && pageDelta &&
+            !this.#destroyed && !this.#preparingView && view === this.#view &&
+            view.layoutRevision !== layoutRevision && !this.scrolled &&
+            this.scrollProp === scrollProp) {
+          // Relayout restored the reading anchor. Turn from its new page.
+          const page = this.page + pageDelta
+          if (page <= 0 || page >= this.pages - 1) return true
+          return this.#scrollToPage(page, reason, { animate: false })
+        }
       })
     } else {
       element[scrollProp] = offset
@@ -1660,6 +1705,141 @@ export class Paginator extends HTMLElement {
     const size = this.#rtl ? -this.size : this.size
     return getVisibleRange(this.#view.document,
       this.start - size, this.end - size, this.#getRectMapper())
+  }
+  async forEachTranslationPrefetchRange(pages, addRange, signal, prepareDocument) {
+    if (!Number.isInteger(pages) || pages < 1 || !this.#view) return
+    const original = this.#view, continuous = this.#continuous, scrolled = this.scrolled
+    const originalIndex = this.#index
+    const active = () => !signal?.aborted && !this.#destroyed && !this.#preparingView &&
+      this.#view === original && this.#index === originalIndex && this.#continuous === continuous &&
+      this.scrolled === scrolled
+    const { width, height } = this.#container.getBoundingClientRect()
+    if (!active() || width <= 0 || height <= 0) return
+
+    let remaining = Math.min(pages, 5)
+    let index = originalIndex
+    const viewportEnd = this.end
+    const consume = (range, used) => {
+      if (range) addRange(range, index)
+      remaining -= used
+    }
+    if (!scrolled) {
+      const available = Math.max(0, this.pages - 2 - this.page)
+      consume(this.getTranslationPrefetchRange(remaining), Math.min(available, remaining))
+      index++
+    }
+    for (; active() && remaining > .00001 && index < this.sections.length; index++) {
+      const section = this.sections[index]
+      if (!section?.load || section.linear === 'no') continue
+      const entry = continuous?.entries.get(index)
+      const laidOut = entry?.ready && !entry.detached
+      const view = laidOut && entry.activated ? entry.view : !continuous && index === originalIndex ? original : null
+      const offset = laidOut ? viewportEnd - continuous.top(entry)
+        : view ? viewportEnd - this.#margin : 0
+      if (view) {
+        const direction = getDirection(view.document)
+        const result = this.#measureTranslationRange(view, direction,
+          this.#measureLayout(direction.vertical, width, height), remaining, offset)
+        consume(result.range, result.used)
+        continue
+      }
+      const used = await this.#scanTranslationChapter(section, { width, height, remaining,
+        offset, active, signal, prepareDocument, addRange: range => consume(range, 0) })
+      // Without the missing chapter's geometry, later chapters cannot be
+      // proven to fall within the requested look-ahead.
+      if (used == null) break
+      remaining -= used
+    }
+  }
+  #measureTranslationRange(view, { vertical, rtl }, layout, remaining, offset = 0) {
+    const doc = view.document
+    if (layout.flow === 'scrolled') {
+      const size = vertical ? layout.width : layout.height
+      const extent = view.element.getBoundingClientRect()[vertical ? 'width' : 'height']
+      const start = Math.max(0, offset), end = Math.min(start + size * remaining, extent)
+      if (end <= start) return { used: 0 }
+      const margin = layout.margin
+      const mapRect = vertical
+        ? ({ left, right }) => ({ left: extent - right - margin, right: extent - left - margin })
+        : ({ top, bottom }) => ({ left: top + margin, right: bottom + margin })
+      return { range: getVisibleRange(doc, start, end - .001, mapRect), used: (end - start) / size }
+    }
+    const size = vertical ? layout.height : layout.width
+    const extent = view.element.getBoundingClientRect()[vertical ? 'height' : 'width']
+    const used = Math.min(remaining, Math.max(0, Math.round(extent / size) - 2))
+    if (!used) return { used }
+    const leading = rtl ? -size : size
+    const mapRect = rtl ? ({ left, right }) => ({ left: extent - right, right: extent - left })
+      : vertical ? ({ top, bottom }) => ({ left: top, right: bottom }) : rect => rect
+    return { range: getVisibleRange(doc, size - leading, (used + 1) * size - leading - .001, mapRect), used }
+  }
+  async #scanTranslationChapter(section, { width, height, remaining, offset, active, signal, prepareDocument, addRange }) {
+    if (!section.loadImageDocument) return null
+    let lease, snapshot, view, host, cancel
+    try {
+      // Use the independent resource lease so a foreground chapter eviction
+      // cannot revoke this document's URLs or be delayed by its font loading.
+      lease = await section.loadImageDocument()
+      if (!active()) return null
+      snapshot = await translationSnapshot(lease.src, signal)
+      if (!active()) return null
+      host = document.createElement('div')
+      host.setAttribute('aria-hidden', 'true')
+      host.inert = true
+      Object.assign(host.style, { position: 'fixed', left: '-100000px', top: '0',
+        width: `${width}px`, height: `${height}px`, overflow: 'hidden', pointerEvents: 'none' })
+      view = new View({ allowAutoplay: false, allowBookScripts: false, onExpand: () => {} })
+      view.element.style.contentVisibility = 'visible'
+      host.append(view.element)
+      document.body.append(host)
+      cancel = () => view.cancelLoad()
+      signal?.addEventListener('abort', cancel, { once: true })
+      let layout, direction
+      await view.load(snapshot, doc => {
+        this.#styleDocument(doc)
+        prepareDocument?.(doc)
+      }, value => {
+        direction = value
+        host.dir = (this.scrolled ? direction.vertical : direction.rtl) ? 'rtl' : 'ltr'
+        layout = this.#measureLayout(direction.vertical, width, height)
+        return layout
+      })
+      if (!active()) return null
+      const { range, used } = this.#measureTranslationRange(view, direction, layout, remaining, offset)
+      if (range) addRange(range)
+      return used
+    } catch (error) {
+      if (active()) console.warn('Could not measure chapter for translation prefetch:', error?.name)
+      return null
+    } finally {
+      if (cancel) signal?.removeEventListener('abort', cancel)
+      view?.destroy()
+      host?.remove()
+      if (snapshot) URL.revokeObjectURL(snapshot)
+      lease?.release()
+    }
+  }
+  getTranslationPrefetchRange(pages) {
+    if (!Number.isInteger(pages) || pages < 1 || this.#preparingView || this.#destroyed) return null
+    const size = this.size
+    if (!(size > 0)) return null
+    const entry = this.#continuous?.current
+    const view = entry?.view ?? this.#view
+    if (!view?.document?.body) return null
+    const limit = Math.min(pages, 5)
+    if (this.scrolled) {
+      const origin = entry ? this.#continuous.top(entry) : 0
+      const start = Math.max(0, this.end - origin - this.#margin)
+      const end = Math.min(start + size * limit, view.element.getBoundingClientRect()[this.sideProp])
+      if (end <= start) return null
+      const mapRect = entry ? ({ top, bottom }) => ({ left: top, right: bottom }) : this.#getRectMapper()
+      return getVisibleRange(view.document, start, end - .001, mapRect)
+    }
+    const first = this.page + 1, last = Math.min(first + limit - 1, this.pages - 2)
+    if (last < first) return null
+    const leading = this.#rtl ? -size : size
+    return getVisibleRange(view.document, first * size - leading,
+      (last + 1) * size - leading - .001, this.#getRectMapper())
   }
   #afterScroll(reason, flush = false) {
     if (reason !== 'scroll' || flush) {
@@ -2042,7 +2222,7 @@ export class Paginator extends HTMLElement {
     if (this.atStart) return
     const page = this.page - 1
     if (page <= 0) return true
-    return this.#scrollToPage(page, 'page', { animate: true }).then(() => page <= 0)
+    return this.#scrollToPage(page, 'page', { animate: true })
   }
   #scheduleLineSettle() {
     clearTimeout(this.#lineSettleTimer)
@@ -2084,7 +2264,7 @@ export class Paginator extends HTMLElement {
     const page = this.page + 1
     const pages = this.pages
     if (page >= pages - 1) return true
-    return this.#scrollToPage(page, 'page', { animate: true }).then(() => page >= pages - 1)
+    return this.#scrollToPage(page, 'page', { animate: true })
   }
   get scrollPageStep() {
     const percent = Number(this.getAttribute('scroll-page-percent') ?? 80)

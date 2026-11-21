@@ -4,6 +4,7 @@ import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:modu_reader/service/ocr/document_ocr_precache.dart';
 import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
+import 'page_prefetch_controls.dart';
 
 class OcrPrecacheSettings extends StatefulWidget {
   const OcrPrecacheSettings({super.key, this.cache});
@@ -34,37 +35,23 @@ class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
       listenable: Prefs(),
       builder: (context, _) =>
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            SwitchListTile(
-                contentPadding: EdgeInsets.zero,
+            PagePrefetchControls(
                 title: SettingHelpTitle(
                     title: ModuStrings.text(
                         context, '后台预缓存 OCR', 'Background OCR cache'),
                     description: ModuStrings.text(context, "提前识别当前页及后续页面，加快重排。",
                         "Recognize the current and following pages in advance for faster reflow.")),
-                value: Prefs().ocrPrecacheEnabled,
-                onChanged: _saving ? null : (value) => _save(enabled: value)),
-            if (Prefs().ocrPrecacheEnabled)
-              Row(children: [
-                Expanded(
-                    child:
-                        Text(ModuStrings.text(context, '缓存页数', 'Cache pages'))),
-                IconButton(
-                    tooltip: ModuStrings.text(context, '减少缓存页数', 'Fewer pages'),
-                    onPressed: _saving || Prefs().ocrPrecachePages <= 1
-                        ? null
-                        : () => _save(pages: Prefs().ocrPrecachePages - 1),
-                    icon: const Icon(Icons.remove)),
-                Semantics(
-                    liveRegion: true,
-                    label: ModuStrings.text(context, '缓存页数', 'Cache pages'),
-                    child: Text('${Prefs().ocrPrecachePages}')),
-                IconButton(
-                    tooltip: ModuStrings.text(context, '增加缓存页数', 'More pages'),
-                    onPressed: _saving || Prefs().ocrPrecachePages >= 5
-                        ? null
-                        : () => _save(pages: Prefs().ocrPrecachePages + 1),
-                    icon: const Icon(Icons.add)),
-              ]),
+                enabled: Prefs().ocrPrecacheEnabled,
+                pages: Prefs().ocrPrecachePages,
+                pagesLabel: ModuStrings.text(context, '缓存页数', 'Cache pages'),
+                fewerPagesTooltip:
+                    ModuStrings.text(context, '减少缓存页数', 'Fewer pages'),
+                morePagesTooltip:
+                    ModuStrings.text(context, '增加缓存页数', 'More pages'),
+                onEnabledChanged:
+                    _saving ? null : (value) => _save(enabled: value),
+                onPagesChanged:
+                    _saving ? null : (value) => _save(pages: value)),
             if (Prefs().ocrPrecacheEnabled && widget.cache != null)
               ListenableBuilder(
                   listenable: widget.cache!,
