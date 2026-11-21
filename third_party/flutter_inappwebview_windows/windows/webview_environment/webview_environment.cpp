@@ -144,9 +144,15 @@ namespace flutter_inappwebview_plugin
                         return S_OK;
                       }).Get());
 
-                    if (succeededOrLog(hr)) {
+                    if (SUCCEEDED(hr)) {
                       return S_OK;
                     }
+                    // ERROR_NOT_READY (0x80070015) here is expected, not a
+                    // fault: the browser process is already shutting down, so
+                    // the extended process list cannot be produced. Logging it
+                    // as an error made every book close look like a WebView
+                    // failure, which sent diagnostics after the wrong problem.
+                    // Fall through to the cheaper query and stay quiet.
                   }
                   wil::com_ptr<ICoreWebView2ProcessInfoCollection> processCollection;
                   if (channelDelegate && succeededOrLog(environment8->GetProcessInfos(&processCollection))) {

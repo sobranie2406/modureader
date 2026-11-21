@@ -23,7 +23,8 @@
     "storage:plugin",
     "dictionary:lookup",
     "translate:invoke",
-    "clipboard:write"
+    "clipboard:write",
+    "ui:dialog"
   ],
   "contributes": [
     {

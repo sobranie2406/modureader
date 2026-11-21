@@ -96,6 +96,12 @@
           progress:args=>request('ui.progress',args)
         }),
         open:Object.freeze({url:args=>request('open.url',args)}),
+        storage:Object.freeze({
+          list:()=>request('storage.list'),
+          read:args=>request('storage.read',args),
+          write:args=>request('storage.write',args),
+          remove:args=>request('storage.remove',args)
+        }),
         permissions:Object.freeze({
           request:args=>request('permissions.request',args),
           status:()=>request('permissions.status')

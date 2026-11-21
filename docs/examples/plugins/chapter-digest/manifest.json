@@ -24,7 +24,9 @@
     "knowledge:query",
     "ai:invoke",
     "note:write",
-    "clipboard:write"
+    "clipboard:write",
+    "ui:dialog",
+    "ui:progress"
   ],
   "contributes": [
     {

@@ -73,6 +73,60 @@ const Set<String> kPluginInteractiveMethods = {
   'permissions.request',
 };
 
+/// The capability every bridge method requires.
+///
+/// Kept as one table rather than a switch so a test can prove that the methods
+/// the JavaScript runtime exposes, the methods the Dart host implements and the
+/// capabilities a package declares all agree. They drifted once: `storage.*`
+/// was implemented and documented but never exposed on `modu`, so every plugin
+/// that saved anything failed with "the plugin could not run".
+const Map<String, String> kPluginMethodCapabilities = {
+  'http.get': 'net:http',
+  'library.list': kLibraryReadCapability,
+  'library.tags': kLibraryReadCapability,
+  'library.groups': kLibraryReadCapability,
+  'library.tag': kLibraryWriteCapability,
+  'library.move': kLibraryWriteCapability,
+  'books.content': kBookContentCapability,
+  'books.chapter': kBookContentCapability,
+  'notes.list': kNoteReadCapability,
+  'notes.save': kNoteWriteCapability,
+  'reading.stats': kReadingReadCapability,
+  'reading.history': kReadingReadCapability,
+  'search.library': kSearchLibraryCapability,
+  'knowledge.search': kKnowledgeQueryCapability,
+  'ai.complete': kAiInvokeCapability,
+  'translate.text': kTranslateInvokeCapability,
+  'tts.speak': kTtsInvokeCapability,
+  'dictionary.lookup': kDictionaryLookupCapability,
+  'clipboard.read': kClipboardReadCapability,
+  'clipboard.write': kClipboardWriteCapability,
+  'share.text': kShareTextCapability,
+  'ui.confirm': kUiDialogCapability,
+  'ui.prompt': kUiDialogCapability,
+  'ui.select': kUiDialogCapability,
+  'ui.progress': kUiProgressCapability,
+  'open.url': kUrlOpenCapability,
+  // Implicit by design: every plugin owns a private directory, so
+  // `storage:plugin` is declared in a manifest but never stored as a grant.
+  'storage.list': 'storage:plugin',
+  'storage.read': 'storage:plugin',
+  'storage.write': 'storage:plugin',
+  'storage.remove': 'storage:plugin',
+  // Asking for consent is itself ungated on purpose: a plugin cannot grant
+  // anything by asking, only surface a sheet the user always decides. If it
+  // were gated, a plugin that lost a grant could never request it back.
+  'permissions.request': kScriptRunCapability,
+  'permissions.status': kScriptRunCapability,
+  'privateLibrary.open': kLibraryPrivateCapability,
+  'privateLibrary.lock': kLibraryPrivateCapability,
+  'privateLibrary.state': kLibraryPrivateControlCapability,
+  'privateLibrary.updateOptions': kLibraryPrivateControlCapability,
+  'privateLibrary.selectBooks': kLibraryPrivateControlCapability,
+  'privateLibrary.setPrivate': kLibraryPrivateControlCapability,
+  'articles.capture': kArticleCaptureCapability,
+};
+
 class PluginScriptFailure implements Exception {
   const PluginScriptFailure(this.code);
   final String code;
@@ -410,51 +464,8 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     if (++job.calls > 16 || job.callBusy) {
       throw const PluginScriptFailure('quota');
     }
-    final permission = switch (method) {
-      'http.get' => 'net:http',
-      'library.list' => kLibraryReadCapability,
-      'library.tags' => kLibraryReadCapability,
-      'library.groups' => kLibraryReadCapability,
-      'library.tag' || 'library.move' => kLibraryWriteCapability,
-      'books.content' => kBookContentCapability,
-      'books.chapter' => kBookContentCapability,
-      'notes.list' => kNoteReadCapability,
-      'notes.save' => kNoteWriteCapability,
-      'reading.stats' || 'reading.history' => kReadingReadCapability,
-      'search.library' => kSearchLibraryCapability,
-      'knowledge.search' => kKnowledgeQueryCapability,
-      'ai.complete' => kAiInvokeCapability,
-      'translate.text' => kTranslateInvokeCapability,
-      'tts.speak' => kTtsInvokeCapability,
-      'dictionary.lookup' => kDictionaryLookupCapability,
-      'clipboard.read' => kClipboardReadCapability,
-      'clipboard.write' => kClipboardWriteCapability,
-      'share.text' => kShareTextCapability,
-      'ui.confirm' || 'ui.prompt' || 'ui.select' => kUiDialogCapability,
-      'ui.progress' => kUiProgressCapability,
-      'open.url' => kUrlOpenCapability,
-      // Implicit by design: every plugin already owns a private directory, so
-      // `storage:plugin` is accepted in a manifest but never stored as a grant.
-      'storage.list' ||
-      'storage.read' ||
-      'storage.write' ||
-      'storage.remove' =>
-        'storage:plugin',
-      // Asking for consent is itself ungated on purpose: a plugin cannot grant
-      // anything by asking, only surface a sheet the user always decides. If it
-      // were gated, a plugin that lost a grant could never request it back.
-      'permissions.request' || 'permissions.status' => kScriptRunCapability,
-      'privateLibrary.open' ||
-      'privateLibrary.lock' =>
-        kLibraryPrivateCapability,
-      'privateLibrary.state' ||
-      'privateLibrary.updateOptions' ||
-      'privateLibrary.selectBooks' ||
-      'privateLibrary.setPrivate' =>
-        kLibraryPrivateControlCapability,
-      'articles.capture' => kArticleCaptureCapability,
-      _ => throw const PluginScriptFailure('permission'),
-    };
+    final permission = kPluginMethodCapabilities[method] ??
+        (throw const PluginScriptFailure('permission'));
     if (!manifest.capabilities.contains(permission) ||
         (permission == kLibraryPrivateControlCapability &&
             !manifest.capabilities.contains(kLibraryPrivateCapability))) {

@@ -22,6 +22,7 @@
     "ui:selection-action",
     "note:read",
     "library:read",
+    "search:library",
     "library:write",
     "share:text"
   ],
