@@ -236,6 +236,7 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
         }
         late final Future<void> started;
         started = () async {
+          if (_disposed || _view?.isDisposed == true) return;
           try {
             final state = await controller.evaluateJavascript(source: '''
 (() => {
@@ -287,7 +288,11 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
     if (_disposed) return;
     _disposed = true;
     _fail();
-    final controller = _controller;
+    // A view that was already released (window closing, renderer gone) has no
+    // native counterpart left: evaluating into it dereferences freed memory
+    // inside the Windows plugin and takes the whole process down with an access
+    // violation, so skip straight to releasing what we still own.
+    final controller = _view?.isDisposed == true ? null : _controller;
     if (controller != null) {
       // Ask the worker to stop, but *await* the reply before tearing the view
       // down. A fire-and-forget call here leaves its platform message pending

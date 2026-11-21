@@ -248,6 +248,14 @@ class AnxHeadlessWebView {
     overlay.insert(_overlayEntry!);
   }
 
+  /// True once this view was asked to release its native WebView.
+  ///
+  /// Owners must consult this before handing the controller any more work:
+  /// after disposal the native view is gone, and a call that arrives late is
+  /// what crashed the process inside the Windows plugin's
+  /// `UserContentController::createContentWorld`.
+  bool get isDisposed => _disposed;
+
   Future<void> dispose() {
     _disposed = true;
     return _disposing ??= _dispose();

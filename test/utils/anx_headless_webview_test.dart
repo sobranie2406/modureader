@@ -179,6 +179,30 @@ void main() {
     });
   }
 
+  test('a released view reports itself so owners stop calling into it',
+      () async {
+    // The Windows plugin dereferences the native view inside
+    // UserContentController::createContentWorld; a JavaScript evaluation that
+    // arrives after release crashed the process with an access violation, so the
+    // owner must be able to see the state before dispatching more work.
+    final previous = InAppWebViewPlatform.instance;
+    final browser = _Browser();
+    InAppWebViewPlatform.instance = browser;
+    addTearDown(() {
+      if (previous != null) InAppWebViewPlatform.instance = previous;
+    });
+    final environment =
+        WebViewEnvironment.fromPlatform(platform: _Environment());
+    final view = AnxHeadlessWebView(
+        webViewEnvironment: environment,
+        initialUrlRequest: URLRequest(url: WebUri('https://example.com/c')));
+    expect(view.isDisposed, isFalse);
+    await view.run();
+    expect(view.isDisposed, isFalse);
+    await view.dispose();
+    expect(view.isDisposed, isTrue);
+  });
+
   test('a stalled creation does not wedge every later background view',
       () async {
     // A WebView2 environment that never finishes initialising ("the device is
