@@ -24,6 +24,8 @@ import 'package:modu_reader/service/tts/system_tts.dart';
 import 'package:modu_reader/service/tts/system_tts_support.dart';
 import 'package:modu_reader/service/tts/tts_factory.dart';
 import 'package:modu_reader/service/tts/tts_service.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:modu_reader/utils/ai_reasoning_parser.dart';
 import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:langchain_core/chat_models.dart';
 import 'package:path/path.dart' as p;
@@ -530,6 +532,25 @@ class PluginHostApi {
   static String _excerpt(String value, int max) =>
       value.length > max ? value.substring(0, max) : value;
 
+  /// Turns the emissions of [aiGenerateStream] into one answer.
+  ///
+  /// That stream re-sends the **whole answer** on every event — LangchainRunner
+  /// accumulates the model's deltas before emitting — so appending the events
+  /// repeats the answer with every prefix. A plugin's "save as note" dialog once
+  /// showed "一句话结论一句话结论：“一句话结论：…" for exactly that reason.
+  ///
+  /// The last emission is therefore the answer. A reasoning model wraps it in
+  /// `<think>` before the text, which belongs to the model, not to the plugin.
+  @visibleForTesting
+  static String aiAnswerFromEmissions(Iterable<String> emissions) {
+    var envelope = '';
+    for (final emission in emissions) {
+      envelope = emission;
+    }
+    final answer = splitReasoningEnvelope(envelope).answerContent.trim();
+    return _excerpt(answer, 32000);
+  }
+
   // ---- dictionary ----------------------------------------------------------
 
   Future<Object?> _dictionaryLookup(Map<String, dynamic> args) async {
@@ -564,14 +585,14 @@ class PluginHostApi {
       HumanChatMessage(
           content: ChatMessageContent.text(prompt)),
     ];
-    final buffer = StringBuffer();
+    final emissions = <String>[];
     await for (final chunk in aiGenerateStream(messages)) {
-      buffer.write(chunk);
+      emissions.add(chunk);
       // The runtime deadline still applies; this only stops a runaway answer
       // from eating the whole budget.
-      if (buffer.length > 32000) break;
+      if (chunk.length > 32000) break;
     }
-    final text = buffer.toString().trim();
+    final text = aiAnswerFromEmissions(emissions);
     if (text.isEmpty) throw const PluginScriptFailure('result');
     return {'text': text};
   }

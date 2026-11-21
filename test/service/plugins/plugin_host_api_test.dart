@@ -179,6 +179,40 @@ void main() {
     });
   });
 
+  group('AI answers', () {
+    test('the answer is the last emission, not every prefix of it', () {
+      // aiGenerateStream re-sends the whole answer on every event, so appending
+      // the events repeats the answer with each prefix. A plugin's "save as
+      // note" dialog once showed
+      // "一句话结论一句话结论：“一句话结论：…" because of it.
+      expect(
+          PluginHostApi.aiAnswerFromEmissions(const [
+            '一句话结论',
+            '一句话结论：日语',
+            '一句话结论：日语是一门语言。',
+          ]),
+          '一句话结论：日语是一门语言。');
+    });
+
+    test('reasoning is stripped before the plugin sees the answer', () {
+      expect(PluginHostApi.aiAnswerFromEmissions(
+              const ['<think>先想一想</think>\n答案在这里']),
+          '答案在这里');
+    });
+
+    test('an oversized answer is truncated, not rejected', () {
+      final answer = PluginHostApi.aiAnswerFromEmissions(['x' * 40000]);
+      expect(answer.length, 32000);
+    });
+
+    test('an empty answer stays empty so the caller can report it', () {
+      expect(PluginHostApi.aiAnswerFromEmissions(const []), isEmpty);
+      expect(
+          PluginHostApi.aiAnswerFromEmissions(const ['<think>只有思考</think>']),
+          isEmpty);
+    });
+  });
+
   group('plugin storage', () {
     setUp(() {
       // The storage root resolves through the app data path; tests point it at
