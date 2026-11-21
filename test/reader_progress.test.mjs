@@ -86,18 +86,20 @@ test('layout changes notify fresh page counts even if the CFI is unchanged', () 
   const View = runInNewContext(`(class {
     #sectionProgress = {getProgress: () => ({section: {current: 1, total: 3}})};
     #tocProgress; #pageProgress; #index; #lastCfi; #lastChapterLocation;
+    #translator = {observeVisibleRange: range => this.translationRanges.push(range)};
     book = {sections: Array(3)};
-    events = []; renderer = {page: 2, pages: 12};
+    events = []; translationRanges = []; renderer = {page: 2, pages: 12};
     history = {replaceState() {}};
     getCFI() {return 'unchanged-cfi'}
     #emit(type, detail) {this.events.push([type, detail.chapterLocation])}
-    relocate() {this.#onRelocate({reason:'anchor', index:1, fraction:.1, size:.1})}
+    relocate(range) {this.#onRelocate({reason:'anchor', index:1, fraction:.1, size:.1, range})}
     ${method}
   })`, {getChapterLocation})
   const view = new View()
-  view.relocate()
-  view.relocate()
+  view.relocate('first range')
+  view.relocate('reflowed range')
   assert.equal(view.events.length, 1, 'identical events stay deduplicated')
+  assert.deepEqual(plain(view.translationRanges), ['first range', 'reflowed range'])
   view.renderer.pages = 22
   view.relocate()
   assert.equal(view.events.length, 2, 'a font-size change refreshes total pages')

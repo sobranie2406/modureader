@@ -144,6 +144,15 @@ export class Translator {
     return this.#translationMode
   }
 
+  observeVisibleRange(range) {
+    if (!range || this.#destroyed || this.#translationMode === TranslationMode.OFF) return
+    const doc = range.startContainer.ownerDocument
+    // Recheck after pagination moves a queued paragraph between columns.
+    for (const element of this.observedElements) {
+      if (element.ownerDocument === doc && range.intersectsNode(element)) this.#enqueue(element)
+    }
+  }
+
   observeDocument(doc) {
     this.#pruneDocuments()
     // console.log('Observing document for translation, doc:', doc)

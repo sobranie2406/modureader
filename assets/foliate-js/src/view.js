@@ -276,6 +276,7 @@ export class View extends HTMLElement {
   }
   #onRelocate({ reason, range, index, fraction, size, readingAction, pdfRegion }) {
     this.#index = index
+    if (!this.isFixedLayout && !this.renderer.scrolled) this.#translator.observeVisibleRange(range)
     const progress = this.#sectionProgress?.getProgress(index, fraction, size) ?? {}
     const tocItem = this.#tocProgress?.getProgress(index, range)
     const pageItem = this.#pageProgress?.getProgress(index, range)

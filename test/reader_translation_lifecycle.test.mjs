@@ -111,6 +111,32 @@ test('preloaded offscreen iframe and horizontal pages are not sent',async()=>{
   assert.equal(s.calls.length,1);s.translator.destroy();s.dom.window.close();
 });
 
+test('pagination requeues a displaced paragraph when only its tail becomes visible', async()=>{
+  const s=setup();
+  const [first,tail,nextPage]=s.elements;
+  const visible=()=>({top:20,bottom:60,left:10,right:150});
+  s.window.document.addEventListener('modu-translation-layout',()=>{
+    if (first.querySelector('.translated-text'))
+      tail.getBoundingClientRect=()=>({top:20,bottom:60,left:5000,right:5140});
+  });
+  await s.translator.setTranslationMode('bilingual',4);
+  s.calls[0].resolve('第一段译文');await tick();
+  assert.deepEqual(s.calls.map(call=>call.text),['first']);
+
+  tail.getBoundingClientRect=visible;
+  nextPage.getBoundingClientRect=visible;
+  const range=s.window.document.createRange();
+  range.setStart(tail.firstChild,3);
+  range.setEnd(tail.firstChild,6);
+  // The new page supplies a visible range even if IntersectionObserver missed it.
+  s.translator.observeVisibleRange(range);
+  s.translator.observeVisibleRange(range);
+  assert.deepEqual(s.calls.map(call=>call.text),['first','second']);
+  s.calls[1].resolve('完整的第二段译文');await tick();
+  assert.equal(tail.querySelector('.translated-text').textContent,'完整的第二段译文');
+  s.translator.destroy();s.dom.window.close();
+});
+
 test('failure/cancellation never inserts an error string into book content',async()=>{
   const s=setup();await s.translator.setTranslationMode('bilingual',1);
   s.calls[0].resolve(null);await tick();
