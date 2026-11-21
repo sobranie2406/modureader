@@ -310,8 +310,10 @@ Future<void> runPluginAction(BuildContext context,
       'cancelled' => t('插件任务已取消。', 'Plugin task cancelled.'),
       'busy' => t('插件正在运行，请稍后再试。', 'A plugin is running. Try again shortly.'),
       'timeout' => t('插件运行超时，已停止。', 'Plugin timed out and was stopped.'),
-      'permission' =>
-        t('插件没有此操作的权限。', 'This plugin cannot perform that action.'),
+      // The package never declared the capability this action needs, which
+      // means a stale or mismatched install rather than a missing switch.
+      'permission' => t('这个插件版本没有声明该能力，请更新插件包后重试。',
+          'This plugin version does not declare the capability it needs. Update the package and try again.'),
       // The package declares the capability; the user has not switched it on.
       // Offer the consent sheet right here rather than sending the reader to a
       // settings page — the plugin already failed, so the ask must be one tap.
