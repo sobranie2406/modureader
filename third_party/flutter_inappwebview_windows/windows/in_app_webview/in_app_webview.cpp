@@ -350,6 +350,7 @@ namespace flutter_inappwebview_plugin
       return;
     }
 
+    const auto lifetime = callbackLifetime();
     auto add_AcceleratorKeyPressed_HResult = webViewController->add_AcceleratorKeyPressed(
       Callback<ICoreWebView2AcceleratorKeyPressedEventHandler>(
         [this](ICoreWebView2Controller* sender, ICoreWebView2AcceleratorKeyPressedEventArgs* args)
@@ -646,8 +647,11 @@ namespace flutter_inappwebview_plugin
 
     auto add_NavigationCompleted_HResult = webView->add_NavigationCompleted(
       Callback<ICoreWebView2NavigationCompletedEventHandler>(
-        [this](ICoreWebView2* sender, ICoreWebView2NavigationCompletedEventArgs* args)
+        [this, lifetime](ICoreWebView2* sender, ICoreWebView2NavigationCompletedEventArgs* args)
         {
+          if (lifetime.expired()) {
+            return S_OK;
+          }
           isLoading_ = false;
           previousAuthRequestFailureCount = 0;
 
@@ -753,9 +757,9 @@ namespace flutter_inappwebview_plugin
     failedLog(add_HistoryChanged_HResult);
 
     auto add_WebMessageReceived_HResult = webView->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(
-      [this](ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
+      [this, lifetime](ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
       {
-        return this->onCallJsHandler(true, args);
+        return lifetime.expired() ? S_OK : onCallJsHandler(true, args);
       }
     ).Get(), nullptr);
     failedLog(add_WebMessageReceived_HResult);
@@ -1112,15 +1116,18 @@ namespace flutter_inappwebview_plugin
     if (SUCCEEDED(webView->QueryInterface(IID_PPV_ARGS(&webView4)))) {
       auto add_FrameCreated_HResult = webView4->add_FrameCreated(
         Callback<ICoreWebView2FrameCreatedEventHandler>(
-          [this](ICoreWebView2* sender, ICoreWebView2FrameCreatedEventArgs* args)
+          [this, lifetime](ICoreWebView2* sender, ICoreWebView2FrameCreatedEventArgs* args)
           {
+            if (lifetime.expired()) {
+              return S_OK;
+            }
             wil::com_ptr<ICoreWebView2Frame> frame;
             wil::com_ptr<ICoreWebView2Frame2> frame2;
             if (succeededOrLog(args->get_Frame(&frame)) && SUCCEEDED(frame->QueryInterface(IID_PPV_ARGS(&frame2)))) {
               auto frame_add_WebMessageReceived_HResult = frame2->add_WebMessageReceived(Callback<ICoreWebView2FrameWebMessageReceivedEventHandler>(
-                [this](ICoreWebView2Frame* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
+                [this, lifetime](ICoreWebView2Frame* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
                 {
-                  return this->onCallJsHandler(false, args);
+                  return lifetime.expired() ? S_OK : onCallJsHandler(false, args);
                 }).Get(), nullptr);
               failedLog(frame_add_WebMessageReceived_HResult);
             }
@@ -2280,16 +2287,22 @@ namespace flutter_inappwebview_plugin
 
   void InAppWebView::evaluateJavascript(const std::string& source, const std::shared_ptr<ContentWorld> contentWorld, const std::function<void(std::string)> completionHandler) const
   {
-    if (!webView || !userContentController) {
+    const auto lifetime = callbackLifetime();
+    if (lifetime.expired() || !webView || !userContentController) {
       if (completionHandler) {
         completionHandler("null");
       }
       return;
     }
 
+    const bool isolatedWorld = contentWorld && !ContentWorld::isPage(contentWorld);
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [this, lifetime, isolatedWorld, source, completionHandler](int contextId)
       {
+        if (lifetime.expired() || (isolatedWorld && contextId < 0)) {
+          if (completionHandler) completionHandler("null");
+          return;
+        }
         nlohmann::json parameters = {
           {"expression", source},
           { "returnByValue", true }
@@ -2300,8 +2313,12 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, lifetime, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (lifetime.expired()) {
+              if (completionHandler) completionHandler("null");
+              return S_OK;
+            }
             nlohmann::json result;
             if (succeededOrLog(errorCode)) {
               nlohmann::json json = nlohmann::json::parse(wide_to_utf8(returnObjectAsJson));
@@ -2333,16 +2350,22 @@ namespace flutter_inappwebview_plugin
 
   void InAppWebView::callAsyncJavaScript(const std::string& functionBody, const std::string& argumentsAsJson, const std::shared_ptr<ContentWorld> contentWorld, const std::function<void(std::string)> completionHandler) const
   {
-    if (!webView || !userContentController) {
+    const auto lifetime = callbackLifetime();
+    if (lifetime.expired() || !webView || !userContentController) {
       if (completionHandler) {
         completionHandler("null");
       }
       return;
     }
 
+    const bool isolatedWorld = contentWorld && !ContentWorld::isPage(contentWorld);
     userContentController->createContentWorld(contentWorld,
-      [=](const int& contextId)
+      [this, lifetime, isolatedWorld, functionBody, argumentsAsJson, completionHandler](int contextId)
       {
+        if (lifetime.expired() || (isolatedWorld && contextId < 0)) {
+          if (completionHandler) completionHandler("null");
+          return;
+        }
         std::vector<std::string> functionArgumentNamesList;
         std::vector<std::string> functionArgumentValuesList;
 
@@ -2367,8 +2390,12 @@ namespace flutter_inappwebview_plugin
         }
 
         auto hr = webView->CallDevToolsProtocolMethod(L"Runtime.evaluate", utf8_to_wide(parameters.dump()).c_str(), Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
-          [this, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
+          [this, lifetime, completionHandler](HRESULT errorCode, LPCWSTR returnObjectAsJson)
           {
+            if (lifetime.expired()) {
+              if (completionHandler) completionHandler("null");
+              return S_OK;
+            }
             nlohmann::json result = {
               {"value", nlohmann::json{}},
               {"error", nlohmann::json{}}
@@ -2540,9 +2567,9 @@ namespace flutter_inappwebview_plugin
     std::string channelId = get_uuid();
     std::string js = WebMessageChannelJS::createWebMessageChannelJs(channelId);
 
-    evaluateJavascript(js, ContentWorld::page(), [this, callback, channelId](const std::string& result)
+    evaluateJavascript(js, ContentWorld::page(), [this, lifetime = callbackLifetime(), callback, channelId](const std::string& result)
       {
-        if (!result.empty() && result != "null") {
+        if (!lifetime.expired() && !result.empty() && result != "null") {
           auto channel = std::make_unique<WebMessageChannel>(
             plugin->registrar->messenger(), channelId, this);
           webMessageChannels_[channelId] = std::move(channel);
@@ -3911,7 +3938,8 @@ namespace flutter_inappwebview_plugin
 
   HRESULT InAppWebView::onCallJsHandler(const bool& isMainFrame, ICoreWebView2WebMessageReceivedEventArgs* args)
   {
-    if (!channelDelegate) {
+    const auto lifetime = callbackLifetime();
+    if (lifetime.expired() || !channelDelegate) {
       return S_OK;
     }
 
@@ -3954,8 +3982,9 @@ namespace flutter_inappwebview_plugin
             return S_OK;
           }
 
-          auto resolveInternalHandler = [this, callHandlerID]()
+          auto resolveInternalHandler = [this, lifetime, callHandlerID]()
             {
+              if (lifetime.expired()) return;
               evaluateJavascript("if (window." + JavaScriptBridgeJS::get_JAVASCRIPT_BRIDGE_NAME() + "[" + std::to_string(callHandlerID) + "] != null) { \
                       window." + JavaScriptBridgeJS::get_JAVASCRIPT_BRIDGE_NAME() + "[" + std::to_string(callHandlerID) + "].resolve(null); \
                       delete window." + JavaScriptBridgeJS::get_JAVASCRIPT_BRIDGE_NAME() + "[" + std::to_string(callHandlerID) + "]; \
@@ -4119,8 +4148,9 @@ namespace flutter_inappwebview_plugin
           */
 
           auto callback = std::make_unique<WebViewChannelDelegate::CallJsHandlerCallback>();
-          callback->defaultBehaviour = [this, callHandlerID](const std::optional<const flutter::EncodableValue*> response)
+          callback->defaultBehaviour = [this, lifetime, callHandlerID](const std::optional<const flutter::EncodableValue*> response)
             {
+              if (lifetime.expired()) return;
               const auto json = javaScriptHandlerResponseJson(response);
 
               evaluateJavascript("if (window." + JavaScriptBridgeJS::get_JAVASCRIPT_BRIDGE_NAME() + "[" + std::to_string(callHandlerID) + "] != null) { \
@@ -4128,8 +4158,9 @@ namespace flutter_inappwebview_plugin
                       delete window." + JavaScriptBridgeJS::get_JAVASCRIPT_BRIDGE_NAME() + "[" + std::to_string(callHandlerID) + "]; \
                     }", ContentWorld::page(), nullptr);
             };
-          callback->error = [this, callHandlerID](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
+          callback->error = [this, lifetime, callHandlerID](const std::string& error_code, const std::string& error_message, const flutter::EncodableValue* error_details)
             {
+              if (lifetime.expired()) return;
               auto errorMessage = error_code + ", " + error_message;
               debugLog(errorMessage);
 
@@ -4153,6 +4184,7 @@ namespace flutter_inappwebview_plugin
 
   InAppWebView::~InAppWebView()
   {
+    callbackLifetime_.reset();
     debugLog("dealloc InAppWebView");
     userContentController = nullptr;
     if (webView) {

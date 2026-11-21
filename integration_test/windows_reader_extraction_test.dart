@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -79,6 +80,9 @@ void main() {
           settings: WebViewEnvironmentSettings(
               userDataFolder: '${root.path}/webview'));
       debugPrint('WINDOWS READER STAGE environment_ready');
+      await _verifyLateBridgeReply(webViewEnvironment!)
+          .timeout(const Duration(seconds: 30));
+      debugPrint('WINDOWS WEBVIEW CLOSE WITH PENDING REPLY PASS');
       final book = Book(
           id: 1,
           title: 'Fixture',
@@ -129,4 +133,36 @@ void main() {
       // Leave only this synthetic OS temp directory for the CI runner cleanup.
     }
   }, timeout: const Timeout(Duration(minutes: 8)));
+}
+
+Future<void> _verifyLateBridgeReply(WebViewEnvironment environment) async {
+  final ready = Completer<InAppWebViewController>();
+  final started = Completer<void>();
+  final reply = Completer<String>();
+  final view = HeadlessInAppWebView(
+    webViewEnvironment: environment,
+    initialData: InAppWebViewInitialData(data: '<p>Reader fixture</p>'),
+    onWebViewCreated: (controller) {
+      controller.addJavaScriptHandler(
+          handlerName: 'deferredReaderResult',
+          callback: (_) {
+            if (!started.isCompleted) started.complete();
+            return reply.future;
+          });
+    },
+    onLoadStop: (controller, _) {
+      if (!ready.isCompleted) ready.complete(controller);
+    },
+  );
+  try {
+    await view.run();
+    final controller = await ready.future;
+    await controller.evaluateJavascript(
+        source:
+            "void window.flutter_inappwebview.callHandler('deferredReaderResult');");
+    await started.future;
+  } finally {
+    await view.dispose();
+    if (!reply.isCompleted) reply.complete('reader result');
+  }
 }

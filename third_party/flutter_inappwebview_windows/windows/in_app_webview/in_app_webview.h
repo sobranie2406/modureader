@@ -2,6 +2,7 @@
 #define FLUTTER_INAPPWEBVIEW_PLUGIN_IN_APP_WEBVIEW_H_
 
 #include <functional>
+#include <memory>
 #include <WebView2.h>
 #include <wil/com.h>
 #include <windows.ui.composition.desktop.h>
@@ -122,6 +123,9 @@ namespace flutter_inappwebview_plugin
       wil::com_ptr<ICoreWebView2Controller> webViewController,
       wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController);
     ~InAppWebView();
+
+    // WebView2 and the Flutter platform callbacks run on the owning UI thread.
+    std::weak_ptr<const bool> callbackLifetime() const { return callbackLifetime_; }
 
     static void createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
       wil::com_ptr<ICoreWebView2Controller> webViewController,
@@ -246,6 +250,7 @@ namespace flutter_inappwebview_plugin
 
     static bool isSslError(const COREWEBVIEW2_WEB_ERROR_STATUS& webErrorStatus);
   private:
+    std::shared_ptr<const bool> callbackLifetime_ = std::make_shared<const bool>(true);
     bool hostWindowVisible_ = true;
     bool paused_ = false;
     std::optional<bool> controllerVisible_;
