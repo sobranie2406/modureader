@@ -22,9 +22,11 @@ export async function resolveReflowRegion(config, page, book, options = {}) {
 }
 // A separate low-resolution renderer avoids cancelling scrolling/detail renders.
 // Cache only small coordinates, keyed by original page and detection settings.
-export async function resolveReadingRegions(config, page, book, {hideWatermarks = false, active = () => true, signal} = {}) {
-    const layout = pageLayout(config, page) ?? {}
-    if (!layout.autoCrop || book?.nativeTextPages?.has(page)) return readingRegions(config, page, book)
+export async function resolveReadingRegions(config, page, book,
+    {hideWatermarks = false, active = () => true, signal, split = true} = {}) {
+    const saved = book?.nativeTextPages?.has(page) ? {} : pageLayout(config, page) ?? {}
+    const layout = split ? saved : {...saved, preset: 'single'}
+    if (!layout.autoCrop) return splitRegions(layout)
     const check = () => { if (signal?.aborted || !active()) throw new DOMException('Reader changed', 'AbortError') }
     check()
     let state = cropStates.get(book)

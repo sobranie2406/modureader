@@ -170,9 +170,10 @@ export class FixedLayout extends HTMLElement {
     get pdfRegionLocation() {
         if (this.#pdfEnabled && this.#pdfScroll) return this.#pdfScroll.location
         if (!this.#pdfEnabled || this.#pdfPage < 0) return null
+        const spread = this.#pdfView.mode === 'spread'
         return { page: this.#pdfPage, panel: this.#pdfPanel,
-            total: this.#pdfFallback ? 1 : readingRegions(this.#pdfLayout, this.#pdfPage).length,
-            signature: this.#pdfView.mode === 'spread' ? PDF_SPREAD_SIGNATURE
+            total: spread || this.#pdfFallback ? 1 : readingRegions(this.#pdfLayout, this.#pdfPage).length,
+            signature: spread ? PDF_SPREAD_SIGNATURE
                 : this.#pdfFallback ? 'original-target' : this.#pdfLayoutSignature(this.#pdfPage),
             zoom: this.#pdfView.zoom,
             center: this.#center?.center ? { ...this.#center.center } : null }
@@ -183,7 +184,7 @@ export class FixedLayout extends HTMLElement {
         this.#pdfScroll?.flushPosition()
         if (this.#pdfViewportDirty && this.pdfRegionLocation && !this.#pdfBusy) this.#reportLocation('viewport')
         const page = this.index
-        const previous = { layout: this.#pdfLayout, enabled: this.#pdfEnabled }
+        const previous = { layout: this.#pdfLayout, enabled: this.#pdfEnabled, resume: this.#pdfResume }
         this.#pdfGeneration++
         this.#cancelPdfDetail()
         this.book.readingRegionRenderer.cancel()
@@ -201,6 +202,7 @@ export class FixedLayout extends HTMLElement {
             if (!ok && generation === this.#pdfGeneration) {
                 this.#pdfLayout = previous.layout
                 this.#pdfEnabled = previous.enabled
+                this.#pdfResume = previous.resume
                 this.#pdfRetry = null
                 this.#pdfScroll?.activate('layout')
                 this.dispatchEvent(new CustomEvent('chapter-state', { detail: { state: 'ready' } }))
@@ -215,6 +217,7 @@ export class FixedLayout extends HTMLElement {
             this.#index = oldSpread
             this.#pdfLayout = previous.layout
             this.#pdfEnabled = previous.enabled
+            this.#pdfResume = previous.resume
             this.#pdfScroll?.activate('layout')
             return false
         }
@@ -398,6 +401,8 @@ export class FixedLayout extends HTMLElement {
         if (!spread && !readingRegions(this.#pdfLayout, page)[panel]) return false
         const otherPage = page % 2 ? page - 1 : page + 1
         const paired = spread && otherPage < this.book.sections.length
+        const companionCenter = paired && center && reason === 'layout' && this.#pdfCompanion?.index === otherPage
+            ? this.#pdfCompanion.center : null
         const generation = ++this.#pdfGeneration
         this.#cancelPdfDetail()
         this.#pdfScroll?.suspend()
@@ -418,11 +423,11 @@ export class FixedLayout extends HTMLElement {
                 checkActive()
                 const doc = frame.iframe.contentDocument
                 const nativeText = doc.documentElement.dataset.documentImage === 'false'
-                let fallback = nativeText || spread
+                let fallback = nativeText
                 const regions = fallback ? [FULL_PAGE] : await resolveReadingRegions(this.#pdfLayout, index, this.book,
-                    {hideWatermarks: this.#pdfView.display?.hideWatermarks, active})
+                    {hideWatermarks: this.#pdfView.display?.hideWatermarks, active, split: !spread})
                 checkActive()
-                let shownPanel = fallback ? 0 : requestedPanel
+                let shownPanel = fallback || spread ? 0 : requestedPanel
                 // Resolve text anchors in original page coordinates before clipping.
                 if (typeof textAnchor === 'function' && !nativeText) {
                     Object.assign(frame.iframe.style, { display: 'block', width: `${frame.width}px`, height: `${frame.height}px` })
@@ -438,12 +443,10 @@ export class FixedLayout extends HTMLElement {
                             const x = (rect.left + Math.min(1, rect.width / 2)) / frame.width
                             const y = (rect.top + rect.height / 2) / frame.height
                             position = { x, y }
-                            if (!spread) {
-                                const found = regions.findIndex(r => x >= r.x && y >= r.y &&
-                                    x < r.x + r.width && y < r.y + r.height)
-                                fallback = found < 0
-                                shownPanel = fallback ? 0 : found
-                            }
+                            const found = regions.findIndex(r => x >= r.x && y >= r.y &&
+                                x < r.x + r.width && y < r.y + r.height)
+                            fallback = found < 0
+                            shownPanel = fallback ? 0 : found
                         }
                     }
                 }
@@ -472,7 +475,7 @@ export class FixedLayout extends HTMLElement {
             }
             // The raster renderer cancels the previous request when a new one starts.
             const frame = await load(page, panel, anchor, center)
-            const companion = paired ? await load(otherPage, 0, null, null) : null
+            const companion = paired ? await load(otherPage, 0, null, companionCenter) : null
             checkActive()
             this.#pdfScroll?.destroy()
             this.#pdfScroll = null
@@ -529,6 +532,7 @@ export class FixedLayout extends HTMLElement {
         this.#pdfCompanion = this.#center
         this.#center = frame
         this.#pdfPage = frame.index
+        this.#pdfFallback = frame.fallback
         this.dispatchEvent(new CustomEvent('activate', { detail: { doc: frame.iframe.contentDocument, index: frame.index } }))
         this.#reportLocation('focus')
     }

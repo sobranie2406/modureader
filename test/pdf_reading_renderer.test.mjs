@@ -261,6 +261,122 @@ test('PDF spreads show consecutive original pages, keep the active source page a
     } finally { h.close(); }
 });
 
+test('PDF spreads crop each source page independently and keep image options and source navigation', async () => {
+    const h = harness(), requests = [], detections = [];
+    const manual = {x: .1, y: .12, width: .75, height: .8};
+    const automatic = {x: .2, y: .18, width: .6, height: .7};
+    const enhancement = {ink: 6, contrast: 18, darken: 24, whiten: 48, sharpen: 12,
+        watermark: 30, paperMode: 'text'};
+    const region = ({x, y, width, height}) => ({x, y, width, height});
+    for (const section of h.renderer.book.sections) section.loadFrame = section.load;
+    h.renderer.book.cropRegionRenderer = {render: async request => {
+        detections.push(request);
+        assert.equal(request.page, 1, 'a manual crop does not run automatic detection');
+        return {cropDetection: {detected: true, crop: automatic}};
+    }};
+    h.source.render = async request => {
+        requests.push(request);
+        return {blob: new Blob(['page'])};
+    };
+    try {
+        h.renderer.setPdfNightMode(true);
+        await h.renderer.setPdfView({mode: 'spread', enhancement,
+            display: {hideWatermarks: true, border: true, separators: false}});
+        await h.renderer.setPdfLayout({version: 1, all: {preset: 'four'}, pages: {
+            0: {crop: manual, preset: 'vertical2'},
+            1: {autoCrop: true, autoMargin: .04, preset: 'nine'},
+        }}, true);
+        await h.renderer.goTo({index: 1});
+        assert.deepEqual(requests.map(request => [request.page, region(request.region), request.width]),
+            [[1, automatic, 396], [0, manual, 396]]);
+        for (const request of requests) {
+            assert.deepEqual(request.enhancement, enhancement);
+            assert.equal(request.hideWatermarks, true);
+        }
+        assert.equal(detections.length, 1);
+        assert.equal(detections[0].margin, .04);
+        assert.equal(detections[0].hideWatermarks, true);
+        assert.equal(detections[0].analyzeCrop, true);
+        assert.equal(detections[0].detectionOnly, true);
+        const [right, left] = h.renderer.getContents();
+        assert.deepEqual([right.index, left.index], [1, 0]);
+        for (const {doc, index} of [right, left]) {
+            const crop = index === 0 ? manual : automatic;
+            const image = doc.querySelector('[data-document-base]');
+            assert.equal(image.style.left, `${crop.x * 600}px`);
+            assert.equal(image.style.top, `${crop.y * 800}px`);
+            assert.equal(image.style.width, `${crop.width * 600}px`);
+            assert.equal(image.style.height, `${crop.height * 800}px`);
+            assert.equal(doc.defaultView.getComputedStyle(image).filter, 'invert(1)');
+            assert.equal(doc.defaultView.getComputedStyle(doc.querySelector('.textLayer span')).filter, '');
+            const range = doc.createRange();
+            range.selectNodeContents(doc.querySelector('.textLayer span').firstChild);
+            assert.equal(CFI.toRange(doc, CFI.parse(CFI.fromRange(range))).toString(), 'Original text');
+        }
+        assert.equal(h.renderer.pdfRegionLocation.page, 1);
+        assert.equal(h.renderer.pdfRegionLocation.panel, 0);
+        assert.equal(h.renderer.pdfRegionLocation.total, 1, 'saved grids do not split a spread into panels');
+        assert.equal(h.renderer.pdfRegionLocation.signature, 'pdf-spread');
+        await h.renderer.next();
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [2]);
+        await h.renderer.prev();
+        assert.deepEqual(h.renderer.getContents().map(x => x.index), [0, 1]);
+        assert.equal(detections.length, 1, 'returning reuses only the matching source page detection');
+        requests.length = 0;
+        const anchor = () => ({startContainer: {nodeType: 1},
+            getClientRects: () => [{left: 20, top: 20, width: 20, height: 12}]});
+        await h.renderer.goTo({index: 1, textAnchor: true, anchor});
+        assert.deepEqual(requests.map(request => [request.page, region(request.region)]),
+            [[1, {x: 0, y: 0, width: 1, height: 1}], [0, manual]],
+            'a bookmark outside its crop reveals only that original page');
+        assert.equal(h.renderer.pdfRegionLocation.page, 1);
+        assert.equal(h.renderer.pdfRegionLocation.total, 1);
+        await h.renderer.next();
+        assert.equal(h.renderer.index, 2, 'an anchor fallback still turns by original-page pairs');
+    } finally { h.close(); }
+});
+
+test('PDF spread image adjustments preserve both independently panned source viewports', async () => {
+    const h = harness(), requests = [];
+    h.source.render = async request => {
+        requests.push(request);
+        return {blob: new Blob(['page'])};
+    };
+    const focus = page => {
+        const {doc} = h.renderer.getContents().find(x => x.index === page);
+        doc.dispatchEvent(new doc.defaultView.Event('pointerdown'));
+        return {...h.renderer.pdfRegionLocation.center};
+    };
+    const closeTo = (actual, expected) => {
+        assert.ok(Math.abs(actual.x - expected.x) < 1e-9, `${actual.x} != ${expected.x}`);
+        assert.ok(Math.abs(actual.y - expected.y) < 1e-9, `${actual.y} != ${expected.y}`);
+    };
+    try {
+        await h.renderer.setPdfLayout({version: 1, pages: {}}, true);
+        await h.renderer.setPdfView({mode: 'spread', zoom: 4});
+        await h.renderer.goTo({index: 0});
+        h.renderer.panPdfView(40, 90);
+        const left = focus(0);
+        focus(1);
+        h.renderer.panPdfView(-30, 170);
+        const right = focus(1);
+        assert.notDeepEqual(left, right);
+        for (const change of [{enhancement: {ink: 8, contrast: -15}},
+            {display: {hideWatermarks: true}}, {enhancement: {}, display: {hideWatermarks: false}}]) {
+            requests.length = 0;
+            const view = {...h.renderer.pdfView, ...change};
+            assert.equal(await h.renderer.setPdfView(view), true);
+            assert.deepEqual(requests.map(x => x.page), [1, 0]);
+            assert.ok(requests.every(x => Boolean(x.hideWatermarks) === (view.display?.hideWatermarks ?? false)));
+            assert.ok(requests.every(x => x.enhancement.ink === (view.enhancement?.ink ?? 0)));
+            assert.equal(h.renderer.index, 1);
+            closeTo(focus(1), right);
+            closeTo(focus(0), left);
+            focus(1);
+        }
+    } finally { h.close(); }
+});
+
 test('a failed companion page keeps the previous PDF view and can be retried', async () => {
     const h = harness();
     try {

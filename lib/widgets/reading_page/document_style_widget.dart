@@ -193,8 +193,11 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
               widget.player.isImageEpub
                   ? 'Scanned image crop and panels'
                   : 'PDF crop and panels')),
-          description: Text(ModuStrings.text(context, '自动裁边、留白、漫画与论文分栏在独立预览中调整',
-              'Auto crop, margins, comics and columns are adjusted in the separate preview'))),
+          description: Text(widget.player.isImageEpub
+              ? ModuStrings.text(context, '自动裁边、留白、漫画与论文分栏在独立预览中调整',
+                  'Auto crop, margins, comics and columns are adjusted in the separate preview')
+              : ModuStrings.text(context, '双页并排时，两页分别裁边。分格阅读可用单页或连续卷轴。',
+                  'Two-page view crops each page independently. Use single page or continuous scroll to read split panels.'))),
     );
     return DocumentPanelTheme(
       child: ReaderSettingsScrollView(
