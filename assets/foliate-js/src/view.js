@@ -84,6 +84,8 @@ export class View extends HTMLElement {
   #translator = new Translator()
   #translationPrefetchPages = 0
   #translationPrefetchTimer
+  #translationPrefetchController
+  #translationPrefetchWork
   constructor() {
     super()
     this.history.addEventListener('popstate', ({ detail }) => {
@@ -181,6 +183,7 @@ export class View extends HTMLElement {
       return true
     }
     this.#switchingRenderer = true
+    this.#cancelTranslationPrefetch()
     const generation = ++this.#rendererSwitchGeneration
     const checkActive = () => { if (generation !== this.#rendererSwitchGeneration) throw new DOMException('Reader closed', 'AbortError') }
     this.#pendingRelocate = null
@@ -221,10 +224,16 @@ export class View extends HTMLElement {
       this.renderer = previous; this.isFixedLayout = oldFixed
       if (generation === this.#rendererSwitchGeneration) configure()
       return false
-    } finally { this.#switchingRenderer = false; this.#pendingRelocate = null }
+    } finally {
+      this.#switchingRenderer = false
+      this.#pendingRelocate = null
+      if (this.#translationPrefetchPages) this.#scheduleTranslationPrefetch()
+    }
   }
   close() {
     this.#rendererSwitchGeneration++
+    this.#translationPrefetchPages = 0
+    this.#cancelTranslationPrefetch()
     // A superseded popup can close while open() is still importing its renderer.
     if (this.renderer) this.initTTS(true)
     this.clearSearch()
@@ -241,10 +250,14 @@ export class View extends HTMLElement {
     this.history.clear()
     this.tts = null
     this.mediaOverlay = null
+    this.#translator?.destroy()
+  }
+  #cancelTranslationPrefetch() {
     clearTimeout(this.#translationPrefetchTimer)
     this.#translationPrefetchTimer = null
-    this.#translationPrefetchPages = 0
-    this.#translator?.destroy()
+    this.#translationPrefetchController?.abort()
+    this.#translationPrefetchController = null
+    this.#translator?.clearPrefetchQueue()
   }
   goToTextStart() {
     return this.goTo(this.book.landmarks
@@ -307,12 +320,14 @@ export class View extends HTMLElement {
     }
   }
 
-  #onLoad({ doc, index }) {
-    // set language and dir if not already set
+  #setChapterLanguage(doc) {
     doc.documentElement.lang ||= this.language.canonical ?? ''
     if (!this.language.isCJK)
       doc.documentElement.dir ||= this.language.direction ?? ''
+  }
 
+  #onLoad({ doc, index }) {
+    this.#setChapterLanguage(doc)
     repairSelfReferentialNotes(doc)
     this.#handleLinks(doc, index)
     this.#handleClick(doc)
@@ -946,18 +961,38 @@ export class View extends HTMLElement {
     this.#scheduleTranslationPrefetch()
   }
   #scheduleTranslationPrefetch() {
-    if (!this.#translationPrefetchPages || this.#translator.getTranslationMode() === TranslationMode.OFF) {
-      clearTimeout(this.#translationPrefetchTimer)
-      this.#translationPrefetchTimer = null
-      this.#translator.setPrefetchRange(null)
+    const renderer = this.renderer
+    if (!this.#translationPrefetchPages || this.#switchingRenderer
+        || !renderer?.forEachTranslationPrefetchRange
+        || this.#translator.getTranslationMode() === TranslationMode.OFF) {
+      this.#cancelTranslationPrefetch()
       return
     }
     if (this.#translationPrefetchTimer != null) return
-    this.#translator.setPrefetchRange(null)
-    this.#translationPrefetchTimer = setTimeout(() => {
+    this.#cancelTranslationPrefetch()
+    this.#translationPrefetchTimer = setTimeout(async () => {
       this.#translationPrefetchTimer = null
       const pages = this.#translationPrefetchPages
-      this.#translator.setPrefetchRange(this.renderer?.getTranslationPrefetchRange?.(pages), pages)
+      const controller = new AbortController()
+      this.#translationPrefetchController = controller
+      try {
+        if (this.#translationPrefetchWork) await this.#translationPrefetchWork
+        if (controller.signal.aborted) return
+        const work = renderer.forEachTranslationPrefetchRange(pages, range => {
+          if (!controller.signal.aborted) this.#translator.addPrefetchRange(range, pages)
+        }, controller.signal, doc => {
+          this.#setChapterLanguage(doc)
+          this.prepareTranslationDocument?.(doc)
+        }).catch(() => {
+          // A chapter that fails to preload can still be opened normally.
+        })
+        this.#translationPrefetchWork = work
+        await work
+        if (this.#translationPrefetchWork === work) this.#translationPrefetchWork = null
+      } finally {
+        if (this.#translationPrefetchController === controller)
+          this.#translationPrefetchController = null
+      }
     }, 100)
   }
   setTranslationTextStyle(style) {

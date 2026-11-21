@@ -5,7 +5,8 @@ import { runInNewContext } from 'node:vm';
 
 const source = await readFile(new URL('../assets/foliate-js/src/paginator.js', import.meta.url), 'utf8');
 const method = source.slice(source.indexOf('  #beforeRender('), source.indexOf('\n  render() {'))
-  .replaceAll('this.#', 'this.').replace('#beforeRender(', 'layout(');
+  .replaceAll('this.#', 'this.').replace('#beforeRender(', 'layout(')
+  .replace('#measureLayout(', 'measureLayout(');
 const Harness = runInNewContext(`class Harness {
   constructor(width, height) {
     this.width = width; this.height = height;

@@ -82,7 +82,7 @@ test('relocation bridge reports section counts separately from chapter page coun
   assert.equal(events[0][1].chapterTotalPages, 15)
 })
 test('layout changes notify fresh page counts even if the CFI is unchanged', () => {
-  const method = viewSource.slice(viewSource.indexOf('  #onRelocate('), viewSource.indexOf('\n  #onLoad('))
+  const method = viewSource.slice(viewSource.indexOf('  #onRelocate('), viewSource.indexOf('\n  #setChapterLanguage('))
   const View = runInNewContext(`(class {
     #sectionProgress = {getProgress: () => ({section: {current: 1, total: 3}})};
     #tocProgress; #pageProgress; #index; #lastCfi; #lastChapterLocation;
@@ -119,6 +119,62 @@ test('both scrolling paths include the active viewport fraction in relocation', 
   assert.match(method, /detail\.size = this\.size \/ this\.viewSize/)
 })
 
+test('a changed page limit aborts an obsolete cross-chapter prefetch plan', async () => {
+  const cancel = viewSource.slice(viewSource.indexOf('  #cancelTranslationPrefetch() {'),
+    viewSource.indexOf('\n  goToTextStart()'))
+  const schedule = viewSource.slice(viewSource.indexOf('  setTranslationPrefetchPages('),
+    viewSource.indexOf('\n  setTranslationTextStyle('))
+  const timers = new Set()
+  const View = runInNewContext(`(class {
+    #switchingRenderer = false;
+    #translationPrefetchPages; #translationPrefetchTimer; #translationPrefetchController;
+    #translationPrefetchWork;
+    #translator = {
+      getTranslationMode: () => 'bilingual',
+      addPrefetchRange: (range, pages) => this.queued.push([range, pages]),
+      clearPrefetchQueue: () => {this.queued = []}
+    };
+    #setChapterLanguage() {}
+    ${cancel}
+    ${schedule}
+  })`, {
+    TranslationMode: {OFF: 'off'}, AbortController,
+    setTimeout: run => (timers.add(run), run), clearTimeout: run => timers.delete(run),
+  })
+  const view = new View()
+  const plans = []
+  view.renderer = {
+    forEachTranslationPrefetchRange(pages, publish, signal) {
+      return new Promise(finish => plans.push({pages, publish, signal, finish}))
+    },
+  }
+  const run = () => {
+    const [timer] = timers
+    timers.delete(timer)
+    return timer()
+  }
+  view.setTranslationPrefetchPages(5)
+  const old = run()
+  plans[0].publish('current chapter')
+  assert.deepEqual(plain(view.queued), [['current chapter', 5]])
+  view.setTranslationPrefetchPages(1)
+  assert.equal(plans[0].signal.aborted, true)
+  const updated = run()
+  assert.equal(plans.length, 1, 'wait for the previous measurement to release its document')
+  plans[0].publish('obsolete next chapter')
+  plans[0].finish()
+  await old
+  assert.deepEqual(plain(view.queued), [])
+
+  plans[1].publish('next chapter')
+  plans[1].finish()
+  await updated
+  assert.deepEqual(plain(view.queued), [['next chapter', 1]])
+  view.setTranslationPrefetchPages(0)
+  assert.deepEqual(plain(view.queued), [])
+  assert.equal(timers.size, 0)
+})
+
 test('translation prefetch counts forward viewports and stops at the end of the laid-out chapter', async () => {
   const source = await readFile(new URL('paginator.js', root), 'utf8')
   const method = source.slice(source.indexOf('  getTranslationPrefetchRange('), source.indexOf('\n  #afterScroll('))
@@ -144,6 +200,33 @@ test('translation prefetch counts forward viewports and stops at the end of the 
   assert.deepEqual(reader.getTranslationPrefetchRange(2), [438, 638])
   assert.deepEqual(reader.getTranslationPrefetchRange(5), [438, 761])
 })
+
+test('translation prefetch fills the remaining page budget across consecutive short chapters', async () => {
+  const source = await readFile(new URL('paginator.js', root), 'utf8')
+  const method = source.slice(source.indexOf('  async forEachTranslationPrefetchRange('),
+    source.indexOf('\n  #measureTranslationRange('))
+  const Paginator = runInNewContext(`(class {
+    #view = {}; #continuous; #index = 0; #destroyed; #preparingView; #margin = 0;
+    #container = {getBoundingClientRect: () => ({width: 500, height: 300})};
+    scrolled = false; page = 1; pages = 5;
+    getTranslationPrefetchRange(pages) {return Math.min(pages, 2)}
+    #measureLayout() {}
+    #measureTranslationRange() {throw Error('expected paginated chapters')}
+    async #scanTranslationChapter(section, {remaining, addRange}) {
+      const used = Math.min(remaining, section.pages)
+      addRange(used)
+      return used
+    }
+    ${method}
+  })`)
+  const reader = new Paginator()
+  reader.sections = [3, 100, 1, 4, 8].map((pages, index) =>
+    ({pages, load() {}, linear: index === 1 ? 'no' : 'yes'}))
+  const ranges = []
+  await reader.forEachTranslationPrefetchRange(5, (range, index) => ranges.push([index, range]))
+  assert.deepEqual(ranges, [[0, 2], [2, 1], [3, 2]])
+})
+
 test('fixed-layout chapter buttons skip non-linear sections and stop at book ends', async () => {
   const source = await readFile(new URL('fixed-layout.js', root), 'utf8')
   const methods = source.slice(source.indexOf('    #adjacentSection('), source.indexOf('\n    getContents()'))

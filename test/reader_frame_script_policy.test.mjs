@@ -21,8 +21,9 @@ for (const allowScript of [false, true]) for (const readerScriptEvents of [false
 test('paginator frame constructor applies policy before navigation', async () => {
   const paginator = await read('paginator.js')
   const viewClass = paginator.slice(paginator.indexOf('class View '), paginator.indexOf('\nexport class'))
-  assert.ok(viewClass.includes("setAttribute('sandbox', bookFrameSandbox())"))
+  assert.ok(viewClass.includes("setAttribute('sandbox', allowBookScripts ? bookFrameSandbox() : 'allow-same-origin')"))
   assert.ok(!viewClass.includes("setAttribute('sandbox', 'allow-same-origin allow-scripts')"))
+  assert.match(paginator, /new View\(\{[^}]*allowBookScripts: false/)
   const fixed = await read('fixed-layout.js')
   assert.ok(fixed.indexOf("setAttribute('sandbox', bookFrameSandbox())") < fixed.indexOf('iframe.src = src'))
 })

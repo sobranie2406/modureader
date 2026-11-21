@@ -854,6 +854,7 @@ class MOBI6 {
         }`))
 
         await this.replaceResources(doc)
+        if (this.#cache.has(section)) return this.#cache.get(section)
         const result = this.serializer.serializeToString(doc)
         const url = URL.createObjectURL(new Blob([result], { type: this.#type }))
         this.#cache.set(section, url)
@@ -1159,6 +1160,7 @@ class KF8 {
         if (this.#cache.has(section)) return this.#cache.get(section)
         const str = await this.loadText(section)
         const replaced = await this.replaceResources(str)
+        if (this.#cache.has(section)) return this.#cache.get(section)
 
         // by default, type is XHTML; change to HTML if it's not valid XHTML
         let doc = this.parser.parseFromString(replaced, this.#type)

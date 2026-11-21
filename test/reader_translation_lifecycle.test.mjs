@@ -31,6 +31,27 @@ function setup() {
   return {dom,window,translator,calls,observers,elements};
 }
 
+function chapter(s, texts, visible = false) {
+  const frame=s.window.document.createElement('iframe');
+  s.window.document.body.append(frame);
+  const doc=frame.contentDocument;
+  Object.defineProperty(doc.defaultView.HTMLElement.prototype,'innerText',{
+    get(){return this.textContent;}});
+  const elements=texts.map(text=>{
+    const el=doc.createElement('p');el.textContent=text;doc.body.append(el);
+    el.getBoundingClientRect=()=>({top:20,bottom:50,left:10,right:150});
+    el.getClientRects=()=>[{top:20,bottom:50,left:10,right:150,width:140,height:30}];
+    return el;
+  });
+  frame.getBoundingClientRect=()=>({top:visible?0:5000,left:0,width:400,height:800});
+  const range=doc.createRange();range.selectNodeContents(doc.body);
+  return {frame,doc,elements,range,close(){frame.remove()}};
+}
+
+function onlyFirstVisible(s) {
+  s.elements[1].getBoundingClientRect=()=>({top:1000,bottom:1050,left:10,right:150});
+}
+
 test('translation style affects only output and switches independent appearances without requests', async()=>{
   const s=setup();
   s.elements[0].style.cssText='font-family: serif; font-size: 18px; font-weight: 400; font-style: normal; color: #343434';
@@ -151,10 +172,10 @@ test('pretranslation waits for visible work, caches only the upcoming range and 
   const range=s.window.document.createRange();
   range.selectNode(next);
 
-  s.translator.setPrefetchRange(range,1);
+  s.translator.addPrefetchRange(range,1);
   assert.equal(s.calls.length,0);
   await s.translator.setTranslationMode('bilingual',6);
-  s.translator.setPrefetchRange(range,1);
+  s.translator.addPrefetchRange(range,1);
   assert.deepEqual(s.calls.map(call=>[call.text,call.prefetch]),[['first',0]]);
   s.calls[0].resolve('当前页');await tick();
   assert.deepEqual(s.calls.map(call=>[call.text,call.prefetch]),[['first',0],['second',1]]);
@@ -177,8 +198,8 @@ test('closing the prefetch window drops future jobs', async()=>{
   const range=s.window.document.createRange();
   range.setStartBefore(next);range.setEndAfter(far);
   await s.translator.setTranslationMode('bilingual',7);
-  s.translator.setPrefetchRange(range,5);
-  s.translator.setPrefetchRange(null);
+  s.translator.addPrefetchRange(range,5);
+  s.translator.clearPrefetchQueue();
   s.calls[0].resolve('当前页');await tick();
   assert.equal(s.calls.length,1);
   s.translator.destroy();s.dom.window.close();
@@ -192,10 +213,169 @@ test('prefetch skips a hidden paragraph between range endpoints', async()=>{
   const range=s.window.document.createRange();
   range.setStartBefore(hidden);range.setEndAfter(far);
   await s.translator.setTranslationMode('bilingual',8);
-  s.translator.setPrefetchRange(range,2);
+  s.translator.addPrefetchRange(range,2);
   s.calls[0].resolve('当前页');await tick();
   assert.deepEqual(s.calls.map(call=>call.text),['first','far away']);
   s.translator.destroy();s.calls[1].resolve('后续页');await tick();s.dom.window.close();
+});
+
+test('prepared chapter text survives immediate frame disposal and is reused by its visible DOM', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const ahead=chapter(s,['next title','next paragraph']);
+  await s.translator.setTranslationMode('bilingual',9);
+  s.translator.addPrefetchRange(ahead.range,2);
+  assert.equal(s.translator.observedElements.has(ahead.elements[0]),false);
+  ahead.close();
+  s.calls[0].resolve('当前页');await tick();
+  assert.equal(s.calls[1].text,'next title');
+  s.calls[1].resolve('下一章标题');await tick();
+  assert.equal(s.calls[2].text,'next paragraph');
+  s.calls[2].resolve('下一章正文');await tick();
+  const actual=chapter(s,['next title','next paragraph'],true);
+  s.translator.observeDocument(actual.doc);
+  assert.equal(actual.doc.querySelector('.translated-text'),null);
+  s.translator.observeVisibleRange(actual.range);await tick();
+  assert.deepEqual([...actual.doc.querySelectorAll('.translated-text')].map(el=>el.textContent),
+    ['下一章标题','下一章正文']);
+  assert.equal(s.calls.length,3);
+  s.translator.destroy();actual.close();s.dom.window.close();
+});
+
+test('range invalidation keeps the active answer, drops old plans and prioritizes newly visible text', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const old=chapter(s,['arriving paragraph','discarded plan']);
+  const later=chapter(s,['appended plan']);
+  await s.translator.setTranslationMode('bilingual',10);
+  s.translator.addPrefetchRange(old.range,2);
+  s.calls[0].resolve('当前页');await tick();
+  assert.equal(s.calls[1].text,'arriving paragraph');
+  s.translator.clearPrefetchQueue();old.close();
+  const actual=chapter(s,['arriving paragraph','visible first'],true);
+  s.translator.observeDocument(actual.doc);
+  s.translator.observeVisibleRange(actual.range);
+  s.translator.addPrefetchRange(actual.range,2);
+  s.translator.addPrefetchRange(later.range,2);
+  assert.equal(s.calls.length,2);
+  s.calls[1].resolve('到达段落');await tick();
+  assert.equal(actual.elements[0].querySelector('.translated-text').textContent,'到达段落');
+  assert.deepEqual(s.calls.map(call=>[call.text,call.prefetch]),
+    [['first',0],['arriving paragraph',2],['visible first',0]]);
+  s.calls[2].resolve('可见内容');await tick();
+  assert.equal(s.calls[3].text,'appended plan');
+  assert.equal(later.doc.querySelector('.translated-text'),null);
+  s.calls[3].resolve('后续内容');await tick();
+  assert.equal(s.calls.length,4);
+  s.translator.destroy();actual.close();later.close();s.dom.window.close();
+});
+
+test('force and session changes invalidate completed and in-flight ahead results', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const ahead=chapter(s,['completed source','in-flight source']);
+  await s.translator.setTranslationMode('bilingual',11);
+  s.translator.addPrefetchRange(ahead.range,1);
+  ahead.close();s.calls[0].resolve('当前页');await tick();
+  s.calls[1].resolve('旧缓存');await tick();
+  assert.equal(s.calls[2].text,'in-flight source');
+  s.elements.forEach(el=>el.getBoundingClientRect=()=>({top:3000,bottom:3050,left:10,right:150}));
+  s.translator.clearTranslations();
+  await s.translator.setTranslationMode('off');
+  const actual=chapter(s,['completed source','in-flight source'],true);
+  s.translator.observeDocument(actual.doc);
+  await s.translator.setTranslationMode('bilingual',12);
+  s.calls[2].resolve('晚到的旧译文');await tick();
+  assert.deepEqual([s.calls[3].text,s.calls[3].id,s.calls[3].prefetch],['completed source',12,0]);
+  s.calls[3].resolve('新译文一');await tick();
+  assert.deepEqual([s.calls[4].text,s.calls[4].id,s.calls[4].prefetch],['in-flight source',12,0]);
+  s.calls[4].resolve('新译文二');await tick();
+  assert.deepEqual([...actual.doc.querySelectorAll('.translated-text')].map(el=>el.textContent),
+    ['新译文一','新译文二']);
+  s.translator.destroy();actual.close();s.dom.window.close();
+});
+
+test('prefetch snapshots exclude hidden, filtered and injected output nodes', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const ahead=chapter(s,['display hidden','visibility hidden','injected output','mixed output','kept','valid source']);
+  ahead.elements[0].style.display='none';
+  ahead.elements[1].style.visibility='hidden';
+  ahead.elements[2].className='translated-text';
+  const output=ahead.doc.createElement('span');output.className='translated-text';output.textContent='already translated';
+  ahead.elements[3].append(output);
+  const filtered=ahead.doc.createElement('span');filtered.setAttribute('data-modu-text-filter','');
+  filtered.style.display='none';filtered.textContent='filtered secret';ahead.elements[4].append(filtered);
+  // Browser innerText omits display:none runs; jsdom has no layout implementation.
+  Object.defineProperty(ahead.elements[4],'innerText',{get(){return 'kept'}});
+  await s.translator.setTranslationMode('bilingual',13);
+  for(const pages of [0,6,1.5,NaN])s.translator.addPrefetchRange(ahead.range,pages);
+  s.translator.addPrefetchRange(ahead.range,2);ahead.close();
+  s.calls[0].resolve('当前页');await tick();
+  assert.equal(s.calls[1].text,'kept');
+  s.calls[1].resolve('保留');await tick();
+  assert.equal(s.calls[2].text,'valid source');
+  s.calls[2].resolve('有效正文');await tick();
+  assert.equal(s.calls.length,3);
+  s.translator.destroy();s.dom.window.close();
+});
+
+test('background and stop cannot start or retain stale speculative work', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const ahead=chapter(s,['future source']);
+  await s.translator.setTranslationMode('bilingual',14);
+  Object.defineProperty(s.window.document,'hidden',{value:true,configurable:true});
+  s.translator.addPrefetchRange(ahead.range,1);
+  Object.defineProperty(s.window.document,'hidden',{value:false,configurable:true});
+  s.translator.addPrefetchRange(ahead.range,1);
+  Object.defineProperty(s.window.document,'hidden',{value:true,configurable:true});
+  s.calls[0].resolve('当前页');await tick();
+  assert.equal(s.calls.length,1);
+  Object.defineProperty(s.window.document,'hidden',{value:false,configurable:true});
+  s.translator.addPrefetchRange(ahead.range,1);ahead.close();
+  assert.equal(s.calls[1].text,'future source');
+  await s.translator.setTranslationMode('off');
+  const actual=chapter(s,['future source'],true);s.translator.observeDocument(actual.doc);
+  await s.translator.setTranslationMode('bilingual',15);
+  s.calls[1].resolve('停止后的旧结果');await tick();
+  assert.deepEqual([s.calls[2].text,s.calls[2].id,s.calls[2].prefetch],['future source',15,0]);
+  s.calls[2].resolve('新请求');await tick();
+  assert.equal(actual.elements[0].querySelector('.translated-text').textContent,'新请求');
+  s.translator.destroy();actual.close();s.dom.window.close();
+});
+
+test('all planned short paragraphs run while the reusable cache retains only its bounded window', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const texts=Array.from({length:513},(_,i)=>`future ${i}`),ahead=chapter(s,texts);
+  await s.translator.setTranslationMode('bilingual',16);
+  s.translator.addPrefetchRange(ahead.range,5);ahead.close();
+  s.calls[0].resolve('当前页');await tick();
+  for(let i=0;i<texts.length;i++) {
+    assert.equal(s.calls[i+1].text,texts[i]);
+    s.calls[i+1].resolve(`译文${i}`);await tick();
+  }
+  const actual=chapter(s,[texts[0],texts.at(-1)],true);
+  s.translator.observeDocument(actual.doc);s.translator.observeVisibleRange(actual.range);
+  assert.equal(s.calls.length,515);
+  assert.equal(s.calls.at(-1).text,texts[0],'oldest speculative entry is evicted');
+  s.calls.at(-1).resolve('重新翻译');await tick();
+  assert.equal(actual.elements[1].querySelector('.translated-text').textContent,'译文512');
+  assert.equal(s.calls.length,515,'latest cached entry is reused');
+  s.translator.destroy();actual.close();s.dom.window.close();
+});
+
+test('speculative cache also bounds source and answer characters', async()=>{
+  const s=setup();onlyFirstVisible(s);
+  const ahead=chapter(s,['first large','second large','oversized']);
+  await s.translator.setTranslationMode('bilingual',17);
+  s.translator.addPrefetchRange(ahead.range,5);ahead.close();
+  s.calls[0].resolve('当前页');await tick();
+  s.calls[1].resolve('甲'.repeat(256*1024));await tick();
+  s.calls[2].resolve('乙'.repeat(256*1024));await tick();
+  s.calls[3].resolve('丙'.repeat(512*1024));await tick();
+  const actual=chapter(s,['first large','second large','oversized'],true);
+  s.translator.observeDocument(actual.doc);s.translator.observeVisibleRange(actual.range);
+  assert.equal(s.calls[4].text,'first large');s.calls[4].resolve('新一');await tick();
+  assert.equal(actual.elements[1].querySelector('.translated-text').textContent.length,256*1024);
+  assert.equal(s.calls[5].text,'oversized');s.calls[5].resolve('新三');await tick();
+  assert.equal(s.calls.length,6);
+  s.translator.destroy();actual.close();s.dom.window.close();
 });
 
 test('failure/cancellation never inserts an error string into book content',async()=>{

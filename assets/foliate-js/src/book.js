@@ -999,6 +999,12 @@ class Reader {
 
   setView(view) {
     view.prepareTtsDocument = doc => applyTextFilters(doc, style.customTextFilters ?? [])
+    view.prepareTranslationDocument = doc => {
+      readingFeaturesDocHandler(doc)
+      applyTextFilters(doc, style.customTextFilters ?? [])
+      if (style.codeHighlightTheme && style.codeHighlightTheme !== 'off')
+        applyCodeHighlighting(style.codeHighlightTheme, doc)
+    }
     // Footnote selections belong to another document and must not target the
     // main book's annotations, even when their local CFI paths look alike.
     view.getSelectionAnnotationIds = cfi => view === this.view
