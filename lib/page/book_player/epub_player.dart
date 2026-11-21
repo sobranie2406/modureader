@@ -39,7 +39,7 @@ import 'package:modu_reader/service/book_player/document_reading_mode_store.dart
 import 'package:modu_reader/service/tts/tts_service.dart';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/dao/book_note.dart';
-import 'package:modu_reader/enums/page_turn_mode.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/enums/reading_info.dart';
 import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/enums/writing_mode.dart';
@@ -94,7 +94,6 @@ import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/webView/gererate_url.dart';
 import 'package:modu_reader/utils/webView/webview_console_message.dart';
 import 'package:modu_reader/widgets/context_menu/context_menu.dart';
-import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:flutter/foundation.dart';
@@ -1612,38 +1611,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     final y = location['y'];
     final part = coordinatesToPart(x, y);
 
-    PageTurningType action;
-    final pageTurnMode = PageTurnMode.fromCode(Prefs().pageTurnMode);
-
-    if (pageTurnMode == PageTurnMode.simple) {
-      // Use predefined page turning types
-      final currentPageTurningType = Prefs().pageTurningType;
-      final pageTurningType = pageTurningTypes[currentPageTurningType];
-      action = pageTurningType[part];
-
-      // Apply swap if enabled
-      if (Prefs().swapPageTurnArea) {
-        if (action == PageTurningType.prev) {
-          action = PageTurningType.next;
-        } else if (action == PageTurningType.next) {
-          action = PageTurningType.prev;
-        }
-      }
-    } else {
-      // Use custom configuration
-      final customConfig = Prefs().customPageTurnConfig;
-      action = PageTurningType.values[customConfig[part]];
-    }
-
-    // Disable mouse/touch page turning when keyboard shortcuts are enabled
-    if (Prefs().keyboardShortcutTurnPage) {
-      // Only allow menu action, disable prev/next page turning
-      if (action == PageTurningType.prev || action == PageTurningType.next) {
-        return;
-      }
-    }
-
-    switch (action) {
+    switch (readerTapAction(part)) {
       case PageTurningType.prev:
         prevPage();
         break;
@@ -1652,6 +1620,11 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         break;
       case PageTurningType.menu:
         widget.showOrHideAppBarAndBottomBar(true);
+        break;
+      case PageTurningType.contents:
+        if (_isTopOfNavigationStack) {
+          unawaited(readingPageKey.currentState?.tocHandler());
+        }
         break;
       case PageTurningType.none:
         break;

@@ -1,4 +1,6 @@
-import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
+import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/page_turn_mode.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 
 List<PageTurningType> type1 = [
   PageTurningType.prev,
@@ -75,3 +77,23 @@ List<List<PageTurningType>> pageTurningTypes = [
   type5
 ];
 List<List<int>> pageTurningIcons = [icon1, icon2, icon3, icon4, icon5];
+
+PageTurningType readerTapAction(int region) {
+  final prefs = Prefs();
+  final mode = PageTurnMode.fromCode(prefs.pageTurnMode);
+  final preset = prefs.pageTurningType.clamp(0, pageTurningTypes.length - 1);
+  final action = mode == PageTurnMode.custom
+      ? PageTurningType.values[prefs.customPageTurnConfig[region]]
+      : pageTurningTypes[preset][region];
+
+  if (action != PageTurningType.prev && action != PageTurningType.next) {
+    return action;
+  }
+  if (prefs.keyboardShortcutTurnPage) return PageTurningType.none;
+  if (mode == PageTurnMode.simple && prefs.swapPageTurnArea) {
+    return action == PageTurningType.prev
+        ? PageTurningType.next
+        : PageTurningType.prev;
+  }
+  return action;
+}

@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/models/book_style.dart';
 import 'package:modu_reader/models/read_theme.dart';
 import 'package:modu_reader/service/config_transfer/config_qr_bridge.dart';
 import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
 import 'package:modu_reader/service/config_transfer/settings_modules.dart';
+import 'package:modu_reader/service/config_transfer/settings_value_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,7 +40,7 @@ void main() {
         BookStyle(fontSize: 1.8, fontFamily: 'source-only', simulateBold: true)
             .toJson(),
     'readingRules': '{"convertChineseMode":"none","bionicReading":true}',
-    'customPageTurnConfig': '2,3,1,2,3,1,2,3,1',
+    'customPageTurnConfig': '2,3,4,2,3,1,2,3,1',
     'bgimg':
         '{"type":"localFile","path":"source.png","alignment":"top","blur":5.0,"opacity":0.5}',
     'customCSS': 'p { color: red; }',
@@ -88,6 +90,27 @@ void main() {
   Map<String, Object?> snapshot() => {
         for (final key in Prefs().prefs.getKeys()) key: Prefs().prefs.get(key),
       };
+
+  test('custom tap actions retain saved indices and allow Contents', () {
+    expect(PageTurningType.none.index, 0);
+    expect(PageTurningType.next.index, 1);
+    expect(PageTurningType.prev.index, 2);
+    expect(PageTurningType.menu.index, 3);
+    expect(PageTurningType.contents.index, 4);
+    expect(
+        () => validateSettingsValue(
+            'customPageTurnConfig', source['customPageTurnConfig']),
+        returnsNormally);
+    for (final invalid in [
+      '-1,3,4,2,3,1,2,3,1',
+      '${PageTurningType.values.length},3,4,2,3,1,2,3,1',
+      '2,3,4,2,3,1,2,3',
+      '2,3,4,2,3,1,2,3,x',
+    ]) {
+      expect(() => validateSettingsValue('customPageTurnConfig', invalid),
+          throwsFormatException);
+    }
+  });
 
   test('old settings files and links skip retired remote embedding fields',
       () async {

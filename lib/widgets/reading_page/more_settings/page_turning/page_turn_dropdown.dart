@@ -1,6 +1,7 @@
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/widgets/common/anx_dropdown_button.dart';
-import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/diagram.dart';
 import 'package:flutter/material.dart';
 
 class PageTurnDropdown extends StatelessWidget {
@@ -23,6 +24,8 @@ class PageTurnDropdown extends StatelessWidget {
         return L10n.of(context).pageTurnActionNext;
       case PageTurningType.menu:
         return L10n.of(context).pageTurnActionMenu;
+      case PageTurningType.contents:
+        return ModuStrings.text(context, '打开目录', 'Open contents');
     }
   }
 

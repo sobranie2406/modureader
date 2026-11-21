@@ -488,6 +488,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         _activateDocumentPane(true);
         showBottomBar();
       },
+      onOpenReaderContents: tocHandler,
       onCloseReaderMenu: hideBottomBar,
       onOpenTranslationSettings: () {
         _activateDocumentPane(true);

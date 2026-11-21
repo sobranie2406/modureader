@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:modu_reader/service/installed_fonts.dart';
 import 'package:modu_reader/enums/translation_mode.dart';
 import 'package:modu_reader/enums/lang_list.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'package:modu_reader/service/translate/index.dart';
 import 'package:modu_reader/service/tts/tts_page_source.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
@@ -22,6 +23,7 @@ import 'package:modu_reader/widgets/reading_page/document_text_style_dialog.dart
 import 'package:modu_reader/widgets/reading_page/document_reader_surface.dart';
 import 'package:modu_reader/widgets/reading_page/style_widget.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/more_settings.dart';
+import 'package:modu_reader/widgets/reading_page/more_settings/page_turning/types_and_icons.dart';
 import 'package:modu_reader/widgets/reading_page/more_settings/style_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -135,6 +137,7 @@ void main() {
       void Function(Map<String, dynamic>)? renderRequest,
       VoidCallback? clearMenu,
       VoidCallback? openReaderMenu,
+      VoidCallback? openReaderContents,
       ValueChanged<Widget>? openReaderPanel,
       VoidCallback? closeReaderMenu,
       FocusOnKeyEventCallback? readerKeyEvent,
@@ -208,6 +211,7 @@ void main() {
           onPageChanged: navigate ?? (page) async => pages.add(page),
           clearMenu: clearMenu ?? () {},
           onOpenReaderMenu: openReaderMenu,
+          onOpenReaderContents: openReaderContents,
           onOpenReaderPanel: openReaderPanel,
           onCloseReaderMenu: closeReaderMenu,
           loadNotes: () async => notes,
@@ -2681,6 +2685,38 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     expect(opened, 1);
+  },
+      variant: TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.macOS}));
+
+  test('default tap regions still turn pages and show the reader menu', () {
+    const expectedRow = [
+      PageTurningType.prev,
+      PageTurningType.menu,
+      PageTurningType.next,
+    ];
+    expect(List.generate(9, readerTapAction),
+        [...expectedRow, ...expectedRow, ...expectedRow]);
+    Prefs().pageTurnMode = 'custom';
+    expect(List.generate(9, readerTapAction),
+        [...expectedRow, ...expectedRow, ...expectedRow]);
+  });
+
+  testWidgets('a custom contents tap opens the TOC without turning the page',
+      (tester) async {
+    Prefs().pageTurnMode = 'custom';
+    Prefs().customPageTurnConfig =
+        List.filled(9, PageTurningType.contents.index);
+    Prefs().keyboardShortcutTurnPage = true;
+    var opened = 0, menus = 0;
+    await open(tester,
+        openReaderContents: () => opened++, openReaderMenu: () => menus++);
+    await tester.tapAt(textPoint(tester, 1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(opened, 1);
+    expect(menus, 0);
+    expect(store.latest.keys, ['0']);
   },
       variant: TargetPlatformVariant(
           {TargetPlatform.android, TargetPlatform.macOS}));

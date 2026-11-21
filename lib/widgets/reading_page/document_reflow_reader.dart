@@ -5,8 +5,8 @@ import 'package:modu_reader/page/reading_page.dart' show epubPlayerKey;
 import 'package:modu_reader/utils/coordinates_to_part.dart';
 import 'package:modu_reader/utils/desktop_wheel_zoom.dart';
 import 'package:modu_reader/utils/platform_utils.dart';
+import 'package:modu_reader/enums/page_turning_type.dart';
 import 'more_settings/page_turning/types_and_icons.dart';
-import 'more_settings/page_turning/diagram.dart';
 import 'reader_menu_appearance.dart';
 import 'package:modu_reader/service/translate/official_api.dart';
 import 'ocr_precache_settings.dart';
@@ -94,6 +94,7 @@ class DocumentReflowReader extends StatefulWidget {
       this.onBookmark,
       this.onExtract,
       this.onOpenReaderMenu,
+      this.onOpenReaderContents,
       this.onOpenTranslationSettings,
       this.onOpenReaderPanel,
       this.onCloseReaderMenu,
@@ -122,6 +123,7 @@ class DocumentReflowReader extends StatefulWidget {
   final VoidCallback? onQuickMarkUnavailable;
   final ValueChanged<bool>? onComparisonChanged;
   final VoidCallback? onOpenReaderMenu, onCloseReaderMenu;
+  final VoidCallback? onOpenReaderContents;
   final VoidCallback? onOpenTranslationSettings;
   final ValueChanged<Widget>? onOpenReaderPanel;
   final bool readerMenuVisible;
@@ -1830,23 +1832,21 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final point = box.globalToLocal(global);
     final part = coordinatesToPart(
         point.dx / box.size.width, point.dy / box.size.height);
-    final prefs = Prefs();
-    var action = prefs.pageTurnMode == 'custom'
-        ? PageTurningType.values[prefs.customPageTurnConfig[part]]
-        : pageTurningTypes[
-            prefs.pageTurningType.clamp(0, pageTurningTypes.length - 1)][part];
-    if (prefs.pageTurnMode != 'custom' && prefs.swapPageTurnArea) {
-      if (action == PageTurningType.prev) {
-        action = PageTurningType.next;
-      } else if (action == PageTurningType.next) {
-        action = PageTurningType.prev;
-      }
-    }
-    if (action == PageTurningType.menu) {
-      widget.onOpenReaderMenu?.call();
-    } else if (!prefs.keyboardShortcutTurnPage) {
-      if (action == PageTurningType.next) unawaited(turn(1));
-      if (action == PageTurningType.prev) unawaited(turn(-1));
+    switch (readerTapAction(part)) {
+      case PageTurningType.prev:
+        unawaited(turn(-1));
+        break;
+      case PageTurningType.next:
+        unawaited(turn(1));
+        break;
+      case PageTurningType.menu:
+        widget.onOpenReaderMenu?.call();
+        break;
+      case PageTurningType.contents:
+        widget.onOpenReaderContents?.call();
+        break;
+      case PageTurningType.none:
+        break;
     }
   }
 
