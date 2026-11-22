@@ -33,7 +33,11 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       droppedPaths == null && (inPlace ?? Prefs().inPlaceImportEnabled);
   if (_pickingBooks) return;
   _pickingBooks = true;
-  final mobileFolder = folder && AnxPlatform.isMobile;
+  final useScopedPicker = droppedPaths == null &&
+      (Platform.isIOS ||
+          (folder && AnxPlatform.isMobile) ||
+          (useInPlace && !(Platform.isWindows || Platform.isLinux)));
+  var phase = 'pick';
   try {
     if (droppedPaths != null) {
       final entries = await discoverBookImportFiles(droppedPaths);
@@ -42,15 +46,14 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     }
 
     List<BookImportEntry>? entries;
-    if (useInPlace && !(Platform.isWindows || Platform.isLinux)) {
+    if (useScopedPicker) {
       entries = await _withImportProgress(
           context,
           () => MobileBookFolder.pick(
               files: !folder,
-              inPlace: true,
-              extensions: IosLinkedBooks.extensions));
-    } else if (mobileFolder) {
-      entries = await _withImportProgress(context, MobileBookFolder.pick);
+              inPlace: useInPlace,
+              extensions:
+                  useInPlace ? IosLinkedBooks.extensions : allowBookExtensions));
     } else if (folder) {
       final path = await FilePicker.platform.getDirectoryPath();
       if (path == null || !context.mounted) return;
@@ -58,13 +61,10 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
           context, () => discoverBookImportFiles([path]));
     } else {
       final picked = await FilePicker.platform.pickFiles(
-        // Mobile providers may not register MIME/UTI types for AZW3/FB2/MD.
+        // Android providers may not register MIME types for AZW3/FB2/MD.
         // Filter the returned names instead of hiding valid books in the picker.
-        type: Platform.isAndroid || Platform.isIOS
-            ? FileType.any
-            : FileType.custom,
-        allowedExtensions:
-            Platform.isAndroid || Platform.isIOS ? null : allowBookExtensions,
+        type: Platform.isAndroid ? FileType.any : FileType.custom,
+        allowedExtensions: Platform.isAndroid ? null : allowBookExtensions,
         allowMultiple: true,
       );
       if (picked == null || !context.mounted) return;
@@ -106,6 +106,7 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
           BookImportSelection(entries: entries!, inPlace: useInPlace),
     );
     if (selected == null || selected.isEmpty || !context.mounted) return;
+    phase = 'stage';
     if (relinkBook != null && selected.length != 1) {
       throw const FileSystemException('Select one matching original');
     }
@@ -200,7 +201,7 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     }
     final files = await _withImportProgress(
         context,
-        () async => mobileFolder
+        () async => useScopedPicker
             ? await MobileBookFolder.stage(selected)
             : await stageBookImportFiles(selected, await getAnxTempDir()));
     if (!context.mounted) {
@@ -215,6 +216,8 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       AnxLog.severe('Dropped book import failed: $error\n$stack');
       return;
     }
+    AnxLog.warning('Book import $phase failed on ${Platform.operatingSystem}: '
+        '${error.runtimeType}');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(ModuStrings.text(
@@ -224,10 +227,7 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
     }
   } finally {
     try {
-      if (mobileFolder ||
-          (useInPlace && !(Platform.isWindows || Platform.isLinux))) {
-        await MobileBookFolder.release();
-      }
+      if (useScopedPicker) await MobileBookFolder.release();
     } finally {
       _pickingBooks = false;
     }

@@ -162,7 +162,8 @@ class AnxHeadlessWebView {
         onConsoleMessage: _onConsoleMessage,
         onReceivedError: _onReceivedError,
         onReceivedHttpError: _onReceivedHttpError,
-        onRenderProcessGone: _onRenderProcessGone,
+        onRenderProcessGone: (controller, _) => _onRendererStopped(controller),
+        onWebContentProcessDidTerminate: _onRendererStopped,
         shouldOverrideUrlLoading: _asyncCallback(shouldOverrideUrlLoading),
         shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
         onCreateWindow: _asyncCallback(onCreateWindow),
@@ -213,9 +214,9 @@ class AnxHeadlessWebView {
         error.description);
   }
 
-  void _onRenderProcessGone(
-      InAppWebViewController controller, RenderProcessGoneDetail detail) {
+  void _onRendererStopped(InAppWebViewController controller) {
     if (_disposed) return;
+    AnxLog.warning('Background WebView renderer stopped');
     // Fail pending import/search immediately; release even if its owner throws.
     try {
       onLoadError?.call(controller, null, -1, 'WebView renderer stopped');
@@ -255,7 +256,8 @@ class AnxHeadlessWebView {
             onConsoleMessage: _onConsoleMessage,
             onReceivedError: _onReceivedError,
             onReceivedHttpError: _onReceivedHttpError,
-            onRenderProcessGone: _onRenderProcessGone,
+            onRenderProcessGone: (controller, _) => _onRendererStopped(controller),
+            onWebContentProcessDidTerminate: _onRendererStopped,
             shouldOverrideUrlLoading: _asyncCallback(shouldOverrideUrlLoading),
             shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
             onCreateWindow: _asyncCallback(onCreateWindow),

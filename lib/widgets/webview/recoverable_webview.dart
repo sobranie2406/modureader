@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'webview_hit_region.dart';
 
-/// A dead Android renderer must be removed, never reloaded or reused.
+/// Replace the native view when its renderer exits.
 class RecoverableWebView extends StatefulWidget {
   const RecoverableWebView({super.key, required this.builder, this.onGone});
 
   final Widget Function(
-          void Function(InAppWebViewController, RenderProcessGoneDetail) onGone)
+          void Function(InAppWebViewController, RenderProcessGoneDetail?) onGone)
       builder;
   final VoidCallback? onGone;
 
@@ -42,7 +42,9 @@ class _RecoverableWebViewState extends State<RecoverableWebView> {
         key: ValueKey(generation),
         child: widget.builder((_, detail) {
           if (!mounted || _gone || generation != _generation) return;
-          AnxLog.warning('WebView renderer gone: didCrash=${detail.didCrash}');
+          AnxLog.warning(detail == null
+              ? 'WebKit content process stopped'
+              : 'WebView renderer gone: didCrash=${detail.didCrash}');
           setState(() => _gone = true);
           widget.onGone?.call();
         }),

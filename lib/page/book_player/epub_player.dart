@@ -3159,6 +3159,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       },
       builder: (onGone) => InAppWebView(
         onRenderProcessGone: onGone,
+        onWebContentProcessDidTerminate: (controller) => onGone(controller, null),
         webViewEnvironment: webViewEnvironment,
         initialUrlRequest: URLRequest(
           url: WebUri(
