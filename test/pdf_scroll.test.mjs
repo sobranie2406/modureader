@@ -253,6 +253,25 @@ function nativePdf(h) {
     }};
     return {rendered,frames};
 }
+test('PDF scroll decodes the backing raster after it replaces the empty image', async () => {
+    const h = harness();
+    nativePdf(h);
+    const create = h.flow.createFrame;
+    const decoded = [];
+    h.flow.createFrame = async (...args) => {
+        const frame = await create(...args);
+        frame.iframe.contentDocument.querySelector('img').decode = async function () {
+            if (!this.src.startsWith('blob:')) throw new DOMException('Loading error', 'EncodingError');
+            decoded.push(this.src);
+        };
+        return frame;
+    };
+    try {
+        assert.equal(await h.flow.open(0, 0), true);
+        assert.deepEqual(decoded, [h.flow.entries[0].baseUrl]);
+    } finally { h.close(); }
+});
+
 test('desktop and mobile display densities prepare sharp pages before display without idle sharpening',async()=>{
     const oldDpr=globalThis.devicePixelRatio;
     try {

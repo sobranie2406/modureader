@@ -949,6 +949,7 @@ export class FixedLayout extends HTMLElement {
             if (Math.abs(target.visible.y-top)>.00001 && bottom>top) return this.panPdfView(0,direction*this.clientHeight*.8)
         }
         if (this.#pdfView.mode === 'spread') {
+            if (this.#pdfPage < 0) return direction > 0 && this.#showPdfPanel(0, 0, 'page')
             const page = this.#pdfPage - this.#pdfPage % 2 + direction * 2
             return this.#showPdfPanel(page, 0, 'page')
         }

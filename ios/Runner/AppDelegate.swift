@@ -94,9 +94,8 @@ final class BookFolderPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate 
     let args = call.arguments as? [String: Any] ?? [:]
     switch call.method {
     case "pick":
-      guard pending == nil, var presenter = registrar?.viewController,
-            presenter.viewIfLoaded?.window != nil else {
-        result(FlutterError(code: "UNAVAILABLE", message: "Document picker unavailable", details: nil)); return
+      guard pending == nil, var presenter = registrar?.viewController else {
+        result(FlutterError(code: "UNAVAILABLE", message: "Folder picker unavailable", details: nil)); return
       }
       while let presented = presenter.presentedViewController { presenter = presented }
       pending = result
@@ -163,12 +162,8 @@ final class BookFolderPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate 
             var coordinationError: NSError?
             var copyError: Error?
             NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { url in
-              do {
-                guard try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
-                  throw CocoaError(.fileReadUnsupportedScheme)
-                }
-                try FileManager.default.copyItem(at: url, to: target)
-              } catch { copyError = error }
+              do { try FileManager.default.copyItem(at: url, to: target) }
+              catch { copyError = error }
             }
             if let error = coordinationError { throw error }
             if let error = copyError { throw error }
@@ -200,12 +195,8 @@ final class BookFolderPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate 
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-    guard let result = pending else { return }
+    guard let result = pending, let folder = urls.first else { return }
     pending = nil
-    guard let folder = urls.first else {
-      result(nil)
-      return
-    }
     if pickingFiles {
       worker.async {
         var found = [[String: String]]()

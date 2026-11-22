@@ -79,6 +79,42 @@ dom.window.Document.prototype.createElement = function(name, ...rest) {
     return el;
 };
 
+for (const adopted of [false, true]) {
+    test(`PDF navigation keeps the fixed-layout stylesheet; adopted=${adopted}`, async t => {
+        const attachShadow = HTMLElement.prototype.attachShadow;
+        let root;
+        t.mock.method(HTMLElement.prototype, 'attachShadow', function(options) {
+            const shadow = attachShadow.call(this, options);
+            if (this.localName === 'foliate-fxl') {
+                root = shadow;
+                if (adopted) root.adoptedStyleSheets = [];
+            }
+            return shadow;
+        });
+        const {renderer, close} = harness();
+        const stylesheet = () => adopted ? root.adoptedStyleSheets[0] : root.querySelector('style');
+        const originalSheet = stylesheet();
+        const checkPage = (index, mode) => {
+            assert.equal(stylesheet(), originalSheet, `${mode} keeps the stylesheet that sizes the reader`);
+            assert.equal(renderer.index, index);
+            assert.ok([...root.querySelectorAll('iframe')].some(frame => frame.style.display === 'block'));
+        };
+        try {
+            assert.ok(originalSheet);
+            await renderer.goTo({index: 0});
+            checkPage(0, 'original');
+            assert.equal(await renderer.setPdfLayout({version: 1, pages: {}}, true), true);
+            await renderer.goTo({index: 1});
+            checkPage(1, 'single');
+            assert.equal(await renderer.setPdfView({mode: 'scroll'}), true);
+            await renderer.goTo({index: 2});
+            checkPage(2, 'scroll');
+            assert.equal(await renderer.setPdfLayout({version: 1, pages: {}}, false), true);
+            checkPage(2, 'original after scroll');
+        } finally { close(); }
+    });
+}
+
 test('PDF marks survive page recycling, crop, rotation and switching between page and scroll modes', async () => {
     const h=harness(), layers=[], saved=new Map();
     for(const section of h.renderer.book.sections) section.loadFrame=section.load;
@@ -421,6 +457,24 @@ test('changing to a spread finishes before another PDF layout or navigation can 
         assert.deepEqual(h.renderer.getContents().map(x => x.index), [0, 1]);
         assert.equal(await h.renderer.setPdfLayout(config, true), true);
     } finally { finish(); h.close(); }
+});
+
+test('opening a PDF in spread mode shows the first page, including a one-page book', async () => {
+    for (const pageCount of [1, 3]) {
+        const h = harness();
+        try {
+            h.renderer.book.sections.length = pageCount;
+            assert.equal(await h.renderer.setPdfView({mode: 'spread'}), true);
+            assert.equal(await h.renderer.setPdfLayout(config, true), true);
+            assert.equal(await h.renderer.prev(), false);
+            assert.equal(await h.renderer.next(), true);
+            assert.equal(h.renderer.index, 0);
+            assert.deepEqual(h.renderer.getContents().map(x => x.index),
+                pageCount === 1 ? [0] : [0, 1]);
+            assert.equal(await h.renderer.next(), pageCount > 1);
+            assert.equal(h.renderer.index, pageCount === 1 ? 0 : 2);
+        } finally { h.close(); }
+    }
 });
 
 test('reopening a PDF spread restores its source page and viewport', async () => {

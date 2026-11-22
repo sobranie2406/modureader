@@ -128,7 +128,10 @@ export class PdfScrollReader {
         try {
             if (!available()) throw new DOMException('Reader closed', 'AbortError')
             Object.assign(e.iframe.style, { display: 'block', width: `${e.width}px`, height: `${e.height}px` })
-            await (e.iframe.contentDocument.querySelector('[data-document-base]') ?? e.iframe.contentDocument.querySelector('img'))?.decode()
+            if (!section.loadFrame) {
+                const doc = e.iframe.contentDocument
+                await (doc.querySelector('[data-document-base]') ?? doc.querySelector('img'))?.decode()
+            }
             if (!available()) throw new DOMException('Reader closed', 'AbortError')
             e.nativeText = e.iframe.contentDocument.documentElement.dataset.documentImage === 'false'
             e.fallback = e.nativeText

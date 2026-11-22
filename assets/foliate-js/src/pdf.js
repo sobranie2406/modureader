@@ -558,7 +558,7 @@ const renderPage = async (page, getImageBlob, frameOnly = false) => {
 
     // The formal PDF reader supplies the only visible bitmap. Its frame still
     // retains exactly the same text/annotation DOM and original coordinates.
-    const src = frameOnly ? 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' : URL.createObjectURL(blob)
+    const src = frameOnly ? null : URL.createObjectURL(blob)
     const html = new Blob([`
         <!DOCTYPE html>
         <meta charset="utf-8">
@@ -574,7 +574,7 @@ const renderPage = async (page, getImageBlob, frameOnly = false) => {
         ${compatiblePDFCSS(textLayerBuilderCSS)}
         ${compatiblePDFCSS(annotationLayerBuilderCSS)}
         </style>
-        <img data-document-base src="${src}" width="${viewport.width}" height="${viewport.height}">
+        <img data-document-base${src ? ` src="${src}"` : ''} width="${viewport.width}" height="${viewport.height}">
         ${container.outerHTML}
         ${div.outerHTML}
     `], { type: 'text/html' })
