@@ -58,7 +58,7 @@ Linux DEB packages target Debian 13 (trixie). The x64 AppImage build targets Arc
 Install the runtime packages once, then give the downloaded AppImage permission to run.
 
 ```sh
-sudo pacman -Syu --needed gtk3 wpewebkit libepoxy libsecret jsoncpp sqlite gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib fuse2
+sudo pacman -Syu --needed gtk3 wpewebkit libepoxy libsecret jsoncpp sqlite gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib
 chmod +x Modu-VERSION-linux-x64.AppImage
 ./Modu-VERSION-linux-x64.AppImage
 ```
