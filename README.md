@@ -36,6 +36,8 @@
 
 [功能说明](docs/FEATURES_zh.md) · [设置指南](docs/SETTINGS_zh.md) · [全部文档](docs/README.md) · [示例电子书](docs/examples/modu-reading-demo.epub)
 
+Linux 从 1.3.11 起提供 Debian 13 的 x64、ARM64 `.deb` 和面向 Arch Linux x64 的 AppImage。[AppImage 安装说明](docs/RELEASING.md#arch-linux-x64-appimage)
+
 <a id="features"></a>
 
 ## 功能一览

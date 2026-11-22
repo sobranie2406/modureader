@@ -43,6 +43,7 @@ jobs:
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
       has_desktop: ${{ steps.matrix.outputs.has_desktop }}
+      linux_appimage: ${{ steps.matrix.outputs.linux_appimage }}
       android: ${{ steps.matrix.outputs.android }}
       ios: ${{ steps.matrix.outputs.ios }}
       harmony: ${{ steps.matrix.outputs.harmony }}
@@ -82,7 +83,7 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.targets.outputs.desktop) }}
-    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    name: ${{ matrix.appimage && 'linux-x64-appimage' || format('{0}-{1}', matrix.platform, matrix.arch) }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     timeout-minutes: 90
@@ -91,10 +92,18 @@ jobs:
         shell: bash
     steps:
       - name: Debian base tools
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && matrix.appimage != true
         run: |
           apt-get update
           apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
+      - name: Arch Linux native toolchain and WPEPlatform
+        if: matrix.appimage == true
+        run: |
+          pacman -Syu --noconfirm --needed base-devel clang cmake ninja pkgconf \
+            ca-certificates curl git unzip xz zip python desktop-file-utils patchelf squashfs-tools \
+            gtk3 glib2-devel wpewebkit libepoxy libsecret jsoncpp sqlite \
+            gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib
+          pkg-config --exists wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
@@ -110,7 +119,7 @@ jobs:
       - name: Verify native-test fixtures (never install in app assets)
         run: python scripts/release/bundle_models.py --verify-only
       - name: Linux native dependencies
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && matrix.appimage != true
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev libwpe-1.0-dev libepoxy-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libasound2-dev libpulse-dev libsqlite3-dev
@@ -154,6 +163,9 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           npm ci --prefix assets/foliate-js
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
+      - name: Use the WPEPlatform-only WebView build on Arch
+        if: matrix.appimage == true
+        run: python3 scripts/release/prepare_arch_webview.py
       - name: Verify downloaded model native inference on macOS
         if: matrix.platform == 'macos' && matrix.arch == 'arm64'
         run: |
@@ -225,13 +237,20 @@ jobs:
           trap 'kill "$fixture_server_pid"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 --fail --silent http://127.0.0.1:8765/ > /dev/null
           flutter test integration_test/bundled_embedding_test.dart -d windows --dart-define=MODU_MODEL_TEST_URL=http://127.0.0.1:8765/ --reporter expanded
+      - name: Verify architecture and package AppImage
+        if: matrix.appimage == true
+        run: |
+          export MODU_APPIMAGE_RUNTIME="$RUNNER_TEMP/modu-appimage-runtime"
+          python3 scripts/release/fetch_appimage_runtime.py "$MODU_APPIMAGE_RUNTIME"
+          python3 scripts/release/package.py linux x64 --appimage
       - name: Verify architecture and package
+        if: matrix.appimage != true
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify Windows installation and uninstallation
         if: matrix.platform == 'windows'
         run: python scripts/release/verify_windows_install.py dist-release/*-setup.exe ${{ matrix.arch }}
       - name: Verify installed Debian package dependencies
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && matrix.appimage != true
         run: |
           sudo apt-get install -y ./dist-release/*.deb
           python scripts/release/verify_linux_install.py ${{ matrix.arch }}
@@ -239,14 +258,55 @@ jobs:
           test ! -e /opt/modureader/modu
       - uses: actions/upload-artifact@v4
         with:
-          name: modu-${{ matrix.platform }}-${{ matrix.arch }}
+          name: ${{ matrix.appimage && 'modu-linux-x64-appimage' || format('modu-{0}-{1}', matrix.platform, matrix.arch) }}
           path: |
             dist-release/*.dmg
             dist-release/*.exe
             dist-release/*.deb
+            dist-release/*.AppImage
             dist-release/*.sha256
           if-no-files-found: error
           retention-days: 14
+
+  linux_appimage_smoke:
+    name: AppImage reader on Arch Linux
+    if: needs.targets.outputs.linux_appimage == 'true'
+    needs: [targets, desktop]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: modu-linux-x64-appimage
+          path: dist-release
+      - name: Allow WebKit's sandbox to create nested user namespaces
+        run: |
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Verify EPUB and PDF rendering without FUSE
+        run: |
+          docker run --rm \
+            --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
+            --volume "$PWD/dist-release:/packages:ro" \
+            --volume "$PWD/scripts/release/verify_linux_appimage.py:/verify_linux_appimage.py:ro" \
+            archlinux:base bash -euc '
+              pacman -Syu --noconfirm --needed \
+                gtk3 wpewebkit libepoxy libsecret jsoncpp sqlite \
+                gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib \
+                python dbus xorg-server-xvfb xorg-xauth xorg-xwd ttf-dejavu mesa libglvnd
+              useradd --create-home smoke
+              cd /home/smoke
+              (
+                cd /packages
+                sha256sum --check ./*.AppImage.sha256
+              )
+              install -m 755 /packages/*.AppImage ./Modu.AppImage
+              runuser -u smoke -- dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 /verify_linux_appimage.py ./Modu.AppImage
+            '
 
   android:
     needs: [targets, models]
@@ -396,10 +456,11 @@ jobs:
       (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') &&
       needs.quality.result == 'success' && needs.models.result == 'success' && needs.targets.result == 'success' &&
       (needs.targets.outputs.has_desktop != 'true' || needs.desktop.result == 'success') &&
+      (needs.targets.outputs.linux_appimage != 'true' || needs.linux_appimage_smoke.result == 'success') &&
       (needs.targets.outputs.android != 'true' || needs.android.result == 'success') &&
       (needs.targets.outputs.ios != 'true' || needs.ios.result == 'success') &&
       (needs.targets.outputs.harmony != 'true' || needs.harmony.result == 'success')
-    needs: [quality, models, targets, desktop, android, ios, harmony]
+    needs: [quality, models, targets, desktop, linux_appimage_smoke, android, ios, harmony]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

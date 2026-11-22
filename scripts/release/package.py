@@ -50,7 +50,7 @@ def verify(path, platform, arch):
         assert expected in run("lipo", "-archs", str(path)).split(), path
 
 
-def notices(folder, platform):
+def notices(folder, platform, appimage=False):
     folder.mkdir(parents=True, exist_ok=True)
     for name in ("LICENSE", "NOTICE", "UPSTREAM.md", "PRIVACY.md"):
         shutil.copy2(ROOT / name, folder / name)
@@ -65,7 +65,7 @@ def notices(folder, platform):
         "Dependency versions and source URLs: pubspec.lock, UPSTREAM.md.\n",
         encoding="utf-8",
     )
-    if platform == "linux":
+    if platform == 'linux' and not appimage:
         source_packages = []
         for package in ("libwpewebkit-2.0-1", "libwpe-1.0-1", "libwpebackend-fdo-1.0-1"):
             copyright_file = Path("/usr/share/doc") / package / "copyright"
@@ -78,11 +78,18 @@ def notices(folder, platform):
             source.write("\nRetrieve with apt-get source PACKAGE=VERSION after enabling matching deb-src repositories.\n")
 
 
-def package(platform, arch, version):
+def package(platform, arch, version, appimage=False):
     if platform == 'android' and arch != 'arm64':
         raise ValueError('Android x64 is an internal test target, not a release artifact')
+    runtime = None
+    if appimage:
+        if (platform, arch) != ('linux', 'x64'):
+            raise ValueError('AppImage packaging requires a Linux x64 build')
+        runtime = os.environ.get('MODU_APPIMAGE_RUNTIME')
+        if not runtime:
+            raise RuntimeError('Set MODU_APPIMAGE_RUNTIME to the verified x64 AppImage runtime')
     name = f"Modu-{version}-{platform}-{arch}"
-    stage = OUT / "staging" / name
+    stage = OUT / 'staging' / (name + '-appimage' if appimage else name)
     if stage.exists():
         raise RuntimeError(f"Refusing to overwrite existing staging folder: {stage}")
     stage.mkdir(parents=True)
@@ -152,25 +159,29 @@ def package(platform, arch, version):
         subprocess.run(["ditto", str(app), str(stage / "Payload" / app.name)], check=True)
     else:
         raise ValueError(platform)
-    notices(stage, platform)
+    notices(stage, platform, appimage=appimage)
     if platform == "ios":
         subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", str(stage), str(OUT / f"{name}.ipa")], check=True)
     else:
-        from native_installers import build
-        build_number = next(line.split('+', 1)[1].strip() for line in
-                            (ROOT / 'pubspec.yaml').read_text().splitlines() if line.startswith('version:'))
-        build(stage, platform, arch, version, OUT, build_number=build_number)
+        from native_installers import build, build_linux_appimage
+        if appimage:
+            build_linux_appimage(stage, version, OUT, runtime)
+        else:
+            build_number = next(line.split('+', 1)[1].strip() for line in
+                                (ROOT / 'pubspec.yaml').read_text().splitlines() if line.startswith('version:'))
+            build(stage, platform, arch, version, OUT, build_number=build_number)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("platform", choices=["macos", "windows", "linux", "android", "ios"])
     parser.add_argument("arch", choices=["x64", "arm64"])
+    parser.add_argument('--appimage', action='store_true', help='Package a Linux x64 AppImage build')
     args = parser.parse_args()
     version = next(line.split(":", 1)[1].strip().split("+")[0] for line in (ROOT / "pubspec.yaml").read_text().splitlines() if line.startswith("version:"))
     os.chdir(ROOT)
     OUT.mkdir(exist_ok=True)
-    package(args.platform, args.arch, version)
+    package(args.platform, args.arch, version, appimage=args.appimage)
     for path in OUT.iterdir():
         if path.is_file() and path.suffix != ".sha256":
             write_checksum(path)

@@ -95,6 +95,10 @@ class AppUpdateDialog extends StatelessWidget {
             "Download the DMG, quit Modu, then drag the new app into Applications to replace it."),
         'windows' => ModuStrings.text(
             c, "退出默读后，运行安装程序。", "Quit Modu, then run the installer."),
+        'linux' when controller.isAppImage => ModuStrings.text(
+            c,
+            '退出默读，将旧 AppImage 替换为下载的文件，并给新文件添加执行权限。',
+            'Quit Modu, replace the old AppImage with the downloaded file, and make it executable.'),
         'linux' => ModuStrings.text(c, "打开下载的 DEB 文件，用系统安装器安装。",
             "Open the downloaded DEB with your system installer."),
         'ios' => ModuStrings.text(
@@ -258,6 +262,8 @@ class AppUpdateDialog extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 8),
                           child: SelectableText(c.downloaded!.path,
                               style: Theme.of(context).textTheme.bodySmall)),
+                    if (c.isAppImage && phase == UpdatePhase.ready)
+                      Text(_instructions(context)),
                     if (c.release?.notes.isNotEmpty == true)
                       ExpansionTile(
                         title: Text(
@@ -318,6 +324,7 @@ class AppUpdateDialog extends StatelessWidget {
                                 context, '下载更新', 'Download update'))),
                       if (!storeBuild &&
                           !browserDownload &&
+                          !c.isAppImage &&
                           c.newer &&
                           c.downloaded != null)
                         FilledButton(

@@ -33,6 +33,21 @@ class UpdateManifestTest(unittest.TestCase):
         self.assertNotIn("must not be copied", str(manifest))
         self.assertEqual(manifest["tag_name"], "v1.0.9")
 
+    def test_optional_x64_appimage_is_preserved_and_validated(self):
+        release = self.fixture()
+        name = "Modu-1.0.9-linux-x64.AppImage"
+        appimage = dict(release["assets"][0], name=name,
+                        browser_download_url=f"https://github.com/sobranie2406/modureader/releases/download/v1.0.9/{name}")
+        release["assets"].append(appimage)
+        manifest = create_manifest(release)
+        self.assertEqual(len(manifest["assets"]), 9)
+        saved = next(asset for asset in manifest["assets"] if asset["name"] == name)
+        self.assertEqual(saved["digest"], "sha256:" + "a" * 64)
+        self.assertEqual(saved["size"], appimage["size"])
+        appimage["digest"] = "sha256:wrong"
+        with self.assertRaises(ValueError):
+            create_manifest(release)
+
     def test_missing_and_duplicate_packages_are_rejected(self):
         release = self.fixture()
         release["assets"].pop()

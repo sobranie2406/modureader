@@ -38,7 +38,8 @@ bool _isRateLimited(DioException error) {
 }
 
 /// Match the running application ABI, never guess from the OS's marketing name.
-String? updateAssetName(String version, String platform, String abi) {
+String? updateAssetName(String version, String platform, String abi,
+    {bool appImage = false}) {
   final arch = abi.endsWith('_arm64')
       ? 'arm64'
       : abi.endsWith('_x64')
@@ -49,7 +50,8 @@ String? updateAssetName(String version, String platform, String abi) {
     'android' => '.apk',
     'macos' => '.dmg',
     'windows' => '-setup.exe',
-    'linux' => '.deb',
+    'linux' when appImage && arch == 'x64' => '.AppImage',
+    'linux' when !appImage => '.deb',
     'ios' when arch == 'arm64' => '.ipa',
     _ => null,
   };
@@ -91,6 +93,7 @@ class UpdateRelease {
   factory UpdateRelease.parse(Map<String, dynamic> json,
       {required String platform,
       required String abi,
+      bool appImage = false,
       bool fromMirror = false}) {
     final tag = json['tag_name'];
     if (json['draft'] != false ||
@@ -100,7 +103,7 @@ class UpdateRelease {
       throw const FormatException('Not a stable Modu release');
     }
     final version = tag.substring(1);
-    final expected = updateAssetName(version, platform, abi);
+    final expected = updateAssetName(version, platform, abi, appImage: appImage);
     if (json['assets'] is! List) {
       throw const FormatException('Invalid release assets');
     }
@@ -125,6 +128,13 @@ class UpdateRelease {
             expected, url, size, digest.substring(7).toLowerCase(),
             mirrorUrl: '$moduMirrorReleasePage/download/$tag/$expected');
       }
+    }
+    // Older mirror manifests can predate the optional AppImage asset.
+    if (fromMirror &&
+        expected != null &&
+        asset == null &&
+        (!expected.endsWith('.AppImage') || matches.isNotEmpty)) {
+      throw const FormatException('Mirror asset not ready');
     }
     return UpdateRelease(
         version, json['body'] is String ? json['body'] as String : '', asset,
@@ -206,18 +216,18 @@ class UpdateTransport {
   }
 
   Future<UpdateRelease> latest(String platform, String abi,
-      {UpdateSource source = UpdateSource.github}) async {
+      {UpdateSource source = UpdateSource.github, bool appImage = false}) async {
     if (source == UpdateSource.gitee) {
-      return _latestFrom(platform, abi, mirror: true);
+      return _latestFrom(platform, abi, mirror: true, appImage: appImage);
     }
     try {
       // A successful upstream check must not contact the mirror, even when
       // there is no new version or no installer for the current platform.
-      return await _latestFrom(platform, abi, mirror: false);
+      return await _latestFrom(platform, abi, mirror: false, appImage: appImage);
     } on Exception catch (error) {
       if (!_isUnavailable(error)) rethrow;
     }
-    return _latestFrom(platform, abi, mirror: true);
+    return _latestFrom(platform, abi, mirror: true, appImage: appImage);
   }
 
   /// Probe the download endpoint, not just the release API. Never save the DMG
@@ -288,7 +298,7 @@ class UpdateTransport {
   }
 
   Future<UpdateRelease> _latestFrom(String platform, String abi,
-      {required bool mirror}) async {
+      {required bool mirror, required bool appImage}) async {
     final cancel = CancelToken();
     Future<UpdateRelease> read() async {
       final response = await _get(
@@ -307,14 +317,8 @@ class UpdateTransport {
           (mirror && json['modu_update_schema'] != 1)) {
         throw const FormatException('Invalid update manifest');
       }
-      final release = UpdateRelease.parse(json,
-          platform: platform, abi: abi, fromMirror: mirror);
-      if (mirror &&
-          updateAssetName(release.version, platform, abi) != null &&
-          release.asset == null) {
-        throw const FormatException('Mirror asset not ready');
-      }
-      return release;
+      return UpdateRelease.parse(json,
+          platform: platform, abi: abi, appImage: appImage, fromMirror: mirror);
     }
 
     // Bound the whole check, including redirects and a stalled response body.
@@ -431,20 +435,30 @@ class AppUpdateController extends ChangeNotifier {
       {UpdateTransport? transport,
       String? platform,
       String? abi,
+      bool? appImage,
       Future<String> Function()? installedVersion,
       Future<Directory> Function()? directory})
       : transport = transport ?? UpdateTransport(),
         platform = platform ?? Platform.operatingSystem,
         abi = abi ?? Abi.current().toString(),
-        installedVersion = installedVersion ?? getAppVersion,
-        directory = directory ??
-            (() async => Directory(
-                '${(await getTemporaryDirectory()).path}/modu-updates'));
+        isAppImage = (platform ?? Platform.operatingSystem) == 'linux' &&
+            (appImage ??
+                (Platform.environment['APPIMAGE']?.isNotEmpty ?? false)),
+        installedVersion = installedVersion ?? getAppVersion {
+    this.directory = directory ??
+        (() async {
+          final base = await (isAppImage
+              ? getApplicationCacheDirectory()
+              : getTemporaryDirectory());
+          return Directory('${base.path}/modu-updates');
+        });
+  }
   static final instance = AppUpdateController();
   final UpdateTransport transport;
   final String platform, abi;
+  final bool isAppImage;
   final Future<String> Function() installedVersion;
-  final Future<Directory> Function() directory;
+  late final Future<Directory> Function() directory;
   UpdatePhase phase = UpdatePhase.idle;
   UpdateRelease? release;
   File? downloaded;
@@ -490,7 +504,8 @@ class AppUpdateController extends ChangeNotifier {
     notifyListeners();
     try {
       currentVersion = await installedVersion();
-      final latest = await transport.latest(platform, abi, source: source);
+      final latest = await transport.latest(platform, abi,
+          source: source, appImage: isAppImage);
       final resolvedSource =
           latest.fromMirror ? UpdateSource.gitee : UpdateSource.github;
       if (usesBrowserDownload ||
@@ -584,7 +599,13 @@ class AppUpdateController extends ChangeNotifier {
 
   /// Recheck integrity immediately before handing executable bytes to the OS.
   Future<void> install(Future<String?> Function(File) open) async {
-    if (busy || downloaded == null || release?.asset == null || !newer) return;
+    if (isAppImage ||
+        busy ||
+        downloaded == null ||
+        release?.asset == null ||
+        !newer) {
+      return;
+    }
     if (usesBrowserDownload) {
       error = 'browser_required';
       notifyListeners();

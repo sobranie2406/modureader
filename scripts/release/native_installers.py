@@ -314,6 +314,17 @@ def _restore_linux_runtime(library, arch, work, provenance):
         'This packaging step adjusts runtime libraries; application source is recorded in SOURCE.txt.\n', encoding='utf-8')
 
 
+def write_linux_desktop_entry(path, executable):
+    path.write_text(
+        '[Desktop Entry]\nType=Application\nName=Modu Reader\nName[zh_CN]=默读\n'
+        f'Comment=Read ebooks with AI tools\nExec={executable} %U\nIcon=modureader\n'
+        'MimeType=x-scheme-handler/modu;application/pdf;application/epub+zip;'
+        'application/x-mobipocket-ebook;application/vnd.amazon.ebook;'
+        'application/x-fictionbook+xml;text/plain;text/markdown;application/x-umd;\n'
+        'Terminal=false\nCategories=Office;Viewer;\nStartupWMClass=com.modu.reader\n', encoding='utf-8')
+    command('desktop-file-validate', path)
+
+
 def build_deb(bundle, arch, version, output, work, build_number=None):
     root = work / 'deb'
     app = root / 'opt/modureader'
@@ -335,13 +346,7 @@ def build_deb(bundle, arch, version, output, work, build_number=None):
         ' Reader, notes, AI tools, vector search, translation and WebDAV sync.\n', encoding='utf-8')
     desktop = root / 'usr/share/applications'
     desktop.mkdir(parents=True)
-    (desktop / 'modureader.desktop').write_text(
-        '[Desktop Entry]\nType=Application\nName=Modu Reader\nName[zh_CN]=默读\n'
-        'Comment=Read ebooks with AI tools\nExec=modureader %U\nIcon=modureader\n'
-        'MimeType=x-scheme-handler/modu;application/pdf;application/epub+zip;'
-        'application/x-mobipocket-ebook;application/vnd.amazon.ebook;'
-        'application/x-fictionbook+xml;text/plain;text/markdown;application/x-umd;\n'
-        'Terminal=false\nCategories=Office;Viewer;\nStartupWMClass=com.modu.reader\n', encoding='utf-8')
+    write_linux_desktop_entry(desktop / 'modureader.desktop', 'modureader')
     mime = root / 'usr/share/mime/packages'
     mime.mkdir(parents=True)
     (mime / 'modureader.xml').write_text(
@@ -364,7 +369,6 @@ def build_deb(bundle, arch, version, output, work, build_number=None):
     docs.mkdir(parents=True)
     for name in ('LICENSE', 'NOTICE', 'SOURCE.txt'):
         shutil.copy2(bundle / name, docs / name)
-    command('desktop-file-validate', desktop / 'modureader.desktop')
     result = output / f'Modu-{version}-linux-{arch}.deb'
     command('dpkg-deb', '--root-owner-group', '--build', root, result)
     if command('dpkg-deb', '-f', result, 'Architecture') != architecture:
@@ -374,6 +378,51 @@ def build_deb(bundle, arch, version, output, work, build_number=None):
     extracted = work / 'deb-verify'
     command('dpkg-deb', '-x', result, extracted)
     verify_payload(extracted / 'opt/modureader', 'linux', arch)
+    return result
+
+
+def build_linux_appimage(bundle, version, output, runtime_path):
+    from fetch_appimage_runtime import RUNTIME_TAG, RUNTIME_URL, validate_runtime
+
+    validate_version(version)
+    runtime = Path(runtime_path).read_bytes()
+    validate_runtime(runtime)
+    result = output / f'Modu-{version}-linux-x64.AppImage'
+    if result.exists():
+        raise ValueError('Refusing to overwrite an existing AppImage')
+    with tempfile.TemporaryDirectory(prefix='modu-appimage-', dir=output) as tmp:
+        work = Path(tmp)
+        appdir = work / 'Modu.AppDir'
+        app = appdir / 'usr' / 'lib' / 'modureader'
+        shutil.copytree(bundle, app, symlinks=True)
+        # Keep the distro's WPE library and helper processes on the same build.
+        for pattern in ('libWPE*.so*', 'libwpe-1.0.so*'):
+            for library in (app / 'lib').glob(pattern):
+                library.unlink()
+        prepare_linux_runtime(app, 'x64', work)
+        (app / 'modu').chmod(0o755)
+        with (app / 'SOURCE.txt').open('a', encoding='utf-8') as source:
+            source.write(f'\nAppImage Type 2 runtime: {RUNTIME_URL}\n'
+                         f'Runtime source: https://github.com/AppImage/type2-runtime/tree/{RUNTIME_TAG}\n')
+        run = appdir / 'AppRun'
+        run.write_text('#!/bin/sh\nexec "${APPDIR:-${0%/*}}/usr/lib/modureader/modu" "$@"\n',
+                       encoding='utf-8')
+        run.chmod(0o755)
+        write_linux_desktop_entry(appdir / 'modureader.desktop', 'AppRun')
+        shutil.copy2(app / 'data/flutter_assets/assets/icon/modu-app-icon.png', appdir / 'modureader.png')
+        (appdir / '.DirIcon').symlink_to('modureader.png')
+        verify_payload(app, 'linux', 'x64')
+
+        filesystem = work / 'image.squashfs'
+        command('mksquashfs', appdir, filesystem, '-noappend', '-all-root', '-no-progress', '-comp', 'gzip')
+        packed = work / result.name
+        with packed.open('wb') as image, filesystem.open('rb') as data:
+            image.write(runtime)
+            shutil.copyfileobj(data, image)
+        packed.chmod(0o755)
+        if command(packed, '--appimage-offset') != str(len(runtime)):
+            raise ValueError('Incorrect AppImage filesystem offset')
+        packed.rename(result)
     return result
 
 

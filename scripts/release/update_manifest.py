@@ -23,11 +23,12 @@ def create_manifest(release):
         for arch in ("arm64", "x64")
         if platform != "android" or arch == "arm64"
     } | {f"Modu-{version}-ios-arm64.ipa"}
+    appimage = f"Modu-{version}-linux-x64.AppImage"
     assets = []
     seen = set()
     for asset in release.get("assets", []):
         name = asset.get("name")
-        if name not in names:
+        if name not in names and name != appimage:
             continue
         url = f"https://github.com/sobranie2406/modureader/releases/download/{tag}/{name}"
         digest = asset.get("digest")
@@ -41,7 +42,7 @@ def create_manifest(release):
         seen.add(name)
         assets.append(dict(name=name, state="uploaded", size=size,
                            digest=digest.lower(), browser_download_url=url))
-    if seen != names:
+    if not names <= seen:
         raise ValueError("All eight verified platform installers are required")
     return dict(modu_update_schema=1, tag_name=tag, draft=False,
                 prerelease=False,

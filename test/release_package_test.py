@@ -86,18 +86,18 @@ class ReleaseAssetSetTest(unittest.TestCase):
                                           ('windows', '-setup.exe'), ('macos', '.dmg')]
                  for arch in ('x64', 'arm64')
                  if platform != 'android' or arch == 'arm64']
-        names += ['Modu-1.0.0-ios-arm64.ipa']
+        names += ['Modu-1.0.0-ios-arm64.ipa', 'Modu-1.0.0-linux-x64.AppImage']
         for name in names:
             data = b'synthetic packaging test'
             (folder / name).write_bytes(data)
             (folder / (name + '.sha256')).write_text(f'{hashlib.sha256(data).hexdigest()}  {name}\n')
         return names
 
-    def test_all_eight_packages_are_required_without_notices(self):
+    def test_all_nine_packages_are_required_without_notices(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             names = self.fixture(folder)
-            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 8)
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0'), 9)
             (folder / names[0]).unlink()
             with self.assertRaisesRegex(ValueError, 'missing='):
                 validate_release_assets(folder, 'v1.0.0')
@@ -110,7 +110,7 @@ class ReleaseAssetSetTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
                 validate_release_assets(folder, 'v1.0.0')
 
-    def test_harmony_release_requires_nine_packages_and_matching_checksum(self):
+    def test_harmony_release_requires_ten_packages_and_matching_checksum(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             self.fixture(folder)
@@ -121,10 +121,24 @@ class ReleaseAssetSetTest(unittest.TestCase):
             (folder / name).write_bytes(payload)
             (folder / (name + '.sha256')).write_text(
                 f'{hashlib.sha256(payload).hexdigest()}  {name}\n')
-            self.assertEqual(validate_release_assets(folder, 'v1.0.0', True), 9)
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0', True), 10)
             (folder / name).write_bytes(b'truncated')
             with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
                 validate_release_assets(folder, 'v1.0.0', True)
+
+    def test_linux_x64_requires_both_deb_and_appimage_and_their_checksums(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            for suffix in ('.deb', '.AppImage'):
+                name = f'Modu-1.0.0-linux-x64{suffix}'
+                (folder / name).write_bytes(b'sample')
+                (folder / (name + '.sha256')).write_text(
+                    f'{hashlib.sha256(b"sample").hexdigest()}  {name}\n')
+            self.assertEqual(validate_release_assets(folder, 'v1.0.0', targets='linux-x64'), 2)
+            checksum = folder / 'Modu-1.0.0-linux-x64.AppImage.sha256'
+            checksum.unlink()
+            with self.assertRaisesRegex(ValueError, r'missing=.*AppImage\.sha256'):
+                validate_release_assets(folder, 'v1.0.0', targets='linux-x64')
 
     def test_android_x64_cannot_be_packaged_or_published(self):
         with self.assertRaisesRegex(ValueError, 'internal test target'):
@@ -352,10 +366,17 @@ class NativeInstallerTest(unittest.TestCase):
 
     def test_linux_link_entry_preserves_single_instance_delivery(self):
         root = Path(__file__).resolve().parents[1]
-        installer = (root / 'scripts/release/native_installers.py').read_text()
         runner = (root / 'linux/my_application.cc').read_text()
-        self.assertIn('Exec=modureader %U', installer)
-        self.assertIn('MimeType=x-scheme-handler/modu;', installer)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(native, 'command') as validate_desktop:
+            entry = Path(tmp) / 'modureader.desktop'
+            for executable in ('modureader', 'AppRun'):
+                with self.subTest(executable=executable):
+                    native.write_linux_desktop_entry(entry, executable)
+                    desktop = entry.read_text().splitlines()
+                    self.assertIn(f'Exec={executable} %U', desktop)
+                    mime_types = next(line for line in desktop if line.startswith('MimeType='))
+                    self.assertIn('x-scheme-handler/modu', mime_types.removeprefix('MimeType=').split(';'))
+                    validate_desktop.assert_called_with('desktop-file-validate', entry)
         self.assertIn('G_APPLICATION_HANDLES_COMMAND_LINE', runner)
         self.assertNotIn('G_APPLICATION_NON_UNIQUE', runner)
         self.assertIn('gtk_window_present', runner)

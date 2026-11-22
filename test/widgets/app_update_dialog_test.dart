@@ -27,7 +27,7 @@ class FakeTransport extends UpdateTransport {
 
   @override
   Future<UpdateRelease> latest(String platform, String abi,
-      {UpdateSource source = UpdateSource.github}) async {
+      {UpdateSource source = UpdateSource.github, bool appImage = false}) async {
     checkRequests.add(source);
     if (gate != null) return gate!.future;
     if (offline) throw const SocketException('offline');
@@ -207,6 +207,28 @@ void main() {
     expect(find.text('Download update'), findsNothing);
     expect(find.textContaining('No package is available for this device'),
         findsOneWidget);
+  });
+
+  testWidgets('verified AppImage provides the file path and replacement steps',
+      (tester) async {
+    const path = '/synthetic/Modu-1.0.9-linux-x64.AppImage';
+    final t = FakeTransport()
+      ..value = const UpdateRelease('1.0.9', '',
+          UpdateAsset('Modu-1.0.9-linux-x64.AppImage', '', 200, 'test'));
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'linux',
+        abi: 'linux_x64',
+        appImage: true,
+        installedVersion: () async => '1.0.8');
+    addTearDown(c.dispose);
+    await c.check();
+    c.downloaded = File(path);
+    c.phase = UpdatePhase.ready;
+    await show(tester, c);
+    expect(find.text(path), findsOneWidget);
+    expect(find.textContaining('replace the old AppImage'), findsOneWidget);
+    expect(find.text('Install update'), findsNothing);
   });
 
   testWidgets('check failure is visible and retryable, not up to date',

@@ -29,23 +29,30 @@ UpdateAsset get asset => UpdateAsset(
     payload.length,
     sha256.convert(payload).toString());
 
-Map<String, dynamic> releaseJson() => {
+UpdateAsset linuxAsset(String suffix) {
+  final name = 'Modu-1.0.9-linux-x64$suffix';
+  return UpdateAsset(name, '$moduReleasePage/download/v1.0.9/$name',
+      payload.length, sha256.convert(payload).toString());
+}
+
+Map<String, dynamic> releaseJson([List<UpdateAsset>? assets]) => {
       'tag_name': 'v1.0.9',
       'draft': false,
       'prerelease': false,
       'body': 'Release notes',
       'assets': [
-        <String, dynamic>{
-          'name': asset.name,
-          'browser_download_url': asset.url,
-          'state': 'uploaded',
-          'size': asset.size,
-          'digest': 'sha256:${asset.digest}',
-        }
+        for (final releaseAsset in assets ?? [asset])
+          <String, dynamic>{
+            'name': releaseAsset.name,
+            'browser_download_url': releaseAsset.url,
+            'state': 'uploaded',
+            'size': releaseAsset.size,
+            'digest': 'sha256:${releaseAsset.digest}',
+          }
       ],
     };
-Map<String, dynamic> mirrorJson() =>
-    {...releaseJson(), 'modu_update_schema': 1};
+Map<String, dynamic> mirrorJson([List<UpdateAsset>? assets]) =>
+    {...releaseJson(assets), 'modu_update_schema': 1};
 UpdateRelease parse(Map<String, dynamic> json) =>
     UpdateRelease.parse(json, platform: 'android', abi: 'android_arm64');
 
@@ -56,7 +63,7 @@ class ControlledTransport extends UpdateTransport {
   bool? downloadAllowsFallback;
   @override
   Future<UpdateRelease> latest(String platform, String abi,
-      {UpdateSource source = UpdateSource.github}) async {
+      {UpdateSource source = UpdateSource.github, bool appImage = false}) async {
     checkedSource = source;
     checks++;
     return response != null
@@ -106,6 +113,26 @@ void main() {
     expect(updateAssetName('1.0.9', 'ios', 'ios_x64'), isNull);
     expect(updateAssetName('1.0.9', 'android', 'android_arm'), isNull);
     expect(updateAssetName('1.0.9', 'linux', 'linux_riscv64'), isNull);
+  });
+
+  test('Linux update matches the running package format and ABI', () {
+    final deb = linuxAsset('.deb');
+    final image = linuxAsset('.AppImage');
+    final json = releaseJson([deb, image]);
+    expect(
+        UpdateRelease.parse(json, platform: 'linux', abi: 'linux_x64')
+            .asset
+            ?.name,
+        deb.name);
+    expect(
+        UpdateRelease.parse(json,
+                platform: 'linux', abi: 'linux_x64', appImage: true)
+            .asset
+            ?.name,
+        image.name);
+    expect(
+        updateAssetName('1.0.9', 'linux', 'linux_arm64', appImage: true),
+        isNull);
   });
 
   test(
@@ -180,6 +207,65 @@ void main() {
             .latest('android', 'android_arm64', source: UpdateSource.gitee),
         throwsA(isA<DioException>()));
     expect(failed.requests.map((r) => r.uri.toString()), [moduMirrorManifest]);
+  });
+
+  test('older Gitee manifests support DEB and fall back to the release page '
+      'for AppImage', () async {
+    final deb = linuxAsset('.deb');
+    final adapter = Adapter(
+        (_) => ResponseBody.fromString(jsonEncode(mirrorJson([deb])), 200));
+    final t = transport(adapter);
+    final image = await t.latest('linux', 'linux_x64',
+        source: UpdateSource.gitee, appImage: true);
+    expect(image.asset, isNull);
+    expect(image.url, '$moduMirrorReleasePage/tag/v1.0.9');
+    final package =
+        await t.latest('linux', 'linux_x64', source: UpdateSource.gitee);
+    expect(package.asset?.name, deb.name);
+  });
+
+  test('AppImage downloads from the selected source and verifies before '
+      'manual replacement', () async {
+    final image = linuxAsset('.AppImage');
+    final mirrorUrl = '$moduMirrorReleasePage/download/v1.0.9/${image.name}';
+    final adapter = Adapter((o) {
+      if (o.uri.toString() == moduMirrorManifest) {
+        return ResponseBody.fromString(
+            jsonEncode(mirrorJson([linuxAsset('.deb'), image])), 200);
+      }
+      expect(o.uri.toString(), mirrorUrl);
+      return ResponseBody.fromBytes(payload, 200);
+    });
+    final t = transport(adapter);
+    final c = AppUpdateController(
+        transport: t,
+        platform: 'linux',
+        abi: 'linux_x64',
+        appImage: true,
+        installedVersion: () async => '1.0.8',
+        directory: () async => directory);
+    addTearDown(c.dispose);
+    c.selectSource(UpdateSource.gitee);
+    await c.check();
+    expect(c.release?.asset?.name, image.name);
+    await c.download();
+    expect(c.phase, UpdatePhase.ready);
+    expect(await t.verify(c.downloaded!, image), isTrue);
+    await c.install((_) async => fail('AppImage was sent to an installer'));
+    expect(c.phase, UpdatePhase.ready);
+    expect(adapter.requests.map((r) => r.uri.toString()),
+        [moduMirrorManifest, mirrorUrl]);
+  });
+
+  test('Gitee rejects a malformed advertised AppImage asset', () async {
+    final doc = mirrorJson([linuxAsset('.AppImage')]);
+    (doc['assets'] as List).first['digest'] = 'sha256:bad';
+    final adapter =
+        Adapter((_) => ResponseBody.fromString(jsonEncode(doc), 200));
+    await expectLater(
+        transport(adapter).latest('linux', 'linux_x64',
+            source: UpdateSource.gitee, appImage: true),
+        throwsFormatException);
   });
 
   test('explicit Gitee downloads directly and still verifies the same digest',

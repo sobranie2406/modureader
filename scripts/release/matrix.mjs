@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 export const desktops = [
   {os: 'ubuntu-24.04', platform: 'linux', arch: 'x64', container: 'debian:trixie'},
+  {os: 'ubuntu-24.04', platform: 'linux', arch: 'x64', container: 'archlinux:base', appimage: true},
   {os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64', container: 'debian:trixie'},
   {os: 'windows-2025', platform: 'windows', arch: 'x64', sdk_arch: 'x64'},
   {os: 'windows-11-arm', platform: 'windows', arch: 'arm64', sdk_arch: 'x64'},
@@ -10,11 +11,11 @@ export const desktops = [
 ];
 
 export function selectTargets(value) {
-  const names = [...desktops.map(t => `${t.platform}-${t.arch}`), 'android', 'ios', 'harmony'];
-  const requested = value === 'all' ? names : value.split(',').map(s => s.trim());
-  if (!requested.length || requested.some(t => !names.includes(t))) throw Error('Invalid release targets');
+  const names = new Set([...desktops.map(t => `${t.platform}-${t.arch}`), 'android', 'ios', 'harmony']);
+  const requested = value === 'all' ? [...names] : value.split(',').map(s => s.trim());
+  if (!requested.length || requested.some(t => !names.has(t))) throw Error('Invalid release targets');
   const desktop = desktops.filter(t => requested.includes(`${t.platform}-${t.arch}`));
-  return {desktop, has_desktop: desktop.length > 0, android: requested.includes('android'), ios: requested.includes('ios'), harmony: requested.includes('harmony')};
+  return {desktop, has_desktop: desktop.length > 0, linux_appimage: requested.includes('linux-x64'), android: requested.includes('android'), ios: requested.includes('ios'), harmony: requested.includes('harmony')};
 }
 
 if (process.env.GITHUB_OUTPUT) {

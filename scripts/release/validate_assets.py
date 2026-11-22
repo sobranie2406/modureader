@@ -24,6 +24,8 @@ def validate(directory, tag, include_harmony=False, targets='all'):
     if not selected or any(t not in packages for t in selected) or len(set(selected)) != len(selected):
         raise ValueError('Invalid release targets')
     expected = {packages[t] for t in selected}
+    if 'linux-x64' in selected:
+        expected.add(f'Modu-{version}-linux-x64.AppImage')
     files = {p.name for p in Path(directory).iterdir() if p.is_file()}
     complete = expected | {name + '.sha256' for name in expected}
     if files != complete:
