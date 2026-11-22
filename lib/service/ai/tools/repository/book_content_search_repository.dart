@@ -14,6 +14,7 @@ import 'package:modu_reader/utils/webView/gererate_url.dart';
 import 'package:modu_reader/utils/webView/webview_console_message.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 import 'package:modu_reader/utils/webView/reader_operation.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 import 'package:modu_reader/service/feedback/crash_journal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -201,7 +202,7 @@ class BookContentSearchRepository {
     final fingerprint = await bookSourceFingerprint(book);
     final existing = _sessions[book.id];
     if (existing != null &&
-        existing.isActive &&
+        !existing._disposed &&
         existing.sourceFingerprint == fingerprint) {
       existing.cancelDisposalTimer();
       await existing.ensureInitialized();
@@ -264,10 +265,26 @@ class _HeadlessSearchSession {
   bool get isActive => _webView != null;
 
   Future<void>? _initialization;
-  Future<void> ensureInitialized() => _initialization ??= _initialize();
+
+  /// A failed start must not be cached: keeping a rejected future here turned
+  /// one transient WebView2 failure into "book search never works again" for
+  /// the rest of the session.
+  Future<void> ensureInitialized() =>
+      _initialization ??= _initialize().catchError((Object error) {
+        _initialization = null;
+        throw error;
+      });
 
   Future<void> _initialize() async {
-    if (Platform.isWindows && webViewEnvironment == null) {
+    // Retry on demand rather than only reading a cached value: one failed start
+    // used to disable book search for the whole session.
+    final environment = Platform.isWindows
+        ? await _wait(WebViewEnvironmentBoot.instance.ensure(), 'environment')
+        : webViewEnvironment;
+    if (_disposed || isCancelled?.call() == true) {
+      throw const ReaderOperationCancelled();
+    }
+    if (Platform.isWindows && environment == null) {
       throw StateError(
         'WebViewEnvironment is not initialized. '
         'WebView2 Runtime may not be installed.',
@@ -289,7 +306,7 @@ class _HeadlessSearchSession {
     _tocCompleter = Completer<List<dynamic>>();
 
     final headless = AnxHeadlessWebView(
-      webViewEnvironment: webViewEnvironment,
+      webViewEnvironment: environment,
       initialUrlRequest: URLRequest(url: WebUri(url)),
       initialSettings: InAppWebViewSettings(
         supportZoom: false,

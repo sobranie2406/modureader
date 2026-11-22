@@ -407,7 +407,10 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             registered.action.scope == PluginSelectionScope.context
                 ? widget.contextText ?? ''
                 : '';
-        final chapter = epubPlayerKey.currentState?.selectionChapterTitle ?? '';
+        final activePlayer = epubPlayerKey.currentState;
+        final chapterReader =
+            activePlayer?.widget.book.id == bookId ? activePlayer : null;
+        final chapter = chapterReader?.selectionChapterTitle ?? '';
         final onNoteCreated =
             widget.allowAnnotations ? widget.onNoteCreated : null;
         widget.onClose();
@@ -420,6 +423,8 @@ class ExcerptMenuState extends State<ExcerptMenu> {
             bookId: bookId,
             cfi: cfi,
             chapter: chapter,
+            chapterContent: chapterReader?.getCurrentChapterContent,
+            chapterByHref: chapterReader?.getChapterContentByHref,
             onNoteCreated: onNoteCreated);
         break;
       case 'query':

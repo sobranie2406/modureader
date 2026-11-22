@@ -1514,22 +1514,27 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         source: "previousContent($count)",
       );
 
-  Future<String> _getCurrentChapterContent({int? maxCharacters}) async {
-    final raw = await theChapterContent();
+  Future<String> getCurrentChapterContent({int? maxCharacters}) async {
+    if (!mounted) return '';
+    final raw = maxCharacters != null && maxCharacters > 0
+        ? await webViewController.evaluateJavascript(
+            source: 'theChapterContent().trim().slice(0, $maxCharacters)',
+          ) as String?
+        : await theChapterContent();
     return _normalizeChapterContent(raw, maxCharacters);
   }
 
-  Future<String> _getChapterContentByHref(
+  Future<String> getChapterContentByHref(
     String href, {
     int? maxCharacters,
   }) async {
-    if (href.isEmpty) {
+    if (!mounted || href.isEmpty) {
       return '';
     }
 
     final result = await webViewController.callAsyncJavaScript(
-      functionBody:
-          'return await getChapterContentByHref("${href.replaceAll('"', '\\"')}")',
+      functionBody: 'return await getChapterContentByHref(href, {maxChars})',
+      arguments: {'href': href, 'maxChars': maxCharacters},
     );
 
     final value = result?.value;
@@ -1555,10 +1560,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   void _registerChapterContentBridge() {
     ref.read(chapterContentBridgeProvider.notifier).state =
         ChapterContentHandlers(
-      fetchCurrentChapter: ({int? maxCharacters}) =>
-          _getCurrentChapterContent(maxCharacters: maxCharacters),
-      fetchChapterByHref: (href, {int? maxCharacters}) =>
-          _getChapterContentByHref(href, maxCharacters: maxCharacters),
+      fetchCurrentChapter: getCurrentChapterContent,
+      fetchChapterByHref: getChapterContentByHref,
       fetchPreviousContent: ({int? maxCharacters}) async {
         final requestedCharacters = maxCharacters ?? 48000;
         final content = await previousContent(requestedCharacters);

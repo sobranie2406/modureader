@@ -729,6 +729,8 @@ String pluginErrorText(BuildContext context, Object error) {
       zh ? '划词工具栏动作 id 冲突，请先删除同名动作。' : error.message,
     PluginErrorCode.noToolbarSlots =>
       zh ? '划词工具栏自定义动作已达 24 个上限，请先删除一个再安装。' : error.message,
+    PluginErrorCode.permissionNotRuntime =>
+      zh ? '该权限随安装授予，不能在运行时单独开关。' : error.message,
     PluginErrorCode.internal => error.message,
   };
   return reason;

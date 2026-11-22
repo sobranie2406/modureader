@@ -13,6 +13,7 @@ import 'package:modu_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:modu_reader/service/feedback/crash_journal.dart';
 import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -76,9 +77,13 @@ void main() {
       debugPrint('WINDOWS READER STAGE server_ready');
       expect(await WebViewEnvironment.getAvailableVersion(), isNotNull);
       debugPrint('WINDOWS READER STAGE runtime_available');
-      webViewEnvironment = await WebViewEnvironment.create(
-          settings: WebViewEnvironmentSettings(
-              userDataFolder: '${root.path}/webview'));
+      // The environment is owned by WebViewEnvironmentBoot now; the old
+      // writable global let one failed start latch null for the session, so the
+      // test injects through the seam instead of assigning the getter.
+      WebViewEnvironmentBoot.instance.debugSetEnvironment(
+          await WebViewEnvironment.create(
+              settings: WebViewEnvironmentSettings(
+                  userDataFolder: '${root.path}/webview')));
       debugPrint('WINDOWS READER STAGE environment_ready');
       await _verifyLateBridgeReply(webViewEnvironment!)
           .timeout(const Duration(seconds: 30));
@@ -128,7 +133,7 @@ void main() {
           .timeout(const Duration(seconds: 20));
       await Server().stop();
       await webViewEnvironment?.dispose();
-      webViewEnvironment = null;
+      WebViewEnvironmentBoot.instance.debugSetEnvironment(null);
       // WebView2 child processes may retain cache files briefly after close.
       // Leave only this synthetic OS temp directory for the CI runner cleanup.
     }

@@ -31,7 +31,6 @@ enum TranslateService {
   TranslateServiceProvider get provider =>
       TranslateRegistry.current.providerFor(name);
 
-
   /// Get the display label from the provider.
   String getLabel(BuildContext context) => provider.getLabel(context);
 
@@ -59,6 +58,21 @@ enum TranslateService {
 TranslateService getTranslateService(String name) =>
     TranslateRegistry.current.resolveService(name) ??
     TranslateService.microsoftFree;
+
+/// A translation attempt retrying cannot fix.
+///
+/// Offline, a blocked host and a request timeout all return the same failure
+/// however many times they are tried, so retrying them only multiplies the
+/// reader's wait: a blocked free endpoint once made one plugin call hang for a
+/// minute and wrote three stack traces to the log.
+class TranslateUnavailableException implements Exception {
+  const TranslateUnavailableException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'TranslateUnavailableException($cause)';
+}
 
 /// Base class for all translation service providers.
 /// Subclasses must implement [service], [label], [translate], and [translateStream].
@@ -126,6 +140,9 @@ abstract class TranslateServiceProvider {
 
         throw Exception(
             'Translation returned no valid result: ${lastResult ?? 'No result'}');
+      } on TranslateUnavailableException {
+        // Nothing about the network state changed between attempts.
+        rethrow;
       } catch (e) {
         if (attempt < maxRetries) {
           AnxLog.warning(

@@ -59,8 +59,53 @@
       });
       const modu = Object.freeze({
         http:Object.freeze({get:args=>request('http.get',args)}),
-        library:Object.freeze({list:args=>request('library.list',args)}),
-        notes:Object.freeze({save:args=>request('notes.save',args)}),
+        library:Object.freeze({
+          list:args=>request('library.list',args),
+          tags:args=>request('library.tags',args),
+          groups:args=>request('library.groups',args),
+          tag:args=>request('library.tag',args),
+          move:args=>request('library.move',args)
+        }),
+        books:Object.freeze({
+          content:args=>request('books.content',args),
+          chapter:args=>request('books.chapter',args)
+        }),
+        notes:Object.freeze({
+          list:args=>request('notes.list',args),
+          save:args=>request('notes.save',args)
+        }),
+        reading:Object.freeze({
+          stats:args=>request('reading.stats',args),
+          history:args=>request('reading.history',args)
+        }),
+        search:Object.freeze({library:args=>request('search.library',args)}),
+        knowledge:Object.freeze({search:args=>request('knowledge.search',args)}),
+        dictionary:Object.freeze({lookup:args=>request('dictionary.lookup',args)}),
+        ai:Object.freeze({complete:args=>request('ai.complete',args)}),
+        translate:Object.freeze({text:args=>request('translate.text',args)}),
+        tts:Object.freeze({speak:args=>request('tts.speak',args)}),
+        clipboard:Object.freeze({
+          read:()=>request('clipboard.read'),
+          write:args=>request('clipboard.write',args)
+        }),
+        share:Object.freeze({text:args=>request('share.text',args)}),
+        ui:Object.freeze({
+          confirm:args=>request('ui.confirm',args),
+          prompt:args=>request('ui.prompt',args),
+          select:args=>request('ui.select',args),
+          progress:args=>request('ui.progress',args)
+        }),
+        open:Object.freeze({url:args=>request('open.url',args)}),
+        storage:Object.freeze({
+          list:()=>request('storage.list'),
+          read:args=>request('storage.read',args),
+          write:args=>request('storage.write',args),
+          remove:args=>request('storage.remove',args)
+        }),
+        permissions:Object.freeze({
+          request:args=>request('permissions.request',args),
+          status:()=>request('permissions.status')
+        }),
         articles:Object.freeze({capture:()=>request('articles.capture')}),
         privateLibrary:Object.freeze({
           open:()=>request('privateLibrary.open'),lock:()=>request('privateLibrary.lock'),
@@ -75,7 +120,13 @@
         if (message.reply) {
           const task=pending.get(message.reply); if(!task)return;
           pending.delete(message.reply);
-          if(message.error)task.reject(new Error('Plugin request failed'));else task.resolve(message.value);
+          if(message.error){
+            // Keep the host's failure code: a permission the user has not
+            // granted must not look like a broken package.
+            const error=new Error('Plugin request failed');
+            error.moduCode=typeof message.code==='string'?message.code:'execution';
+            task.reject(error);
+          }else task.resolve(message.value);
           return;
         }
         if (!message.start) return;
@@ -86,7 +137,11 @@
     const suffix = `
           })(message.input,modu);
           post({kind:'result',value:result});
-        } catch (_) { post({kind:'error'}); }
+        } catch (error) {
+          // Report the code the host gave us, or 'execution' for a script bug,
+          // so the diagnostics panel names the real cause.
+          post({kind:'error',code:(error&&typeof error.moduCode==='string')?error.moduCode:'execution'});
+        }
       };
     `;
     const url = URL.createObjectURL(new Blob([prelude, source, suffix],{type:'application/javascript'}));

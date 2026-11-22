@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
 import 'package:modu_reader/service/plugins/plugin_script_engine.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
@@ -52,6 +53,42 @@ class Engine implements PluginScriptEngine {
   Future<void> dispose() async {
     disposed++;
     if (!result.isCompleted) result.completeError(StateError('disposed'));
+  }
+}
+
+/// Answers storage calls from memory so the test proves the *gate*, not the
+/// filesystem: a real `PluginHostApi` would resolve an app-data directory.
+class _MemoryStorageApi extends PluginHostApi {
+  _MemoryStorageApi(String pluginId)
+      : super(pluginId: pluginId, services: const PluginHostServices());
+  final files = <String, String>{};
+  @override
+  Future<Object?> call(String method, Map<String, dynamic> args) async {
+    switch (method) {
+      case 'storage.write':
+        files[args['name'] as String] = args['text'] as String;
+        return {'bytes': (args['text'] as String).length};
+      case 'storage.read':
+        return {'text': files[args['name'] as String] ?? ''};
+      case 'storage.list':
+        return {'entries': files.keys.toList()};
+      case 'storage.remove':
+        files.remove(args['name'] as String);
+        return {'removed': true};
+    }
+    throw const PluginScriptFailure('permission');
+  }
+}
+
+class _SpeechApi extends PluginHostApi {
+  _SpeechApi(String pluginId)
+      : super(pluginId: pluginId, services: const PluginHostServices());
+
+  @override
+  Future<Object?> call(String method, Map<String, dynamic> args) async {
+    expect(method, 'tts.speak');
+    expect(args, {'text': 'hello'});
+    return {'spoken': true};
   }
 }
 
@@ -360,6 +397,87 @@ void main() {
     });
   });
 
+  test('a declared but ungranted capability reports denied, not permission',
+      () async {
+    // 'permission' means the package never declared the token; 'denied' means it
+    // did and the reader has not switched it on. Collapsing the two sent people
+    // looking for a broken package instead of the consent sheet.
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      'ui:dialog',
+    ]);
+    final result = runtime.run(
+        pluginId: id,
+        action: action,
+        hostApi: PluginHostApi(
+            pluginId: id,
+            services: PluginHostServices(askConfirm: (_, __) async => true)));
+    await engine.ready.future;
+    await expectLater(engine.call('ui.confirm', {'title': 'a', 'message': 'b'}),
+        throwsA(failure('denied')));
+    // Granting the capability makes the same call succeed without a restart.
+    await host.grantPermissions(id, ['ui:dialog']);
+    expect(await engine.call('ui.confirm', {'title': 'a', 'message': 'b'}),
+        {'confirmed': true});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('plugin storage needs neither a declaration nor a consent switch',
+      () async {
+    // 'storage:plugin' is install-tier and the parser deliberately drops it from
+    // manifest.capabilities, so authorising storage by reading that set denied a
+    // capability the user could never grant: every modu.storage.* call failed
+    // with 'permission' and the detail page showed no row to switch on.
+    await install(capabilities: ['script:run', 'ui:selection-action']);
+    final api = _MemoryStorageApi(id);
+    final result = runtime.run(pluginId: id, action: action, hostApi: api);
+    await engine.ready.future;
+    expect(await engine.call('storage.write', {'name': 'a.json', 'text': 'hi'}),
+        {'bytes': 2});
+    expect(
+        await engine.call('storage.read', {'name': 'a.json'}), {'text': 'hi'});
+    expect(api.files, {'a.json': 'hi'});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('routes speech to the native host after consent', () async {
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      'tts:invoke',
+    ]);
+    final result =
+        runtime.run(pluginId: id, action: action, hostApi: _SpeechApi(id));
+    await engine.ready.future;
+    await expectLater(engine.call('tts.speak', {'text': 'hello'}),
+        throwsA(failure('denied')));
+    await host.grantPermissions(id, ['tts:invoke']);
+    expect(await engine.call('tts.speak', {'text': 'hello'}), {'spoken': true});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('a manifest that still names storage:plugin behaves the same', () async {
+    // Packages shipped before the token was made implicit declare it; accepting
+    // the token must not change what the plugin is allowed to do.
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      kPluginStorageCapability,
+    ]);
+    final api = _MemoryStorageApi(id);
+    final result = runtime.run(pluginId: id, action: action, hostApi: api);
+    await engine.ready.future;
+    expect(await engine.call('storage.write', {'name': 'b.json', 'text': 'x'}),
+        {'bytes': 1});
+    expect(api.files, {'b.json': 'x'});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
   Future<void> installArticle({String? source, bool library = false}) async {
     final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
     final extract =
@@ -649,6 +767,33 @@ void main() {
         engine.call('library.list', {}), throwsA(failure('cancelled')));
     expect(engine.disposed, greaterThan(0));
   });
+  test('an aborted job stops reserving the plugin once its engine releases',
+      () async {
+    // The slot used to be released only when the engine answered its disposal,
+    // so an engine that never answers kept the plugin — and, through the global
+    // two-job cap, every other plugin — permanently "busy".
+    final engines = <Engine>[];
+    runtime.dispose();
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () {
+          final created = Engine();
+          engines.add(created);
+          return created;
+        },
+        timeout: const Duration(milliseconds: 50));
+    await expectLater(run(), throwsA(failure('timeout')));
+    expect(engines.first.disposed, greaterThan(0));
+    // The released slot is reusable immediately in this fixture: Engine.dispose
+    // resolves at once, so the teardown map is cleared with it.
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final second = run();
+    await engines.last.ready.future;
+    engines.last.result.complete({'text': 'again'});
+    expect(await second, {'text': 'again'});
+    expect(engines.length, 2);
+  });
+
   test('bounds structured results and rejects HTML/action payload fields',
       () async {
     final result = run();
@@ -807,6 +952,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     final dns = Completer<List<InternetAddress>>();
     final http = Http();
     runtime = PluginScriptRuntime(
@@ -843,6 +991,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     var valid = true, resolved = false;
     final http = Http();
     runtime = PluginScriptRuntime(
@@ -875,6 +1026,9 @@ void main() {
     ], network: {
       'domains': ['example.com']
     });
+    // net:http is a runtime grant now; the network path is only reached after
+    // the user has switched it on.
+    await host.setPermission(id, 'net:http', true);
     final http = Http();
     runtime = PluginScriptRuntime(
         host: host,

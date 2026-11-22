@@ -75,11 +75,59 @@ class AnxHeadlessWebView {
     if (_stopping || _disposed) {
       return Future.error(StateError('Background reader is closing'));
     }
-    if (Platform.isWindows && _instances.any((view) => view._disposed)) {
-      return Future.error(StateError('上一后台阅读器仍在释放，请稍后重试'));
+    // Assigned before the first await so concurrent callers share one attempt
+    // and dispose() always has a future to wait on.
+    return _running ??= _start();
+  }
+
+  Future<void> _start() async {
+    // WebView2 tolerates only one create/destroy at a time. Instead of failing
+    // outright while a previous view finishes releasing — which made a quick
+    // second action, or a retry right after a failure, report "the previous
+    // background reader is still closing" — wait for those disposals, bounded
+    // so a stuck one cannot block forever.
+    //
+    // The wait only happens when there really is a disposal in flight: yielding
+    // on every start would let a caller that disposes immediately race ahead of
+    // creation and skip it entirely.
+    if (hasPendingDisposal) await _awaitPendingDisposals();
+    if (_stopping || _disposed) {
+      throw StateError('Background reader is closing');
     }
+    // No await between the check and the insert, so a concurrent dispose cannot
+    // leave a disposed instance registered.
     _instances.add(this);
-    return _running ??= _run();
+    try {
+      await _run();
+    } catch (_) {
+      // A failed creation owns no native view, so it must not stay registered:
+      // leaving it here would keep a dead view alive for the whole session.
+      _instances.remove(this);
+      rethrow;
+    }
+  }
+
+  static bool get hasPendingDisposal {
+    for (final view in _instances) {
+      if (view._disposed) return true;
+    }
+    return false;
+  }
+
+  Future<void> _awaitPendingDisposals() async {
+    final pending = [
+      for (final view in _instances)
+        if (view._disposed) view._disposing,
+    ].whereType<Future<void>>().toList();
+    if (pending.isEmpty) return;
+    try {
+      await Future.wait(pending).timeout(_creationGrace + _creationGrace);
+    } catch (_) {
+      // Falls through to the check below, which reports the real state.
+    }
+    if (hasPendingDisposal) {
+      throw StateError('上一后台阅读器仍在释放，请稍后重试');
+    }
   }
 
   Future<void> _run() async {
@@ -93,23 +141,25 @@ class AnxHeadlessWebView {
     }
 
     if (Platform.isWindows && webViewEnvironment == null) {
-      AnxLog.severe(
-          'AnxHeadlessWebView: webViewEnvironment is null on Windows, falling back to Overlay');
-      _runOverlay();
-      return;
+      // Fail loudly instead of using the overlay path: creating a second native
+      // window after a failed environment start races a late WebView2 callback,
+      // and a silent overlay that renders nothing left callers waiting forever
+      // for a load that could never happen.
+      AnxLog.severe('AnxHeadlessWebView: WebView2 environment is unavailable');
+      throw StateError('WebView2 环境不可用，请重试或重启应用');
     }
 
     if (useOverlay) {
       _runOverlay();
     } else {
-      _headlessWebView = HeadlessInAppWebView(
+      final view = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
         initialUrlRequest: initialUrlRequest,
         initialData: initialData,
         initialSettings: initialSettings,
-        onWebViewCreated: onWebViewCreated,
-        onLoadStop: onLoadStop,
-        onConsoleMessage: onConsoleMessage,
+        onWebViewCreated: _onWebViewCreated,
+        onLoadStop: _onLoadStop,
+        onConsoleMessage: _onConsoleMessage,
         onReceivedError: _onReceivedError,
         onReceivedHttpError: _onReceivedHttpError,
         onRenderProcessGone: _onRenderProcessGone,
@@ -118,8 +168,9 @@ class AnxHeadlessWebView {
         onCreateWindow: _asyncCallback(onCreateWindow),
         onPermissionRequest: _asyncCallback(onPermissionRequest),
       );
+      _headlessWebView = view;
       try {
-        await _headlessWebView?.run();
+        await view.run();
       } catch (e) {
         // Creating a second Windows native view after a failed creation can
         // race a late WebView2 callback. Surface the failure instead.
@@ -128,14 +179,36 @@ class AnxHeadlessWebView {
             "HeadlessInAppWebView failed to run, falling back to Overlay: $e");
         _headlessWebView = null;
         _runOverlay();
+      } finally {
+        // Windows cannot dispose until run completes; keep late creation owned.
+        if (_disposed && identical(_headlessWebView, view)) {
+          try {
+            await view.dispose();
+          } finally {
+            if (identical(_headlessWebView, view)) _headlessWebView = null;
+          }
+        }
       }
     }
+  }
+
+  void _onWebViewCreated(InAppWebViewController controller) {
+    if (!_disposed) onWebViewCreated?.call(controller);
+  }
+
+  void _onLoadStop(InAppWebViewController controller, Uri? url) {
+    if (!_disposed) onLoadStop?.call(controller, url);
+  }
+
+  void _onConsoleMessage(
+      InAppWebViewController controller, ConsoleMessage message) {
+    if (!_disposed) onConsoleMessage?.call(controller, message);
   }
 
   void _onReceivedError(InAppWebViewController controller,
       WebResourceRequest request, WebResourceError error) {
     // Match the old page-load callbacks; failed images must not abort import.
-    if (request.isForMainFrame == false) return;
+    if (_disposed || request.isForMainFrame == false) return;
     onLoadError?.call(controller, request.url, error.type.toNativeValue() ?? -1,
         error.description);
   }
@@ -153,7 +226,7 @@ class AnxHeadlessWebView {
 
   void _onReceivedHttpError(InAppWebViewController controller,
       WebResourceRequest request, WebResourceResponse response) {
-    if (request.isForMainFrame == false) return;
+    if (_disposed || request.isForMainFrame == false) return;
     onLoadHttpError?.call(controller, request.url, response.statusCode ?? 0,
         response.reasonPhrase ?? '');
   }
@@ -161,8 +234,10 @@ class AnxHeadlessWebView {
   void _runOverlay() {
     final overlay = navigatorKey.currentState?.overlay;
     if (overlay == null) {
+      // Silently returning made run() succeed with no view at all, so every
+      // caller waited for a load stop that never came.
       AnxLog.severe("No context available for AnxHeadlessWebView overlay");
-      return;
+      throw StateError('没有可用的界面上下文，后台阅读器无法启动');
     }
 
     _overlayEntry = OverlayEntry(
@@ -176,8 +251,8 @@ class AnxHeadlessWebView {
             initialUrlRequest: initialUrlRequest,
             initialData: initialData,
             initialSettings: initialSettings,
-            onLoadStop: onLoadStop,
-            onConsoleMessage: onConsoleMessage,
+            onLoadStop: _onLoadStop,
+            onConsoleMessage: _onConsoleMessage,
             onReceivedError: _onReceivedError,
             onReceivedHttpError: _onReceivedHttpError,
             onRenderProcessGone: _onRenderProcessGone,
@@ -185,9 +260,7 @@ class AnxHeadlessWebView {
             shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
             onCreateWindow: _asyncCallback(onCreateWindow),
             onPermissionRequest: _asyncCallback(onPermissionRequest),
-            onWebViewCreated: (controller) {
-              onWebViewCreated?.call(controller);
-            },
+            onWebViewCreated: _onWebViewCreated,
           ),
         ),
       ),
@@ -196,28 +269,53 @@ class AnxHeadlessWebView {
     overlay.insert(_overlayEntry!);
   }
 
+  /// True once this view was asked to release its native WebView.
+  ///
+  /// Owners must consult this before handing the controller any more work:
+  /// after disposal the native view is gone, and a call that arrives late is
+  /// what crashed the process inside the Windows plugin's
+  /// `UserContentController::createContentWorld`.
+  bool get isDisposed => _disposed;
+
   Future<void> dispose() {
     _disposed = true;
     return _disposing ??= _dispose();
   }
 
+  /// How long dispose waits for a late native creation before giving up.
+  ///
+  /// A WebView2 environment that fails to initialise ("the device is not ready",
+  /// 0x80070015) never completes run(), so without a bound this instance would
+  /// stay in [_instances] marked disposed forever — and because [run] refuses to
+  /// start while any disposed instance is still registered, every later
+  /// background WebView would fail for the rest of the session.
+  static const Duration _creationGrace = Duration(seconds: 5);
+
   Future<void> _dispose() async {
-    // Windows plugin dispose is a no-op until run() has completed. Wait for
-    // late creation before disposing; callers may bound their own wait, but
-    // retain this instance until native cleanup really finishes.
+    var creationPending = false;
     try {
-      await _running;
-    } catch (_) {
-      // A failed creation may still have allocated a native controller.
+      // Windows plugin dispose is a no-op until run() has completed. Wait for
+      // late creation before disposing; callers may bound their own wait, but
+      // retain this instance until native cleanup really finishes.
+      try {
+        await _running?.timeout(_creationGrace);
+      } on TimeoutException {
+        creationPending = true;
+      } catch (_) {
+        // A failed or wedged creation may still have allocated a controller.
+      }
+      if (!creationPending && _headlessWebView != null) {
+        await _headlessWebView?.dispose();
+        _headlessWebView = null;
+      }
+      if (_overlayEntry != null) {
+        _overlayEntry?.remove();
+        _overlayEntry = null;
+      }
+    } finally {
+      // Always unregister, otherwise one failed dispose wedges every later
+      // background WebView.
+      _instances.remove(this);
     }
-    if (_headlessWebView != null) {
-      await _headlessWebView?.dispose();
-      _headlessWebView = null;
-    }
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
-    }
-    _instances.remove(this);
   }
 }

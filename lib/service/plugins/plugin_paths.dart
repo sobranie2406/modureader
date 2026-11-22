@@ -19,6 +19,14 @@ class PluginPaths {
 
   Directory pluginDir(String id) => Directory(p.join(root.path, id));
 
+  /// Where a plugin may keep its own data.
+  ///
+  /// Deliberately a sibling of [pluginDir], not a child: the package directory
+  /// is verified file-by-file against the reviewed inventory, so writing into
+  /// it would make the plugin look tampered with on the next start.
+  Directory dataDir(String id) =>
+      Directory(p.join(root.path, '.data', id));
+
   File manifestFile(String id) =>
       File(p.join(pluginDir(id).path, 'manifest.json'));
 

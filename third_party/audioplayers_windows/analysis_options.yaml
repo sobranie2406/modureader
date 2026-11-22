@@ -1,0 +1,5 @@
+# Modu patch: upstream includes package:flame_lint/analysis_options.yaml, a dev
+# dependency of this federated package that the app does not resolve. Analyzing
+# the repository therefore reported "include_file_not_found" on every run, so
+# the include is dropped here; the package is still analyzed (with the root
+# rules) as part of the app.

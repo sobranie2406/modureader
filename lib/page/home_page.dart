@@ -17,7 +17,8 @@ import 'package:modu_reader/service/notes/open_reading_link.dart';
 import 'package:modu_reader/service/notes/reading_link.dart';
 import 'package:modu_reader/service/receive_file/receive_share.dart';
 import 'package:modu_reader/utils/check_update.dart';
-import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
+import 'package:modu_reader/utils/webView/webview_environment_boot.dart';
+import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/utils/load_default_font.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/platform_utils.dart';
@@ -30,7 +31,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-WebViewEnvironment? webViewEnvironment;
+/// The shared Windows WebView2 environment, for the many call sites that pass
+/// it straight to `InAppWebView`.
+///
+/// The object is owned by [WebViewEnvironmentBoot], not by this page: creating
+/// it in a post-frame callback meant one failure latched null for the rest of
+/// the session, and every background WebView (plugins, article capture, book
+/// import, AI search) failed until the app restarted. The boot module retries
+/// and lets a caller ask for it again.
+WebViewEnvironment? get webViewEnvironment =>
+    WebViewEnvironmentBoot.instance.environment;
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -46,32 +56,46 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => initAnx());
   }
 
-  Future<void> _checkWindowsWebview() async {
-    final availableVersion = await WebViewEnvironment.getAvailableVersion();
-    AnxLog.info('WebView2 version: $availableVersion');
-
-    if (availableVersion == null) {
+  Future<void> _checkWindowsWebview({bool force = false}) async {
+    // One call owns creation, retry and the profile folder, so a failed start is
+    // not permanent and no two callers create a second environment at once.
+    final environment =
+        await WebViewEnvironmentBoot.instance.ensure(force: force);
+    AnxLog.info('WebView2 environment: '
+        '${environment == null ? 'unavailable' : 'ready'}');
+    if (environment == null && mounted) {
+      final missingRuntime = WebViewEnvironmentBoot.instance.lastError
+              ?.contains('not installed') ==
+          true;
       SmartDialog.show(
         builder: (context) => AlertDialog(
           title: const Icon(Icons.error),
-          content: Text(L10n.of(context).webview2NotInstalled),
+          content: Text(missingRuntime
+              ? L10n.of(context).webview2NotInstalled
+              : ModuStrings.text(
+                  context,
+                  '网页组件启动失败，导入、插件与 AI 搜索暂时不可用。可以重试，或检查 Microsoft Edge WebView2 Runtime 是否正常。',
+                  'The web component failed to start, so import, plugins and AI search are unavailable. You can retry, or check that the Microsoft Edge WebView2 Runtime is installed correctly.')),
           actions: [
             TextButton(
-              onPressed: () => {
-                launchUrl(
-                    Uri.parse(
-                        'https://developer.microsoft.com/en-us/microsoft-edge/webview2'),
-                    mode: LaunchMode.externalApplication)
+              onPressed: () async {
+                SmartDialog.dismiss();
+                await _checkWindowsWebview(force: true);
               },
-              child: Text(L10n.of(context).webview2Install),
+              child: Text(ModuStrings.text(context, '重试', 'Retry')),
             ),
+            if (missingRuntime)
+              TextButton(
+                onPressed: () => {
+                  launchUrl(
+                      Uri.parse(
+                          'https://developer.microsoft.com/en-us/microsoft-edge/webview2'),
+                      mode: LaunchMode.externalApplication)
+                },
+                child: Text(L10n.of(context).webview2Install),
+              ),
           ],
         ),
-      );
-    } else {
-      webViewEnvironment = await WebViewEnvironment.create(
-        settings: WebViewEnvironmentSettings(
-            userDataFolder: (await getAnxTempDir()).path),
       );
     }
   }

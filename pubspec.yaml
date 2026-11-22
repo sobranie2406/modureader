@@ -153,6 +153,9 @@ dependency_overrides:
     path: third_party/audioplayers_android
   audioplayers_darwin:
     path: third_party/audioplayers_darwin
+  # Shutdown crash: the global event handler was owned twice.
+  audioplayers_windows:
+    path: third_party/audioplayers_windows
   flutter_inappwebview_windows:
     path: third_party/flutter_inappwebview_windows
   hf_tokenizers:

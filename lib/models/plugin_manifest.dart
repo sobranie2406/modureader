@@ -54,6 +54,23 @@ const Set<String> kP1SupportedCapabilities = {
   'dictionary:transform',
   'article:capture',
   'article:extract',
+  // P6: host API expansion. Each is a runtime grant the user switches on.
+  'note:read',
+  'book:content',
+  'library:write',
+  'reading:read',
+  'ai:invoke',
+  'translate:invoke',
+  'tts:invoke',
+  'dictionary:lookup',
+  'clipboard:read',
+  'clipboard:write',
+  'share:text',
+  'ui:dialog',
+  'ui:progress',
+  'url:open',
+  'knowledge:query',
+  'search:library',
 };
 
 /// Known tokens are checked separately from the adapter's allowed capabilities.
@@ -73,6 +90,22 @@ const Set<String> kKnownCapabilities = {
   'article:capture',
   'article:extract',
   'storage:plugin',
+  'note:read',
+  'book:content',
+  'library:write',
+  'reading:read',
+  'ai:invoke',
+  'translate:invoke',
+  'tts:invoke',
+  'dictionary:lookup',
+  'clipboard:read',
+  'clipboard:write',
+  'share:text',
+  'ui:dialog',
+  'ui:progress',
+  'url:open',
+  'knowledge:query',
+  'search:library',
 };
 
 const String kAiPromptPackCapability = 'ai:prompt-pack';
@@ -93,6 +126,36 @@ const String kPluginDeviceSettingsCapability = 'settings:device';
 const String kDictionaryTransformCapability = 'dictionary:transform';
 const String kArticleCaptureCapability = 'article:capture';
 const String kArticleExtractCapability = 'article:extract';
+
+// P6 host API capabilities. Kept next to the tokens above so the manifest and
+// the runtime permission catalogue cannot drift apart.
+const String kNoteReadCapability = 'note:read';
+const String kBookContentCapability = 'book:content';
+const String kLibraryWriteCapability = 'library:write';
+const String kReadingReadCapability = 'reading:read';
+const String kAiInvokeCapability = 'ai:invoke';
+const String kTranslateInvokeCapability = 'translate:invoke';
+const String kTtsInvokeCapability = 'tts:invoke';
+const String kDictionaryLookupCapability = 'dictionary:lookup';
+const String kClipboardReadCapability = 'clipboard:read';
+const String kClipboardWriteCapability = 'clipboard:write';
+const String kShareTextCapability = 'share:text';
+const String kUiDialogCapability = 'ui:dialog';
+const String kUiProgressCapability = 'ui:progress';
+const String kUrlOpenCapability = 'url:open';
+const String kKnowledgeQueryCapability = 'knowledge:query';
+const String kSearchLibraryCapability = 'search:library';
+const String kPluginStorageCapability = 'storage:plugin';
+
+/// Capabilities a package holds by being installed.
+///
+/// They are never stored as grants, and a package may name them in its
+/// manifest only for forward compatibility: the parser drops them from
+/// [PluginManifest.capabilities]. Every caller authorising a host call must
+/// therefore treat this set as "declared and granted", exactly like an
+/// install-tier token, or the call fails with `permission` even though the
+/// plugin was never able to fix it — that is what broke `modu.storage.*`.
+const Set<String> kImplicitCapabilities = {kPluginStorageCapability};
 
 enum PluginErrorCode {
   untrustedPackage,
@@ -129,6 +192,7 @@ enum PluginErrorCode {
   promptConflict,
   toolbarConflict,
   noToolbarSlots,
+  permissionNotRuntime,
   internal,
 }
 
@@ -1027,7 +1091,7 @@ class PluginManifest {
         throw PluginInstallError(PluginErrorCode.invalidManifest,
             'capabilities contains an invalid token.');
       }
-      if (capability == 'storage:plugin') {
+      if (capability == kPluginStorageCapability) {
         // Always granted implicitly; accept but do not store as a grant.
         continue;
       }

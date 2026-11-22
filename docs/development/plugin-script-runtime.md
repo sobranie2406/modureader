@@ -36,6 +36,134 @@ Host API methods:
 | `modu.privateLibrary.setPrivate({bookIds,private,lockAfter})` | Same | Revalidates selected IDs against native grants and saves local marks; optional lock after commit |
 | `modu.articles.capture()` | `article:capture` | Opens native URL capture, Markdown preview, export and bookshelf import; returns `{opened: true}` |
 
+### Reading content and library
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.library.tags({bookId})` | `library:read` | Tags of one public book, with id and colour |
+| `modu.library.groups()` | `library:read` | At most 500 folders with id, name and parent. Folders reserved for private books are hidden |
+| `modu.library.tag({bookIds,name,remove?})` | `library:write` | Attaches or detaches a tag on public books. Attaching creates the tag if needed |
+| `modu.library.move({bookIds,groupId})` | `library:write` | Moves public books into a folder visible to the plugin. `0` means the shelf root |
+| `modu.books.content({maxCharacters?})` | `book:content` | Current chapter text of the open book, at most 12k characters |
+| `modu.books.chapter({href,maxCharacters?})` | `book:content` | Chapter text by href within the open book, at most 12k characters. Unavailable chapters return empty text |
+| `modu.notes.list({bookId?,keyword?,limit?})` | `note:read` | Highlights and notes from public books with chapter and text |
+| `modu.reading.stats({days?})` | `reading:read` | Total and per-book reading seconds for public books |
+| `modu.reading.history({bookId?,limit?})` | `reading:read` | Daily reading entries from public books |
+| `modu.search.library({query,limit?,includeNotes?})` | `search:library` | One query across public books and their notes |
+| `modu.knowledge.search({query,limit?})` | `knowledge:query` | Local vector index of the open book or a public book, with a five-second budget |
+| `modu.dictionary.lookup({word,limit?})` | `dictionary:lookup` | Installed local dictionaries |
+
+### Models
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.ai.complete({prompt,system?})` | `ai:invoke` | The user's configured model, capped at 32k output characters. Billed to the user |
+| `modu.translate.text({text})` | `translate:invoke` | The user's configured translation engine |
+| `modu.tts.speak({text})` | `tts:invoke` | The user's configured voice. The plugin never receives the audio bytes |
+
+### System surfaces
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.clipboard.write({text})` | `clipboard:write` | Copies up to 8k characters |
+| `modu.clipboard.read()` | `clipboard:read` | Returns the plain-text clipboard, at most 8k characters |
+| `modu.share.text({text,subject?})` | `share:text` | Opens the system share sheet |
+| `modu.ui.confirm({title,message})` | `ui:dialog` | Yes/no dialog, returns `{confirmed}` |
+| `modu.ui.prompt({title,message,initial?})` | `ui:dialog` | Text dialog, returns `{text}` |
+| `modu.ui.select({title,options})` | `ui:dialog` | At most 30 options, returns `{selected}` |
+| `modu.ui.progress({label,fraction})` | `ui:progress` | Transient progress bar, grows with a long task |
+| `modu.open.url({url})` | `url:open` | http(s) only; `file:`, `javascript:` and `intent:` are refused |
+| `modu.storage.list()` | `storage:plugin` | Files the plugin owns, with sizes |
+| `modu.storage.read({name})` | `storage:plugin` | Returns `{text}`, or `{text: null}` when absent |
+| `modu.storage.write({name,text})` | `storage:plugin` | Replaces one file |
+| `modu.storage.remove({name})` | `storage:plugin` | Deletes one file; `{removed}` |
+
+### Asking for a permission
+
+| Method | Permission | Behavior |
+| --- | --- | --- |
+| `modu.permissions.request({capabilities,reason?})` | none needed | Shows the consent sheet, returns `{granted,denied}` |
+| `modu.permissions.status()` | none needed | Returns `{granted}` so a plugin can check before asking |
+
+`capabilities` must be runtime-tier tokens the package already declares; an
+install-tier token, an unknown token or an empty list fails the call instead of
+opening a sheet. `reason` is shown above the list, at most 300 characters, and
+is the plugin's chance to explain itself — it never grants anything by itself.
+Each requested capability gets its own switch, unticked by default, so a
+multi-capability request cannot smuggle in a fourth permission. Dismissing the
+sheet returns the grants the plugin already held.
+
+Granting here deliberately does **not** cancel the running task, unlike revoking
+one in the details page: the caller is usually the job that just hit the missing
+capability, and killing it would make the fresh grant unusable. Revoking still
+stops work in flight.
+
+```js
+const { granted } = await modu.permissions.request({
+  capabilities: ['ai:invoke'],
+  reason: '用你的模型总结这一章。',
+});
+if (!granted.includes('ai:invoke')) return { title: '需要授权', text: '' };
+```
+
+`storage.*` writes under `<plugins>/.data/<pluginId>`, a sibling of the verified
+package rather than a child, so a plugin cannot overwrite the files the reviewed
+inventory hashes. Names must be flat `*.json` of at most 64 characters, checked by
+pattern and again after normalisation. Limits are 256 KiB per file, 200 files and
+4 MiB total per plugin. Uninstalling deletes the directory with the package.
+Developer plugins use the temporary session directory.
+
+Every argument is validated against a named-argument allowlist, so an unknown
+key fails the call instead of being ignored, and every list and string has a
+hard bound. A call whose capability the user has not granted fails with
+`denied`, which the UI explains as a missing permission rather than a broken
+package.
+
+Methods that wait on the network or on native UI (`privateLibrary.update*/`
+`selectBooks`/`setPrivate`, `ui.*`, `share.text`, `clipboard.read`,
+`ai.complete`, `translate.text`, `tts.speak`) pause the execution clock while one
+is pending and charge it to a separate two-minute interaction budget. A slow model
+server therefore does not turn a correct plugin into a `timeout`; total wall time
+is still bounded, so a hung plugin cannot run forever.
+
+Worked examples of this surface live in
+[`docs/examples/plugins`](../examples/plugins/README.md): reading reports,
+annotation digests, model-assisted explanation, an owned vocabulary notebook and
+chapter digests.
+
+## Permissions
+
+Capabilities split in two tiers:
+
+- **Install tier** — materialised by installing the package (`ai:prompt-pack`,
+  `ui:selection-action`, `ui:book-action`, `script:run`, the private-library
+  trio, `settings:device`, `dictionary:transform`, `article:capture`,
+  `article:extract`). Refusing them means not installing, so the details page
+  lists them as information.
+- **Runtime tier** — off by default and switched on per plugin in
+  **插件 → 详情 → 权限**. This covers `net:http`, book and note reads and writes,
+  the library, reading statistics, search, the local vector index, `ai:invoke`,
+  `translate:invoke`, `tts:invoke`, `dictionary:lookup`, the clipboard, the
+  share sheet, `ui:dialog`, `ui:progress` and `url:open`.
+
+Grants are device-local consent, exactly like the experimental switch: they are
+never exported, never travel in a settings backup and never sync. Restoring a
+backup on another device therefore cannot hand a plugin new powers. Revoking a
+capability cancels the plugin's running task, so work already in flight cannot
+finish with a permission that was just withdrawn. Uninstalling removes every
+grant.
+
+Packages that shipped before manual grants existed keep the capabilities they
+already implied (network, library read, notes, the private-library trio and
+article capture) so an app upgrade does not break a working plugin. Every
+capability added later starts denied.
+
+A plugin can ask for a grant at the moment it needs one with
+`modu.permissions.request()`, which opens the same consent decision as a sheet.
+When an action fails with `denied`, the reading view also offers a **去授权**
+button that opens that sheet pre-filled with everything the package declares but
+does not hold yet, so a first run is one tap away from working.
+
 ## Plugin-owned private policies and settings
 
 Private plugin rules, visibility choices, import decisions and book-menu behavior
