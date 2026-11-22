@@ -15,6 +15,7 @@ import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/service/book.dart';
 import 'package:modu_reader/service/book_import_source.dart';
 import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
+import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +33,7 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       droppedPaths == null && (inPlace ?? Prefs().inPlaceImportEnabled);
   if (_pickingBooks) return;
   _pickingBooks = true;
-  final mobileFolder = folder && (Platform.isAndroid || Platform.isIOS);
+  final mobileFolder = folder && AnxPlatform.isMobile;
   try {
     if (droppedPaths != null) {
       final entries = await discoverBookImportFiles(droppedPaths);

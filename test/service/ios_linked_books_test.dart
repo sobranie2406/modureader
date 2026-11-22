@@ -13,6 +13,8 @@ void main() {
   late Directory root;
   late File original;
   late Map<String, String> bookmarks;
+  late List<Map<String, String>> folderEntries;
+  late List<String> copiedPaths;
   final calls = <MethodCall>[];
 
   setUp(() async {
@@ -21,6 +23,8 @@ void main() {
     await Directory('$documentPath/file').create(recursive: true);
     original = await File('${root.path}/original.epub').writeAsString('book');
     bookmarks = {key: original.path};
+    folderEntries = [];
+    copiedPaths = [];
     calls.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(IosLinkedBooks.channel, (call) async {
@@ -34,7 +38,11 @@ void main() {
           bookmarks.remove(call.arguments['key']);
           return null;
         case 'pick':
-          return <dynamic>[];
+          return folderEntries;
+        case 'copy':
+          return copiedPaths;
+        case 'release':
+          return null;
       }
       throw MissingPluginException();
     });
@@ -95,13 +103,37 @@ void main() {
       'in-place picker uses direct formats while ordinary folder import is unchanged',
       () async {
     await MobileBookFolder.pick(
-        files: true, extensions: IosLinkedBooks.extensions);
+        files: true, inPlace: true, extensions: IosLinkedBooks.extensions);
     expect(calls.last.arguments['files'], true);
+    expect(calls.last.arguments['inPlace'], true);
     expect(calls.last.arguments['extensions'],
         ['epub', 'pdf', 'mobi', 'azw3', 'fb2']);
     await MobileBookFolder.pick();
     expect(calls.last.arguments['files'], false);
+    expect(calls.last.arguments['inPlace'], false);
     expect(calls.last.arguments['extensions'], contains('txt'));
     expect(calls.any((call) => call.method == 'copy'), false);
+  });
+
+  test('folder copy passes selected opaque IDs to the native picker', () async {
+    final copied = await File('${root.path}/staged.txt').writeAsString('copy');
+    folderEntries = [
+      {'id': 'first', 'name': '书.txt', 'label': '一/书.txt'},
+      {'id': 'second', 'name': '书.txt', 'label': '二/书.txt'},
+    ];
+    copiedPaths = [copied.path];
+    calls.clear();
+
+    final entries = (await MobileBookFolder.pick())!;
+    expect(entries.map((entry) => entry.label), ['一/书.txt', '二/书.txt']);
+    final copies = await MobileBookFolder.stage([entries.last]);
+    await MobileBookFolder.release();
+
+    expect(calls.map((call) => call.method), ['pick', 'copy', 'release']);
+    expect(calls[1].arguments, {
+      'ids': ['second']
+    });
+    expect(copies.single.path, copied.path);
+    expect(await original.readAsString(), 'book');
   });
 }
