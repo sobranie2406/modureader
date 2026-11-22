@@ -19,6 +19,8 @@ import 'package:modu_reader/service/ai/reading_request_snapshot.dart';
 import 'package:modu_reader/service/ai/reading_skill_execution.dart';
 import 'package:langchain_core/chat_models.dart';
 import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/statistic/reading_insights.dart';
 import 'package:modu_reader/service/ai/tools/repository/books_repository.dart';
 import 'package:modu_reader/service/ai/tools/repository/notes_repository.dart';
@@ -87,6 +89,56 @@ void main() {
     PathProviderPlatform.instance = oldPaths;
     documentPath = oldDocumentPath;
     await root.delete(recursive: true);
+  });
+
+  test('plugin-wide queries exclude private data even when unlocked', () async {
+    final api = PluginHostApi(
+        pluginId: 'com.example.privacy-test',
+        services: const PluginHostServices());
+    final db = await DBHelper().database;
+    for (final id in [1, 2]) {
+      await db.insert('tb_groups', {'id': id, 'name': 'Folder $id'});
+      await db.update('tb_books', {'group_id': id},
+          where: 'id = ?', whereArgs: [id]);
+      await readingTimeDao.insertReadingSession(
+          bookId: id,
+          readingTime: id * 40,
+          startedAt: DateTime.now().subtract(const Duration(minutes: 5)));
+    }
+    await db.insert('tb_groups', {'id': 3, 'name': 'Empty folder'});
+    await db
+        .insert('tb_groups', {'id': 4, 'name': 'Hidden child', 'parent_id': 2});
+    await library.unlock();
+
+    final groups = await api.call('library.groups', {}) as List;
+    final groupIds = groups.map((group) => (group as Map)['id']);
+    expect(groupIds, containsAll([1, 3]));
+    expect(groupIds, isNot(contains(2)));
+    expect(groupIds, isNot(contains(4)));
+    final matches = await api.call('search.library', {'query': 'book'}) as Map;
+    expect((matches['books'] as List).map((book) => (book as Map)['id']), [1]);
+    final notes = await api.call('notes.list', {}) as List;
+    expect(notes.map((note) => (note as Map)['bookId']), [1]);
+    final stats = await api.call('reading.stats', {'days': 1}) as Map;
+    expect(stats['totalSeconds'], 40);
+    final history = await api.call('reading.history', {}) as List;
+    expect(history.every((entry) => (entry as Map)['bookId'] == 1), isTrue);
+
+    final denied = throwsA(isA<PluginScriptFailure>()
+        .having((error) => error.code, 'code', 'permission'));
+    await expectLater(api.call('library.tags', {'bookId': 2}), denied);
+    await expectLater(
+        api.call('library.move', {
+          'bookIds': [1],
+          'groupId': 2
+        }),
+        denied);
+    expect(
+        await api.call('library.move', {
+          'bookIds': [1],
+          'groupId': 3
+        }),
+        {'moved': 1});
   });
 
   test('shelf policy refreshes on unlock while raw sync keeps every book',

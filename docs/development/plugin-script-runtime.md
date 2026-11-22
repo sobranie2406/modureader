@@ -40,17 +40,17 @@ Host API methods:
 
 | Method | Permission | Behavior |
 | --- | --- | --- |
-| `modu.library.tags({bookId})` | `library:read` | Tags of one readable book, with id and colour; no tags of a locked private book |
-| `modu.library.groups()` | `library:read` | At most 500 folders with id, name and parent |
-| `modu.library.tag({bookIds,name,remove?})` | `library:write` | Creates the tag when missing, then attaches or detaches it; every book is re-checked as readable |
-| `modu.library.move({bookIds,groupId})` | `library:write` | Moves readable books into a folder; `0` means the shelf root |
+| `modu.library.tags({bookId})` | `library:read` | Tags of one public book, with id and colour |
+| `modu.library.groups()` | `library:read` | At most 500 folders with id, name and parent. Folders reserved for private books are hidden |
+| `modu.library.tag({bookIds,name,remove?})` | `library:write` | Attaches or detaches a tag on public books. Attaching creates the tag if needed |
+| `modu.library.move({bookIds,groupId})` | `library:write` | Moves public books into a folder visible to the plugin. `0` means the shelf root |
 | `modu.books.content({maxCharacters?})` | `book:content` | Current chapter text of the open book, at most 12k characters |
-| `modu.books.chapter({href,maxCharacters?})` | `book:content` | One chapter by href, same bound |
-| `modu.notes.list({bookId?,keyword?,limit?})` | `note:read` | Highlights and notes with their chapter and text |
-| `modu.reading.stats({days?})` | `reading:read` | Total and per-book reading seconds for a window |
-| `modu.reading.history({bookId?,limit?})` | `reading:read` | Daily reading entries |
-| `modu.search.library({query,limit?,includeNotes?})` | `search:library` | One query across books and notes |
-| `modu.knowledge.search({query,limit?})` | `knowledge:query` | Local vector index of one book, five-second budget |
+| `modu.books.chapter({href,maxCharacters?})` | `book:content` | Chapter text by href within the open book, at most 12k characters. Unavailable chapters return empty text |
+| `modu.notes.list({bookId?,keyword?,limit?})` | `note:read` | Highlights and notes from public books with chapter and text |
+| `modu.reading.stats({days?})` | `reading:read` | Total and per-book reading seconds for public books |
+| `modu.reading.history({bookId?,limit?})` | `reading:read` | Daily reading entries from public books |
+| `modu.search.library({query,limit?,includeNotes?})` | `search:library` | One query across public books and their notes |
+| `modu.knowledge.search({query,limit?})` | `knowledge:query` | Local vector index of the open book or a public book, with a five-second budget |
 | `modu.dictionary.lookup({word,limit?})` | `dictionary:lookup` | Installed local dictionaries |
 
 ### Models
@@ -111,6 +111,7 @@ package rather than a child, so a plugin cannot overwrite the files the reviewed
 inventory hashes. Names must be flat `*.json` of at most 64 characters, checked by
 pattern and again after normalisation. Limits are 256 KiB per file, 200 files and
 4 MiB total per plugin. Uninstalling deletes the directory with the package.
+Developer plugins use the temporary session directory.
 
 Every argument is validated against a named-argument allowlist, so an unknown
 key fails the call instead of being ignored, and every list and string has a

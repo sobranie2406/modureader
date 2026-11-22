@@ -6,6 +6,7 @@ import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_state.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
+import 'package:modu_reader/service/plugins/plugin_permissions.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,14 +23,34 @@ void main() {
   String manifestJsonFor(List<String> capabilities) => manifestJson(
         id: _id,
         capabilities: capabilities,
-        contributes: const [],
+        contributes: host.development
+            ? const [
+                {
+                  'kind': 'scriptAction',
+                  'schema': 1,
+                  'id': 'echo',
+                  'name': 'Echo',
+                  'entry': 'main.js',
+                  'surface': 'library',
+                }
+              ]
+            : const [],
       );
 
   Future<void> install(List<String> capabilities) async {
-    final package = await writePluginZip(temp,
-        samplePackageFiles(manifest: manifestJsonFor(capabilities)));
+    final package = await writePluginZip(temp, {
+      ...samplePackageFiles(manifest: manifestJsonFor(capabilities)),
+      if (host.development) 'main.js': 'return {text: "ok"};',
+    });
     await host.install(package, allowSameVersion: true);
   }
+
+  PluginHost makeHost({bool development = false}) => PluginHost(
+        trust: FixturePluginTrust(),
+        paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
+        appVersionResolver: () async => '1.3.10',
+        development: development,
+      );
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(
@@ -38,11 +59,7 @@ void main() {
     await Prefs().savePluginState(PluginState.empty);
     await Prefs().savePluginPermissions({});
     temp = await Directory.systemTemp.createTemp('modu_plugin_perms_');
-    host = PluginHost(
-      trust: FixturePluginTrust(),
-      paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
-      appVersionResolver: () async => '1.3.10',
-    );
+    host = makeHost();
     await host.initialize();
   });
 
@@ -136,21 +153,21 @@ void main() {
     expect(host.hasPermission(_id, 'library:read'), isFalse);
   });
 
-  test('revoking everything does not resurrect on the next start', () async {
-    await install(['library:read']);
-    await host.setPermission(_id, 'library:read', true);
+  test('older installations keep only existing legacy capabilities', () async {
+    await install(['library:read', 'ai:invoke']);
+    await Prefs().clearPluginPermissionSeeded(_id);
+    host.dispose();
+    host = makeHost();
+    await host.initialize();
+    expect(host.grantedPermissions(_id), {'library:read'});
+
+    await install(['library:read', 'ai:invoke', 'note:write']);
+    expect(host.grantedPermissions(_id), {'library:read'});
     await host.revokeAllPermissions(_id);
     host.dispose();
-
-    final reopened = PluginHost(
-      trust: FixturePluginTrust(),
-      paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
-      appVersionResolver: () async => '1.3.10',
-    );
-    await reopened.initialize();
-    expect(reopened.grantedPermissions(_id), isEmpty);
-    reopened.dispose();
-    host = reopened;
+    host = makeHost();
+    await host.initialize();
+    expect(host.grantedPermissions(_id), isEmpty);
   });
 
   test('grants survive a restart', () async {
@@ -158,16 +175,9 @@ void main() {
     await host.setPermission(_id, 'ai:invoke', true);
     host.dispose();
 
-    final reopened = PluginHost(
-      trust: FixturePluginTrust(),
-      paths: PluginPaths(rootPath: p.join(temp.path, 'plugins')),
-      appVersionResolver: () async => '1.3.10',
-    );
-    await reopened.initialize();
-    expect(reopened.hasPermission(_id, 'ai:invoke'), isTrue);
-    reopened.dispose();
-    // Keep tearDown's host reference valid for disposal bookkeeping.
-    host = reopened;
+    host = makeHost();
+    await host.initialize();
+    expect(host.hasPermission(_id, 'ai:invoke'), isTrue);
   });
 
   test('grantPermissions applies a batch and reports what is in force',
@@ -181,10 +191,9 @@ void main() {
 
   test('grantPermissions still refuses an undeclared capability', () async {
     await install(['note:read']);
-    await expectLater(host.grantPermissions(_id, ['ai:invoke', 'note:read']),
+    await expectLater(host.grantPermissions(_id, ['note:read', 'ai:invoke']),
         throwsA(isA<PluginInstallError>()));
-    // The valid part of the batch is applied before the bad one fails, and
-    // nothing is silently granted for the token the package never declared.
+    expect(host.grantedPermissions(_id), isEmpty);
     expect(host.hasPermission(_id, 'ai:invoke'), isFalse);
   });
 
@@ -198,10 +207,34 @@ void main() {
     expect(host.hasPermission(_id, 'ai:invoke'), isFalse);
   });
 
-  test('permission grants never enter the settings backup', () async {
+  test('development grants are pruned and never reseeded', () async {
+    host.dispose();
+    host = makeHost(development: true);
+    await host.initialize();
+    await install(['script:run', 'library:read', 'ai:invoke']);
+    expect(host.grantedPermissions(_id), isEmpty);
+    await host.setPermission(_id, 'ai:invoke', true);
+    await install(['script:run', 'library:read']);
+    await install(['script:run', 'library:read', 'ai:invoke']);
+    expect(host.grantedPermissions(_id), isEmpty);
+    await host.setPermission(_id, 'ai:invoke', true);
+    await host.uninstall(_id);
+    await install(['script:run', 'library:read', 'ai:invoke']);
+    expect(host.grantedPermissions(_id), isEmpty);
+  });
+
+  test('device permission state stays out of settings backup and restoration',
+      () async {
     await install(['ai:invoke']);
     await host.setPermission(_id, 'ai:invoke', true);
     final backup = await Prefs().buildPrefsBackupMap();
-    expect(backup.containsKey('pluginPermissions'), isFalse);
+    expect(backup, isNot(contains(PluginPermissions.prefsKey)));
+    expect(backup, isNot(contains(PluginPermissions.seededKey)));
+    await Prefs().applyPrefsBackupMap({
+      PluginPermissions.prefsKey: {'type': 'string', 'value': '{}'},
+      PluginPermissions.seededKey: {'type': 'stringList', 'value': <String>[]},
+    });
+    expect(host.grantedPermissions(_id), {'ai:invoke'});
+    expect(Prefs().pluginPermissionSeeded, {_id});
   });
 }

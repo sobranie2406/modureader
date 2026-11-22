@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 
@@ -14,11 +14,13 @@ void main() {
   PluginHostApi api({
     PluginHostServices? overrides,
     int maxResults = 50,
+    Directory? storageRoot,
   }) =>
       PluginHostApi(
         pluginId: 'com.example.host-api',
         services: overrides ?? services,
         maxResults: maxResults,
+        storageRoot: storageRoot,
       );
 
   setUp(() {
@@ -73,10 +75,8 @@ void main() {
     });
 
     test('an out-of-range integer is refused', () async {
-      await expectLater(
-          api().call('library.list', {'limit': 0}), denied());
-      await expectLater(
-          api().call('library.list', {'limit': 500}), denied());
+      await expectLater(api().call('library.list', {'limit': 0}), denied());
+      await expectLater(api().call('library.list', {'limit': 500}), denied());
     });
   });
 
@@ -98,8 +98,7 @@ void main() {
 
     test('a missing native surface reports permission, not a crash', () async {
       final bare = api(overrides: const PluginHostServices());
-      await expectLater(
-          bare.call('clipboard.write', {'text': 'x'}), denied());
+      await expectLater(bare.call('clipboard.write', {'text': 'x'}), denied());
     });
   });
 
@@ -120,8 +119,7 @@ void main() {
         'https://user:pass@example.com/',
         'not a url',
       ]) {
-        await expectLater(
-            api().call('open.url', {'url': url}), denied(),
+        await expectLater(api().call('open.url', {'url': url}), denied(),
             reason: url);
       }
       expect(asked, isEmpty);
@@ -129,8 +127,7 @@ void main() {
 
     test('an ordinary web URL is opened', () async {
       expect(
-          await api()
-              .call('open.url', {'url': 'https://example.com/page?q=1'}),
+          await api().call('open.url', {'url': 'https://example.com/page?q=1'}),
           {'opened': true});
       expect(asked, ['open:https://example.com/page?q=1']);
     });
@@ -145,8 +142,7 @@ void main() {
     });
 
     test('prompt returns what was typed', () async {
-      expect(
-          await api().call('ui.prompt', {'title': 'Name', 'message': ''}),
+      expect(await api().call('ui.prompt', {'title': 'Name', 'message': ''}),
           {'text': 'typed'});
     });
 
@@ -154,14 +150,19 @@ void main() {
       await expectLater(
           api().call('ui.select', {'title': 'Pick', 'options': []}), denied());
       await expectLater(
-          api().call('ui.select', {'title': 'Pick', 'options': ['', 'b']}),
+          api().call('ui.select', {
+            'title': 'Pick',
+            'options': ['', 'b']
+          }),
           denied());
     });
 
     test('select returns the first option', () async {
       expect(
-          await api()
-              .call('ui.select', {'title': 'Pick', 'options': ['a', 'b']}),
+          await api().call('ui.select', {
+            'title': 'Pick',
+            'options': ['a', 'b']
+          }),
           {'selected': 'a'});
     });
 
@@ -197,7 +198,8 @@ void main() {
     });
 
     test('reasoning is stripped before the plugin sees the answer', () {
-      expect(PluginHostApi.aiAnswerFromEmissions(
+      expect(
+          PluginHostApi.aiAnswerFromEmissions(
               const ['<think>先想一想</think>\n答案在这里']),
           '答案在这里');
     });
@@ -209,28 +211,20 @@ void main() {
 
     test('an empty answer stays empty so the caller can report it', () {
       expect(PluginHostApi.aiAnswerFromEmissions(const []), isEmpty);
-      expect(
-          PluginHostApi.aiAnswerFromEmissions(const ['<think>只有思考</think>']),
+      expect(PluginHostApi.aiAnswerFromEmissions(const ['<think>只有思考</think>']),
           isEmpty);
     });
   });
 
   group('plugin storage', () {
     late Directory storageRoot;
+    PluginHostApi storageApi() => api(storageRoot: storageRoot);
 
     setUp(() {
-      // The storage root resolves through the app data path, which is empty in
-      // a unit test: getBasePath('plugins') would be /plugins — uncreatable on
-      // CI. Point the API at a temp directory instead so these tests are
-      // hermetic and cannot write to real app data.
-      SharedPreferences.setMockInitialValues({});
       storageRoot = Directory.systemTemp.createTempSync('modu-api-storage');
-      PluginHostApi.debugStorageRoot =
-          (pluginId) => Directory('${storageRoot.path}/$pluginId');
     });
 
     tearDown(() {
-      PluginHostApi.debugStorageRoot = null;
       if (storageRoot.existsSync()) storageRoot.deleteSync(recursive: true);
     });
 
@@ -243,39 +237,55 @@ void main() {
         'a' * 100 + '.json',
       ]) {
         await expectLater(
-            api().call('storage.write', {'name': name, 'text': 'x'}), denied(),
+            storageApi().call('storage.write', {'name': name, 'text': 'x'}),
+            denied(),
             reason: name);
         await expectLater(
-            api().call('storage.read', {'name': name}), denied(),
+            storageApi().call('storage.read', {'name': name}), denied(),
             reason: name);
       }
     });
 
     test('storage methods reject unexpected arguments', () async {
       await expectLater(
-          api().call('storage.list', {'path': '/'}), denied());
-      await expectLater(api().call('storage.read', {'file': 'a.json'}),
-          denied());
+          storageApi().call('storage.list', {'path': '/'}), denied());
+      await expectLater(
+          storageApi().call('storage.read', {'file': 'a.json'}), denied());
     });
 
     test('overwriting an owned file still works at the file limit', () async {
       // Fill the quota through the API so the test exercises the same path the
       // plugin does, then update one of those files.
       for (var index = 0; index < 200; index++) {
-        await api().call(
-            'storage.write', {'name': 'f$index.json', 'text': 'x'});
+        await storageApi()
+            .call('storage.write', {'name': 'f$index.json', 'text': 'x'});
       }
       expect(
-          await api().call('storage.write', {'name': 'f0.json', 'text': 'new'}),
+          await storageApi()
+              .call('storage.write', {'name': 'f0.json', 'text': 'new'}),
           {'bytes': 3});
-      expect(await api().call('storage.read', {'name': 'f0.json'}),
+      expect(await storageApi().call('storage.read', {'name': 'f0.json'}),
           {'text': 'new'});
     });
 
     test('writing more than the file limit is refused', () async {
       await expectLater(
-          api().call('storage.write', {'name': 'a.json', 'text': 'x' * 300000}),
+          storageApi()
+              .call('storage.write', {'name': 'a.json', 'text': 'x' * 300000}),
           denied());
+    });
+
+    test('writes measure UTF-8 bytes in the chosen host directory', () async {
+      expect(
+          await storageApi()
+              .call('storage.write', {'name': 'a.json', 'text': '默读'}),
+          {'bytes': 6});
+      expect(await File('${storageRoot.path}/a.json').readAsString(), '默读');
+      await expectLater(
+          storageApi()
+              .call('storage.write', {'name': 'b.json', 'text': '读' * 90000}),
+          throwsA(isA<PluginScriptFailure>()
+              .having((e) => e.code, 'code', 'size')));
     });
   });
 
@@ -365,9 +375,15 @@ void main() {
           grantedPermissions: (_) async => <String>{},
         ),
       );
-      for (final raw in [null, 'ai:invoke', <Object>[], ['a' * 200]]) {
+      for (final raw in [
+        null,
+        'ai:invoke',
+        <Object>[],
+        ['a' * 200]
+      ]) {
         await expectLater(
-            service.call('permissions.request', {'capabilities': raw}), denied(),
+            service.call('permissions.request', {'capabilities': raw}),
+            denied(),
             reason: '$raw');
       }
       expect(asked, 0);
@@ -403,14 +419,17 @@ void main() {
           grantedPermissions: (_) async => {'note:read', 'ai:invoke'},
         ),
       );
-      expect(await service.call('permissions.status', {}),
-          {'granted': ['ai:invoke', 'note:read']});
+      expect(await service.call('permissions.status', {}), {
+        'granted': ['ai:invoke', 'note:read']
+      });
     });
 
     test('without the native surface the calls report permission', () async {
       final bare = api(overrides: const PluginHostServices());
       await expectLater(
-          bare.call('permissions.request', {'capabilities': ['ai:invoke']}),
+          bare.call('permissions.request', {
+            'capabilities': ['ai:invoke']
+          }),
           denied());
       await expectLater(bare.call('permissions.status', {}), denied());
     });
@@ -421,6 +440,23 @@ void main() {
       await expectLater(api().call('books.content', {}), denied());
       await expectLater(
           api().call('books.chapter', {'href': 'ch1.xhtml'}), denied());
+    });
+
+    test('chapter requests stay on the reader and pass the requested bound',
+        () async {
+      final result = await api(
+          overrides: PluginHostServices(
+        reader: PluginReaderSnapshot(
+          book: Book.mock().copyWith(id: 11),
+          chapter: 'Chapter 2',
+          chapterByHref: (href, {maxCharacters}) async {
+            expect(href, 'ch2.xhtml');
+            expect(maxCharacters, 4);
+            return 'chapter';
+          },
+        ),
+      )).call('books.chapter', {'href': 'ch2.xhtml', 'maxCharacters': 4});
+      expect(result, {'bookId': 11, 'href': 'ch2.xhtml', 'text': 'chap'});
     });
 
     test('an unknown method is refused', () async {

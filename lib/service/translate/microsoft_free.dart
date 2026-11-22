@@ -69,11 +69,13 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
 
     yield '...';
 
+    final dio = _dioFactory();
     try {
       final chunks = _splitText(text);
       final translated = <String>[];
       for (final chunk in chunks) {
-        translated.add(await _translateChunk(chunk, from, to, cancelToken));
+        translated
+            .add(await _translateChunk(dio, chunk, from, to, cancelToken));
       }
       yield translated.join();
     } catch (error) {
@@ -86,10 +88,13 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
           'Free translation ${unavailable ? 'unavailable' : 'failed'}: '
           '${_describe(error)}');
       yield* Stream.error(unavailable ? error : Exception(_describe(error)));
+    } finally {
+      dio.close(force: true);
     }
   }
 
   Future<String> _translateChunk(
+    Dio dio,
     String text,
     LangListEnum from,
     LangListEnum to,
@@ -97,7 +102,7 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
   ) async {
     final Response<dynamic> response;
     try {
-      response = await _dioFactory().get<dynamic>(
+      response = await dio.get<dynamic>(
         _readAnyFreeTranslateUrl,
         cancelToken: cancelToken,
         queryParameters: {
@@ -118,9 +123,12 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
       throw TranslateUnavailableException(_describe(error));
     }
 
-    if (response.statusCode != 200 || response.data is! List) {
+    if (response.statusCode != 200) {
       throw TranslateUnavailableException(
           'HTTP ${response.statusCode} from the free endpoint');
+    }
+    if (response.data is! List) {
+      throw const FormatException('Invalid free translation response');
     }
 
     final data = response.data as List<dynamic>;
@@ -148,12 +156,15 @@ class MicrosoftFreeTranslateProvider extends TranslateServiceProvider {
     if (error is DioException) {
       final inner = error.error;
       if (inner is SocketException) {
-        return 'cannot reach ${Uri.parse(_readAnyFreeTranslateUrl).host} '
-            '(socket: ${inner.osError?.message ?? inner.message})';
+        final code = inner.osError?.errorCode;
+        return code == null ? 'connection failed' : 'socket error $code';
       }
-      return '${error.type.name}: ${error.message ?? error}';
+      final status = error.response?.statusCode;
+      return status == null
+          ? error.type.name
+          : '${error.type.name} HTTP $status';
     }
-    return '$error';
+    return error is String ? error : error.runtimeType.toString();
   }
 
   List<String> _splitText(String text) {

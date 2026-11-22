@@ -38,15 +38,12 @@ void main() {
     await host.install(await writePluginZip(
         temp,
         samplePackageFiles(
-            manifest: manifestJson(
-                id: _id,
-                capabilities: const [
-                  'script:run',
-                  'ai:invoke',
-                  'note:read',
-                  'clipboard:read'
-                ],
-                contributes: const []))));
+            manifest: manifestJson(id: _id, capabilities: const [
+          'script:run',
+          'ai:invoke',
+          'note:read',
+          'clipboard:read'
+        ], contributes: const []))));
   });
 
   tearDown(() async {
@@ -57,6 +54,7 @@ void main() {
   /// Opens the sheet, lets [answer] drive it, and returns the resulting grants.
   Future<Set<String> Function()> open(WidgetTester tester,
       {required List<String> capabilities,
+      bool Function()? isCurrent,
       required Future<void> Function(WidgetTester tester) answer}) async {
     late Future<Set<String>> pending;
     await tester.pumpWidget(MaterialApp(
@@ -69,6 +67,7 @@ void main() {
                   host: host,
                   pluginId: _id,
                   capabilities: capabilities,
+                  isCurrent: isCurrent,
                   reason: 'Needs the model to summarise this chapter.');
             },
             child: const Text('ask'),
@@ -91,40 +90,54 @@ void main() {
 
   testWidgets('every requested capability gets its own unticked row',
       (tester) async {
-    await open(tester,
-        capabilities: ['ai:invoke', 'note:read'],
+    await open(tester, capabilities: ['ai:invoke', 'note:read'],
         answer: (tester) async {
-          expect(find.text('Plugin permission request'), findsOneWidget);
-          expect(find.text('Needs the model to summarise this chapter.'),
-              findsOneWidget);
-          // Labels come from the shared catalogue, so the sheet and the details
-          // page can never describe the same capability differently.
-          final context = tester.element(find.text('ask'));
-          for (final token in ['ai:invoke', 'note:read']) {
-            expect(find.text(pluginCapabilityLabel(context, token)),
-                findsOneWidget);
-            expect(find.text(token), findsOneWidget);
-          }
-          final boxes = tester
-              .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
-              .toList();
-          expect(boxes, hasLength(2));
-          expect(boxes.every((box) => box.value == false), isTrue);
-          // The expensive capability is flagged before the user decides.
-          expect(find.byIcon(Icons.warning_amber_outlined), findsOneWidget);
-          await tester.tap(find.text('Deny'));
-          await tester.pump();
-        });
+      expect(find.text('Plugin permission request'), findsOneWidget);
+      expect(find.text('Needs the model to summarise this chapter.'),
+          findsOneWidget);
+      // Labels come from the shared catalogue, so the sheet and the details
+      // page can never describe the same capability differently.
+      final context = tester.element(find.text('ask'));
+      for (final token in ['ai:invoke', 'note:read']) {
+        expect(
+            find.text(pluginCapabilityLabel(context, token)), findsOneWidget);
+        expect(find.text(token), findsOneWidget);
+      }
+      final boxes = tester
+          .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
+          .toList();
+      expect(boxes, hasLength(2));
+      expect(boxes.every((box) => box.value == false), isTrue);
+      // The expensive capability is flagged before the user decides.
+      expect(find.byIcon(Icons.warning_amber_outlined), findsOneWidget);
+      await tester.tap(find.text('Deny'));
+      await tester.pump();
+    });
     expect(host.grantedPermissions(_id), isEmpty);
   });
 
   testWidgets('confirming with nothing ticked grants nothing', (tester) async {
+    final result =
+        await open(tester, capabilities: ['ai:invoke'], answer: (tester) async {
+      expect(find.text('Keep everything off'), findsOneWidget);
+      await tester.tap(find.text('Keep everything off'));
+      await tester.pump();
+    });
+    expect(result(), isEmpty);
+    expect(host.grantedPermissions(_id), isEmpty);
+  });
+
+  testWidgets('confirming after the invoking action ends grants nothing',
+      (tester) async {
+    var active = true;
     final result = await open(tester,
         capabilities: ['ai:invoke'],
+        isCurrent: () => active,
         answer: (tester) async {
-          expect(find.text('Keep everything off'), findsOneWidget);
-          await tester.tap(find.text('Keep everything off'));
+          await tester.tap(find.byType(CheckboxListTile));
           await tester.pump();
+          active = false;
+          await tester.tap(find.text('Allow selected'));
         });
     expect(result(), isEmpty);
     expect(host.grantedPermissions(_id), isEmpty);
@@ -133,23 +146,20 @@ void main() {
   testWidgets('a capability the package never declared is not offered',
       (tester) async {
     // note:write is a real runtime capability the package never declares.
-    await open(tester,
-        capabilities: ['note:write', 'ai:invoke'],
+    await open(tester, capabilities: ['note:write', 'ai:invoke'],
         answer: (tester) async {
-          expect(find.byType(CheckboxListTile), findsOneWidget);
-          await tester.tap(find.text('Deny'));
-          await tester.pump();
-        });
+      expect(find.byType(CheckboxListTile), findsOneWidget);
+      await tester.tap(find.text('Deny'));
+      await tester.pump();
+    });
   });
 
   testWidgets('an install-tier capability opens no sheet', (tester) async {
-    final result = await open(tester,
-        capabilities: ['script:run'],
+    final result = await open(tester, capabilities: ['script:run'],
         answer: (tester) async {
-          // Nothing is runtime-tier and undeclared, so there is nothing to ask.
-          expect(find.text('Plugin permission request'), findsNothing);
-        });
+      // Nothing is runtime-tier and undeclared, so there is nothing to ask.
+      expect(find.text('Plugin permission request'), findsNothing);
+    });
     expect(result(), isEmpty);
   });
-
 }

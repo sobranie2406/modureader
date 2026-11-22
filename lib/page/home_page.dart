@@ -56,16 +56,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => initAnx());
   }
 
-  Future<void> _checkWindowsWebview() async {
+  Future<void> _checkWindowsWebview({bool force = false}) async {
     // One call owns creation, retry and the profile folder, so a failed start is
     // not permanent and no two callers create a second environment at once.
-    final environment = await WebViewEnvironmentBoot.instance.ensure();
+    final environment =
+        await WebViewEnvironmentBoot.instance.ensure(force: force);
     AnxLog.info('WebView2 environment: '
         '${environment == null ? 'unavailable' : 'ready'}');
     if (environment == null && mounted) {
-      final missingRuntime =
-          WebViewEnvironmentBoot.instance.lastError?.contains('not installed') ==
-              true;
+      final missingRuntime = WebViewEnvironmentBoot.instance.lastError
+              ?.contains('not installed') ==
+          true;
       SmartDialog.show(
         builder: (context) => AlertDialog(
           title: const Icon(Icons.error),
@@ -79,7 +80,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             TextButton(
               onPressed: () async {
                 SmartDialog.dismiss();
-                await _checkWindowsWebview();
+                await _checkWindowsWebview(force: true);
               },
               child: Text(ModuStrings.text(context, '重试', 'Retry')),
             ),

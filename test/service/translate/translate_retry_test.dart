@@ -43,6 +43,7 @@ class _ScriptedProvider extends TranslateServiceProvider {
 
 class _BlockedAdapter implements HttpClientAdapter {
   int calls = 0;
+  bool closed = false;
   @override
   Future<ResponseBody> fetch(RequestOptions options,
       Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
@@ -55,7 +56,7 @@ class _BlockedAdapter implements HttpClientAdapter {
   }
 
   @override
-  void close({bool force = false}) {}
+  void close({bool force = false}) => closed = true;
 }
 
 void main() {
@@ -104,6 +105,7 @@ void main() {
         throwsA(isA<TranslateUnavailableException>()));
     // One HTTP attempt, not three: the old code waited three connect timeouts.
     expect(adapter.calls, 1);
+    expect(adapter.closed, true);
   });
 
   test('a non-200 answer from the free endpoint is unavailable, not retried',

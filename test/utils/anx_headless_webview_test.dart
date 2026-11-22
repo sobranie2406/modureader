@@ -9,13 +9,17 @@ import 'package:modu_reader/main.dart' show navigatorKey;
 import 'package:modu_reader/utils/webView/anx_headless_webview.dart';
 
 class _Browser extends InAppWebViewPlatform {
-  _Browser({this.failHeadless = false, this.stallCreation = false});
+  _Browser(
+      {this.failHeadless = false,
+      this.stallCreation = false,
+      this.firstCreation});
 
   final bool failHeadless;
 
   /// When true, the first headless run() never completes, reproducing a
   /// WebView2 environment that fails to initialise.
   final bool stallCreation;
+  final Completer<void>? firstCreation;
   _Headless? headless;
   PlatformInAppWebViewWidgetCreationParams? overlay;
 
@@ -23,7 +27,8 @@ class _Browser extends InAppWebViewPlatform {
   PlatformHeadlessInAppWebView createPlatformHeadlessInAppWebView(
           PlatformHeadlessInAppWebViewCreationParams params) =>
       headless = _Headless(params, failHeadless,
-          stall: stallCreation && headless == null);
+          stall: stallCreation && headless == null,
+          creation: headless == null ? firstCreation : null);
 
   @override
   PlatformInAppWebViewWidget createPlatformInAppWebViewWidget(
@@ -34,11 +39,13 @@ class _Browser extends InAppWebViewPlatform {
 }
 
 class _Headless extends PlatformHeadlessInAppWebView {
-  _Headless(super.params, this.fail, {this.stall = false})
+  _Headless(super.params, this.fail, {this.stall = false, this.creation})
       : super.implementation();
 
   final bool fail;
   final bool stall;
+  final Completer<void>? creation;
+  bool running = false;
   int runs = 0, disposals = 0;
 
   @override
@@ -47,10 +54,17 @@ class _Headless extends PlatformHeadlessInAppWebView {
     if (fail) throw StateError('Headless unavailable');
     // Never completes: the native controller never arrives.
     if (stall) await Completer<void>().future;
+    await creation?.future;
+    running = true;
   }
 
   @override
-  Future<void> dispose() async => disposals++;
+  Future<void> dispose() async {
+    // The Windows implementation cannot release a pending creation.
+    if (!running) return;
+    running = false;
+    disposals++;
+  }
 }
 
 class _View extends PlatformInAppWebViewWidget {
@@ -234,6 +248,51 @@ void main() {
     await next.run();
     expect(browser.headless!.params.initialUrlRequest!.url.toString(),
         'https://example.com/b');
+  });
+
+  test(
+      'late native creation is released after disposal times out without owner callbacks',
+      () async {
+    final previous = InAppWebViewPlatform.instance;
+    final creation = Completer<void>();
+    final browser = _Browser(firstCreation: creation);
+    InAppWebViewPlatform.instance = browser;
+    addTearDown(() {
+      if (previous != null) InAppWebViewPlatform.instance = previous;
+    });
+    final environment =
+        WebViewEnvironment.fromPlatform(platform: _Environment());
+    var created = 0, loaded = 0, errors = 0;
+    final late = AnxHeadlessWebView(
+        webViewEnvironment: environment,
+        onWebViewCreated: (_) => created++,
+        onLoadStop: (_, __) => loaded++,
+        onLoadError: (_, __, ___, ____) => errors++);
+    final running = late.run();
+    final native = browser.headless!;
+    await late.dispose().timeout(const Duration(seconds: 20));
+    expect(native.disposals, 0, reason: 'native run has not completed');
+    expect(AnxHeadlessWebView.hasPendingDisposal, isFalse);
+    final next = AnxHeadlessWebView(webViewEnvironment: environment);
+    addTearDown(next.dispose);
+    await next.run();
+    final controller =
+        InAppWebViewController.fromPlatform(platform: _Controller());
+    native.params.onWebViewCreated!(controller);
+    native.params.onLoadStop!(controller, WebUri('https://example.com/late'));
+    native.params.onReceivedError!(
+        controller,
+        WebResourceRequest(url: WebUri('https://example.com/late')),
+        WebResourceError(
+            type: WebResourceErrorType.UNKNOWN, description: 'late'));
+    expect([created, loaded, errors], [0, 0, 0]);
+    creation.complete();
+    await running;
+    expect(native.disposals, 1, reason: 'late native creation remains owned');
+    await late.dispose();
+    expect(native.disposals, 1);
+    expect(browser.headless!.running, isTrue,
+        reason: 'cleaning up the old view must not release the next one');
   });
 
   test(

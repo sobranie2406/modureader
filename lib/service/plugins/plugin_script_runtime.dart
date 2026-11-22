@@ -36,6 +36,7 @@ const Set<String> kPluginServiceMethods = {
   'dictionary.lookup',
   'ai.complete',
   'translate.text',
+  'tts.speak',
   'clipboard.write',
   'clipboard.read',
   'share.text',

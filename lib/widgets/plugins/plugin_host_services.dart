@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/providers/chapter_content_bridge.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/widgets/plugins/plugin_permission_sheet.dart';
@@ -20,8 +21,9 @@ PluginHostServices buildPluginHostServices(
   required String pluginId,
   Book? book,
   String chapter = '',
-  Future<String> Function()? currentChapter,
-  Future<String> Function(String href)? chapterByHref,
+  CurrentChapterContentFetcher? currentChapter,
+  ChapterContentByHrefFetcher? chapterByHref,
+  required bool Function() isCurrent,
 }) {
   String t(String zh, String en) => ModuStrings.text(context, zh, en);
   return PluginHostServices(
@@ -55,7 +57,8 @@ PluginHostServices buildPluginHostServices(
             host: host,
             pluginId: id,
             capabilities: capabilities,
-            reason: reason),
+            reason: reason,
+            isCurrent: isCurrent),
     grantedPermissions: (id) async => host.grantedPermissions(id),
     askConfirm: (title, message) async {
       if (!context.mounted) return false;
@@ -85,9 +88,7 @@ PluginHostServices buildPluginHostServices(
                 content: Column(mainAxisSize: MainAxisSize.min, children: [
                   if (message.isNotEmpty) Text(message),
                   TextField(
-                      controller: controller,
-                      maxLength: 500,
-                      autofocus: true),
+                      controller: controller, maxLength: 500, autofocus: true),
                 ]),
                 actions: [
                   TextButton(
@@ -124,7 +125,8 @@ PluginHostServices buildPluginHostServices(
           if (label.isNotEmpty)
             Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Align(alignment: Alignment.centerLeft, child: Text(label))),
+                child:
+                    Align(alignment: Alignment.centerLeft, child: Text(label))),
           LinearProgressIndicator(value: fraction),
         ]),
       ));

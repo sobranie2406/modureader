@@ -152,14 +152,14 @@ class AnxHeadlessWebView {
     if (useOverlay) {
       _runOverlay();
     } else {
-      _headlessWebView = HeadlessInAppWebView(
+      final view = HeadlessInAppWebView(
         webViewEnvironment: webViewEnvironment,
         initialUrlRequest: initialUrlRequest,
         initialData: initialData,
         initialSettings: initialSettings,
-        onWebViewCreated: onWebViewCreated,
-        onLoadStop: onLoadStop,
-        onConsoleMessage: onConsoleMessage,
+        onWebViewCreated: _onWebViewCreated,
+        onLoadStop: _onLoadStop,
+        onConsoleMessage: _onConsoleMessage,
         onReceivedError: _onReceivedError,
         onReceivedHttpError: _onReceivedHttpError,
         onRenderProcessGone: _onRenderProcessGone,
@@ -168,8 +168,9 @@ class AnxHeadlessWebView {
         onCreateWindow: _asyncCallback(onCreateWindow),
         onPermissionRequest: _asyncCallback(onPermissionRequest),
       );
+      _headlessWebView = view;
       try {
-        await _headlessWebView?.run();
+        await view.run();
       } catch (e) {
         // Creating a second Windows native view after a failed creation can
         // race a late WebView2 callback. Surface the failure instead.
@@ -178,14 +179,36 @@ class AnxHeadlessWebView {
             "HeadlessInAppWebView failed to run, falling back to Overlay: $e");
         _headlessWebView = null;
         _runOverlay();
+      } finally {
+        // Windows cannot dispose until run completes; keep late creation owned.
+        if (_disposed && identical(_headlessWebView, view)) {
+          try {
+            await view.dispose();
+          } finally {
+            if (identical(_headlessWebView, view)) _headlessWebView = null;
+          }
+        }
       }
     }
+  }
+
+  void _onWebViewCreated(InAppWebViewController controller) {
+    if (!_disposed) onWebViewCreated?.call(controller);
+  }
+
+  void _onLoadStop(InAppWebViewController controller, Uri? url) {
+    if (!_disposed) onLoadStop?.call(controller, url);
+  }
+
+  void _onConsoleMessage(
+      InAppWebViewController controller, ConsoleMessage message) {
+    if (!_disposed) onConsoleMessage?.call(controller, message);
   }
 
   void _onReceivedError(InAppWebViewController controller,
       WebResourceRequest request, WebResourceError error) {
     // Match the old page-load callbacks; failed images must not abort import.
-    if (request.isForMainFrame == false) return;
+    if (_disposed || request.isForMainFrame == false) return;
     onLoadError?.call(controller, request.url, error.type.toNativeValue() ?? -1,
         error.description);
   }
@@ -203,7 +226,7 @@ class AnxHeadlessWebView {
 
   void _onReceivedHttpError(InAppWebViewController controller,
       WebResourceRequest request, WebResourceResponse response) {
-    if (request.isForMainFrame == false) return;
+    if (_disposed || request.isForMainFrame == false) return;
     onLoadHttpError?.call(controller, request.url, response.statusCode ?? 0,
         response.reasonPhrase ?? '');
   }
@@ -228,8 +251,8 @@ class AnxHeadlessWebView {
             initialUrlRequest: initialUrlRequest,
             initialData: initialData,
             initialSettings: initialSettings,
-            onLoadStop: onLoadStop,
-            onConsoleMessage: onConsoleMessage,
+            onLoadStop: _onLoadStop,
+            onConsoleMessage: _onConsoleMessage,
             onReceivedError: _onReceivedError,
             onReceivedHttpError: _onReceivedHttpError,
             onRenderProcessGone: _onRenderProcessGone,
@@ -237,9 +260,7 @@ class AnxHeadlessWebView {
             shouldInterceptRequest: _asyncCallback(shouldInterceptRequest),
             onCreateWindow: _asyncCallback(onCreateWindow),
             onPermissionRequest: _asyncCallback(onPermissionRequest),
-            onWebViewCreated: (controller) {
-              onWebViewCreated?.call(controller);
-            },
+            onWebViewCreated: _onWebViewCreated,
           ),
         ),
       ),
@@ -271,16 +292,19 @@ class AnxHeadlessWebView {
   static const Duration _creationGrace = Duration(seconds: 5);
 
   Future<void> _dispose() async {
+    var creationPending = false;
     try {
       // Windows plugin dispose is a no-op until run() has completed. Wait for
       // late creation before disposing; callers may bound their own wait, but
       // retain this instance until native cleanup really finishes.
       try {
         await _running?.timeout(_creationGrace);
+      } on TimeoutException {
+        creationPending = true;
       } catch (_) {
         // A failed or wedged creation may still have allocated a controller.
       }
-      if (_headlessWebView != null) {
+      if (!creationPending && _headlessWebView != null) {
         await _headlessWebView?.dispose();
         _headlessWebView = null;
       }

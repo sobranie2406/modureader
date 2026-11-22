@@ -202,7 +202,7 @@ class BookContentSearchRepository {
     final fingerprint = await bookSourceFingerprint(book);
     final existing = _sessions[book.id];
     if (existing != null &&
-        existing.isActive &&
+        !existing._disposed &&
         existing.sourceFingerprint == fingerprint) {
       existing.cancelDisposalTimer();
       await existing.ensureInitialized();
@@ -279,8 +279,11 @@ class _HeadlessSearchSession {
     // Retry on demand rather than only reading a cached value: one failed start
     // used to disable book search for the whole session.
     final environment = Platform.isWindows
-        ? await WebViewEnvironmentBoot.instance.ensure()
+        ? await _wait(WebViewEnvironmentBoot.instance.ensure(), 'environment')
         : webViewEnvironment;
+    if (_disposed || isCancelled?.call() == true) {
+      throw const ReaderOperationCancelled();
+    }
     if (Platform.isWindows && environment == null) {
       throw StateError(
         'WebViewEnvironment is not initialized. '

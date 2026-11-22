@@ -20,11 +20,18 @@ Future<Set<String>> showPluginPermissionRequest(
   required String pluginId,
   required List<String> capabilities,
   required String reason,
+  bool Function()? isCurrent,
 }) async {
   // Only what this package actually declares: showing a row the host would
   // refuse to grant would let a plugin ask for a permission it never requested
   // at installation, and the grant call would then fail after the user agreed.
-  final declared = host.manifestFor(pluginId)?.capabilities ?? const <String>{};
+  final manifest = host.manifestFor(pluginId);
+  final declared = manifest?.capabilities ?? const <String>{};
+  bool current() =>
+      context.mounted &&
+      identical(host.manifestFor(pluginId), manifest) &&
+      host.isScriptRunnable(pluginId) &&
+      (isCurrent?.call() ?? true);
   final requested = <PluginPermissionSpec>[];
   for (final capability in capabilities) {
     if (!declared.contains(capability)) continue;
@@ -36,7 +43,7 @@ Future<Set<String>> showPluginPermissionRequest(
     return host.grantedPermissions(pluginId);
   }
   final before = host.grantedPermissions(pluginId);
-  if (!context.mounted) return before;
+  if (!current()) return before;
 
   final answer = await showDialog<Set<String>>(
     context: context,
@@ -44,31 +51,32 @@ Future<Set<String>> showPluginPermissionRequest(
     builder: (dialog) => _PermissionDialog(
       host: host,
       pluginId: pluginId,
-      pluginName: record.name.resolve(
-          Localizations.localeOf(dialog).toLanguageTag()),
+      pluginName:
+          record.name.resolve(Localizations.localeOf(dialog).toLanguageTag()),
       specs: requested,
       reason: reason,
       initial: before,
     ),
   );
-  if (answer == null) {
+  if (answer == null || !current()) {
     // Dismissed without confirming: keep whatever was already granted.
     return host.grantedPermissions(pluginId);
   }
-  // Grant first, in one batch that does not disturb running work: the caller is
-  // usually the plugin's own in-flight job, and cancelling it here would make
-  // the just-granted permission impossible to use. Revoking still goes through
-  // setPermission, which stops the plugin's task on purpose.
   final toGrant = [
     for (final spec in requested)
       if (answer.contains(spec.token) && !before.contains(spec.token))
         spec.token,
   ];
-  if (toGrant.isNotEmpty) await host.grantPermissions(pluginId, toGrant);
-  for (final spec in requested) {
-    if (before.contains(spec.token) && !answer.contains(spec.token)) {
-      await host.setPermission(pluginId, spec.token, false);
-    }
+  final toRevoke = [
+    for (final spec in requested)
+      if (before.contains(spec.token) && !answer.contains(spec.token))
+        spec.token,
+  ];
+  if (toGrant.isNotEmpty) {
+    await host.grantPermissions(pluginId, toGrant, isCurrent: current);
+  }
+  if (toRevoke.isNotEmpty) {
+    await host.revokePermissions(pluginId, toRevoke, isCurrent: current);
   }
   return host.grantedPermissions(pluginId);
 }

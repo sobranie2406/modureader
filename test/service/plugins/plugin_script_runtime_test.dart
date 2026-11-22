@@ -80,6 +80,18 @@ class _MemoryStorageApi extends PluginHostApi {
   }
 }
 
+class _SpeechApi extends PluginHostApi {
+  _SpeechApi(String pluginId)
+      : super(pluginId: pluginId, services: const PluginHostServices());
+
+  @override
+  Future<Object?> call(String method, Map<String, dynamic> args) async {
+    expect(method, 'tts.speak');
+    expect(args, {'text': 'hello'});
+    return {'spoken': true};
+  }
+}
+
 class Http extends PluginHttpClient {
   int requests = 0;
   @override
@@ -424,8 +436,26 @@ void main() {
     await engine.ready.future;
     expect(await engine.call('storage.write', {'name': 'a.json', 'text': 'hi'}),
         {'bytes': 2});
-    expect(await engine.call('storage.read', {'name': 'a.json'}), {'text': 'hi'});
+    expect(
+        await engine.call('storage.read', {'name': 'a.json'}), {'text': 'hi'});
     expect(api.files, {'a.json': 'hi'});
+    engine.result.complete({'text': ''});
+    await result;
+  });
+
+  test('routes speech to the native host after consent', () async {
+    await install(capabilities: [
+      'script:run',
+      'ui:selection-action',
+      'tts:invoke',
+    ]);
+    final result =
+        runtime.run(pluginId: id, action: action, hostApi: _SpeechApi(id));
+    await engine.ready.future;
+    await expectLater(engine.call('tts.speak', {'text': 'hello'}),
+        throwsA(failure('denied')));
+    await host.grantPermissions(id, ['tts:invoke']);
+    expect(await engine.call('tts.speak', {'text': 'hello'}), {'spoken': true});
     engine.result.complete({'text': ''});
     await result;
   });

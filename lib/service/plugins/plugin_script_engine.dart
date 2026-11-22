@@ -39,6 +39,7 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
   final _result = Completer<Map<String, dynamic>>();
   bool _disposed = false, _started = false;
   int _messages = 0;
+
   /// In-flight JavaScript evaluations. dispose() waits for these, because a
   /// platform message that is still pending when the native view is destroyed
   /// is reported by the engine as "Failed to respond to a message".
@@ -191,9 +192,15 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
                     // granted this" indistinguishable from "the package is
                     // broken", which is exactly what left a real permission
                     // failure looking like a generic plugin crash.
-                    return {'error': 'Plugin request failed', 'code': failure.code};
+                    return {
+                      'error': 'Plugin request failed',
+                      'code': failure.code
+                    };
                   } catch (_) {
-                    return {'error': 'Plugin request failed', 'code': 'execution'};
+                    return {
+                      'error': 'Plugin request failed',
+                      'code': 'execution'
+                    };
                   } finally {
                     if (!_disposed && !_result.isCompleted) {
                       _diagnosticStage = 'worker';
@@ -234,8 +241,7 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
           _fail('invalid_message');
           return;
         }
-        late final Future<void> started;
-        started = () async {
+        final started = () async {
           if (_disposed || _view?.isDisposed == true) return;
           try {
             final state = await controller.evaluateJavascript(source: '''
@@ -255,12 +261,12 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
             }
           } catch (_) {
             _fail('bootstrap_error');
-          } finally {
-            _pendingJs.remove(started);
           }
         }();
         _pendingJs.add(started);
-        unawaited(started);
+        unawaited(started.whenComplete(() {
+          _pendingJs.remove(started);
+        }));
       },
       onConsoleMessage: (_, message) {
         if (message.messageLevel == ConsoleMessageLevel.ERROR) {

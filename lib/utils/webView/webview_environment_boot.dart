@@ -44,6 +44,7 @@ class WebViewEnvironmentBoot {
   void debugSetEnvironment(WebViewEnvironment? environment) {
     _override = environment;
   }
+
   String? _lastError;
   DateTime? _failedAt;
 
@@ -132,13 +133,8 @@ class WebViewEnvironmentBoot {
     return folder;
   }
 
-  /// Bounded, path-free error text. A Windows exception message embeds the
-  /// profile path, which is user data and must not reach a log file.
-  static String _describe(Object error) {
-    final raw = error.toString();
-    final text = raw.length <= 200 ? raw : '${raw.substring(0, 200)}…';
-    return text;
-  }
+  // Native messages can contain the user's profile directory.
+  static String _describe(Object error) => error.runtimeType.toString();
 
   void _fail(String message) {
     _lastError = message;
@@ -155,7 +151,8 @@ class WebViewEnvironmentBoot {
     try {
       await current.dispose();
     } catch (error) {
-      AnxLog.warning('Could not dispose WebView2 environment: $error');
+      AnxLog.warning(
+          'Could not dispose WebView2 environment: ${_describe(error)}');
     }
   }
 }

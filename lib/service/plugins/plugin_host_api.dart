@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:modu_reader/config/shared_preference_provider.dart';
@@ -13,6 +14,7 @@ import 'package:modu_reader/models/book_note.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_permissions.dart';
 import 'package:modu_reader/models/tag.dart';
+import 'package:modu_reader/providers/chapter_content_bridge.dart';
 import 'package:modu_reader/service/ai/index.dart';
 import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_retriever.dart';
@@ -44,8 +46,8 @@ class PluginReaderSnapshot {
 
   final Book book;
   final String chapter;
-  final Future<String> Function()? currentChapter;
-  final Future<String> Function(String href)? chapterByHref;
+  final CurrentChapterContentFetcher? currentChapter;
+  final ChapterContentByHrefFetcher? chapterByHref;
 }
 
 /// Extra native surfaces a host call needs.
@@ -72,8 +74,7 @@ class PluginHostServices {
   final Future<bool> Function(String title, String message)? askConfirm;
   final Future<String?> Function(String title, String message, String? initial)?
       askPrompt;
-  final Future<String?> Function(String title, List<String> options)?
-      askSelect;
+  final Future<String?> Function(String title, List<String> options)? askSelect;
   final Future<void> Function(String text)? copyToClipboard;
   final Future<String?> Function()? readClipboard;
   final Future<void> Function(String text, String? subject)? shareText;
@@ -95,20 +96,22 @@ class PluginHostServices {
 
 /// Executes the non-network host API methods for one plugin.
 ///
-/// Everything here is deliberately narrow: ids are validated, every list is
-/// bounded, every write goes through the same DAO the app uses, and private
-/// books are filtered by [PrivateLibrary.canRead] rather than by a copy of the
-/// rule. Nothing returns a file path, a credential or another plugin's data.
+/// Shelf-wide queries expose public books. Reader text stays bound to the
+/// current book and its native privacy session.
 class PluginHostApi {
   PluginHostApi({
     required this.pluginId,
     required this.services,
     this.maxResults = 50,
-  });
+    this.storageRoot,
+    PrivateLibrary? privacy,
+  }) : _privacy = privacy ?? PrivateLibrary.instance;
 
   final String pluginId;
   final PluginHostServices services;
   final int maxResults;
+  final Directory? storageRoot;
+  final PrivateLibrary _privacy;
 
   /// Dispatches one method. Throws [PluginScriptFailure] with a stable code.
   Future<Object?> call(String method, Map<String, dynamic> args) async {
@@ -211,12 +214,12 @@ class PluginHostApi {
     return value;
   }
 
-  Future<Book> _readableBook(int id) async {
+  bool _public(Book book) =>
+      !book.isDeleted && !_privacy.corrupt && !_privacy.isPrivate(book);
+
+  Future<Book> _publicBook(int id) async {
     final book = await bookDao.selectBookById(id);
-    if (book.id != id || book.isDeleted) {
-      throw const PluginScriptFailure('permission');
-    }
-    if (!PrivateLibrary.instance.canRead(book)) {
+    if (book.id != id || !_public(book)) {
       throw const PluginScriptFailure('permission');
     }
     return book;
@@ -229,7 +232,7 @@ class PluginHostApi {
         'groupId': book.groupId,
         'percentage': book.readingPercentage,
         'lastReadAt': book.lastReadTime.toIso8601String(),
-        'private': PrivateLibrary.instance.isPrivate(book),
+        'private': false,
       };
 
   // ---- library -------------------------------------------------------------
@@ -240,7 +243,7 @@ class PluginHostApi {
     final limit = _int(args, 'limit', min: 1, max: maxResults, fallback: 20);
     final books = await bookDao.selectBooks(includeDeleted: false);
     return books
-        .where(PrivateLibrary.instance.canRead)
+        .where(_public)
         .skip(offset)
         .take(limit)
         .map(_bookSummary)
@@ -250,27 +253,52 @@ class PluginHostApi {
   Future<Object?> _libraryTags(Map<String, dynamic> args) async {
     _only(args, const {'bookId'});
     final bookId = _int(args, 'bookId', min: 1, max: _maxId);
-    await _readableBook(bookId);
+    final book = await _publicBook(bookId);
     final tags = await bookTagDao.fetchTagsForBook(bookId);
+    if (!_public(book)) throw const PluginScriptFailure('permission');
     return [
-      for (final tag in tags)
+      for (final tag in tags.take(maxResults))
         {'id': tag.id, 'name': tag.name, 'color': _colorValue(tag)},
     ];
   }
 
   Future<Object?> _libraryGroups(Map<String, dynamic> args) async {
     _only(args, const {});
+    return (await _publicGroups()).take(500).toList();
+  }
+
+  Future<Iterable<Map<String, Object?>>> _publicGroups() async {
     final db = await DBHelper().database;
     final rows = await db.rawQuery(
         'SELECT id, name, parent_id FROM tb_groups WHERE COALESCE(is_deleted, 0) = 0 ORDER BY id');
-    return [
-      for (final row in rows.take(500))
-        {
+    final parentIds = {
+      for (final row in rows) row['id'] as int: row['parent_id'] as int?,
+    };
+    final books = await bookDao.selectBooks(includeDeleted: false);
+    if (_privacy.corrupt) return const [];
+    final public = <int>{}, private = <int>{};
+    for (final book in books) {
+      final groups = _public(book) ? public : private;
+      int? id = book.groupId;
+      while (id != null && id != 0 && groups.add(id)) {
+        id = parentIds[id];
+      }
+    }
+    final hidden = private.difference(public);
+    bool visible(int? id) {
+      final seen = <int>{};
+      while (id != null && seen.add(id)) {
+        if (hidden.contains(id)) return false;
+        id = parentIds[id];
+      }
+      return true;
+    }
+
+    return rows.where((row) => visible(row['id'] as int)).map((row) => {
           'id': row['id'],
           'name': row['name'],
           'parentId': row['parent_id'],
-        }
-    ];
+        });
   }
 
   Future<Object?> _libraryTag(Map<String, dynamic> args) async {
@@ -279,9 +307,11 @@ class PluginHostApi {
     if (ids is! List || ids.isEmpty || ids.length > 100) {
       throw const PluginScriptFailure('permission');
     }
-    final bookIds = <int>[];
+    final bookIds = <int>{};
     for (final id in ids) {
-      if (id is! int || id < 1) throw const PluginScriptFailure('permission');
+      if (id is! int || id < 1 || id > _maxId) {
+        throw const PluginScriptFailure('permission');
+      }
       bookIds.add(id);
     }
     final name = _text(args, 'name', maxLength: 60).trim();
@@ -291,20 +321,22 @@ class PluginHostApi {
     }
     // Check every book first: applying as we go left a half-tagged shelf behind
     // when one id belonged to a private book the plugin may not touch.
-    for (final bookId in bookIds) {
-      await _readableBook(bookId);
-    }
+    final books = [for (final id in bookIds) await _publicBook(id)];
     if (remove == true) {
       final tag = await tagDao.getTagByName(name);
       if (tag == null) return {'applied': 0};
-      for (final bookId in bookIds) {
-        await bookTagDao.removeRelation(bookId: bookId, tagId: tag.id);
+      if (!books.every(_public)) throw const PluginScriptFailure('permission');
+      for (final book in books) {
+        if (!_public(book)) throw const PluginScriptFailure('permission');
+        await bookTagDao.removeRelation(bookId: book.id, tagId: tag.id);
       }
       return {'applied': bookIds.length};
     }
     final tag = await _ensureTag(name);
-    for (final bookId in bookIds) {
-      await bookTagDao.addRelation(bookId: bookId, tagId: tag.id);
+    if (!books.every(_public)) throw const PluginScriptFailure('permission');
+    for (final book in books) {
+      if (!_public(book)) throw const PluginScriptFailure('permission');
+      await bookTagDao.addRelation(bookId: book.id, tagId: tag.id);
     }
     return {'applied': bookIds.length, 'tagId': tag.id};
   }
@@ -326,11 +358,18 @@ class PluginHostApi {
       throw const PluginScriptFailure('permission');
     }
     final groupId = _int(args, 'groupId', min: 0, max: _maxId);
-    final bookIds = <int>[];
+    final bookIds = <int>{};
     for (final id in ids) {
-      if (id is! int || id < 1) throw const PluginScriptFailure('permission');
-      await _readableBook(id);
+      if (id is! int || id < 1 || id > _maxId) {
+        throw const PluginScriptFailure('permission');
+      }
       bookIds.add(id);
+    }
+    final books = [for (final id in bookIds) await _publicBook(id)];
+    final groups = groupId == 0 ? null : await _publicGroups();
+    if ((groups != null && !groups.any((group) => group['id'] == groupId)) ||
+        !books.every(_public)) {
+      throw const PluginScriptFailure('permission');
     }
     await bookDao.moveBooksToFolder(bookIds, groupId: groupId);
     return {'moved': bookIds.length};
@@ -345,12 +384,15 @@ class PluginHostApi {
     if (reader == null || fetch == null) {
       throw const PluginScriptFailure('permission');
     }
-    if (!PrivateLibrary.instance.canRead(reader.book)) {
+    if (!_privacy.canRead(reader.book)) {
       throw const PluginScriptFailure('permission');
     }
     final limit = _int(args, 'maxCharacters',
         min: 1, max: _maxChapterChars, fallback: _maxChapterChars);
-    final text = await fetch();
+    final text = await fetch(maxCharacters: limit);
+    if (!_privacy.canRead(reader.book)) {
+      throw const PluginScriptFailure('permission');
+    }
     return {
       'bookId': reader.book.id,
       'title': reader.book.title,
@@ -366,13 +408,16 @@ class PluginHostApi {
     if (reader == null || fetch == null) {
       throw const PluginScriptFailure('permission');
     }
-    if (!PrivateLibrary.instance.canRead(reader.book)) {
+    if (!_privacy.canRead(reader.book)) {
       throw const PluginScriptFailure('permission');
     }
     final href = _text(args, 'href', maxLength: 512).trim();
     final limit = _int(args, 'maxCharacters',
         min: 1, max: _maxChapterChars, fallback: _maxChapterChars);
-    final text = await fetch(href);
+    final text = await fetch(href, maxCharacters: limit);
+    if (!_privacy.canRead(reader.book)) {
+      throw const PluginScriptFailure('permission');
+    }
     return {
       'bookId': reader.book.id,
       'href': href,
@@ -388,7 +433,7 @@ class PluginHostApi {
     final bookId = args.containsKey('bookId')
         ? _int(args, 'bookId', min: 1, max: _maxId)
         : null;
-    if (bookId != null) await _readableBook(bookId);
+    if (bookId != null) await _publicBook(bookId);
     final keyword = args.containsKey('keyword')
         ? _text(args, 'keyword', maxLength: 200)
         : null;
@@ -403,7 +448,7 @@ class PluginHostApi {
     final result = <Map<String, Object?>>[];
     for (final note in notes) {
       final book = byId[note.bookId];
-      if (book == null || !PrivateLibrary.instance.canRead(book)) continue;
+      if (book == null || !_public(book)) continue;
       result.add(_noteSummary(note, book));
       if (result.length >= limit) break;
     }
@@ -428,29 +473,29 @@ class PluginHostApi {
     final days = _int(args, 'days', min: 1, max: 365, fallback: 30);
     final from = DateTime.now().subtract(Duration(days: days));
     final entries = await readingTimeDao.queryReadingHistory(from: from);
-    var total = 0;
     final perBook = <int, int>{};
     for (final entry in entries) {
-      total += entry.readingTime;
       perBook[entry.bookId] = (perBook[entry.bookId] ?? 0) + entry.readingTime;
     }
     final books =
         await bookDao.selectBooksByIds(perBook.keys.toList(growable: false));
-    final byId = {for (final book in books) book.id: book};
-    final ranked = perBook.entries.toList()
+    final byId = {for (final book in books.where(_public)) book.id: book};
+    final ranked = perBook.entries
+        .where((entry) => byId.containsKey(entry.key))
+        .toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final result = <Map<String, Object?>>[];
-    for (final entry in ranked) {
-      final book = byId[entry.key];
-      if (book == null || !PrivateLibrary.instance.canRead(book)) continue;
-      result.add({
-        'bookId': entry.key,
-        'title': book.title,
-        'seconds': entry.value,
-      });
-      if (result.length >= 20) break;
-    }
-    return {'days': days, 'totalSeconds': total, 'books': result};
+    return {
+      'days': days,
+      'totalSeconds': ranked.fold(0, (int total, entry) => total + entry.value),
+      'books': [
+        for (final entry in ranked.take(20))
+          {
+            'bookId': entry.key,
+            'title': byId[entry.key]!.title,
+            'seconds': entry.value,
+          },
+      ],
+    };
   }
 
   Future<Object?> _readingHistory(Map<String, dynamic> args) async {
@@ -459,16 +504,16 @@ class PluginHostApi {
     final bookId = args.containsKey('bookId')
         ? _int(args, 'bookId', min: 1, max: _maxId)
         : null;
-    if (bookId != null) await _readableBook(bookId);
+    if (bookId != null) await _publicBook(bookId);
     final entries =
         await readingTimeDao.queryReadingHistory(bookId: bookId, limit: limit);
-    final books = await bookDao
-        .selectBooksByIds(entries.map((entry) => entry.bookId).toSet().toList());
+    final books = await bookDao.selectBooksByIds(
+        entries.map((entry) => entry.bookId).toSet().toList());
     final byId = {for (final book in books) book.id: book};
     final result = <Map<String, Object?>>[];
     for (final entry in entries) {
       final book = byId[entry.bookId];
-      if (book == null || !PrivateLibrary.instance.canRead(book)) continue;
+      if (book == null || !_public(book)) continue;
       result.add({
         'bookId': entry.bookId,
         'title': book.title,
@@ -494,12 +539,12 @@ class PluginHostApi {
         .search(query, limit: limit, includeNotes: includeNotes != false);
     return {
       'books': [
-        for (final book in data.books.take(limit))
-          if (PrivateLibrary.instance.canRead(book)) _bookSummary(book)
+        for (final book in data.books.where(_public).take(limit))
+          _bookSummary(book)
       ],
       'notes': [
         for (final group in data.noteGroups)
-          if (PrivateLibrary.instance.canRead(group.book))
+          if (_public(group.book))
             for (final note in group.notes.take(limit))
               _noteSummary(note, group.book)
       ],
@@ -513,13 +558,16 @@ class PluginHostApi {
     final reader = services.reader;
     final book = reader?.book ??
         (await bookDao.selectBooks(includeDeleted: false))
-            .where(PrivateLibrary.instance.canRead)
+            .where(_public)
             .firstOrNull;
-    if (book == null || !PrivateLibrary.instance.canRead(book)) {
+    if (book == null || !_privacy.canRead(book)) {
       throw const PluginScriptFailure('permission');
     }
     final results = await BookKnowledgeRetriever().search(book, query,
         limit: limit, timeBudget: const Duration(seconds: 5));
+    if (reader == null ? !_public(book) : !_privacy.canRead(book)) {
+      throw const PluginScriptFailure('permission');
+    }
     return {
       'bookId': book.id,
       'results': [
@@ -582,8 +630,7 @@ class PluginHostApi {
         : null;
     final messages = <ChatMessage>[
       if (system != null) SystemChatMessage(content: system),
-      HumanChatMessage(
-          content: ChatMessageContent.text(prompt)),
+      HumanChatMessage(content: ChatMessageContent.text(prompt)),
     ];
     final emissions = <String>[];
     await for (final chunk in aiGenerateStream(messages)) {
@@ -728,14 +775,8 @@ class PluginHostApi {
   static const int _maxStorageFileBytes = 256 * 1024;
   static const int _maxStorageTotalBytes = 4 * 1024 * 1024;
 
-  /// Where one plugin's files live. Overridable so a test never writes to the
-  /// real app data directory — with an empty document root it resolves to
-  /// `/plugins`, which a CI runner cannot create.
-  @visibleForTesting
-  static Directory Function(String pluginId)? debugStorageRoot;
-
   Directory get _storageRoot =>
-      debugStorageRoot?.call(pluginId) ?? pluginOwnedDirectory(pluginId);
+      storageRoot ?? (throw const PluginScriptFailure('permission'));
 
   /// Rejects anything that is not a flat, safe file name.
   ///
@@ -797,6 +838,10 @@ class PluginHostApi {
     _only(args, const {'name', 'text'});
     final name = _storageName(args['name']);
     final text = _text(args, 'text', maxLength: _maxStorageFileBytes);
+    final bytes = utf8.encode(text);
+    if (bytes.length > _maxStorageFileBytes) {
+      throw const PluginScriptFailure('size');
+    }
     final root = _storageRoot;
     if (!await root.exists()) await root.create(recursive: true);
     var total = 0;
@@ -805,19 +850,18 @@ class PluginHostApi {
       total += await file.length();
     }
     final target = File(p.join(root.path, name));
-    final previous = await target.exists() ? await target.length() : 0;
+    final replacing = await target.exists();
+    final previous = replacing ? await target.length() : 0;
     // Rewriting a file the plugin already owns must keep working at the limit,
     // otherwise a plugin that filled its quota could never update what it wrote.
-    final replacing =
-        existing.any((file) => p.basename(file.path) == name);
     if (!replacing && existing.length >= _maxStorageFiles) {
       throw const PluginScriptFailure('quota');
     }
-    if (total - previous + text.length > _maxStorageTotalBytes) {
+    if (total - previous + bytes.length > _maxStorageTotalBytes) {
       throw const PluginScriptFailure('quota');
     }
-    await target.writeAsString(text, flush: true);
-    return {'bytes': text.length};
+    await target.writeAsBytes(bytes, flush: true);
+    return {'bytes': bytes.length};
   }
 
   Future<Object?> _storageRemove(Map<String, dynamic> args) async {
@@ -901,7 +945,3 @@ class PluginHostApi {
     return {'opened': await open(uri)};
   }
 }
-
-/// The plugin's own data directory, resolved through the same root as packages.
-Directory pluginOwnedDirectory(String id) =>
-    Directory(p.join(getBasePath('plugins'), '.data', id));

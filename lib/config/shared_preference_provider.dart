@@ -75,7 +75,8 @@ const Set<String> _prefsImportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
-  'pluginPermissions',
+  PluginPermissions.prefsKey,
+  PluginPermissions.seededKey,
   'inPlaceImportEnabled',
   'autoScrollEnabled',
   'autoScrollSpeed',
@@ -119,7 +120,8 @@ const Set<String> _prefsExportSkipKeys = {
   'translationUsageDevice',
   'translationUsageCounters',
   'experimentalPluginsEnabled',
-  'pluginPermissions',
+  PluginPermissions.prefsKey,
+  PluginPermissions.seededKey,
   'inPlaceImportEnabled',
   'autoScrollEnabled',
   'autoScrollSpeed',
@@ -1997,10 +1999,37 @@ class Prefs extends ChangeNotifier {
   }
 
   Future<void> savePluginState(PluginState state) async {
-    if (!await prefs.setString(_pluginStateKey, jsonEncode(state.toJson()))) {
-      throw StateError('Could not save plugin state');
-    }
+    await _writePluginPreference(
+        _pluginStateKey,
+        prefs.getString(_pluginStateKey),
+        jsonEncode(state.toJson()),
+        prefs.setString,
+        'Could not save plugin state');
     notifyListeners();
+  }
+
+  Future<void> _writePluginPreference<T>(
+    String key,
+    T? previous,
+    T value,
+    Future<bool> Function(String, T) write,
+    String message,
+  ) async {
+    try {
+      if (!await write(key, value)) throw StateError(message);
+    } catch (_) {
+      // SharedPreferences updates its cache before platform writes complete.
+      try {
+        if (previous == null) {
+          await prefs.remove(key);
+        } else {
+          await write(key, previous);
+        }
+      } catch (error) {
+        AnxLog.warning('Could not restore plugin preference $key: $error');
+      }
+      rethrow;
+    }
   }
 
   /// Removes a plugin from the registry and deletes its saved settings.
@@ -2009,8 +2038,12 @@ class Prefs extends ChangeNotifier {
     // while a deleted config with a surviving entry would look like data loss.
     await savePluginState(pluginState.remove(id));
     final configKey = '$_pluginConfigPrefix$id';
-    if (prefs.containsKey(configKey) && !await prefs.remove(configKey)) {
+    try {
+      if (!prefs.containsKey(configKey) || await prefs.remove(configKey))
+        return;
       AnxLog.warning('Could not remove plugin settings for $id');
+    } catch (error) {
+      AnxLog.warning('Could not remove plugin settings for $id: $error');
     }
   }
 
@@ -2053,10 +2086,12 @@ class Prefs extends ChangeNotifier {
   }
 
   Future<void> savePluginPermissions(Map<String, Set<String>> grants) async {
-    final encoded = PluginPermissions.encode(grants);
-    if (!await prefs.setString(PluginPermissions.prefsKey, encoded)) {
-      throw StateError('Could not save plugin permissions');
-    }
+    await _writePluginPreference(
+        PluginPermissions.prefsKey,
+        prefs.getString(PluginPermissions.prefsKey),
+        PluginPermissions.encode(grants),
+        prefs.setString,
+        'Could not save plugin permissions');
     notifyListeners();
   }
 
@@ -2067,23 +2102,26 @@ class Prefs extends ChangeNotifier {
   /// back on the next start, because "no grants stored" is indistinguishable
   /// from "never seeded".
   Set<String> get pluginPermissionSeeded =>
-      (prefs.getStringList(PluginPermissions.seededKey) ?? const [])
-          .toSet();
+      (prefs.getStringList(PluginPermissions.seededKey) ?? const []).toSet();
 
   Future<void> markPluginPermissionSeeded(String id) async {
     final seeded = pluginPermissionSeeded..add(id);
-    if (!await prefs.setStringList(
-        PluginPermissions.seededKey, seeded.toList()..sort())) {
-      throw StateError('Could not record plugin permission seeding');
-    }
+    await _writePluginPreference(
+        PluginPermissions.seededKey,
+        prefs.getStringList(PluginPermissions.seededKey),
+        seeded.toList()..sort(),
+        prefs.setStringList,
+        'Could not record plugin permission seeding');
   }
 
   Future<void> clearPluginPermissionSeeded(String id) async {
     final seeded = pluginPermissionSeeded..remove(id);
-    if (!await prefs.setStringList(
-        PluginPermissions.seededKey, seeded.toList()..sort())) {
-      throw StateError('Could not record plugin permission seeding');
-    }
+    await _writePluginPreference(
+        PluginPermissions.seededKey,
+        prefs.getStringList(PluginPermissions.seededKey),
+        seeded.toList()..sort(),
+        prefs.setStringList,
+        'Could not record plugin permission seeding');
   }
 
   bool get aiReadingSkillsVisible =>
