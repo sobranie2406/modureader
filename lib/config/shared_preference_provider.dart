@@ -2039,8 +2039,9 @@ class Prefs extends ChangeNotifier {
     await savePluginState(pluginState.remove(id));
     final configKey = '$_pluginConfigPrefix$id';
     try {
-      if (!prefs.containsKey(configKey) || await prefs.remove(configKey))
+      if (!prefs.containsKey(configKey) || await prefs.remove(configKey)) {
         return;
+      }
       AnxLog.warning('Could not remove plugin settings for $id');
     } catch (error) {
       AnxLog.warning('Could not remove plugin settings for $id: $error');
