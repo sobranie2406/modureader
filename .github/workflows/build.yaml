@@ -316,7 +316,7 @@ jobs:
               pacman -Syu --noconfirm --needed \
                 gtk3 wpewebkit libepoxy libsecret jsoncpp sqlite \
                 gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib \
-                python dbus xorg-server-xvfb xorg-xauth xorg-xwd ttf-dejavu mesa libglvnd
+                python dbus xorg-server-xvfb xorg-xauth ttf-dejavu mesa libglvnd
               useradd --create-home smoke
               install -d /run/dbus
               dbus-uuidgen > /etc/machine-id
@@ -327,7 +327,10 @@ jobs:
                 sha256sum --check ./*.AppImage.sha256
               )
               install -m 755 /packages/*.AppImage ./Modu.AppImage
-              runuser -u smoke -- dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -noreset" python3 /verify_linux_appimage.py ./Modu.AppImage
+              framebuffer_dir=$(runuser -u smoke -- mktemp -d)
+              runuser -u smoke -- dbus-run-session -- xvfb-run -a \
+                -s "-screen 0 1280x800x24 -noreset -fbdir $framebuffer_dir" \
+                python3 /verify_linux_appimage.py ./Modu.AppImage "$framebuffer_dir/Xvfb_screen0"
             '
 
   android:

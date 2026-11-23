@@ -69,45 +69,73 @@ def all_imported(data, hashes):
     return False
 
 
-def visible_marker(color):
-    try:
-        frame = subprocess.check_output(['xwd', '-root', '-silent'],
-                                        stderr=subprocess.PIPE, timeout=5)
-    except subprocess.CalledProcessError as error:
-        if b'BadColor' in error.stderr:
-            return False
-        print(error.stderr.decode(errors='replace'), file=sys.stderr)
-        raise
-    header = struct.unpack_from('>25I', frame)
+XWD_HEADER = struct.Struct('>25I')
+
+
+def framebuffer_details(framebuffer):
+    if not framebuffer.exists():
+        return 'framebuffer file is missing'
+    with framebuffer.open('rb') as source:
+        header = source.read(XWD_HEADER.size)
+    if len(header) < XWD_HEADER.size:
+        return f'framebuffer header is {len(header)} bytes'
+    fields = XWD_HEADER.unpack(header)
+    return (f'framebuffer {fields[4]}x{fields[5]}, depth {fields[3]}, '
+            f'{fields[11]} bpp, stride {fields[12]}, RGB masks '
+            f'{fields[14]:#x}/{fields[15]:#x}/{fields[16]:#x}')
+
+
+def visible_marker(framebuffer, color):
+    if not framebuffer.exists():
+        return False
+    frame = framebuffer.read_bytes()
+    if len(frame) < XWD_HEADER.size:
+        return False
+    header = XWD_HEADER.unpack_from(frame)
     size, version, pixmap_format, _, width, height, _, order = header[:8]
     bits, stride, _, red, green, blue = header[11:17]
-    if (version, pixmap_format, bits, red, green, blue) != (
-        7, 2, 32, 0xff0000, 0x00ff00, 0x0000ff
-    ):
-        raise RuntimeError('Unexpected Xvfb pixel format')
+    if (version, pixmap_format) != (7, 2) or bits not in (24, 32) or order not in (0, 1):
+        return False
+    rgb_mask = red | green | blue
+    if not all((red, green, blue)) or rgb_mask >= 1 << bits:
+        return False
+    pixel_size = bits // 8
     # XWD stores 12 bytes per colormap entry before the pixel data.
     start = size + 12 * header[19]
-    marker = bytes.fromhex(color)
-    if order == 0:
-        marker = marker[::-1]
-    left = width // 5 * 4
-    right = width * 4 // 5 * 4
+    if (size < XWD_HEADER.size or stride < width * pixel_size or
+            start + height * stride > len(frame)):
+        return False
+
+    marker = 0
+    for channel, mask in zip(bytes.fromhex(color), (red, green, blue)):
+        shift = (mask & -mask).bit_length() - 1
+        marker |= ((channel * (mask >> shift) + 127) // 255) << shift
+
+    byte_order = 'little' if order == 0 else 'big'
+    left = width // 5 * pixel_size
+    right = width * 4 // 5 * pixel_size
     pixels = 0
     for y in range(height // 6, height * 5 // 6):
         offset = start + y * stride
-        pixels += frame[offset + left:offset + right].count(marker)
-    # Import thumbnails are smaller than the rendered marker on the page.
-    return pixels > 20_000
+        pixels += sum(
+            int.from_bytes(frame[i:i + pixel_size], byte_order) & rgb_mask == marker
+            for i in range(offset + left, offset + right, pixel_size)
+        )
+        # Import thumbnails are smaller than the rendered marker on the page.
+        if pixels > 20_000:
+            return True
+    return False
 
 
-def wait_for_app(process, condition, description):
+def wait_for_app(process, condition, description, failure_details=None):
     deadline = time.monotonic() + 50
     while time.monotonic() < deadline and process.poll() is None:
         if condition():
             print(f'Verified {description}', flush=True)
             return
         time.sleep(0.75)
-    raise RuntimeError(f'{description} was not observed (exit status {process.poll()})')
+    details = f'; {failure_details()}' if failure_details else ''
+    raise RuntimeError(f'{description} was not observed (exit status {process.poll()}{details})')
 
 
 @contextmanager
@@ -130,7 +158,7 @@ def launch(appimage, args, log, env):
                 process.wait()
 
 
-def verify(appimage, work):
+def verify(appimage, work, framebuffer):
     env = os.environ | {
         'APPIMAGE_EXTRACT_AND_RUN': '1',
         'GDK_BACKEND': 'x11',
@@ -156,8 +184,9 @@ def verify(appimage, work):
             'created': '2026-01-01T00:00:00Z', 'cfi': 'epubcfi(/6/2)',
         })
         with launch(appimage, [link], work / (path.name + '.log'), env) as process:
-            wait_for_app(process, lambda: visible_marker(marker),
-                         f'{path.suffix[1:].upper()} page rendering')
+            wait_for_app(process, lambda: visible_marker(framebuffer, marker),
+                         f'{path.suffix[1:].upper()} page rendering',
+                         lambda: framebuffer_details(framebuffer))
 
 
 if __name__ == '__main__':
@@ -166,7 +195,7 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='modu-appimage-test-') as tmp:
         work = Path(tmp)
         try:
-            verify(Path(sys.argv[1]).resolve(strict=True), work)
+            verify(Path(sys.argv[1]).resolve(strict=True), work, Path(sys.argv[2]))
         except Exception:
             for log in sorted(work.rglob('*.log')):
                 print(f'\n--- {log.name} ---\n{log.read_text(errors="replace")[-12_000:]}',
