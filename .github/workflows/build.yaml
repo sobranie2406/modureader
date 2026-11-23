@@ -7,6 +7,10 @@ on:
         description: 'Only run the isolated Windows reader diagnostic (no packages or release)'
         default: false
         type: boolean
+      appimage_smoke_run_id:
+        description: 'Only test the Arch AppImage from this repository workflow run ID'
+        default: ''
+        type: string
       targets:
         description: 'all or comma-separated targets (linux-x64,linux-arm64,windows-x64,windows-arm64,macos-x64,macos-arm64,android,ios,harmony)'
         default: all
@@ -30,15 +34,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: modu-packages-${{ github.ref }}-${{ github.sha }}-${{ inputs.targets || 'all' }}
+  group: modu-packages-${{ github.ref }}-${{ github.sha }}-${{ inputs.appimage_smoke_run_id || inputs.targets || 'all' }}
   cancel-in-progress: false
 
 jobs:
   reader_diagnostic:
-    if: inputs.reader_diagnostic == true
+    if: inputs.reader_diagnostic == true && !inputs.appimage_smoke_run_id
     uses: ./.github/workflows/windows-reader-diagnostic.yml
   targets:
-    if: inputs.reader_diagnostic != true
+    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
@@ -55,11 +59,11 @@ jobs:
         run: node scripts/release/matrix.mjs
 
   quality:
-    if: inputs.reader_diagnostic != true
+    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     uses: ./.github/workflows/pr-check.yml
 
   models:
-    if: inputs.reader_diagnostic != true
+    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -270,11 +274,22 @@ jobs:
 
   linux_appimage_smoke:
     name: AppImage reader on Arch Linux
-    if: needs.targets.outputs.linux_appimage == 'true'
+    if: >-
+      always() && !cancelled() &&
+      (inputs.appimage_smoke_run_id ||
+        (needs.targets.outputs.linux_appimage == 'true' && needs.desktop.result == 'success'))
     needs: [targets, desktop]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
     steps:
+      - name: Validate prior workflow run ID
+        if: inputs.appimage_smoke_run_id
+        env:
+          APPIMAGE_RUN_ID: ${{ inputs.appimage_smoke_run_id }}
+        run: '[[ "$APPIMAGE_RUN_ID" =~ ^[1-9][0-9]*$ ]]'
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -282,6 +297,9 @@ jobs:
         with:
           name: modu-linux-x64-appimage
           path: dist-release
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.appimage_smoke_run_id || github.run_id }}
+          github-token: ${{ inputs.appimage_smoke_run_id && github.token || '' }}
       - name: Allow WebKit's sandbox to create nested user namespaces
         run: |
           if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
@@ -291,6 +309,7 @@ jobs:
         run: |
           docker run --rm \
             --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
+            --security-opt systempaths=unconfined \
             --volume "$PWD/dist-release:/packages:ro" \
             --volume "$PWD/scripts/release/verify_linux_appimage.py:/verify_linux_appimage.py:ro" \
             archlinux:base bash -euc '
@@ -299,6 +318,9 @@ jobs:
                 gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib \
                 python dbus xorg-server-xvfb xorg-xauth xorg-xwd ttf-dejavu mesa libglvnd
               useradd --create-home smoke
+              install -d /run/dbus
+              dbus-uuidgen > /etc/machine-id
+              dbus-daemon --system --fork --nopidfile
               cd /home/smoke
               (
                 cd /packages
@@ -452,7 +474,7 @@ jobs:
 
   release:
     if: >-
-      always() && !cancelled() &&
+      always() && !cancelled() && !inputs.appimage_smoke_run_id &&
       (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') &&
       needs.quality.result == 'success' && needs.models.result == 'success' && needs.targets.result == 'success' &&
       (needs.targets.outputs.has_desktop != 'true' || needs.desktop.result == 'success') &&
