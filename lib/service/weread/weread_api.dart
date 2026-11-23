@@ -139,7 +139,7 @@ class WereadApi {
   final String key;
   final http.Client _client;
   static final gateway = Uri.https('i.weread.qq.com', '/api/agent/gateway');
-  static const skillVersion = '1.0.5';
+  static const skillVersion = '1.0.6';
 
   void close() => _client.close();
 
@@ -195,9 +195,6 @@ class WereadApi {
       final decoded = jsonDecode(utf8.decode(bytes));
       if (decoded is! Map<String, dynamic>) {
         throw const WereadException('invalidResponse');
-      }
-      if (decoded['upgrade_info'] != null) {
-        throw const WereadException('upgradeRequired');
       }
       if (decoded['errcode'] != null && decoded['errcode'].toString() != '0') {
         throw const WereadException('apiError');

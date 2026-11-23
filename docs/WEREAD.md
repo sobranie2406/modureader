@@ -21,7 +21,8 @@
 ## 数据与同步边界
 
 - 请求固定发送到官方 `https://i.weread.qq.com/api/agent/gateway`，
-  使用 Bearer Key、平铺参数和 `skill_version=1.0.5`。
+  使用 Bearer Key、平铺参数和 `skill_version=1.0.6`。
+  响应带有升级提示时，仍显示本次查询结果。
   只调用 search、book/info、review/list、book/bestbookmarks。
   不上传正文、笔记、个人书评，不调用扫码移动端私有接口。
 - 官方网关实测 `newRating=836` 表示 83.6%，在网络边界转换为百分值；

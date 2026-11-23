@@ -7,8 +7,6 @@ String wereadError(BuildContext context, Object error) {
   return switch (code) {
     'unauthorized' => ModuStrings.text(context, '请在外观设置中检查微信读书 API Key。',
         'Check your WeRead API Key in Appearance settings.'),
-    'upgradeRequired' => ModuStrings.text(context, '微信读书接口要求更新客户端，已停止请求。',
-        'WeRead requires a client update. Requests stopped.'),
     'invalidQuery' => ModuStrings.text(context, '请输入书名或作者（不超过 500 字）。',
         'Enter a title or author (up to 500 characters).'),
     _ => ModuStrings.text(context, "微信读书资料暂不可用，请稍后重试。",

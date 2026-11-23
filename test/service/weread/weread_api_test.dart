@@ -6,7 +6,7 @@ import 'package:http/testing.dart';
 
 void main() {
   test(
-      'official gateway, flat parameters, version, scope 17 results, no body upload',
+      'official 1.0.6 request returns search results alongside an upgrade notice',
       () async {
     final api = WereadApi('wrk-test', client: MockClient((request) async {
       expect(
@@ -15,13 +15,15 @@ void main() {
       expect(request.headers['Authorization'], 'Bearer wrk-test');
       expect(jsonDecode(request.body), {
         'api_name': '/store/search',
-        'skill_version': '1.0.5',
+        'skill_version': '1.0.6',
         'keyword': '三体 刘慈欣',
         'scope': 10,
         'maxIdx': 0,
       });
       return http.Response(
           jsonEncode({
+            'errcode': 0,
+            'upgrade_info': {'message': 'A newer version is available'},
             'hasMore': 1,
             'results': [
               {
@@ -163,19 +165,21 @@ void main() {
         ]);
   });
 
-  for (final error in [
-    'upgrade',
-    'api',
-    'malformed',
-    'redirect',
-    'unauthorized'
-  ]) {
+  const errorCodes = {
+    'notice only': 'invalidResponse',
+    'api': 'apiError',
+    'malformed': 'invalidResponse',
+    'redirect': 'network',
+    'unauthorized': 'unauthorized',
+  };
+  for (final error in errorCodes.keys) {
     test('sanitized $error failure without key or server payload', () async {
       final api = WereadApi('wrk-secret', client: MockClient((request) async {
         return switch (error) {
-          'upgrade' =>
+          'notice only' =>
             http.Response('{"upgrade_info":{"message":"secret"}}', 200),
-          'api' => http.Response('{"errcode":9,"errmsg":"wrk-secret"}', 200),
+          'api' => http.Response(
+              '{"errcode":9,"errmsg":"wrk-secret","upgrade_info":{}}', 200),
           'malformed' => http.Response('<html>wrk-secret</html>', 200),
           'redirect' =>
             http.Response('', 302, headers: {'location': 'https://evil.test'}),
@@ -184,8 +188,10 @@ void main() {
       }));
       await expectLater(
           api.info('b'),
-          throwsA(isA<WereadException>().having((error) => error.toString(),
-              'no key', isNot(contains('wrk-secret')))));
+          throwsA(isA<WereadException>()
+              .having((error) => error.code, 'code', errorCodes[error])
+              .having((error) => error.toString(), 'sanitized message',
+                  isNot(contains('secret')))));
     });
   }
 
