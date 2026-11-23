@@ -1,41 +1,43 @@
-# Modu 1.3.10
+# Modu 1.3.11
 
-Build / 构建：**10182** · Stable / 正式版
+Build / 构建：**10189** · Stable / 正式版
 
 ### English
 
-- Feat(reader): Add auto-scroll to standard reading and PDF/OCR reflow, with adjustable speed, e-ink scroll steps, a draggable control bar, and a stop timer up to 120 minutes. The screen stays awake while scrolling. Tap the page to recall the scroll or narration bar after it hides. ([Issue #84](https://github.com/sobranie2406/modureader/issues/84)) Thanks [@zhangxiaochang](https://github.com/zhangxiaochang).
-- Fix(reader): Pause auto-scroll during a drag and resume from the new position when you let go. Improve cross-chapter scrolling and keep the current passage in view when reflow layout changes. ([Issue #88](https://github.com/sobranie2406/modureader/issues/88)) Thanks [@zhangxiaochang](https://github.com/zhangxiaochang).
-- Feat(reader): Add swipe-to-highlight quick marking on mobile reflow pages. Connected marks can merge.
-- Feat(plugins): Add a catalog of reviewed plugins with GitHub and Gitee sources. Install and update compatible plugins from settings, with an on-device mode for testing your own plugins. The optional Private Books plugin can hide or restore books and lock them with a passcode. Private books, their notes, and reading progress stay on the device.
-- Feat(plugins): Save an article from a URL, preview its text as Markdown, then export it or add it to the bookshelf with the optional Web Read Later plugin.
-- Feat(dictionary): Let the optional lookup plugin try English word forms, French elisions, and custom patterns after an exact lookup misses. ([Issue #83](https://github.com/sobranie2406/modureader/issues/83)) Thanks [@zhuhui-in](https://github.com/zhuhui-in).
-- Feat(sync): Explain the counts and conflict options in the sync preview, add upload-only sync, and ask for confirmation again if the list of books to remove has changed. ([PR #86](https://github.com/sobranie2406/modureader/pull/86), [PR #87](https://github.com/sobranie2406/modureader/pull/87)) Thanks [@1Cookie2gavh](https://github.com/1Cookie2gavh).
-- Fix(sync): Follow WebDAV redirects that add a trailing slash to WeRead and OCR metadata directories.
-- Fix(reader): Preserve the paragraph's text size when a book displays a rare character as an inline image.
-- Feat(search): Use downloaded local models for semantic search on all platforms, including HarmonyOS.
-- Fix(ocr): Restore PDF text extraction, page and region rendering, and local OCR in HarmonyOS PDF reflow. ([Issue #85 discussion](https://github.com/sobranie2406/modureader/issues/85#issuecomment-6947843346)) Thanks [@gexiaoqing2009](https://github.com/gexiaoqing2009) and [@Keenwind](https://github.com/Keenwind).
+- Feat(pdf): View two PDF pages side by side, with separate cropping for each page. Image enhancement carries over when switching to continuous scroll.
+- Feat(translation): Pretranslate the next 1–5 pages in reader translation and Classical Chinese translation. Continue into the next chapter when needed.
+- Feat(reader): Assign “Open table of contents” to a custom tap zone. ([Issue #92](https://github.com/sobranie2406/modureader/issues/92)) Thanks [@chchoo](https://github.com/chchoo).
+- Feat(plugins): Review permissions in plugin settings or grant them when prompted. Plugins can use their own data storage and request access to books, notes and search. ([PR #94](https://github.com/sobranie2406/modureader/pull/94)) Thanks [@RuizeSun](https://github.com/RuizeSun).
+- Feat(linux): Add an AppImage for Arch Linux x64 alongside the Debian 13 packages. ([Issue #96](https://github.com/sobranie2406/modureader/issues/96)) Thanks [@boreascn](https://github.com/boreascn).
+- Fix(pdf): Keep mouse-wheel panning within a zoomed PDF page from turning it accidentally. ([Issue #93](https://github.com/sobranie2406/modureader/issues/93)) Thanks [@peterblack111](https://github.com/peterblack111).
+- Fix(translation): Restore skipped paragraphs at page breaks and keep page turns responsive while translations arrive.
+- Fix(reader): Keep line spacing consistent on the page before an illustration.
+- Fix(macos): Dismiss reader menus and lookup popups by clicking outside them.
+- Fix(ios): Fix blank PDF pages on iPad and improve importing books from Files.
+- Fix(harmony): Fix book imports from folders on HarmonyOS. ([Issue #95](https://github.com/sobranie2406/modureader/issues/95)) Thanks [@Keenwind](https://github.com/Keenwind).
+- Fix(windows): Fix crashes when closing reader views or releasing audio on shutdown.
 
 ### 简体中文
 
-- Feat(reader): 普通阅读和 PDF／OCR 重排的滚动模式支持自动滚动，可调速度，适配电纸书分步滚动。浮动条可拖动，支持 0～120 分钟定时停止，滚动期间屏幕常亮。滚动和朗读浮动条闲置后收起，轻点页面可唤回。 ([Issue #84](https://github.com/sobranie2406/modureader/issues/84)) 感谢 [@zhangxiaochang](https://github.com/zhangxiaochang)。
-- Fix(reader): 拖动页面时暂缓自动滚动，松手后从当前位置继续。改善跨章滚动衔接，并在重排布局变化后保留当前阅读位置。 ([Issue #88](https://github.com/sobranie2406/modureader/issues/88)) 感谢 [@zhangxiaochang](https://github.com/zhangxiaochang)。
-- Feat(reader): 移动端重排页支持快速标记，划过文字即可高亮，相连的划线可合并。
-- Feat(plugins): 设置里的插件页可从 GitHub 或 Gitee 安装和更新审核上架的插件，也提供本机开发调试入口。安装「私密书籍」插件后可隐藏、恢复书籍并设置密码，私密书籍、笔记和进度均留在本机。
-- Feat(plugins): 「网页稍后阅读」插件可以提取网页正文，预览 Markdown，再导出或加入书架。
-- Feat(dictionary): 安装「查词预处理」插件后，原词查不到时可尝试英语词形、法语省音形式和自定义规则。 ([Issue #83](https://github.com/sobranie2406/modureader/issues/83)) 感谢 [@zhuhui-in](https://github.com/zhuhui-in)。
-- Feat(sync): 同步预览说明各项数量和冲突处理选项，新增「仅上传」模式。待移除书籍名单发生变化时，重新确认后才继续。 ([PR #86](https://github.com/sobranie2406/modureader/pull/86), [PR #87](https://github.com/sobranie2406/modureader/pull/87)) 感谢 [@1Cookie2gavh](https://github.com/1Cookie2gavh)。
-- Fix(sync): 修复 WebDAV 给微信读书和 OCR 资料目录补上末尾斜杠时的同步错误。
-- Fix(reader): 修复书内用行内图片显示生僻字时，所在段落字号异常的问题。
-- Feat(search): 各平台的语义搜索使用下载到本机的模型，鸿蒙也支持本地推理。
-- Fix(ocr): 修复鸿蒙 PDF 重排的文本提取、整页与局部取图，以及扫描页本地 OCR。 ([Issue #85 讨论](https://github.com/sobranie2406/modureader/issues/85#issuecomment-6947843346)) 感谢 [@gexiaoqing2009](https://github.com/gexiaoqing2009) 和 [@Keenwind](https://github.com/Keenwind)。
+- Feat(pdf): PDF 支持双页并排，两页可分别裁边，切换至连续卷轴后保留图像增强设置。
+- Feat(translation): 阅读翻译和文言文翻译可预译后续 1～5 页，本章页数不足时接着译下一章。
+- Feat(reader): 自定义翻页区域可设为「打开目录」。 ([Issue #92](https://github.com/sobranie2406/modureader/issues/92)) 感谢 [@chchoo](https://github.com/chchoo)。
+- Feat(plugins): 可在插件设置里管理权限，也可在使用时按提示授权。插件有独立存储，可申请访问书籍、笔记和搜索。 ([PR #94](https://github.com/sobranie2406/modureader/pull/94)) 感谢 [@RuizeSun](https://github.com/RuizeSun)。
+- Feat(linux): 新增面向 Arch Linux x64 的 AppImage，继续提供 Debian 13 安装包。 ([Issue #96](https://github.com/sobranie2406/modureader/issues/96)) 感谢 [@boreascn](https://github.com/boreascn)。
+- Fix(pdf): 修复放大 PDF 后用鼠标滚轮移动页面时误触发翻页的问题。 ([Issue #93](https://github.com/sobranie2406/modureader/issues/93)) 感谢 [@peterblack111](https://github.com/peterblack111)。
+- Fix(translation): 修复页末漏译和译文更新期间点击翻页失灵的问题。
+- Fix(reader): 修复插画前一页行距过大的问题。
+- Fix(macos): 点击阅读菜单或查询弹窗外侧即可关闭。
+- Fix(ios): 修复 iPad 上打开 PDF 空白的问题，改善从「文件」导入书籍。
+- Fix(harmony): 修复鸿蒙从文件夹导入书籍失败的问题。 ([Issue #95](https://github.com/sobranie2406/modureader/issues/95)) 感谢 [@Keenwind](https://github.com/Keenwind)。
+- Fix(windows): 修复关闭阅读页面或退出时释放音频导致的崩溃。
 
 ### Downloads / 下载
 
-Android ARM64 · iOS ARM64 · macOS ARM64 / x64 · Windows ARM64 / x64 · Linux ARM64 / x64 · HarmonyOS ARM64.
+Android ARM64 · iOS ARM64 · macOS ARM64 / x64 · Windows ARM64 / x64 · Debian 13 DEB ARM64 / x64 · Arch Linux x64 AppImage · HarmonyOS ARM64.
 
-Each of the nine packages includes a SHA-256 checksum file. / 共九个安装包，各附 SHA-256 校验文件。
+Each of the ten packages includes a SHA-256 checksum file. / 共十个安装包，各附 SHA-256 校验文件。
 
-iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing. Windows requires WebView2. Linux DEB targets Debian 13. / iOS IPA 和鸿蒙 HAP 需自行签名。macOS 使用临时签名。Windows 需要 WebView2。Linux DEB 面向 Debian 13。
+iOS IPA and HarmonyOS HAP require your own signing. macOS uses ad-hoc signing. Windows requires WebView2. See the installation guide for the AppImage runtime dependencies. / iOS IPA 和鸿蒙 HAP 需自行签名。macOS 使用临时签名。Windows 需要 WebView2。AppImage 的运行依赖见安装指南。
 
-[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.10) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.10/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.10/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.10/NOTICE)
+[Source / 源码](https://github.com/sobranie2406/modureader/tree/v1.3.11) · [Installation / 安装说明](https://github.com/sobranie2406/modureader/blob/v1.3.11/docs/RELEASING.md) · [License](https://github.com/sobranie2406/modureader/blob/v1.3.11/LICENSE) · [Notice](https://github.com/sobranie2406/modureader/blob/v1.3.11/NOTICE)

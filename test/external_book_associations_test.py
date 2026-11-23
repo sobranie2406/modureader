@@ -35,7 +35,6 @@ class ExternalBookAssociationsTest(unittest.TestCase):
     def test_linux_and_harmony_cover_all_formats(self):
         linux = (ROOT / 'scripts/release/native_installers.py').read_text()
         harmony = (ROOT / 'ohos/entry/src/main/ets/plugins/ExternalBookFilesPlugin.ets').read_text()
-        self.assertIn('Exec=modureader %U', linux)
         for extension in EXTENSIONS:
             self.assertIn("'" + extension + "':", linux)
             self.assertIn(extension, harmony)

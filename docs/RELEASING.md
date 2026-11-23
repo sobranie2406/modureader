@@ -53,6 +53,8 @@ Linux DEB packages target Debian 13 (trixie). The x64 AppImage build targets Arc
 | iOS | The ARM64 IPA requires iOS 16+ and your own valid signing for the app and Share Extension. It cannot be installed directly without signing. |
 | HarmonyOS | Native ARM64 HAP, unsigned. Sign locally with a valid HarmonyOS certificate/profile and install using the official tools. Android signing is not interchangeable. |
 
+<a id="arch-linux-x64-appimage"></a>
+
 ### Arch Linux x64 AppImage
 
 Install the runtime packages once, then give the downloaded AppImage permission to run.
@@ -148,15 +150,15 @@ A stable-release request includes **GitHub and Gitee publication by default**. G
 1. Update pubspec.yaml and release notes; run relevant security checks and regression tests. Distinguish builds, automated checks and device validation.
 2. Run Modu Packages with selected targets and the intended release tag, or push an authorized version tag. CI builds platform assets in parallel; create the source tag/release only after verification. Never retarget an existing tag to different source.
 3. Failed targets must not produce apparently successful assets. Fix and rebuild them; a release asset proves production, not full device acceptance.
-4. Retain LICENSE/NOTICE inside packages and SOURCE.txt inside desktop installations. Publish hashes and the exact tagged source. Prerelease tags create prereleases. A full stable release must verify all nine packages; scoped previews publish only the requested targets. The Harmony reusable workflow builds the same commit, verifies native assets and version/build identity, and never receives signing keys. Its failure blocks publication.
+4. Retain LICENSE/NOTICE inside packages and SOURCE.txt inside desktop installations. Publish hashes and the exact tagged source. Prerelease tags create prereleases. A full stable release must verify all ten packages. Scoped previews publish the requested targets. The Harmony reusable workflow builds the same commit and checks native assets and build identity.
 5. Do not run upstream store publishing or signing-service workflows. Modu uses its own Telegram release notifier described below.
 6. Mirror the identical original packages following [UPDATE_MIRROR.md](UPDATE_MIRROR.md). On Gitee, confirm deletion authority and that GitHub retains the old release, then delete only the old app release/assets before uploading the new release. Verify every hash before updating the manifest. Retain local packages for retries; do not publish an unverified manifest. Do not delete model mirrors, source, tags or branches. GitHub retains release history from 1.1.0 onward.
 
 ### Completion checklist
 
-- [ ] GitHub has the exact source tag, bilingual notes, all nine installers and nine verified SHA-256 sidecars.
+- [ ] GitHub has the exact source tag, bilingual notes, all ten installers and ten verified SHA-256 files.
 - [ ] Gitee has the same version, notes, filenames and byte-identical installers/sidecars; public downloads, sizes and hashes are verified following [UPDATE_MIRROR.md](UPDATE_MIRROR.md).
-- [ ] Only after asset verification, the Gitee `master` branch's `updates/latest.json` is updated and publicly checked for the new version and eight supported installer targets (HarmonyOS remains a manual download).
+- [ ] After asset verification, the Gitee `master` branch's `updates/latest.json` lists the new version and nine in-app update packages. HarmonyOS remains a manual download.
 - [ ] Telegram and QQ jobs are checked separately. Failed or uncertain sends are investigated before retrying; build success is not delivery confirmation. See [QQ release announcements](../scripts/community/README.md).
 - [ ] The handoff reports GitHub, Gitee/manifest and both notification results, including any blockers. Do not describe a GitHub-only publication as the completed two-site release.
 

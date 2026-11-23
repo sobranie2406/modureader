@@ -1,8 +1,8 @@
 # Application update mirror
 
-## Release procedure: Modu 1.3.6+10168
+## Release procedure
 
-This guide describes the Modu publishing repository's `v1.3.6` release procedure and client behavior. A mirror is current only after all nine packages and their checksums have been verified and its manifest updated.
+For Modu 1.3.11 and later, verify all ten packages and their checksums before updating the mirror manifest.
 
 A single Update Source option controls both checking and downloading. Each fresh app launch starts with GitHub preferred. A GitHub check that fails because of connection, timeout, TLS/certificate or HTTP request errors falls back to the fixed HTTPS Gitee manifest and switches the source for the whole workflow:
 
@@ -12,7 +12,7 @@ https://gitee.com/sobranie2406/modureader/raw/master/updates/latest.json
 
 Successful GitHub checks use GitHub metadata and downloads. A check resolved through Gitee uses Gitee downloads. Changing the source clears pending release/download information and requires a fresh check; downloads never silently switch sources or combine responses from two sources.
 
-### Nine-package release matrix
+### Ten-package release matrix
 
 | Platform | Architectures | Package |
 | --- | --- | --- |
@@ -20,10 +20,11 @@ Successful GitHub checks use GitHub metadata and downloads. A check resolved thr
 | iOS | ARM64 | IPA (unsigned; user signing required) |
 | macOS | ARM64, x64 | DMG |
 | Windows | ARM64, x64 | setup EXE |
-| Linux | ARM64, x64 | DEB |
+| Debian 13 | ARM64, x64 | DEB |
+| Arch Linux | x64 | AppImage |
 | HarmonyOS | ARM64 | Unsigned HAP; manual signing/installation |
 
-There are nine packages in total. Android x64 is excluded from the release matrix and update manifest. The existing update manifest still contains the eight supported installer targets; HarmonyOS HAP is distributed as a manual download with a checksum, not through an unimplemented automatic HAP installer.
+The update manifest lists nine packages. HarmonyOS HAP is available from the release page with its checksum. Android releases are ARM64 only.
 
 ### macOS browser downloads
 
@@ -31,14 +32,18 @@ On macOS, the app opens the checked source's DMG download link in the default br
 
 If a GitHub browser download fails, select Gitee, check again and download from that source. The app does not switch the browser download automatically. Manual checksum verification can use the release's checksum file; this is separate from the in-app integrity checks on platforms that download internally.
 
+### Linux AppImage updates
+
+Modu uses the x64 AppImage entry when running from an AppImage. After downloading and verifying the file, Modu shows where it was saved. Quit Modu, replace the old file and make the new one executable. DEB installations receive the DEB for their architecture.
+
 ## Publishing order
 
 Gitee synchronization is a required part of every requested stable Modu release, together with GitHub publication. Do not ask whether to include it each time or silently defer it. Completion requires verified public mirror assets and the updated public manifest, not merely a successful GitHub workflow. If credentials, permissions or service limits block this process, preserve verified originals, report the blocker and remaining work, and do not claim the full release is complete.
 
 The mirror repository contains explanations, update manifests and release assets, not imported application source. The existing release policy allows cleanup of old Gitee application releases within the previously agreed scope; it still requires target checks, backups and integrity verification. Any tool-enforced approval or expansion of scope is handled separately. This guide does not itself perform those actions.
 
-1. Finish the stable GitHub release with all nine packages, SHA-256 files and corresponding source.
-2. Delete the old Gitee application releases and assets before creating/uploading the new one. First confirm the nine new GitHub packages are complete, the old version remains downloadable from GitHub, and local originals for uploading are retained. Check each old release's repository, tag and assets, then confirm the release list is empty. Preserve Git tags, source, branches and the separate `modu-models` repository.
+1. Finish the stable GitHub release with all ten packages, SHA-256 files and corresponding source.
+2. Delete the old Gitee application releases and assets before creating/uploading the new one. First confirm the ten new GitHub packages are complete, the old version remains downloadable from GitHub, and local originals for uploading are retained. Check each old release's repository, tag and assets, then confirm the release list is empty. Preserve Git tags, source, branches and the separate `modu-models` repository.
 3. Upload the same-version, same-name, byte-identical installers and checksum files to Gitee. Do not replace model assets, recompress installers or reuse another version's files.
 4. Verify every public, anonymous Gitee download, redirect, byte length and SHA-256 against GitHub's asset `digest`. Mirror installer URLs follow `https://gitee.com/sobranie2406/modureader/releases/download/v<version>/<installer-name>`.
 5. Generate the manifest from the GitHub Release API JSON: `python3 scripts/release/update_manifest.py github-release.json`. The script prints JSON; it neither uploads nor modifies the repository.
@@ -46,7 +51,7 @@ The mirror repository contains explanations, update manifests and release assets
 
 The historical GitHub cleanup scope covers releases/assets through 1.0.9, preserving tags and source. Releases from 1.1.0 onward remain. This does not mean GitHub retains only the newest release.
 
-The manifest retains GitHub's `tag_name`, `draft`, `prerelease`, `body`, `assets` and original GitHub download URLs. The client derives the Gitee URLs itself; the manifest cannot choose arbitrary download hosts. The generator accepts only the eight expected installers and excludes tokens, upload URLs and other API fields.
+The manifest retains GitHub's `tag_name`, `draft`, `prerelease`, `body`, `assets` and original GitHub download URLs. The client derives the Gitee URLs itself; the manifest cannot choose arbitrary download hosts. The generator accepts the nine supported update packages and omits tokens, upload URLs and other API fields. It can also regenerate the eight-package manifest from stable releases before 1.3.11.
 
 ## Fallback and integrity
 
@@ -62,7 +67,7 @@ The client needs no Gitee login, does not read browser sessions and does not att
 
 ## Historical milestones and optional verification
 
-The nine installers for 1.0.9 and their checksums were anonymously downloaded and matched GitHub digests; nine was that historical matrix, not the current one. The stable mirror manifest was published. Starting with `1.0.9+10028`, the client accepted Gitee raw-file CDN redirects; `1.0.9+10027` could still check GitHub metadata and preferentially download Gitee assets under its earlier policy. Those results do not establish that current release assets were rechecked here.
+The nine installers for 1.0.9 were anonymously downloaded and matched GitHub digests. The stable mirror manifest was published. Starting with `1.0.9+10028`, the client accepted Gitee raw-file CDN redirects.
 
 After a release, the following opt-in check verifies public metadata redirects and simulates GitHub unavailability:
 
@@ -70,4 +75,4 @@ After a release, the following opt-in check verifies public metadata redirects a
 flutter test test/service/update/app_update_mirror_live_test.dart --dart-define=MODU_VERIFY_UPDATE_MIRROR=true
 ```
 
-It does not download/install the app or replace independent SHA-256 verification of all eight installers. It was not run for this documentation update.
+Verify the SHA-256 of all ten public installers separately.
