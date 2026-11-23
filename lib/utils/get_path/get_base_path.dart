@@ -44,12 +44,11 @@ Future<String> getAnxDocumentsPath() async {
     }
   }
 
-  final directory = await getApplicationDocumentsDirectory();
   switch (AnxPlatform.type) {
     case AnxPlatformEnum.android:
       return (await androidDataDirectory()).path;
     case AnxPlatformEnum.ohos:
-      return directory.path;
+      return (await getApplicationDocumentsDirectory()).path;
     case AnxPlatformEnum.linux:
     case AnxPlatformEnum.windows:
       return (await getApplicationSupportDirectory()).path;

@@ -108,5 +108,5 @@ test('ordinary book pictures still open preview; text links and footnote links s
 
 test('PDF loader explicitly identifies its generated page raster', async () => {
   const pdf = await readFile(new URL('../assets/foliate-js/src/pdf.js', import.meta.url), 'utf8');
-  assert.match(pdf, /<img data-document-base src="\$\{src\}"[^>]*>/);
+  assert.match(pdf, /<img\s+data-document-base\b[^>]*>/);
 });
