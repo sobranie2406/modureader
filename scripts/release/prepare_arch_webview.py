@@ -1,4 +1,4 @@
-"""Make the pinned Linux WebView plugin's libwpe dependency legacy-only."""
+"""Adapt the pinned Linux WebView plugin to Arch's WPEPlatform."""
 import json
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -16,8 +16,7 @@ if uri.scheme != 'file' or uri.netloc or root.name != 'flutter_inappwebview_linu
     raise RuntimeError('Review the WPEPlatform build adjustment for this WebView version')
 
 cmake = root / 'linux/CMakeLists.txt'
-before = cmake.read_text()
-checks = {
+cmake_checks = {
     '''pkg_check_modules(LIBWPE QUIET IMPORTED_TARGET wpe-1.0)
 if(NOT LIBWPE_FOUND)
   message(FATAL_ERROR "libwpe (wpe-1.0) not found. Please install libwpe-1.0-dev.")
@@ -27,14 +26,21 @@ endif()''',
 }
 for target in ('${PLUGIN_NAME}', '${TEST_RUNNER}'):
     line = f'target_link_libraries({target} PRIVATE PkgConfig::LIBWPE)'
-    checks[line] = f'if(HAVE_WPE_FDO)\n  {line}\nendif()'
+    cmake_checks[line] = f'if(HAVE_WPE_FDO)\n  {line}\nendif()'
 
-after = before
-for old, new in checks.items():
-    if after.count(new) == 1:
-        continue
-    if after.count(old) != 1:
-        raise RuntimeError('Review the WPEPlatform build adjustment for the updated CMake source')
-    after = after.replace(old, new)
-if after != before:
-    cmake.write_text(after)
+settings = root / 'linux/in_app_webview/in_app_webview_settings.cc'
+settings_checks = {'WPE_SETTING_DISABLE_ANIMATIONS': 'WPE_SETTING_REDUCED_MOTION'}
+pending = {}
+for source, checks in ((cmake, cmake_checks), (settings, settings_checks)):
+    before = source.read_text()
+    after = before
+    for old, new in checks.items():
+        if after.count(new) == 1:
+            continue
+        if after.count(old) != 1:
+            raise RuntimeError(f'Review the WPEPlatform build adjustment for {source.name}')
+        after = after.replace(old, new)
+    if after != before:
+        pending[source] = after
+for source, content in pending.items():
+    source.write_text(content)
