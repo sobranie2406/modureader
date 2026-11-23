@@ -70,7 +70,14 @@ def all_imported(data, hashes):
 
 
 def visible_marker(color):
-    frame = subprocess.check_output(['xwd', '-root', '-silent'], timeout=5)
+    try:
+        frame = subprocess.check_output(['xwd', '-root', '-silent'],
+                                        stderr=subprocess.PIPE, timeout=5)
+    except subprocess.CalledProcessError as error:
+        if b'BadColor' in error.stderr:
+            return False
+        print(error.stderr.decode(errors='replace'), file=sys.stderr)
+        raise
     header = struct.unpack_from('>25I', frame)
     size, version, pixmap_format, _, width, height, _, order = header[:8]
     bits, stride, _, red, green, blue = header[11:17]

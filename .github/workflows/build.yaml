@@ -327,7 +327,7 @@ jobs:
                 sha256sum --check ./*.AppImage.sha256
               )
               install -m 755 /packages/*.AppImage ./Modu.AppImage
-              runuser -u smoke -- dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" python3 /verify_linux_appimage.py ./Modu.AppImage
+              runuser -u smoke -- dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24 -noreset" python3 /verify_linux_appimage.py ./Modu.AppImage
             '
 
   android:
