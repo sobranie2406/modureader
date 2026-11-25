@@ -106,7 +106,7 @@ void main() {
     final serviceIds = TtsService.values.map((service) => service.name);
     expect(
       serviceIds,
-      ['system', 'edge', 'dashscope', 'xiaomi', 'openai'],
+      ['system', 'edge', 'dashscope', 'xiaomi', 'openai', 'deepseek'],
     );
     expect(getTtsService('azure'), TtsService.system);
     expect(getTtsService('aliyun'), TtsService.system);

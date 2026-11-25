@@ -147,7 +147,7 @@ Source: [models](../lib/service/knowledge/local_embedding_models.dart), [queue](
 
 ## 9. Speech, voices and buffering
 
-Choose system speech, Edge TTS, DashScope, Xiaomi MiMo or OpenAI-compatible speech in **Read aloud**. Save endpoint edits before loading voices or previewing. System speech is connected for Android/iOS/macOS/Windows; Linux/OpenHarmony require explicitly selecting an online service.
+Choose system speech, Edge TTS, DashScope, Xiaomi MiMo, DeepSeek or OpenAI-compatible speech in **Read aloud**. Save endpoint edits before loading voices or previewing. System speech is connected for Android/iOS/macOS/Windows; Linux/OpenHarmony require explicitly selecting an online service.
 
 Reader controls include play/pause, return to narration and read from here. Pitch (0.5–2.0×) and speed use equal-width compact controls with direct input and 0.1 steps; narrow screens put labels above. The speed control supports 0.1–4.0× in 0.1 steps and direct input; system/instruction rates are provider-dependent. Android MiMo pitch changes local playback without discarding buffered speech; other platforms depend on style-instruction support. Background speech and notification controls depend on OS permissions/power management. OpenAI-compatible/MiMo style prompts require provider support; MiMo text-designed voices are not voice cloning.
 

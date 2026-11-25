@@ -15,6 +15,17 @@ class TtsConfigTransfer {
   /// ids keep their stored shape instead of being validated or dropped.
   static bool isKnownProvider(String id) => services.contains(id);
 
+  /// Providers every snapshot must carry. Providers added after the snapshot
+  /// format was published are optional so a backup written by an older build
+  /// still imports; they are filled with an empty configuration instead.
+  static const Set<String> requiredProviders = {
+    'system',
+    'edge',
+    'dashscope',
+    'xiaomi',
+    'openai',
+  };
+
   static Map<String, dynamic> defaults() => {
         'version': 1,
         'service': 'system',
@@ -69,7 +80,7 @@ class TtsConfigTransfer {
     final rawProviders = data['providers'];
     if (data['allowMixWithOtherAudio'] is! bool ||
         rawProviders is! Map ||
-        !services.every(rawProviders.containsKey)) {
+        !requiredProviders.every(rawProviders.containsKey)) {
       throw const FormatException('朗读配置不完整 / Incomplete TTS configuration');
     }
     final providers = <String, dynamic>{};
@@ -96,6 +107,10 @@ class TtsConfigTransfer {
     }
     for (final id in services) {
       final raw = rawProviders[id];
+      if (raw == null && !requiredProviders.contains(id)) {
+        providers[id] = {'config': <String, dynamic>{}, 'voice': ''};
+        continue;
+      }
       if (raw is! Map || raw['voice'] is! String || raw['config'] is! Map) {
         throw const FormatException('语音配置无效 / Invalid voice configuration');
       }

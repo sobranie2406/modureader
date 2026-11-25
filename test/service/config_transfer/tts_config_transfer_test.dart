@@ -102,6 +102,26 @@ void main() {
     expect(Prefs().ttsService, 'openai');
   });
 
+  test('a snapshot written before a newer provider still imports', () async {
+    // Backups created by an older build cannot know about providers added
+    // later; they import with an empty configuration instead of failing.
+    final data = example();
+    data['providers'].remove('deepseek');
+    final validated = TtsConfigTransfer.validate(data);
+    expect(validated['providers']['deepseek'], {
+      'config': <String, dynamic>{},
+      'voice': '',
+    });
+    await TtsConfigTransfer.apply(Prefs(), data);
+    expect(Prefs().getOnlineTtsConfig('deepseek'), isEmpty);
+  });
+
+  test('a snapshot missing an original provider is still rejected', () async {
+    final data = example();
+    data['providers'].remove('dashscope');
+    expect(() => TtsConfigTransfer.validate(data), throwsFormatException);
+  });
+
   test('a retired provider id is normalised when the snapshot is applied', () async {
     final data = example();
     data['service'] = 'aliyun';

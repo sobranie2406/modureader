@@ -1,5 +1,6 @@
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/service/registry/host_registry.dart';
+import 'package:modu_reader/service/tts/deepseek_tts_backend.dart';
 import 'package:modu_reader/service/tts/edge_tts_backend.dart';
 import 'package:modu_reader/service/tts/openai_tts_backend.dart';
 import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
@@ -16,7 +17,8 @@ enum TtsService {
   edge,
   dashscope,
   xiaomi,
-  openai;
+  openai,
+  deepseek;
 
   /// Get the provider for this TTS service.
   TtsServiceProvider get provider => TtsRegistry.current.providerFor(name);
@@ -125,6 +127,7 @@ class TtsRegistry {
         'dashscope',
         'xiaomi',
         'openai',
+        'deepseek',
       ];
 
   static final List<TtsProviderEntry> _builtIn = [
@@ -140,6 +143,7 @@ class TtsRegistry {
     TtsProviderEntry(id: 'dashscope', builder: DashScopeTtsProvider.new),
     TtsProviderEntry(id: 'xiaomi', builder: XiaomiMimoTtsProvider.new),
     TtsProviderEntry(id: 'openai', builder: OpenAiTtsProvider.new),
+    TtsProviderEntry(id: 'deepseek', builder: DeepSeekTtsProvider.new),
   ];
 }
 

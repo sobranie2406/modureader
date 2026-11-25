@@ -679,6 +679,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               value: 'openai',
               child: Text(
                   ModuStrings.text(context, 'OpenAI 兼容', 'OpenAI compatible'))),
+          const DropdownMenuItem(value: 'deepseek', child: Text('DeepSeek')),
         ],
         onChanged: (value) async {
           if (value != null && value != currentServiceId) {

@@ -38,6 +38,13 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
   String _text(ConfigItem item, Map<String, dynamic> config) =>
       (config[item.key] ?? item.defaultValue)?.toString() ?? '';
 
+  static bool _boolValue(Object? value) => switch (value) {
+        bool v => v,
+        String v => v.trim().toLowerCase() != 'false' && v.trim().isNotEmpty,
+        num v => v != 0,
+        _ => false,
+      };
+
   @override
   void initState() {
     super.initState();
@@ -233,7 +240,9 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
               ? Text(item.label)
               : SettingHelpTitle(
                   title: item.label, description: item.description!),
-          value: _currentConfig[item.key] ?? item.defaultValue ?? false,
+          // Transfers persist every provider value as a string, so a stored
+          // 'false' must not read as a truthy non-empty value.
+          value: _boolValue(_currentConfig[item.key] ?? item.defaultValue),
           onChanged: (value) => _updateConfig(item.key, value),
         );
 
@@ -313,7 +322,7 @@ class _ServiceConfigFormState extends State<ServiceConfigForm> {
               ? Text(item.label)
               : SettingHelpTitle(
                   title: item.label, description: item.description!),
-          value: _currentConfig[item.key] ?? item.defaultValue ?? false,
+          value: _boolValue(_currentConfig[item.key] ?? item.defaultValue),
           onChanged: (value) {
             if (value != null) {
               _updateConfig(item.key, value);

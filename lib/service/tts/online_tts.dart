@@ -8,6 +8,7 @@ import 'package:modu_reader/models/tts_role_config.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/page/reading_page.dart';
 import 'package:modu_reader/service/tts/base_tts.dart';
+import 'package:modu_reader/service/tts/deepseek_tts_backend.dart';
 import 'package:modu_reader/service/tts/edge_tts_backend.dart';
 import 'package:modu_reader/service/tts/openai_tts_backend.dart';
 import 'package:modu_reader/service/tts/readany_compatible_tts_backend.dart';
@@ -90,7 +91,9 @@ class OnlineTts extends BaseTts {
   AudioPlayer Function()? _createPlayer;
   bool? _localPitchOverride;
   bool get _usesLocalPitch =>
-      (backend is XiaomiMimoTtsProvider || backend is OpenAiTtsProvider) &&
+      (backend is XiaomiMimoTtsProvider ||
+          backend is OpenAiTtsProvider ||
+          backend is DeepSeekTtsProvider) &&
       (_localPitchOverride ?? (AnxPlatform.isAndroid || AnxPlatform.isMacOS));
   double get _synthesisPitch => _usesLocalPitch ? 1.0 : pitch;
 
@@ -238,10 +241,14 @@ class OnlineTts extends BaseTts {
       backend is XiaomiMimoTtsProvider ||
       backend is EdgeTtsProvider ||
       backend is OpenAiTtsProvider ||
-      backend is DashScopeTtsProvider;
+      backend is DashScopeTtsProvider ||
+      backend is DeepSeekTtsProvider;
 
+  // DeepSeek exposes no speed or pitch parameter, so both are applied locally.
   bool get _usesLocalSpeed =>
-      backend is XiaomiMimoTtsProvider || backend is OpenAiTtsProvider;
+      backend is XiaomiMimoTtsProvider ||
+      backend is OpenAiTtsProvider ||
+      backend is DeepSeekTtsProvider;
 
   double _playbackRateFor(double rate) {
     if (!rate.isFinite) return 1.0;

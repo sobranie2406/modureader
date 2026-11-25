@@ -238,7 +238,7 @@ The selection-translation window can switch providers and also supports Baidu / 
 
 ## Narration and style templates
 
-**Settings → Narrate** offers system voices, Edge TTS, DashScope, Xiaomi MiMo and OpenAI-compatible speech. Configure the required endpoint/key, save, fetch voices, select one and test it. System TTS is connected for Android, iOS, macOS and Windows; Linux / OpenHarmony have no system TTS backend and require explicitly choosing an online service.
+**Settings → Narrate** offers system voices, Edge TTS, DashScope, Xiaomi MiMo, DeepSeek and OpenAI-compatible speech. Configure the required endpoint/key, save, fetch voices, select one and test it. System TTS is connected for Android, iOS, macOS and Windows; Linux / OpenHarmony have no system TTS backend and require explicitly choosing an online service.
 
 Editable style templates include natural narration, gentle bedtime reading, fiction performance, knowledge explanation, classical recitation and news reading. OpenAI-compatible services must support the relevant instructions. MiMo offers preset voices or voice design from a description, not voice cloning. Descriptions instruct the model and are not spoken text; results depend on the service.
 
