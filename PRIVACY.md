@@ -64,6 +64,8 @@ WebDAV sync runs only after configuration and enablement. Your server receives s
 
 Use HTTPS. Basic authentication is not transport encryption; explicitly choosing HTTP risks interception of credentials and content.
 
+The remote library can also browse and download over FTP. FTP sends credentials and file contents without transport encryption. Modu keeps FTP connection settings on this device and excludes them from its sync and backups.
+
 ## Settings transfer and database backups
 
 **Global settings backup** excludes accounts, passwords and API keys by default. Opting in produces JSON files or modu links containing **recoverable plaintext credentials**, not encrypted backups. The sync encryption password is never exported. Review the import scope; with credentials excluded, existing local credentials are preserved. Import does not automatically connect to a remote library.

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -206,6 +207,7 @@ bool isCredentialPreference(String key) =>
       'ftpInfo',
       'sftpInfo',
       'remoteLibraryConnection',
+      FtpConnectionStore.key,
       'syncAiSettingsEncryptionPassword',
       'syncAiSettingsToWebdav'
     }.contains(key) ||

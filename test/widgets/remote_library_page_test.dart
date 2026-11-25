@@ -6,6 +6,8 @@ import 'package:modu_reader/widgets/common/container/filled_container.dart';
 
 import 'package:modu_reader/page/home_page/remote_library_page.dart';
 import 'package:modu_reader/page/settings_page/remote_library.dart';
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
+import 'package:modu_reader/service/remote_library/ftp_library.dart';
 import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:modu_reader/service/remote_library/library_view_options.dart';
 import 'package:dio/dio.dart';
@@ -73,6 +75,30 @@ class _Library extends WebdavLibrary {
     ];
   }
 }
+
+class _FtpLibrary extends FtpLibrary {
+  _FtpLibrary(FtpConnection connection) : super(connection.root);
+
+  Completer<List<LibraryEntry>>? pending;
+  CancelToken? listingToken;
+
+  @override
+  Future<List<LibraryEntry>> list(Uri directory,
+      {CancelToken? cancelToken}) async {
+    listingToken = cancelToken;
+    return pending?.future ??
+        [
+          LibraryEntry(root.resolve('archive/'), 'archive', true, null),
+          LibraryEntry(root.resolve('FTP.epub'), 'FTP.epub', false, 16),
+          LibraryEntry(root.resolve('misc.zip'), 'misc.zip', false, 12),
+        ];
+  }
+}
+
+Finder _sourceItem(RemoteLibrarySource source) => find.byWidgetPredicate(
+    (widget) =>
+        widget is CheckedPopupMenuItem<RemoteLibrarySource> &&
+        widget.value == source);
 
 void main() {
   tearDown(() => AnxToast.fToast.removeQueuedCustomToasts());
@@ -247,6 +273,88 @@ void main() {
     expect(find.text('Save'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('FTP switches independently and shares the file filter',
+      (tester) async {
+    const webdav = LibraryConnection(url: 'https://example.com/books/');
+    const ftp = FtpConnection(address: 'nas.local:2121', directory: '/书架');
+    await LibraryConnectionStore.save(webdav);
+    await FtpConnectionStore.save(ftp);
+
+    Widget page() => ProviderScope(
+            child: MaterialApp(
+                home: RemoteLibraryPage(
+          clientFactory: (connection) => _Library(url: connection.url),
+          ftpClientFactory: (connection) {
+            expect(connection.root, ftp.root);
+            return _FtpLibrary(connection);
+          },
+        )));
+    Future<void> select(RemoteLibrarySource source) async {
+      await tester.tap(find.byTooltip('Library source'));
+      await tester.pumpAndSettle();
+      await tester.tap(_sourceItem(source));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    expect(find.text('A.epub'), findsOneWidget);
+    await select(RemoteLibrarySource.ftp);
+    expect(find.text('A.epub'), findsNothing);
+    expect(find.text('FTP.epub'), findsOneWidget);
+    expect(find.text('misc.zip'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('library-file-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EPUB').last);
+    await tester.pumpAndSettle();
+    expect(find.text('FTP.epub'), findsOneWidget);
+    expect(find.text('archive'), findsOneWidget);
+    expect(find.text('misc.zip'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    expect(find.text('FTP.epub'), findsOneWidget);
+    await select(RemoteLibrarySource.webdav);
+    expect(find.text('A.epub'), findsOneWidget);
+    expect(find.text('FTP.epub'), findsNothing);
+    expect((await LibraryConnectionStore.load())?.root, webdav.root);
+    expect((await FtpConnectionStore.load())?.root, ftp.root);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a late FTP response cannot replace the WebDAV listing',
+      (tester) async {
+    await LibraryConnectionStore.save(
+        const LibraryConnection(url: 'https://example.com/books/'));
+    const ftp = FtpConnection(address: 'nas.local');
+    await FtpConnectionStore.save(ftp);
+    await LibraryViewOptionsStore.saveSource(RemoteLibrarySource.ftp);
+    final pending = Completer<List<LibraryEntry>>();
+    final client = _FtpLibrary(ftp)..pending = pending;
+    await tester.pumpWidget(ProviderScope(
+        child: MaterialApp(
+            home: RemoteLibraryPage(
+      clientFactory: (_) => _Library(),
+      ftpClientFactory: (_) => client,
+    ))));
+    await tester.pump();
+    await tester.pump();
+    expect(client.listingToken, isNotNull);
+    await tester.tap(find.byTooltip('Library source'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(_sourceItem(RemoteLibrarySource.webdav));
+    await tester.pumpAndSettle();
+    expect(client.listingToken?.isCancelled, isTrue);
+    pending.complete(
+        [LibraryEntry(ftp.root.resolve('stale.pdf'), 'stale.pdf', false, 1)]);
+    await tester.pumpAndSettle();
+    expect(find.text('A.epub'), findsOneWidget);
+    expect(find.text('stale.pdf'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('settings save persists the password without enabling sync',
       (tester) async {
     final baselineKeys = (await SharedPreferences.getInstance()).getKeys();

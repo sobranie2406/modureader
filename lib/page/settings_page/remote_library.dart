@@ -1,25 +1,37 @@
-import 'package:modu_reader/widgets/settings/setting_help_title.dart';
-import 'package:modu_reader/utils/app_motion.dart';
 import 'package:modu_reader/l10n/modu_strings.dart';
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
+import 'package:modu_reader/service/remote_library/ftp_library.dart';
 import 'package:modu_reader/service/remote_library/webdav_library.dart';
+import 'package:modu_reader/utils/app_motion.dart';
+import 'package:modu_reader/widgets/common/anx_segmented_button.dart';
+import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'package:modu_reader/widgets/settings/settings_section.dart';
 import 'package:flutter/material.dart';
 
 class RemoteLibrarySettings extends StatefulWidget {
-  const RemoteLibrarySettings({super.key});
+  const RemoteLibrarySettings({
+    super.key,
+    this.initialSource = RemoteLibrarySource.webdav,
+  });
+
+  final RemoteLibrarySource initialSource;
+
   @override
   State<RemoteLibrarySettings> createState() => _RemoteLibrarySettingsState();
 }
 
 class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
   final _url = TextEditingController();
+  final _directory = TextEditingController();
   final _username = TextEditingController();
   final _password = TextEditingController();
+  late RemoteLibrarySource _source = widget.initialSource;
   bool _loading = true, _busy = false, _http = false, _hide = true;
   String? _message;
-  WebdavLibrary? _testing;
+  RemoteLibrary? _testing;
+  bool get _isFtp => _source == RemoteLibrarySource.ftp;
   bool get zh => Localizations.localeOf(context).languageCode == 'zh';
-  String t(String cn, String en) => zh ? cn : en;
+  String t(String cn, String en) => ModuStrings.text(context, cn, en);
 
   @override
   void initState() {
@@ -28,22 +40,40 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
   }
 
   Future<void> _load() async {
-    final value = await LibraryConnectionStore.load();
+    final webdav = _isFtp ? null : await LibraryConnectionStore.load();
+    final ftp = _isFtp ? await FtpConnectionStore.load() : null;
     if (!mounted) return;
     setState(() {
-      _url.text = value?.url ?? '';
-      _username.text = value?.username ?? '';
-      _password.text = value?.password ?? '';
-      _http = value?.allowHttp ?? false;
+      _url.text = ftp?.address ?? webdav?.url ?? '';
+      _directory.text = ftp?.directory ?? '';
+      _username.text = ftp?.username ?? webdav?.username ?? '';
+      _password.text = ftp?.password ?? webdav?.password ?? '';
+      _http = webdav?.allowHttp ?? false;
+      _hide = true;
       _loading = false;
     });
   }
 
-  LibraryConnection get _value => LibraryConnection(
-      url: _url.text,
-      username: _username.text.trim(),
-      password: _password.text,
-      allowHttp: _http);
+  Future<void> _selectSource(RemoteLibrarySource source) async {
+    if (_source == source) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _source = source;
+      _loading = true;
+      _message = null;
+    });
+    await _load();
+  }
+
+  Future<void> _testConnection(RemoteLibrary client) async {
+    _testing = client;
+    try {
+      await client.list(client.root);
+    } finally {
+      client.close();
+      _testing = null;
+    }
+  }
 
   Future<void> _perform(bool save) async {
     setState(() {
@@ -51,29 +81,97 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
       _message = null;
     });
     try {
-      final value = _value;
-      value.root;
-      if (save) {
-        await LibraryConnectionStore.save(value);
-      } else {
-        final client = WebdavLibrary(value);
-        _testing = client;
+      if (_isFtp) {
+        final value = FtpConnection(
+          address: _url.text,
+          directory: _directory.text,
+          username: _username.text.trim(),
+          password: _password.text,
+        );
+        final Uri root;
         try {
-          await client.list(client.root);
-        } finally {
-          client.close();
-          _testing = null;
+          root = value.root;
+        } on FormatException {
+          setState(() => _message = t('请检查 FTP 地址、目录和登录信息。',
+              'Check the FTP address, directory and login details.'));
+          return;
+        }
+        if (save) {
+          await FtpConnectionStore.save(value);
+        } else {
+          await _testConnection(FtpLibrary(root,
+              username: value.username, password: value.password));
+        }
+      } else {
+        final value = LibraryConnection(
+          url: _url.text,
+          username: _username.text.trim(),
+          password: _password.text,
+          allowHttp: _http,
+        );
+        if (save) {
+          await LibraryConnectionStore.save(value);
+        } else {
+          await _testConnection(WebdavLibrary(value));
         }
       }
       if (mounted) {
         setState(() => _message = save
             ? ModuStrings.text(context, "连接已保存，请到“远程书库”打开。",
                 "Connection saved. Open Remote library to browse.")
-            : ModuStrings.text(context, '连接成功，目录可读取（未写入任何远程文件）。',
-                'Connected. Directory is readable; no remote files were written.'));
+            : t('连接成功，目录可读取。', 'Connected. The directory is readable.'));
       }
     } catch (error) {
-      if (mounted) setState(() => _message = libraryError(error, zh));
+      if (mounted) {
+        setState(() => _message = _isFtp
+            ? ftpLibraryError(error, zh, listing: !save)
+            : libraryError(error, zh));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _clearConnection() async {
+    final confirmed = await showDialog<bool>(
+      animationStyle: AppMotion.style,
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t('清除书库连接？', 'Clear library connection?')),
+        content: Text(_isFtp
+            ? t('清除本机保存的 FTP 连接和密码？',
+                'Clear the FTP connection and password on this device?')
+            : t('清除连接和密码？开启同步的设备也会更新。',
+                'Clear the connection and password? This also updates devices with sync enabled.')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t('取消', 'Cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(t('清除', 'Clear'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      if (_isFtp) {
+        await FtpConnectionStore.clear();
+      } else {
+        await LibraryConnectionStore.clear();
+      }
+      if (!mounted) return;
+      await _load();
+      if (mounted) {
+        setState(() => _message =
+            t('已清除连接配置和保存的密码。', 'Connection and saved password cleared.'));
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message =
+            _isFtp ? ftpLibraryError(error, zh) : libraryError(error, zh));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -83,6 +181,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
   void dispose() {
     _testing?.close();
     _url.dispose();
+    _directory.dispose();
     _username.dispose();
     _password.dispose();
     super.dispose();
@@ -95,25 +194,54 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
           child: EinkStaticIndicator(child: CircularProgressIndicator()));
     }
     return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: AnxSegmentedButton<RemoteLibrarySource>(
+          segments: [
+            for (final source in RemoteLibrarySource.values)
+              SegmentButtonItem(value: source, label: source.label),
+          ],
+          selected: {_source},
+          onSelectionChanged:
+              _busy ? null : (value) => _selectSource(value.single),
+        ),
+      ),
       SettingsSection.content(
         key: const ValueKey('remote-library-settings-frame'),
-        title: const Text('WebDAV'),
+        title: _isFtp
+            ? SettingHelpTitle(
+                title: t('连接配置', 'Connection settings'),
+                description: t('FTP 会明文传输帐号、密码和文件，请在可信的局域网内使用。',
+                    'FTP sends login details and files unencrypted. Use it on a trusted local network.'),
+              )
+            : Text(t('连接配置', 'Connection settings')),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(ModuStrings.text(context, "浏览并下载服务器上的书籍。",
-                "Browse and download books from your server.")),
-            const SizedBox(height: 16),
             TextField(
                 controller: _url,
                 enabled: !_busy,
                 autocorrect: false,
                 keyboardType: TextInputType.url,
                 decoration: InputDecoration(
-                    labelText: ModuStrings.text(
-                        context, 'WebDAV 书库完整地址', 'Full WebDAV library URL'),
-                    hintText: 'https://example.com/dav/books/',
+                    labelText: _isFtp
+                        ? t('FTP 地址', 'FTP address')
+                        : t('WebDAV 书库完整地址', 'Full WebDAV library URL'),
+                    hintText: _isFtp
+                        ? '192.168.1.1:21'
+                        : 'https://example.com/dav/books/',
                     border: const OutlineInputBorder())),
+            if (_isFtp) ...[
+              const SizedBox(height: 16),
+              TextField(
+                  controller: _directory,
+                  enabled: !_busy,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                      labelText: t('目录', 'Directory'),
+                      hintText: '/',
+                      border: const OutlineInputBorder())),
+            ],
             const SizedBox(height: 16),
             TextField(
                 controller: _username,
@@ -144,32 +272,35 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
           ],
         ),
       ),
-      SettingsSection.content(
-        title: Text(ModuStrings.text(context, '连接安全', 'Connection security')),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _http,
-                onChanged: _busy ? null : (v) => setState(() => _http = v),
-                title: Text(ModuStrings.text(
-                    context, '允许 HTTP 明文连接', 'Allow unencrypted HTTP')),
-                subtitle: SettingHelp(
-                    title:
-                        Text(ModuStrings.text(context, "连接方式", "Connection")),
-                    description: Text(ModuStrings.text(context,
-                        "建议使用 HTTPS 连接。", "Use HTTPS for this connection.")))),
-            SettingHelp(
-                title:
-                    Text(ModuStrings.text(context, "同步连接", "Sync connection")),
-                description: Text(ModuStrings.text(
-                    context,
-                    "在“同步”中开启敏感数据同步，可同步书库连接。",
-                    "Enable Sensitive data sync in Sync settings to share this connection."))),
-          ],
+      if (!_isFtp)
+        SettingsSection.content(
+          title: Text(ModuStrings.text(context, '连接安全', 'Connection security')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _http,
+                  onChanged: _busy ? null : (v) => setState(() => _http = v),
+                  title: Text(ModuStrings.text(
+                      context, '允许 HTTP 明文连接', 'Allow unencrypted HTTP')),
+                  subtitle: SettingHelp(
+                      title:
+                          Text(ModuStrings.text(context, "连接方式", "Connection")),
+                      description: Text(ModuStrings.text(
+                          context,
+                          "建议使用 HTTPS 连接。",
+                          "Use HTTPS for this connection.")))),
+              SettingHelp(
+                  title: Text(
+                      ModuStrings.text(context, "同步连接", "Sync connection")),
+                  description: Text(ModuStrings.text(
+                      context,
+                      "在“同步”中开启敏感数据同步，可同步书库连接。",
+                      "Enable Sensitive data sync in Sync settings to share this connection."))),
+            ],
+          ),
         ),
-      ),
       SettingsSection.content(
         title: Text(ModuStrings.text(context, '连接管理', 'Connection management')),
         child: Column(
@@ -186,53 +317,7 @@ class _RemoteLibrarySettingsState extends State<RemoteLibrarySettings> {
                   icon: const Icon(Icons.save_outlined),
                   label: Text(ModuStrings.text(context, '保存配置', 'Save'))),
               TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          final confirmed = await showDialog<bool>(
-                              animationStyle: AppMotion.style,
-                              context: context,
-                              builder: (c) => AlertDialog(
-                                      title: Text(ModuStrings.text(
-                                          context,
-                                          '清除书库连接？',
-                                          'Clear library connection?')),
-                                      content: Text(ModuStrings.text(
-                                          context,
-                                          "清除连接和密码？开启同步的设备也会更新。",
-                                          "Clear the connection and password? This also updates devices with sync enabled.")),
-                                      actions: [
-                                        TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(c, false),
-                                            child: Text(ModuStrings.text(
-                                                context, '取消', 'Cancel'))),
-                                        TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(c, true),
-                                            child: Text(ModuStrings.text(
-                                                context, '清除', 'Clear')))
-                                      ]));
-                          if (confirmed != true || !mounted) return;
-                          setState(() => _busy = true);
-                          try {
-                            await LibraryConnectionStore.clear();
-                            await _load();
-                            if (mounted) {
-                              setState(() => _message = ModuStrings.text(
-                                  context,
-                                  '已清除连接配置和保存的密码。',
-                                  'Connection and saved password cleared.'));
-                            }
-                          } catch (error) {
-                            if (mounted) {
-                              setState(
-                                  () => _message = libraryError(error, zh));
-                            }
-                          } finally {
-                            if (mounted) setState(() => _busy = false);
-                          }
-                        },
+                  onPressed: _busy ? null : _clearConnection,
                   child: Text(
                       ModuStrings.text(context, '清除连接', 'Clear connection'))),
             ]),

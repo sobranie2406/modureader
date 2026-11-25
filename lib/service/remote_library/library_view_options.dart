@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
 import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -88,6 +89,23 @@ class LibraryViewOptions {
 /// Device-only presentation preferences; never part of the WebDAV data.
 class LibraryViewOptionsStore {
   static const key = 'remoteLibraryViewOptions';
+  static const _sourceKey = 'remoteLibrarySource';
+
+  static Future<RemoteLibrarySource> loadSource() async {
+    final source =
+        (await SharedPreferences.getInstance()).getString(_sourceKey);
+    return RemoteLibrarySource.values
+            .where((s) => s.name == source)
+            .firstOrNull ??
+        RemoteLibrarySource.webdav;
+  }
+
+  static Future<void> saveSource(RemoteLibrarySource source) async {
+    final saved = await (await SharedPreferences.getInstance())
+        .setString(_sourceKey, source.name);
+    if (!saved) throw StateError('Cannot save library source');
+  }
+
   static Future<LibraryViewOptions> load() async {
     final raw = (await SharedPreferences.getInstance()).getString(key);
     if (raw != null) {

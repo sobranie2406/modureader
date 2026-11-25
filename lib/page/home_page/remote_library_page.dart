@@ -12,6 +12,8 @@ import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/toast/common.dart';
 import 'package:modu_reader/service/md5_service.dart';
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
+import 'package:modu_reader/service/remote_library/ftp_library.dart';
 import 'package:modu_reader/service/remote_library/webdav_library.dart';
 import 'package:modu_reader/service/remote_library/library_view_options.dart';
 import 'package:modu_reader/widgets/remote_library_controls.dart';
@@ -22,14 +24,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class RemoteLibraryPage extends ConsumerStatefulWidget {
-  const RemoteLibraryPage({super.key, this.clientFactory});
+  const RemoteLibraryPage(
+      {super.key, this.clientFactory, this.ftpClientFactory});
   final WebdavLibrary Function(LibraryConnection)? clientFactory;
+  final RemoteLibrary Function(FtpConnection)? ftpClientFactory;
   @override
   ConsumerState<RemoteLibraryPage> createState() => _RemoteLibraryPageState();
 }
 
 class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
-  WebdavLibrary? _client;
+  RemoteLibrary? _client;
+  RemoteLibrarySource _source = RemoteLibrarySource.webdav;
+  bool _initializing = true;
+  int _connectionGeneration = 0;
   Uri? _directory;
   List<LibraryEntry> _entries = [];
   (List<LibraryEntry>, LibraryViewOptions, String)? _visibleKey;
@@ -40,6 +47,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   LibraryViewOptions _viewOptions = const LibraryViewOptions();
   bool _loading = true, _importing = false;
   int _received = 0, _total = -1;
+  final _search = TextEditingController();
   final _imported = <String>{};
   bool get zh => Localizations.localeOf(context).languageCode == 'zh';
   String t(String cn, String en) => zh ? cn : en;
@@ -52,9 +60,26 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
 
   Future<void> _initialize() async {
     final options = await LibraryViewOptionsStore.load();
+    final source = await LibraryViewOptionsStore.loadSource();
     if (!mounted) return;
-    setState(() => _viewOptions = options);
+    setState(() {
+      _viewOptions = options;
+      _source = source;
+      _initializing = false;
+    });
     await _connect();
+  }
+
+  Future<void> _changeSource(RemoteLibrarySource source) async {
+    if (source == _source || _activeName != null) return;
+    _source = source;
+    final connecting = _connect();
+    try {
+      await LibraryViewOptionsStore.saveSource(source);
+    } catch (_) {
+      _message(t('无法保存书库来源。', 'Could not save the library source.'));
+    }
+    await connecting;
   }
 
   Future<void> _changeViewOptions(LibraryViewOptions options) async {
@@ -69,6 +94,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   }
 
   Future<void> _connect() async {
+    final generation = ++_connectionGeneration;
     _listing?.cancel();
     _client?.close();
     _client = null;
@@ -79,11 +105,23 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       _error = null;
     });
     try {
-      final connection = await LibraryConnectionStore.load();
-      if (!mounted) return;
-      if (connection != null) {
-        _client =
-            widget.clientFactory?.call(connection) ?? WebdavLibrary(connection);
+      switch (_source) {
+        case RemoteLibrarySource.webdav:
+          final connection = await LibraryConnectionStore.load();
+          if (!mounted || generation != _connectionGeneration) return;
+          if (connection != null) {
+            _client = widget.clientFactory?.call(connection) ??
+                WebdavLibrary(connection);
+          }
+        case RemoteLibrarySource.ftp:
+          final connection = await FtpConnectionStore.load();
+          if (!mounted || generation != _connectionGeneration) return;
+          if (connection != null) {
+            _client = widget.ftpClientFactory?.call(connection) ??
+                FtpLibrary(connection.root,
+                    username: connection.username,
+                    password: connection.password);
+          }
       }
       if (_client == null) {
         setState(() => _loading = false);
@@ -91,10 +129,10 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         await _browse(_client!.root);
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && generation == _connectionGeneration) {
         setState(() {
           _loading = false;
-          _error = libraryError(error, zh, listing: true);
+          _error = _libraryError(error, listing: true);
         });
       }
     }
@@ -118,18 +156,19 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         _directory = directory;
       });
     } catch (error) {
+      if (!mounted || token.isCancelled) return;
       AnxLog.warning('Remote library listing failed: ${error.runtimeType}'
           '${error is LibraryListingException ? ' (${error.reason})' : ''}'
+          '${error is FtpLibraryException ? ' (${error.failure.name})' : ''}'
           '${error is DioException ? ', HTTP ${error.response?.statusCode}' : ''}');
-      if (mounted && !token.isCancelled) {
-        setState(() => _error = libraryError(error, zh, listing: true));
-      }
+      setState(() => _error = _libraryError(error, listing: true));
     } finally {
       if (mounted && !token.isCancelled) setState(() => _loading = false);
     }
   }
 
   Future<void> _settings() async {
+    final source = _source;
     await Navigator.push(
         context,
         MaterialPageRoute(
@@ -137,13 +176,18 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                 appBar: AppBar(
                     title: Text(ModuStrings.text(
                         context, '远程书库设置', 'Remote library settings'))),
-                body: const RemoteLibrarySettings())));
+                body: RemoteLibrarySettings(initialSource: source))));
     if (mounted) await _connect();
   }
 
   void _message(String value) {
     if (mounted) AnxToast.show(value, context: context);
   }
+
+  String _libraryError(Object error, {bool listing = false}) =>
+      _source == RemoteLibrarySource.ftp
+          ? ftpLibraryError(error, zh, listing: listing)
+          : libraryError(error, zh, listing: listing);
 
   Future<void> _getBook(LibraryEntry entry) async {
     if (_activeName != null) return;
@@ -168,7 +212,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
           : _importing
               ? t('文件已下载，但书籍解析失败。请检查格式、是否加密或文件是否损坏。',
                   'Download completed, but import failed. Check the format, encryption or file integrity.')
-              : libraryError(error, zh));
+              : _libraryError(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -181,11 +225,11 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   }
 
   Future<bool> _importEntry(
-      LibraryEntry entry, WebdavLibrary client, CancelToken token) async {
+      LibraryEntry entry, RemoteLibrary client, CancelToken token) async {
     final container = ProviderScope.containerOf(context, listen: false);
     Directory? temporary;
     try {
-      temporary = await (await getAnxTempDir()).createTemp('modu-webdav-');
+      temporary = await (await getAnxTempDir()).createTemp('modu-remote-');
       // URI-derived immediate-child names are checked by the service, and the
       // unique staging directory prevents clobbering a user's local book.
       final localName =
@@ -246,6 +290,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         return;
       }
       final byId = {for (final e in entries) e.uri.toString(): e};
+      final segments = directory.pathSegments;
+      final depth = segments.length - (segments.lastOrNull == '' ? 1 : 0);
       final selected = await showDialog<List<BookImportEntry>>(
           context: context,
           animationStyle: AppMotion.style,
@@ -254,9 +300,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                   .map((e) => BookImportEntry(
                       id: e.uri.toString(),
                       name: e.name,
-                      label: e.uri.pathSegments
-                          .skip(directory.pathSegments.length - 1)
-                          .join('/')))
+                      label: e.uri.pathSegments.skip(depth).join('/')))
                   .toList()));
       if (selected == null || !mounted || token.isCancelled) return;
       for (var i = 0; i < selected.length; i++) {
@@ -279,7 +323,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
           failed++;
           lastFailure = _importing
               ? t('书籍解析失败', 'Book import failed')
-              : libraryError(error, zh);
+              : _libraryError(error);
         }
       }
       if (mounted) {
@@ -291,7 +335,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       if (mounted) {
         _message(token.isCancelled
             ? t('已取消文件夹扫描。', 'Folder scan cancelled.')
-            : libraryError(error, zh, listing: true));
+            : _libraryError(error, listing: true));
       }
     } finally {
       if (mounted) {
@@ -309,6 +353,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
     _listing?.cancel();
     _download?.cancel();
     _client?.close();
+    _search.dispose();
     super.dispose();
   }
 
@@ -354,6 +399,25 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
         appBar: AppBar(
             title: Text(ModuStrings.text(context, '远程书库', 'Remote library')),
             actions: [
+              PopupMenuButton<RemoteLibrarySource>(
+                tooltip: t('书库来源', 'Library source'),
+                enabled: !_initializing && _activeName == null,
+                onSelected: _changeSource,
+                itemBuilder: (_) => [
+                  for (final source in RemoteLibrarySource.values)
+                    CheckedPopupMenuItem(
+                        value: source,
+                        checked: source == _source,
+                        child: Text(source.label)),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_source.label),
+                    const Icon(Icons.arrow_drop_down, size: 18),
+                  ]),
+                ),
+              ),
               IconButton(
                   tooltip: t('导入当前文件夹', 'Import current folder'),
                   onPressed: _loading ||
@@ -373,7 +437,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
               IconButton(
                   tooltip: ModuStrings.text(
                       context, '远程书库设置', 'Remote library settings'),
-                  onPressed: _activeName == null ? _settings : null,
+                  onPressed:
+                      !_initializing && _activeName == null ? _settings : null,
                   icon: const Icon(Icons.settings_outlined)),
             ]),
         body: Column(children: [
@@ -403,6 +468,7 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
             Padding(
                 padding: const EdgeInsets.all(16),
                 child: TextField(
+                    controller: _search,
                     onChanged: (value) => setState(() => _filter = value),
                     decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search),
@@ -469,16 +535,16 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
                                   Text(
                                       ModuStrings.text(
                                           context,
-                                          '连接 WebDAV，浏览远程目录并将书籍下载到本地书架。',
-                                          'Connect WebDAV to browse and import books into your local bookshelf.'),
+                                          '连接 ${_source.label} 后可浏览和下载书籍。',
+                                          'Connect ${_source.label} to browse and download books.'),
                                       textAlign: TextAlign.center),
                                   const SizedBox(height: 16),
                                   FilledButton(
                                       onPressed: _settings,
                                       child: Text(ModuStrings.text(
                                           context,
-                                          '配置书库 WebDAV',
-                                          'Configure library WebDAV')))
+                                          '配置书库 ${_source.label}',
+                                          'Configure library ${_source.label}')))
                                 ]))
                           : visible.isEmpty
                               ? Center(

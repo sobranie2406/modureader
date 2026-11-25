@@ -8,6 +8,7 @@ import 'package:modu_reader/models/theme_preset.dart';
 import 'package:modu_reader/models/tts_role_config.dart';
 import 'dart:core';
 import 'package:modu_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/remote_library/ftp_connection.dart';
 import 'package:modu_reader/service/sync/reading_sync_scheduler.dart';
 
 import 'package:modu_reader/enums/ai_prompts.dart';
@@ -70,6 +71,7 @@ const retiredEmbeddingPreferenceKeys = {'vectorModelMode', 'vectorModelConfig'};
 
 const Set<String> _prefsImportSkipKeys = {
   ...retiredEmbeddingPreferenceKeys,
+  FtpConnectionStore.key,
   'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
@@ -115,6 +117,7 @@ const Set<String> _prefsImportSkipKeys = {
 
 const Set<String> _prefsExportSkipKeys = {
   ...retiredEmbeddingPreferenceKeys,
+  FtpConnectionStore.key,
   'privateLibrary_v1',
   'lastAppVersion',
   'translationUsageDevice',
