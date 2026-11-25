@@ -17,6 +17,8 @@ if uri.scheme != 'file' or uri.netloc or root.name != 'flutter_inappwebview_linu
 
 cmake = root / 'linux/CMakeLists.txt'
 cmake_checks = {
+    'set(CMAKE_REQUIRED_LIBRARIES ${WPE_WEBKIT_LIBRARIES} ${WPE_PLATFORM_LIBRARIES})':
+        'set(CMAKE_REQUIRED_LIBRARIES PkgConfig::WPE_WEBKIT PkgConfig::WPE_PLATFORM)',
     '''pkg_check_modules(LIBWPE QUIET IMPORTED_TARGET wpe-1.0)
 if(NOT LIBWPE_FOUND)
   message(FATAL_ERROR "libwpe (wpe-1.0) not found. Please install libwpe-1.0-dev.")
