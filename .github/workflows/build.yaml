@@ -42,7 +42,7 @@ jobs:
     if: inputs.reader_diagnostic == true && !inputs.appimage_smoke_run_id
     uses: ./.github/workflows/windows-reader-diagnostic.yml
   targets:
-    if: github.event_name == 'workflow_dispatch' && inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
+    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
@@ -65,7 +65,7 @@ jobs:
     uses: ./.github/workflows/pr-check.yml
 
   models:
-    if: github.event_name == 'workflow_dispatch' && inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
+    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +121,7 @@ jobs:
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: actions/checkout@v4
         with:
-          ref: ede33d7af9939bdf032df79f7e40d264632ded25
+          ref: 7c3380ecaf36b5e2bedccbfdd69da41b1631f914
       - uses: actions/download-artifact@v4
         with:
           name: embedding-test-fixtures
@@ -316,13 +316,18 @@ jobs:
 
   linux_appimage_smoke:
     name: AppImage reader on ${{ matrix.distribution }}
-    if: always() && !cancelled()
+    if: >-
+      always() && !cancelled() &&
+      (inputs.appimage_smoke_run_id ||
+        (needs.targets.outputs.linux_appimage == 'true' && needs.desktop.result == 'success'))
     needs: [targets, desktop]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { distribution: 'Ubuntu 24.04 with Canonical Bubblewrap profile', runner: 'ubuntu-24.04', ubuntu_version: '24.04' }
+          - { distribution: 'Ubuntu 24.04', runner: 'ubuntu-24.04', ubuntu_version: '24.04' }
+          - { distribution: 'Ubuntu 26.04', runner: 'ubuntu-26.04', ubuntu_version: '26.04' }
+          - { distribution: 'Arch Linux', runner: 'ubuntu-24.04', ubuntu_version: '' }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     permissions:
@@ -342,8 +347,8 @@ jobs:
           name: modu-linux-x64-appimage
           path: dist-release
           repository: ${{ github.repository }}
-          run-id: 45537959540
-          github-token: ${{ github.token }}
+          run-id: ${{ inputs.appimage_smoke_run_id || github.run_id }}
+          github-token: ${{ inputs.appimage_smoke_run_id && github.token || '' }}
       - name: Verify the single AppImage artifact
         working-directory: dist-release
         run: |
@@ -365,12 +370,15 @@ jobs:
             liblcms2-2 libwebp7 libwebpdemux2 libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good libgl1-mesa-dri \
             libegl-mesa0 libgles2 fonts-dejavu-core dbus-daemon xvfb xauth
-      - name: Load the official optional profile in this disposable test VM
+      - name: Enable Ubuntu 24.04’s packaged Bubblewrap profile
+        if: matrix.ubuntu_version == '24.04'
         run: |
           sudo apt-get install -y --no-install-recommends apparmor-profiles
-          sudo apparmor_parser --skip-read-cache --replace /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
-          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
-          /usr/bin/bwrap --unshare-net --ro-bind / / -- /usr/bin/true
+          sudo cp -n /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+            /etc/apparmor.d/bwrap-userns-restrict
+          sudo cmp /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+            /etc/apparmor.d/bwrap-userns-restrict
+          sudo apparmor_parser --skip-read-cache --replace /etc/apparmor.d/bwrap-userns-restrict
       - name: Verify EPUB and PDF on native Ubuntu with AppArmor enabled
         if: matrix.ubuntu_version
         env:

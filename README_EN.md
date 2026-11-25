@@ -36,7 +36,7 @@ Available for Android, iOS, macOS, Windows, Linux and native HarmonyOS. Local re
 
 [Feature guide](docs/FEATURES.md) · [Settings guide](docs/SETTINGS.md) · [All documentation](docs/README.md) · [Sample ebook](docs/examples/modu-reading-demo-en.epub)
 
-From 1.3.11, Linux packages include x64 and ARM64 DEBs for Debian 13 and an AppImage for Arch Linux x64. [AppImage installation guide](docs/RELEASING.md#arch-linux-x64-appimage)
+Linux packages include x64 and ARM64 DEBs for Debian 13. Starting with 1.3.12, Ubuntu 24.04, Ubuntu 26.04, and Arch Linux share one x64 AppImage. Ubuntu 24.04 requires the official Bubblewrap profile. [AppImage installation guide](docs/RELEASING.md#linux-x64-appimage)
 
 <a id="features"></a>
 

@@ -21,7 +21,7 @@ Successful GitHub checks use GitHub metadata and downloads. A check resolved thr
 | macOS | ARM64, x64 | DMG |
 | Windows | ARM64, x64 | setup EXE |
 | Debian 13 | ARM64, x64 | DEB |
-| Arch Linux | x64 | AppImage |
+| Arch Linux, Ubuntu 24.04 and 26.04 (Ubuntu from 1.3.12) | x64 | AppImage |
 | HarmonyOS | ARM64 | Unsigned HAP; manual signing/installation |
 
 The update manifest lists nine packages. HarmonyOS HAP is available from the release page with its checksum. Android releases are ARM64 only.
