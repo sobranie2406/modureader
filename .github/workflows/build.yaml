@@ -361,7 +361,7 @@ jobs:
             libharfbuzz-icu0 libgcrypt20 libtasn1-6 libjpeg-turbo8 libpng16-16t64 \
             liblcms2-2 libwebp7 libwebpdemux2 libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good libgl1-mesa-dri \
-            libegl-mesa0 fonts-dejavu-core dbus-daemon xvfb xauth
+            libegl-mesa0 libgles2 fonts-dejavu-core dbus-daemon xvfb xauth
       - name: Verify EPUB and PDF on native Ubuntu with AppArmor enabled
         if: matrix.ubuntu_version
         env:
