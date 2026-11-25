@@ -105,7 +105,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential clang-18 lld-18 cmake ninja-build pkg-config ccache bison flex gperf ruby perl \
+            build-essential clang clang-18 lld-18 cmake ninja-build pkg-config ccache bison flex gperf ruby perl \
             ca-certificates curl git unzip xz-utils zip python3 python-is-python3 python3-packaging \
             gettext unifdef bubblewrap xdg-dbus-proxy desktop-file-utils patchelf squashfs-tools \
             libseccomp-dev libglib2.0-dev libharfbuzz-dev libicu-dev libjpeg-dev libepoxy-dev \
