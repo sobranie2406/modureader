@@ -1,0 +1,67 @@
+--- a/Source/WebKit/Shared/glib/ProcessExecutablePathGLib.cpp
++++ b/Source/WebKit/Shared/glib/ProcessExecutablePathGLib.cpp
+@@ -30,4 +30,5 @@
+ #include <glib.h>
+ #include <wtf/FileSystem.h>
++#include <wtf/glib/GUniquePtr.h>
+ 
+ namespace WebKit {
+@@ -45,4 +46,9 @@
+ static String findWebKitProcess(const ASCIILiteral processName)
+ {
++    if (const char* prefix = g_getenv("MODU_WPE_PREFIX"); prefix && g_path_is_absolute(prefix)) {
++        GUniquePtr<char> directory(g_build_filename(prefix, "libexec", "wpe-webkit-" WPE_API_VERSION, nullptr));
++        return FileSystem::pathByAppendingComponent(FileSystem::stringFromFileSystemRepresentation(directory.get()), processName);
++    }
++
+ #if ENABLE(DEVELOPER_MODE)
+     static const char* execDirectory = g_getenv("WEBKIT_EXEC_PATH");
+--- a/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
++++ b/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
+@@ -862,4 +862,11 @@
+     }
+ 
++    if (const char* prefix = g_getenv("MODU_WPE_PREFIX"); prefix && g_path_is_absolute(prefix)) {
++        for (const char* name : { "lib", "libexec", "share" }) {
++            GUniquePtr<char> path(g_build_filename(prefix, name, nullptr));
++            bindIfExists(sandboxArgs, path.get());
++        }
++    }
++
+     addExtraPaths(launchOptions.extraSandboxPaths, sandboxArgs);
+ 
+--- a/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitWebContext.cpp
+@@ -344,4 +344,11 @@
+ static const char* injectedBundleDirectory()
+ {
++    static GUniquePtr<char> packagedPath([]() -> char* {
++        const char* prefix = g_getenv("MODU_WPE_PREFIX");
++        return prefix && g_path_is_absolute(prefix) ? g_build_filename(prefix, "lib", "wpe-webkit-" WPE_API_VERSION, "injected-bundle", nullptr) : nullptr;
++    }());
++    if (packagedPath)
++        return packagedPath.get();
++
+     const char* bundleDirectory = g_getenv("WEBKIT_INJECTED_BUNDLE_PATH");
+     if (bundleDirectory && g_file_test(bundleDirectory, G_FILE_TEST_IS_DIR))
+@@ -514,5 +521,7 @@
+     GObjectClass* gObjectClass = G_OBJECT_CLASS(webContextClass);
+ 
+-    bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
++    const char* prefix = g_getenv("MODU_WPE_PREFIX");
++    GUniquePtr<char> localeDirectory(prefix && g_path_is_absolute(prefix) ? g_build_filename(prefix, "share", "locale", nullptr) : nullptr);
++    bindtextdomain(GETTEXT_PACKAGE, localeDirectory ? localeDirectory.get() : LOCALEDIR);
+     bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
+ 
+--- a/Source/WTF/wtf/glib/GResources.cpp
++++ b/Source/WTF/wtf/glib/GResources.cpp
+@@ -42,4 +42,9 @@
+             dataDir = path;
+ 
++        const char* prefix = g_getenv("MODU_WPE_PREFIX");
++        GUniquePtr<char> packagedPath(prefix && g_path_is_absolute(prefix) ? g_build_filename(prefix, "share", "wpe-webkit-" WPE_API_VERSION, nullptr) : nullptr);
++        if (packagedPath)
++            dataDir = packagedPath.get();
++
+         GUniquePtr<char> gResourceFilename(g_build_filename(dataDir, "inspector.gresource", nullptr));
+         GRefPtr<GResource> gresource = adoptGRef(g_resource_load(gResourceFilename.get(), &error.outPtr()));

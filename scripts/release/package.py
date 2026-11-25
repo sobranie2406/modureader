@@ -81,13 +81,16 @@ def notices(folder, platform, appimage=False):
 def package(platform, arch, version, appimage=False):
     if platform == 'android' and arch != 'arm64':
         raise ValueError('Android x64 is an internal test target, not a release artifact')
-    runtime = None
+    runtime = wpe_prefix = None
     if appimage:
         if (platform, arch) != ('linux', 'x64'):
             raise ValueError('AppImage packaging requires a Linux x64 build')
         runtime = os.environ.get('MODU_APPIMAGE_RUNTIME')
         if not runtime:
             raise RuntimeError('Set MODU_APPIMAGE_RUNTIME to the verified x64 AppImage runtime')
+        wpe_prefix = os.environ.get('MODU_APPIMAGE_WPE_PREFIX')
+        if not wpe_prefix:
+            raise RuntimeError('Set MODU_APPIMAGE_WPE_PREFIX to the Ubuntu WPE runtime')
     name = f"Modu-{version}-{platform}-{arch}"
     stage = OUT / 'staging' / (name + '-appimage' if appimage else name)
     if stage.exists():
@@ -165,7 +168,7 @@ def package(platform, arch, version, appimage=False):
     else:
         from native_installers import build, build_linux_appimage
         if appimage:
-            build_linux_appimage(stage, version, OUT, runtime)
+            build_linux_appimage(stage, version, OUT, runtime, wpe_prefix)
         else:
             build_number = next(line.split('+', 1)[1].strip() for line in
                                 (ROOT / 'pubspec.yaml').read_text().splitlines() if line.startswith('version:'))

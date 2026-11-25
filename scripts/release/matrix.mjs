@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 export const desktops = [
   {os: 'ubuntu-24.04', platform: 'linux', arch: 'x64', container: 'debian:trixie'},
-  {os: 'ubuntu-24.04', platform: 'linux', arch: 'x64', container: 'archlinux:base', appimage: true},
+  {os: 'ubuntu-24.04', platform: 'linux', arch: 'x64', container: 'ubuntu:24.04', appimage: true},
   {os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64', container: 'debian:trixie'},
   {os: 'windows-2025', platform: 'windows', arch: 'x64', sdk_arch: 'x64'},
   {os: 'windows-11-arm', platform: 'windows', arch: 'arm64', sdk_arch: 'x64'},

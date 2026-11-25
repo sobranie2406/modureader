@@ -20,10 +20,10 @@ test('only Linux x64 requires the AppImage smoke test', () => {
   assert.equal(selectTargets('linux-arm64').linux_appimage, false);
   assert.equal(selectTargets('windows-x64').linux_appimage, false);
 });
-test('Linux x64 keeps the Debian build and adds a separate Arch AppImage build', () => {
+test('Linux x64 has one Debian build and one AppImage built on the Ubuntu baseline', () => {
   const {desktop} = selectTargets('linux-x64');
   assert.deepEqual(desktop.map(({container, appimage = false}) => [container, appimage]), [
     ['debian:trixie', false],
-    ['archlinux:base', true],
+    ['ubuntu:24.04', true],
   ]);
 });

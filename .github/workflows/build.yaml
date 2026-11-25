@@ -8,7 +8,7 @@ on:
         default: false
         type: boolean
       appimage_smoke_run_id:
-        description: 'Only test the Arch AppImage from this repository workflow run ID'
+        description: 'Test the AppImage from this repository workflow run ID'
         default: ''
         type: string
       targets:
@@ -90,7 +90,7 @@ jobs:
     name: ${{ matrix.appimage && 'linux-x64-appimage' || format('{0}-{1}', matrix.platform, matrix.arch) }}
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
-    timeout-minutes: 90
+    timeout-minutes: ${{ matrix.appimage && 300 || 90 }}
     defaults:
       run:
         shell: bash
@@ -100,14 +100,23 @@ jobs:
         run: |
           apt-get update
           apt-get install -y ca-certificates curl git unzip xz-utils zip sudo python3 python-is-python3 desktop-file-utils patchelf
-      - name: Arch Linux native toolchain and WPEPlatform
+      - name: Ubuntu 24.04 AppImage build dependencies
         if: matrix.appimage == true
         run: |
-          pacman -Syu --noconfirm --needed base-devel clang cmake ninja pkgconf \
-            ca-certificates curl git unzip xz zip python desktop-file-utils patchelf squashfs-tools \
-            gtk3 glib2-devel wpewebkit libepoxy libsecret jsoncpp sqlite \
-            gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib
-          pkg-config --exists wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang-18 lld-18 cmake ninja-build pkg-config ccache bison flex gperf ruby perl \
+            ca-certificates curl git unzip xz-utils zip python3 python-is-python3 python3-packaging \
+            gettext unifdef bubblewrap xdg-dbus-proxy desktop-file-utils patchelf squashfs-tools \
+            libseccomp-dev libglib2.0-dev libharfbuzz-dev libicu-dev libjpeg-dev libepoxy-dev \
+            libgcrypt20-dev libsoup-3.0-dev libtasn1-6-dev libxkbcommon-dev libxml2-dev \
+            libxml2-utils libpng-dev libsqlite3-dev libwebp-dev zlib1g-dev libfreetype-dev libwoff-dev libxslt1-dev \
+            libatk1.0-dev libatk-bridge2.0-dev libatspi2.0-dev flite1-dev libjxl-dev libhyphen-dev \
+            libavif-dev libsystemd-dev liblcms2-dev libenchant-2-dev libdrm-dev libgbm-dev \
+            libwayland-dev wayland-protocols libmanette-0.2-dev libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+            libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libasound2-dev libpulse-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
@@ -167,9 +176,28 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           npm ci --prefix assets/foliate-js
           (cd assets/foliate-js && node node_modules/webpack-cli/bin/cli.js --config webpack.config.js)
-      - name: Use the WPEPlatform-only WebView build on Arch
+      - name: Cache the Ubuntu AppImage WebKit build
         if: matrix.appimage == true
-        run: python3 scripts/release/prepare_arch_webview.py
+        id: appimage-webkit
+        uses: actions/cache@v4
+        with:
+          path: /opt/modu-wpe
+          key: appimage-wpe-ubuntu24-x64-${{ hashFiles('scripts/release/build_appimage_wpe.py', 'scripts/release/*appimage*.patch') }}
+      - name: Build the pinned WebKit runtime on Ubuntu 24.04
+        if: matrix.appimage == true && steps.appimage-webkit.outputs.cache-hit != 'true'
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: python scripts/release/build_appimage_wpe.py /opt/modu-wpe --jobs 3
+      - name: Use the same WPE runtime for building and packaging the AppImage
+        if: matrix.appimage == true
+        run: |
+          export PKG_CONFIG_PATH=/opt/modu-wpe/lib/pkgconfig
+          pkg-config --exists wpe-webkit-2.0 wpe-platform-2.0 wpe-platform-headless-2.0
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          echo "MODU_APPIMAGE_WPE_PREFIX=/opt/modu-wpe" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/modu-wpe/lib" >> "$GITHUB_ENV"
+          python3 scripts/release/prepare_appimage_webview.py
       - name: Verify downloaded model native inference on macOS
         if: matrix.platform == 'macos' && matrix.arch == 'arm64'
         run: |
@@ -273,13 +301,20 @@ jobs:
           retention-days: 14
 
   linux_appimage_smoke:
-    name: AppImage reader on Arch Linux
+    name: AppImage reader on ${{ matrix.distribution }}
     if: >-
       always() && !cancelled() &&
       (inputs.appimage_smoke_run_id ||
         (needs.targets.outputs.linux_appimage == 'true' && needs.desktop.result == 'success'))
     needs: [targets, desktop]
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distribution: 'Ubuntu 24.04', runner: 'ubuntu-24.04', ubuntu_version: '24.04' }
+          - { distribution: 'Ubuntu 26.04', runner: 'ubuntu-26.04', ubuntu_version: '26.04' }
+          - { distribution: 'Arch Linux', runner: 'ubuntu-24.04', ubuntu_version: '' }
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -300,12 +335,54 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ inputs.appimage_smoke_run_id || github.run_id }}
           github-token: ${{ inputs.appimage_smoke_run_id && github.token || '' }}
-      - name: Allow WebKit's sandbox to create nested user namespaces
+      - name: Verify the single AppImage artifact
+        working-directory: dist-release
+        run: |
+          shopt -s nullglob
+          images=(*.AppImage)
+          test "${#images[@]}" -eq 1
+          sha256sum --strict --check "${images[0]}.sha256"
+          sha256sum "${images[0]}"
+          chmod +x "${images[0]}"
+      - name: Install Ubuntu desktop runtime and test dependencies
+        if: matrix.ubuntu_version
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bubblewrap xdg-dbus-proxy gtk-update-icon-cache libgtk-3-0t64 \
+            libepoxy0 libsecret-1-0 libsqlite3-0 libasound2t64 libpulse0 \
+            libsoup-3.0-0 libavif16 libmanette-0.2-0 libenchant-2-2 libwoff1 \
+            libharfbuzz-icu0 libgcrypt20 libtasn1-6 libjpeg-turbo8 libpng16-16t64 \
+            liblcms2-2 libwebp7 libwebpdemux2 libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good libgl1-mesa-dri \
+            libegl-mesa0 fonts-dejavu-core dbus-daemon xvfb xauth
+      - name: Verify EPUB and PDF on native Ubuntu with AppArmor enabled
+        if: matrix.ubuntu_version
+        env:
+          EXPECTED_UBUNTU: ${{ matrix.ubuntu_version }}
+        run: |
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = "$EXPECTED_UBUNTU"
+          if [[ $(cat /sys/module/apparmor/parameters/enabled) != Y ||
+                $(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns) != 1 ]]; then
+            echo "::error::Ubuntu validation requires AppArmor and its default user namespace restrictions"
+            exit 1
+          fi
+          framebuffer_dir=$(mktemp -d)
+          trap 'rm -rf "$framebuffer_dir"' EXIT
+          dbus-run-session -- xvfb-run -a \
+            -s "-screen 0 1280x800x24 -noreset -fbdir $framebuffer_dir" \
+            python3 scripts/release/verify_linux_appimage.py \
+            dist-release/*.AppImage "$framebuffer_dir/Xvfb_screen0"
+      - name: Allow nested user namespaces for the Arch container
+        if: '!matrix.ubuntu_version'
         run: |
           if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-      - name: Verify EPUB and PDF rendering without FUSE
+      - name: Verify EPUB and PDF in Arch Linux
+        if: '!matrix.ubuntu_version'
         run: |
           docker run --rm \
             --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
@@ -314,7 +391,9 @@ jobs:
             --volume "$PWD/scripts/release/verify_linux_appimage.py:/verify_linux_appimage.py:ro" \
             archlinux:base bash -euc '
               pacman -Syu --noconfirm --needed \
-                gtk3 wpewebkit libepoxy libsecret jsoncpp sqlite \
+                gtk3 libepoxy libsecret sqlite bubblewrap xdg-dbus-proxy \
+                libsoup3 libavif libmanette enchant woff2 harfbuzz-icu libgcrypt libtasn1 \
+                libjpeg-turbo libpng lcms2 libwebp openjpeg2 libseccomp gst-plugins-bad-libs \
                 gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib \
                 python dbus xorg-server-xvfb xorg-xauth ttf-dejavu mesa libglvnd
               useradd --create-home smoke
@@ -322,10 +401,6 @@ jobs:
               dbus-uuidgen > /etc/machine-id
               dbus-daemon --system --fork --nopidfile
               cd /home/smoke
-              (
-                cd /packages
-                sha256sum --check ./*.AppImage.sha256
-              )
               install -m 755 /packages/*.AppImage ./Modu.AppImage
               framebuffer_dir=$(runuser -u smoke -- mktemp -d)
               runuser -u smoke -- dbus-run-session -- xvfb-run -a \

@@ -1,4 +1,4 @@
-"""Adapt the pinned Linux WebView plugin to Arch's WPEPlatform."""
+"""Adapt the pinned Linux WebView plugin to the bundled WPEPlatform."""
 import json
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit

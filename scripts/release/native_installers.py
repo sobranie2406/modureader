@@ -249,7 +249,7 @@ def verify_linux_onnx_library(library, arch):
         raise ValueError('Mislabeled ONNX Runtime library architecture')
 
 
-def prepare_linux_runtime(app, arch, work):
+def prepare_linux_runtime(app, arch, work, *, relocate=True):
     library = app / 'lib/libonnxruntime.so.1.22.0'
     provenance = app / 'LINUX-RUNTIME.txt'
     if library.exists() or library.is_symlink():
@@ -273,14 +273,14 @@ def prepare_linux_runtime(app, arch, work):
             verify_linux_onnx_library(link, arch)
             link.unlink()
         link.symlink_to(target)
-    # Plugin files carry absolute CI build paths. Relocate them to the package's
-    # own library directory; never add application libraries to global ldconfig.
-    for plugin in (app / 'lib').glob('*.so'):
-        if not plugin.is_symlink() and plugin.name != 'libapp.so':
-            command('patchelf', '--set-rpath', '$ORIGIN', plugin)
-    command('patchelf', '--set-rpath', '$ORIGIN/lib', app / 'modu')
-    with provenance.open('a', encoding='utf-8') as record:
-        record.write('ELF RPATH metadata made relocatable; application source is recorded in SOURCE.txt.\n')
+    if relocate:
+        # Plugins carry absolute CI build paths. Keep their library search private.
+        for plugin in (app / 'lib').glob('*.so'):
+            if not plugin.is_symlink() and plugin.name != 'libapp.so':
+                command('patchelf', '--set-rpath', '$ORIGIN', plugin)
+        command('patchelf', '--set-rpath', '$ORIGIN/lib', app / 'modu')
+        with provenance.open('a', encoding='utf-8') as record:
+            record.write('ELF RPATH metadata made relocatable; application source is recorded in SOURCE.txt.\n')
 
 
 def _restore_linux_runtime(library, arch, work, provenance):
@@ -381,7 +381,120 @@ def build_deb(bundle, arch, version, output, work, build_number=None):
     return result
 
 
-def build_linux_appimage(bundle, version, output, runtime_path):
+# Ubuntu 24.04's private dependency ABIs that need to travel with the WPE build.
+# The host supplies glibc, graphics drivers and the desktop/media platform.
+APPIMAGE_COMPAT_LIBRARIES = {
+    **{f'libicu{name}.so.74': 'libicu74' for name in ('data', 'i18n', 'uc')},
+    'libjsoncpp.so.25': 'libjsoncpp25',
+    'libjxl.so.0.7': 'libjxl0.7',
+    'libjxl_threads.so.0.7': 'libjxl0.7',
+    'libhwy.so.1': 'libhwy1t64',
+    'libxml2.so.2': 'libxml2',
+    'libxslt.so.1': 'libxslt1.1',
+    'libexslt.so.0': 'libxslt1.1',
+    'libhyphen.so.0': 'libhyphen0',
+    **{f'libflite{name}.so.1': 'libflite1' for name in (
+        '', '_cmulex', '_usenglish', '_cmu_indic_lang', '_cmu_indic_lex',
+        '_cmu_us_kal16', '_cmu_us_slt')},
+}
+
+
+def prepare_appimage_wpe(prefix, appdir, app):
+    libdir = appdir / 'usr/lib'
+    helpers = tuple(Path('libexec/wpe-webkit-2.0') / f'WPE{name}Process'
+                    for name in ('Web', 'Network', 'GPU'))
+    notices = Path('share/doc/modu-wpe')
+    required = (
+        Path('lib/libWPEWebKit-2.0.so.1'),
+        *helpers,
+        Path('lib/wpe-webkit-2.0/injected-bundle/libWPEInjectedBundle.so'),
+        Path('share/wpe-webkit-2.0/inspector.gresource'),
+        notices / 'SOURCE.txt',
+    )
+    for path in required:
+        if not (prefix / path).is_file():
+            raise ValueError(f'Incomplete AppImage WPE runtime: {path}')
+    for path in sorted((prefix / 'lib').glob('libWPE*.so*')):
+        shutil.copy2(path, libdir / path.name, follow_symlinks=False)
+    for path in ('lib/wpe-webkit-2.0', 'libexec', 'share'):
+        shutil.copytree(prefix / path, appdir / 'usr' / path, symlinks=True)
+
+    for pattern in ('libWPE*.so*', 'libwpe-1.0.so*'):
+        for path in (app / 'lib').glob(pattern):
+            path.unlink()
+
+    binaries = []
+    for path in sorted((appdir / 'usr').rglob('*')):
+        if path.is_symlink():
+            if (path.readlink().is_absolute() or
+                    not path.resolve(strict=True).is_relative_to(appdir)):
+                raise ValueError(f'External AppImage symlink: {path}')
+        elif path.is_file():
+            with path.open('rb') as source:
+                header = source.read(20)
+            if header[:4] != b'\x7fELF':
+                continue
+            if header[:6] != b'\x7fELF\x02\x01' or struct.unpack_from('<H', header, 18)[0] != 62:
+                raise ValueError(f'Mislabeled AppImage ELF: {path}')
+            binaries.append(path)
+
+    c_locale = {**os.environ, 'LC_ALL': 'C'}
+    packages = set()
+    for path in binaries:
+        elf = command('readelf', '--wide', '--dynamic', '--version-info', path, env=c_locale)
+        needs = elf.partition('Version needs section')[2]
+        for version in re.findall(r'Name:\s+GLIBC_(\d+\.\d+(?:\.\d+)?)\b', needs):
+            if tuple(map(int, version.split('.'))) > (2, 39, 0):
+                raise ValueError(f'{path.name} requires GLIBC_{version}, newer than Ubuntu 24.04')
+        for library in re.findall(r'\(NEEDED\)\s+Shared library: \[([^\]]+)\]', elf):
+            if '/' in library:
+                raise ValueError(f'AppImage {path.name} uses an absolute build dependency: {library}')
+            package = APPIMAGE_COMPAT_LIBRARIES.get(library)
+            target = libdir / library
+            if package and not target.exists():
+                sources = command('dpkg-query', '-L', package)
+                source = next((Path(item) for item in sources.splitlines()
+                               if Path(item).name == library and Path(item).is_file()), None)
+                if source is None:
+                    raise ValueError(f'Missing required AppImage library {library} in {package}')
+                shutil.copy2(source, target)
+                # Check the dependencies of each newly copied library as well.
+                binaries.append(target)
+                packages.add(package)
+        if 'Dynamic section at offset' in elf and path != app / 'lib/libapp.so':
+            search = (app / 'lib', libdir) if path.is_relative_to(app) else (libdir,)
+            relative = [os.path.relpath(directory, path.parent) for directory in search]
+            runpath = ':'.join('$ORIGIN' if value == '.' else f'$ORIGIN/{value}'
+                               for value in relative)
+            command('patchelf', '--set-rpath', runpath, path)
+
+    notice_dir = appdir / 'usr' / notices
+    with (notice_dir / 'SOURCE.txt').open('a', encoding='utf-8') as record:
+        if packages:
+            record.write('\nUbuntu corresponding source packages for compatibility libraries:\n')
+            for package in sorted(packages):
+                shutil.copy2(Path('/usr/share/doc') / package / 'copyright',
+                             notice_dir / f'{package}-copyright.txt')
+                record.write(command('dpkg-query', '--show',
+                                     '--showformat=${source:Package} ${source:Version}', package) + '\n')
+            record.write('Retrieve with apt-get source PACKAGE=VERSION using Ubuntu 24.04 sources.\n')
+
+    clean_env = c_locale.copy()
+    clean_env.pop('LD_LIBRARY_PATH', None)
+    for path in (app / 'modu', *(appdir / 'usr' / path for path in helpers)):
+        if not os.access(path, os.X_OK):
+            raise ValueError(f'Missing AppImage executable permission: {path}')
+        dependencies = command('ldd', path, env=clean_env)
+        if 'not found' in dependencies:
+            raise ValueError(f'Unresolved AppImage libraries for {path.name}:\n{dependencies}')
+        for line in dependencies.splitlines():
+            if 'libWPEWebKit-2.0.so.1 =>' in line:
+                resolved = line.split('=>', 1)[1].split(' (', 1)[0].strip()
+                if not Path(resolved).resolve().is_relative_to(libdir):
+                    raise ValueError(f'{path.name} resolved WPE WebKit outside the AppImage: {resolved}')
+
+
+def build_linux_appimage(bundle, version, output, runtime_path, wpe_prefix):
     from fetch_appimage_runtime import RUNTIME_TAG, RUNTIME_URL, validate_runtime
 
     validate_version(version)
@@ -395,18 +508,21 @@ def build_linux_appimage(bundle, version, output, runtime_path):
         appdir = work / 'Modu.AppDir'
         app = appdir / 'usr' / 'lib' / 'modureader'
         shutil.copytree(bundle, app, symlinks=True)
-        # Keep the distro's WPE library and helper processes on the same build.
-        for pattern in ('libWPE*.so*', 'libwpe-1.0.so*'):
-            for library in (app / 'lib').glob(pattern):
-                library.unlink()
-        prepare_linux_runtime(app, 'x64', work)
+        prepare_linux_runtime(app, 'x64', work, relocate=False)
         (app / 'modu').chmod(0o755)
+        prepare_appimage_wpe(Path(wpe_prefix), appdir, app)
         with (app / 'SOURCE.txt').open('a', encoding='utf-8') as source:
             source.write(f'\nAppImage Type 2 runtime: {RUNTIME_URL}\n'
-                         f'Runtime source: https://github.com/AppImage/type2-runtime/tree/{RUNTIME_TAG}\n')
+                         f'Runtime source: https://github.com/AppImage/type2-runtime/tree/{RUNTIME_TAG}\n'
+                         'Bundled WPE WebKit source and license: ../../share/doc/modu-wpe/\n')
         run = appdir / 'AppRun'
-        run.write_text('#!/bin/sh\nexec "${APPDIR:-${0%/*}}/usr/lib/modureader/modu" "$@"\n',
-                       encoding='utf-8')
+        run.write_text(
+            '#!/bin/sh\n'
+            'set -eu\n'
+            'appdir=$(CDPATH= cd -P "${APPDIR:-${0%/*}}" && pwd)\n'
+            'export MODU_WPE_PREFIX="$appdir/usr"\n'
+            'exec "$MODU_WPE_PREFIX/lib/modureader/modu" "$@"\n',
+            encoding='utf-8')
         run.chmod(0o755)
         write_linux_desktop_entry(appdir / 'modureader.desktop', 'AppRun')
         shutil.copy2(app / 'data/flutter_assets/assets/icon/modu-app-icon.png', appdir / 'modureader.png')

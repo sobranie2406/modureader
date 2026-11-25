@@ -317,6 +317,68 @@ native = importlib.util.module_from_spec(native_spec)
 native_spec.loader.exec_module(native)
 
 
+class PortableAppImageTest(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        self.prefix = root / 'wpe'
+        self.appdir = root / 'AppDir'
+        self.app = self.appdir / 'usr/lib/modureader'
+        self.processes = tuple(Path('libexec/wpe-webkit-2.0') / f'WPE{name}Process'
+                               for name in ('Web', 'Network', 'GPU'))
+        elf = bytearray(20)
+        elf[:6] = b'\x7fELF\x02\x01'
+        struct.pack_into('<H', elf, 18, 62)
+        runtime = (
+            Path('lib/libWPEWebKit-2.0.so.1.11.6'),
+            Path('lib/wpe-webkit-2.0/injected-bundle/libWPEInjectedBundle.so'),
+            *self.processes,
+        )
+        for binary in (self.app / 'modu', *(self.prefix / path for path in runtime)):
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.write_bytes(elf)
+            binary.chmod(0o755)
+        (self.prefix / 'lib/libWPEWebKit-2.0.so.1').symlink_to('libWPEWebKit-2.0.so.1.11.6')
+        for name in ('share/wpe-webkit-2.0/inspector.gresource', 'share/doc/modu-wpe/SOURCE.txt'):
+            path = self.prefix / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('fixture')
+        (self.app / 'lib').mkdir()
+        (self.app / 'lib/libWPEWebKit-2.0.so.1').write_text('old runtime')
+
+    def test_wpe_and_helpers_use_private_relative_library_paths(self):
+        wpe = self.appdir / 'usr/lib/libWPEWebKit-2.0.so.1'
+
+        def command(tool, *args, **kwargs):
+            if tool == 'readelf':
+                return 'Dynamic section at offset 1\nVersion needs section\nName: GLIBC_2.39'
+            if tool == 'ldd':
+                self.assertNotIn('LD_LIBRARY_PATH', kwargs['env'])
+                return f'libWPEWebKit-2.0.so.1 => {wpe} (0x1)'
+            return ''
+
+        with patch.object(native, 'command', side_effect=command) as run:
+            native.prepare_appimage_wpe(self.prefix, self.appdir, self.app)
+        self.assertTrue(wpe.resolve().is_relative_to(self.appdir))
+        self.assertFalse((self.app / 'lib/libWPEWebKit-2.0.so.1').exists())
+        run.assert_any_call('patchelf', '--set-rpath', '$ORIGIN/lib:$ORIGIN/..',
+                            self.app / 'modu')
+        run.assert_any_call('patchelf', '--set-rpath', '$ORIGIN/../../lib',
+                            self.appdir / 'usr' / self.processes[0])
+
+    def test_missing_helper_fails_before_packing(self):
+        (self.prefix / self.processes[0]).unlink()
+        with self.assertRaisesRegex(ValueError, 'Incomplete.*WPEWebProcess'):
+            native.prepare_appimage_wpe(self.prefix, self.appdir, self.app)
+
+    def test_rejects_components_built_for_newer_glibc(self):
+        with patch.object(native, 'command',
+                          return_value='Version needs section\nName: GLIBC_2.40'):
+            with self.assertRaisesRegex(ValueError, 'GLIBC_2.40, newer than Ubuntu 24.04'):
+                native.prepare_appimage_wpe(self.prefix, self.appdir, self.app)
+
+
 class NativeInstallerTest(unittest.TestCase):
     def test_wrong_silent_switch_is_rejected_before_the_wizard(self):
         for arch in ('x64', 'arm64'):
