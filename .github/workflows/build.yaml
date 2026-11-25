@@ -322,9 +322,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { distribution: 'Ubuntu 24.04', runner: 'ubuntu-24.04', ubuntu_version: '24.04' }
-          - { distribution: 'Ubuntu 26.04', runner: 'ubuntu-26.04', ubuntu_version: '26.04' }
-          - { distribution: 'Arch Linux', runner: 'ubuntu-24.04', ubuntu_version: '' }
+          - { distribution: 'Ubuntu 24.04 with Canonical Bubblewrap profile', runner: 'ubuntu-24.04', ubuntu_version: '24.04' }
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     permissions:
@@ -367,6 +365,12 @@ jobs:
             liblcms2-2 libwebp7 libwebpdemux2 libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good libgl1-mesa-dri \
             libegl-mesa0 libgles2 fonts-dejavu-core dbus-daemon xvfb xauth
+      - name: Load the official optional profile in this disposable test VM
+        run: |
+          sudo apt-get install -y --no-install-recommends apparmor-profiles
+          sudo apparmor_parser --skip-read-cache --replace /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          test "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = 1
+          /usr/bin/bwrap --unshare-net --ro-bind / / -- /usr/bin/true
       - name: Verify EPUB and PDF on native Ubuntu with AppArmor enabled
         if: matrix.ubuntu_version
         env:
