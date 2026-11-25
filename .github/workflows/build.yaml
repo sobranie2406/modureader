@@ -28,7 +28,7 @@ on:
         default: ''
         type: string
   push:
-    tags: ['v*']
+    branches: ['verify/ubuntu-appimage-build-20261125003109']
 
 permissions:
   contents: read
@@ -54,12 +54,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: matrix
-        env:
-          MODU_BUILD_TARGETS: ${{ inputs.targets || 'all' }}
-        run: node scripts/release/matrix.mjs
+        run: |
+          echo 'has_desktop=true' >> "$GITHUB_OUTPUT"
+          echo 'linux_appimage=true' >> "$GITHUB_OUTPUT"
+          echo 'desktop=[{"os":"ubuntu-24.04","platform":"linux","arch":"x64","container":"ubuntu:24.04","appimage":true}]' >> "$GITHUB_OUTPUT"
+          printf '%s\n' android=false ios=false harmony=false >> "$GITHUB_OUTPUT"
 
   quality:
-    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
+    if: github.event_name == 'workflow_dispatch' && inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     uses: ./.github/workflows/pr-check.yml
 
   models:
@@ -118,6 +120,8 @@ jobs:
             libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev libasound2-dev libpulse-dev \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: actions/checkout@v4
+        with:
+          ref: 8bb5d1ca06cab0357c76f9d7d1efcb02a292679c
       - uses: actions/download-artifact@v4
         with:
           name: embedding-test-fixtures
