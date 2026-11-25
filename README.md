@@ -36,7 +36,7 @@
 
 [功能说明](docs/FEATURES_zh.md) · [设置指南](docs/SETTINGS_zh.md) · [全部文档](docs/README.md) · [示例电子书](docs/examples/modu-reading-demo.epub)
 
-Linux 从 1.3.11 起提供 Debian 13 的 x64、ARM64 `.deb` 和面向 Arch Linux x64 的 AppImage。[AppImage 安装说明](docs/RELEASING.md#arch-linux-x64-appimage)
+Linux 提供 Debian 13 的 x64 和 ARM64 `.deb`。从 1.3.12 起，Ubuntu 24.04、26.04 和 Arch Linux 共用同一个 x64 AppImage。Ubuntu 24.04 需启用官方 Bubblewrap 配置。 [AppImage 安装说明](docs/RELEASING.md#linux-x64-appimage)
 
 <a id="features"></a>
 
