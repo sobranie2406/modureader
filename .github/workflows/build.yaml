@@ -42,7 +42,7 @@ jobs:
     if: inputs.reader_diagnostic == true && !inputs.appimage_smoke_run_id
     uses: ./.github/workflows/windows-reader-diagnostic.yml
   targets:
-    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
+    if: github.event_name == 'workflow_dispatch' && inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     outputs:
       desktop: ${{ steps.matrix.outputs.desktop }}
@@ -65,7 +65,7 @@ jobs:
     uses: ./.github/workflows/pr-check.yml
 
   models:
-    if: inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
+    if: github.event_name == 'workflow_dispatch' && inputs.reader_diagnostic != true && !inputs.appimage_smoke_run_id
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -316,10 +316,7 @@ jobs:
 
   linux_appimage_smoke:
     name: AppImage reader on ${{ matrix.distribution }}
-    if: >-
-      always() && !cancelled() &&
-      (inputs.appimage_smoke_run_id ||
-        (needs.targets.outputs.linux_appimage == 'true' && needs.desktop.result == 'success'))
+    if: always() && !cancelled()
     needs: [targets, desktop]
     strategy:
       fail-fast: false
@@ -347,8 +344,8 @@ jobs:
           name: modu-linux-x64-appimage
           path: dist-release
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.appimage_smoke_run_id || github.run_id }}
-          github-token: ${{ inputs.appimage_smoke_run_id && github.token || '' }}
+          run-id: 45537959540
+          github-token: ${{ github.token }}
       - name: Verify the single AppImage artifact
         working-directory: dist-release
         run: |
