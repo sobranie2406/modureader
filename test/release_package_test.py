@@ -349,6 +349,8 @@ class PortableAppImageTest(unittest.TestCase):
 
     def test_wpe_and_helpers_use_private_relative_library_paths(self):
         wpe = self.appdir / 'usr/lib/libWPEWebKit-2.0.so.1'
+        onnx = self.app / 'lib' / native.LINUX_ONNX_LIBRARY
+        onnx.write_bytes((self.app / 'modu').read_bytes())
 
         def command(tool, *args, **kwargs):
             if tool == 'readelf':
@@ -366,6 +368,8 @@ class PortableAppImageTest(unittest.TestCase):
                             self.app / 'modu')
         run.assert_any_call('patchelf', '--set-rpath', '$ORIGIN/../../lib',
                             self.appdir / 'usr' / self.processes[0])
+        self.assertFalse(any(call.args[0] == 'patchelf' and call.args[-1] == onnx
+                             for call in run.call_args_list))
 
     def test_missing_helper_fails_before_packing(self):
         (self.prefix / self.processes[0]).unlink()

@@ -226,6 +226,7 @@ DEB_DEPENDS = ('libc6 (>= 2.41), libstdc++6 (>= 14), libgcc-s1, libgtk-3-0t64, '
                'libasound2t64, libpulse0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good')
 
 
+LINUX_ONNX_LIBRARY = 'libonnxruntime.so.1.22.0'
 LINUX_ONNX_LIBRARY_SHA256 = {
     'x64': '3da6146e14e7b8aaec625dde11d6114c7457c87a5f93d744897da8781e35c673',
     'arm64': '0afd69a0ae38c5099fd0e8604dda398ac43dee67cd9c6394b5142b19e82528de',
@@ -250,7 +251,7 @@ def verify_linux_onnx_library(library, arch):
 
 
 def prepare_linux_runtime(app, arch, work, *, relocate=True):
-    library = app / 'lib/libonnxruntime.so.1.22.0'
+    library = app / 'lib' / LINUX_ONNX_LIBRARY
     provenance = app / 'LINUX-RUNTIME.txt'
     if library.exists() or library.is_symlink():
         # New builds already install the hash-pinned NuGet payload during CMake.
@@ -461,7 +462,8 @@ def prepare_appimage_wpe(prefix, appdir, app):
                 # Check the dependencies of each newly copied library as well.
                 binaries.append(target)
                 packages.add(package)
-        if 'Dynamic section at offset' in elf and path != app / 'lib/libapp.so':
+        # The pinned ONNX payload does not need relocation and keeps its published checksum.
+        if 'Dynamic section at offset' in elf and path.name not in ('libapp.so', LINUX_ONNX_LIBRARY):
             search = (app / 'lib', libdir) if path.is_relative_to(app) else (libdir,)
             relative = [os.path.relpath(directory, path.parent) for directory in search]
             runpath = ':'.join('$ORIGIN' if value == '.' else f'$ORIGIN/{value}'

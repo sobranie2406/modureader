@@ -61,7 +61,7 @@ Install the desktop runtime packages for your distribution, then give the downlo
 
 ```sh
 # Ubuntu
-sudo apt install bubblewrap xdg-dbus-proxy libgtk-3-0t64 libepoxy0 libsecret-1-0 libsqlite3-0 libasound2t64 libpulse0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+sudo apt install bubblewrap xdg-dbus-proxy libgtk-3-0t64 libepoxy0 libsecret-1-0 libsqlite3-0 libasound2t64 libpulse0 libwayland-server0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 # Arch Linux
 sudo pacman -Syu --needed bubblewrap xdg-dbus-proxy gtk3 libepoxy libsecret sqlite gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib
 chmod +x Modu-VERSION-linux-x64.AppImage
