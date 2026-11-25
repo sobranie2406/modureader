@@ -134,6 +134,15 @@ test('full mode archives only the bound group and leaves ordinary conversation u
 
 test('an explicit question is answered once even when QQ redelivers it', async () => {
   await withFixture(async f => {
+    f.env.AI.run = async (model, input) => {
+      assert.equal(model, '@cf/zai-org/glm-4.7-flash');
+      assert.equal(input.chat_template_kwargs.enable_thinking, false);
+      f.prompts.push(input);
+      return {choices: [{message: {
+        content: 'Supported formats are documented in https://github.com/sobranie2406/modureader/blob/main/README.md',
+        reasoning_content: 'internal reasoning',
+      }}]};
+    };
     const payload = event('5', '/ask What formats does Modu support?');
     const response = await qqRoutes(await signed(payload), f.env);
     assert.deepEqual(await response.json(), {op:12});
@@ -143,6 +152,7 @@ test('an explicit question is answered once even when QQ redelivers it', async (
     assert.equal(f.sent[0].msg_id, '5');
     assert.equal(f.sent[0].msg_seq, 1);
     assert.match(f.sent[0].content, /README.md/);
+    assert.doesNotMatch(f.sent[0].content, /internal reasoning/);
   });
 });
 
