@@ -24,36 +24,51 @@ from validate_assets import validate as validate_release_assets
 
 
 class ReleaseReplacementTest(unittest.TestCase):
-    def run_replacement(self, existing=False, api_failure=False, tag_changed=False):
-        workflow = (Path(__file__).resolve().parents[1] /
-                    '.github/workflows/build.yaml').read_text()
-        block = workflow.split('          if [[ "$REPLACE_RELEASE" == "true" ]]; then\n', 1)[1]
-        block = textwrap.dedent(block.split('            exit 0\n', 1)[0])
+    def run_publication(self, existing=False, api_failure=False, tag_changed=False,
+                        tag_name='v1.1.3', replace=True):
+        project = Path(__file__).resolve().parents[1]
+        workflow = (project / '.github/workflows/build.yaml').read_text()
+        step = workflow.split('      - name: Verify complete package set and publish release\n', 1)[1]
+        block = textwrap.dedent(step.split('        run: |\n', 1)[1].split('\n  notify-telegram:', 1)[0])
         with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'scripts').symlink_to(project / 'scripts', target_is_directory=True)
+            (root / 'pubspec.yaml').write_text(f'version: {tag_name[1:]}+1\n')
+            (root / 'dist-release').mkdir()
+            installer = f'Modu-{tag_name[1:]}-android-arm64.apk'
+            payload = root / 'dist-release' / installer
+            payload.write_bytes(b'fixture')
+            payload.with_suffix('.apk.sha256').write_text(
+                f'{hashlib.sha256(b"fixture").hexdigest()}  {installer}\n')
             env = dict(os.environ, RUNNER_TEMP=tmp, GITHUB_REPOSITORY='test/repo',
-                       RELEASE_TAG='v1.1.3', RELEASE_COMMIT='b' * 40,
-                       EXPECTED_TAG_COMMIT='a' * 40, CREATE_RELEASE_TAG='true')
+                       RELEASE_TAG=tag_name, RELEASE_COMMIT='b' * 40, RELEASE_TARGETS='android',
+                       EXPECTED_TAG_COMMIT='a' * 40, CREATE_RELEASE_TAG=str(replace).lower(),
+                       REPLACE_RELEASE=str(replace).lower())
             tag = json.dumps({'object': {'type': 'commit',
                                         'sha': ('c' if tag_changed else 'a') * 40}})
-            releases = json.dumps([[{'tag_name': 'v1.1.3'}] if existing else []])
+            releases = [{'tag_name': 'v1.1.2', 'assets': [{'id': 33, 'name': 'other.sha256'}]}]
+            if existing:
+                releases.append({'tag_name': tag_name, 'assets': [
+                    {'id': 31, 'name': installer + '.sha256'}, {'id': 32, 'name': installer}]})
+            releases = json.dumps([releases])
             # Run the actual workflow shell with a fake gh, never a network call.
             prelude = f'''set -euo pipefail
 gh() {{
   printf '%s\\n' "$*" >> "$RUNNER_TEMP/calls"
-  if [[ "$*" == "api repos/test/repo/git/ref/tags/v1.1.3" ]]; then
+  if [[ "$*" == "api repos/test/repo/git/ref/tags/$RELEASE_TAG" ]]; then
     printf '%s' '{tag}'
   elif [[ "$*" == "api --paginate --slurp repos/test/repo/releases?per_page=100" ]]; then
     {'return 1' if api_failure else "printf '%s' '" + releases + "'"}
   fi
 }}
 '''
-            result = subprocess.run(['bash', '-c', prelude + block], env=env,
+            result = subprocess.run(['bash', '-c', prelude + block], env=env, cwd=root,
                                     capture_output=True, text=True)
             calls = (Path(tmp) / 'calls').read_text()
             return result, calls
 
     def test_missing_release_is_created_draft_from_new_source(self):
-        result, calls = self.run_replacement()
+        result, calls = self.run_publication()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('sha=' + 'b' * 40, calls)
         self.assertIn('release create v1.1.3 --verify-tag --draft', calls)
@@ -61,19 +76,35 @@ gh() {{
         self.assertLess(calls.index('release upload'), calls.index('--draft=false'))
 
     def test_existing_release_is_hidden_and_replaced(self):
-        result, calls = self.run_replacement(existing=True)
+        result, calls = self.run_publication(existing=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('release edit v1.1.3 --draft\n', calls)
         self.assertNotIn('release create', calls)
+        self.assertIn('release upload v1.1.3 dist-release/Modu-1.1.3-android-arm64.apk --clobber', calls)
+        self.assertNotIn('.sha256', calls)
+        self.assertEqual([line for line in calls.splitlines() if '--method DELETE' in line],
+                         ['api --method DELETE repos/test/repo/releases/assets/31'])
+        self.assertLess(calls.index('release upload'), calls.index('--method DELETE'))
+        self.assertLess(calls.index('--method DELETE'), calls.index('--draft=false'))
+
+    def test_new_stable_and_beta_publish_installers_only(self):
+        for tag_name, option in [('v1.1.3', '--latest'), ('v1.1.3-beta.1', '--prerelease')]:
+            with self.subTest(tag=tag_name):
+                result, calls = self.run_publication(tag_name=tag_name, replace=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'release create {tag_name} dist-release/Modu-{tag_name[1:]}-android-arm64.apk', calls)
+                self.assertIn(option, calls)
+                self.assertNotIn('.sha256', calls)
+                self.assertNotIn('--method DELETE', calls)
 
     def test_failed_listing_does_not_modify_tag_or_release(self):
-        result, calls = self.run_replacement(api_failure=True)
+        result, calls = self.run_publication(api_failure=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('--method PATCH', calls)
         self.assertNotIn('release ', calls)
 
     def test_unexpected_tag_does_not_modify_anything(self):
-        result, calls = self.run_replacement(tag_changed=True)
+        result, calls = self.run_publication(tag_changed=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('--method PATCH', calls)
         self.assertNotIn('release ', calls)

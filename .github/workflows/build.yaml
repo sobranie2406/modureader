@@ -599,6 +599,13 @@ jobs:
           expected_tag="v$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
           test "$RELEASE_TAG" = "$expected_tag"
           python3 scripts/release/validate_assets.py dist-release "$RELEASE_TAG" --include-harmony --targets "$RELEASE_TARGETS"
+          installers=()
+          for asset in dist-release/*; do
+            if [[ -f "$asset" && "$asset" != *.sha256 ]]; then
+              installers+=("$asset")
+            fi
+          done
+          test "${#installers[@]}" -gt 0
           if [[ "$REPLACE_RELEASE" == "true" ]]; then
             test "$CREATE_RELEASE_TAG" = "true"
             [[ "$EXPECTED_TAG_COMMIT" =~ ^[0-9a-f]{40}$ ]]
@@ -608,6 +615,7 @@ jobs:
             # errors must never be mistaken for a deleted release.
             gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/modu-releases.json"
             release_exists=$(python3 -c 'import json,os,sys; pages=json.load(open(sys.argv[1])); print("true" if any(r["tag_name"] == os.environ["RELEASE_TAG"] for page in pages for r in page) else "false")' "$RUNNER_TEMP/modu-releases.json")
+            checksum_ids=$(python3 -c 'import json,os,sys; pages=json.load(open(sys.argv[1])); print("\n".join(str(a["id"]) for page in pages for r in page if r["tag_name"] == os.environ["RELEASE_TAG"] for a in r.get("assets", []) if a["name"].endswith(".sha256")))' "$RUNNER_TEMP/modu-releases.json")
             # Hide an existing release while replacing its source and assets.
             # This workflow token does not dispatch another tag-triggered build.
             if [[ "$release_exists" == "true" ]]; then
@@ -617,7 +625,12 @@ jobs:
             if [[ "$release_exists" == "false" ]]; then
               gh release create "$RELEASE_TAG" --verify-tag --draft --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
             fi
-            gh release upload "$RELEASE_TAG" dist-release/* --clobber
+            gh release upload "$RELEASE_TAG" "${installers[@]}" --clobber
+            while IFS= read -r asset_id; do
+              [[ -n "$asset_id" ]] || continue
+              [[ "$asset_id" =~ ^[1-9][0-9]*$ ]]
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+            done <<< "$checksum_ids"
             gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --target "$RELEASE_COMMIT" --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
             exit 0
           fi
@@ -631,9 +644,9 @@ jobs:
             fi
           fi
           if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            gh release create "$RELEASE_TAG" dist-release/* --verify-tag --latest --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
+            gh release create "$RELEASE_TAG" "${installers[@]}" --verify-tag --latest --title "默读 $RELEASE_TAG · 正式版" --notes-file docs/RELEASE_NOTES.md
           else
-            gh release create "$RELEASE_TAG" dist-release/* --verify-tag --prerelease --latest=false --title "默读 $RELEASE_TAG · Beta" --notes-file docs/RELEASE_NOTES.md
+            gh release create "$RELEASE_TAG" "${installers[@]}" --verify-tag --prerelease --latest=false --title "默读 $RELEASE_TAG · Beta" --notes-file docs/RELEASE_NOTES.md
           fi
 
 
