@@ -26,6 +26,8 @@ def configure(source, build, prefix):
     options = {
         "PORT": "WPE",
         "CMAKE_BUILD_TYPE": "Release",
+        # WebKit's generated headers are not ordered ahead of JSC's PCH in Ninja.
+        "CMAKE_DISABLE_PRECOMPILE_HEADERS": "ON",
         "CMAKE_C_COMPILER": "clang-18",
         "CMAKE_CXX_COMPILER": "clang++-18",
         "CMAKE_EXE_LINKER_FLAGS": "-fuse-ld=lld-18",

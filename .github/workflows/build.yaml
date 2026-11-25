@@ -183,7 +183,7 @@ jobs:
       - name: Cache the Ubuntu AppImage WebKit build
         if: matrix.appimage == true
         id: appimage-webkit
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: /opt/modu-wpe
           key: appimage-wpe-ubuntu24-x64-${{ hashFiles('scripts/release/build_appimage_wpe.py', 'scripts/release/*appimage*.patch') }}
@@ -193,6 +193,12 @@ jobs:
           CC: clang-18
           CXX: clang++-18
         run: python scripts/release/build_appimage_wpe.py /opt/modu-wpe --jobs 3
+      - name: Save the verified WebKit build
+        if: matrix.appimage == true && steps.appimage-webkit.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/modu-wpe
+          key: ${{ steps.appimage-webkit.outputs.cache-primary-key }}
       - name: Use the same WPE runtime for building and packaging the AppImage
         if: matrix.appimage == true
         run: |
