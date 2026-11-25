@@ -121,7 +121,7 @@ jobs:
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: actions/checkout@v4
         with:
-          ref: 661317597b39bd7230938aa3608c7b4541c4cf30
+          ref: 3c5ba610366f704b17d63b706f60fb642b0f363e
       - uses: actions/download-artifact@v4
         with:
           name: embedding-test-fixtures
@@ -285,6 +285,10 @@ jobs:
           export MODU_APPIMAGE_RUNTIME="$RUNNER_TEMP/modu-appimage-runtime"
           python3 scripts/release/fetch_appimage_runtime.py "$MODU_APPIMAGE_RUNTIME"
           python3 scripts/release/package.py linux x64 --appimage
+      - name: Report AppImage configuration errors
+        if: failure() && matrix.appimage == true
+        run: |
+          find build/linux -name CMakeConfigureLog.yaml -exec grep -A 18 -B 3 -E 'WEBKIT_HAS_WPE_PLATFORM_API|fatal error|cannot find -l' {} + || true
       - name: Verify architecture and package
         if: matrix.appimage != true
         run: python scripts/release/package.py ${{ matrix.platform }} ${{ matrix.arch }}
