@@ -1,10 +1,30 @@
 # Modu changelog
 
-Latest stable: **1.3.11+10189**. Updated 2026-11-23.
+Latest stable: **1.3.12+10191**. Updated 2026-11-26.
 
 [Settings](../docs/SETTINGS.md) · [中文设置指南](../docs/SETTINGS_zh.md) · [Published releases](https://github.com/sobranie2406/modureader/releases)
 
 Older sections retain their original version scope; they are not current acceptance reports.
+
+## 1.3.12
+
+### English
+
+- Feat(bookshelf): Create collections from first-level subfolders when importing or linking a local folder, or importing a remote folder. Existing books keep their collections. ([Issue #99](https://github.com/sobranie2406/modureader/issues/99)) Thanks [@guo1505208031-design](https://github.com/guo1505208031-design).
+- Feat(remote-library): Browse and download books from read-only FTP sources. FTP and WebDAV keep separate settings.
+- Feat(tts): Add DeepSeek narration with Stella and Tide voices. ([PR #98](https://github.com/sobranie2406/modureader/pull/98)) Thanks [@RuizeSun](https://github.com/RuizeSun).
+- Feat(linux): Use the same x64 AppImage on Ubuntu 24.04, Ubuntu 26.04 and Arch Linux.
+- Fix(weread): Support WeRead API 1.0.6 and keep displaying lookup results when the service prompts for an upgrade.
+- Fix(ocr): Distinguish image decoding, model loading and inference failures in Windows OCR logs. ([Issue #85](https://github.com/sobranie2406/modureader/issues/85))
+
+### 简体中文
+
+- Feat(bookshelf): 本地文件夹导入、原位添加和远程文件夹导入可按一级子文件夹创建合集，重复书保留原合集。([Issue #99](https://github.com/sobranie2406/modureader/issues/99)) 感谢 [@guo1505208031-design](https://github.com/guo1505208031-design)。
+- Feat(remote-library): 远程书库支持通过只读 FTP 浏览和下载书籍，FTP 和 WebDAV 分别保存配置。
+- Feat(tts): 新增 DeepSeek 朗读，可选海星和暗潮两种音色。([PR #98](https://github.com/sobranie2406/modureader/pull/98)) 感谢 [@RuizeSun](https://github.com/RuizeSun)。
+- Feat(linux): Ubuntu 24.04、Ubuntu 26.04 和 Arch Linux 共用一个 x64 AppImage。
+- Fix(weread): 适配微信读书 API 1.0.6，收到接口升级提示时照常显示查询结果。
+- Fix(ocr): Windows OCR 日志可区分图片解码、模型加载和推理失败。([Issue #85](https://github.com/sobranie2406/modureader/issues/85))
 
 ## 1.3.12-beta.1
 
