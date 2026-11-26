@@ -113,6 +113,12 @@ class DetailedRuntimeLog {
     if (foundTypes.isNotEmpty) details['errors'] = foundTypes;
     const reasons = {
       'reason=ocr_model_unavailable': 'ocr_model_unavailable',
+      'reason=ocr_model_load_failed': 'ocr_model_load_failed',
+      'reason=ocr_image_decode_failed': 'ocr_image_decode_failed',
+      'reason=ocr_image_processing_failed': 'ocr_image_processing_failed',
+      'reason=ocr_inference_failed': 'ocr_inference_failed',
+      'reason=ocr_worker_failed': 'ocr_worker_failed',
+      'reason=ocr_cleanup_failed': 'ocr_cleanup_failed',
       'reason=ocr_invalid_page': 'ocr_invalid_page',
       'reason=ocr_invalid_bounds': 'ocr_invalid_bounds',
       'reason=ocr_invalid_image': 'ocr_invalid_image',

@@ -140,6 +140,7 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
     {required bool Function() cancelled,
     double detectionThreshold = .3,
     double boxThreshold = .5,
+    void Function()? onImageDecoded,
     void Function(int, int)? progress}) async {
   void check() {
     if (cancelled()) throw StateError('OCR cancelled');
@@ -158,6 +159,7 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   if (image == null || image.width * image.height > 2097152) {
     throw const FormatException('Invalid OCR image');
   }
+  onImageDecoded?.call();
   final scale = math.min(1.0, 960 / math.max(image.width, image.height));
   final w = math.max(32, (image.width * scale / 32).round() * 32);
   final h = math.max(32, (image.height * scale / 32).round() * 32);

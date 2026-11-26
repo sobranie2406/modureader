@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:logging/logging.dart';
+import 'package:modu_reader/service/feedback/detailed_runtime_log.dart';
 import 'package:modu_reader/service/ocr/local_ocr_service.dart';
 import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:modu_reader/service/ocr/ohos_ocr_bridge.dart';
@@ -80,6 +83,46 @@ void main() {
     expect(result.regions, hasLength(1));
     expect(calls, ['load', 'run', 'run', 'close']);
   });
+
+  for (final (reason, failure) in [
+    ('ocr_model_load_failed', 'model'),
+    ('ocr_image_decode_failed', 'image'),
+    ('ocr_inference_failed', 'inference'),
+  ]) {
+    test('OCR worker reports $reason in the log and the feedback export',
+        () async {
+      final records = <LogRecord>[];
+      final listener = Logger.root.onRecord.listen(records.add);
+      addTearDown(listener.cancel);
+      const privateValue = r'C:\Users\private\book.pdf';
+      if (failure == 'model') {
+        await File('${directory.path}/rec.yml').writeAsString(privateValue);
+      }
+      messenger.setMockMethodCallHandler(OhosOcrBridge.channel, (call) async {
+        if (call.method != 'run') return null;
+        expect(failure, 'inference');
+        return {
+          'data': [privateValue],
+          'shape': [1, 1, 32, 32],
+        };
+      });
+
+      final bytes = failure == 'image' ? Uint8List(0) : png;
+      await expectLater(
+          LocalOcrService(ohosBridge: const OhosOcrBridge())
+              .recognizeWithRegions(bytes, store, OcrCancellation()),
+          throwsA(isA<OcrFailure>()));
+
+      final record = records.singleWhere(
+          (record) => record.message.startsWith('OCR recognition failed:'));
+      expect(record.message, contains('reason=$reason'));
+      expect(record.message, isNot(contains(privateValue)));
+      expect(record.error, isNull);
+      final exported = jsonDecode(DetailedRuntimeLog.format(record)) as Map;
+      expect(exported['operation'], 'ocr');
+      expect(exported['reasons'], [reason]);
+    });
+  }
 
   test('HarmonyOS cancellation waits for native cleanup and skips recognition',
       () async {

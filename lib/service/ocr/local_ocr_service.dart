@@ -4,12 +4,33 @@ import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
+import 'package:modu_reader/utils/log/common.dart';
 import 'ocr_model_store.dart';
 import 'ocr_models.dart';
 import 'ocr_processing.dart';
 import 'ocr_model_metadata.dart';
 import 'document_text_geometry.dart';
 import 'ohos_ocr_bridge.dart';
+
+enum _OcrFailureStage {
+  worker('ocr_worker_failed'),
+  modelLoad('ocr_model_load_failed'),
+  imageDecode('ocr_image_decode_failed'),
+  imageProcessing('ocr_image_processing_failed'),
+  inference('ocr_inference_failed'),
+  cleanup('ocr_cleanup_failed');
+
+  const _OcrFailureStage(this.reason);
+  final String reason;
+}
+
+/// A recognition failure already recorded by [LocalOcrService].
+class OcrFailure extends StateError {
+  OcrFailure._(this._stage)
+      : super('OCR failed or cancelled; select a smaller area and retry');
+
+  final _OcrFailureStage _stage;
+}
 
 class OcrCancellation {
   bool cancelled = false;
@@ -57,13 +78,20 @@ class LocalOcrService {
     Object? failure;
     try {
       cancellation.check();
-      await store.verify();
+      final Directory root;
+      try {
+        await store.verify();
+        cancellation.check();
+        root = await store.root();
+      } catch (_) {
+        cancellation.check();
+        throw OcrFailure._(_OcrFailureStage.modelLoad);
+      }
       cancellation.check();
-      final root = await store.root();
       final ohos = _ohos;
       final token = ohos == null ? RootIsolateToken.instance : null;
       if (ohos == null && token == null) {
-        throw StateError('OCR worker unavailable');
+        throw OcrFailure._(_OcrFailureStage.worker);
       }
       cancellation.check();
       if (ohos != null) {
@@ -93,14 +121,23 @@ class LocalOcrService {
         } else if (event is List && event.first == 'result') {
           cancellation.check();
           return DocumentTextResult.decode(event[1] as Map);
+        } else if (event case ['error', _OcrFailureStage stage]) {
+          cancellation.check();
+          throw OcrFailure._(stage);
         } else {
-          throw StateError(
-              'OCR failed or cancelled; select a smaller area and retry');
+          cancellation.check();
+          throw OcrFailure._(_OcrFailureStage.worker);
         }
       }
-      throw StateError('OCR worker stopped');
-    } catch (error) {
+      throw OcrFailure._(_OcrFailureStage.worker);
+    } catch (error, stack) {
       failure = error;
+      if (error is OcrFailure && !cancellation.cancelled) {
+        AnxLog.warning(
+            'OCR recognition failed: StateError; reason=${error._stage.reason}',
+            null,
+            stack);
+      }
       rethrow;
     } finally {
       cancellation._notify = null;
@@ -122,15 +159,17 @@ void _ocrWorker(List<Object?> args) async {
   final reply = args[0] as SendPort;
   final token = args[1] as RootIsolateToken?;
   final onOhos = token == null;
-  if (!onOhos) BackgroundIsolateBinaryMessenger.ensureInitialized(token);
   final commands = ReceivePort();
   var cancelled = false;
   commands.listen((_) => cancelled = true);
-  reply.send(commands.sendPort);
   final sessions = <String, OrtSession>{};
   const android = MethodChannel('com.modu.reader/local_ocr');
-  Object? result;
+  var stage = _OcrFailureStage.worker;
+  late List<Object?> result;
   try {
+    if (!onOhos) BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+    reply.send(commands.sendPort);
+    stage = _OcrFailureStage.modelLoad;
     final path = args[2] as String;
     final model = OcrModels.byId(args[4] as String);
     final alphabet = model.files.containsKey('rec.yml')
@@ -198,17 +237,26 @@ void _ocrWorker(List<Object?> args) async {
       }
     }
 
-    result = [
-      'result',
-      (await recognizeOcrImageWithRegions(args[3] as Uint8List, alphabet, run,
-              detectionThreshold: model.detectionThreshold,
-              boxThreshold: model.boxThreshold,
-              cancelled: () => cancelled,
-              progress: (n, total) => reply.send(['progress', n, total])))
-          .toJson()
-    ];
+    stage = _OcrFailureStage.imageDecode;
+    final text = await recognizeOcrImageWithRegions(
+      args[3] as Uint8List,
+      alphabet,
+      (name, values, shape) async {
+        stage = _OcrFailureStage.inference;
+        final output = await run(name, values, shape);
+        stage = _OcrFailureStage.imageProcessing;
+        return output;
+      },
+      detectionThreshold: model.detectionThreshold,
+      boxThreshold: model.boxThreshold,
+      cancelled: () => cancelled,
+      onImageDecoded: () => stage = _OcrFailureStage.imageProcessing,
+      progress: (n, total) => reply.send(['progress', n, total]),
+    );
+    result = ['result', text.toJson()];
   } catch (_) {
-    result = ['error'];
+    // Native error messages can contain local paths. Send only the stage.
+    result = ['error', stage];
   } finally {
     try {
       if (!onOhos && Platform.isAndroid) {
@@ -218,7 +266,9 @@ void _ocrWorker(List<Object?> args) async {
         await session.close();
       }
     } catch (_) {
-      result = ['error'];
+      if (result.first == 'result') {
+        result = ['error', _OcrFailureStage.cleanup];
+      }
     }
     commands.close();
     reply.send(result);

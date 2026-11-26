@@ -149,6 +149,7 @@ class DocumentOcrPrecache extends ChangeNotifier {
     } catch (failure, stack) {
       if (!cancel.cancelled && generation == _generation) {
         error = failure;
+        if (failure is OcrFailure) return;
         final reason = switch (failure) {
           ReflowModelUnavailable() => 'ocr_model_unavailable',
           FormatException(
