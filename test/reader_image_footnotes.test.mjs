@@ -139,6 +139,40 @@ test('standard noteref links still extract the referenced EPUB footnote', async 
   f.close();
 });
 
+test('Duokan image links open their own note without changing the source document', async () => {
+  const f = handlerFixture();
+  try {
+    f.doc.body.innerHTML = `
+      <p>正文<a class="duokan-footnote" id="fnref1" href="../Text/chapter.xhtml#fn1"><img src="note.png" /></a></p>
+      <ol class="duokan-footnote-content">
+        <li class="duokan-footnote-item" id="fn1"><a href="../Text/chapter.xhtml#fnref1">1</a>第一条注释。</li>
+        <li class="duokan-footnote-item" id="fn2">第二条注释。</li>
+      </ol>`;
+    const before = f.doc.body.innerHTML;
+    const href = 'Text/chapter.xhtml#fn1';
+    const book = {
+      sections: [{ load: () => 'blob:duokan-note', createDocument: () => f.doc.cloneNode(true) }],
+      resolveHref: url => {
+        assert.equal(url, href);
+        return { index: 0, anchor: doc => doc.getElementById('fn1') };
+      },
+    };
+    const event = new CustomEvent('link', { cancelable: true,
+      detail: { a: f.doc.getElementById('fnref1'), href } });
+    await f.handler.handle(book, event);
+    assert.equal(event.defaultPrevented, true);
+    const rendered = f.events[1];
+    assert.equal(rendered.type, 'footnote');
+    assert.equal(rendered.doc.body.textContent, '1第一条注释。');
+    assert.equal(f.doc.body.innerHTML, before);
+
+    const back = new CustomEvent('link', { cancelable: true,
+      detail: { a: f.doc.querySelector('#fn1 a'), href: 'Text/chapter.xhtml#fnref1' } });
+    assert.equal(f.handler.handle(book, back), undefined);
+    assert.equal(back.defaultPrevented, false);
+  } finally { f.close(); }
+});
+
 test('normalized AZW3 notes open even with heuristic detection disabled and are visible in the popup', async () => {
   const f = handlerFixture();
   f.doc.body.innerHTML = '<aside id="n" type="footnote">AZW3 注释</aside><p>正文<a type="noteref" href="#n">①</a></p>';
