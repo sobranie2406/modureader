@@ -21,6 +21,8 @@ PluginHostServices buildPluginHostServices(
   String chapter = '',
   CurrentChapterContentFetcher? currentChapter,
   ChapterContentByHrefFetcher? chapterByHref,
+  Future<PluginReadingPosition> Function()? readingPosition,
+  PluginReadingPositionApplier? applyReadingPosition,
   required bool Function() isCurrent,
 }) {
   String t(String zh, String en) => ModuStrings.text(context, zh, en);
@@ -32,6 +34,9 @@ PluginHostServices buildPluginHostServices(
             chapter: chapter,
             currentChapter: currentChapter,
             chapterByHref: chapterByHref,
+            readingPosition: readingPosition,
+            applyReadingPosition: applyReadingPosition,
+            isCurrent: isCurrent,
           ),
     copyToClipboard: (text) => Clipboard.setData(ClipboardData(text: text)),
     readClipboard: () async {

@@ -39,6 +39,8 @@ export 'package:modu_reader/models/plugin_manifest.dart'
         kNoteWriteCapability,
         kPluginDeviceSettingsCapability,
         kReadingReadCapability,
+        kReadingPositionReadCapability,
+        kReadingPositionWriteCapability,
         kScriptRunCapability,
         kSearchLibraryCapability,
         kSelectionActionCapability,
@@ -124,6 +126,19 @@ const List<PluginPermissionSpec> kPluginPermissions = [
       group: PluginPermissionGroup.content,
       zh: '读取阅读时长与历史',
       en: 'Read reading time and history'),
+  PluginPermissionSpec(
+      token: kReadingPositionReadCapability,
+      tier: PluginPermissionTier.user,
+      group: PluginPermissionGroup.content,
+      zh: '读取当前普通书籍的进度和文件指纹',
+      en: 'Read the current public book’s position and fingerprint'),
+  PluginPermissionSpec(
+      token: kReadingPositionWriteCapability,
+      tier: PluginPermissionTier.user,
+      group: PluginPermissionGroup.content,
+      zh: '应用当前普通书籍的阅读进度',
+      en: 'Apply the current public book’s reading position',
+      danger: true),
   PluginPermissionSpec(
       token: kSearchLibraryCapability,
       tier: PluginPermissionTier.user,
@@ -249,6 +264,13 @@ const List<PluginPermissionSpec> kPluginPermissions = [
 
   // Network and declarative installs.
   PluginPermissionSpec(
+      token: kPluginAuthenticatedHttpCapability,
+      tier: PluginPermissionTier.user,
+      group: PluginPermissionGroup.network,
+      zh: '向已配置的服务器发送认证请求',
+      en: 'Send authenticated requests to the configured server',
+      danger: true),
+  PluginPermissionSpec(
       token: 'net:http',
       tier: PluginPermissionTier.user,
       group: PluginPermissionGroup.network,
@@ -273,6 +295,12 @@ const List<PluginPermissionSpec> kPluginPermissions = [
       group: PluginPermissionGroup.installOnly,
       zh: '添加书籍操作菜单',
       en: 'Add book menu actions'),
+  PluginPermissionSpec(
+      token: kReaderActionCapability,
+      tier: PluginPermissionTier.install,
+      group: PluginPermissionGroup.installOnly,
+      zh: '添加阅读菜单动作',
+      en: 'Add reader menu actions'),
   PluginPermissionSpec(
       token: kAiPromptPackCapability,
       tier: PluginPermissionTier.install,
@@ -315,5 +343,4 @@ PluginPermissionSpec? pluginPermissionSpec(String token) => _byToken[token];
 
 /// Unknown tokens are treated as runtime grants so a future capability from a
 /// newer package can never be used without an explicit grant.
-bool isRuntimePermission(String token) =>
-    _byToken[token]?.isRuntime ?? true;
+bool isRuntimePermission(String token) => _byToken[token]?.isRuntime ?? true;

@@ -27,9 +27,18 @@ class ReaderProgressSession {
       });
 
   Future<bool> record(String position, double percentage,
-          {required int generation, NarrationPosition? narration}) =>
+          {required int generation,
+          String? expectedRevision,
+          bool Function()? isCurrent,
+          NarrationPosition? narration}) =>
       _serial(() async {
-        if (current == null || generation != this.generation) return false;
+        if (current == null ||
+            generation != this.generation ||
+            isCurrent?.call() == false ||
+            (expectedRevision != null &&
+                current!.revision != expectedRevision)) {
+          return false;
+        }
         final next = await dao.updateReadingPosition(
             bookId, position, percentage,
             expectedRevision: current!.revision, narration: narration);

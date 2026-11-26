@@ -52,12 +52,18 @@ class WebViewPluginScriptEngine implements PluginScriptEngine {
   static const Set<String> _workerCodes = {
     'unavailable',
     'busy',
+    'stale',
     'cancelled',
     'timeout',
     'execution',
     'permission',
     'denied',
     'quota',
+    'configuration',
+    'network',
+    'rateLimited',
+    'dailyLimit',
+    'responseTooLarge',
     'size',
     'result',
   };

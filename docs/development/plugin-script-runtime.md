@@ -26,6 +26,7 @@ Host API methods:
 | Method | Permission | Behavior |
 | --- | --- | --- |
 | `modu.http.get({url})` | `net:http` | One HTTPS GET per invocation, exact declared domains, pinned public DNS address, no redirects, headers or cookies |
+| `modu.http.request({method,path,body?})` | `net:http` and `net:request` | Up to three requests on declared GET or PUT routes. Returns `{status,text}`. The host adds declared authentication headers. |
 | `modu.library.list({offset,limit})` | `library:read` | At most 50 readable book summaries; no file paths or locked private books |
 | `modu.notes.save({text})` | `note:write` | Native confirmation; app binds the note to the actual selected book/CFI and uses the existing DAO |
 | `modu.privateLibrary.open()` | `library:private` | Opens the native protection UI; no credentials cross the bridge |
@@ -36,7 +37,22 @@ Host API methods:
 | `modu.privateLibrary.setPrivate({bookIds,private,lockAfter})` | Same | Revalidates selected IDs against native grants and saves local marks; optional lock after commit |
 | `modu.articles.capture()` | `article:capture` | Opens native URL capture, Markdown preview, export and bookshelf import; returns `{opened: true}` |
 
+Declare `network.request` with `baseUrlSetting`, `routes`, and `headers`.
+The base is selected through a device-only setting. Each route fixes a method
+and relative path and can use `:id` for one segment. `PUT` takes a JSON object.
+The host reads authentication header values from device-only text settings or
+`secret` fields. It checks TLS and public DNS, rejects redirects, and binds a
+saved credential to its configured server and account. Credentials stay in
+app-private local preferences and are excluded from the worker and backups.
+
 ### Reading content and library
+
+A `scriptAction` with `surface: "reader"` and `ui:reader-action` appears in the
+reader's More menu. An optional `formats` array lists file extensions, for
+example `["pdf", "epub"]`. The reader issues a position revision for the
+selected book and invalidates it after navigation, a book switch or an external
+position update. A private book cannot supply a reading position, even while
+unlocked.
 
 | Method | Permission | Behavior |
 | --- | --- | --- |
@@ -49,6 +65,8 @@ Host API methods:
 | `modu.notes.list({bookId?,keyword?,limit?})` | `note:read` | Highlights and notes from public books with chapter and text |
 | `modu.reading.stats({days?})` | `reading:read` | Total and per-book reading seconds for public books |
 | `modu.reading.history({bookId?,limit?})` | `reading:read` | Daily reading entries from public books |
+| `modu.reading.position()` | `reading:position-read` | Snapshot of the current public PDF or EPUB, with sampled file fingerprint, native position, progress fraction, and revision. PDFs also return the one-based original page and page count. |
+| `modu.reading.applyPosition({revision,page?,cfi?,percentage?})` | `reading:position-write` | Applies one position to the same open book if its revision still matches. Uses the existing reader and position store. |
 | `modu.search.library({query,limit?,includeNotes?})` | `search:library` | One query across public books and their notes |
 | `modu.knowledge.search({query,limit?})` | `knowledge:query` | Local vector index of the open book or a public book, with a five-second budget |
 | `modu.dictionary.lookup({word,limit?})` | `dictionary:lookup` | Installed local dictionaries |
@@ -136,13 +154,13 @@ chapter digests.
 Capabilities split in two tiers:
 
 - **Install tier** — materialised by installing the package (`ai:prompt-pack`,
-  `ui:selection-action`, `ui:book-action`, `script:run`, the private-library
+  `ui:selection-action`, `ui:book-action`, `ui:reader-action`, `script:run`, the private-library
   trio, `settings:device`, `dictionary:transform`, `article:capture`,
   `article:extract`). Refusing them means not installing, so the details page
   lists them as information.
 - **Runtime tier** — off by default and switched on per plugin in
-  **插件 → 详情 → 权限**. This covers `net:http`, book and note reads and writes,
-  the library, reading statistics, search, the local vector index, `ai:invoke`,
+  **插件 → 详情 → 权限**. This covers `net:http`, `net:request`, book and note reads and writes,
+  the library, reading statistics and positions, search, the local vector index, `ai:invoke`,
   `translate:invoke`, `tts:invoke`, `dictionary:lookup`, the clipboard, the
   share sheet, `ui:dialog`, `ui:progress` and `url:open`.
 

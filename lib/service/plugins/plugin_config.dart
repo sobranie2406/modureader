@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_network.dart';
 
 /// Validation and encoding for the per-plugin `pluginConfig_<id>` preference.
 ///
@@ -13,12 +15,14 @@ class PluginConfig {
 
   static const String prefix = 'pluginConfig_';
   static const String devicePrefix = 'pluginDeviceConfig_';
+  static const String secretPrefix = 'pluginSecret_';
   static const int maxEntries = 40;
   static const int maxKeyLength = 40;
   static const int maxTextLength = 8000;
 
   static String keyFor(String pluginId) => '$prefix$pluginId';
   static String deviceKeyFor(String pluginId) => '$devicePrefix$pluginId';
+  static String secretKeyFor(String pluginId) => '$secretPrefix$pluginId';
 
   static Map<String, dynamic> forStorage(PluginManifest manifest,
       Map<String, dynamic> values, PluginSettingStorage storage) {
@@ -136,4 +140,50 @@ class PluginConfig {
     }
     return values;
   }
+}
+
+/// Authenticated request settings are resolved only by the native host.
+class PluginRequestSettings {
+  PluginRequestSettings(PluginManifest manifest, Map<String, dynamic> values) {
+    final request = manifest.network?.request;
+    if (request == null) throw const FormatException('No plugin request rules');
+    final defaults = {
+      for (final spec in manifest.settings) spec.key: spec.defaultValue
+    };
+    Object? read(String key) => values[key] ?? defaults[key];
+    final url = read(request.baseUrlSetting);
+    if (url is! String) throw const FormatException('Missing plugin server');
+    base = PluginAuthenticatedRequest.baseUri(url);
+    for (final entry in request.headers.entries) {
+      final reference = PluginAuthenticatedRequest.credentialReference
+          .firstMatch(entry.value);
+      if (reference == null) {
+        headers[entry.key] = entry.value;
+      } else if (reference.group(1) == 'secret') {
+        secretHeaders[entry.key] = reference.group(2)!;
+      } else {
+        final value = read(reference.group(2)!);
+        if (value is! String ||
+            !validHeaderValue(value) ||
+            value.length > 256) {
+          throw const FormatException('Invalid plugin authentication setting');
+        }
+        headers[entry.key] = value;
+      }
+    }
+    scope = sha256
+        .convert(
+            utf8.encode(jsonEncode([base.toString(), headers, secretHeaders])))
+        .toString();
+  }
+
+  late final Uri base;
+  late final String scope;
+  final headers = <String, String>{};
+  final secretHeaders = <String, String>{};
+
+  static bool validHeaderValue(String value) =>
+      value.isNotEmpty &&
+      value == value.trim() &&
+      RegExp(r'^[\x20-\x7e]+$').hasMatch(value);
 }

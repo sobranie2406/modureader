@@ -79,19 +79,24 @@ class ReaderTopActions extends StatelessWidget {
       {super.key,
       required this.readerWidth,
       required this.buttons,
-      required this.actions});
+      required this.actions,
+      this.extraItems,
+      this.extraChanges});
   final double readerWidth;
   final Map<ReaderTopAction, Widget> buttons;
   final Map<ReaderTopAction, VoidCallback?> actions;
+  final List<PopupMenuEntry<ReaderTopAction>> Function(BuildContext)?
+      extraItems;
+  final Listenable? extraChanges;
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-      listenable: Prefs(),
+      listenable: Listenable.merge([Prefs(), extraChanges]),
       builder: (context, _) {
         final visible = ReaderTopActionsConfig.parse(Prefs().readerToolbar)
             .visible(buttons.keys);
+        final extras = extraItems?.call(context) ?? const [];
         final capacity = (readerWidth * .4 / kMinInteractiveDimension).floor();
-        final hasMore = visible.length > capacity;
-        // Reserve a touch target for More only when actions actually overflow.
+        final hasMore = visible.length > capacity || extras.isNotEmpty;
         final directCount =
             hasMore ? (capacity - 1).clamp(0, visible.length) : visible.length;
         return Row(mainAxisSize: MainAxisSize.min, children: [
@@ -118,6 +123,9 @@ class ReaderTopActions extends StatelessWidget {
                             const SizedBox(width: 12),
                             Flexible(child: Text(action.label(context)))
                           ])),
+                    if (extras.isNotEmpty && visible.length > directCount)
+                      const PopupMenuDivider(),
+                    ...extras,
                   ],
                 )),
         ]);

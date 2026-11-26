@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/models/plugin_network.dart';
+import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_http_budget.dart';
 import 'package:modu_reader/service/plugins/plugin_http_client.dart';
@@ -31,6 +34,8 @@ const Set<String> kPluginServiceMethods = {
   'notes.list',
   'reading.stats',
   'reading.history',
+  'reading.position',
+  'reading.applyPosition',
   'search.library',
   'knowledge.search',
   'dictionary.lookup',
@@ -83,6 +88,7 @@ const Set<String> kPluginInteractiveMethods = {
 /// that saved anything failed with "the plugin could not run".
 const Map<String, String> kPluginMethodCapabilities = {
   'http.get': 'net:http',
+  'http.request': kPluginAuthenticatedHttpCapability,
   'library.list': kLibraryReadCapability,
   'library.tags': kLibraryReadCapability,
   'library.groups': kLibraryReadCapability,
@@ -94,6 +100,8 @@ const Map<String, String> kPluginMethodCapabilities = {
   'notes.save': kNoteWriteCapability,
   'reading.stats': kReadingReadCapability,
   'reading.history': kReadingReadCapability,
+  'reading.position': kReadingPositionReadCapability,
+  'reading.applyPosition': kReadingPositionWriteCapability,
   'search.library': kSearchLibraryCapability,
   'knowledge.search': kKnowledgeQueryCapability,
   'ai.complete': kAiInvokeCapability,
@@ -316,9 +324,18 @@ class PluginScriptRuntime with WidgetsBindingObserver {
       _check(id, job);
       job.stage = 'input';
       final config = host.configFor(id);
+      final authenticationSettings = {
+        for (final header
+            in manifest.network?.request?.headers.values ?? const <String>[])
+          if (PluginAuthenticatedRequest.credentialReference.firstMatch(header)
+              case final reference? when reference.group(1) == 'setting')
+            reference.group(2)!,
+      };
       final settings = <String, Object?>{
         for (final spec in manifest.settings)
-          if (!spec.isSecret && spec.type != PluginSettingType.tip)
+          if (!spec.isSecret &&
+              spec.type != PluginSettingType.tip &&
+              !authenticationSettings.contains(spec.key))
             spec.key: config[spec.key] ?? spec.defaultValue,
       };
       // Only named fields from the trusted UI cross the process boundary.
@@ -334,6 +351,9 @@ class PluginScriptRuntime with WidgetsBindingObserver {
                   'actionId': action.id,
                 }
               : <String, Object?>{
+                  if (input['locale'] case final String locale
+                      when locale.length <= 64)
+                    'locale': locale,
                   'selection':
                       input['selection'] is String ? input['selection'] : '',
                   if (action.surface != PluginScriptSurface.dictionary &&
@@ -488,7 +508,14 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     job.stage = 'host_call';
     try {
       Object? value;
-      if (method == 'http.get') {
+      if (method == 'http.request') {
+        _beginNativeInteraction(job);
+        try {
+          value = await _authenticatedRequest(id, manifest, args, job);
+        } finally {
+          _endNativeInteraction(job);
+        }
+      } else if (method == 'http.get') {
         if (++job.requests > 1 ||
             args.keys.any((key) => key != 'url') ||
             args['url'] is! String ||
@@ -542,6 +569,86 @@ class PluginScriptRuntime with WidgetsBindingObserver {
     } finally {
       job.callBusy = false;
       job.stage = previousStage;
+    }
+  }
+
+  Future<Map<String, Object>> _authenticatedRequest(
+      String id,
+      PluginManifest manifest,
+      Map<String, dynamic> args,
+      _ScriptJob job) async {
+    final network = manifest.network;
+    final rule = network?.request;
+    if (network == null ||
+        rule == null ||
+        !host.hasPermission(id, 'net:http')) {
+      throw const PluginScriptFailure('denied');
+    }
+    if (++job.requests > 3) throw const PluginScriptFailure('quota');
+    final method = args['method'], path = args['path'], body = args['body'];
+    if (args.keys.any((key) => !{'method', 'path', 'body'}.contains(key)) ||
+        method is! String ||
+        path is! String ||
+        !rule.allows(method, path) ||
+        (method == 'GET'
+            ? args.containsKey('body')
+            : body is! Map<String, dynamic>)) {
+      throw const PluginScriptFailure('configuration');
+    }
+    try {
+      final settings = host.requestSettingsFor(id);
+      job.authenticatedScope ??= settings.scope;
+      if (job.authenticatedScope != settings.scope) {
+        throw const PluginScriptFailure('cancelled');
+      }
+      final headers = Map<String, String>.of(settings.headers);
+      for (final entry in settings.secretHeaders.entries) {
+        final value = host.requestSecretFor(id, entry.value, settings);
+        if (value == null) {
+          throw const FormatException('Missing plugin credential');
+        }
+        headers[entry.key] = value;
+      }
+      final payload = body == null ? null : utf8.encode(jsonEncode(body));
+      if (payload != null && payload.length > 16 * 1024) {
+        throw const PluginScriptFailure('size');
+      }
+      final deadline = Duration(milliseconds: network.timeoutMs);
+      final clock = Stopwatch()..start();
+      job.stage = 'dns';
+      final target = await _guard
+          .validate(
+              network: network,
+              uri: settings.base.replace(path: '${settings.base.path}$path'),
+              headers: headers,
+              configuredHost: settings.base.host)
+          .timeout(deadline);
+      _check(id, job);
+      final remaining = deadline - clock.elapsed;
+      if (remaining <= Duration.zero) {
+        throw const PluginScriptFailure('timeout');
+      }
+      job.stage = 'http';
+      final (status, bytes) = await _http.request(
+          method: method,
+          target: target,
+          body: payload == null ? null : Uint8List.fromList(payload),
+          timeout: remaining,
+          maxBytes: network.maxResponseBytes.clamp(0, maxResultBytes),
+          pluginId: id,
+          cancel: job.cancel);
+      final text = utf8.decode(bytes);
+      if (settings.secretHeaders.keys
+          .any((name) => text.contains(headers[name]!))) {
+        throw const PluginScriptFailure('result');
+      }
+      return {'status': status, 'text': text};
+    } on FormatException {
+      throw const PluginScriptFailure('configuration');
+    } on TimeoutException {
+      throw const PluginScriptFailure('timeout');
+    } on DictionaryFailure catch (error) {
+      throw PluginScriptFailure(error.code);
     }
   }
 
@@ -718,5 +825,6 @@ class _ScriptJob {
   Duration remaining = Duration.zero, nativeRemaining = Duration.zero;
   final executionClock = Stopwatch(), nativeClock = Stopwatch();
   int calls = 0, requests = 0;
+  String? authenticatedScope;
   bool callBusy = false;
 }

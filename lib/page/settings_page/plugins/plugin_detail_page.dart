@@ -124,7 +124,8 @@ class PluginDetailPage extends StatelessWidget {
     final enabled = record?.status == PluginStatus.enabled;
     // Runtime grants are the ones the user controls; install-tier ones are
     // listed lower as information, exactly like a store permission screen.
-    final runtimeByGroup = <PluginPermissionGroup, List<PluginPermissionSpec>>{};
+    final runtimeByGroup =
+        <PluginPermissionGroup, List<PluginPermissionSpec>>{};
     final installOnly = <String>[];
     for (final capability in capabilities) {
       final spec = pluginPermissionSpec(capability);
@@ -156,9 +157,7 @@ class PluginDetailPage extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Text(
                   !enabled
-                      ? ModuStrings.text(
-                          context,
-                          '启用插件后可以授权这些权限。',
+                      ? ModuStrings.text(context, '启用插件后可以授权这些权限。',
                           'Enable the plugin to grant these permissions.')
                       : ModuStrings.text(
                           context,
@@ -174,8 +173,10 @@ class PluginDetailPage extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Text(
                   pluginPermissionGroupLabel(context, group),
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.primary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -199,16 +200,15 @@ class PluginDetailPage extends StatelessWidget {
     return CustomSettingsTile(
       child: SwitchListTile(
         key: ValueKey('plugin-permission-${spec.token}'),
-        secondary: Icon(spec.danger ? Icons.warning_amber_outlined : Icons.shield_outlined,
+        secondary: Icon(
+            spec.danger ? Icons.warning_amber_outlined : Icons.shield_outlined,
             color: spec.danger && granted
                 ? Theme.of(context).colorScheme.error
                 : null),
         title: Text(pluginCapabilityLabel(context, spec.token)),
         subtitle: Text(spec.token),
         value: granted,
-        onChanged: !enabled
-            ? null
-            : (value) => _toggle(context, spec, value),
+        onChanged: !enabled ? null : (value) => _toggle(context, spec, value),
       ),
     );
   }
@@ -313,6 +313,8 @@ class PluginDetailPage extends StatelessWidget {
                     context, '在网页稍后阅读中使用', 'Used by Web clipper')),
                 PluginScriptSurface.bookImport => Text(ModuStrings.text(
                     context, '导入书籍时使用', 'Used when importing books')),
+                PluginScriptSurface.reader => Text(ModuStrings.text(
+                    context, '在阅读菜单的“更多”中使用', 'Use from the reader More menu')),
                 PluginScriptSurface.library => null,
               },
               trailing: action.surface == PluginScriptSurface.library
@@ -568,8 +570,95 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
   List<ConfigItem> _items(String locale) {
     return [
       for (final spec in widget.manifest.settings)
-        if (spec.binding == null) _configItem(spec, locale),
+        if (spec.binding == null && !_isRequestSecret(spec))
+          _configItem(spec, locale),
     ];
+  }
+
+  bool _isRequestSecret(PluginSettingSpec spec) =>
+      spec.isSecret &&
+      (widget.manifest.network?.request?.headers.values
+              .contains('{secret.${spec.key}}') ??
+          false);
+
+  bool _hasRequestSecret(PluginSettingSpec spec) {
+    try {
+      final settings = widget.host.requestSettingsFor(widget.pluginId);
+      return widget.host
+              .requestSecretFor(widget.pluginId, spec.key, settings) !=
+          null;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  Future<void> _editRequestSecret(PluginSettingSpec spec, String title) async {
+    _saveTimer?.cancel();
+    await _save();
+    if (!mounted || _saveFailed) return;
+    String t(String zh, String en) => ModuStrings.text(context, zh, en);
+    try {
+      final host = widget.host;
+      final id = widget.pluginId;
+      final settings = host.requestSettingsFor(id);
+      final configured = host.requestSecretFor(id, spec.key, settings) != null;
+      final address = settings.base.toString();
+      var input = '';
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialog) => StatefulBuilder(
+          builder: (_, update) => AlertDialog(
+            title: Text(title),
+            content: TextField(
+              autofocus: true,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              maxLength: 512,
+              decoration: InputDecoration(
+                helperText: t('用于连接 $address', 'Used to connect to $address'),
+                helperMaxLines: 4,
+                labelText: title,
+              ),
+              onChanged: (value) => update(() => input = value),
+            ),
+            actions: [
+              if (configured)
+                TextButton(
+                  onPressed: () => Navigator.pop(dialog, ''),
+                  child: Text(t('清除', 'Clear')),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialog),
+                child: Text(t('取消', 'Cancel')),
+              ),
+              FilledButton(
+                onPressed:
+                    input.isEmpty ? null : () => Navigator.pop(dialog, input),
+                child: Text(t('保存', 'Save')),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || value == null) return;
+      await host.saveRequestSecret(id, spec.key, value,
+          expectedScope: settings.scope);
+      if (mounted) setState(() {});
+    } on FormatException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('请检查服务器地址、账号和密码。',
+              'Check the server address, account, and password.')),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('无法保存凭据。', 'Could not save the credential.')),
+        ));
+      }
+    }
   }
 
   Future<void> _changeBinding(PluginSettingSpec spec, bool value) async {
@@ -678,6 +767,16 @@ class _PluginSettingsFormState extends State<_PluginSettingsForm> {
           initialConfig: _config,
           onConfigChanged: _onChanged,
         ),
+        for (final spec in widget.manifest.settings.where(_isRequestSecret))
+          SettingsTile.navigation(
+            key: ValueKey('plugin-secret-${spec.key}'),
+            title: Text(spec.label?.resolve(locale) ?? spec.key),
+            value: Text(_hasRequestSecret(spec)
+                ? ModuStrings.text(context, '已设置', 'Set')
+                : ModuStrings.text(context, '未设置', 'Not set')),
+            onPressed: (_) => unawaited(_editRequestSecret(
+                spec, spec.label?.resolve(locale) ?? spec.key)),
+          ),
         for (final spec
             in widget.manifest.settings.where((s) => s.binding != null))
           SwitchListTile(

@@ -321,6 +321,7 @@ class Prefs extends ChangeNotifier {
     };
     for (final String key in prefs.getKeys()) {
       if (_prefsExportSkipKeys.contains(key) ||
+          key.startsWith('pluginSecret_') ||
           key.startsWith('pluginDeviceConfig_')) {
         continue;
       }
@@ -347,6 +348,7 @@ class Prefs extends ChangeNotifier {
       final String key = entry.key;
       if (key == prefsBackupVersionKey ||
           _prefsImportSkipKeys.contains(key) ||
+          key.startsWith('pluginSecret_') ||
           key.startsWith('pluginDeviceConfig_')) {
         continue;
       }

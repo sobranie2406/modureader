@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
+import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/plugins/plugin_config.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
 import 'package:modu_reader/service/plugins/plugin_paths.dart';
@@ -106,6 +108,26 @@ class Http extends PluginHttpClient {
   }
 }
 
+class _AuthenticatedHttp extends PluginHttpClient {
+  final calls =
+      <({String method, PluginGuardResult target, Uint8List? body})>[];
+  String response = '{}';
+
+  @override
+  Future<(int, Uint8List)> request({
+    required String method,
+    required PluginGuardResult target,
+    required Duration timeout,
+    required int maxBytes,
+    required String pluginId,
+    Uint8List? body,
+    CancelTokenLike? cancel,
+  }) async {
+    calls.add((method: method, target: target, body: body));
+    return (method == 'PUT' ? 202 : 200, utf8.encode(response));
+  }
+}
+
 class _DiagnosticEngine extends WebViewPluginScriptEngine {
   final delegate = Engine();
   @override
@@ -130,10 +152,13 @@ void main() {
   const id = 'com.modu.text-tools';
 
   Future<void> install(
-      {List<String>? capabilities, Map<String, dynamic>? network}) async {
+      {List<String>? capabilities,
+      Map<String, dynamic>? network,
+      List<Map<String, dynamic>>? settings}) async {
     final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
     if (capabilities != null) m['capabilities'] = capabilities;
     if (network != null) m['network'] = network;
+    if (settings != null) m['settings'] = settings;
     files['manifest.json'] = jsonEncode(m);
     (host.trust as _RuntimeFixtureTrust).sealed = {
       for (final entry in files.entries)
@@ -182,6 +207,140 @@ void main() {
       runtime.run(pluginId: id, action: action, input: input);
   Matcher failure(String code) =>
       isA<PluginScriptFailure>().having((e) => e.code, 'code', code);
+
+  Future<void> installAuthenticated() => install(
+        capabilities: [
+          'script:run',
+          'ui:selection-action',
+          'settings:device',
+          'net:http',
+          kPluginAuthenticatedHttpCapability,
+        ],
+        network: {
+          'domains': ['sync.example.org'],
+          'request': {
+            'baseUrlSetting': 'server_url',
+            'routes': [
+              {'method': 'GET', 'path': '/users/auth'},
+              {'method': 'GET', 'path': '/syncs/progress/:id'},
+              {'method': 'PUT', 'path': '/syncs/progress'},
+            ],
+            'headers': {
+              'Accept': 'application/vnd.koreader.v1+json',
+              'X-Auth-User': '{setting.username}',
+              'X-Auth-Key': '{secret.password}',
+            }
+          },
+        },
+        settings: [
+          {
+            'type': 'text',
+            'key': 'server_url',
+            'storage': 'device',
+            'defaultValue': 'https://sync.example.org'
+          },
+          {'type': 'text', 'key': 'username', 'storage': 'device'},
+          {'type': 'secret', 'key': 'password', 'transform': 'md5'}
+        ],
+      );
+
+  test('authenticated credentials are local and scoped to server and account',
+      () async {
+    await installAuthenticated();
+    const secret = 'a raw ü pass';
+    const account = 'owner';
+    const server = 'https://custom.example.org/kosync/';
+    await host.saveConfig(id, {'server_url': server, 'username': account});
+    final scope = host.requestSettingsFor(id);
+    await host.saveRequestSecret(id, 'password', secret,
+        expectedScope: scope.scope);
+    final credential = md5.convert(utf8.encode(secret)).toString();
+    final key = PluginConfig.secretKeyFor(id);
+    expect(host.requestSecretFor(id, 'password', scope), credential);
+    expect(Prefs().prefs.getString(key), contains(credential));
+    expect(Prefs().prefs.getString(key), isNot(contains(secret)));
+    expect(host.configFor(id), isNot(contains('password')));
+    final exported =
+        await GlobalSettingsTransfer.export(Prefs(), includeSecrets: true);
+    expect(exported, isNot(contains(credential)));
+    final snapshot = await Prefs().buildPrefsBackupMap();
+    expect(snapshot, isNot(contains(key)));
+    await Prefs().applyPrefsBackupMap({
+      ...snapshot,
+      key: {'type': 'string', 'value': 'tampered'},
+    });
+    expect(Prefs().prefs.getString(key), contains(credential));
+
+    for (final config in [
+      {'server_url': server, 'username': 'other'},
+      {'server_url': 'https://another.example.org/kosync', 'username': account},
+      {'server_url': 'https://custom.example.org/other', 'username': account},
+    ]) {
+      await host.saveConfig(id, config);
+      expect(host.requestSecretFor(id, 'password', host.requestSettingsFor(id)),
+          isNull);
+      await expectLater(
+          host.saveRequestSecret(id, 'password', secret,
+              expectedScope: scope.scope),
+          throwsFormatException);
+    }
+    await host.uninstall(id);
+    expect(Prefs().prefs.get(key), isNull);
+  });
+
+  test(
+      'authenticated routing uses local credentials and caps an action at 3 calls',
+      () async {
+    runtime.dispose();
+    await installAuthenticated();
+    await host.saveConfig(id, {
+      'server_url': 'https://custom.example.org/kosync/',
+      'username': 'owner',
+    });
+    await host.saveRequestSecret(id, 'password', 'secret',
+        expectedScope: host.requestSettingsFor(id).scope);
+    final http = _AuthenticatedHttp();
+    final dns = <String>[];
+    runtime = PluginScriptRuntime(
+        host: host,
+        engineFactory: () => engine,
+        httpClient: http,
+        networkGuard: PluginNetworkGuard(resolver: (name) async {
+          dns.add(name);
+          return [InternetAddress('8.8.8.8')];
+        }));
+    await host.setPermission(id, 'net:http', true);
+    await host.setPermission(id, kPluginAuthenticatedHttpCapability, true);
+    final result = run();
+    await engine.ready.future;
+    expect(engine.input['settings'], isNot(contains('password')));
+    expect(engine.input['settings'], isNot(contains('username')));
+    for (final path in ['/users/auth', '/syncs/progress/example-id']) {
+      expect(await engine.call('http.request', {'method': 'GET', 'path': path}),
+          {'status': 200, 'text': '{}'});
+    }
+    expect(
+        await engine.call('http.request', {
+          'method': 'PUT',
+          'path': '/syncs/progress',
+          'body': {'percentage': 0.5},
+        }),
+        {'status': 202, 'text': '{}'});
+    expect(dns, List.filled(3, 'custom.example.org'));
+    expect(http.calls[2].target.uri.toString(),
+        'https://custom.example.org/kosync/syncs/progress');
+    expect(http.calls[2].target.headers, {
+      'accept': 'application/vnd.koreader.v1+json',
+      'x-auth-user': 'owner',
+      'x-auth-key': md5.convert(utf8.encode('secret')).toString(),
+    });
+    expect(jsonDecode(utf8.decode(http.calls[2].body!)), {'percentage': 0.5});
+    await expectLater(
+        engine.call('http.request', {'method': 'GET', 'path': '/users/auth'}),
+        throwsA(failure('quota')));
+    engine.result.complete({'text': 'ok'});
+    await result;
+  });
 
   Future<void> installPrivateControls() => install(capabilities: [
         'script:run',

@@ -58,7 +58,7 @@
         pending.set(next,{resolve,reject}); post({kind:'call',id:next,method,arguments:argumentsValue});
       });
       const modu = Object.freeze({
-        http:Object.freeze({get:args=>request('http.get',args)}),
+        http:Object.freeze({get:args=>request('http.get',args),request:args=>request('http.request',args)}),
         library:Object.freeze({
           list:args=>request('library.list',args),
           tags:args=>request('library.tags',args),
@@ -76,7 +76,9 @@
         }),
         reading:Object.freeze({
           stats:args=>request('reading.stats',args),
-          history:args=>request('reading.history',args)
+          history:args=>request('reading.history',args),
+          position:args=>request('reading.position',args),
+          applyPosition:args=>request('reading.applyPosition',args)
         }),
         search:Object.freeze({library:args=>request('search.library',args)}),
         knowledge:Object.freeze({search:args=>request('knowledge.search',args)}),

@@ -32,6 +32,9 @@ Future<void> runPluginAction(BuildContext context,
     String chapter = '',
     CurrentChapterContentFetcher? chapterContent,
     ChapterContentByHrefFetcher? chapterByHref,
+    Future<PluginReadingPosition> Function()? readingPosition,
+    PluginReadingPositionApplier? applyReadingPosition,
+    bool Function()? isReaderCurrent,
     ValueChanged<int>? onNoteCreated,
     PluginScriptRuntime? scriptRuntime,
     PrivateLibrary? privateLibrary,
@@ -58,7 +61,11 @@ Future<void> runPluginAction(BuildContext context,
   NavigatorState? resultNavigator;
   bool readable() =>
       !contextRevoked &&
-      (book == null || privacy.canRead(book)) &&
+      (isReaderCurrent?.call() ?? true) &&
+      (book == null ||
+          (readingPosition == null
+              ? privacy.canRead(book)
+              : !privacy.corrupt && !privacy.isPrivate(book))) &&
       (privateBridge?.canReadExposedData ?? true) &&
       (!privateDataUsed || privacy.unlocked);
   void dismissResult() {
@@ -101,7 +108,7 @@ Future<void> runPluginAction(BuildContext context,
     if (bookId != null) {
       final selected = await bookDao.selectBookById(bookId);
       book = selected;
-      if (selected.isDeleted || !privacy.canRead(selected)) {
+      if (selected.isDeleted || !readable()) {
         throw const PluginScriptFailure('permission');
       }
     }
@@ -126,6 +133,7 @@ Future<void> runPluginAction(BuildContext context,
         action: action,
         isContextValid: readable,
         input: {
+          'locale': Localizations.localeOf(context).toLanguageTag(),
           'selection': selection,
           'context': contextText,
           if (book != null) 'book': _summary(book),
@@ -144,6 +152,8 @@ Future<void> runPluginAction(BuildContext context,
             chapter: chapter,
             currentChapter: chapterContent,
             chapterByHref: chapterByHref,
+            readingPosition: readingPosition,
+            applyReadingPosition: applyReadingPosition,
             isCurrent: () => current() && readable(),
           ),
         ),
@@ -315,6 +325,8 @@ Future<void> runPluginAction(BuildContext context,
         t('私密书籍已更新。', 'Private books updated.'),
       'cancelled' => t('插件任务已取消。', 'Plugin task cancelled.'),
       'busy' => t('插件正在运行，请稍后再试。', 'A plugin is running. Try again shortly.'),
+      'stale' =>
+        t('阅读位置已变化，请重新同步。', 'The reading position changed. Please sync again.'),
       'timeout' => t('插件运行超时，已停止。', 'Plugin timed out and was stopped.'),
       'permission' =>
         t('插件无法执行此操作。', 'This plugin cannot perform that action.'),

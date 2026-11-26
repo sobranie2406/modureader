@@ -92,6 +92,9 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
       if (action is! ScriptActionContribution ||
           (action.surface == PluginScriptSurface.selection &&
               !manifest.capabilities.contains(kSelectionActionCapability)) ||
+          (action.surface == PluginScriptSurface.reader &&
+              (!manifest.capabilities.contains(kReaderActionCapability) ||
+                  action.scope != PluginSelectionScope.selection)) ||
           (action.surface == PluginScriptSurface.dictionary &&
               !manifest.capabilities
                   .contains(kDictionaryTransformCapability)) ||

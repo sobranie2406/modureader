@@ -136,7 +136,9 @@ test('only frozen, named host API methods are exposed and direct network/storage
       if (Object.getOwnPropertyDescriptor(self,name).writable) throw new Error('Mutable API');
     }
     const methods = [await modu.http.get({url:'https://example.com'}),
+      await modu.http.request({method:'GET',path:'/test'}),
       await modu.library.list({limit:1}), await modu.notes.save({text:'note'}),
+      await modu.reading.position(), await modu.reading.applyPosition({revision:'1',page:7}),
       await modu.articles.capture(),
       await modu.privateLibrary.open(), await modu.privateLibrary.state(),
       await modu.privateLibrary.updateOptions({privateOnly:true}),
@@ -149,12 +151,18 @@ test('only frozen, named host API methods are exposed and direct network/storage
   assert.equal(message.kind, 'result');
   assert.equal(message.value.blocked.length, 9);
   assert.deepEqual(message.value.methods,
-    ['http.get','library.list','notes.save','articles.capture','privateLibrary.open',
+    ['http.get','http.request','library.list','notes.save','reading.position',
+      'reading.applyPosition','articles.capture','privateLibrary.open',
       'privateLibrary.state','privateLibrary.updateOptions','privateLibrary.selectBooks',
       'privateLibrary.setPrivate','privateLibrary.lock']);
-  assert.deepEqual(message.value.keys, ['http','library','notes','articles','privateLibrary']);
+  assert.deepEqual(message.value.keys, [
+    'http','library','books','notes','reading','search','knowledge','dictionary',
+    'ai','translate','tts','clipboard','share','ui','open','storage','permissions',
+    'articles','privateLibrary'
+  ]);
   assert.equal(message.value.frozen, true);
-  assert.deepEqual(f.messages.filter(message => message.kind === 'call').map(message => message.id), [1,2,3,4,5,6,7,8,9,10]);
+  assert.deepEqual(f.messages.filter(message => message.kind === 'call').map(message => message.id),
+    message.value.methods.map((_, index) => index + 1));
 });
 
 for (const kind of ['result', 'request']) test(`oversized ${kind} is stopped before reaching the native bridge`, async t => {

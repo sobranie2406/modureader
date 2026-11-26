@@ -139,6 +139,42 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testWidgets('plugin reader actions add a More entry only while available',
+      (tester) async {
+    final available = ValueNotifier(false);
+    addTearDown(available.dispose);
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ReaderTopActions(
+          readerWidth: 900,
+          buttons: const {},
+          actions: const {},
+          extraChanges: available,
+          extraItems: (_) => [
+            if (available.value)
+              PopupMenuItem<ReaderTopAction>(
+                onTap: () => calls++,
+                child: const Text('Pull position'),
+              ),
+          ],
+        ),
+      ),
+    ));
+    final more = find.byKey(const ValueKey('reader-top-more'));
+    expect(more, findsNothing);
+    available.value = true;
+    await tester.pump();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pull position'));
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    available.value = false;
+    await tester.pump();
+    expect(more, findsNothing);
+  });
   testWidgets('More disappears as actions are hidden, including an empty bar',
       (tester) async {
     final actions = ReaderTopAction.values.take(3).toList();

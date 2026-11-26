@@ -42,7 +42,9 @@ const Set<String> kP1SupportedCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
   'ui:book-action',
+  'ui:reader-action',
   'net:http',
+  kPluginAuthenticatedHttpCapability,
   'storage:plugin',
   'script:run',
   'library:read',
@@ -59,6 +61,8 @@ const Set<String> kP1SupportedCapabilities = {
   'book:content',
   'library:write',
   'reading:read',
+  kReadingPositionReadCapability,
+  kReadingPositionWriteCapability,
   'ai:invoke',
   'translate:invoke',
   'tts:invoke',
@@ -78,7 +82,9 @@ const Set<String> kKnownCapabilities = {
   'ai:prompt-pack',
   'ui:selection-action',
   'ui:book-action',
+  'ui:reader-action',
   'net:http',
+  kPluginAuthenticatedHttpCapability,
   'script:run',
   'library:read',
   'note:write',
@@ -94,6 +100,8 @@ const Set<String> kKnownCapabilities = {
   'book:content',
   'library:write',
   'reading:read',
+  kReadingPositionReadCapability,
+  kReadingPositionWriteCapability,
   'ai:invoke',
   'translate:invoke',
   'tts:invoke',
@@ -111,6 +119,7 @@ const Set<String> kKnownCapabilities = {
 const String kAiPromptPackCapability = 'ai:prompt-pack';
 const String kSelectionActionCapability = 'ui:selection-action';
 const String kBookActionCapability = 'ui:book-action';
+const String kReaderActionCapability = 'ui:reader-action';
 const String kAiSkillContributionKind = 'aiSkill';
 const String kSelectionActionContributionKind = 'selectionAction';
 const String kDictionarySourceContributionKind = 'dictionarySource';
@@ -126,6 +135,7 @@ const String kPluginDeviceSettingsCapability = 'settings:device';
 const String kDictionaryTransformCapability = 'dictionary:transform';
 const String kArticleCaptureCapability = 'article:capture';
 const String kArticleExtractCapability = 'article:extract';
+const String kPluginAuthenticatedHttpCapability = 'net:request';
 
 // P6 host API capabilities. Kept next to the tokens above so the manifest and
 // the runtime permission catalogue cannot drift apart.
@@ -133,6 +143,8 @@ const String kNoteReadCapability = 'note:read';
 const String kBookContentCapability = 'book:content';
 const String kLibraryWriteCapability = 'library:write';
 const String kReadingReadCapability = 'reading:read';
+const String kReadingPositionReadCapability = 'reading:position-read';
+const String kReadingPositionWriteCapability = 'reading:position-write';
 const String kAiInvokeCapability = 'ai:invoke';
 const String kTranslateInvokeCapability = 'translate:invoke';
 const String kTtsInvokeCapability = 'tts:invoke';
@@ -633,7 +645,14 @@ class AiSkillContribution extends PluginContribution {
 
 enum PluginSelectionScope { selection, context }
 
-enum PluginScriptSurface { selection, library, dictionary, article, bookImport }
+enum PluginScriptSurface {
+  selection,
+  library,
+  dictionary,
+  article,
+  bookImport,
+  reader,
+}
 
 class ScriptActionContribution extends PluginContribution {
   const ScriptActionContribution({
@@ -647,6 +666,7 @@ class ScriptActionContribution extends PluginContribution {
     this.surface = PluginScriptSurface.selection,
     this.scope = PluginSelectionScope.selection,
     this.enabledSetting,
+    this.formats = const {},
   });
 
   final PluginText name;
@@ -654,6 +674,10 @@ class ScriptActionContribution extends PluginContribution {
   final PluginScriptSurface surface;
   final PluginSelectionScope scope;
   final String? enabledSetting;
+  final Set<String> formats;
+
+  bool supportsFormat(String format) =>
+      formats.isEmpty || formats.contains(format);
 
   factory ScriptActionContribution.parse({
     required String kind,
@@ -688,7 +712,8 @@ class ScriptActionContribution extends PluginContribution {
         (const {
               PluginScriptSurface.dictionary,
               PluginScriptSurface.article,
-              PluginScriptSurface.bookImport
+              PluginScriptSurface.bookImport,
+              PluginScriptSurface.reader,
             }.contains(surface) &&
             scope != PluginSelectionScope.selection)) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
@@ -701,6 +726,19 @@ class ScriptActionContribution extends PluginContribution {
             !settingKeyPattern.hasMatch(enabledSetting))) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
           'contributes[$index].enabledSetting is invalid.');
+    }
+    final formats = raw['formats'];
+    if (raw.containsKey('formats') &&
+        (surface != PluginScriptSurface.reader ||
+            formats is! List ||
+            formats.isEmpty ||
+            formats.length > 16 ||
+            !formats.every((format) =>
+                format is String &&
+                RegExp(r'^[a-z0-9]{1,12}$').hasMatch(format)) ||
+            formats.toSet().length != formats.length)) {
+      throw PluginInstallError(PluginErrorCode.invalidContribution,
+          'contributes[$index].formats is invalid.');
     }
     return ScriptActionContribution(
       kind: kind,
@@ -715,6 +753,9 @@ class ScriptActionContribution extends PluginContribution {
       surface: surface,
       scope: scope,
       enabledSetting: enabledSetting as String?,
+      formats: formats == null
+          ? const {}
+          : Set.unmodifiable((formats as List).cast<String>()),
     );
   }
 }
@@ -820,6 +861,7 @@ class PluginSettingSpec {
     this.required = false,
     this.storage = PluginSettingStorage.sync,
     this.binding,
+    this.secretTransform,
   });
 
   final String key;
@@ -830,6 +872,7 @@ class PluginSettingSpec {
   final List<String> options;
   final PluginSettingStorage storage;
   final String? binding;
+  final String? secretTransform;
   bool get isDevice => storage == PluginSettingStorage.device;
 
   /// Secrets only: when true a lookup fails instead of silently omitting the
@@ -914,6 +957,12 @@ class PluginSettingSpec {
         break;
     }
     final requiredRaw = raw['required'];
+    final transform = raw['transform'];
+    if (raw.containsKey('transform') &&
+        (type != PluginSettingType.secret || transform != 'md5')) {
+      throw PluginInstallError(PluginErrorCode.invalidSetting,
+          'settings[$index].transform is invalid.');
+    }
     final storage = PluginSettingStorage.values
         .where((entry) => entry.name == (raw['storage'] ?? 'sync'))
         .firstOrNull;
@@ -949,6 +998,7 @@ class PluginSettingSpec {
       required: requiredRaw is bool ? requiredRaw : false,
       storage: storage,
       binding: binding as String?,
+      secretTransform: transform as String?,
     );
   }
 }
@@ -1120,6 +1170,12 @@ class PluginManifest {
           "A 'network' block requires the 'net:http' capability.");
     }
     final network = rawNetwork == null ? null : PluginNetwork.parse(rawNetwork);
+    final authenticated = network?.request;
+    if (capabilities.contains(kPluginAuthenticatedHttpCapability) !=
+        (authenticated != null)) {
+      throw const PluginInstallError(PluginErrorCode.invalidManifest,
+          'Authenticated networking requires net:request and network.request.');
+    }
 
     final rawContributions = json['contributes'] ?? const <dynamic>[];
     if (rawContributions is! List) {
@@ -1176,6 +1232,8 @@ class PluginManifest {
       if (!capabilities.contains(kScriptRunCapability) ||
           (action.surface == PluginScriptSurface.selection &&
               !capabilities.contains(kSelectionActionCapability)) ||
+          (action.surface == PluginScriptSurface.reader &&
+              !capabilities.contains(kReaderActionCapability)) ||
           (action.surface == PluginScriptSurface.dictionary &&
               !capabilities.contains(kDictionaryTransformCapability)) ||
           (action.surface == PluginScriptSurface.article &&
@@ -1246,6 +1304,35 @@ class PluginManifest {
     // Every {setting.<key>} and {secret.<key>} a source references must exist,
     // so a typo is an install error rather than a silently empty request.
     final settingByKey = {for (final setting in settings) setting.key: setting};
+    if (authenticated != null) {
+      const invalid = PluginInstallError(PluginErrorCode.invalidSetting,
+          'Authenticated networking must use declared local settings.');
+      final base = settingByKey[authenticated.baseUrlSetting];
+      if (base?.type != PluginSettingType.text ||
+          base?.isDevice != true ||
+          base?.defaultValue is! String) {
+        throw invalid;
+      }
+      late final Uri defaultUri;
+      try {
+        defaultUri =
+            PluginAuthenticatedRequest.baseUri(base!.defaultValue as String);
+      } on FormatException {
+        throw invalid;
+      }
+      if (!network!.allows(defaultUri.host)) throw invalid;
+      for (final value in authenticated.headers.values) {
+        final reference =
+            PluginAuthenticatedRequest.credentialReference.firstMatch(value);
+        if (reference == null) continue;
+        final spec = settingByKey[reference.group(2)];
+        if (reference.group(1) == 'secret'
+            ? spec?.isSecret != true
+            : spec?.type != PluginSettingType.text || spec?.isDevice != true) {
+          throw invalid;
+        }
+      }
+    }
     if (settings
             .where((setting) => setting.binding != null)
             .map((setting) => setting.binding)

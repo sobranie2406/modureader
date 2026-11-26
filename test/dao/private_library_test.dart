@@ -171,6 +171,100 @@ void main() {
         1);
   });
 
+  test('reading plugins get a sampled identity and a one-use position receipt',
+      () async {
+    final db = await DBHelper().database;
+    await db.update('tb_books', {'file_path': 'file/public.pdf'},
+        where: 'id = ?', whereArgs: [1]);
+    final book = await bookDao.selectBookById(1);
+    final file = File(book.fileFullPath);
+    await file.writeAsBytes(
+        List.generate(4101, (index) => (index ^ (index >> 8)) & 0xff));
+    late int appliedPage;
+    var currentPage = 2;
+    final api = PluginHostApi(
+      pluginId: 'com.example.position',
+      services: PluginHostServices(
+        reader: PluginReaderSnapshot(
+          book: book,
+          chapter: '',
+          isCurrent: () => true,
+          readingPosition: () async => PluginReadingPosition(
+              position: 'epubcfi(/6/${2 * currentPage})',
+              percentage: currentPage / 10,
+              revision: 'native-position',
+              page: currentPage,
+              pageCount: 10),
+          applyReadingPosition: (expected,
+              {required isCurrent, page, cfi, percentage}) async {
+            expect(isCurrent(), isTrue);
+            expect(expected.revision, 'native-position');
+            appliedPage = page!;
+          },
+        ),
+      ),
+    );
+    final result = await api.call('reading.position', {}) as Map;
+    expect(result, {
+      'format': 'pdf',
+      'fingerprint': '16fd62089bc41e460b9ab4f9e098a6ef',
+      'position': 'epubcfi(/6/4)',
+      'percentage': .2,
+      'page': 2,
+      'pageCount': 10,
+      'revision': isA<String>(),
+    });
+    final originalRevision = result['revision'];
+    expect((await api.call('reading.position', {}) as Map)['revision'],
+        originalRevision);
+    currentPage = 3;
+    final revised = await api.call('reading.position', {}) as Map;
+    final revision = revised['revision'];
+    expect(revision, isNot(originalRevision));
+    await expectLater(
+        api.call(
+            'reading.applyPosition', {'revision': originalRevision, 'page': 8}),
+        throwsA(
+            isA<PluginScriptFailure>().having((e) => e.code, 'code', 'stale')));
+    final args = {'revision': revision, 'page': 8};
+    await expectLater(
+        api.call('reading.applyPosition', {'revision': revision, 'page': 11}),
+        throwsA(isA<PluginScriptFailure>()
+            .having((e) => e.code, 'code', 'permission')));
+    expect(await api.call('reading.applyPosition', args), {'applied': true});
+    expect(appliedPage, 8);
+    await expectLater(
+        api.call('reading.applyPosition', args),
+        throwsA(
+            isA<PluginScriptFailure>().having((e) => e.code, 'code', 'stale')));
+  });
+
+  test('reading plugin positions exclude a private book while unlocked',
+      () async {
+    await library.unlock();
+    final book = await bookDao.selectBookById(2);
+    final api = PluginHostApi(
+      pluginId: 'com.example.position',
+      services: PluginHostServices(
+        reader: PluginReaderSnapshot(
+          book: book,
+          chapter: '',
+          isCurrent: () => true,
+          readingPosition: () async => throw StateError('Private book read'),
+          applyReadingPosition: (expected,
+                  {required isCurrent, page, cfi, percentage}) async =>
+              throw StateError('Private book write'),
+        ),
+      ),
+    );
+    final denied = throwsA(
+        isA<PluginScriptFailure>().having((e) => e.code, 'code', 'permission'));
+    await expectLater(api.call('reading.position', {}), denied);
+    await expectLater(
+        api.call('reading.applyPosition', {'revision': '1', 'percentage': .5}),
+        denied);
+  });
+
   test(
       'protected AI history remains on disk and lock clears restored book content',
       () async {

@@ -83,8 +83,8 @@ class PluginAllowlist {
           PluginErrorCode.invalidManifest, '$field must be lowercase.');
     }
     if (value.endsWith('.')) {
-      throw PluginInstallError(PluginErrorCode.invalidManifest,
-          '$field must not end with a dot.');
+      throw PluginInstallError(
+          PluginErrorCode.invalidManifest, '$field must not end with a dot.');
     }
     for (final forbidden in ['@', '%', '\\', ' ', '*', '/', '?', '#']) {
       if (value.contains(forbidden)) {
@@ -126,12 +126,14 @@ class PluginNetwork {
     required this.timeoutMs,
     required this.maxResponseBytes,
     required this.requestsPerLookup,
+    this.request,
   });
 
   final List<String> domains;
   final int timeoutMs;
   final int maxResponseBytes;
   final int requestsPerLookup;
+  final PluginAuthenticatedRequest? request;
 
   static const int minTimeoutMs = 1000;
   static const int maxTimeoutMs = 15000;
@@ -173,8 +175,7 @@ class PluginNetwork {
 
     final timeout = raw['timeoutMs'] ?? defaultTimeoutMs;
     if (timeout is! int || timeout < minTimeoutMs || timeout > maxTimeoutMs) {
-      throw PluginInstallError(
-          PluginErrorCode.invalidManifest,
+      throw PluginInstallError(PluginErrorCode.invalidManifest,
           'network.timeoutMs must be between $minTimeoutMs and $maxTimeoutMs.');
     }
 
@@ -199,10 +200,133 @@ class PluginNetwork {
       timeoutMs: timeout,
       maxResponseBytes: maxBytes,
       requestsPerLookup: perLookup,
+      request: raw['request'] == null
+          ? null
+          : PluginAuthenticatedRequest.parse(raw['request']),
     );
   }
 
   bool allows(String host) => domains.contains(host);
+}
+
+/// Routes and headers for host-authenticated requests. The worker supplies
+/// only the method, path and optional JSON object.
+class PluginAuthenticatedRequest {
+  const PluginAuthenticatedRequest._(
+      this.baseUrlSetting, this.routes, this.headers);
+
+  final String baseUrlSetting;
+  final Map<String, List<RegExp>> routes;
+  final Map<String, String> headers;
+
+  static final _route =
+      RegExp(r'^/(?:[A-Za-z0-9_-]+|:id)(?:/(?:[A-Za-z0-9_-]+|:id))*$');
+  static final _path = RegExp(r'^/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$');
+  static final _base = RegExp(
+      r'^https://[a-z0-9.-]+(?::443)?(?:/[A-Za-z0-9_-]+)*/?$',
+      caseSensitive: false);
+  static final _authHeader = RegExp(r'^(?:authorization|x-auth-[a-z0-9-]+)$');
+  static final credentialReference =
+      RegExp(r'^\{(setting|secret)\.([a-z][a-z0-9_]{0,39})\}$');
+
+  static PluginAuthenticatedRequest parse(Object? raw) {
+    Never invalid() => throw const PluginInstallError(
+        PluginErrorCode.invalidManifest,
+        'Invalid authenticated network request.');
+    if (raw is! Map ||
+        raw.keys.any(
+            (key) => !{'baseUrlSetting', 'routes', 'headers'}.contains(key))) {
+      invalid();
+    }
+    final base = raw['baseUrlSetting'];
+    final rawRoutes = raw['routes'];
+    final rawHeaders = raw['headers'];
+    if (base is! String ||
+        !settingKeyPattern.hasMatch(base) ||
+        rawRoutes is! List ||
+        rawRoutes.isEmpty ||
+        rawRoutes.length > 8 ||
+        rawHeaders is! Map ||
+        rawHeaders.isEmpty ||
+        rawHeaders.length > 8) {
+      invalid();
+    }
+    final routes = <String, List<RegExp>>{};
+    final declaredPaths = <String>{};
+    for (final entry in rawRoutes) {
+      if (entry is! Map || entry.length != 2) invalid();
+      final method = entry['method'];
+      final path = entry['path'];
+      if (method is! String ||
+          (method != 'GET' && method != 'PUT') ||
+          path is! String ||
+          path.length > 256 ||
+          path != path.trim() ||
+          !_route.hasMatch(path) ||
+          !declaredPaths.add('$method $path')) {
+        invalid();
+      }
+      final pattern = path
+          .split('/')
+          .map((segment) => segment == ':id'
+              ? '[A-Za-z0-9_-]{1,128}'
+              : RegExp.escape(segment))
+          .join('/');
+      (routes[method] ??= []).add(RegExp('^$pattern\$'));
+    }
+    final headers = <String, String>{};
+    for (final entry in rawHeaders.entries) {
+      final name = entry.key, value = entry.value;
+      if (name is! String ||
+          name != name.trim() ||
+          name.length > 64 ||
+          value is! String ||
+          value.isEmpty ||
+          value.length > 128 ||
+          value.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
+        invalid();
+      }
+      final header = name.toLowerCase();
+      if (headers.containsKey(header) ||
+          !(header == 'accept'
+              ? RegExp(r'^[\x20-\x7e]+$').hasMatch(value) &&
+                  !value.contains(RegExp(r'[{}]'))
+              : _authHeader.hasMatch(header) &&
+                  credentialReference.hasMatch(value))) {
+        invalid();
+      }
+      headers[header] = value;
+    }
+    if (!headers.values.any((value) => value.startsWith('{secret.'))) invalid();
+    return PluginAuthenticatedRequest._(
+        base,
+        Map.unmodifiable(routes.map((method, paths) =>
+            MapEntry(method, List<RegExp>.unmodifiable(paths)))),
+        Map.unmodifiable(headers));
+  }
+
+  bool allows(String method, String path) =>
+      path.length <= 512 &&
+      path == path.trim() &&
+      _path.hasMatch(path) &&
+      (routes[method]?.any((route) => route.hasMatch(path)) ?? false);
+
+  static Uri baseUri(String input) {
+    final url = input.trim();
+    if (url.length > 1024 || !_base.hasMatch(url)) {
+      throw const FormatException('Invalid plugin server');
+    }
+    final uri = Uri.parse(url);
+    try {
+      PluginAllowlist.validate(uri.host, 'server');
+    } on PluginInstallError {
+      throw const FormatException('Invalid plugin server');
+    }
+    return Uri(
+        scheme: 'https',
+        host: uri.host,
+        path: uri.path.replaceFirst(RegExp(r'/$'), ''));
+  }
 }
 
 /// A declarative GET request. The host builds it; the manifest only supplies
@@ -277,7 +401,8 @@ class PluginRequestTemplate {
       throw PluginInstallError(PluginErrorCode.invalidManifest,
           'request.url must be a path, not a URL; the host comes from network.domains.');
     }
-    _validatePlaceholders(url, 'request.url', allowSecret: false, allowWord: true);
+    _validatePlaceholders(url, 'request.url',
+        allowSecret: false, allowWord: true);
 
     final rawQuery = raw['query'] ?? const <String, dynamic>{};
     if (rawQuery is! Map) {
@@ -300,26 +425,29 @@ class PluginRequestTemplate {
         throw PluginInstallError(PluginErrorCode.invalidManifest,
             'request.query keys must be literal; placeholders belong in values.');
       }
-      if (value is! String || value.isEmpty || value.length > maxQueryValueLength) {
-        throw PluginInstallError(
-            PluginErrorCode.invalidManifest,
+      if (value is! String ||
+          value.isEmpty ||
+          value.length > maxQueryValueLength) {
+        throw PluginInstallError(PluginErrorCode.invalidManifest,
             'request.query values must be strings of 1-$maxQueryValueLength characters.');
       }
-      _validatePlaceholders(value, 'request.query', allowSecret: false, allowWord: true);
+      _validatePlaceholders(value, 'request.query',
+          allowSecret: false, allowWord: true);
       query[key] = value;
     }
 
     final rawHeaders = raw['headers'] ?? const <String, dynamic>{};
     if (rawHeaders is! Map) {
-      throw PluginInstallError(
-          PluginErrorCode.invalidManifest, 'request.headers must be an object.');
+      throw PluginInstallError(PluginErrorCode.invalidManifest,
+          'request.headers must be an object.');
     }
     final headers = <String, String>{};
     for (final entry in rawHeaders.entries) {
       final name = entry.key;
       final value = entry.value;
       if (name is! String || !allowedHeaders.contains(name)) {
-        throw PluginInstallError(PluginErrorCode.invalidManifest,
+        throw PluginInstallError(
+            PluginErrorCode.invalidManifest,
             'request.headers may only set Accept, Accept-Language and Authorization; '
             'host-controlled headers cannot be overridden.');
       }
@@ -348,8 +476,8 @@ class PluginRequestTemplate {
         throw PluginInstallError(PluginErrorCode.invalidManifest,
             'Secrets may only be used in the Authorization header.');
       }
-      _validatePlaceholders(value, 'request.headers', allowSecret: name == 'Authorization',
-          allowWord: false);
+      _validatePlaceholders(value, 'request.headers',
+          allowSecret: name == 'Authorization', allowWord: false);
       headers[name] = value;
     }
 
@@ -371,7 +499,8 @@ class PluginRequestTemplate {
     for (final match in anyPlaceholder.allMatches(value)) {
       final token = match.group(0)!;
       if (allowWord && token == wordPlaceholder) continue;
-      if (settingPlaceholder.hasMatch(token) && token.length == match.group(0)!.length) {
+      if (settingPlaceholder.hasMatch(token) &&
+          token.length == match.group(0)!.length) {
         // A full `{setting.<key>}` token is fine.
         if (token.replaceAll(settingPlaceholder, '').isEmpty) continue;
       }
@@ -428,8 +557,8 @@ class JsonPath {
           PluginErrorCode.invalidManifest, '$field must not be empty.');
     }
     if (text.length > 512) {
-      throw PluginInstallError(PluginErrorCode.invalidManifest,
-          '$field exceeds 512 characters.');
+      throw PluginInstallError(
+          PluginErrorCode.invalidManifest, '$field exceeds 512 characters.');
     }
     final segments = <JsonPathSegment>[];
     var index = 0;
@@ -438,8 +567,8 @@ class JsonPath {
       final char = text[index];
       if (char == '.') {
         if (expectSegment) {
-          throw PluginInstallError(PluginErrorCode.invalidManifest,
-              '$field has an empty segment.');
+          throw PluginInstallError(
+              PluginErrorCode.invalidManifest, '$field has an empty segment.');
         }
         expectSegment = true;
         index++;
@@ -589,8 +718,7 @@ class PluginResponseMapping {
           'response.maxEntries must be between 1 and $maxEntriesLimit.');
     }
 
-    final maxChars =
-        raw['maxDefinitionChars'] ?? defaultMaxDefinitionChars;
+    final maxChars = raw['maxDefinitionChars'] ?? defaultMaxDefinitionChars;
     if (maxChars is! int ||
         maxChars < minDefinitionChars ||
         maxChars > maxDefinitionCharsLimit) {

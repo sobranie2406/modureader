@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:modu_reader/models/plugin_network.dart';
 import 'package:modu_reader/service/dictionary/local_dictionary.dart';
@@ -15,6 +16,47 @@ Matcher _fails(String code) =>
     throwsA(isA<DictionaryFailure>().having((e) => e.code, 'code', code));
 
 void main() {
+  test('authenticated request routes and bases cannot change scope', () {
+    final rules = PluginAuthenticatedRequest.parse({
+      'baseUrlSetting': 'server_url',
+      'routes': [
+        {'method': 'GET', 'path': '/syncs/progress/:id'},
+        {'method': 'PUT', 'path': '/syncs/progress'},
+      ],
+      'headers': {'X-Auth-Key': '{secret.password}'},
+    });
+    expect(rules.allows('GET', '/syncs/progress/book-1'), isTrue);
+    expect(rules.allows('PUT', '/syncs/progress'), isTrue);
+    for (final path in [
+      'https://other.example.org/syncs/progress/book-1',
+      '//other.example.org/syncs/progress/book-1',
+      '/syncs/progress/%2e%2e',
+      '/syncs/progress/book?password=1',
+      '/syncs/progress/book/subpath',
+      '/syncs/progress/book\n',
+    ]) {
+      expect(rules.allows('GET', path), isFalse);
+    }
+    expect(rules.allows('POST', '/syncs/progress'), isFalse);
+    expect(
+        PluginAuthenticatedRequest.baseUri('https://example.org:443/kosync/')
+            .toString(),
+        'https://example.org/kosync');
+    for (final url in [
+      'http://example.org',
+      'https://localhost',
+      'https://127.0.0.1',
+      'https://example.org:8000',
+      'https://user@example.org',
+      'https://example.org/../kosync',
+      'https://example.org/%2e%2e',
+      'https://example.org?scope=x',
+    ]) {
+      expect(
+          () => PluginAuthenticatedRequest.baseUri(url), throwsFormatException);
+    }
+  });
+
   group('JSON path evaluation', () {
     const document = {
       'data': {
@@ -592,6 +634,38 @@ void main() {
         pluginId: 'a',
       );
       expect(utf8.decode(bytes), '{"ok":true}');
+    });
+
+    test('authenticated PUT sends JSON and hides a rejected response body',
+        () async {
+      final observed = server.first.then((request) async {
+        final body = await utf8.decoder.bind(request).join();
+        request.response
+          ..statusCode = 401
+          ..write('This error body stays native.');
+        await request.response.close();
+        return (
+          request.method,
+          request.headers.contentType?.mimeType,
+          request.headers.value('x-auth-key'),
+          jsonDecode(body)
+        );
+      });
+      final (status, bytes) = await client.request(
+        method: 'PUT',
+        target: target('/syncs/progress', headers: {'x-auth-key': 'fixture'}),
+        timeout: const Duration(seconds: 5),
+        maxBytes: 1024,
+        pluginId: 'a',
+        body: Uint8List.fromList(utf8.encode('{"progress":2}')),
+      );
+      final (method, type, key, body) = await observed;
+      expect(method, 'PUT');
+      expect(type, 'application/json');
+      expect(key, 'fixture');
+      expect(body, {'progress': 2});
+      expect(status, 401);
+      expect(bytes, isEmpty);
     });
 
     test('rejects a redirect without following it', () async {

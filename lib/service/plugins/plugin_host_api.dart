@@ -18,8 +18,10 @@ import 'package:modu_reader/providers/chapter_content_bridge.dart';
 import 'package:modu_reader/service/ai/index.dart';
 import 'package:modu_reader/service/dictionary/local_dictionary.dart';
 import 'package:modu_reader/service/knowledge/book_knowledge_retriever.dart';
+import 'package:modu_reader/service/plugins/plugin_book_fingerprint.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/private_library.dart';
+import 'package:modu_reader/service/read_only_book_file.dart';
 import 'package:modu_reader/service/translate/index.dart';
 import 'package:modu_reader/service/tts/online_tts.dart';
 import 'package:modu_reader/service/tts/system_tts.dart';
@@ -32,6 +34,27 @@ import 'package:modu_reader/utils/get_path/get_base_path.dart';
 import 'package:langchain_core/chat_models.dart';
 import 'package:path/path.dart' as p;
 
+class PluginReadingPosition {
+  const PluginReadingPosition({
+    required this.position,
+    required this.percentage,
+    required this.revision,
+    this.page,
+    this.pageCount,
+  });
+
+  final String position, revision;
+  final double percentage;
+  final int? page, pageCount;
+}
+
+typedef PluginReadingPositionApplier = Future<void> Function(
+    PluginReadingPosition expected,
+    {required bool Function() isCurrent,
+    int? page,
+    String? cfi,
+    double? percentage});
+
 /// Text the reading view exposes to one plugin invocation.
 ///
 /// Kept as a narrow value object so the reader page can supply content without
@@ -42,12 +65,18 @@ class PluginReaderSnapshot {
     required this.chapter,
     this.currentChapter,
     this.chapterByHref,
+    this.readingPosition,
+    this.applyReadingPosition,
+    this.isCurrent,
   });
 
   final Book book;
   final String chapter;
   final CurrentChapterContentFetcher? currentChapter;
   final ChapterContentByHrefFetcher? chapterByHref;
+  final Future<PluginReadingPosition> Function()? readingPosition;
+  final PluginReadingPositionApplier? applyReadingPosition;
+  final bool Function()? isCurrent;
 }
 
 /// Extra native surfaces a host call needs.
@@ -112,6 +141,12 @@ class PluginHostApi {
   final int maxResults;
   final Directory? storageRoot;
   final PrivateLibrary _privacy;
+  ({
+    PluginReadingPosition position,
+    String fingerprint,
+    String revision
+  })? _positionReceipt;
+  int _positionSequence = 0;
 
   /// Dispatches one method. Throws [PluginScriptFailure] with a stable code.
   Future<Object?> call(String method, Map<String, dynamic> args) async {
@@ -136,6 +171,10 @@ class PluginHostApi {
         return _readingStats(args);
       case 'reading.history':
         return _readingHistory(args);
+      case 'reading.position':
+        return _readingPosition(args);
+      case 'reading.applyPosition':
+        return _applyReadingPosition(args);
       case 'search.library':
         return _searchLibrary(args);
       case 'knowledge.search':
@@ -234,6 +273,112 @@ class PluginHostApi {
         'lastReadAt': book.lastReadTime.toIso8601String(),
         'private': false,
       };
+
+  bool _publicReaderCurrent(PluginReaderSnapshot reader) =>
+      reader.isCurrent?.call() == true && _public(reader.book);
+
+  Future<Book> _currentReaderBook(PluginReaderSnapshot reader) async {
+    if (!_publicReaderCurrent(reader)) {
+      throw const PluginScriptFailure('permission');
+    }
+    final book = await _publicBook(reader.book.id);
+    if (!_publicReaderCurrent(reader) ||
+        book.filePath != reader.book.filePath ||
+        book.md5 != reader.book.md5) {
+      throw const PluginScriptFailure('stale');
+    }
+    return book;
+  }
+
+  Future<String> _bookFingerprint(Book book) async {
+    try {
+      return await partialBookMd5(readOnlyBookFile(book.fileFullPath));
+    } on FileSystemException {
+      throw const PluginScriptFailure('unavailable');
+    }
+  }
+
+  Future<Object> _readingPosition(Map<String, dynamic> args) async {
+    _only(args, const {});
+    final reader = services.reader;
+    final capture = reader?.readingPosition;
+    if (reader == null || capture == null) {
+      throw const PluginScriptFailure('permission');
+    }
+    final book = await _currentReaderBook(reader);
+    final format = p.extension(book.filePath).toLowerCase();
+    if (format != '.pdf' && format != '.epub') {
+      throw const PluginScriptFailure('unavailable');
+    }
+    final fingerprint = await _bookFingerprint(book);
+    final position = await capture();
+    await _currentReaderBook(reader);
+    final previous = _positionReceipt;
+    final revision = previous != null &&
+            previous.fingerprint == fingerprint &&
+            previous.position.revision == position.revision &&
+            previous.position.position == position.position &&
+            previous.position.percentage == position.percentage &&
+            previous.position.page == position.page &&
+            previous.position.pageCount == position.pageCount
+        ? previous.revision
+        : (++_positionSequence).toString();
+    _positionReceipt =
+        (position: position, fingerprint: fingerprint, revision: revision);
+    return {
+      'format': format.substring(1),
+      'fingerprint': fingerprint,
+      'position': position.position,
+      'percentage': position.percentage,
+      if (position.page != null) 'page': position.page,
+      if (position.pageCount != null) 'pageCount': position.pageCount,
+      'revision': revision,
+    };
+  }
+
+  Future<Object> _applyReadingPosition(Map<String, dynamic> args) async {
+    _only(args, const {'revision', 'page', 'cfi', 'percentage'});
+    final revision = _text(args, 'revision', maxLength: 32);
+    final reader = services.reader;
+    final apply = reader?.applyReadingPosition;
+    if (reader == null || apply == null || args.length != 2) {
+      throw const PluginScriptFailure('permission');
+    }
+    final book = await _currentReaderBook(reader);
+    final receipt = _positionReceipt;
+    if (receipt == null || receipt.revision != revision) {
+      throw const PluginScriptFailure('stale');
+    }
+
+    int? page;
+    String? cfi;
+    double? percentage;
+    if (receipt.position.pageCount case final count?) {
+      page = _int(args, 'page', min: 1, max: count);
+    } else if (args.containsKey('cfi')) {
+      cfi = _text(args, 'cfi');
+      if (!cfi.startsWith('epubcfi(') || !cfi.endsWith(')')) {
+        throw const PluginScriptFailure('permission');
+      }
+    } else {
+      final value = args['percentage'];
+      if (value is! num || !value.isFinite || value < 0 || value > 1) {
+        throw const PluginScriptFailure('permission');
+      }
+      percentage = value.toDouble();
+    }
+    if (receipt.fingerprint != await _bookFingerprint(book)) {
+      throw const PluginScriptFailure('stale');
+    }
+    await _currentReaderBook(reader);
+    _positionReceipt = null;
+    await apply(receipt.position,
+        isCurrent: () => _publicReaderCurrent(reader),
+        page: page,
+        cfi: cfi,
+        percentage: percentage);
+    return {'applied': true};
+  }
 
   // ---- library -------------------------------------------------------------
 

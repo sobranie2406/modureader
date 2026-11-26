@@ -71,6 +71,36 @@ void main() {
         throwsA(isA<PluginInstallError>()));
   });
 
+  test('reader actions require a menu capability and may filter formats', () {
+    const capabilities = ['script:run', 'ui:reader-action'];
+    final raw = {
+      ...scriptAction(surface: 'reader'),
+      'formats': ['pdf']
+    };
+    final action = parse(raw, capabilities: capabilities).contributions.single
+        as ScriptActionContribution;
+    expect(action.surface, PluginScriptSurface.reader);
+    expect(action.supportsFormat('pdf'), isTrue);
+    expect(action.supportsFormat('epub'), isFalse);
+    expect(() => parse(raw), throwsA(isA<PluginInstallError>()));
+    for (final invalid in [
+      {...raw, 'surface': 'library'},
+      {...raw, 'scope': 'context'},
+      {...raw, 'formats': <String>[]},
+      {
+        ...raw,
+        'formats': ['../pdf']
+      },
+      {
+        ...raw,
+        'formats': ['pdf', 'pdf']
+      },
+    ]) {
+      expect(() => parse(invalid, capabilities: capabilities),
+          throwsA(isA<PluginInstallError>()));
+    }
+  });
+
   test(
       'dictionary transforms require their permission and selection-only input',
       () {

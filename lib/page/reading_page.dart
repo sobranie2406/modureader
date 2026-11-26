@@ -35,6 +35,7 @@ import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/main.dart';
 import 'package:modu_reader/models/ai_quick_prompt_chip.dart';
 import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/book_note.dart';
 import 'package:modu_reader/models/unified_query.dart';
 import 'package:modu_reader/models/read_theme.dart';
@@ -47,6 +48,8 @@ import 'package:modu_reader/widgets/ai/reading_skill_chips.dart';
 import 'package:modu_reader/service/reader_focus.dart';
 import 'package:modu_reader/service/reader_keyboard.dart';
 import 'package:modu_reader/service/reader_page_keys.dart';
+import 'package:modu_reader/service/plugins/handlers/script_action_handler.dart';
+import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/utils/env_var.dart';
 import 'package:modu_reader/utils/toast/common.dart';
 import 'package:modu_reader/utils/ui/status_bar.dart';
@@ -78,6 +81,7 @@ import 'package:modu_reader/widgets/reading_page/document_reflow_reader.dart';
 import 'package:modu_reader/widgets/reading_page/document_comparison_view.dart';
 import 'package:modu_reader/widgets/reading_page/document_original_note.dart';
 import 'package:modu_reader/widgets/context_menu/context_menu.dart';
+import 'package:modu_reader/widgets/plugins/plugin_script_action.dart';
 import 'package:modu_reader/dao/book_note.dart';
 import 'package:modu_reader/widgets/reading_page/toc_widget.dart';
 import 'package:modu_reader/widgets/common/axis_flex.dart';
@@ -88,6 +92,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
+import 'package:path/path.dart' as p;
 import 'package:modu_reader/utils/reader_wakelock.dart';
 
 class ReadingPage extends ConsumerStatefulWidget {
@@ -1980,6 +1985,54 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
   }
 
+  List<PopupMenuEntry<ReaderTopAction>> _pluginReaderMenuItems(
+      BuildContext context) {
+    final registry = PluginScriptActionRegistry.instance;
+    final privacy = PrivateLibrary.instance;
+    final player = epubPlayerKey.currentState;
+    final book = _book;
+    bool isCurrent() =>
+        mounted &&
+        _readingRouteVisible &&
+        identical(epubPlayerKey.currentState, player) &&
+        _book.id == book.id &&
+        !isReflowReading &&
+        !book.isDeleted &&
+        !privacy.corrupt &&
+        !privacy.isPrivate(book);
+
+    if (player == null || !isCurrent()) return const [];
+    final format =
+        p.extension(book.filePath).replaceFirst('.', '').toLowerCase();
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return [
+      for (final item in registry.forSurface(PluginScriptSurface.reader))
+        if (item.action.supportsFormat(format))
+          PopupMenuItem<ReaderTopAction>(
+            key: ValueKey(item.id),
+            onTap: () {
+              if (!isCurrent() || !identical(registry.byId(item.id), item)) {
+                return;
+              }
+              unawaited(runPluginAction(
+                this.context,
+                pluginId: item.pluginId,
+                action: item.action,
+                bookId: book.id,
+                isReaderCurrent: isCurrent,
+                readingPosition: player.pluginReadingPosition,
+                applyReadingPosition: player.applyPluginReadingPosition,
+              ));
+            },
+            child: Row(children: [
+              const Icon(Icons.extension_outlined),
+              const SizedBox(width: 12),
+              Flexible(child: Text(item.action.name.resolve(locale))),
+            ]),
+          ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final documentPlayer = epubPlayerKey.currentState;
@@ -2071,6 +2124,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                               ),
                               actions: [
                                 ReaderTopActions(
+                                    extraItems: _pluginReaderMenuItems,
+                                    extraChanges: Listenable.merge([
+                                      PluginScriptActionRegistry.instance,
+                                      PrivateLibrary.instance,
+                                    ]),
                                     readerWidth: constraints.maxWidth -
                                         MediaQuery.paddingOf(context)
                                             .horizontal,

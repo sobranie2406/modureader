@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/models/plugin_permissions.dart';
@@ -97,6 +98,7 @@ class PluginHost extends ChangeNotifier {
   final _reservedIds = <String>{};
   PluginState _developmentState = const PluginState();
   final _developmentConfig = <String, Map<String, dynamic>>{};
+  final _developmentSecrets = <String, Map<String, String>>{};
   Future<void> _configWrites = Future.value();
   final _runtimes = <PluginScriptRuntime>{};
   PluginScriptRuntime? _developmentRuntime;
@@ -203,6 +205,102 @@ class PluginHost extends ChangeNotifier {
     return PluginConfig.sanitize(manifest, saved);
   }
 
+  PluginRequestSettings requestSettingsFor(String id) {
+    final manifest = manifestFor(id);
+    if (_disposed ||
+        !_sessionOpen ||
+        manifest == null ||
+        byId(id)?.isUsable != true) {
+      throw const FormatException('Plugin settings are unavailable');
+    }
+    return PluginRequestSettings(manifest, configFor(id));
+  }
+
+  Map<String, String> _requestSecrets(String id) {
+    if (development) return {...?_developmentSecrets[id]};
+    final raw = Prefs().prefs.get(PluginConfig.secretKeyFor(id));
+    try {
+      return {
+        if (raw != null)
+          for (final entry in PluginConfig.decode(raw).entries)
+            if (entry.value is String) entry.key: entry.value as String,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  String? requestSecretFor(
+      String id, String key, PluginRequestSettings settings) {
+    if (_disposed ||
+        !_sessionOpen ||
+        !settings.secretHeaders.containsValue(key)) {
+      return null;
+    }
+    final spec =
+        manifestFor(id)?.settings.where((spec) => spec.key == key).firstOrNull;
+    final raw = _requestSecrets(id)[key];
+    if (raw == null || spec?.isSecret != true) return null;
+    try {
+      final entry = jsonDecode(raw);
+      if (entry is! List ||
+          entry.length != 3 ||
+          entry[0] != settings.scope ||
+          entry[1] != spec!.secretTransform ||
+          entry[2] is! String) {
+        return null;
+      }
+      final value = entry[2] as String;
+      return value.length <= 512 &&
+              PluginRequestSettings.validHeaderValue(value)
+          ? value
+          : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> saveRequestSecret(String id, String key, String value,
+          {required String expectedScope}) =>
+      _exclusive(() async {
+        final settings = requestSettingsFor(id);
+        final spec = manifestFor(id)!
+            .settings
+            .where((spec) => spec.key == key)
+            .firstOrNull;
+        if (settings.scope != expectedScope ||
+            !settings.secretHeaders.containsValue(key) ||
+            spec?.isSecret != true) {
+          throw const FormatException('Plugin authentication settings changed');
+        }
+        if (value.runes.length > 512 ||
+            (value.isNotEmpty &&
+                spec!.secretTransform == null &&
+                !PluginRequestSettings.validHeaderValue(value))) {
+          throw const FormatException('Invalid plugin credential');
+        }
+        final saved = _requestSecrets(id);
+        if (value.isEmpty) {
+          saved.remove(key);
+        } else {
+          final credential = spec!.secretTransform == 'md5'
+              ? md5.convert(utf8.encode(value)).toString()
+              : value;
+          saved[key] =
+              jsonEncode([settings.scope, spec.secretTransform, credential]);
+        }
+        if (development) {
+          _developmentSecrets[id] = saved;
+        } else if (!await (saved.isEmpty
+            ? Prefs().prefs.remove(PluginConfig.secretKeyFor(id))
+            : Prefs()
+                .prefs
+                .setString(PluginConfig.secretKeyFor(id), jsonEncode(saved)))) {
+          throw StateError('Could not save plugin credential');
+        }
+        notifyListeners();
+      });
+
   Future<void> saveConfig(String id, Map<String, dynamic> values) {
     final manifest = manifestFor(id);
     final session = PrivateLibrary.instance.authenticationSession;
@@ -218,6 +316,11 @@ class PluginHost extends ChangeNotifier {
         throw StateError('Plugin settings are unavailable.');
       }
       PluginConfig.validate(id, snapshot, manifest: manifest);
+      if (manifest.network?.request != null) {
+        for (final runtime in _runtimes) {
+          runtime.cancelPlugin(id);
+        }
+      }
       final native = development
           ? PrivateLibrary.instance.policyOptionsFor(this)
           : PrivateLibrary.instance.storedPolicyOptions;
@@ -276,9 +379,15 @@ class PluginHost extends ChangeNotifier {
         PrivateLibrary.instance.clearOptionsOverlay(this);
       }
       _developmentConfig.remove(id);
+      _developmentSecrets.remove(id);
       _developmentPermissionGrants.remove(id);
       await _saveState(_state.remove(id));
     } else {
+      final secretKey = PluginConfig.secretKeyFor(id);
+      if (Prefs().prefs.containsKey(secretKey) &&
+          !await Prefs().prefs.remove(secretKey)) {
+        throw StateError('Could not remove plugin credential.');
+      }
       await Prefs().removePluginData(id);
       try {
         await _revokeAllPermissions(id);
@@ -309,6 +418,7 @@ class PluginHost extends ChangeNotifier {
         _sessionOpen = false;
         PrivateLibrary.instance.clearOptionsOverlay(this);
         _developmentConfig.clear();
+        _developmentSecrets.clear();
         _developmentPermissionGrants.clear();
         _developmentState = const PluginState();
         _plugins = const [];
@@ -1316,6 +1426,7 @@ class PluginHost extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _developmentSecrets.clear();
     if (development) PrivateLibrary.instance.clearOptionsOverlay(this);
     if (development) {
       for (final record in _plugins) {

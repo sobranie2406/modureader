@@ -37,6 +37,7 @@ class PluginNetworkGuard {
       InternetAddress.lookup(host);
 
   /// Validates [uri] against [network] and resolves it.
+  /// [configuredHost] must come from the local, credential-bound setting.
   ///
   /// Throws [DictionaryFailure] with a code the UI can show; the message never
   /// contains the host, the word or any header value.
@@ -44,13 +45,14 @@ class PluginNetworkGuard {
     required PluginNetwork network,
     required Uri uri,
     required Map<String, String> headers,
+    String? configuredHost,
   }) async {
-    _validateShape(uri, network);
+    _validateShape(uri, network, configuredHost);
     final addresses = await _resolve(uri.host);
     return PluginGuardResult(uri: uri, addresses: addresses, headers: headers);
   }
 
-  void _validateShape(Uri uri, PluginNetwork network) {
+  void _validateShape(Uri uri, PluginNetwork network, String? configuredHost) {
     if (uri.scheme != 'https') {
       throw const DictionaryFailure('configuration');
     }
@@ -72,7 +74,9 @@ class PluginNetworkGuard {
     if (PluginAllowlist.isIpLiteral(host)) {
       throw const DictionaryFailure('configuration');
     }
-    if (!network.allows(host)) {
+    if (configuredHost == null
+        ? !network.allows(host)
+        : host != configuredHost) {
       throw const DictionaryFailure('configuration');
     }
   }

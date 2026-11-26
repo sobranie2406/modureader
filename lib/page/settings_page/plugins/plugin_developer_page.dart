@@ -286,6 +286,7 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
               .whereType<ScriptActionContribution>()
               .where((action) =>
                   action.surface != PluginScriptSurface.article &&
+                  action.surface != PluginScriptSurface.reader &&
                   action.surface != PluginScriptSurface.bookImport) ??
           const <ScriptActionContribution>[])
         ListTile(
@@ -296,6 +297,16 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
             onTap: _working || plugin.status != PluginStatus.enabled
                 ? null
                 : () => _run(plugin.id, action)),
+      for (final action in manifest?.contributions
+              .whereType<ScriptActionContribution>()
+              .where(
+                  (action) => action.surface == PluginScriptSurface.reader) ??
+          const <ScriptActionContribution>[])
+        ListTile(
+            leading: const Icon(Icons.extension_outlined),
+            title: Text(action.name
+                .resolve(Localizations.localeOf(context).toLanguageTag())),
+            subtitle: Text(t('从阅读菜单测试', 'Test from the reader menu'))),
       if (manifest?.contributions.whereType<ScriptActionContribution>().any(
               (action) => action.surface == PluginScriptSurface.bookImport) ??
           false)

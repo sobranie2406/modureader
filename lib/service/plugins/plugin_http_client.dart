@@ -57,7 +57,7 @@ Future<ConnectionTask<Socket>> connectPluginTls({
   return ConnectionTask.fromSocket(result.future, () => abort('cancelled'));
 }
 
-/// Performs the single GET a plugin source is allowed per lookup.
+/// Performs a bounded HTTP request for plugin sources.
 ///
 /// Everything is bounded: the response is streamed and cancelled as soon as it
 /// exceeds the byte cap, redirects are refused, and the connection is made to an
@@ -84,13 +84,46 @@ class PluginHttpClient {
     required String pluginId,
     CancelTokenLike? cancel,
   }) async {
+    final (status, bytes) = await request(
+        method: 'GET',
+        target: target,
+        timeout: timeout,
+        maxBytes: maxBytes,
+        pluginId: pluginId,
+        cancel: cancel);
+    if (status == 429) throw const DictionaryFailure('rateLimited');
+    if (status < 200 || status >= 300) {
+      throw const DictionaryFailure('network');
+    }
+    return bytes;
+  }
+
+  /// Auth callers need the status (including 401 and 404). Only successful
+  /// responses expose a body, so error pages never reach the plugin.
+  Future<(int, Uint8List)> request({
+    required String method,
+    required PluginGuardResult target,
+    required Duration timeout,
+    required int maxBytes,
+    required String pluginId,
+    Uint8List? body,
+    CancelTokenLike? cancel,
+  }) async {
+    if (method == 'GET' ? body != null : method != 'PUT' || body == null) {
+      throw const DictionaryFailure('configuration');
+    }
     if (cancel?.isCancelled ?? false) {
       throw const DictionaryFailure('cancelled');
     }
     budget?.acquire(pluginId);
     try {
-      return await _get(
-          target: target, timeout: timeout, maxBytes: maxBytes, cancel: cancel);
+      return await _request(
+          method: method,
+          target: target,
+          timeout: timeout,
+          maxBytes: maxBytes,
+          body: body,
+          cancel: cancel);
     } on DictionaryFailure {
       rethrow;
     } catch (_) {
@@ -100,14 +133,16 @@ class PluginHttpClient {
     }
   }
 
-  Future<Uint8List> _get({
+  Future<(int, Uint8List)> _request({
+    required String method,
     required PluginGuardResult target,
     required Duration timeout,
     required int maxBytes,
+    Uint8List? body,
     CancelTokenLike? cancel,
   }) async {
     final client = _httpClientFactory();
-    final completer = Completer<Uint8List>();
+    final completer = Completer<(int, Uint8List)>();
     Timer? timer;
     var finished = false;
 
@@ -149,12 +184,19 @@ class PluginHttpClient {
 
     () async {
       try {
-        final request = await client.getUrl(target.uri);
+        final request = method == 'GET'
+            ? await client.getUrl(target.uri)
+            : await client.openUrl(method, target.uri);
         request.followRedirects = false;
         request.persistentConnection = false;
         // Host forces these; a manifest cannot set them.
         request.headers.set(HttpHeaders.userAgentHeader, _userAgent);
         target.headers.forEach(request.headers.set);
+        if (body != null) {
+          request.headers.contentType = ContentType.json;
+          request.contentLength = body.length;
+          request.add(body);
+        }
 
         final response = await request.close();
         final status = response.statusCode;
@@ -163,12 +205,8 @@ class PluginHttpClient {
           fail(const DictionaryFailure('network'));
           return;
         }
-        if (status == 429) {
-          fail(const DictionaryFailure('rateLimited'));
-          return;
-        }
         if (status < 200 || status >= 300) {
-          fail(const DictionaryFailure('network'));
+          finish(() => completer.complete((status, Uint8List(0))));
           return;
         }
         final declared = response.contentLength;
@@ -185,7 +223,9 @@ class PluginHttpClient {
           }
         }
         finish(() {
-          if (!completer.isCompleted) completer.complete(builder.takeBytes());
+          if (!completer.isCompleted) {
+            completer.complete((status, builder.takeBytes()));
+          }
         });
       } on DictionaryFailure catch (failure) {
         fail(failure);

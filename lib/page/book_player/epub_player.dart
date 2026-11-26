@@ -69,6 +69,8 @@ import 'package:modu_reader/providers/sync_database_revision.dart';
 import 'package:modu_reader/providers/sync.dart';
 import 'package:modu_reader/enums/sync_direction.dart';
 import 'package:modu_reader/service/book_player/reader_progress_session.dart';
+import 'package:modu_reader/service/plugins/plugin_host_api.dart';
+import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/book_player/document_layout_store.dart';
 import 'package:modu_reader/service/book_player/pdf_reading_state_store.dart';
 import 'package:modu_reader/models/pdf_reading_view.dart';
@@ -1170,6 +1172,130 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (result?.error != null || result?.value != true) {
       throw StateError('Original page navigation failed');
     }
+  }
+
+  bool get _pluginReadingPositionAvailable =>
+      mounted &&
+      _readerReady &&
+      _readerPositionInitialized &&
+      !_chapterLoading &&
+      !_remotePositionPending &&
+      widget.cfi == null &&
+      readingPageKey.currentState?.isReflowReading != true &&
+      !_hasNarrationSession;
+
+  Future<PluginReadingPosition> pluginReadingPosition() async {
+    if (!_pluginReadingPositionAvailable) {
+      throw const PluginScriptFailure('unavailable');
+    }
+    await _progress.flush();
+    final saved = await bookDao.readReadingPosition(book.id);
+    if (!_pluginReadingPositionAvailable ||
+        saved.deleted ||
+        _progress.current?.revision != saved.revision) {
+      throw const PluginScriptFailure('stale');
+    }
+    if (cfi.isEmpty ||
+        !percentage.isFinite ||
+        (isPdfDocument &&
+            (currentChapter < 1 || currentChapter > totalChapters))) {
+      throw const PluginScriptFailure('unavailable');
+    }
+    return PluginReadingPosition(
+      position: cfi,
+      percentage: isPdfDocument
+          ? currentChapter / totalChapters
+          : percentage.clamp(0.0, 1.0).toDouble(),
+      revision: saved.revision,
+      page: isPdfDocument ? currentChapter : null,
+      pageCount: isPdfDocument ? totalChapters : null,
+    );
+  }
+
+  Future<void> applyPluginReadingPosition(PluginReadingPosition expected,
+      {required bool Function() isCurrent,
+      int? page,
+      String? cfi,
+      double? percentage}) async {
+    if (!isCurrent()) throw const PluginScriptFailure('cancelled');
+    readingPageKey.currentState?.stopAutoScroll();
+    await stopAutoScroll();
+    final current = await pluginReadingPosition();
+    if (!isCurrent() ||
+        current.revision != expected.revision ||
+        current.position != expected.position ||
+        current.page != expected.page ||
+        current.pageCount != expected.pageCount) {
+      throw const PluginScriptFailure('stale');
+    }
+    final generation = _progress.generation;
+    final narration = _progress.current?.narration;
+    final result = await webViewController.callAsyncJavaScript(
+      functionBody: '''
+        const view = window.reader?.view;
+        if (!view || view.renderer.isNavigating ||
+            view.lastLocation?.cfi !== expected)
+          return {stale: true};
+        if (typeof target === "string") {
+          const resolved = view.resolveNavigation(target);
+          const section = view.book.sections[resolved?.index];
+          if (!section?.createDocument) return null;
+          const doc = await section.createDocument();
+          if (resolved.anchor(doc) == null) return null;
+          if (view.lastLocation?.cfi !== expected) return {stale: true};
+        }
+        if (!await window.restoreSyncedReadingPosition(target)) return null;
+        await window.stopReaderAutoScroll("navigation");
+        const location = view.lastLocation;
+        if (!location || (typeof target === "number" &&
+            location.section?.current !== target)) return null;
+        return {cfi: location.cfi, fraction: location.fraction,
+                region: location.pdfRegion};
+      ''',
+      arguments: {
+        'expected': expected.position,
+        'target': page != null ? page - 1 : cfi ?? {'fraction': percentage},
+      },
+    );
+    final value = result?.value;
+    if (value is Map && value['stale'] == true) {
+      throw const PluginScriptFailure('stale');
+    }
+    final destination = value is Map ? value['cfi'] : null;
+    final fraction = value is Map ? value['fraction'] : null;
+    if (result?.error != null ||
+        destination is! String ||
+        destination.isEmpty ||
+        fraction is! num ||
+        !fraction.isFinite) {
+      throw const PluginScriptFailure('unavailable');
+    }
+    final progress = fraction.clamp(0.0, 1.0).toDouble();
+    final accepted = isCurrent() &&
+        _pluginReadingPositionAvailable &&
+        await _progress.record(destination, progress,
+            generation: generation,
+            expectedRevision: expected.revision,
+            isCurrent: () => isCurrent() && _pluginReadingPositionAvailable,
+            narration: narration?.canResume == true
+                ? NarrationPosition(narration!.cfi, 'stopped')
+                : null);
+    if (!accepted) {
+      if (mounted) {
+        _remotePositionPending = true;
+        await refreshReadingAfterSync();
+      }
+      throw const PluginScriptFailure('stale');
+    }
+    if (!mounted) return;
+    widget.book.lastReadPosition = destination;
+    widget.book.readingPercentage = progress;
+    if (supportsDocumentImages && value is Map) {
+      await PdfReadingStateStore(Prefs().prefs).savePosition(
+          cssBookKey, destination, value['region'],
+          enabled: pdfPanelReading);
+    }
+    ref.read(bookListProvider.notifier).refresh();
   }
 
   String get selectionChapterTitle =>
@@ -3159,7 +3285,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       },
       builder: (onGone) => InAppWebView(
         onRenderProcessGone: onGone,
-        onWebContentProcessDidTerminate: (controller) => onGone(controller, null),
+        onWebContentProcessDidTerminate: (controller) =>
+            onGone(controller, null),
         webViewEnvironment: webViewEnvironment,
         initialUrlRequest: URLRequest(
           url: WebUri(

@@ -79,6 +79,30 @@ void main() {
     expect((await dao.readReadingPosition(1)).position, second);
   });
 
+  test('plugin position writes recheck the exact revision and invocation',
+      () async {
+    final db = await fixture();
+    addTearDown(db.close);
+    final dao = IsolatedBookDao(db);
+    final session = ReaderProgressSession(dao, 1);
+    final before = await session.refresh();
+    final generation = session.generation;
+    expect(await session.record(first, .4, generation: generation), isTrue);
+    expect(session.generation, generation);
+    expect(
+        await session.record(second, .8,
+            generation: generation, expectedRevision: before.revision),
+        isFalse);
+    final latest = (await dao.readReadingPosition(1)).revision;
+    expect(
+        await session.record(second, .8,
+            generation: generation,
+            expectedRevision: latest,
+            isCurrent: () => false),
+        isFalse);
+    expect((await dao.readReadingPosition(1)).position, first);
+  });
+
   for (final conflict in [false, true]) {
     test(
         'sync replaces the retained speech cursor without publishing stale data, conflict=$conflict',
