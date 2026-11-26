@@ -357,7 +357,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bubblewrap xdg-dbus-proxy gtk-update-icon-cache libgtk-3-0t64 \
             libepoxy0 libsecret-1-0 libsqlite3-0 libasound2t64 libpulse0 libwayland-server0 \
-            libsoup-3.0-0 libavif16 libmanette-0.2-0 libenchant-2-2 libwoff1 \
+            libsoup-3.0-0 libavif16 libenchant-2-2 libwoff1 \
             libharfbuzz-icu0 libgcrypt20 libtasn1-6 libjpeg-turbo8 libpng16-16t64 \
             liblcms2-2 libwebp7 libwebpdemux2 libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good libgl1-mesa-dri \
@@ -407,10 +407,14 @@ jobs:
             archlinux:base bash -euc '
               pacman -Syu --noconfirm --needed \
                 gtk3 libepoxy libsecret sqlite bubblewrap xdg-dbus-proxy \
-                libsoup3 libavif libmanette enchant woff2 harfbuzz-icu libgcrypt libtasn1 \
+                libsoup3 libavif enchant woff2 harfbuzz-icu libgcrypt libtasn1 \
                 libjpeg-turbo libpng lcms2 libwebp openjpeg2 libseccomp gst-plugins-bad-libs \
                 gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib \
                 python dbus xorg-server-xvfb xorg-xauth ttf-dejavu mesa libglvnd
+              if ldconfig -p | grep -Fq libmanette-0.2.so.0; then
+                echo "Arch AppImage smoke requires a host without libmanette installed" >&2
+                exit 1
+              fi
               useradd --create-home smoke
               install -d /run/dbus
               dbus-uuidgen > /etc/machine-id

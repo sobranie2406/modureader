@@ -66,7 +66,7 @@ Ubuntu 24.04, Ubuntu 26.04, and Arch Linux use the same x64 AppImage starting wi
 sudo apt update
 sudo apt install bubblewrap xdg-dbus-proxy libgtk-3-0t64 libepoxy0 libsecret-1-0 \
   libsqlite3-0 libasound2t64 libpulse0 libwayland-server0 libgles2 libsoup-3.0-0 \
-  libavif16 libmanette-0.2-0 libenchant-2-2 libwoff1 libharfbuzz-icu0 libgcrypt20 \
+  libavif16 libenchant-2-2 libwoff1 libharfbuzz-icu0 libgcrypt20 \
   libtasn1-6 libjpeg-turbo8 libpng16-16t64 liblcms2-2 libwebp7 libwebpdemux2 \
   libopenjp2-7 libseccomp2 libgstreamer-plugins-bad1.0-0 \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good
@@ -89,10 +89,12 @@ sudo apparmor_parser --skip-read-cache --replace /etc/apparmor.d/bwrap-userns-re
 
 ```sh
 sudo pacman -Syu --needed bubblewrap xdg-dbus-proxy gtk3 libepoxy libsecret sqlite \
-  libsoup3 libavif libmanette enchant woff2 harfbuzz-icu libgcrypt libtasn1 \
+  libsoup3 libavif enchant woff2 harfbuzz-icu libgcrypt libtasn1 \
   libjpeg-turbo libpng lcms2 libwebp openjpeg2 libseccomp gst-plugins-bad-libs \
   gstreamer gst-plugins-base gst-plugins-good libpulse alsa-lib libglvnd
 ```
+
+The 1.3.12 AppImage also requires `libmanette-0.2-0` on Ubuntu or `libmanette` on Arch Linux.
 
 #### Start Modu
 

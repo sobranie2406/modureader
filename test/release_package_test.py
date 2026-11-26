@@ -407,6 +407,44 @@ class PortableAppImageTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Incomplete.*WPEWebProcess'):
             native.prepare_appimage_wpe(self.prefix, self.appdir, self.app)
 
+    def test_manette_and_its_dependencies_are_copied_from_build_packages(self):
+        libraries = {
+            'libmanette-0.2.so.0': 'libmanette-0.2-0',
+            'libevdev.so.2': 'libevdev2',
+            'libgudev-1.0.so.0': 'libgudev-1.0-0',
+        }
+        sources = {package: self.prefix / soname
+                   for soname, package in libraries.items()}
+        for source in sources.values():
+            source.write_bytes((self.app / 'modu').read_bytes())
+
+        def command(tool, *args, **kwargs):
+            if tool == 'readelf':
+                binary = args[-1].name
+                if binary.startswith('libWPEWebKit-2.0.so.'):
+                    return '(NEEDED) Shared library: [libmanette-0.2.so.0]'
+                if binary == 'libmanette-0.2.so.0':
+                    return '\n'.join(f'(NEEDED) Shared library: [{soname}]'
+                                     for soname in libraries if soname != binary)
+            if tool == 'dpkg-query' and args[0] == '-L':
+                return str(sources[args[-1]])
+            return ''
+
+        copy_file = shutil.copy2
+
+        def copy_with_fixture_notice(source, target, **kwargs):
+            if Path(source).parent.parent == Path('/usr/share/doc'):
+                Path(target).write_text('fixture license')
+                return
+            copy_file(source, target, **kwargs)
+
+        with patch.object(native, 'command', side_effect=command), \
+                patch.object(native.shutil, 'copy2', side_effect=copy_with_fixture_notice):
+            native.prepare_appimage_wpe(self.prefix, self.appdir, self.app)
+        for soname, package in libraries.items():
+            self.assertEqual((self.appdir / 'usr/lib' / soname).read_bytes(),
+                             sources[package].read_bytes())
+
     def test_rejects_components_built_for_newer_glibc(self):
         with patch.object(native, 'command',
                           return_value='Version needs section\nName: GLIBC_2.40'):

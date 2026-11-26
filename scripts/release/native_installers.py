@@ -394,6 +394,9 @@ APPIMAGE_COMPAT_LIBRARIES = {
     'libxslt.so.1': 'libxslt1.1',
     'libexslt.so.0': 'libxslt1.1',
     'libhyphen.so.0': 'libhyphen0',
+    'libmanette-0.2.so.0': 'libmanette-0.2-0',
+    'libevdev.so.2': 'libevdev2',
+    'libgudev-1.0.so.0': 'libgudev-1.0-0',
     **{f'libflite{name}.so.1': 'libflite1' for name in (
         '', '_cmulex', '_usenglish', '_cmu_indic_lang', '_cmu_indic_lex',
         '_cmu_us_kal16', '_cmu_us_slt')},
