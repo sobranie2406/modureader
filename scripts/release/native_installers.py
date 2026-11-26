@@ -532,7 +532,11 @@ def build_linux_appimage(bundle, version, output, runtime_path, wpe_prefix):
         verify_payload(app, 'linux', 'x64')
 
         filesystem = work / 'image.squashfs'
-        command('mksquashfs', appdir, filesystem, '-noappend', '-all-root', '-no-progress', '-comp', 'gzip')
+        # The pinned Type 2 runtime supports Zstandard. Keep one image small
+        # enough for the Gitee attachment limit.
+        command('mksquashfs', appdir, filesystem, '-noappend', '-all-root',
+                '-no-progress', '-comp', 'zstd', '-Xcompression-level', '19',
+                '-b', '1M')
         packed = work / result.name
         with packed.open('wb') as image, filesystem.open('rb') as data:
             image.write(runtime)
