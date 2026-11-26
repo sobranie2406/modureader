@@ -121,7 +121,7 @@ jobs:
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: actions/checkout@v4
         with:
-          ref: 7c3380ecaf36b5e2bedccbfdd69da41b1631f914
+          ref: 83e39a7989801d59d30c4a958c7b205931a8c14e
       - uses: actions/download-artifact@v4
         with:
           name: embedding-test-fixtures
