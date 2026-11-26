@@ -1,6 +1,7 @@
 import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:modu_reader/service/book_local_sources.dart';
 import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'dart:io';
@@ -24,6 +25,7 @@ import 'package:modu_reader/providers/chapter_content_bridge.dart';
 import 'package:modu_reader/providers/current_reading.dart';
 import 'package:modu_reader/providers/sync.dart';
 import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/providers/tb_groups.dart';
 import 'package:modu_reader/providers/toc_search.dart';
 import 'package:modu_reader/service/convert_to_epub/txt/convert_from_txt.dart';
 import 'package:modu_reader/service/convert_to_epub/markdown/convert_from_markdown.dart';
@@ -80,7 +82,8 @@ Future<void> importBooksQuietly(
 
 /// import book list and **delete file**
 Future<void> importBookList(
-    List<File> fileList, BuildContext context, WidgetRef ref) async {
+    List<File> fileList, BuildContext context, WidgetRef ref,
+    {Map<String, String> collectionNames = const {}}) async {
   AnxLog.info('importBook fileList: ${fileList.toString()}');
 
   List<File> supportedFiles = fileList.where((file) {
@@ -99,6 +102,7 @@ Future<void> importBookList(
     fileList,
     context,
     ref,
+    collectionNames,
   );
 }
 
@@ -107,7 +111,8 @@ Future<void> _checkDuplicatesAndShowDialog(
     List<File> unsupportedFiles,
     List<File> fileList,
     BuildContext context,
-    WidgetRef ref) async {
+    WidgetRef ref,
+    Map<String, String> collectionNames) async {
   showDialog(
     animationStyle: AppMotion.style,
     context: context,
@@ -152,7 +157,7 @@ Future<void> _checkDuplicatesAndShowDialog(
   if (!context.mounted) return;
   Navigator.of(context, rootNavigator: true).pop();
   await _showImportDialog(uniqueFiles, duplicateFiles, duplicateInfo,
-      unsupportedFiles, fileList, ref);
+      unsupportedFiles, fileList, ref, collectionNames);
 }
 
 Future<void> _showImportDialog(
@@ -161,7 +166,8 @@ Future<void> _showImportDialog(
     Map<String, Book> duplicateInfo,
     List<File> unsupportedFiles,
     List<File> fileList,
-    WidgetRef ref) async {
+    WidgetRef ref,
+    Map<String, String> collectionNames) async {
   // delete unsupported files
   for (var file in unsupportedFiles) {
     if (file.existsSync()) file.deleteSync();
@@ -246,6 +252,8 @@ Future<void> _showImportDialog(
   }
 
   final supportedFiles = [...uniqueFiles, ...duplicateFiles];
+  final collections =
+      collectionNames.isEmpty ? null : FolderImportCollections();
   bool skipDuplicates = true;
 
   await showDialog(
@@ -279,7 +287,9 @@ Future<void> _showImportDialog(
                 currentHandlingFile = file.path;
               });
               try {
-                await importBook(file, ref);
+                await importBook(file, ref,
+                    collections: collections,
+                    collectionName: collectionNames[file.path]);
                 succeeded.add(file.path);
               } catch (e, stackTrace) {
                 AnxLog.severe('Failed to import ${file.path}: $e');
@@ -466,7 +476,9 @@ Future<void> _showImportDialog(
 }
 
 Future<void> importBook(File file, WidgetRef ref,
-    {void Function()? onImported}) async {
+    {void Function()? onImported,
+    FolderImportCollections? collections,
+    String? collectionName}) async {
   if (await FileSystemEntity.type(file.path) != FileSystemEntityType.file) {
     throw FileSystemException('Book source is not a regular file', file.path);
   }
@@ -496,12 +508,17 @@ Future<void> importBook(File file, WidgetRef ref,
       md5: md5,
       sourceMd5: sourceMd5,
       sourceFormat: extension,
+      collections: collections,
+      collectionName: collectionName,
       inspectDocumentOnImport:
           {'epub', 'pdf', 'mobi', 'azw3', 'fb2'}.contains(extension));
   if (await file.exists()) await file.delete();
   if (onImported != null) {
     onImported();
   } else {
+    if (collections?.groupIds.isNotEmpty == true) {
+      ref.invalidate(groupDaoProvider);
+    }
     ref.read(bookListProvider.notifier).refresh();
   }
 }
@@ -631,6 +648,8 @@ Future<void> saveBook(
   Object? documentReadingMode,
   String? linkedPath,
   String? sourceName,
+  FolderImportCollections? collections,
+  String? collectionName,
 }) async {
   final effectiveTitle = importedBookTitle(sourceName ?? file.path, title);
 
@@ -682,7 +701,10 @@ Future<void> saveBook(
       await PrivateLibrary.instance.registerImportedId(provideBook);
     }
     await PrivateLibrary.instance.onImported(book, isNew: provideBook == null);
-    book.id = await bookDao.insertBook(book, sourceMd5: sourceMd5);
+    book.id = await bookDao.insertBook(book,
+        sourceMd5: sourceMd5,
+        collections: collections,
+        collectionName: collectionName);
   } catch (_) {
     // Only remove newly created staging artifacts; never the imported source.
     final copied = File(filePath);
@@ -747,6 +769,8 @@ Future<void> getBookMetadata(
   bool inspectDocumentOnImport = true,
   String? linkedPath,
   String? sourceName,
+  FolderImportCollections? collections,
+  String? collectionName,
 }) async {
   if (classificationOnly && (book == null || coverOnly)) {
     throw ArgumentError('Classification requires an existing book');
@@ -845,6 +869,8 @@ Future<void> getBookMetadata(
         sourceFormat: sourceFormat,
         linkedPath: linkedPath,
         sourceName: sourceName,
+        collections: collections,
+        collectionName: collectionName,
         documentReadingMode: metadata['documentReadingMode']);
     ref?.read(bookListProvider.notifier).refresh();
   } finally {

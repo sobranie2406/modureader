@@ -9,6 +9,7 @@ import 'package:modu_reader/dao/database.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/main.dart' show navigatorKey;
 import 'package:modu_reader/service/book.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/service/sync/private_book_sync.dart';
 import 'package:modu_reader/service/sync/row_sync_store.dart';
@@ -79,6 +80,7 @@ void main() {
           'reading_percentage': .4,
         });
         await db.insert('tb_notes', noteRow(42, 'saved-note'));
+        await bookDao.moveBooksToFolder([42], newFolderName: '原合集');
         final old = await bookDao.selectBookById(42);
         expect(library.isPrivate(old), true);
         expect(library.syncExcludedLocalBookIds, isEmpty);
@@ -93,10 +95,14 @@ void main() {
       await tester.runAsync(() async {
         final source = await File('${root.path}/converted.epub')
             .writeAsString('converted bytes');
+        final originalGroup = (await bookDao.selectBookById(42)).groupId;
         await saveBook(
             source, 'Imported', 'Imported author', '', 'replacement-hash', '',
-            sourceMd5: 'old-source');
+            sourceMd5: 'old-source',
+            collections: FolderImportCollections(),
+            collectionName: '新目录');
         final replacement = await bookDao.selectBookById(42);
+        expect(replacement.groupId, originalGroup);
         expect(replacement.md5, 'replacement-hash');
         expect(replacement.filePath, isNot('file/old-source.epub'));
         expect(replacement.lastReadPosition, 'saved-position');
@@ -108,6 +114,7 @@ void main() {
         expect(library.syncExcludedLocalBookIds, contains(42));
         expect(await source.readAsString(), 'converted bytes');
         final db = await DBHelper().database;
+        expect(await db.query('tb_groups', where: "name = '新目录'"), isEmpty);
         expect((await db.query('tb_notes')).single['content'], 'saved-note');
         final records = await RowSyncStore(db).snapshot();
         final outgoing = PrivateBookSyncFilter(records).allowedRecords(records);

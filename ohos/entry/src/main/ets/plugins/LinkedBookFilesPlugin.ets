@@ -8,7 +8,7 @@ import { util } from '@kit.ArkTS';
 
 interface SelectedBook { uri: string; root: string; name: string; }
 interface LinkedBook { uri: string; root: string; }
-interface PickerEntry { id: string; name: string; label: string; }
+interface PickerEntry { id: string; name: string; label: string; collectionName?: string; }
 
 export default class LinkedBookFilesPlugin implements FlutterPlugin, MethodCallHandler, AbilityAware {
   private channel: MethodChannel | null = null;
@@ -68,7 +68,9 @@ export default class LinkedBookFilesPlugin implements FlutterPlugin, MethodCallH
         if (dot <= 0 || /[/\\\x00]/.test(name) || !extensions.includes(name.substring(dot + 1).toLowerCase())) continue;
         const id = util.generateRandomUUID();
         this.selected.set(id, { uri: uri, root: root, name: name });
-        output.push({ id: id, name: name, label: relative || name });
+        const entry: PickerEntry = { id: id, name: name, label: relative || name };
+        if (!files && parts.length > 1) entry.collectionName = parts[0];
+        output.push(entry);
       }
     }
     return output;

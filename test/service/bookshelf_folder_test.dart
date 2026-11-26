@@ -1,4 +1,6 @@
 import 'package:modu_reader/dao/book.dart';
+import 'package:modu_reader/models/book.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/service/sync/row_sync_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -24,6 +26,59 @@ void main() {
     await db.insert('tb_books', bookRow(3, md5: 'book-three'));
   });
   tearDown(() => db.close());
+
+  test('new books share the collection for their source folder and sync it',
+      () async {
+    final collections = FolderImportCollections();
+    final oldGroup = await dao.moveBooksToFolder([1], newFolderName: '小说');
+    final first = Book.fromDb(bookRow(-1, md5: 'new-one'));
+    final second =
+        Book.fromDb(bookRow(-1, md5: '1234567890abcdef1234567890abcdef'));
+    final other = Book.fromDb(bookRow(-1, md5: 'new-three'));
+    await dao.insertBook(first, collections: collections, collectionName: '小说');
+    await dao.insertBook(second,
+        sourceMd5: 'abcdef0123456789abcdef0123456789',
+        collections: collections,
+        collectionName: '小说');
+    await dao.insertBook(other, collections: collections, collectionName: '历史');
+
+    expect(first.groupId, second.groupId);
+    expect(first.groupId, isNot(oldGroup));
+    expect(other.groupId, isNot(first.groupId));
+    expect((await db.query('tb_books', where: 'id=1')).single['group_id'],
+        oldGroup);
+    final remote = await fixture(bookId: 77);
+    try {
+      await RowSyncStore(remote).merge(await RowSyncStore(db).snapshot());
+      final synced = await remote.query('tb_books',
+          where: 'file_md5 IN (?, ?)', whereArgs: [first.md5, second.md5]);
+      expect(synced, hasLength(2));
+      final syncedGroup = synced.map((row) => row['group_id']).toSet().single;
+      expect(
+          (await remote
+                  .query('tb_groups', where: 'id=?', whereArgs: [syncedGroup]))
+              .single['name'],
+          '小说');
+    } finally {
+      await remote.close();
+    }
+  });
+
+  test('duplicate and failed imports leave no collection behind', () async {
+    final collections = FolderImportCollections();
+    await expectLater(
+        dao.insertBook(Book.fromDb(bookRow(-1, md5: 'book-two')),
+            collections: collections, collectionName: '重复'),
+        throwsStateError);
+    await expectLater(
+        dao.insertBook(Book.fromDb(bookRow(-1, md5: 'new-one')),
+            sourceMd5: 'invalid',
+            collections: collections,
+            collectionName: '导入失败'),
+        throwsFormatException);
+    expect(await db.query('tb_groups', where: 'id > 0'), isEmpty);
+    expect(collections.groupIds, isEmpty);
+  });
 
   test(
       'creates named folder, deduplicates IDs and preserves all other book data',

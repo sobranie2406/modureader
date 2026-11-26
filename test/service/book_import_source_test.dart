@@ -5,10 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('PDF imports keep filenames instead of unreliable embedded titles', () {
     for (final title in ['P3', '天', 'æµ‹è¯•', '正常的内部标题', 'Unknown', '']) {
-      expect(importedBookTitle('/cache/倪海厦人纪系列之针灸.PDF', title),
-          '倪海厦人纪系列之针灸');
+      expect(importedBookTitle('/cache/倪海厦人纪系列之针灸.PDF', title), '倪海厦人纪系列之针灸');
     }
     expect(importedBookTitle('/cache/书名.修订版.pdf', 'P3'), '书名.修订版');
   });
@@ -41,9 +42,10 @@ void main() {
       'folder scan includes supported nested books, deduplicates overlapping drops, skips links',
       () async {
     final first = await book('a/Novel.EPUB', 'first');
-    await book('b/Novel.EPUB', 'second');
+    final second = await book('b/deeper/Novel.EPUB', 'second');
     await book('b/notes.markdown', 'notes');
     await book('b/novel.UMD', 'umd');
+    await book('root.pdf', 'root book');
     await book('cover.jpg', 'not a book');
     await book('.hidden/book.pdf', 'hidden');
     if (!Platform.isWindows) {
@@ -51,7 +53,7 @@ void main() {
       await Link(p.join(root.path, 'alias.epub')).create(first.path);
     }
     final entries = await discoverBookImportFiles([root.path, first.path]);
-    expect(entries, hasLength(4));
+    expect(entries, hasLength(5));
     expect(entries.map((e) => e.name),
         containsAll(['Novel.EPUB', 'notes.markdown', 'novel.UMD']));
     expect(
@@ -60,6 +62,43 @@ void main() {
             .map((e) => e.label)
             .toSet(),
         hasLength(2));
+    expect(
+        entries
+            .singleWhere(
+                (entry) => entry.id == first.resolveSymbolicLinksSync())
+            .collectionName,
+        'a');
+    expect(
+        entries
+            .singleWhere(
+                (entry) => entry.id == second.resolveSymbolicLinksSync())
+            .collectionName,
+        'b');
+    expect(
+        entries.singleWhere((entry) => entry.name == 'root.pdf').collectionName,
+        isNull);
+  });
+
+  test('native selection reads collection metadata independently of labels',
+      () async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+        MobileBookFolder.channel,
+        (_) async => [
+              {
+                'id': 'a',
+                'name': 'book.pdf',
+                'label': 'book.pdf',
+                'collectionName': '史书',
+              },
+              {'id': 'b', 'name': 'root.pdf', 'label': 'root.pdf'},
+            ]);
+    addTearDown(() =>
+        messenger.setMockMethodCallHandler(MobileBookFolder.channel, null));
+
+    final entries = (await MobileBookFolder.pick())!;
+    expect(entries.map((entry) => entry.collectionName), ['史书', null]);
   });
 
   test(
@@ -68,6 +107,7 @@ void main() {
     final first = await book('a/Novel.txt', 'first');
     final second = await book('b/Novel.txt', 'second');
     final entries = await discoverBookImportFiles([first.path, second.path]);
+    expect(entries.map((entry) => entry.collectionName), everyElement(isNull));
     final staged = await stageBookImportFiles(entries, root);
     expect(staged[0].path, isNot(staged[1].path));
     expect(await staged[0].readAsString(), 'first');

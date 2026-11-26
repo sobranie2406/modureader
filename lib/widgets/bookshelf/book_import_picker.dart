@@ -8,12 +8,14 @@ import 'dart:io';
 import 'package:modu_reader/dao/book.dart';
 import 'package:modu_reader/providers/book_list.dart';
 import 'package:modu_reader/providers/sync_status.dart';
+import 'package:modu_reader/providers/tb_groups.dart';
 import 'package:modu_reader/service/ios_linked_books.dart';
 import 'package:modu_reader/service/md5_service.dart';
 
 import 'package:modu_reader/l10n/modu_strings.dart';
 import 'package:modu_reader/service/book.dart';
 import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/utils/get_path/get_temp_dir.dart';
 import 'package:modu_reader/utils/platform_utils.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -99,18 +101,23 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
                   : 'No supported books found'))));
       return;
     }
-    final selected = await showDialog<List<BookImportEntry>>(
+    final selection = await showDialog<BookImportSelectionResult>(
       animationStyle: AppMotion.style,
       context: context,
-      builder: (_) =>
-          BookImportSelection(entries: entries!, inPlace: useInPlace),
+      builder: (_) => BookImportSelection(
+          entries: entries!, inPlace: useInPlace, allowCollections: folder),
     );
-    if (selected == null || selected.isEmpty || !context.mounted) return;
+    if (selection == null || selection.entries.isEmpty || !context.mounted) {
+      return;
+    }
+    final selected = selection.entries;
     if (relinkBook != null && selected.length != 1) {
       throw const FileSystemException('Select one matching original');
     }
     if (useInPlace) {
       var failed = 0;
+      final collections =
+          selection.createCollections ? FolderImportCollections() : null;
       await _withImportProgress(context, () async {
         for (final entry in selected) {
           String? key;
@@ -174,7 +181,9 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
                 md5: md5,
                 linkedPath: key,
                 sourceName: entry.name,
-                sourceFormat: entry.name.split('.').last.toLowerCase());
+                sourceFormat: entry.name.split('.').last.toLowerCase(),
+                collections: collections,
+                collectionName: entry.collectionName);
             key = null; // The saved book now owns this bookmark.
           } catch (_) {
             failed++;
@@ -184,6 +193,9 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
               await IosLinkedBooks.forget(key);
             }
           }
+        }
+        if (collections?.groupIds.isNotEmpty == true) {
+          ref.invalidate(groupDaoProvider);
         }
         await ref.read(bookListProvider.notifier).refresh();
         ref.invalidate(syncStatusProvider);
@@ -209,7 +221,12 @@ Future<void> pickBooksForImport(BuildContext context, WidgetRef ref,
       }
       return;
     }
-    importBookList(files, context, ref);
+    importBookList(files, context, ref, collectionNames: {
+      if (selection.createCollections)
+        for (var i = 0; i < files.length; i++)
+          if (selected[i].collectionName case final String name)
+            files[i].path: name,
+    });
   } catch (error, stack) {
     if (droppedPaths != null) {
       AnxLog.severe('Dropped book import failed: $error\n$stack');
@@ -259,17 +276,30 @@ Future<T> _withImportProgress<T>(
   }
 }
 
+class BookImportSelectionResult {
+  const BookImportSelectionResult(this.entries,
+      {required this.createCollections});
+
+  final List<BookImportEntry> entries;
+  final bool createCollections;
+}
+
 class BookImportSelection extends StatefulWidget {
   const BookImportSelection(
-      {super.key, required this.entries, this.inPlace = false});
+      {super.key,
+      required this.entries,
+      this.inPlace = false,
+      this.allowCollections = false});
   final List<BookImportEntry> entries;
   final bool inPlace;
+  final bool allowCollections;
   @override
   State<BookImportSelection> createState() => _BookImportSelectionState();
 }
 
 class _BookImportSelectionState extends State<BookImportSelection> {
   late final selected = widget.entries.map((e) => e.id).toSet();
+  bool createCollections = false;
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: Text(ModuStrings.text(
@@ -280,7 +310,8 @@ class _BookImportSelectionState extends State<BookImportSelection> {
             width: 520,
             height: MediaQuery.sizeOf(context).height * .55,
             child: ListView.builder(
-                itemCount: widget.entries.length + 2,
+                itemCount:
+                    widget.entries.length + (widget.allowCollections ? 3 : 2),
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return Text(ModuStrings.text(
@@ -314,7 +345,17 @@ class _BookImportSelectionState extends State<BookImportSelection> {
                       }),
                     );
                   }
-                  final entry = widget.entries[index - 2];
+                  if (widget.allowCollections && index == 2) {
+                    return CheckboxListTile(
+                      title: Text(ModuStrings.text(context, '按子文件夹创建合集',
+                          'Create collections from subfolders')),
+                      value: createCollections,
+                      onChanged: (value) =>
+                          setState(() => createCollections = value ?? false),
+                    );
+                  }
+                  final entry =
+                      widget.entries[index - (widget.allowCollections ? 3 : 2)];
                   return CheckboxListTile(
                       key: ValueKey(entry.id),
                       title: Text(entry.name),
@@ -337,9 +378,11 @@ class _BookImportSelectionState extends State<BookImportSelection> {
                   ? null
                   : () => Navigator.pop(
                       context,
-                      widget.entries
-                          .where((e) => selected.contains(e.id))
-                          .toList()),
+                      BookImportSelectionResult(
+                          widget.entries
+                              .where((e) => selected.contains(e.id))
+                              .toList(),
+                          createCollections: createCollections)),
               child: Text(ModuStrings.text(
                   context,
                   widget.inPlace ? '添加所选' : '导入所选',

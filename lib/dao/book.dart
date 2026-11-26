@@ -1,4 +1,5 @@
 import 'package:modu_reader/dao/base_dao.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/service/private_library.dart';
 import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/narration_position.dart';
@@ -13,6 +14,15 @@ class BookDao extends BaseDao {
   BookDao();
 
   static const String table = 'tb_books';
+
+  Future<int> _createFolder(DatabaseExecutor db, String name, String now) =>
+      db.insert('tb_groups', {
+        'name': name,
+        'parent_id': 0,
+        'is_deleted': 0,
+        'create_time': now,
+        'update_time': now,
+      });
 
   /// Create a folder and move its books atomically, or move into a live folder.
   /// Only membership changes: never write a stale Book snapshot over sync data.
@@ -50,13 +60,7 @@ class BookDao extends BaseDao {
         if (groups.isEmpty) throw StateError('Folder no longer exists');
         target = groupId;
       } else {
-        target = await txn.insert('tb_groups', {
-          'name': name,
-          'parent_id': 0,
-          'is_deleted': 0,
-          'create_time': now,
-          'update_time': now,
-        });
+        target = await _createFolder(txn, name!, now);
       }
       for (final id in ids) {
         await txn.update(table, {'group_id': target, 'update_time': now},
@@ -76,10 +80,45 @@ class BookDao extends BaseDao {
     return insert(table, book.toMap());
   }
 
-  Future<int> insertBook(Book book, {String? sourceMd5}) {
-    if (book.id != -1 || sourceMd5 == null) return save(book);
-    return transaction((txn) =>
-        ConvertedBookChecksum.insert(txn, book.toMap(), sourceMd5: sourceMd5));
+  Future<int> insertBook(Book book,
+      {String? sourceMd5,
+      FolderImportCollections? collections,
+      String? collectionName}) async {
+    if (book.id != -1) return save(book);
+    if (collections == null || collectionName == null) {
+      if (sourceMd5 == null) return save(book);
+      return transaction((txn) => ConvertedBookChecksum.insert(
+          txn, book.toMap(),
+          sourceMd5: sourceMd5));
+    }
+    final (id, groupId) = await transaction((txn) async {
+      final hash = (sourceMd5 ?? book.md5)?.toLowerCase();
+      if (hash != null &&
+          (await txn.rawQuery(_bookByMd5Query, [hash, 'md5:$hash']))
+              .isNotEmpty) {
+        throw StateError('Book already exists');
+      }
+      final previousGroupId = collections.groupIds[collectionName];
+      final groups = previousGroupId == null
+          ? const []
+          : await txn.query('tb_groups',
+              columns: ['id'],
+              where: 'id = ? AND is_deleted = 0',
+              whereArgs: [previousGroupId]);
+      final groupId = groups.isNotEmpty
+          ? previousGroupId!
+          : await _createFolder(
+              txn, collectionName, DateTime.now().toIso8601String());
+      final values = book.toMap()..['group_id'] = groupId;
+      final id = sourceMd5 == null
+          ? await txn.insert(table, values)
+          : await ConvertedBookChecksum.insert(txn, values,
+              sourceMd5: sourceMd5);
+      return (id, groupId);
+    });
+    collections.groupIds[collectionName] = groupId;
+    book.groupId = groupId;
+    return id;
   }
 
   Future<void> updateBook(Book book) async {
@@ -245,13 +284,15 @@ class BookDao extends BaseDao {
     return selectBooks();
   }
 
-  Future<Book?> getBookByMd5(String md5) {
-    // Converted books retain their source identity while file_md5 checks the
-    // actual EPUB. The same import must still find the original shelf entry.
-    return rawQuerySingle('''SELECT b.* FROM tb_books b
+  // Converted books retain their source identity while file_md5 checks the
+  // actual EPUB. The same import must still find the original shelf entry.
+  static const _bookByMd5Query = '''SELECT b.* FROM tb_books b
       LEFT JOIN $syncRecordsTable r ON r.kind='book' AND r.local_id=b.id
       WHERE lower(b.file_md5)=? OR r.sync_id=?
-      ORDER BY b.is_deleted ASC, b.id ASC LIMIT 1''',
+      ORDER BY b.is_deleted ASC, b.id ASC LIMIT 1''';
+
+  Future<Book?> getBookByMd5(String md5) {
+    return rawQuerySingle(_bookByMd5Query,
         arguments: [md5.toLowerCase(), 'md5:${md5.toLowerCase()}'],
         mapper: Book.fromDb);
   }

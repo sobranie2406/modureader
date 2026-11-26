@@ -215,7 +215,7 @@ final class BookFolderPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate 
     worker.async {
       do {
         var found = [[String: String]]()
-        func visit(_ directory: URL, prefix: String) throws {
+        func visit(_ directory: URL, prefix: String, collectionName: String? = nil) throws {
           let children = try FileManager.default.contentsOfDirectory(at: directory,
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
           for child in children {
@@ -223,11 +223,13 @@ final class BookFolderPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate 
             if values.isSymbolicLink == true { continue }
             let name = child.lastPathComponent
             let label = prefix.isEmpty ? name : "\(prefix)/\(name)"
-            if values.isDirectory == true { try visit(child, prefix: label) }
+            if values.isDirectory == true { try visit(child, prefix: label, collectionName: collectionName ?? name) }
             else if values.isRegularFile == true && self.extensions.contains(child.pathExtension.lowercased()) {
               let id = String(found.count)
               self.entries[id] = child
-              found.append(["id": id, "name": name, "label": label])
+              var entry = ["id": id, "name": name, "label": label]
+              entry["collectionName"] = collectionName
+              found.append(entry)
             }
           }
         }

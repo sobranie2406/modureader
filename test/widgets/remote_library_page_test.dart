@@ -6,6 +6,7 @@ import 'package:modu_reader/widgets/common/container/filled_container.dart';
 
 import 'package:modu_reader/page/home_page/remote_library_page.dart';
 import 'package:modu_reader/page/settings_page/remote_library.dart';
+import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:modu_reader/service/remote_library/ftp_connection.dart';
 import 'package:modu_reader/service/remote_library/ftp_library.dart';
 import 'package:modu_reader/service/remote_library/webdav_library.dart';
@@ -46,7 +47,8 @@ class _Library extends WebdavLibrary {
     }
     return [
       LibraryEntry(directory.resolve('one.txt'), 'one.txt', false, 10),
-      LibraryEntry(directory.resolve('sub/two.umd'), 'two.umd', false, 10),
+      LibraryEntry(
+          directory.resolve('sub/child/two.umd'), 'two.umd', false, 10),
       LibraryEntry(directory.resolve('three.pdf'), 'three.pdf', false, 10),
     ];
   }
@@ -147,7 +149,19 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(library.scannedDirectory, library.root.resolve('folder/'));
     expect(find.text('Select books to import'), findsOneWidget);
-    expect(find.text('sub/two.umd'), findsOneWidget);
+    expect(find.text('sub/child/two.umd'), findsOneWidget);
+    final picker =
+        tester.widget<BookImportSelection>(find.byType(BookImportSelection));
+    expect(picker.allowCollections, isTrue);
+    expect(
+        {for (final entry in picker.entries) entry.name: entry.collectionName},
+        {'one.txt': null, 'two.umd': 'sub', 'three.pdf': null});
+    final collections = find.widgetWithText(
+        CheckboxListTile, 'Create collections from subfolders');
+    expect(tester.widget<CheckboxListTile>(collections).value, isFalse);
+    await tester.tap(collections);
+    await tester.pump();
+    expect(tester.widget<CheckboxListTile>(collections).value, isTrue);
     expect(library.downloads, isEmpty);
     await tester.tap(find
         .byKey(ValueKey(library.root.resolve('folder/one.txt').toString())));
@@ -169,7 +183,7 @@ void main() {
     expect(library.downloads.length, 2);
     await tester.pumpAndSettle();
     expect(library.downloads, [
-      library.root.resolve('folder/sub/two.umd'),
+      library.root.resolve('folder/sub/child/two.umd'),
       library.root.resolve('folder/three.pdf')
     ]);
     expect(find.textContaining('Imported 0, skipped 0 duplicates, failed 2.'),

@@ -6,10 +6,16 @@ import 'package:path/path.dart' as p;
 
 class BookImportEntry {
   const BookImportEntry(
-      {required this.id, required this.name, required this.label});
+      {required this.id,
+      required this.name,
+      required this.label,
+      this.collectionName});
   final String id;
   final String name;
   final String label;
+
+  /// The first directory under the selected root, if this book is inside one.
+  final String? collectionName;
 }
 
 bool isSupportedBookFile(String name) => allowBookExtensions
@@ -30,7 +36,8 @@ String importedBookTitle(String filePath, String metadataTitle) {
 Future<List<BookImportEntry>> discoverBookImportFiles(
     List<String> paths) async {
   final entries = <String, BookImportEntry>{};
-  Future<void> addFile(String path, String label) async {
+  Future<void> addFile(String path, String label,
+      {String? collectionName}) async {
     if (!isSupportedBookFile(path)) return;
     final id = await File(path).resolveSymbolicLinks();
     entries.putIfAbsent(
@@ -39,18 +46,20 @@ Future<List<BookImportEntry>> discoverBookImportFiles(
               id: id,
               name: p.basename(path),
               label: label,
+              collectionName: collectionName,
             ));
   }
 
-  Future<void> visit(Directory folder, String prefix) async {
+  Future<void> visit(Directory folder, String prefix,
+      {String? collectionName}) async {
     await for (final child in folder.list(followLinks: false)) {
       final name = p.basename(child.path);
       if (name.startsWith('.')) continue;
       final label = p.join(prefix, name);
       if (child is Directory) {
-        await visit(child, label);
+        await visit(child, label, collectionName: collectionName ?? name);
       } else if (child is File) {
-        await addFile(child.path, label);
+        await addFile(child.path, label, collectionName: collectionName);
       }
     }
   }
@@ -140,6 +149,7 @@ class MobileBookFolder {
               id: item['id'] as String,
               name: item['name'] as String,
               label: item['label'] as String,
+              collectionName: item['collectionName'] as String?,
             ))
         .toList();
   }

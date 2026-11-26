@@ -63,8 +63,8 @@ void main() {
       BookImportEntry(id: 'a', name: 'book.epub', label: 'book.epub'),
     ]))));
     expect(find.textContaining('without uploading'), findsOneWidget);
-    expect(find.textContaining('Notes and progress still sync'),
-        findsOneWidget);
+    expect(
+        find.textContaining('Notes and progress still sync'), findsOneWidget);
     expect(find.textContaining('TXT, Markdown or UMD'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -75,21 +75,25 @@ void main() {
       BookImportEntry(id: 'a', name: 'same.epub', label: 'a/same.epub'),
       BookImportEntry(id: 'b', name: 'same.epub', label: 'b/same.epub'),
     ];
-    List<BookImportEntry>? result;
+    BookImportSelectionResult? result;
     await tester.pumpWidget(MaterialApp(
         home: Builder(
             builder: (context) => Scaffold(
                   body: TextButton(
                       onPressed: () async {
-                        result = await showDialog<List<BookImportEntry>>(
+                        result = await showDialog<BookImportSelectionResult>(
                             context: context,
-                            builder: (_) =>
-                                const BookImportSelection(entries: entries));
+                            builder: (_) => const BookImportSelection(
+                                entries: entries, allowCollections: true));
                       },
                       child: const Text('open')),
                 ))));
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
+    final collections = find.widgetWithText(
+        CheckboxListTile, 'Create collections from subfolders');
+    expect(tester.widget<CheckboxListTile>(collections).value, false);
+    await tester.tap(collections);
     expect(
         tester.widget<CheckboxListTile>(find.byKey(const ValueKey('a'))).value,
         true);
@@ -97,7 +101,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
-    expect(result!.map((e) => e.id), ['b']);
+    expect(result!.entries.map((e) => e.id), ['b']);
+    expect(result!.createCollections, true);
     expect(tester.takeException(), isNull);
   });
 }

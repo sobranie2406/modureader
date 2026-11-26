@@ -6,8 +6,10 @@ import 'dart:io';
 
 import 'package:modu_reader/page/settings_page/remote_library.dart';
 import 'package:modu_reader/providers/book_list.dart';
+import 'package:modu_reader/providers/tb_groups.dart';
 import 'package:modu_reader/service/book.dart';
 import 'package:modu_reader/service/book_import_source.dart';
+import 'package:modu_reader/service/folder_import_collections.dart';
 import 'package:modu_reader/widgets/bookshelf/book_import_picker.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'package:modu_reader/utils/toast/common.dart';
@@ -225,7 +227,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
   }
 
   Future<bool> _importEntry(
-      LibraryEntry entry, RemoteLibrary client, CancelToken token) async {
+      LibraryEntry entry, RemoteLibrary client, CancelToken token,
+      {FolderImportCollections? collections, String? collectionName}) async {
     final container = ProviderScope.containerOf(context, listen: false);
     Directory? temporary;
     try {
@@ -257,9 +260,18 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
           !duplicate.isDeleted &&
           File(duplicate.fileFullPath).existsSync();
       if (!alreadyPresent) {
-        await importBook(file, ref,
-            onImported: () =>
-                container.read(bookListProvider.notifier).refresh());
+        await importBook(
+          file,
+          ref,
+          collections: collections,
+          collectionName: collectionName,
+          onImported: () {
+            if (collections != null && collectionName != null) {
+              container.invalidate(groupDaoProvider);
+            }
+            container.read(bookListProvider.notifier).refresh();
+          },
+        );
       }
       if (mounted) setState(() => _imported.add(entry.uri.toString()));
       return !alreadyPresent;
@@ -292,20 +304,29 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
       final byId = {for (final e in entries) e.uri.toString(): e};
       final segments = directory.pathSegments;
       final depth = segments.length - (segments.lastOrNull == '' ? 1 : 0);
-      final selected = await showDialog<List<BookImportEntry>>(
+      final selection = await showDialog<BookImportSelectionResult>(
           context: context,
           animationStyle: AppMotion.style,
           builder: (_) => BookImportSelection(
-              entries: entries
-                  .map((e) => BookImportEntry(
-                      id: e.uri.toString(),
-                      name: e.name,
-                      label: e.uri.pathSegments.skip(depth).join('/')))
-                  .toList()));
-      if (selected == null || !mounted || token.isCancelled) return;
+              allowCollections: true,
+              entries: entries.map((entry) {
+                final relativePath =
+                    entry.uri.pathSegments.skip(depth).toList();
+                return BookImportEntry(
+                    id: entry.uri.toString(),
+                    name: entry.name,
+                    label: relativePath.join('/'),
+                    collectionName:
+                        relativePath.length > 1 ? relativePath.first : null);
+              }).toList()));
+      if (selection == null || !mounted || token.isCancelled) return;
+      final selected = selection.entries;
+      final collections =
+          selection.createCollections ? FolderImportCollections() : null;
       for (var i = 0; i < selected.length; i++) {
         if (!mounted || token.isCancelled) break;
-        final entry = byId[selected[i].id]!;
+        final item = selected[i];
+        final entry = byId[item.id]!;
         setState(() {
           _activeName = '${i + 1}/${selected.length} · ${entry.name}';
           _received = 0;
@@ -313,7 +334,8 @@ class _RemoteLibraryPageState extends ConsumerState<RemoteLibraryPage> {
           _importing = false;
         });
         try {
-          if (await _importEntry(entry, client, token)) {
+          if (await _importEntry(entry, client, token,
+              collections: collections, collectionName: item.collectionName)) {
             added++;
           } else {
             skipped++;

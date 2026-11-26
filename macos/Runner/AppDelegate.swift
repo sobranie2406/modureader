@@ -120,7 +120,10 @@ final class LinkedBookFiles {
                       v.isRegularFile == true, v.isSymbolicLink != true else { continue }
                 let id = UUID().uuidString
                 self.selected[id] = url
-                output.append(["id": id, "name": url.lastPathComponent, "label": url.lastPathComponent])
+                var entry = ["id": id, "name": url.lastPathComponent, "label": url.lastPathComponent]
+                let relative = url.pathComponents.dropFirst(root.pathComponents.count)
+                if !files && relative.count > 1 { entry["collectionName"] = relative.first }
+                output.append(entry)
               }
             }
             result(output)

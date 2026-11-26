@@ -110,12 +110,13 @@ function harness({uris = [folderUri], children = [], unreadable = [], directorie
 }
 
 test('OHOS folder copy uses scoped URI handles for nested Unicode and encoded filenames', async () => {
-    const relative = '子 目录/罕见#100%.EPUB';
+    const relative = '子 目录/更深一层/罕见#100%.EPUB';
     const h = harness({children: ['/' + relative, '/另一层/同名.pdf', '/同名.pdf', '/ignore.txt']});
     const picked = await h.pick();
     assert.equal(picked.error, undefined);
     assert.equal(picked.value.length, 3);
-    assert.ok(picked.value.some(entry => entry.name === '罕见#100%.EPUB'));
+    assert.deepEqual(picked.value.map(entry => [entry.name, entry.collectionName ?? null]),
+        [['罕见#100%.EPUB', '子 目录'], ['同名.pdf', '另一层'], ['同名.pdf', null]]);
     assert.deepEqual(h.events.find(event => event[0] === 'picker')[1],
         {selectMode: 1, maxSelectNumber: 1});
     assert.deepEqual(h.events.find(event => event[0] === 'list').slice(1),

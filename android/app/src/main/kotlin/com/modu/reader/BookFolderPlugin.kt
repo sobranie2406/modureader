@@ -190,11 +190,13 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
             try {
                 selectionRoot = tree
                 val found = mutableListOf<Map<String, String>>()
-                fun add(uri: Uri, name: String, label: String) {
+                fun add(uri: Uri, name: String, label: String, collectionName: String? = null) {
                     if (name.contains('/') || name.contains('\\') || name.substringAfterLast('.', "").lowercase() !in extensions) return
                     val key = found.size.toString()
                     entries[key] = Pair(uri, name)
-                    found.add(mapOf("id" to key, "name" to name, "label" to label))
+                    val entry = mutableMapOf("id" to key, "name" to name, "label" to label)
+                    if (collectionName != null) entry["collectionName"] = collectionName
+                    found.add(entry)
                 }
                 if (pickingFiles) {
                     val uris = linkedSetOf<Uri>()
@@ -209,7 +211,7 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
                     return@execute
                 }
                 val visited = mutableSetOf<String>()
-                fun visit(id: String, prefix: String) {
+                fun visit(id: String, prefix: String, collectionName: String? = null) {
                     if (!visited.add(id)) return
                     val uri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id)
                     val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -224,9 +226,9 @@ class BookFolderPlugin : FlutterPlugin, ActivityAware, PluginRegistry.ActivityRe
                             if (name.startsWith(".") || name.contains('/') || name.contains('\\')) continue
                             val label = if (prefix.isEmpty()) name else "$prefix/$name"
                             if (it.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
-                                visit(childId, label)
+                                visit(childId, label, collectionName ?: name)
                             } else if (name.substringAfterLast('.', "").lowercase() in extensions) {
-                                add(DocumentsContract.buildDocumentUriUsingTree(tree, childId), name, label)
+                                add(DocumentsContract.buildDocumentUriUsingTree(tree, childId), name, label, collectionName)
                             }
                         }
                     }
