@@ -163,4 +163,18 @@ void main() {
     expect(Prefs().prefs.getString('unrelated'), 'unchanged');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('DeepSeek saves the Markdown filter as a persistent setting',
+      (tester) async {
+    Prefs().ttsService = 'deepseek';
+    await open(tester);
+    final toggle = find.widgetWithText(SwitchListTile, 'Strip Markdown');
+    await tester.ensureVisible(toggle);
+    expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    await tap(tester, 'Save settings');
+    expect(Prefs().getOnlineTtsConfig('deepseek')['filterMarkdown'], 'false');
+    expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+  });
 }

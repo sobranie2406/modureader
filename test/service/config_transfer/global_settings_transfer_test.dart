@@ -337,14 +337,19 @@ void main() {
     });
   }
 
-  test('legacy TTS link remains importable at central entry', () async {
+  test('legacy TTS link imports without clearing newer providers', () async {
+    await Prefs().saveOnlineTtsConfig('deepseek', {'key': 'fixture-key'});
+    Prefs().setTtsVoiceModel('deepseek', 'tide');
     final source = TtsConfigTransfer.defaults();
+    source['providers'].remove('deepseek');
     source['rate'] = 1.3;
     final token = ConfigTransferCodec.encode(kind: 'tts', data: source);
     final data = GlobalSettingsTransfer.legacy(token)!;
     await GlobalSettingsTransfer.apply(Prefs(), data);
     expect(Prefs().ttsRate, 1.3);
     expect(Prefs().webdavStatus, true);
+    expect(Prefs().getOnlineTtsConfig('deepseek'), {'key': 'fixture-key'});
+    expect(Prefs().getTtsVoiceModel('deepseek'), 'tide');
   });
 
   for (final includeSecrets in [false, true]) {

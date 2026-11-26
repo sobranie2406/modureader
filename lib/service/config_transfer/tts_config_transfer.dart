@@ -6,7 +6,7 @@ import 'package:modu_reader/service/tts/tts_service.dart';
 
 /// A complete, versioned snapshot. Parsing never changes preferences or starts TTS.
 class TtsConfigTransfer {
-  /// The five built-in providers, in the fixed order an export writes them so
+  /// The built-in providers in the fixed order an export writes them so
   /// an older build can read a backup produced by a newer one. Sourced from the
   /// registry so adding a provider cannot silently drop its configuration.
   static List<String> get services => TtsRegistry.transferOrder;
@@ -14,6 +14,17 @@ class TtsConfigTransfer {
   /// True when [id] is a built-in provider this build can configure. Unknown
   /// ids keep their stored shape instead of being validated or dropped.
   static bool isKnownProvider(String id) => services.contains(id);
+
+  /// Providers every snapshot must carry. Providers added after the snapshot
+  /// format was published are optional so a backup written by an older build
+  /// still imports without overwriting settings it does not contain.
+  static const Set<String> requiredProviders = {
+    'system',
+    'edge',
+    'dashscope',
+    'xiaomi',
+    'openai',
+  };
 
   static Map<String, dynamic> defaults() => {
         'version': 1,
@@ -69,7 +80,7 @@ class TtsConfigTransfer {
     final rawProviders = data['providers'];
     if (data['allowMixWithOtherAudio'] is! bool ||
         rawProviders is! Map ||
-        !services.every(rawProviders.containsKey)) {
+        !requiredProviders.every(rawProviders.containsKey)) {
       throw const FormatException('朗读配置不完整 / Incomplete TTS configuration');
     }
     final providers = <String, dynamic>{};
@@ -85,8 +96,7 @@ class TtsConfigTransfer {
       }
       for (final entry in (raw['config'] as Map).entries) {
         if (entry.key is! String || entry.value is! String) {
-          throw const FormatException(
-              '接口配置无效 / Invalid service configuration');
+          throw const FormatException('接口配置无效 / Invalid service configuration');
         }
       }
       providers[id as String] = {
@@ -95,6 +105,7 @@ class TtsConfigTransfer {
       };
     }
     for (final id in services) {
+      if (!rawProviders.containsKey(id)) continue;
       final raw = rawProviders[id];
       if (raw is! Map || raw['voice'] is! String || raw['config'] is! Map) {
         throw const FormatException('语音配置无效 / Invalid voice configuration');
@@ -159,8 +170,7 @@ class TtsConfigTransfer {
       'ttsBufferSettings': jsonEncode(valid['buffer']),
       'allowMixWithOtherAudio': valid['allowMixWithOtherAudio'],
       for (final id in (valid['providers'] as Map<String, dynamic>).keys)
-        'onlineTtsConfig_$id':
-            jsonEncode(valid['providers'][id]['config']),
+        'onlineTtsConfig_$id': jsonEncode(valid['providers'][id]['config']),
       for (final id in (valid['providers'] as Map<String, dynamic>).keys)
         'ttsVoiceModel_$id': valid['providers'][id]['voice'],
     };

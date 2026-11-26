@@ -14,6 +14,7 @@ void main() {
       'dashscope',
       'xiaomi',
       'openai',
+      'deepseek',
     ]);
     expect(TtsRegistry.instance.services, hasLength(TtsService.values.length));
   });
@@ -36,14 +37,15 @@ void main() {
 
   test('only online providers own a configuration key', () {
     expect(TtsRegistry.instance.configurableIds,
-        ['edge', 'dashscope', 'xiaomi', 'openai']);
+        ['edge', 'dashscope', 'xiaomi', 'openai', 'deepseek']);
     expect(TtsRegistry.instance.registry.byId('system')!.configurable, isFalse);
     expect(TtsService.system.isOnline, isFalse);
     expect(TtsService.edge.isOnline, isTrue);
   });
 
-  test('the transfer snapshot keeps the historical five-provider order', () {
-    expect(TtsConfigTransfer.services, ['system', 'edge', 'dashscope', 'xiaomi', 'openai']);
+  test('the transfer snapshot keeps a stable provider order', () {
+    expect(TtsConfigTransfer.services,
+        ['system', 'edge', 'dashscope', 'xiaomi', 'openai', 'deepseek']);
     expect(TtsConfigTransfer.isKnownProvider('edge'), isTrue);
     expect(TtsConfigTransfer.isKnownProvider('elevenlabs'), isFalse);
   });

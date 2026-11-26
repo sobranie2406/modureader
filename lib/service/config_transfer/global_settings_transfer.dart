@@ -292,9 +292,10 @@ webdavInfo s3Info syncProtocol remoteLibraryConnection remoteLibraryViewOptions 
           'allowMixWithOtherAudio': tts['allowMixWithOtherAudio']
         });
         for (final id in TtsConfigTransfer.services) {
-          raw['onlineTtsConfig_$id'] =
-              jsonEncode(tts['providers'][id]['config']);
-          raw['ttsVoiceModel_$id'] = tts['providers'][id]['voice'];
+          final provider = tts['providers'][id];
+          if (provider == null) continue;
+          raw['onlineTtsConfig_$id'] = jsonEncode(provider['config']);
+          raw['ttsVoiceModel_$id'] = provider['voice'];
         }
         break;
       case 'webdav':

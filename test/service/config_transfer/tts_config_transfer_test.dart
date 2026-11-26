@@ -86,7 +86,8 @@ void main() {
     expect(Prefs().prefs.getString('sync-sentinel'), 'do-not-touch');
   });
 
-  test('a provider this build does not know is preserved, not dropped', () async {
+  test('a provider this build does not know is preserved, not dropped',
+      () async {
     // A newer build (or a plugin) may have written a provider we cannot run.
     // Importing must keep its configuration so the setting survives a
     // downgrade / reinstall instead of being silently deleted.
@@ -102,7 +103,26 @@ void main() {
     expect(Prefs().ttsService, 'openai');
   });
 
-  test('a retired provider id is normalised when the snapshot is applied', () async {
+  test('an older snapshot preserves a newer provider configuration', () async {
+    await Prefs().saveOnlineTtsConfig('deepseek', {'key': 'fixture-key'});
+    Prefs().setTtsVoiceModel('deepseek', 'tide');
+    final data = example();
+    data['providers'].remove('deepseek');
+    final validated = TtsConfigTransfer.validate(data);
+    expect(validated['providers'].containsKey('deepseek'), isFalse);
+    await TtsConfigTransfer.apply(Prefs(), data);
+    expect(Prefs().getOnlineTtsConfig('deepseek'), {'key': 'fixture-key'});
+    expect(Prefs().getTtsVoiceModel('deepseek'), 'tide');
+  });
+
+  test('a snapshot missing an original provider is still rejected', () async {
+    final data = example();
+    data['providers'].remove('dashscope');
+    expect(() => TtsConfigTransfer.validate(data), throwsFormatException);
+  });
+
+  test('a retired provider id is normalised when the snapshot is applied',
+      () async {
     final data = example();
     data['service'] = 'aliyun';
     await TtsConfigTransfer.apply(Prefs(), data);

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/service/tts/deepseek_tts_backend.dart';
 import 'package:modu_reader/service/tts/edge_tts_backend.dart';
 import 'package:modu_reader/service/tts/openai_tts_backend.dart';
 import 'package:modu_reader/service/tts/online_tts.dart';
@@ -29,6 +30,7 @@ void main() {
       EdgeTtsProvider(),
       OpenAiTtsProvider(),
       DashScopeTtsProvider(),
+      DeepSeekTtsProvider(),
     ]) {
       final tts = ttsFor(backend);
       expect(tts.previewSynthesisRateFor(1.0), 1.0,
@@ -59,6 +61,14 @@ void main() {
     final tts = ttsFor(OpenAiTtsProvider());
     expect(tts.previewSynthesisRateFor(1.7), 1.0);
     expect(tts.previewPlaybackRateFor(1.7), 1.7);
+  });
+
+  test('DeepSeek has no speed parameter, so the whole slider is local', () {
+    final tts = ttsFor(DeepSeekTtsProvider());
+    for (final rate in [0.1, 0.6, 1.0, 1.7, 4.0]) {
+      expect(tts.previewSynthesisRateFor(rate), 1.0);
+      expect(tts.previewPlaybackRateFor(rate), rate);
+    }
   });
 
   test('Edge keeps a bounded synthesis range and accelerates locally', () {

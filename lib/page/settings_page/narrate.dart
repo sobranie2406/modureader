@@ -112,8 +112,10 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
   Future<void> _saveSettings() async {
     final data = TtsConfigTransfer.snapshot(Prefs());
     for (final entry in _configDrafts.entries) {
-      data['providers'][entry.key]['config'] =
-          Map<String, dynamic>.from(entry.value);
+      data['providers'][entry.key]['config'] = {
+        for (final field in entry.value.entries)
+          field.key: field.value is bool ? field.value.toString() : field.value,
+      };
     }
     try {
       await _applySettings(data);
@@ -679,6 +681,7 @@ class _NarrateSettingsState extends ConsumerState<NarrateSettings>
               value: 'openai',
               child: Text(
                   ModuStrings.text(context, 'OpenAI 兼容', 'OpenAI compatible'))),
+          const DropdownMenuItem(value: 'deepseek', child: Text('DeepSeek')),
         ],
         onChanged: (value) async {
           if (value != null && value != currentServiceId) {

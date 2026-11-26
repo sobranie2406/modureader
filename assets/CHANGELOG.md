@@ -6,6 +6,20 @@ Latest stable: **1.3.11+10189**. Updated 2026-11-23.
 
 Older sections retain their original version scope; they are not current acceptance reports.
 
+## 1.3.12-beta.1
+
+### English
+
+- Add DeepSeek as a narration engine with Stella and Tide voices. ([PR #98](https://github.com/sobranie2406/modureader/pull/98)) Thanks [@RuizeSun](https://github.com/RuizeSun).
+- Browse and download books from a read-only FTP source in Remote Library.
+- Use one x64 AppImage on Ubuntu 24.04, Ubuntu 26.04 and Arch Linux.
+
+### 简体中文
+
+- 朗读新增 DeepSeek，可选海星和暗潮两种音色。([PR #98](https://github.com/sobranie2406/modureader/pull/98)) 感谢 [@RuizeSun](https://github.com/RuizeSun)。
+- 远程书库可通过只读 FTP 浏览和下载书籍。
+- Ubuntu 24.04、Ubuntu 26.04 和 Arch Linux 共用一个 x64 AppImage。
+
 ## 1.3.11
 
 ### English

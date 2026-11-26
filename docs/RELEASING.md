@@ -54,6 +54,7 @@ Linux DEB packages target Debian 13 (trixie). The x64 AppImage is built on Ubunt
 | HarmonyOS | Native ARM64 HAP, unsigned. Sign locally with a valid HarmonyOS certificate/profile and install using the official tools. Android signing is not interchangeable. |
 
 <a id="arch-linux-x64-appimage"></a>
+<a id="linux-x64-appimage"></a>
 
 ### Linux x64 AppImage
 

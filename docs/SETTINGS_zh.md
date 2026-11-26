@@ -238,7 +238,7 @@ AI 知识在追问、历史恢复和重试时也不调用本地书库或本书�
 
 ## 朗读与风格模板
 
-「设置 → 朗读」提供系统语音、Edge TTS、DashScope、Xiaomi MiMo 和 OpenAI 兼容语音。按引擎填写接口和密钥，保存设置、获取声音、选择并试听。系统 TTS 已接入 Android、iOS、macOS、Windows；Linux / OpenHarmony 没有系统 TTS 后端，需主动选择在线服务。
+「设置 → 朗读」提供系统语音、Edge TTS、DashScope、Xiaomi MiMo、DeepSeek 和 OpenAI 兼容语音。按引擎填写接口和密钥，保存设置、获取声音、选择并试听。系统 TTS 已接入 Android、iOS、macOS、Windows；Linux / OpenHarmony 没有系统 TTS 后端，需主动选择在线服务。
 
 支持可编辑的朗读风格模板，如自然叙述、睡前轻读、小说演绎、知识讲解、古文诵读和新闻播报。OpenAI 兼容服务需支持相关指令；MiMo 提供预设音色或文字设计音色，不支持声音克隆。描述是给模型的指令，不是需要读出的正文，效果由服务能力决定。
 
