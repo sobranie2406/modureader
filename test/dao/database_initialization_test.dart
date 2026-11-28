@@ -97,6 +97,31 @@ void main() {
     expect(await dao.selectThemes(), hasLength(2));
   });
 
+  test('book history preserves local session times and date-only legacy totals',
+      () async {
+    final db = await DBHelper().database;
+    await db.insert('tb_books', bookRow(1));
+    for (final day in ['2026-10-06', '2026-10-07']) {
+      await db.insert(
+          'tb_reading_time', {'book_id': 1, 'date': day, 'reading_time': 60});
+    }
+    for (final start in [
+      DateTime(2026, 10, 7, 19, 35),
+      DateTime(2026, 10, 7),
+      DateTime(2026, 10, 7, 23, 59, 55)
+    ]) {
+      await readingTimeDao.insertReadingSession(
+          bookId: 1, readingTime: 10, startedAt: start);
+    }
+    final days = await readingTimeDao.selectReadingTimeByBookId(1);
+    expect(days.map((d) => d.date), ['2026-10-07', '2026-10-06']);
+    expect(days.first.intervals,
+        ['00:00–00:00', '19:35–19:35', '23:59–2026-10-08 00:00']);
+    expect(days.first.seconds, 90);
+    expect(days.last.intervals, isEmpty);
+    expect(days.last.seconds, 60);
+  });
+
   test(
       'reading history retains deleted books without restoring them to the shelf',
       () async {

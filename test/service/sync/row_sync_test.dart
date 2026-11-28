@@ -287,7 +287,7 @@ void main() {
     await a.insert('tb_reading_time',
         {'book_id': 1, 'date': '2026-09-09', 'reading_time': 30});
     await b.insert('tb_reading_time',
-        {'book_id': 77, 'date': '2026-09-09', 'reading_time': 40});
+        {'book_id': 77, 'date': '2026-09-09T20:16:50', 'reading_time': 40});
     for (var i = 0; i < 4; i++) {
       await converge();
     }
@@ -299,6 +299,7 @@ void main() {
     final daily = await a.rawQuery(ReadingTimeDao.dailyBookReadingQuery, [1]);
     expect(daily.length, 1);
     expect(daily.single['reading_time'], 70);
+    expect(daily.single['intervals'], '20:16–20:17');
     await a.delete('tb_reading_time');
     await converge();
     expect(await b.query('tb_reading_time'), isEmpty);

@@ -12,7 +12,6 @@ import 'package:modu_reader/enums/sync_direction.dart';
 import 'package:modu_reader/enums/sync_trigger.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/models/book.dart';
-import 'package:modu_reader/models/reading_time.dart';
 import 'package:modu_reader/models/tag.dart';
 import 'package:modu_reader/providers/sync.dart';
 import 'package:modu_reader/providers/book_list.dart';
@@ -35,6 +34,7 @@ import 'package:modu_reader/widgets/book_detail_typography.dart';
 import 'package:modu_reader/widgets/reading_round/reading_rounds_card.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -757,35 +757,38 @@ class _BookDetailState extends ConsumerState<BookDetail> {
 
     Widget buildMoreDetail() {
       Widget buildReadingDetail() {
-        return FutureBuilder<List<ReadingTime>>(
+        return FutureBuilder<List<BookReadingDay>>(
           future: readingTimeDao.selectReadingTimeByBookId(widget.book.id),
           builder: (BuildContext context,
-              AsyncSnapshot<List<ReadingTime>> snapshot) {
+              AsyncSnapshot<List<BookReadingDay>> snapshot) {
             if (snapshot.hasData) {
-              List<ReadingTime> readingTimes = snapshot.data!;
+              final days = snapshot.data!;
               return Column(
-                children: List.generate(readingTimes.length, (index) {
-                  int totalReadingTime = readingTimes[index].readingTime;
+                children: days.map((day) {
                   return Row(
                     children: [
-                      Text(
-                        readingTimes[index].dateOnly ??
-                            readingTimes[index].date ??
-                            '',
-                        style: const TextStyle(
-                          fontSize: 15,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(day.date,
+                                style: const TextStyle(fontSize: 15)),
+                            if (day.intervals.isNotEmpty)
+                              Text(day.intervals.join(' · '),
+                                  style: Theme.of(context).textTheme.bodySmall),
+                          ],
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       Text(
-                        convertSeconds(totalReadingTime),
+                        convertSeconds(day.seconds),
                         style: const TextStyle(
                           fontSize: 15,
                         ),
                       ),
                     ],
                   );
-                }),
+                }).toList(),
               );
             } else {
               return const EinkStaticIndicator(
@@ -795,6 +798,7 @@ class _BookDetailState extends ConsumerState<BookDetail> {
         );
       }
 
+      final timestamp = DateFormat('yyyy-MM-dd HH:mm');
       TextStyle textStyle = const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.bold,
@@ -809,11 +813,11 @@ class _BookDetailState extends ConsumerState<BookDetail> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${L10n.of(context).bookDetailImportDate}${widget.book.createTime.toString().substring(0, 10)}',
+                    '${L10n.of(context).bookDetailImportDate}${timestamp.format(widget.book.createTime.toLocal())}',
                     style: textStyle,
                   ),
                   Text(
-                    '${L10n.of(context).bookDetailLastReadDate}${widget.book.updateTime.toString().substring(0, 10)}',
+                    '${L10n.of(context).bookDetailLastReadDate}${timestamp.format(widget.book.lastReadTime.toLocal())}',
                     style: textStyle,
                   ),
                   const Divider(),

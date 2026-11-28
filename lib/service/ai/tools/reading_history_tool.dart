@@ -47,6 +47,10 @@ class ReadingHistoryTool
 
   @override
   ReadingHistoryInput parseInput(Map<String, dynamic> json) {
+    final to = json['to'];
+    if (to is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(to)) {
+      return ReadingHistoryInput.fromJson({...json, 'to': '${to}T23:59:59'});
+    }
     return ReadingHistoryInput.fromJson(json);
   }
 

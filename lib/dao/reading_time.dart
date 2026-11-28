@@ -10,15 +10,27 @@ import 'package:modu_reader/models/reading_time_deletion.dart';
 import 'package:modu_reader/providers/reading_data_revision.dart';
 import 'package:modu_reader/providers/sync.dart';
 
+typedef BookReadingDay = ({String date, List<String> intervals, int seconds});
+
 class ReadingTimeDao extends BaseDao {
   ReadingTimeDao();
 
   static const String table = 'tb_reading_time';
   static const String dailyBookReadingQuery = '''
-    SELECT MIN(id) AS id, book_id, DATE(date) AS date,
-           SUM(reading_time) AS reading_time
-    FROM tb_reading_time WHERE book_id = ?
-    GROUP BY DATE(date) ORDER BY DATE(date) DESC
+    SELECT day AS date, SUM(reading_time) AS reading_time,
+           GROUP_CONCAT(
+             strftime('%H:%M', start) || '–' ||
+             CASE WHEN DATE(finish) = day THEN strftime('%H:%M', finish)
+                  ELSE strftime('%Y-%m-%d %H:%M', finish) END
+           ) AS intervals
+    FROM (
+      SELECT DATE(date) AS day, reading_time,
+             CASE WHEN length(date) > 10 THEN date END AS start,
+             datetime(date, '+' || reading_time || ' seconds') AS finish
+      FROM tb_reading_time WHERE book_id = ?
+      ORDER BY datetime(date), id
+    )
+    GROUP BY day ORDER BY 1 DESC
   ''';
 
   Future<void> insertReadingTime(
@@ -26,9 +38,13 @@ class ReadingTimeDao extends BaseDao {
     DateTime? startedAt,
   }) async {
     final db = await database;
-    final resolvedDay = _resolveDayString(readingTime, startedAt);
-
-    readingTime.date ??= resolvedDay;
+    final start = startedAt ?? readingTime.startedAt;
+    final hasTime = startedAt != null || (readingTime.date?.length ?? 0) > 10;
+    final date = start != null && hasTime
+        ? start.toLocal().toIso8601String().substring(0, 19)
+        : readingTime.dateOnly ??
+            DateTime.now().toIso8601String().substring(0, 10);
+    readingTime.date = date;
 
     if (readingTime.readingTime <= 0) return;
 
@@ -47,7 +63,7 @@ class ReadingTimeDao extends BaseDao {
     // statistics already use SUM/GROUP BY; never modify a shared daily total.
     await db.insert(table, {
       'book_id': readingTime.bookId,
-      'date': resolvedDay,
+      'date': date,
       'reading_time': readingTime.readingTime,
       'round': readingTime.round,
     });
@@ -72,33 +88,11 @@ class ReadingTimeDao extends BaseDao {
     final session = ReadingTime(
       bookId: bookId,
       readingTime: readingTime,
-      date: startedAt?.toIso8601String(),
       round: round,
     );
 
     await insertReadingTime(session, startedAt: startedAt);
   }
-
-  String _resolveDayString(ReadingTime readingTime, DateTime? startedAt) {
-    final fromModel = readingTime.startedAt;
-    if (fromModel != null) {
-      return _dayKey(fromModel);
-    }
-
-    if (startedAt != null) {
-      return _dayKey(startedAt);
-    }
-
-    final raw = readingTime.date;
-    if (raw != null && raw.length >= 10) {
-      return raw.substring(0, 10);
-    }
-
-    return _dayKey(DateTime.now());
-  }
-
-  String _dayKey(DateTime dateTime) =>
-      dateTime.toIso8601String().substring(0, 10);
 
   Future<List<ReadingTime>> selectAllReadingTime() async {
     return queryList(
@@ -232,12 +226,17 @@ class ReadingTimeDao extends BaseDao {
     });
   }
 
-  Future<List<ReadingTime>> selectReadingTimeByBookId(int bookId) {
+  Future<List<BookReadingDay>> selectReadingTimeByBookId(int bookId) {
     // Keep the book detail UI daily, even though storage now has independent
     // sessions. Rendering one row per interval could otherwise grow unbounded.
     return rawQueryList(
       dailyBookReadingQuery,
-      mapper: ReadingTime.fromDb,
+      mapper: (row) => (
+        date: row['date'] as String? ?? '',
+        intervals:
+            (row['intervals'] as String?)?.split(',') ?? const <String>[],
+        seconds: row['reading_time'] as int,
+      ),
       arguments: [bookId],
     );
   }

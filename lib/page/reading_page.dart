@@ -58,7 +58,6 @@ import 'package:modu_reader/widgets/reading_page/notes_widget.dart';
 import 'package:modu_reader/widgets/dictionary/dictionary_lookup.dart';
 import 'package:modu_reader/widgets/dictionary/unified_query.dart';
 import 'package:modu_reader/widgets/reading_page/quick_mark_toggle.dart';
-import 'package:modu_reader/models/reading_time.dart';
 import 'package:modu_reader/widgets/reading_page/progress_widget.dart';
 import 'package:modu_reader/widgets/reading_page/tts_quick_toolbar.dart';
 import 'package:modu_reader/service/tts/tts_handler.dart';
@@ -1007,15 +1006,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     _screenAwake.dispose();
     showStatusBar();
     WidgetsBinding.instance.removeObserver(this);
-    readingTimeDao.insertReadingTime(
-      ReadingTime(
-        bookId: _book.id,
-        readingTime: _readTimeWatch.elapsed.inSeconds,
-        round: _book.currentRound,
-      ),
-      startedAt: _sessionStart,
-    );
-    _sessionStart = null;
+    unawaited(_saveReadingInterval());
     audioHandler.stop();
     _readerFocusNode.dispose();
     _readerWebViewFocusScope.dispose();
@@ -1220,24 +1211,27 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     return _backgroundReadingSave = _saveBackgroundReading();
   }
 
-  Future<void> _saveBackgroundReading() async {
+  Future<void> _saveReadingInterval({int minimumSeconds = 1}) async {
     _readTimeWatch.stop();
-    final elapsedSeconds = _readTimeWatch.elapsed.inSeconds;
-    final startedAt = _sessionStart;
+    final seconds = _readTimeWatch.elapsed.inSeconds;
+    final start = _sessionStart;
     _readTimeWatch.reset();
     _sessionStart = null;
+    if (start != null && seconds >= minimumSeconds) {
+      await readingTimeDao.insertReadingSession(
+        bookId: _book.id,
+        readingTime: seconds,
+        startedAt: start,
+        round: _book.currentRound,
+      );
+    }
+  }
+
+  Future<void> _saveBackgroundReading() async {
     await Future.wait<void>([
+      _saveReadingInterval(minimumSeconds: 6),
       if (epubPlayerKey.currentState case final reader?)
         reader.saveReadingProgress(captureVisiblePage: true),
-      if (elapsedSeconds > 5)
-        readingTimeDao.insertReadingTime(
-          ReadingTime(
-            bookId: _book.id,
-            readingTime: elapsedSeconds,
-            round: _book.currentRound,
-          ),
-          startedAt: startedAt,
-        ),
     ]);
   }
 
@@ -1282,9 +1276,11 @@ class ReadingPageState extends ConsumerState<ReadingPage>
         _backgroundReadingSave = null;
         _refreshReaderHostState();
         if (!_readTimeWatch.isRunning) {
+          // Inactive time separates two reading intervals even without a background event.
+          unawaited(_saveReadingInterval());
+          _sessionStart = DateTime.now();
           _readTimeWatch.start();
         }
-        _sessionStart ??= DateTime.now();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:

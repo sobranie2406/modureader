@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:modu_reader/dao/reading_time.dart';
 import 'package:modu_reader/l10n/generated/L10n.dart';
 import 'package:modu_reader/models/book.dart';
@@ -164,12 +165,14 @@ class _ReadingRoundsCardState extends ConsumerState<ReadingRoundsCard> {
   Widget _buildRoundTile(BuildContext context, ReadingRound round) {
     final l10n = L10n.of(context);
     final theme = Theme.of(context);
-    final startDate = (round.startTime?.length ?? 0) >= 10
-        ? round.startTime!.substring(0, 10)
-        : '?';
-    final endDate = (round.endTime?.length ?? 0) >= 10
-        ? round.endTime!.substring(0, 10)
-        : '?';
+    final timestamp = DateFormat('yyyy-MM-dd HH:mm');
+    String formatDate(String? raw) {
+      if (raw == null) return '?';
+      final parsed = DateTime.tryParse(raw);
+      if (parsed == null) return '?';
+      return raw.length == 10 ? raw : timestamp.format(parsed.toLocal());
+    }
+
     final startPct = (round.startPercentage * 100).toStringAsFixed(0);
     final endPct = (round.endPercentage * 100).toStringAsFixed(0);
     return Padding(
@@ -191,7 +194,7 @@ class _ReadingRoundsCardState extends ConsumerState<ReadingRoundsCard> {
           ),
           const SizedBox(height: 2),
           Text(
-            '$startDate ~ $endDate',
+            '${formatDate(round.startTime)} ~ ${formatDate(round.endTime)}',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.outline),
           ),
