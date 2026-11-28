@@ -32,6 +32,7 @@ void main() {
 
   Future<DocumentReflowPage> load(Map<String, dynamic> info,
           {bool scanned = false,
+          bool vertical = false,
           bool bridgeRegions = false,
           bool forceOcr = false,
           DocumentReflowAnchor? anchor}) =>
@@ -41,6 +42,7 @@ void main() {
         model: model,
         cancel: OcrCancellation(),
         forceOcr: forceOcr,
+        vertical: vertical,
         anchor: anchor,
         extract: (request) async {
           expect(request['page'], isA<int>());
@@ -67,6 +69,21 @@ void main() {
           return DocumentTextResult('Recognized text');
         },
       );
+
+  test('vertical OCR rereads horizontal cache and keeps corrected text',
+      () async {
+    const page = {'page': 0, 'total': 1};
+    final first = await load(page, scanned: true);
+    stages.clear();
+    final second = await load(page, scanned: true, vertical: true);
+    expect(stages, contains('render'));
+    expect(first.ocrProfile, '');
+    expect(second.ocrProfile, 'vertical');
+    await store.saveEdit(second, 'corrected');
+    stages.clear();
+    expect((await load(page, scanned: true)).text, 'corrected');
+    expect(stages, isEmpty);
+  });
 
   test(
       'forced OCR skips embedded text and its cache but retains note revisions',

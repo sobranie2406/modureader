@@ -10,13 +10,13 @@ class OcrBox {
 
 /// PP-OCR mobile uses BGR, NCHW. Keep preprocessing out of the UI isolate.
 Float32List ocrTensor(img.Image image,
-    {required bool detection, int? paddedWidth}) {
+    {required bool detection, int? paddedWidth, bool rgb = false}) {
   final w = paddedWidth ?? image.width, h = image.height;
   final data = Float32List(3 * w * h);
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < image.width; x++) {
       final p = image.getPixel(x, y);
-      final channels = [p.b.toDouble(), p.g.toDouble(), p.r.toDouble()];
+      final channels = [rgb ? p.r : p.b, p.g, rgb ? p.b : p.r];
       for (var c = 0; c < 3; c++) {
         data[c * w * h + y * w + x] = detection
             ? (channels[c] / 255 - const [.485, .456, .406][c]) /
@@ -32,7 +32,9 @@ Float32List ocrTensor(img.Image image,
 /// semantic table/layout model. Users can crop one column before recognizing.
 List<OcrBox> ocrBoxes(
     List<double> values, int w, int h, int originalW, int originalH,
-    {double detectionThreshold = .3, double boxThreshold = .5}) {
+    {double detectionThreshold = .3,
+    double boxThreshold = .5,
+    bool vertical = false}) {
   if (w <= 0 || h <= 0 || w * h > 1024 * 1024 || values.length != w * h) {
     throw const FormatException('Invalid detection map');
   }
@@ -73,7 +75,8 @@ List<OcrBox> ocrBoxes(
         bottom - top < 2) {
       continue;
     }
-    final pad = (bottom - top + 1) * .55;
+    final span = bottom - top + 1;
+    final pad = (vertical ? math.min(right - left + 1, span) : span) * .55;
     final x = ((left - pad) * originalW / w).floor().clamp(0, originalW - 1);
     final y = ((top - pad) * originalH / h).floor().clamp(0, originalH - 1);
     final r =
@@ -86,6 +89,7 @@ List<OcrBox> ocrBoxes(
           'Too many text regions; select a smaller area');
     }
   }
+  if (vertical) return orderVerticalOcrBoxes(boxes);
   // Stable row grouping rather than a non-transitive fuzzy sort comparator.
   boxes.sort((a, b) => a.y.compareTo(b.y));
   final ordered = <OcrBox>[];
@@ -100,6 +104,24 @@ List<OcrBox> ocrBoxes(
     ordered.addAll(row);
   }
   return ordered;
+}
+
+List<OcrBox> orderVerticalOcrBoxes(List<OcrBox> boxes) {
+  double center(OcrBox b) => b.x + b.width / 2;
+  final sorted = [...boxes]..sort((a, b) => center(b).compareTo(center(a)));
+  final result = <OcrBox>[];
+  for (var i = 0; i < sorted.length;) {
+    final first = sorted[i++];
+    final column = [first];
+    while (i < sorted.length &&
+        center(first) - center(sorted[i]) <
+            math.min(first.width, sorted[i].width) * .5) {
+      column.add(sorted[i++]);
+    }
+    column.sort((a, b) => a.y.compareTo(b.y));
+    result.addAll(column);
+  }
+  return result;
 }
 
 String decodeOcrCtc(List<double> data, List<int> shape, List<String> alphabet) {
@@ -138,6 +160,7 @@ Future<String> recognizeOcrImage(
 Future<DocumentTextResult> recognizeOcrImageWithRegions(
     Uint8List bytes, List<String> alphabet, OcrRun run,
     {required bool Function() cancelled,
+    bool vertical = false,
     double detectionThreshold = .3,
     double boxThreshold = .5,
     void Function()? onImageDecoded,
@@ -147,18 +170,7 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   }
 
   check();
-  // Reject decompression bombs before allocating a decoded pixel buffer.
-  final header = img.PngDecoder().startDecode(bytes);
-  if (header == null ||
-      header.width <= 0 ||
-      header.height <= 0 ||
-      header.width * header.height > 2097152) {
-    throw const FormatException('Invalid OCR image dimensions');
-  }
-  final image = img.decodePng(bytes);
-  if (image == null || image.width * image.height > 2097152) {
-    throw const FormatException('Invalid OCR image');
-  }
+  final image = decodeOcrPage(bytes);
   onImageDecoded?.call();
   final scale = math.min(1.0, 960 / math.max(image.width, image.height));
   final w = math.max(32, (image.width * scale / 32).round() * 32);
@@ -172,18 +184,18 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   }
   final boxes = ocrBoxes(
       det.$1, det.$2[3], det.$2[2], image.width, image.height,
-      detectionThreshold: detectionThreshold, boxThreshold: boxThreshold);
-  final lines = <String>[];
-  final regions = <DocumentTextRegion>[];
-  var offset = 0;
-  for (var i = 0; i < boxes.length; i++) {
-    check();
-    final b = boxes[i];
-    final crop =
+      detectionThreshold: detectionThreshold,
+      boxThreshold: boxThreshold,
+      vertical: vertical);
+  return recognizeOcrBoxes(image, boxes, (b) async {
+    var crop =
         img.copyCrop(image, x: b.x, y: b.y, width: b.width, height: b.height);
+    if (vertical && b.height >= b.width * 1.5) {
+      crop = img.copyRotate(crop, angle: -90);
+    }
     // v5 has a larger alphabet. Bound CTC output before allocating/bridging it.
     final maxWidth = math.min(1536, (5000000 ~/ alphabet.length) * 4);
-    final width = (48 * b.width / b.height).ceil().clamp(8, maxWidth);
+    final width = (48 * crop.width / crop.height).ceil().clamp(8, maxWidth);
     final line = img.copyResize(crop,
         width: width, height: 48, interpolation: img.Interpolation.linear);
     final padded = math.max(320, width);
@@ -192,7 +204,23 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
         ocrTensor(line, detection: false, paddedWidth: padded),
         [1, 3, 48, padded]);
     check();
-    final text = decodeOcrCtc(rec.$1, rec.$2, alphabet);
+    return decodeOcrCtc(rec.$1, rec.$2, alphabet);
+  }, check, progress);
+}
+
+Future<DocumentTextResult> recognizeOcrBoxes(
+    img.Image image,
+    List<OcrBox> boxes,
+    Future<String> Function(OcrBox) recognize,
+    void Function() check,
+    void Function(int, int)? progress) async {
+  final lines = <String>[];
+  final regions = <DocumentTextRegion>[];
+  var offset = 0;
+  for (var i = 0; i < boxes.length; i++) {
+    check();
+    final b = boxes[i];
+    final text = await recognize(b);
     if (text.isNotEmpty) {
       if (lines.isNotEmpty) offset++;
       regions.add(DocumentTextRegion(
@@ -208,4 +236,20 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   }
   check();
   return DocumentTextResult(lines.join('\n'), regions);
+}
+
+img.Image decodeOcrPage(Uint8List bytes) {
+  // Reject decompression bombs before allocating a decoded pixel buffer.
+  final header = img.PngDecoder().startDecode(bytes);
+  if (header == null ||
+      header.width <= 0 ||
+      header.height <= 0 ||
+      header.width * header.height > 2097152) {
+    throw const FormatException('Invalid OCR image dimensions');
+  }
+  final image = img.decodePng(bytes);
+  if (image == null || image.width * image.height > 2097152) {
+    throw const FormatException('Invalid OCR image');
+  }
+  return image;
 }

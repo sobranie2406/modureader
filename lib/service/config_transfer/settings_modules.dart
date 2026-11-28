@@ -28,7 +28,7 @@ codeHighlightTheme enabledAiTools''',
   'vector':
       'vectorModelEnabled autoVectorizeOnImport vectorLocalModelId vectorModelDownloadSource',
   'ocr':
-      'ocrModelId ocrModelDownloadSource ocrPrecacheEnabled ocrPrecachePages',
+      'ocrModelId ocrModelDownloadSource ocrVerticalEnabled ocrPrecacheEnabled ocrPrecachePages',
   'tts':
       '''ttsVolume ttsPitch ttsRate ttsService onlineTtsService isSystemTts allowMixWithOtherAudio ttsBufferSettings ttsRoleConfig''',
   'translation':

@@ -36,7 +36,7 @@ showAuthorOnDefaultCover openBookAnimation bookshelfListMode onlySyncWhenWifi us
 bottomNavigatorShowRemote bottomNavigatorShowStatistics bottomNavigatorShowAI syncCompletedToast autoSync readingTimedSync
 syncPreviewBeforeSync
 isSystemTts showTextUnderIconButton notesExportMergeChapters verticalRedFrame enableJsForEpub themeAppliesToReader
-httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn continuousScroll scrollAutoAlign longPressSelectParagraph adjustableReaderPopups aiReadingSkillsVisible aiSkillTemplateDraft ocrPrecacheEnabled'''
+httpProxyEnabled customCSSEnabled allowMixWithOtherAudio tapOnlyPageTurn continuousScroll scrollAutoAlign longPressSelectParagraph adjustableReaderPopups aiReadingSkillsVisible aiSkillTemplateDraft ocrVerticalEnabled ocrPrecacheEnabled'''
             .split(RegExp(r'\s+')))
       key: 'bool',
     for (final key

@@ -7,18 +7,24 @@ import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
 import 'page_prefetch_controls.dart';
 
 class OcrPrecacheSettings extends StatefulWidget {
-  const OcrPrecacheSettings({super.key, this.cache});
+  const OcrPrecacheSettings({super.key, this.cache, this.onVerticalChanged});
   final DocumentOcrPrecache? cache;
+  final Future<void> Function()? onVerticalChanged;
   @override
   State<OcrPrecacheSettings> createState() => _OcrPrecacheSettingsState();
 }
 
 class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
   bool _saving = false;
-  Future<void> _save({bool? enabled, int? pages}) async {
+  Future<void> _save({bool? enabled, int? pages, bool? vertical}) async {
     setState(() => _saving = true);
     try {
-      await Prefs().saveOcrPrecache(enabled: enabled, pages: pages);
+      if (vertical != null) {
+        await Prefs().saveOcrVertical(vertical);
+        if (mounted) await widget.onVerticalChanged?.call();
+      } else {
+        await Prefs().saveOcrPrecache(enabled: enabled, pages: pages);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -35,6 +41,12 @@ class _OcrPrecacheSettingsState extends State<OcrPrecacheSettings> {
       listenable: Prefs(),
       builder: (context, _) =>
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(ModuStrings.text(context, '竖排识别', 'Vertical OCR')),
+              value: Prefs().ocrVerticalEnabled,
+              onChanged: _saving ? null : (v) => _save(vertical: v),
+            ),
             PagePrefetchControls(
                 title: SettingHelpTitle(
                     title: ModuStrings.text(

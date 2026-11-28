@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:modu_reader/service/ocr/manga_ocr.dart';
 import 'package:modu_reader/service/ocr/ocr_processing.dart';
 import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:modu_reader/service/ocr/ocr_model_metadata.dart';
@@ -9,6 +10,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
+  test('vertical OCR keeps narrow columns separate in reading order', () {
+    final map = List<double>.filled(48 * 48, 0);
+    for (final x in [8, 18]) {
+      for (var y = 5; y <= 40; y++) {
+        for (var dx = 0; dx < 3; dx++) {
+          map[y * 48 + x + dx] = 1;
+        }
+      }
+    }
+    final boxes = ocrBoxes(map, 48, 48, 48, 48, vertical: true);
+    expect(boxes, hasLength(2));
+    expect(
+        boxes.first.x, greaterThanOrEqualTo(boxes.last.x + boxes.last.width));
+  });
+  test('manga lettering supersedes enclosing bubbles and duplicate boxes', () {
+    final boxes = mangaTextBoxes([
+      0,
+      1,
+      1,
+      0,
+      2
+    ], [
+      .99,
+      .9,
+      .85,
+      .8,
+      .1
+    ], [
+      0,
+      0,
+      45,
+      50,
+      5,
+      5,
+      30,
+      40,
+      6,
+      5,
+      31,
+      39,
+      60,
+      0,
+      95,
+      55,
+      0,
+      0,
+      10,
+      10
+    ], 100, 60, vertical: true);
+    expect(boxes.map((b) => b.x), [60, 5]);
+  });
   test('official V6 sidecar alphabet includes CTC blank and trailing space',
       () {
     final chars = List.generate(10, (i) => String.fromCharCode(65 + i));

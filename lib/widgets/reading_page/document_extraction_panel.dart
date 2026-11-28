@@ -307,6 +307,8 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
       bool refresh = false}) async {
     if (!mounted || _busy || _preview == null) return;
     final cancel = OcrCancellation();
+    final vertical = Prefs().ocrVerticalEnabled;
+    final profile = _store.model.readingProfile(vertical);
     _ocr = cancel;
     setState(() {
       _busy = true;
@@ -339,7 +341,7 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
         final cached = !refresh ? await persistent?.read(page, '') : null;
         cancel.check();
         if (!mounted) return;
-        if (cached != null) {
+        if (cached != null && cached.acceptsOcrProfile(profile)) {
           setState(() {
             _savedPages[page] = cached;
             _results[page] = cached.text;
@@ -379,7 +381,7 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
                   await widget.recognize!(png, cancel, progress))
               : await LocalOcrService().recognizeWithRegions(
                   png, _store, cancel,
-                  progress: progress);
+                  vertical: vertical, progress: progress);
         }
         final text = result.text;
         cancel.check();
@@ -394,6 +396,7 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
           saved = DocumentReflowPage(
               page: page,
               ocr: usedOcr,
+              ocrProfile: usedOcr ? profile : '',
               rawText: text,
               rawRegions: result.regions);
           await persistent.save(saved, '');

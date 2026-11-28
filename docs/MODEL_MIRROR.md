@@ -93,3 +93,16 @@ python3 scripts/release/ocr_model_mirror.py --v6-only --source <source> --output
 ```
 
 Upload the generated V6 attachments to the existing `ocr-v1` release. Keep all V3/V4/V5 files and metadata. The V6 manifest, checksums and source notice have separate filenames, and the existing PaddleOCR Apache-2.0 license applies.
+
+### Japanese manga and vertical print
+
+Enable **Vertical OCR** for right-to-left columns in scanned books. For Japanese comics, select **RT-DETR-V2 + MangaOCR** in OCR model settings. The optional 144.5 MiB pack contains an ONNX bubble detector, a Japanese encoder/decoder and its vocabulary. HarmonyOS currently supports vertical PP-OCR only.
+
+[Gitee mirror and upstream credits](https://gitee.com/sobranie2406/modu-models/releases/tag/manga-ocr-v1). The mirror splits the decoder at 64 MiB. Modu joins both parts and checks the original SHA-256 before use. To run the native smoke tests, pass absolute paths to the installed model directories and the checked-in sample images:
+
+```sh
+flutter test -d macos integration_test/manga_ocr_test.dart \
+  --dart-define=MODU_MANGA_PACK=/path/to/manga-ocr-1 \
+  --dart-define=MODU_PP_PACK=/path/to/ppocr-v6-small-1 \
+  --dart-define=MODU_OCR_FIXTURES="$PWD/integration_test/fixtures"
+```

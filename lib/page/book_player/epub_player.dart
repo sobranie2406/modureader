@@ -523,7 +523,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
   DocumentOcrPrecache get ocrPrecache => _ocrPrecache;
   late final DocumentOcrPrecache _ocrPrecache = DocumentOcrPrecache(
       cachedPages: (start, count) => DocumentReflowStore(cssBookKey)
-          .cachedPages(start, count, forceOcr: documentForceOcr),
+          .cachedPages(start, count,
+              forceOcr: documentForceOcr,
+              ocrProfile: OcrModels.byId(Prefs().ocrModelId)
+                  .readingProfile(Prefs().ocrVerticalEnabled)),
       canRun: () =>
           mounted &&
           _readerReady &&
@@ -535,8 +538,12 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       load: (page, cancel) async {
         final store = DocumentReflowStore(cssBookKey);
         final forceOcr = documentForceOcr;
+        final spec = OcrModels.byId(Prefs().ocrModelId);
+        final vertical = Prefs().ocrVerticalEnabled;
         final saved = await store.read(page, '');
-        if (saved != null && (!forceOcr || saved.ocr)) return;
+        if (saved != null &&
+            (!forceOcr || saved.ocr) &&
+            saved.acceptsOcrProfile(spec.readingProfile(vertical))) return;
         cancel.check();
         final info = await documentReflowInfo(page);
         cancel.check();
@@ -545,9 +552,10 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             page >= (info['total'] as num)) {
           throw const FormatException('Invalid precache page');
         }
-        final model = OcrModelStore(model: OcrModels.byId(Prefs().ocrModelId));
+        final model = OcrModelStore(model: spec);
         try {
           await loadDocumentReflowPage(
+              vertical: vertical,
               forceOcr: forceOcr,
               info: info,
               store: store,
@@ -560,7 +568,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
                   {...request, if (isImageEpub) 'source': 'epub'}),
               recognize: (bytes, token, progress) => LocalOcrService()
                   .recognizeWithRegions(bytes, model, token,
-                      progress: progress));
+                      vertical: vertical, progress: progress));
         } finally {
           model.close();
         }
@@ -578,7 +586,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     _configureOcrPrecache();
   }
 
+  String _ocrPrecacheProfile = '';
   void _configureOcrPrecache() {
+    final profile = OcrModels.byId(Prefs().ocrModelId)
+        .readingProfile(Prefs().ocrVerticalEnabled);
+    if (profile != _ocrPrecacheProfile) {
+      _ocrPrecacheProfile = profile;
+      _ocrPrecache.update(_ocrPrecachePage, 0);
+    }
     _ocrPrecache.update(
         _ocrPrecachePage,
         supportsDocumentImages && Prefs().ocrPrecacheEnabled

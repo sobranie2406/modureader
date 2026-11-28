@@ -86,6 +86,7 @@ class DocumentReflowPage {
       required this.rawText,
       this.layoutVersion = 4,
       this.editedText,
+      this.ocrProfile = '',
       List<DocumentTextRegion> rawRegions = const []})
       : rawRegions = DocumentTextResult(rawText, rawRegions).regions {
     final mapped = <DocumentTextRegion>[];
@@ -156,6 +157,9 @@ class DocumentReflowPage {
   final bool ocr;
   final int layoutVersion;
   final String rawText;
+  final String ocrProfile;
+  bool acceptsOcrProfile(String profile) =>
+      !ocr || editedText != null || ocrProfile == profile;
   final String? editedText;
   late final String text, revision;
   final List<DocumentTextRegion> rawRegions;
@@ -171,6 +175,7 @@ class DocumentReflowPage {
         'page': page,
         'ocr': ocr,
         'rawText': rawText,
+        if (ocrProfile.isNotEmpty) 'ocrProfile': ocrProfile,
         'text': text,
         'revision': revision,
         if (editedText != null) 'editedText': editedText!,
@@ -202,6 +207,7 @@ class DocumentReflowPage {
           rawText: raw,
           layoutVersion: data['version'],
           editedText: data['editedText'],
+          ocrProfile: data['ocrProfile'] ?? '',
           rawRegions: geometry);
       return value.revision == data['revision'] && value.text == data['text']
           ? value
@@ -328,7 +334,8 @@ class DocumentReflowStore {
   }
 
   // Forced OCR skips embedded-text heads; old revisions remain available to notes.
-  Future<Set<int>> cachedPages(int start, int count, {bool forceOcr = false}) =>
+  Future<Set<int>> cachedPages(int start, int count,
+          {bool forceOcr = false, String ocrProfile = ''}) =>
       _locked((root) async {
         if (start < 0 || count < 0 || count > 5) {
           throw ArgumentError('Invalid prefetch window');
@@ -336,7 +343,9 @@ class DocumentReflowStore {
         final data = await _book(root);
         return {
           for (var page = start; page < start + count; page++)
-            if (_page(data, page) case final saved? when !forceOcr || saved.ocr)
+            if (_page(data, page) case final saved?
+                when (!forceOcr || saved.ocr) &&
+                    saved.acceptsOcrProfile(ocrProfile))
               page
         };
       });
@@ -351,6 +360,7 @@ class DocumentReflowStore {
           final updated = DocumentReflowPage(
               page: page,
               ocr: result.ocr,
+              ocrProfile: result.ocrProfile,
               rawText: result.rawText,
               rawRegions: result.rawRegions);
           _put(data, updated);
@@ -383,6 +393,7 @@ class DocumentReflowStore {
         final existing = _page(data, value.page);
         if (onlyIfAbsent &&
             existing != null &&
+            existing.acceptsOcrProfile(value.ocrProfile) &&
             !(replaceEmbeddedText && value.ocr && !existing.ocr)) {
           return;
         }
@@ -403,6 +414,7 @@ class DocumentReflowStore {
         final edited = DocumentReflowPage(
             page: original.page,
             ocr: original.ocr,
+            ocrProfile: original.ocrProfile,
             rawText: original.rawText,
             rawRegions: original.rawRegions,
             layoutVersion: original.layoutVersion,

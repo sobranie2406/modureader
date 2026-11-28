@@ -100,21 +100,22 @@ void main() {
     await store.withModelFiles(() async {}); // failed deletion releases lock
   });
 
-  test('catalog retains legacy packs and adds pinned V6 models', () {
-    expect(OcrModels.all.length, 6);
-    expect(OcrModels.all.map((m) => m.id).toSet().length, 6);
+  test('catalog retains legacy packs and adds pinned V6 and manga models', () {
+    expect(OcrModels.all.length, 7);
+    expect(OcrModels.all.map((m) => m.id).toSet().length, 7);
     expect(OcrModels.byId('unknown'), OcrModels.defaultModel);
     for (final model in OcrModels.all) {
       expect(model.totalBytes, lessThan(150 * 1024 * 1024));
-      expect(model.files.keys, containsAll(['det.onnx', 'rec.onnx']));
+      final file = model == OcrModels.manga ? 'decoder.onnx' : 'rec.onnx';
+      expect(model.files.keys, containsAll(['det.onnx', file]));
       for (final spec in model.files.values) {
         expect(spec.$3, matches(RegExp(r'^[0-9a-f]{64}$')));
       }
       final store = OcrModelStore(model: model);
       for (final source in OcrDownloadSource.values) {
-        final uri = Uri.parse(store.downloadUrl('rec.onnx', source));
+        final uri = Uri.parse(store.downloadUrl(file, source));
         expect(OcrModelStore.allowedDownloadUri(uri, source), isTrue);
-        if (!model.files['rec.onnx']!.$1.startsWith('https://') ||
+        if (!model.files[file]!.$1.startsWith('https://') ||
             source == OcrDownloadSource.gitee) {
           expect(uri.path, contains(model.revision));
         }

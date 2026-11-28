@@ -7,6 +7,7 @@ import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:modu_reader/utils/log/common.dart';
 import 'ocr_model_store.dart';
 import 'ocr_models.dart';
+import 'manga_ocr.dart';
 import 'ocr_processing.dart';
 import 'ocr_model_metadata.dart';
 import 'document_text_geometry.dart';
@@ -56,20 +57,20 @@ class LocalOcrService {
   /// Single on-demand job, no persistent queue, no restart/recovery task.
   Future<String> recognize(
           Uint8List image, OcrModelStore store, OcrCancellation cancellation,
-          {void Function(int, int)? progress}) async =>
+          {bool vertical = false, void Function(int, int)? progress}) async =>
       (await recognizeWithRegions(image, store, cancellation,
-              progress: progress))
+              vertical: vertical, progress: progress))
           .text;
 
   Future<DocumentTextResult> recognizeWithRegions(
           Uint8List image, OcrModelStore store, OcrCancellation cancellation,
-          {void Function(int, int)? progress}) =>
-      store.withModelFiles(
-          () => _recognize(image, store, cancellation, progress: progress));
+          {bool vertical = false, void Function(int, int)? progress}) =>
+      store.withModelFiles(() => _recognize(image, store, cancellation,
+          vertical: vertical, progress: progress));
 
   Future<DocumentTextResult> _recognize(
       Uint8List image, OcrModelStore store, OcrCancellation cancellation,
-      {void Function(int, int)? progress}) async {
+      {bool vertical = false, void Function(int, int)? progress}) async {
     if (_running) throw StateError('Another OCR task is running');
     _running = true;
     final port = ReceivePort();
@@ -101,8 +102,8 @@ class LocalOcrService {
         await ohos.load(root.path);
         cancellation.check();
       }
-      worker = await Isolate.spawn(
-          _ocrWorker, [port.sendPort, token, root.path, image, store.model.id],
+      worker = await Isolate.spawn(_ocrWorker,
+          [port.sendPort, token, root.path, image, store.model.id, vertical],
           onError: port.sendPort, onExit: port.sendPort);
       await for (final event in port) {
         if (event is SendPort) {
@@ -172,13 +173,13 @@ void _ocrWorker(List<Object?> args) async {
     stage = _OcrFailureStage.modelLoad;
     final path = args[2] as String;
     final model = OcrModels.byId(args[4] as String);
-    final alphabet = model.files.containsKey('rec.yml')
-        ? ocrAlphabetFromConfig(await File('$path/rec.yml').readAsString())
-        : ocrAlphabet(await File('$path/rec.onnx').readAsBytes());
-    if (!onOhos && Platform.isAndroid) {
+    final manga = model == OcrModels.manga;
+    final vertical = args[5] as bool;
+    if (!onOhos && Platform.isAndroid && !manga) {
       await android.invokeMethod<void>('load', {'path': path});
     } else if (!onOhos) {
-      for (final name in ['det', 'rec']) {
+      for (final name
+          in manga ? ['det', 'encoder', 'decoder'] : ['det', 'rec']) {
         if (cancelled) throw StateError('cancelled');
         sessions[name] = await OnnxRuntime().createSession('$path/$name.onnx',
             options: OrtSessionOptions(
@@ -237,29 +238,44 @@ void _ocrWorker(List<Object?> args) async {
       }
     }
 
-    stage = _OcrFailureStage.imageDecode;
-    final text = await recognizeOcrImageWithRegions(
-      args[3] as Uint8List,
-      alphabet,
-      (name, values, shape) async {
-        stage = _OcrFailureStage.inference;
-        final output = await run(name, values, shape);
-        stage = _OcrFailureStage.imageProcessing;
-        return output;
-      },
-      detectionThreshold: model.detectionThreshold,
-      boxThreshold: model.boxThreshold,
-      cancelled: () => cancelled,
-      onImageDecoded: () => stage = _OcrFailureStage.imageProcessing,
-      progress: (n, total) => reply.send(['progress', n, total]),
-    );
+    late DocumentTextResult text;
+    if (manga) {
+      final vocab = await File('$path/vocab.txt').readAsLines();
+      stage = _OcrFailureStage.imageDecode;
+      final page = decodeOcrPage(args[3] as Uint8List);
+      stage = _OcrFailureStage.inference;
+      text = await recognizeManga(page, vocab, sessions, () {
+        if (cancelled) throw StateError('cancelled');
+      }, (n, total) => reply.send(['progress', n, total]), vertical: vertical);
+    } else {
+      final alphabet = model.files.containsKey('rec.yml')
+          ? ocrAlphabetFromConfig(await File('$path/rec.yml').readAsString())
+          : ocrAlphabet(await File('$path/rec.onnx').readAsBytes());
+      stage = _OcrFailureStage.imageDecode;
+      text = await recognizeOcrImageWithRegions(
+        args[3] as Uint8List,
+        alphabet,
+        (name, values, shape) async {
+          stage = _OcrFailureStage.inference;
+          final output = await run(name, values, shape);
+          stage = _OcrFailureStage.imageProcessing;
+          return output;
+        },
+        vertical: vertical,
+        detectionThreshold: model.detectionThreshold,
+        boxThreshold: model.boxThreshold,
+        cancelled: () => cancelled,
+        onImageDecoded: () => stage = _OcrFailureStage.imageProcessing,
+        progress: (n, total) => reply.send(['progress', n, total]),
+      );
+    }
     result = ['result', text.toJson()];
   } catch (_) {
     // Native error messages can contain local paths. Send only the stage.
     result = ['error', stage];
   } finally {
     try {
-      if (!onOhos && Platform.isAndroid) {
+      if (!onOhos && Platform.isAndroid && args[4] != OcrModels.manga.id) {
         await android.invokeMethod<void>('close');
       }
       for (final session in sessions.values) {

@@ -1744,6 +1744,14 @@ class Prefs extends ChangeNotifier {
 
   String get ocrModelId =>
       OcrModels.byId(prefs.getString('ocrModelId') ?? '').id;
+  bool get ocrVerticalEnabled => prefs.getBool('ocrVerticalEnabled') ?? false;
+  Future<void> saveOcrVertical(bool enabled) async {
+    if (!await prefs.setBool('ocrVerticalEnabled', enabled)) {
+      throw StateError('Could not save OCR reading direction');
+    }
+    notifyListeners();
+  }
+
   bool get ocrPrecacheEnabled => prefs.getBool('ocrPrecacheEnabled') ?? false;
   int get ocrPrecachePages =>
       (prefs.getInt('ocrPrecachePages') ?? 3).clamp(1, 5);

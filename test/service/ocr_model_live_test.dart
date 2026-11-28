@@ -15,6 +15,8 @@ void main() {
     final root = await Directory.systemTemp.createTemp('modu-ocr-mirror-live-');
     try {
       for (final model in OcrModels.all) {
+        if (const bool.fromEnvironment('MODU_VERIFY_MANGA_ONLY') &&
+            model != OcrModels.manga) continue;
         if (const bool.fromEnvironment('MODU_VERIFY_OCR_V6_ONLY') &&
             !model.files.containsKey('rec.yml')) {
           continue;

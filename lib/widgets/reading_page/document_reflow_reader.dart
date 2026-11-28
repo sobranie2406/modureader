@@ -1116,7 +1116,15 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       int page, bool Function() active) async {
     final saved = await widget.store.read(page, '');
     if (!active()) return null;
-    if (saved != null) return !_forceOcr || saved.ocr ? saved : null;
+    if (saved != null) {
+      final model =
+          widget.modelStore?.model ?? OcrModels.byId(Prefs().ocrModelId);
+      return (!_forceOcr || saved.ocr) &&
+              saved.acceptsOcrProfile(
+                  model.readingProfile(Prefs().ocrVerticalEnabled))
+          ? saved
+          : null;
+    }
     if (_forceOcr) return null;
 
     final info = await widget.info(page);
@@ -1640,6 +1648,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _progress = null;
     });
     _panels.value++;
+    final vertical = Prefs().ocrVerticalEnabled;
     final model = widget.modelStore ??
         OcrModelStore(model: OcrModels.byId(Prefs().ocrModelId));
     bool active() =>
@@ -1670,6 +1679,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
         _ownsRenderer = true;
         try {
           return await loadDocumentReflowPage(
+              vertical: vertical,
               info: info,
               store: widget.store,
               model: model,
@@ -1686,7 +1696,7 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                           .then(DocumentTextResult.new)
                       : LocalOcrService().recognizeWithRegions(
                           bytes, model, token,
-                          progress: progress)),
+                          vertical: vertical, progress: progress)),
               progress: (n, total) {
                 if (active()) {
                   setState(() => _progress = total > 0 ? n / total : null);
@@ -1704,7 +1714,10 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
               : await widget.store.readAnchor(anchor);
       check();
       final result = cached != null &&
-              (anchor != null || !_forceOcr || cached.ocr)
+              (anchor != null ||
+                  ((!_forceOcr || cached.ocr) &&
+                      cached.acceptsOcrProfile(
+                          model.model.readingProfile(vertical))))
           ? cached
           : await (widget.precache?.runForeground<DocumentReflowPage>(load) ??
               load());
@@ -1827,7 +1840,9 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
                     onChanged: widget.onComparisonChanged),
               Padding(
                   padding: const EdgeInsets.all(12),
-                  child: OcrPrecacheSettings(cache: widget.precache)),
+                  child: OcrPrecacheSettings(
+                      cache: widget.precache,
+                      onVerticalChanged: () => _load(_navigationPage))),
             ])),
             ReaderMenuGroup(
                 child: Column(children: [

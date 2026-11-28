@@ -22,6 +22,7 @@ Future<DocumentReflowPage> loadDocumentReflowPage({
   DocumentReflowAnchor? anchor,
   bool forceOcr = false,
   bool refresh = false,
+  bool vertical = false,
 }) async {
   cancel.check();
   final rawPage = info['page'], rawTotal = info['total'];
@@ -38,13 +39,16 @@ Future<DocumentReflowPage> loadDocumentReflowPage({
     throw const FormatException('Invalid image page');
   }
   final page = rawPage.toInt();
+  final profile = model.model.readingProfile(vertical);
   final cached = refresh
       ? null
       : anchor == null
           ? await store.read(page, '')
           : await store.readAnchor(anchor);
   cancel.check();
-  if (cached != null && (anchor != null || !forceOcr || cached.ocr)) {
+  if (cached != null &&
+      (anchor != null ||
+          ((!forceOcr || cached.ocr) && cached.acceptsOcrProfile(profile)))) {
     return cached;
   }
   final rawRegion =
@@ -87,7 +91,11 @@ Future<DocumentReflowPage> loadDocumentReflowPage({
     throw const FormatException('No usable text');
   }
   final value = DocumentReflowPage(
-      page: page, ocr: ocr, rawText: result.text, rawRegions: result.regions);
+      page: page,
+      ocr: ocr,
+      ocrProfile: ocr ? profile : '',
+      rawText: result.text,
+      rawRegions: result.regions);
   await store.save(value, '',
       onlyIfAbsent: !refresh, replaceEmbeddedText: forceOcr);
   cancel.check();

@@ -50,6 +50,7 @@ void validateSettingsValue(String key, dynamic value,
     'ocrModelId': [
       'ppocr-v6-small-1',
       'ppocr-v6-medium-1',
+      'manga-ocr-1',
       'ppocr-v4-mobile-1',
       'ppocr-v5-mobile-1',
       'ppocr-v3-mobile-1',

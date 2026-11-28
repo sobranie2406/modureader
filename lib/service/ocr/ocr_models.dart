@@ -1,3 +1,5 @@
+import 'dart:io';
+
 class OcrModelSpec {
   const OcrModelSpec(this.id, this.name, this.englishName, this.files,
       {this.revision = OcrModels.revision,
@@ -9,6 +11,11 @@ class OcrModelSpec {
   final String revision, upstreamBase, upstreamName;
   final Map<String, (String, int, String)> files;
   final double detectionThreshold, boxThreshold;
+  String readingProfile(bool vertical) {
+    if (id == OcrModels.manga.id) return vertical ? 'manga-vertical' : 'manga';
+    return vertical ? 'vertical' : '';
+  }
+
   int get totalBytes => files.values.fold(0, (n, file) => n + file.$2);
 }
 
@@ -95,9 +102,37 @@ abstract final class OcrModels {
       revision: 'v6-1',
       detectionThreshold: .2,
       boxThreshold: .45);
+  static const manga = OcrModelSpec(
+      'manga-ocr-1',
+      'RT-DETR-V2 + MangaOCR（日语漫画）',
+      'RT-DETR-V2 + MangaOCR (Japanese manga)',
+      {
+        'det.onnx': (
+          'https://huggingface.co/ogkalu/comic-text-and-bubble-detector/resolve/16e8a622f91fabc6b5b65c96d32d1183f8843546/detector-v4-s_int8.onnx',
+          11120765,
+          '5fe9e4f576e49d4e7e8b0e029d6d3cdc252abd4694113e1cae120e62c931ea79'
+        ),
+        'encoder.onnx': (
+          'https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/encoder_model.onnx',
+          22356885,
+          'f87668ae0f62d6f032dac6b213e8c0fea84cd15895ac8cab624cc9a2f49d4a27'
+        ),
+        'decoder.onnx': (
+          'https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/decoder_model.onnx',
+          118053454,
+          '6b1fb216d542c4b2a4fa5b9d7ae3522081eb85fb959d2cecd28055af956a8a5e'
+        ),
+        'vocab.txt': (
+          'https://huggingface.co/l0wgear/manga-ocr-2025-onnx/resolve/e8b27bbd3f424fe3877e0bda704d6a920e4f0a33/vocab.txt',
+          24072,
+          '344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d'
+        ),
+      },
+      revision: 'v1');
   static const all = [
     defaultModel,
     v6Medium,
+    manga,
     v5Mobile,
     v4Mobile,
     OcrModelSpec('ppocr-v3-mobile-1', 'PP-OCRv3 中英文（更小）',
@@ -127,6 +162,9 @@ abstract final class OcrModels {
       ),
     }),
   ];
-  static OcrModelSpec byId(String id) =>
-      all.firstWhere((model) => model.id == id, orElse: () => defaultModel);
+  // HarmonyOS uses a separate Paddle-only ONNX bridge.
+  static Iterable<OcrModelSpec> get supported =>
+      Platform.operatingSystem == 'ohos' ? all.where((m) => m != manga) : all;
+  static OcrModelSpec byId(String id) => supported
+      .firstWhere((model) => model.id == id, orElse: () => defaultModel);
 }

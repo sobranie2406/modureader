@@ -68,7 +68,7 @@ class OcrModelStore {
       final dir = await root();
       final targets = <(String, FileSystemEntityType)>[];
       for (final name in model.files.keys) {
-        if (!RegExp(r'^[a-zA-Z0-9_-]+\.(onnx|yml)$').hasMatch(name)) {
+        if (!RegExp(r'^[a-zA-Z0-9_-]+\.(onnx|yml|txt)$').hasMatch(name)) {
           throw StateError('Invalid OCR model filename');
         }
         for (final suffix in ['', '.part']) {
@@ -115,6 +115,9 @@ class OcrModelStore {
     final spec = model.files[file];
     if (spec == null) throw ArgumentError.value(file, 'file');
     final absolute = Uri.parse(spec.$1).hasScheme;
+    if (model == OcrModels.manga && source == OcrDownloadSource.gitee) {
+      return 'https://gitee.com/sobranie2406/modu-models/releases/download/manga-ocr-v1/$file';
+    }
     return source == OcrDownloadSource.gitee
         ? '$mirrorBase/${model.id}-${model.revision}-${absolute ? file : spec.$1.split('/').last}'
         : absolute
@@ -210,31 +213,38 @@ class OcrModelStore {
       if (!await validFile(path, spec.$2, spec.$3)) {
         final partial = File('$path.part');
         try {
-          var uri = Uri.parse(downloadUrl(entry.key, source));
-          for (var hop = 0;; hop++) {
-            check();
-            if (hop > 5 || !allowedDownloadUri(uri, source)) {
-              throw const FormatException(
-                  'Untrusted OCR model download redirect');
+          final base = downloadUrl(entry.key, source);
+          final split = model == OcrModels.manga &&
+              source == OcrDownloadSource.gitee &&
+              entry.key == 'decoder.onnx';
+          const limit = 64 * 1024 * 1024;
+          final parts = split
+              ? [('$base.part-01', limit), ('$base.part-02', spec.$2 - limit)]
+              : [(base, spec.$2)];
+          var received = 0;
+          final sink = partial.openWrite();
+          try {
+            for (final part in parts) {
+              final body =
+                  await _openDownload(Uri.parse(part.$1), source, token);
+              var partBytes = 0;
+              await sink.addStream(
+                  body.stream.timeout(const Duration(minutes: 2)).map((chunk) {
+                check();
+                partBytes += chunk.length;
+                if (partBytes > part.$2) {
+                  throw const FormatException('Oversized OCR model');
+                }
+                received += chunk.length;
+                progress(done + received, totalBytes);
+                return chunk;
+              }));
+              if (partBytes != part.$2) {
+                throw const FormatException('Incomplete OCR model');
+              }
             }
-            final response = await _dio.download(uri.toString(), partial.path,
-                cancelToken: token,
-                options: Options(
-                    receiveTimeout: const Duration(minutes: 2),
-                    followRedirects: false,
-                    validateStatus: (status) =>
-                        status == 200 ||
-                        [301, 302, 303, 307, 308].contains(status)),
-                onReceiveProgress: (n, _) {
-              if (n > spec.$2) token.cancel('Oversized OCR model');
-              progress(done + n, totalBytes);
-            });
-            if (response.statusCode == 200) break;
-            final location = response.headers.value('location');
-            if (location == null) {
-              throw const FormatException('Missing OCR model redirect');
-            }
-            uri = uri.resolve(location);
+          } finally {
+            await sink.close();
           }
           check();
           if (!await validFile(partial.path, spec.$2, spec.$3)) {
@@ -252,5 +262,28 @@ class OcrModelStore {
       done += spec.$2;
       progress(done, totalBytes);
     }
+  }
+
+  Future<ResponseBody> _openDownload(
+      Uri uri, OcrDownloadSource source, CancelToken token) async {
+    for (var hop = 0; hop <= 5 && allowedDownloadUri(uri, source); hop++) {
+      final response = await _dio.get<ResponseBody>(uri.toString(),
+          cancelToken: token,
+          options: Options(
+              responseType: ResponseType.stream,
+              receiveTimeout: const Duration(minutes: 2),
+              followRedirects: false,
+              validateStatus: (status) =>
+                  status == 200 || [301, 302, 303, 307, 308].contains(status)));
+      final body = response.data!;
+      if (response.statusCode == 200) return body;
+      await body.stream.listen(null).cancel();
+      final location = response.headers.value('location');
+      if (location == null) {
+        throw const FormatException('Missing OCR model redirect');
+      }
+      uri = uri.resolve(location);
+    }
+    throw const FormatException('Untrusted OCR model download redirect');
   }
 }

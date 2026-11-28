@@ -40,7 +40,7 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
   @override
   void initState() {
     super.initState();
-    for (final model in OcrModels.all) {
+    for (final model in OcrModels.supported) {
       _stores[model.id] =
           widget.storeFactory?.call(model) ?? OcrModelStore(model: model);
       _checking.add(model.id);
@@ -64,7 +64,7 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
   }
 
   Future<void> _checkAll() async {
-    for (final model in OcrModels.all) {
+    for (final model in OcrModels.supported) {
       if (!mounted) return;
       await _check(model);
     }
@@ -306,7 +306,7 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                                         Theme.of(context).colorScheme.error)),
                             const SizedBox(height: 12),
                           ],
-                          for (final model in OcrModels.all) ...[
+                          for (final model in OcrModels.supported) ...[
                             _modelCard(model),
                             const SizedBox(height: 10)
                           ],

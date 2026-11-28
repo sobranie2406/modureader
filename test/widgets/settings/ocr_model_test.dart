@@ -90,6 +90,25 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets('manga is manually selected independently of vertical reading',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await Prefs().initPrefs();
+    await show(tester, (m) => FakeOcrStore(m)..ready = true);
+    final toggle = find.text('竖排识别');
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(Prefs().ocrVerticalEnabled, isTrue);
+    expect(Prefs().ocrModelId, OcrModels.defaultModel.id);
+    final use = find.byKey(ValueKey('ocr-use-${OcrModels.manga.id}'));
+    await tester.ensureVisible(use);
+    await tester.pumpAndSettle();
+    await tester.tap(use);
+    await tester.pumpAndSettle();
+    expect(Prefs().ocrModelId, OcrModels.manga.id);
+    expect(Prefs().ocrVerticalEnabled, isTrue);
+  });
   testWidgets(
       'offline import explains pinned files and cancels without changes',
       (tester) async {
@@ -157,9 +176,9 @@ void main() {
         stores.add(store);
         return store;
       }, locale: locale);
-      expect(stores.length, 6);
+      expect(stores.length, OcrModels.supported.length);
       expect(stores.every((store) => store.downloads == 0), isTrue);
-      expect(find.byType(Card), findsNWidgets(6));
+      expect(find.byType(Card), findsNWidgets(OcrModels.supported.length));
       await tester
           .ensureVisible(find.byKey(const ValueKey('ocr-source-gitee')));
       await tester.tap(find.byKey(const ValueKey('ocr-source-gitee')));
