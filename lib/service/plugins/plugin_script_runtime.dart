@@ -229,6 +229,9 @@ class PluginScriptRuntime with WidgetsBindingObserver {
         record == null ||
         !_enabled(pluginId, record.version) ||
         !manifest.capabilities.contains(kScriptRunCapability) ||
+        (action.surface == PluginScriptSurface.readerOpen &&
+            (isContextValid == null ||
+                host.configFor(pluginId)[action.enabledSetting] != true)) ||
         (action.surface == PluginScriptSurface.article &&
             (!manifest.capabilities.contains(kArticleExtractCapability) ||
                 action.scope != PluginSelectionScope.selection)) ||
@@ -368,8 +371,18 @@ class PluginScriptRuntime with WidgetsBindingObserver {
                 };
       _bounded(payload, article ? maxArticleInputBytes : maxInputBytes);
       job.stage = 'execute';
+      final readerOpen = action.surface == PluginScriptSurface.readerOpen;
       final result = await job.engine.execute(utf8.decode(bytes), payload,
-          onCall: (method, args) => article ||
+          onCall: (method, args) => (readerOpen &&
+                      !(const {
+                            'reading.position',
+                            'reading.applyPosition',
+                            'storage.read',
+                            'permissions.status'
+                          }.contains(method) ||
+                          (method == 'http.request' &&
+                              args['method'] == 'GET'))) ||
+                  article ||
                   importPolicy ||
                   action.surface == PluginScriptSurface.dictionary
               ? Future.error(const PluginScriptFailure('permission'))

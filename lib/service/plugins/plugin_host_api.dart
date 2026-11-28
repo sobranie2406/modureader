@@ -41,11 +41,12 @@ class PluginReadingPosition {
     required this.revision,
     this.page,
     this.pageCount,
+    this.updatedAtMs,
   });
 
   final String position, revision;
   final double percentage;
-  final int? page, pageCount;
+  final int? page, pageCount, updatedAtMs;
 }
 
 typedef PluginReadingPositionApplier = Future<void> Function(
@@ -330,6 +331,7 @@ class PluginHostApi {
       'fingerprint': fingerprint,
       'position': position.position,
       'percentage': position.percentage,
+      if (position.updatedAtMs != null) 'updatedAtMs': position.updatedAtMs,
       if (position.page != null) 'page': position.page,
       if (position.pageCount != null) 'pageCount': position.pageCount,
       'revision': revision,

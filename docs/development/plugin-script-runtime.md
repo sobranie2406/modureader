@@ -8,7 +8,7 @@ review admission, with separate temporary packages, state and trust; ordinary
 installation still requires the signed catalog.
 
 Packages remain schema 1 / host API 1. `scriptAction` declares `id`, localized
-`name`, relative `.js` `entry`, `surface` (`selection`, `library`, `dictionary`, `article` or `bookImport`) and `scope`
+`name`, relative `.js` `entry`, `surface` (`selection`, `library`, `dictionary`, `article`, `bookImport`, `reader` or `readerOpen`) and `scope`
 (`selection` or `context`). It requires `script:run`; selection actions also
 require `ui:selection-action`. Existing prompt and AI toolbar formats are unchanged.
 The dictionary surface additionally requires `dictionary:transform` and uses
@@ -322,3 +322,10 @@ callbacks, runtime permission/timeout/cancellation, malicious manifests, exact
 package inventory, SQLite visibility and native protection UI. A real Chromium smoke check also verified text execution, controlled private-library
 calls, Blob-worker connect-src enforcement and termination of an infinite loop.
 Physical-device WebView/CSP and platform-specific performance remain acceptance checks.
+
+A `readerOpen` action requires `ui:reader-action` and an `enabledSetting` referencing
+a device-local toggle with `defaultValue: false`. It runs after the initial public
+reader position is restored. Use previously granted permissions for
+`http.request` (GET), `reading.position`, `reading.applyPosition`, `permissions.status`
+or `storage.read`. The reading position includes `updatedAtMs` (Unix milliseconds,
+zero for an unread book). Pass the captured revision when applying a position.

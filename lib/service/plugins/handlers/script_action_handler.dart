@@ -92,7 +92,8 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
       if (action is! ScriptActionContribution ||
           (action.surface == PluginScriptSurface.selection &&
               !manifest.capabilities.contains(kSelectionActionCapability)) ||
-          (action.surface == PluginScriptSurface.reader &&
+          ((action.surface == PluginScriptSurface.reader ||
+                  action.surface == PluginScriptSurface.readerOpen) &&
               (!manifest.capabilities.contains(kReaderActionCapability) ||
                   action.scope != PluginSelectionScope.selection)) ||
           (action.surface == PluginScriptSurface.dictionary &&
@@ -108,7 +109,8 @@ class ScriptActionContributionHandler implements PluginContributionHandler {
                   }) ||
                   action.scope != PluginSelectionScope.selection)) ||
           (action.enabledSetting != null &&
-              (action.surface != PluginScriptSurface.bookImport ||
+              ((action.surface != PluginScriptSurface.bookImport &&
+                      action.surface != PluginScriptSurface.readerOpen) ||
                   !manifest.settings.any((setting) =>
                       setting.key == action.enabledSetting &&
                       setting.type == PluginSettingType.toggle)))) {

@@ -286,6 +286,7 @@ class _PluginDeveloperPageState extends State<PluginDeveloperPage> {
               .whereType<ScriptActionContribution>()
               .where((action) =>
                   action.surface != PluginScriptSurface.article &&
+                  action.surface != PluginScriptSurface.readerOpen &&
                   action.surface != PluginScriptSurface.reader &&
                   action.surface != PluginScriptSurface.bookImport) ??
           const <ScriptActionContribution>[])

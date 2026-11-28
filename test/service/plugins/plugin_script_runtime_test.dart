@@ -7,8 +7,10 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
 import 'package:modu_reader/config/shared_preference_provider.dart';
+import 'package:modu_reader/models/book.dart';
 import 'package:modu_reader/models/plugin_manifest.dart';
 import 'package:modu_reader/service/config_transfer/global_settings_transfer.dart';
+import 'package:modu_reader/service/plugins/plugin_reader_open.dart';
 import 'package:modu_reader/service/plugins/plugin_config.dart';
 import 'package:modu_reader/service/plugins/plugin_host.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
@@ -444,6 +446,59 @@ void main() {
     await expired;
     waiting.complete({});
     await rejected;
+  });
+
+  test('reader open is opt-in and runs without interactive or upload calls',
+      () async {
+    final m = jsonDecode(files['manifest.json']!) as Map<String, dynamic>;
+    final contribution = (m['contributes'] as List).first;
+    contribution['surface'] = 'readerOpen';
+    contribution['enabledSetting'] = 'auto';
+    contribution['formats'] = ['epub'];
+    files['manifest.json'] = jsonEncode(m);
+    await install(capabilities: [
+      'script:run',
+      'ui:reader-action',
+      'settings:device'
+    ], settings: [
+      {
+        'type': 'toggle',
+        'key': 'auto',
+        'storage': 'device',
+        'defaultValue': false
+      }
+    ]);
+    Future<Map<String, dynamic>> open() =>
+        runtime.run(pluginId: id, action: action, isContextValid: () => true);
+    await expectLater(open(), throwsA(failure('unavailable')));
+    final book = Book.mock()..filePath = 'book.epub';
+    Future<void> opened({bool visible = true}) => runReaderOpenPlugins(
+        book: book,
+        isCurrent: () => visible,
+        resolveRuntime: (_) => runtime,
+        readingPosition: () async => throw UnimplementedError(),
+        applyReadingPosition: (_,
+            {required isCurrent, page, cfi, percentage}) async {});
+    await opened();
+    await host.saveConfig(id, {'auto': true});
+    await opened(visible: false);
+    book.filePath = 'book.txt';
+    await opened();
+    expect(engine.ready.isCompleted, isFalse);
+    book.filePath = 'book.epub';
+    final response = opened();
+    await engine.ready.future;
+    for (final method in [
+      'permissions.request',
+      'ui.confirm',
+      'storage.write',
+      'http.request'
+    ]) {
+      await expectLater(engine.call(method, {'method': 'PUT'}),
+          throwsA(failure('permission')));
+    }
+    engine.result.complete({'text': ''});
+    await response;
   });
 
   test('import policy receives a safe summary and cannot call host methods',

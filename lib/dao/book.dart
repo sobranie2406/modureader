@@ -169,6 +169,7 @@ class BookDao extends BaseDao {
       row['last_read_position'] as String? ?? '',
       normalizeReadingProgress(row['reading_percentage'] as num?),
       '${row['clock']}:${row['revision']}',
+      updatedAtMs: row['clock'] as int?,
       deleted: row['is_deleted'] == 1,
       narration: NarrationPosition.decode(row['narration']),
     );

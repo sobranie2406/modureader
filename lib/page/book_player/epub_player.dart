@@ -70,6 +70,7 @@ import 'package:modu_reader/providers/sync.dart';
 import 'package:modu_reader/enums/sync_direction.dart';
 import 'package:modu_reader/service/book_player/reader_progress_session.dart';
 import 'package:modu_reader/service/plugins/plugin_host_api.dart';
+import 'package:modu_reader/service/plugins/plugin_reader_open.dart';
 import 'package:modu_reader/service/plugins/plugin_script_runtime.dart';
 import 'package:modu_reader/service/book_player/document_layout_store.dart';
 import 'package:modu_reader/service/book_player/pdf_reading_state_store.dart';
@@ -1174,6 +1175,43 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     }
   }
 
+  bool _openingPositionRestored = false;
+  bool _openingPluginsDispatched = false;
+  bool _movedSinceOpening = false;
+
+  void _dispatchOpeningPlugins() {
+    if (_openingPluginsDispatched ||
+        !_openingPositionRestored ||
+        !_pluginReadingPositionAvailable ||
+        cfi.isEmpty ||
+        (isPdfDocument &&
+            (currentChapter < 1 || currentChapter > totalChapters))) {
+      return;
+    }
+    _openingPluginsDispatched = true;
+    if (_movedSinceOpening) return;
+    final openingCfi = cfi;
+    unawaited(runReaderOpenPlugins(
+        book: book,
+        isCurrent: () =>
+            mounted &&
+            _readerReady &&
+            _isTopOfNavigationStack &&
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed &&
+            !_hasNarrationSession &&
+            !_movedSinceOpening &&
+            readingPageKey.currentState?.isReflowReading != true,
+        readingPosition: () async {
+          final position = await pluginReadingPosition();
+          if (position.position != openingCfi) {
+            throw const PluginScriptFailure('stale');
+          }
+          return position;
+        },
+        applyReadingPosition: applyPluginReadingPosition));
+  }
+
   bool get _pluginReadingPositionAvailable =>
       mounted &&
       _readerReady &&
@@ -1207,6 +1245,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           ? currentChapter / totalChapters
           : percentage.clamp(0.0, 1.0).toDouble(),
       revision: saved.revision,
+      updatedAtMs: saved.position.isEmpty && saved.percentage == 0
+          ? 0
+          : saved.updatedAtMs,
       page: isPdfDocument ? currentChapter : null,
       pageCount: isPdfDocument ? totalChapters : null,
     );
@@ -2178,6 +2219,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             _chapterFontFailed = _chapterLoadFailed && data['reason'] == 'font';
             if (data['state'] == 'ready') _readerLoadFailed = false;
           });
+          if (data['state'] == 'ready') _dispatchOpeningPlugins();
         });
     controller.addJavaScriptHandler(
         handlerName: 'onReaderTap',
@@ -2229,6 +2271,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           Prefs()
               .setBookTranslationMode(widget.book.id, TranslationModeEnum.off);
           if (!mounted) return;
+          _openingPositionRestored = true;
+          if (_pendingLinkedCfi != null) _openingPluginsDispatched = true;
+          _dispatchOpeningPlugins();
           widget.onLoadEnd();
           final linkedCfi = _pendingLinkedCfi;
           _pendingLinkedCfi = null;
@@ -2240,6 +2285,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
         callback: (args) {
           Map<String, dynamic> location = args[0];
           if (!mounted) return;
+          if (_readerPositionInitialized && location['readingAction'] == true) {
+            _movedSinceOpening = true;
+          }
           _observeEinkPage(location);
           final region = location['pdfRegion'];
           if (supportsDocumentImages) {
@@ -2319,6 +2367,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
                 chapterTotalPages: chapterTotalPages,
               );
           widget.updateParent();
+          _dispatchOpeningPlugins();
           if (location['readingAction'] == true) {
             unawaited(_recordReadingAction(cfi, percentage,
                 pdfRegion: location['pdfRegion']));

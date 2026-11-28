@@ -652,6 +652,7 @@ enum PluginScriptSurface {
   article,
   bookImport,
   reader,
+  readerOpen,
 }
 
 class ScriptActionContribution extends PluginContribution {
@@ -714,14 +715,17 @@ class ScriptActionContribution extends PluginContribution {
               PluginScriptSurface.article,
               PluginScriptSurface.bookImport,
               PluginScriptSurface.reader,
+              PluginScriptSurface.readerOpen,
             }.contains(surface) &&
             scope != PluginSelectionScope.selection)) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
           'contributes[$index] has an invalid surface or scope.');
     }
     final enabledSetting = raw['enabledSetting'];
-    if (raw.containsKey('enabledSetting') &&
-        (surface != PluginScriptSurface.bookImport ||
+    if ((raw.containsKey('enabledSetting') ||
+            surface == PluginScriptSurface.readerOpen) &&
+        ((surface != PluginScriptSurface.bookImport &&
+                surface != PluginScriptSurface.readerOpen) ||
             enabledSetting is! String ||
             !settingKeyPattern.hasMatch(enabledSetting))) {
       throw PluginInstallError(PluginErrorCode.invalidContribution,
@@ -729,7 +733,8 @@ class ScriptActionContribution extends PluginContribution {
     }
     final formats = raw['formats'];
     if (raw.containsKey('formats') &&
-        (surface != PluginScriptSurface.reader ||
+        ((surface != PluginScriptSurface.reader &&
+                surface != PluginScriptSurface.readerOpen) ||
             formats is! List ||
             formats.isEmpty ||
             formats.length > 16 ||
@@ -1232,7 +1237,8 @@ class PluginManifest {
       if (!capabilities.contains(kScriptRunCapability) ||
           (action.surface == PluginScriptSurface.selection &&
               !capabilities.contains(kSelectionActionCapability)) ||
-          (action.surface == PluginScriptSurface.reader &&
+          ((action.surface == PluginScriptSurface.reader ||
+                  action.surface == PluginScriptSurface.readerOpen) &&
               !capabilities.contains(kReaderActionCapability)) ||
           (action.surface == PluginScriptSurface.dictionary &&
               !capabilities.contains(kDictionaryTransformCapability)) ||
@@ -1348,6 +1354,15 @@ class PluginManifest {
           : action is BookActionContribution
               ? action.lockAfterSetting
               : null;
+      if (action is ScriptActionContribution &&
+          action.surface == PluginScriptSurface.readerOpen) {
+        final gate = settingByKey[key];
+        if (gate?.storage != PluginSettingStorage.device ||
+            gate?.defaultValue != false) {
+          throw const PluginInstallError(PluginErrorCode.invalidContribution,
+              'Reader-open actions require a default-off device toggle.');
+        }
+      }
       if (key != null && settingByKey[key]?.type != PluginSettingType.toggle) {
         throw const PluginInstallError(PluginErrorCode.invalidContribution,
             'Action setting references must name a declared toggle.');

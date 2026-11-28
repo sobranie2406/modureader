@@ -313,6 +313,8 @@ class PluginDetailPage extends StatelessWidget {
                     context, '在网页稍后阅读中使用', 'Used by Web clipper')),
                 PluginScriptSurface.bookImport => Text(ModuStrings.text(
                     context, '导入书籍时使用', 'Used when importing books')),
+                PluginScriptSurface.readerOpen => Text(ModuStrings.text(
+                    context, '打开书籍时运行', 'Runs when opening a book')),
                 PluginScriptSurface.reader => Text(ModuStrings.text(
                     context, '在阅读菜单的“更多”中使用', 'Use from the reader More menu')),
                 PluginScriptSurface.library => null,
