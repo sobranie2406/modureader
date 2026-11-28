@@ -2292,7 +2292,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                                     : Icons.color_lens),
                                 tooltip: documentMenu
                                     ? ModuStrings.text(context, '文字', 'Text')
-                                    : null,
+                                    : L10n.of(context).readingPageStyle,
                                 onPressed: () {
                                   documentMenu
                                       ? _documentPanel(textOnly: true)
@@ -2328,6 +2328,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
                               ),
                               if (!documentMenu)
                                 IconButton(
+                                  tooltip: L10n.of(context).settingsNarrate,
                                   icon: const Icon(EvaIcons.headphones),
                                   onPressed: ttsHandler,
                                 ),
