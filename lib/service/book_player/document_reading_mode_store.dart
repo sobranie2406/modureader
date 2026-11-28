@@ -66,11 +66,34 @@ class DocumentReadingModeStore {
         entry['forceOcr'] == true;
   }
 
+  ({bool recognize, bool translate}) mangaSettings(Book book) {
+    final entry = _read()[customCssBookKey(book)];
+    if (entry is! Map ||
+        entry['version'] != 1 ||
+        entry['source'] != _source(book)) {
+      return (recognize: false, translate: false);
+    }
+    return (
+      recognize: entry['mangaOcr'] == true,
+      translate: entry['bubbleTranslation'] == true
+    );
+  }
+
+  Future<void> setMangaSettings(Book book,
+          {bool? recognize, bool? translate}) =>
+      _write(book,
+          mangaOcr: recognize,
+          bubbleTranslation: recognize == false ? false : translate);
+
   Future<void> setForceOcr(Book book, bool enabled) =>
       _write(book, forceOcr: enabled);
 
   Future<void> _write(Book book,
-      {String? mode, bool? scannedOverride, bool? forceOcr}) {
+      {String? mode,
+      bool? scannedOverride,
+      bool? forceOcr,
+      bool? mangaOcr,
+      bool? bubbleTranslation}) {
     final identity = customCssBookKey(book), source = _source(book);
     final operation = _writes.then((_) async {
       final previous = prefs.getString(key);
@@ -83,6 +106,8 @@ class DocumentReadingModeStore {
         'source': source,
         if (mode != null) 'mode': mode,
         if (scannedOverride != null) 'scannedOverride': scannedOverride,
+        if (mangaOcr != null) 'mangaOcr': mangaOcr,
+        if (bubbleTranslation != null) 'bubbleTranslation': bubbleTranslation,
         if (forceOcr != null) 'forceOcr': forceOcr,
       };
       try {

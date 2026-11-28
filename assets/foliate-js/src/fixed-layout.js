@@ -108,7 +108,8 @@ export class FixedLayout extends HTMLElement {
         sheet = doc.createElement('style')
         sheet.id = 'modu-pdf-night-mode'
         sheet.textContent = `html, body { background: #000 !important; }
-            img[data-document-base], img[data-document-detail] { filter: invert(1); }`
+            img[data-document-base], img[data-document-detail] { filter: invert(1); }
+            [data-manga-layer] { filter: invert(1) !important; }`
         doc.head.append(sheet)
     }
     get pdfReading() { return this.#pdfEnabled }

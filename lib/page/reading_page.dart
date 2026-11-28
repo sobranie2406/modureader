@@ -420,6 +420,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     }
 
     return DocumentReflowReader(
+      mangaRecognition: player.mangaRecognition,
       key: _reflowKey,
       quickMarkEnabled: _reflowQuickMarkEnabled &&
           isReflowActive &&
@@ -1798,6 +1799,7 @@ class ReadingPageState extends ConsumerState<ReadingPage>
     final text = await Navigator.of(context).push<String>(MaterialPageRoute(
       builder: (_) => Scaffold(
           body: DocumentExtractionPanel(
+        mangaRecognition: player.mangaRecognition,
         comparison: isComparingDocument,
         onComparisonChanged: (page, enabled) {
           comparisonPage = page;

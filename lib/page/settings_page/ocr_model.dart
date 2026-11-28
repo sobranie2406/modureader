@@ -142,7 +142,8 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
           _present.add(model.id);
         });
         // Do not overwrite a newer selection imported/synced while downloading.
-        if (Prefs().ocrModelId == previousSelection) {
+        if (model != OcrModels.manga &&
+            Prefs().ocrModelId == previousSelection) {
           await _save(model: model.id);
         }
       }
@@ -429,7 +430,9 @@ class _OcrModelSettingsState extends State<OcrModelSettings> {
                             key: ValueKey('ocr-download-${model.id}'),
                             onPressed:
                                 _busy ? null : () => _startDownload(model),
-                            child: Text(t('下载并使用', 'Download and use'))),
+                            child: Text(model == OcrModels.manga
+                                ? t('下载', 'Download')
+                                : t('下载并使用', 'Download and use'))),
                     ],
                   ]),
             ],

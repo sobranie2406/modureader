@@ -33,6 +33,23 @@ void main() {
     expect(reopened.forceOcr(scanned.copyWith(md5: 'replaced')), isFalse);
   });
 
+  test('manga recognition is per book and translation requires separate opt-in',
+      () async {
+    final store =
+        DocumentReadingModeStore(await SharedPreferences.getInstance());
+    final a = Book.mock().copyWith(filePath: 'a.pdf', md5: 'a');
+    final b = a.copyWith(id: 2, filePath: 'b.pdf', md5: 'b');
+    await store.setMangaSettings(a, recognize: true);
+    expect(store.mangaSettings(a), (recognize: true, translate: false));
+    await store.setMangaSettings(a, translate: true);
+    expect(DocumentReadingModeStore(store.prefs).mangaSettings(a),
+        (recognize: true, translate: true));
+    expect(store.mangaSettings(b).recognize, isFalse);
+    expect(store.mangaSettings(a.copyWith(md5: 'new')).recognize, isFalse);
+    await store.setMangaSettings(a, recognize: false);
+    expect(store.mangaSettings(a), (recognize: false, translate: false));
+  });
+
   test('import result survives restart and reads make no preference changes',
       () async {
     final prefs = await SharedPreferences.getInstance();

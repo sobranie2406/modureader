@@ -9,7 +9,7 @@ import 'ocr_processing.dart';
 
 List<OcrBox> mangaTextBoxes(List<int> labels, List<double> scores,
     List<double> coords, int width, int height,
-    {required bool vertical}) {
+    {required bool vertical, Map<OcrBox, OcrBox>? bubbles}) {
   if (labels.length != scores.length ||
       coords.length != 4 * labels.length ||
       labels.length > 300) {
@@ -54,7 +54,26 @@ List<OcrBox> mangaTextBoxes(List<int> labels, List<double> scores,
               .5 * (a.width * a.height + b.width * b.height - overlap) ||
           (c.label == 0 && overlap >= .9 * b.width * b.height);
     });
-    if (!duplicate) kept.add(a);
+    if (duplicate) continue;
+    kept.add(a);
+    // A balloon without detected lettering is still readable on tap. Painting
+    // its entire detection rectangle would erase the outline and nearby art.
+    if (bubbles != null && c.label == 1) {
+      OcrBox? enclosing;
+      for (final outer in candidates.where((item) => item.label == 0)) {
+        final b = outer.box;
+        final w = math.max(
+            0, math.min(a.x + a.width, b.x + b.width) - math.max(a.x, b.x));
+        final h = math.max(
+            0, math.min(a.y + a.height, b.y + b.height) - math.max(a.y, b.y));
+        if (w * h >= .9 * a.width * a.height &&
+            (enclosing == null ||
+                b.width * b.height < enclosing.width * enclosing.height)) {
+          enclosing = b;
+        }
+      }
+      bubbles[a] = enclosing ?? a;
+    }
   }
   if (vertical) return orderVerticalOcrBoxes(kept);
   return kept
@@ -78,6 +97,7 @@ Future<DocumentTextResult> recognizeManga(
   final inputs = <String, OrtValue>{};
   Map<String, OrtValue> output = {};
   late List<OcrBox> boxes;
+  final bubbles = <OcrBox, OcrBox>{};
   try {
     inputs['images'] = await _pixels(image, 640, detector: true);
     inputs['orig_target_sizes'] = await OrtValue.fromList(
@@ -90,7 +110,8 @@ Future<DocumentTextResult> recognizeManga(
         (await output['boxes']!.asFlattenedList()).cast<double>(),
         image.width,
         image.height,
-        vertical: vertical);
+        vertical: vertical,
+        bubbles: bubbles);
   } finally {
     for (final tensor in [...inputs.values, ...output.values]) {
       await tensor.dispose();
@@ -152,5 +173,5 @@ Future<DocumentTextResult> recognizeManga(
         await tensor.dispose();
       }
     }
-  }, check, progress);
+  }, check, progress, bubbles: bubbles);
 }

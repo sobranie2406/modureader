@@ -1,3 +1,4 @@
+import { mangaReader } from './manga-bubbles.js'
 console.log('book.js')
 console.log('AnxUA', navigator.userAgent)
 
@@ -1263,6 +1264,7 @@ class Reader {
   #onLoad({ detail: { doc, index } }) {
     this.#doc = doc
     this.#index = index
+    manga.schedule()
     this.installDesktopInput(doc)
     autoScroll.attach(doc)
     // Fixed-layout/PDF currently has no annotation overlayer. Do not claim
@@ -1327,6 +1329,7 @@ class Reader {
   }
 
   #onRelocate({ detail }) {
+    manga.schedule()
     desktopInputDocuments.get(document)?.cancel();
     for (const { doc } of this.view.renderer.getContents()) {
       desktopInputDocuments.get(doc)?.cancel();
@@ -1704,6 +1707,15 @@ const callFlutter = (name, data) => {
   // console.log('callFlutter', name, data)
   return window.flutter_inappwebview.callHandler(name, data)
 }
+
+const manga = mangaReader({
+  contents: () => globalThis.reader?.view?.renderer?.getContents?.() ?? [],
+  viewport: () => ({width: window.innerWidth, height: window.innerHeight}),
+  request: (page, epoch) => callFlutter('onMangaPage', {page, epoch}),
+  cancel: (page, epoch) => { void callFlutter('cancelMangaPage', {page, epoch}).catch(() => {}) },
+})
+window.setMangaReader = manga.configure
+window.addEventListener('resize', manga.schedule)
 
 const autoScroll = new ReaderAutoScroll({
   renderer: () => globalThis.reader?.view?.renderer,

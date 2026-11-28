@@ -94,12 +94,18 @@ void main() {
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     await Prefs().initPrefs();
-    await show(tester, (m) => FakeOcrStore(m)..ready = true);
+    await show(tester, FakeOcrStore.new);
     final toggle = find.text('竖排识别');
     await tester.ensureVisible(toggle);
     await tester.tap(toggle);
     await tester.pumpAndSettle();
     expect(Prefs().ocrVerticalEnabled, isTrue);
+    expect(Prefs().ocrModelId, OcrModels.defaultModel.id);
+    final download = find.byKey(ValueKey('ocr-download-${OcrModels.manga.id}'));
+    await tester.ensureVisible(download);
+    await tester.pumpAndSettle();
+    await tester.tap(download);
+    await tester.pumpAndSettle();
     expect(Prefs().ocrModelId, OcrModels.defaultModel.id);
     final use = find.byKey(ValueKey('ocr-use-${OcrModels.manga.id}'));
     await tester.ensureVisible(use);

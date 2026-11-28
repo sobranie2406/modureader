@@ -37,6 +37,7 @@ class DocumentExtractionPanel extends StatefulWidget {
       required this.extractText,
       required this.cancelRender,
       this.modelStore,
+      this.mangaRecognition = false,
       this.reflowStore,
       this.recognize,
       this.initialTextStyle = const DocumentTextStyle(),
@@ -56,6 +57,7 @@ class DocumentExtractionPanel extends StatefulWidget {
   final DocumentRequest render, extractText;
   final VoidCallback cancelRender;
   final OcrModelStore? modelStore;
+  final bool mangaRecognition;
   final DocumentReflowStore? reflowStore;
   final DocumentOcr? recognize;
   final bool forceOcr;
@@ -69,7 +71,10 @@ class DocumentExtractionPanel extends StatefulWidget {
 
 class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
   late final OcrModelStore _store = widget.modelStore ??
-      OcrModelStore(model: OcrModels.byId(Prefs().ocrModelId));
+      OcrModelStore(
+          model: (widget.mangaRecognition
+              ? OcrModels.manga
+              : OcrModels.byId(Prefs().ocrModelId)));
   final _surfaceKey = GlobalKey<DocumentReaderSurfaceState>();
   bool _narrationOpened = false;
   final _textScroll = ScrollController();
@@ -307,7 +312,7 @@ class _DocumentExtractionPanelState extends State<DocumentExtractionPanel> {
       bool refresh = false}) async {
     if (!mounted || _busy || _preview == null) return;
     final cancel = OcrCancellation();
-    final vertical = Prefs().ocrVerticalEnabled;
+    final vertical = widget.mangaRecognition || Prefs().ocrVerticalEnabled;
     final profile = _store.model.readingProfile(vertical);
     _ocr = cancel;
     setState(() {

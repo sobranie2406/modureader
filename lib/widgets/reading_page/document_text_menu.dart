@@ -20,6 +20,7 @@ class DocumentTextMenu extends StatelessWidget {
     this.comparison = false,
     this.onComparisonChanged,
     this.cache,
+    this.mangaOptions,
   });
 
   final VoidCallback? openReflow;
@@ -30,6 +31,7 @@ class DocumentTextMenu extends StatelessWidget {
   final bool comparison;
   final ValueChanged<bool>? onComparisonChanged;
   final DocumentOcrPrecache? cache;
+  final Widget? mangaOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +120,10 @@ class DocumentTextMenu extends StatelessWidget {
             ])),
             group(Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: OcrPrecacheSettings(cache: cache),
+              child: Column(children: [
+                if (mangaOptions != null) mangaOptions!,
+                OcrPrecacheSettings(cache: cache)
+              ]),
             )),
             group(action(
               key: const ValueKey('export-saved-txt'),

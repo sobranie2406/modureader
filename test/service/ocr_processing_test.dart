@@ -61,6 +61,43 @@ void main() {
     ], 100, 60, vertical: true);
     expect(boxes.map((b) => b.x), [60, 5]);
   });
+  test(
+      'multiple lettering boxes retain one balloon; loose lettering stays independent',
+      () {
+    final bubbles = <OcrBox, OcrBox>{};
+    final boxes = mangaTextBoxes([
+      0,
+      1,
+      1,
+      2
+    ], [
+      .95,
+      .93,
+      .92,
+      .90
+    ], [
+      0,
+      0,
+      70,
+      50,
+      44,
+      8,
+      56,
+      40,
+      20,
+      8,
+      31,
+      40,
+      80,
+      6,
+      92,
+      40
+    ], 100, 60, vertical: true, bubbles: bubbles);
+    expect(boxes.map((b) => b.x), [80, 44, 20]);
+    expect(bubbles[boxes.first], isNull);
+    expect(bubbles[boxes[1]], same(bubbles[boxes[2]]));
+    expect(bubbles[boxes[1]]!.width, 70);
+  });
   test('official V6 sidecar alphabet includes CTC blank and trailing space',
       () {
     final chars = List.generate(10, (i) => String.fromCharCode(65 + i));

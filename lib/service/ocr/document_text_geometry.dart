@@ -31,11 +31,19 @@ class DocumentImageRect {
 }
 
 class DocumentTextRegion {
-  const DocumentTextRegion(this.start, this.end, this.rect);
+  const DocumentTextRegion(this.start, this.end, this.rect,
+      {this.bubble, this.tapToReveal = false});
   final int start, end;
   final DocumentImageRect rect;
-  Map<String, Object> toJson() =>
-      {'start': start, 'end': end, 'rect': rect.toJson()};
+  final DocumentImageRect? bubble;
+  final bool tapToReveal;
+  Map<String, Object> toJson() => {
+        'start': start,
+        'end': end,
+        'rect': rect.toJson(),
+        if (bubble != null) 'bubble': bubble!.toJson(),
+        if (tapToReveal) 'tapToReveal': true
+      };
   static DocumentTextRegion? decode(dynamic value, int length) {
     if (value is! Map) {
       return null;
@@ -55,7 +63,9 @@ class DocumentTextRegion {
     }
     final rect = DocumentImageRect.decode(value['rect']);
     if (rect == null) return null;
-    return DocumentTextRegion(start.toInt(), end.toInt(), rect);
+    return DocumentTextRegion(start.toInt(), end.toInt(), rect,
+        bubble: DocumentImageRect.decode(value['bubble']),
+        tapToReveal: value['tapToReveal'] == true);
   }
 }
 
@@ -68,7 +78,8 @@ class DocumentTextResult {
             r.start < 0 ||
             r.end <= r.start ||
             r.end > text.length ||
-            !r.rect.valid)) {
+            !r.rect.valid ||
+            r.bubble?.valid == false)) {
       throw const FormatException('Invalid document text geometry');
     }
   }
@@ -95,6 +106,7 @@ class DocumentTextResult {
   DocumentTextResult within(DocumentImageRect crop) => DocumentTextResult(
       text,
       regions
-          .map((r) => DocumentTextRegion(r.start, r.end, r.rect.within(crop)))
+          .map((r) => DocumentTextRegion(r.start, r.end, r.rect.within(crop),
+              bubble: r.bubble?.within(crop), tapToReveal: r.tapToReveal))
           .toList());
 }

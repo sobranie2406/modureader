@@ -94,6 +94,7 @@ class DocumentReflowReader extends StatefulWidget {
       this.forceOcr = false,
       this.anchor,
       this.modelStore,
+      this.mangaRecognition = false,
       this.recognize,
       this.recognizeWithRegions,
       this.brightness,
@@ -159,6 +160,7 @@ class DocumentReflowReader extends StatefulWidget {
   final bool forceOcr;
   final DocumentReflowAnchor? anchor;
   final OcrModelStore? modelStore;
+  final bool mangaRecognition;
   final Future<String> Function(
       Uint8List, OcrCancellation, void Function(int, int))? recognize;
   final Future<DocumentTextResult> Function(
@@ -1117,11 +1119,13 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
     final saved = await widget.store.read(page, '');
     if (!active()) return null;
     if (saved != null) {
-      final model =
-          widget.modelStore?.model ?? OcrModels.byId(Prefs().ocrModelId);
+      final model = widget.modelStore?.model ??
+          (widget.mangaRecognition
+              ? OcrModels.manga
+              : OcrModels.byId(Prefs().ocrModelId));
       return (!_forceOcr || saved.ocr) &&
-              saved.acceptsOcrProfile(
-                  model.readingProfile(Prefs().ocrVerticalEnabled))
+              saved.acceptsOcrProfile(model.readingProfile(
+                  widget.mangaRecognition || Prefs().ocrVerticalEnabled))
           ? saved
           : null;
     }
@@ -1648,9 +1652,12 @@ class DocumentReflowReaderState extends State<DocumentReflowReader> {
       _progress = null;
     });
     _panels.value++;
-    final vertical = Prefs().ocrVerticalEnabled;
+    final vertical = widget.mangaRecognition || Prefs().ocrVerticalEnabled;
     final model = widget.modelStore ??
-        OcrModelStore(model: OcrModels.byId(Prefs().ocrModelId));
+        OcrModelStore(
+            model: (widget.mangaRecognition
+                ? OcrModels.manga
+                : OcrModels.byId(Prefs().ocrModelId)));
     bool active() =>
         mounted &&
         generation == _generation &&

@@ -1,6 +1,8 @@
 import 'package:modu_reader/widgets/settings/setting_help_title.dart';
 import 'reader_menu_appearance.dart';
 import 'document_text_menu.dart';
+import 'package:modu_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/ocr/document_reflow_loader.dart';
 import 'package:modu_reader/page/reading_page.dart';
 import 'widget_title.dart';
 import 'document_saved_text_actions.dart';
@@ -54,6 +56,26 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(ModuStrings.text(
                 context, '保存失败，请重试', 'Could not save. Please retry.'))));
+      }
+    } finally {
+      if (mounted) setState(() => _savingOcrMode = false);
+    }
+  }
+
+  Future<void> _saveManga({bool? recognize, bool? translate}) async {
+    setState(() => _savingOcrMode = true);
+    try {
+      await widget.player
+          .setMangaSettings(recognize: recognize, translate: translate);
+    } catch (error) {
+      if (mounted) {
+        final message = error is ReflowModelUnavailable
+            ? ModuStrings.text(context, '请先在「离线模型」中下载漫画识别模型。',
+                'Download the manga OCR model in Offline models first.')
+            : ModuStrings.text(
+                context, '保存失败，请重试', 'Could not save. Please retry.');
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     } finally {
       if (mounted) setState(() => _savingOcrMode = false);
@@ -176,6 +198,27 @@ class _DocumentStyleWidgetState extends State<DocumentStyleWidget> {
         comparison: widget.comparison,
         onComparisonChanged: widget.onComparisonChanged,
         cache: widget.player.ocrPrecache,
+        mangaOptions: OcrModels.supported.contains(OcrModels.manga)
+            ? Column(children: [
+                SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(ModuStrings.text(
+                        context, '本书使用漫画识别', 'Recognize manga in this book')),
+                    value: widget.player.mangaSettings.recognize,
+                    onChanged: _savingOcrMode
+                        ? null
+                        : (v) => _saveManga(recognize: v)),
+                if (widget.player.mangaSettings.recognize)
+                  SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(ModuStrings.text(
+                          context, '气泡翻译', 'Translate speech bubbles')),
+                      value: widget.player.mangaSettings.translate,
+                      onChanged: _savingOcrMode
+                          ? null
+                          : (v) => _saveManga(translate: v)),
+              ])
+            : null,
         exportText: _savedTextBusy ? null : _exportSavedText,
       );
     }

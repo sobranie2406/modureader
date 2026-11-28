@@ -208,12 +208,27 @@ Future<DocumentTextResult> recognizeOcrImageWithRegions(
   }, check, progress);
 }
 
+// A plain white mask works on light paper. Leave dark or illustrated balloons
+// untouched until tapped. Sample in source coordinates before scaling the page.
+bool _lightBalloon(img.Image image, OcrBox box) {
+  var light = 0;
+  for (var row = 0; row < 7; row++) {
+    for (var col = 0; col < 7; col++) {
+      final p = image.getPixel(box.x + (2 * col + 1) * box.width ~/ 14,
+          box.y + (2 * row + 1) * box.height ~/ 14);
+      if (p.r >= 224 && p.g >= 224 && p.b >= 224) light++;
+    }
+  }
+  return light >= 32;
+}
+
 Future<DocumentTextResult> recognizeOcrBoxes(
     img.Image image,
     List<OcrBox> boxes,
     Future<String> Function(OcrBox) recognize,
     void Function() check,
-    void Function(int, int)? progress) async {
+    void Function(int, int)? progress,
+    {Map<OcrBox, OcrBox>? bubbles}) async {
   final lines = <String>[];
   final regions = <DocumentTextRegion>[];
   var offset = 0;
@@ -223,11 +238,20 @@ Future<DocumentTextResult> recognizeOcrBoxes(
     final text = await recognize(b);
     if (text.isNotEmpty) {
       if (lines.isNotEmpty) offset++;
+      final bubble = bubbles?[b];
       regions.add(DocumentTextRegion(
           offset,
           offset + text.length,
           DocumentImageRect(b.x / image.width, b.y / image.height,
-              b.width / image.width, b.height / image.height)));
+              b.width / image.width, b.height / image.height),
+          tapToReveal: bubble != null && !_lightBalloon(image, bubble),
+          bubble: bubble == null
+              ? null
+              : DocumentImageRect(
+                  bubble.x / image.width,
+                  bubble.y / image.height,
+                  bubble.width / image.width,
+                  bubble.height / image.height)));
       lines.add(text);
       offset += text.length;
     }

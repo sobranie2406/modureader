@@ -11,6 +11,8 @@ import 'package:modu_reader/service/ocr/document_reflow_store.dart';
 import 'package:modu_reader/service/ocr/local_ocr_service.dart';
 import 'package:modu_reader/service/ocr/ocr_model_store.dart';
 import 'package:modu_reader/service/ocr/ocr_models.dart';
+import 'package:modu_reader/service/ocr/manga_page.dart';
+import 'package:modu_reader/enums/lang_list.dart';
 import 'package:modu_reader/utils/app_motion.dart';
 import 'package:flutter/services.dart';
 import 'package:modu_reader/service/feedback/runtime_diagnostics.dart';
@@ -418,7 +420,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       documentReadingMode.value == DocumentReadingMode.imageEpub;
   bool get supportsDocumentImages => documentReadingMode.value.hasDocumentMenu;
   final einkRefresh = EinkRefresh();
-  bool _einkReaderActive = false;
+  bool _documentReaderActive = false;
   bool _lastEinkMotionDisabled = Prefs().eInkMotionDisabled;
   bool _lastEinkMode = Prefs().eInkMode;
   late final _einkPageRefresh = EinkPageRefreshScheduler(() async {
@@ -426,7 +428,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     return einkRefresh.refresh(
         canRefresh: () =>
             mounted &&
-            _einkReaderActive &&
+            _documentReaderActive &&
             Prefs().eInkMode &&
             Prefs().eInkRefreshPages > 0 &&
             supportsDocumentImages);
@@ -444,7 +446,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     }
     _einkPageRefresh.configure(
         active: mounted &&
-            _einkReaderActive &&
+            _documentReaderActive &&
             Prefs().eInkMode &&
             supportsDocumentImages,
         interval: Prefs().eInkRefreshPages);
@@ -474,7 +476,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     active = active &&
         (readingPageKey.currentState?.isReflowReading != true ||
             readingPageKey.currentState?.isComparingDocument == true);
-    _einkReaderActive = active;
+    _documentReaderActive = active;
+    _configureMangaReader();
     _configureEinkPreferences();
     final keyboardActive =
         active && readingPageKey.currentState?.isReflowActive != true;
@@ -503,6 +506,121 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
             .change('tapPan', false));
   }
 
+  Future<String> _translateReaderText(
+      String text, ReaderTranslationSession session, int generation,
+      {required LangListEnum from, bool prefetch = false}) {
+    final service = Prefs().fullTextTranslateService;
+    final to = Prefs().fullTextTranslateTo;
+    final provider = service.provider;
+    return session.translate(
+        generation,
+        (runner) => switch (provider) {
+              AiTranslateProvider provider => provider.translateStream(
+                  text, from, to,
+                  isFullText: true, requestRunner: runner),
+              MicrosoftFreeTranslateProvider provider =>
+                provider.translateStream(text, from, to,
+                    isFullText: true, whenCancelled: runner.whenCancelled),
+              OfficialApiTranslateProvider provider => provider.translateStream(
+                  text, from, to,
+                  isFullText: true, whenCancelled: runner.whenCancelled),
+              DeepLTranslateProvider provider => provider.translateStream(
+                  text, from, to,
+                  isFullText: true, whenCancelled: runner.whenCancelled),
+              GoogleApiTranslateProvider provider => provider.translateStream(
+                  text, from, to,
+                  isFullText: true, whenCancelled: runner.whenCancelled),
+              _ => provider.translateStream(text, from, to, isFullText: true),
+            },
+        prefetch: prefetch);
+  }
+
+  var mangaSettings = (recognize: false, translate: false);
+  bool get mangaRecognition =>
+      OcrModels.supported.contains(OcrModels.manga) && mangaSettings.recognize;
+  OcrModelSpec get documentOcrModel =>
+      mangaRecognition ? OcrModels.manga : OcrModels.byId(Prefs().ocrModelId);
+  bool get documentOcrVertical =>
+      mangaRecognition || Prefs().ocrVerticalEnabled;
+  int _mangaEpoch = 0;
+  String _mangaMode = 'off';
+  int? _mangaRequest;
+  late final _mangaReader = MangaPageReader(
+    recognize: (page, token) => _ocrPrecache.runForeground(() async {
+      token.check();
+      final store = OcrModelStore(model: OcrModels.manga);
+      try {
+        if (!await store.available()) throw ReflowModelUnavailable();
+        token.check();
+        final image = await renderPdfRegion({
+          'page': page,
+          'region': {'x': 0, 'y': 0, 'width': 1, 'height': 1},
+          'rotation': 0,
+          'width': 2048,
+          'height': 2048,
+          if (isImageEpub) 'source': 'epub',
+        });
+        token.check();
+        final data = image['dataUrl'];
+        const prefix = 'data:image/png;base64,';
+        if (image['page'] != page ||
+            data is! String ||
+            !data.startsWith(prefix) ||
+            data.length > 16000000) {
+          throw const FormatException('Invalid manga page image');
+        }
+        return await LocalOcrService().recognizeWithRegions(
+            base64Decode(data.substring(prefix.length)), store, token,
+            vertical: true);
+      } finally {
+        store.close();
+      }
+    }),
+    translate: (text, session, generation) => _translateReaderText(
+        text, session, generation,
+        from: LangListEnum.japanese),
+  );
+
+  Future<void> setMangaSettings({bool? recognize, bool? translate}) async {
+    final book = widget.book;
+    if (recognize == true) {
+      final model = OcrModelStore(model: OcrModels.manga);
+      try {
+        if (!await model.available()) throw ReflowModelUnavailable();
+      } finally {
+        model.close();
+      }
+    }
+    final store = DocumentReadingModeStore(Prefs().prefs);
+    await store.setMangaSettings(book,
+        recognize: recognize, translate: translate);
+    if (!mounted) return;
+    mangaSettings = store.mangaSettings(book);
+    _configureOcrPrecache();
+    _configureMangaReader();
+  }
+
+  void _configureMangaReader() {
+    if (!_readerReady || !mounted) return;
+    final enabled = _documentReaderActive &&
+        supportsDocumentImages &&
+        mangaRecognition &&
+        !_ocrPrecache.paused;
+    final mode = !enabled
+        ? 'off'
+        : mangaSettings.translate
+            ? 'translate'
+            : 'read';
+    if (mode == _mangaMode) return;
+    _mangaMode = mode;
+    final epoch = ++_mangaEpoch;
+    unawaited(_mangaReader.cancel());
+    unawaited(webViewController
+        .evaluateJavascript(
+            source: 'window.setMangaReader?.(\'$mode\', $epoch); void 0;')
+        .catchError((_) => null));
+  }
+
   bool get documentForceOcr =>
       DocumentReadingModeStore(Prefs().prefs).forceOcr(widget.book);
 
@@ -525,8 +643,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       cachedPages: (start, count) => DocumentReflowStore(cssBookKey)
           .cachedPages(start, count,
               forceOcr: documentForceOcr,
-              ocrProfile: OcrModels.byId(Prefs().ocrModelId)
-                  .readingProfile(Prefs().ocrVerticalEnabled)),
+              ocrProfile: documentOcrModel.readingProfile(documentOcrVertical)),
       canRun: () =>
           mounted &&
           _readerReady &&
@@ -538,12 +655,14 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       load: (page, cancel) async {
         final store = DocumentReflowStore(cssBookKey);
         final forceOcr = documentForceOcr;
-        final spec = OcrModels.byId(Prefs().ocrModelId);
-        final vertical = Prefs().ocrVerticalEnabled;
+        final spec = documentOcrModel;
+        final vertical = documentOcrVertical;
         final saved = await store.read(page, '');
         if (saved != null &&
             (!forceOcr || saved.ocr) &&
-            saved.acceptsOcrProfile(spec.readingProfile(vertical))) return;
+            saved.acceptsOcrProfile(spec.readingProfile(vertical))) {
+          return;
+        }
         cancel.check();
         final info = await documentReflowInfo(page);
         cancel.check();
@@ -573,11 +692,16 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           model.close();
         }
       });
-  Future<void> pauseDocumentOcrCache({bool cancelRunning = true}) =>
-      _ocrPrecache.pause(cancelRunning: cancelRunning);
+  Future<void> pauseDocumentOcrCache({bool cancelRunning = true}) async {
+    final paused = _ocrPrecache.pause(cancelRunning: cancelRunning);
+    _configureMangaReader();
+    await Future.wait([paused, _mangaReader.cancel()]);
+  }
+
   void resumeDocumentOcrCache() {
     _configureOcrPrecache();
     _ocrPrecache.resume();
+    _configureMangaReader();
   }
 
   void updateDocumentOcrCachePage(int page, int total) {
@@ -588,8 +712,7 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
 
   String _ocrPrecacheProfile = '';
   void _configureOcrPrecache() {
-    final profile = OcrModels.byId(Prefs().ocrModelId)
-        .readingProfile(Prefs().ocrVerticalEnabled);
+    final profile = documentOcrModel.readingProfile(documentOcrVertical);
     if (profile != _ocrPrecacheProfile) {
       _ocrPrecacheProfile = profile;
       _ocrPrecache.update(_ocrPrecachePage, 0);
@@ -2166,6 +2289,56 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
           }
         });
     controller.addJavaScriptHandler(
+        handlerName: 'onMangaPage',
+        callback: (args) async {
+          if (!mounted ||
+              !_readerReady ||
+              _mangaMode == 'off' ||
+              args.length != 1 ||
+              args.first is! Map) {
+            return null;
+          }
+          final request = args.first as Map;
+          final page =
+              ReaderTranslationSession.bridgeGeneration(request['page']);
+          final epoch = request['epoch'];
+          if (page == null ||
+              epoch != _mangaEpoch ||
+              (_ocrPrecacheTotal != null && page >= _ocrPrecacheTotal!)) {
+            return null;
+          }
+          _mangaRequest = page;
+          try {
+            return await _mangaReader.load(page,
+                translationSettings: _mangaMode == 'translate'
+                    ? fullTextTranslationIdentity()
+                    : null);
+          } catch (error) {
+            if (mounted && _mangaEpoch == epoch && _mangaRequest == page) {
+              AnxLog.warning('Manga page failed: ${error.runtimeType}');
+              AnxToast.show(error is ReflowModelUnavailable
+                  ? ModuStrings.text(context, '请先下载漫画识别模型。',
+                      'Download the manga OCR model first.')
+                  : ModuStrings.text(context, '本页处理失败，请在文字菜单中重新开启后重试。',
+                      'Page processing failed. Toggle manga recognition to retry.'));
+            }
+            return null;
+          } finally {
+            _mangaRequest = null;
+          }
+        });
+    controller.addJavaScriptHandler(
+        handlerName: 'cancelMangaPage',
+        callback: (args) {
+          if (args.length == 1 &&
+              args.first is Map &&
+              args.first['epoch'] == _mangaEpoch &&
+              args.first['page'] == _mangaRequest) {
+            _mangaRequest = null;
+            unawaited(_mangaReader.cancel());
+          }
+        });
+    controller.addJavaScriptHandler(
         handlerName: 'onPdfReadingSettings',
         callback: (_) async {
           if (!mounted) return null;
@@ -2786,36 +2959,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
                 generation, (runner) => classical.translate(text, runner),
                 prefetch: prefetch);
           }
-          final service = Prefs().fullTextTranslateService;
-          final from = Prefs().fullTextTranslateFrom;
-          final to = Prefs().fullTextTranslateTo;
-
-          final provider = service.provider;
-          return await _translationSession.translate(
-              generation,
-              (runner) => switch (provider) {
-                    AiTranslateProvider provider => provider.translateStream(
-                        text, from, to,
-                        isFullText: true, requestRunner: runner),
-                    MicrosoftFreeTranslateProvider provider =>
-                      provider.translateStream(text, from, to,
-                          isFullText: true,
-                          whenCancelled: runner.whenCancelled),
-                    OfficialApiTranslateProvider provider =>
-                      provider.translateStream(text, from, to,
-                          isFullText: true,
-                          whenCancelled: runner.whenCancelled),
-                    DeepLTranslateProvider provider => provider.translateStream(
-                        text, from, to,
-                        isFullText: true, whenCancelled: runner.whenCancelled),
-                    GoogleApiTranslateProvider provider =>
-                      provider.translateStream(text, from, to,
-                          isFullText: true,
-                          whenCancelled: runner.whenCancelled),
-                    _ => provider.translateStream(text, from, to,
-                        isFullText: true),
-                  },
-              prefetch: prefetch);
+          return await _translateReaderText(
+              text, _translationSession, generation,
+              from: Prefs().fullTextTranslateFrom, prefetch: prefetch);
         } on TranslationCancelled {
           return null;
         } catch (e) {
@@ -2951,6 +3097,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     if (widget.cfi?.startsWith(DocumentReflowAnchor.prefix) == true) {
       _pendingLinkedCfi = widget.cfi;
     }
+    mangaSettings =
+        DocumentReadingModeStore(Prefs().prefs).mangaSettings(widget.book);
     _progress = ReaderProgressSession(bookDao, widget.book.id);
     book = widget.book;
     // Read import-time evidence immediately; menu selection must not depend on
@@ -3054,6 +3202,8 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
     Prefs().removeListener(_configureOcrPrecache);
     Prefs().removeListener(_configureTranslationTextStyle);
     Prefs().removeListener(_configureTranslationPrefetch);
+    _mangaEpoch++;
+    unawaited(_mangaReader.cancel());
     _ocrPrecache.dispose();
     _einkPageRefresh.dispose();
     _translationSession.stop();
@@ -3335,6 +3485,9 @@ class EpubPlayerState extends ConsumerState<EpubPlayer> {
       onGone: () {
         readingPageKey.currentState?.stopAutoScroll();
         _brightnessWebViewReady = false;
+        _mangaEpoch++;
+        _mangaMode = 'off';
+        unawaited(_mangaReader.cancel());
         _rendererRecoveryCfi = _progress.current?.position;
         _readerReady = false;
         _chapterLoading = false;
